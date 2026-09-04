@@ -166,6 +166,10 @@ the mailbox — a per-number routing decision owned by the agent config.
   `.env` files.
 - **Billing:** Magnate monetizes agents as an add-on SKU on a Zeus
   number/plan (entitlement gates whether a DID may route to an agent).
+  Capstone carries **no Stripe keys** — checkout, invoicing, and the webhook
+  live in Magnate (RevenueOps); Capstone only consumes the entitlement
+  decision (`MAGNATE_PUBLIC_URL` in `.env`). The optional PBX portal's own
+  `STRIPE_*` variables are a legacy self-billing mode, empty by default.
 
 ## 7. Migration steps (phased)
 
@@ -192,7 +196,9 @@ the mailbox — a per-number routing decision owned by the agent config.
    call history with playback.
 7. **Deprecate the bundled Capstone PBX** as the default topology — keep the
    standalone compose only for development/offline installs.
-8. **Add the Magnate entitlement** gating agent routing per number/plan.
+8. **Add the Magnate entitlement** gating agent routing per number/plan —
+   config surface is in place (`MAGNATE_PUBLIC_URL`); the entitlement check
+   lands when Magnate's v2.1 entitlement API ships.
 
 ## 8. Open gaps & decisions
 

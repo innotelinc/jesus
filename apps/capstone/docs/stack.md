@@ -28,7 +28,9 @@ provides, and explicitly does not own.
 - Zeus — telephony (PBX/Asterisk/FreePBX) as the voice plane
 - Authentik — identity, SSO, user management
 - Infisical — secrets, API keys, service credentials
-- Magnate — subscriptions and entitlements
+- Magnate — subscriptions and entitlements (`MAGNATE_PUBLIC_URL`; agents are
+  a Magnate SKU — Capstone holds no Stripe keys)
+- Cerulean — certificates and DNS for every `capstone.innotel.us` host
 
 ## Explicitly does NOT own
 

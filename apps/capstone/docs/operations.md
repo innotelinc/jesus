@@ -12,7 +12,7 @@ The stack ships with an operational dashboard — **Capstone Control Center** �
 of the main compose file and starts with everything else:
 
 - **`dashboard`** — built React SPA served by nginx at `http://<host>:8096` (or
-  `https://dashboard.<domain>` behind the proxy — see [NPM proxy hosts](#npm-proxy-hosts)).
+  `https://admin.<domain>` behind the proxy — see [NPM proxy hosts](#npm-proxy-hosts)).
 - **`dashboard-api`** — FastAPI aggregator at `http://<host>:8095` that reads live state
   from the Docker socket (container health, published ports, versions, stats), the `.env`
   secret inventory (names/types only — never values), host users (`/etc/passwd`), and
@@ -161,8 +161,10 @@ subdomain URLs automatically. When unset, everything falls back to `http://<host
 links.
 
 The dashboard itself is served at its **own** subdomain via `DASHBOARD_PUBLIC_URL` (e.g.
-`https://admin.capstone.innotel.us`). Keep `PUBLIC_BASE_URL` for dograh's advertised origin
-— the two are deliberately separate vars so the dashboard can move without breaking dograh.
+`https://admin.capstone.innotel.us` — the canonical name; the pre-v3.11
+`dashboard.capstone.innotel.us` is retired and its DNS/NPM entries are gone). Keep
+`PUBLIC_BASE_URL` for dograh's advertised origin — the two are deliberately separate vars
+so the dashboard can move without breaking dograh.
 
 Create one NPM proxy host per row (one wildcard Let's Encrypt certificate covers all of them
 when `NPM_WILDCARD_CERT=1` + DNS credentials are set; otherwise NPM issues one cert per host
@@ -177,7 +179,6 @@ and handles renewal):
 | `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
 | `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
-| `omniroute.<domain>` | `http://<host>:20128` | OmniRoute completions UI/API |
 | `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
 | `grist.<domain>` | `http://<host>:8484` | Grist documents |
 | `signoz.<domain>` | `http://<host>:3301` | SigNoz UI + dashboards |
@@ -194,6 +195,17 @@ and handles renewal):
   `http://<host>:8088/ws` instead — plain-`ws` upstream, same `/ws` signaling handler.
 - The browser connects to `wss://voice.<domain>/ws`; no self-signed warning because NPM's
   Let's Encrypt certificate terminates TLS.
+
+### Certificates & DNS — Cerulean (TrustOps)
+
+Certificates for every `capstone.innotel.us` host are owned by **Cerulean** (the stack's
+TrustOps platform): it issues **one wildcard Let's Encrypt certificate**
+(`*.capstone.innotel.us` + apex) via DNS-01 against the shared BIND, exports it into NPM
+(`cerulean-capstone.innotel.us-wildcard`), and attaches it to every proxy host. Renewals
+refresh the same NPM certificate in place — NPM never requests per-host certs for these
+names. The same model covers `*.magnate.innotel.us` and `*.cerulean.innotel.us`. DNS
+records for every subdomain live in the shared `innotel.us` BIND zone (managed through
+Cerulean), not in per-platform providers.
 
 ### Automate proxy-host creation via the NPM API
 
