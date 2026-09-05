@@ -28,7 +28,7 @@ Status**, **Network Ports**, **Alerts**, **Secrets inventory**, **Users**, **Mon
 (real CPU/mem/disk/network from the host), **Logs** (recent Docker events), **Links**
 (service URLs derived from `PUBLIC_BASE_URL` / `NPM_BASE_DOMAIN` — see
 [NPM proxy hosts](#npm-proxy-hosts)), and a **Softphone** — an in-browser WebRTC phone that
-registers to the PBX over WSS (`/softphone`, extension 102 by default, STUN/TURN pulled
+registers to the PBX over WSS (`/softphone`, extension 101 by default, STUN/TURN pulled
 from coturn via `/api/turnconfig`).
 
 > Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the public WSS

@@ -591,53 +591,67 @@ EOF
   fi
   chown asterisk:asterisk "$ec" 2>/dev/null || true
 
-  # Durable WebRTC test extension (102) — inherits the webrtc-template above.
-  # Endpoint + auth + aor all live in the never-regenerated *_custom.conf
-  # files so the GUI's Apply Config can't drop them. Lets anyone verify the
-  # WSS/DTLS/ICE path end-to-end with a browser SIP.js client (or the
-  # scripts/webrtc-register-test.py probe):
-  #   server wss://<host>:8089   user 102   password ${WEBRTC_TEST_PASSWORD}
-  local webrtc_pass="${WEBRTC_TEST_PASSWORD:-webrtc-test-102}"
+  # Durable WebRTC test extension (default 101, WEBRTC_TEST_EXTENSION) —
+  # inherits the webrtc-template above. Endpoint + auth + aor all live in the
+  # never-regenerated *_custom.conf files so the GUI's Apply Config can't drop
+  # them. Lets anyone verify the WSS/DTLS/ICE path end-to-end with a browser
+  # SIP.js client (or the scripts/webrtc-register-test.py probe):
+  #   server wss://<host>:8089   user ${WEBRTC_TEST_EXTENSION:-101}
+  #   password ${WEBRTC_TEST_PASSWORD:-webrtc-test-101}
+  local webrtc_ext="${WEBRTC_TEST_EXTENSION:-101}"
+  local webrtc_pass="${WEBRTC_TEST_PASSWORD:-webrtc-test-101}"
   local ec2="${DEST}/pjsip.endpoint_custom.conf"
   local ac="${DEST}/pjsip.auth_custom.conf"
   local oc="${DEST}/pjsip.aor_custom.conf"
   [ -f "$ac" ] || touch "$ac"
   [ -f "$oc" ] || touch "$oc"
-  if ! grep -q '^\[102\]' "$ec2" 2>/dev/null; then
+  # If the demo extension was renumbered away from 102 (the original default),
+  # drop the stale 102 demo sections so a re-provisioned box never keeps both.
+  if [ "$webrtc_ext" != "102" ]; then
+    for conf in "$ec2" "$ac" "$oc"; do
+      [ -f "$conf" ] || continue
+      awk -v keep="$webrtc_ext" '
+        /^\[/ { keepblock = ($0 ~ "^\\[102(\\(|\\])") || ($0 ~ "^\\[102-auth\\]");
+                if (!keepblock) print; next }
+        !keepblock { print }
+      ' "$conf" > "$conf.tmp" 2>/dev/null && mv "$conf.tmp" "$conf"
+    done
+  fi
+  if ! grep -q '^\['"$webrtc_ext"'\]' "$ec2" 2>/dev/null; then
     cat >> "$ec2" <<EOF
 
 ; Capstone WebRTC test extension — register from a browser over WSS with
-; user 102 / ${webrtc_pass} (template=webrtc-template inherits DTLS/ICE/TURN).
-[102](webrtc-template)
+; user ${webrtc_ext} / ${webrtc_pass} (template=webrtc-template inherits DTLS/ICE/TURN).
+[${webrtc_ext}](webrtc-template)
 type = endpoint
-auth = 102-auth
-aors = 102
-callerid = WebRTC Test <102>
+auth = ${webrtc_ext}-auth
+aors = ${webrtc_ext}
+callerid = WebRTC Test <${webrtc_ext}>
 EOF
-    echo ">>> [dograh-ari] webrtc test endpoint 102 written to pjsip.endpoint_custom.conf"
+    echo ">>> [dograh-ari] webrtc test endpoint ${webrtc_ext} written to pjsip.endpoint_custom.conf"
   fi
-  if ! grep -q '^\[102-auth\]' "$ac" 2>/dev/null; then
+  if ! grep -q '^\['"$webrtc_ext"'-auth\]' "$ac" 2>/dev/null; then
     cat >> "$ac" <<EOF
 
-; WebRTC test extension auth (user 102) — ${webrtc_pass}
-[102-auth]
+; WebRTC test extension auth (user ${webrtc_ext}) — ${webrtc_pass}
+[${webrtc_ext}-auth]
 type = auth
 auth_type = userpass
-username = 102
+username = ${webrtc_ext}
 password = ${webrtc_pass}
 EOF
-    echo ">>> [dograh-ari] webrtc test auth 102-auth written to pjsip.auth_custom.conf"
+    echo ">>> [dograh-ari] webrtc test auth ${webrtc_ext}-auth written to pjsip.auth_custom.conf"
   fi
-  if ! grep -q '^\[102\]' "$oc" 2>/dev/null; then
+  if ! grep -q '^\['"$webrtc_ext"'\]' "$oc" 2>/dev/null; then
     cat >> "$oc" <<EOF
 
 ; WebRTC test extension AOR (single WSS contact)
-[102]
+[${webrtc_ext}]
 type = aor
 max_contacts = 1
 remove_existing = yes
 EOF
-    echo ">>> [dograh-ari] webrtc test aor 102 written to pjsip.aor_custom.conf"
+    echo ">>> [dograh-ari] webrtc test aor ${webrtc_ext} written to pjsip.aor_custom.conf"
   fi
   chown asterisk:asterisk "$ec2" "$ac" "$oc" 2>/dev/null || true
   echo ">>> [dograh-ari] STUN/TURN/WebRTC wired (STUN/TURN ${turn_uri}, WSS :8089)"
@@ -838,12 +852,36 @@ contact=sip:${server}:5060
 qualify_frequency=60
 EOF
 
-  # Inbound routing: each DID → its dograh agent extension.
-  # VOIPMS_DIDS="2125551234:8003,2125551235:8004" (DID:agent-ext pairs).
+  # Inbound routing: dashboard-managed DID → WebRTC-extension routes first,
+  # then static dograh agent mappings (VOIPMS_DIDS="2125551234:8003,..."
+  # DID:agent-ext pairs), then the dograh default (8000). The dashboard
+  # writes extensions_webrtc_dids_custom.conf (included below); this file is
+  # regenerated every boot but that one is only created when missing, so
+  # control-center routes survive restarts.
   local dids="${VOIPMS_DIDS:-}"
+  local wdids="${DEST}/extensions_webrtc_dids_custom.conf"
+  if [ ! -f "$wdids" ]; then
+    {
+      echo "; Inbound DID → WebRTC-extension routes."
+      echo "; Managed by the Capstone control center (Extensions → routing); do"
+      echo "; not edit by hand — changes here are overwritten on the next write."
+      echo "; Each line:  exten => <did>,1,NoOp(...)"
+      echo ";              same => n,Dial(PJSIP/<extension>,45)"
+    } > "$wdids"
+  fi
   {
     echo "; Auto-generated by pbx/entrypoint-dograh.sh — VoIP.ms DID routing."
     echo "[from-trunk-voipms]"
+    echo "; All inbound calls flow through [webrtc-inbound], which matches the"
+    echo "; dashboard-managed DID routes, then VOIPMS_DIDS agent mappings, and"
+    echo "; finally falls back to the dograh default agent (8000)."
+    echo "exten => _X.,1,NoOp(VoIP.ms inbound)"
+    echo ' same => n,Goto(webrtc-inbound,${EXTEN},1)'
+    echo " same => n,Hangup()"
+    echo ""
+    echo "[webrtc-inbound]"
+    echo "; Dashboard-managed DID → WebRTC-extension routes (control center)."
+    echo "#include extensions_webrtc_dids_custom.conf"
     if [ -n "$dids" ]; then
       local pair did ext
       IFS=','
@@ -858,13 +896,12 @@ EOF
       done
       unset IFS
     else
-      # No DIDs configured: catch-all → the default agent (8000).
-      echo "; No VOIPMS_DIDS configured — all inbound calls go to ext 8000."
-      echo "; Set VOIPMS_DIDS=\"<did>:<agent-ext>,...\" in .env and restart."
-      echo "exten => _X.,1,NoOp(VoIP.ms inbound (no DID map) -> dograh ext 8000)"
-      echo " same => n,Goto(dograh-inbound,8000,1)"
-      echo " same => n,Hangup()"
+      echo "; No VOIPMS_DIDS configured — agent DIDs below default to dograh 8000."
     fi
+    echo "; No route matched — dograh default agent (8000)."
+    echo "exten => _X.,1,NoOp(no inbound route -> dograh ext 8000)"
+    echo " same => n,Goto(dograh-inbound,8000,1)"
+    echo " same => n,Hangup()"
   } > "${DEST}/extensions_custom_voipms.conf"
 
   # Wire the includes (idempotent). The pjsip trunk include goes into
@@ -883,7 +920,8 @@ EOF
 
   # Ownership for the reload user (fwconsole chown also runs before reload).
   chown asterisk:asterisk "${DEST}/pjsip_custom_voipms.conf" \
-    "${DEST}/extensions_custom_voipms.conf" 2>/dev/null || true
+    "${DEST}/extensions_custom_voipms.conf" \
+    "${DEST}/extensions_webrtc_dids_custom.conf" 2>/dev/null || true
   echo ">>> [dograh-ari] VoIP.ms trunk configured (registration to ${server})"
 }
 setup_voipms_trunk

@@ -760,7 +760,7 @@ def build_links() -> list[dict[str, Any]]:
         links.append({
             "id": "ln-wss",
             "name": "WebRTC WSS (Softphone signaling)",
-            "description": "Secure WebSocket signaling endpoint for WebRTC softphones (extension 102).",
+            "description": "Secure WebSocket signaling endpoint for WebRTC softphones (extension 101).",
             "url": f"wss://voice.{NPM_BASE_DOMAIN}/ws",
             "category": "voip",
             "status": "verified",
@@ -1394,10 +1394,14 @@ def extensions_list(user: dict = Depends(require_session)):
     try:
         exts = _parse_webrtc_extensions()
         reg = _pbx_registration_map()
+        route_map = {d: e["extension"] for d, e in _read_webrtc_did_routes().items()}
+        demo = _demo_extension()
         for ext in exts:
             live = reg.get(ext["extension"])
             ext["registered"] = bool(live)
             ext["contactUri"] = (live or {}).get("contactUri")
+            ext["builtIn"] = ext["extension"] == demo
+            ext["dids"] = sorted(d for d, e in route_map.items() if e == ext["extension"])
     except HTTPException:
         raise
     except Exception as exc:
@@ -1430,11 +1434,17 @@ def extensions_calls(extension: str, limit: int = 25,
     if not re.fullmatch(r"\d{3,5}", extension):
         raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
     limit = max(5, min(int(limit), 100))
+    # A call is "the extension's" when it is the source, the called number,
+    # or the PJSIP leg that actually rang the device (inbound DID → extension
+    # routes keep dst = the DID on the PSTN leg).
     sql = (
         "SELECT calldate, src, dst, disposition, duration, billsec, dstchannel "
-        f"FROM cdr WHERE src = '{extension}' OR dst = '{extension}' "
-        f"ORDER BY calldate DESC LIMIT {limit}"
-    )
+        "FROM cdr WHERE src = '{ext}' OR dst = '{ext}' "
+        "OR dstchannel LIKE 'PJSIP/{ext}-%' OR channel LIKE 'PJSIP/{ext}-%' "
+        "ORDER BY calldate DESC LIMIT {lim}"
+    ).format(ext=extension, lim=limit)
+    code, text = _pbx_exec(["sh", "-c",
+                            f"mysql -u root asteriskcdrdb -N -e \"{sql}\" 2>/dev/null || true"])
     code, text = _pbx_exec(["sh", "-c",
                             f"mysql -u root asteriskcdrdb -N -e \"{sql}\" 2>/dev/null || true"])
     calls = []
@@ -1469,8 +1479,9 @@ def extensions_create(body: dict, user: dict = Depends(require_session)):
         raise HTTPException(status_code=422, detail="password is required")
     if any(c in password for c in "\r\n\";"):
         raise HTTPException(status_code=422, detail="password contains unsupported characters")
-    if ext == "102":
-        raise HTTPException(status_code=409, detail="102 is the built-in test extension")
+    if ext == _demo_extension():
+        raise HTTPException(status_code=409,
+                            detail=f"{ext} is the built-in test extension")
 
     endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
     if re.search(rf"(?m)^\[{re.escape(ext)}\]", endpoint_conf):
@@ -1505,7 +1516,88 @@ def extensions_create(body: dict, user: dict = Depends(require_session)):
     _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", auth_conf)
     _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", aor_conf)
     _pbx_reload_pjsip()
-    return {"status": "created", "extension": ext, "callerId": caller_id}
+    dids = _bind_extension_dids(ext, body.get("dids"))
+    return {"status": "created", "extension": ext, "callerId": caller_id,
+            "dids": dids, "builtIn": ext == _demo_extension()}
+
+
+@app.patch("/extensions/{extension}")
+def extensions_update(extension: str, body: dict, user: dict = Depends(require_session)):
+    """Edit a WebRTC extension: caller ID, SIP password, and inbound DID routes."""
+    if not re.fullmatch(r"\d{3,5}", extension):
+        raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
+    demo = extension == _demo_extension()
+    password = str(body.get("password") or "").strip()
+    if password:
+        if demo:
+            raise HTTPException(
+                status_code=403,
+                detail=f"{extension}'s password is managed by the stack (WEBRTC_TEST_PASSWORD)")
+        if any(c in password for c in "\r\n\";"):
+            raise HTTPException(status_code=422, detail="invalid password")
+    caller_id = str(body.get("callerId") or "").strip()
+
+    # Caller ID lives on the endpoint section; password on the auth section.
+    changed = False
+    endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
+    ep_pre, ep_sec, ep_tail = _conf_split(endpoint_conf)
+    auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
+    au_pre, au_sec, au_tail = _conf_split(auth_conf)
+    for s in ep_sec:
+        if _section_name(s["header"]) != extension:
+            continue
+        if caller_id:
+            body_lines = []
+            replaced = False
+            for line in s["body"]:
+                if re.match(r"callerid\s*=", line):
+                    body_lines.append(f"callerid = {caller_id} <{extension}>")
+                    replaced = True
+                else:
+                    body_lines.append(line)
+            if not replaced:
+                body_lines.append(f"callerid = {caller_id} <{extension}>")
+            s["body"] = body_lines
+            changed = True
+        break
+    if password:
+        for s in au_sec:
+            if _section_name(s["header"]) != f"{extension}-auth":
+                continue
+            body_lines = []
+            replaced = False
+            for line in s["body"]:
+                if re.match(r"password\s*=", line):
+                    body_lines.append(f"password = {password}")
+                    replaced = True
+                else:
+                    body_lines.append(line)
+            if not replaced:
+                body_lines.append(f"password = {password}")
+            s["body"] = body_lines
+            changed = True
+            break
+    if changed:
+        _pbx_write_conf("/etc/asterisk/pjsip.endpoint_custom.conf",
+                        _conf_join(ep_pre, ep_sec, ep_tail))
+        _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf",
+                        _conf_join(au_pre, au_sec, au_tail))
+        _pbx_reload_pjsip()
+    else:
+        # Nothing to edit on the SIP side — still allow a routes-only change.
+        exists = any(
+            _section_name(s["header"]) == extension
+            for s in _conf_split(_pbx_read_conf(
+                "/etc/asterisk/pjsip.endpoint_custom.conf"))[1])
+        if not exists:
+            raise HTTPException(status_code=404, detail=f"Extension {extension} not found")
+
+    dids = None
+    if "dids" in body:
+        dids = _bind_extension_dids(extension, body.get("dids"))
+    return {"status": "updated", "extension": extension, "callerId": caller_id,
+            "passwordChanged": bool(password), "dids": dids or
+            [d for d, e in _read_webrtc_did_routes().items() if e == extension]}
 
 
 @app.delete("/extensions/{extension}")
@@ -1513,8 +1605,10 @@ def extensions_delete(extension: str, user: dict = Depends(require_session)):
     """Remove a WebRTC extension's endpoint/auth/aor sections and reload pjsip."""
     if not re.fullmatch(r"\d{3,5}", extension):
         raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
-    if extension == "102":
-        raise HTTPException(status_code=403, detail="102 is the built-in test extension and cannot be removed")
+    if extension == _demo_extension():
+        raise HTTPException(
+            status_code=403,
+            detail=f"{extension} is the built-in test extension and cannot be removed")
 
     endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
     auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
@@ -1538,6 +1632,7 @@ def extensions_delete(extension: str, user: dict = Depends(require_session)):
     _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", _conf_join(au_pre, au_sec, au_tail))
     _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", _conf_join(ao_pre, ao_sec, ao_tail))
     _pbx_reload_pjsip()
+    _purge_extension_dids(extension)
     return {"status": "deleted", "extension": extension}
 
 
@@ -1546,8 +1641,10 @@ def extensions_password(extension: str, body: dict, user: dict = Depends(require
     """Rotate a WebRTC extension's SIP password."""
     if not re.fullmatch(r"\d{3,5}", extension):
         raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
-    if extension == "102":
-        raise HTTPException(status_code=403, detail="102's password is managed by the stack (WEBRTC_TEST_PASSWORD)")
+    if extension == _demo_extension():
+        raise HTTPException(
+            status_code=403,
+            detail=f"{extension}'s password is managed by the stack (WEBRTC_TEST_PASSWORD)")
     password = str(body.get("password") or "").strip()
     if not password or any(c in password for c in "\r\n\";"):
         raise HTTPException(status_code=422, detail="invalid password")
@@ -1572,6 +1669,144 @@ def extensions_password(extension: str, body: dict, user: dict = Depends(require
         _pbx_reload_pjsip()
         return {"status": "password-updated", "extension": extension}
     raise HTTPException(status_code=404, detail=f"Extension {extension} auth not found")
+
+
+_WEBRTC_DIDS_CONF = "/etc/asterisk/extensions_webrtc_dids_custom.conf"
+
+
+def _demo_extension() -> str:
+    """The built-in test extension (stack-managed, WEBRTC_TEST_EXTENSION)."""
+    ext = (_env_value("WEBRTC_TEST_EXTENSION") or "101").strip()
+    return ext if re.fullmatch(r"\d{3,5}", ext) else "101"
+
+
+def _pbx_reload_dialplan() -> None:
+    code, text = _pbx_exec(["asterisk", "-rx", "dialplan reload"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"dialplan reload failed: {text}")
+
+
+def _read_webrtc_did_routes() -> dict[str, dict[str, Any]]:
+    """Inbound-DID → extension map from the dashboard-managed dialplan file."""
+    try:
+        conf = _pbx_read_conf(_WEBRTC_DIDS_CONF)
+    except HTTPException:
+        return {}
+    routes: dict[str, dict[str, Any]] = {}
+    pending_did: str | None = None
+    for line in conf.splitlines():
+        m = re.match(r"exten => (\d+),1,", line)
+        if m:
+            pending_did = m.group(1)
+            continue
+        if pending_did is not None:
+            d = re.search(r"Dial\(PJSIP/(\d{3,5})", line)
+            if d:
+                routes[pending_did] = {"did": pending_did, "extension": d.group(1)}
+            pending_did = None
+    return routes
+
+
+def _write_webrtc_did_routes(routes: dict[str, str]) -> None:
+    """Persist the DID map and reload the dialplan so routes go live."""
+    header = (
+        "; Inbound DID → WebRTC-extension routes.\n"
+        "; Managed by the Capstone control center (Extensions → routing); do\n"
+        "; not edit by hand — changes here are overwritten on the next write.\n"
+    )
+    body = "".join(
+        f"exten => {did},1,NoOp(Inbound DID {did} -> extension {ext})\n"
+        f" same => n,Dial(PJSIP/{ext},45)\n"
+        for did, ext in sorted(routes.items())
+    )
+    if not body:
+        body = "; (no inbound DID routes configured)\n"
+    _pbx_write_conf(_WEBRTC_DIDS_CONF, header + body)
+    _pbx_reload_dialplan()
+
+
+def _normalize_dids(raw: Any) -> list[str]:
+    """Accept a list or comma-separated string of DID numbers."""
+    if raw is None:
+        return []
+    items = raw if isinstance(raw, list) else str(raw).split(",")
+    out: list[str] = []
+    for item in items:
+        did = str(item).strip()
+        if not re.fullmatch(r"\d{3,15}", did):
+            raise HTTPException(status_code=422,
+                                detail=f"Invalid DID {did!r} (expect 3-15 digits)")
+        if did not in out:
+            out.append(did)
+    return out
+
+
+def _known_webrtc_extensions() -> list[str]:
+    return [e["extension"] for e in _parse_webrtc_extensions()]
+
+
+def _bind_extension_dids(ext: str, raw: Any) -> list[str]:
+    """Replace the DID routes bound to `ext` with the given set."""
+    dids = _normalize_dids(raw)
+    if dids and ext not in _known_webrtc_extensions():
+        raise HTTPException(status_code=409, detail=f"Unknown extension {ext}")
+    routes = {d: e["extension"] for d, e in _read_webrtc_did_routes().items()}
+    # Drop routes this extension used to own, keep everyone else's.
+    routes = {d: e for d, e in routes.items() if e != ext}
+    for did in dids:
+        routes[did] = ext
+    _write_webrtc_did_routes(routes)
+    return sorted(dids)
+
+
+def _purge_extension_dids(ext: str) -> None:
+    current = _read_webrtc_did_routes()
+    routes = {d: e["extension"] for d, e in current.items()
+              if e["extension"] != ext}
+    if len(routes) != len(current):
+        _write_webrtc_did_routes(routes)
+
+
+@app.get("/extensions/routes")
+def extension_routes_list(user: dict = Depends(require_session)):
+    """Inbound DID → WebRTC-extension routes."""
+    try:
+        return sorted(_read_webrtc_did_routes().values(), key=lambda r: r["did"])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Route read failed: {exc}")
+
+
+@app.post("/extensions/routes")
+def extension_routes_create(body: dict, user: dict = Depends(require_session)):
+    """Bind an inbound DID to a WebRTC extension (route a number to a phone)."""
+    did = str(body.get("did") or "").strip()
+    ext = str(body.get("extension") or "").strip()
+    if not re.fullmatch(r"\d{3,15}", did):
+        raise HTTPException(status_code=422, detail="did must be 3-15 digits")
+    if not re.fullmatch(r"\d{3,5}", ext):
+        raise HTTPException(status_code=422, detail="extension must be 3-5 digits")
+    if ext not in _known_webrtc_extensions():
+        raise HTTPException(status_code=409, detail=f"Unknown extension {ext}")
+    routes = {d: e["extension"] for d, e in _read_webrtc_did_routes().items()
+              if d != did}
+    routes[did] = ext
+    _write_webrtc_did_routes(routes)
+    return {"status": "routed", "did": did, "extension": ext}
+
+
+@app.delete("/extensions/routes/{did}")
+def extension_routes_delete(did: str, user: dict = Depends(require_session)):
+    """Remove an inbound DID → extension route."""
+    if not re.fullmatch(r"\d{3,15}", did):
+        raise HTTPException(status_code=422, detail="did must be 3-15 digits")
+    current = _read_webrtc_did_routes()
+    routes = {d: e["extension"] for d, e in current.items() if d != did}
+    if len(routes) + 1 != len(current):
+        raise HTTPException(status_code=404, detail=f"Route for DID {did} not found")
+    _write_webrtc_did_routes(routes)
+    return {"status": "unrouted", "did": did}
 
 
 @app.get("/ports")

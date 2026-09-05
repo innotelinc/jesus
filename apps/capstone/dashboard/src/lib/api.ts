@@ -47,9 +47,9 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE'): Pro
   return (await response.json()) as T;
 }
 
-async function postJSON<T>(path: string, body: unknown): Promise<T> {
+async function postJSON<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
   const response = await fetch(`${dashboardBaseUrl}${path}`, {
-    method: 'POST',
+    method,
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -80,6 +80,14 @@ export interface PbxExtension {
   authUser: string;
   registered?: boolean;
   contactUri?: string | null;
+  builtIn?: boolean;
+  dids?: string[];
+}
+
+export interface PbxExtensionUpdate {
+  callerId?: string;
+  password?: string;
+  dids?: string[];
 }
 
 export interface ExtensionCall {
@@ -98,6 +106,7 @@ export interface PbxExtensionCreate {
   extension: string;
   password: string;
   callerId?: string;
+  dids?: string[];
 }
 
 export interface Me {
@@ -126,6 +135,8 @@ export const api = {
   extensions: () => getJSON<PbxExtension[]>('/extensions'),
   createExtension: (body: PbxExtensionCreate) =>
     postJSON<{ status: string; extension: string }>('/extensions', body),
+  updateExtension: (ext: string, body: PbxExtensionUpdate) =>
+    postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`, body, 'PATCH'),
   deleteExtension: (ext: string) =>
     deleteJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`),
   rotateExtensionPassword: (ext: string, password: string) =>

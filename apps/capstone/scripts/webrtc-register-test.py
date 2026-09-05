@@ -5,18 +5,18 @@ a browser SIP.js client would, using only the Python standard library.
 Does the full handshake against the PBX's published WSS endpoint:
   1. TLS connect to <host>:8089 (the pjsip WSS transport)
   2. WebSocket upgrade on /ws with the "sip" subprotocol
-  3. SIP REGISTER for the test extension (default 102)
+  3. SIP REGISTER for the test extension (default 101)
   4. Digest-auth challenge/response (RFC 7616 / RFC 8760 style)
   5. Expects a 200 OK (registration accepted)
   6. Optional --hold N: keep the registration alive N seconds so you can
      inspect `pjsip show contacts` from another shell, then unregister.
 
 Usage:
-  ./scripts/webrtc-register-test.py [--host HOST] [--user 102] [--password P]
+  ./scripts/webrtc-register-test.py [--host HOST] [--user 101] [--password P]
       [--hold SECONDS] [--insecure]
 
 The test extension is created by pbx/entrypoint-dograh.sh on every boot
-(endpoint 102 inherits [webrtc-template], auth 102-auth, aor 102).
+(endpoint 101 inherits [webrtc-template], auth 101-auth, aor 101).
 """
 
 import argparse
@@ -200,8 +200,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="WSS SIP REGISTER probe (Asterisk WebRTC)")
     ap.add_argument("--host", default=os.environ.get("WEBRTC_TEST_HOST", "127.0.0.1"))
     ap.add_argument("--port", type=int, default=8089)
-    ap.add_argument("--user", default="102")
-    ap.add_argument("--password", default=os.environ.get("WEBRTC_TEST_PASSWORD", "webrtc-test-102"))
+    ap.add_argument("--user", default=os.environ.get("WEBRTC_TEST_EXTENSION", "101"))
+    ap.add_argument("--password", default=os.environ.get("WEBRTC_TEST_PASSWORD", "webrtc-test-101"))
     ap.add_argument("--hold", type=float, default=0.0,
                     help="keep the registration alive this many seconds before unregistering")
     ap.add_argument("--insecure", action="store_true",

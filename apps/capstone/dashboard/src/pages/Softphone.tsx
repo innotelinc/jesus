@@ -65,7 +65,7 @@ function CallChip({ state }: { state: CallState }) {
 }
 
 export default function Softphone() {
-  // Connection settings (defaults match the durable test extension 102 that
+  // Connection settings (defaults match the durable test extension 101 that
   // pbx/entrypoint-dograh.sh provisions on every boot).
   //
   // Preferred: the aggregator's /turnconfig returns the public WSS endpoint
@@ -79,8 +79,8 @@ export default function Softphone() {
         : `wss://${window.location.hostname}:8089/ws`)
     : 'wss://localhost:8089/ws';
   const [server, setServer] = useState(defaultServer);
-  const [extension, setExtension] = useState('102');
-  const [password, setPassword] = useState('webrtc-test-102');
+  const [extension, setExtension] = useState('101');
+  const [password, setPassword] = useState('webrtc-test-101');
 
   const [regState, setRegState] = useState<RegState>('idle');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -372,11 +372,11 @@ export default function Softphone() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Extension</label>
-                <Input value={extension} onChange={e => setExtension(e.target.value.replace(/\D/g, ''))} placeholder="102" />
+                <Input value={extension} onChange={e => setExtension(e.target.value.replace(/\D/g, ''))} placeholder="101" />
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Password</label>
-                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="webrtc-test-102" />
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="webrtc-test-101" />
               </div>
             </div>
             {regState === 'registered' ? (
