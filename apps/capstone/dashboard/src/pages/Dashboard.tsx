@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { Service } from '../types';
+import type { Entitlement, Service } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { useMetricsPolling } from '../hooks/useMetricsPolling';
+import { api } from '../lib/api';
 import KpiCard from '../components/KpiCard';
 import StatusBadge from '../components/StatusBadge';
 import ServiceCard from '../components/ServiceCard';
@@ -72,6 +73,20 @@ export default function Dashboard() {
   const [drawerTab, setDrawerTab] = useState<ServiceTab>('overview');
   const [autoRestart, setAutoRestart] = useState(false);
 
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [entitlementState, setEntitlementState] = useState<'loading' | 'live' | 'error'>('loading');
+
+  const loadEntitlement = useCallback(async () => {
+    try {
+      setEntitlement(await api.entitlements());
+      setEntitlementState('live');
+    } catch {
+      setEntitlementState('error');
+    }
+  }, []);
+
+  useEffect(() => { void loadEntitlement(); }, [loadEntitlement]);
+
   const openService = useCallback((service: Service, tab: ServiceTab) => {
     setSelected(service);
     setDrawerTab(tab);
@@ -113,6 +128,26 @@ export default function Dashboard() {
 
   const openAlerts = alerts.filter(a => a.status === 'open');
 
+  // ── Entitlement status (Magnate, RevenueOps) ──────────────────────────
+  const entBadge =
+    entitlementState === 'loading' ? { label: 'Checking…', dot: 'bg-info', cls: 'border-info/20 bg-info/10 text-info' }
+      : entitlementState === 'error' || !entitlement ? { label: 'Unavailable', dot: 'bg-danger', cls: 'border-danger/20 bg-danger/10 text-danger' }
+      : entitlement.source === 'standalone' ? { label: 'Standalone — no billing', dot: 'bg-muted-foreground/60', cls: 'border-border bg-muted/30 text-muted-foreground' }
+      : entitlement.source === 'unreachable' ? { label: 'Failing open', dot: 'bg-warning', cls: 'border-warning/20 bg-warning/10 text-warning' }
+      : entitlement.source === 'unauthorized' ? { label: 'Unauthorized', dot: 'bg-danger', cls: 'border-danger/20 bg-danger/10 text-danger' }
+      : entitlement.entitled === null ? { label: 'Connected', dot: 'bg-info', cls: 'border-info/20 bg-info/10 text-info' }
+      : entitlement.entitled ? { label: 'Entitled', dot: 'bg-success', cls: 'border-success/20 bg-success/10 text-success' }
+      : { label: 'Not entitled', dot: 'bg-danger', cls: 'border-danger/20 bg-danger/10 text-danger' };
+  const entSource =
+    entitlementState === 'error' || !entitlement ? '—'
+      : entitlement.source === 'magnate' ? 'Magnate (live)'
+      : entitlement.source === 'standalone' ? 'Standalone'
+      : entitlement.source === 'unreachable' ? 'Magnate unreachable'
+      : 'Unauthorized';
+  const entExpires = entitlement?.expires_at
+    ? new Date(entitlement.expires_at * 1000).toLocaleDateString()
+    : '—';
+
   return (
     <div className="space-y-6">
       {/* ── Hero: system status ─────────────────────────────────────────── */}
@@ -144,7 +179,7 @@ export default function Dashboard() {
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 Export
               </Button>
-              <Button size="sm" disabled={dataState === 'loading'} onClick={() => { void refresh(); void refreshSnapshot(); }}>
+              <Button size="sm" disabled={dataState === 'loading'} onClick={() => { void refresh(); void refreshSnapshot(); void loadEntitlement(); }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
                 Refresh
               </Button>
@@ -225,6 +260,58 @@ export default function Dashboard() {
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
         />
       </div>
+
+      {/* ── Billing & entitlements ─────────────────────────────────────── */}
+      <section className="rounded-2xl border bg-card p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Billing & Entitlements</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">Magnate entitlement status</h2>
+          </div>
+          <span className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium', entBadge.cls)}>
+            <span className={cn('h-2 w-2 rounded-full', entBadge.dot)} />
+            {entBadge.label}
+          </span>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border bg-background/40 p-4">
+            <div className="text-xs text-muted-foreground">Source</div>
+            <div className="mt-1 font-mono text-sm font-medium text-foreground">{entSource}</div>
+          </div>
+          <div className="rounded-xl border bg-background/40 p-4">
+            <div className="text-xs text-muted-foreground">Plan</div>
+            <div className="mt-1 font-mono text-sm font-medium text-foreground">{entitlement?.plan ?? '—'}</div>
+          </div>
+          <div className="rounded-xl border bg-background/40 p-4">
+            <div className="text-xs text-muted-foreground">Subscription</div>
+            <div className="mt-1 font-mono text-sm font-medium text-foreground">{entitlement?.status ?? '—'}</div>
+          </div>
+          <div className="rounded-xl border bg-background/40 p-4">
+            <div className="text-xs text-muted-foreground">Renews</div>
+            <div className="mt-1 font-mono text-sm font-medium text-foreground">{entExpires}</div>
+          </div>
+        </div>
+        {(entitlementState === 'error' || entitlement?.message) && (
+          <p className="mt-4 text-xs text-muted-foreground">
+            {entitlementState === 'error'
+              ? 'Entitlement status unavailable — the dashboard API did not respond.'
+              : entitlement?.message}
+          </p>
+        )}
+        {entitlement?.magnate_url && (
+          <div className="mt-4">
+            <a
+              href={`${entitlement.magnate_url}/manage`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              Manage subscription on Magnate
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+            </a>
+          </div>
+        )}
+      </section>
 
       {/* ── Services ────────────────────────────────────────────────────── */}
       <div>

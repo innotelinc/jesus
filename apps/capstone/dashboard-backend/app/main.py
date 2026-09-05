@@ -1243,14 +1243,19 @@ def metrics():
 
 
 @app.get("/entitlements")
-def entitlements(phone_number: str | None = None, plan: str | None = None):
+def entitlements(
+    phone_number: str | None = None,
+    plan: str | None = None,
+    user: str | None = None,
+):
     """Magnate (RevenueOps) entitlement decision for a number/plan.
 
-    STUB — always entitled until Magnate's v2.1 entitlement API ships
-    (docs/zeus-integration.md §7 step 8). The real lookup will be a call
-    to {MAGNATE_PUBLIC_URL}/api/entitlements; see app/entitlements.py.
+    Calls Magnate's v2.1 entitlement API ({MAGNATE_PUBLIC_URL}/api/entitlements);
+    with no `plan` it reports Magnate connectivity/standalone status instead
+    of a per-SKU decision. See app/entitlements.py for the failure policy
+    (fail-open when Magnate is unreachable).
     """
-    return check_entitlement(phone_number=phone_number, plan=plan)
+    return check_entitlement(phone_number=phone_number, plan=plan, user=user)
 
 
 @app.get("/turnconfig")

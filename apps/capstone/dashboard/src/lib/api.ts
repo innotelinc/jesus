@@ -10,6 +10,7 @@ import type {
   ConfigPolicy,
   AuditEntry,
   DashboardStats,
+  Entitlement,
 } from '../types';
 import { dashboardBaseUrl } from './config';
 
@@ -52,6 +53,7 @@ export const api = {
   policies: () => getJSON<ConfigPolicy[]>('/policies'),
   audit: () => getJSON<AuditEntry[]>('/audit'),
   stats: () => getJSON<DashboardStats>('/stats'),
+  entitlements: () => getJSON<Entitlement>('/entitlements'),
   serviceLogs: (id: string, tail = 200) =>
     getJSON<ServiceLogs>(`/services/${encodeURIComponent(id)}/logs?tail=${tail}`),
   restartService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/restart`, 'POST'),

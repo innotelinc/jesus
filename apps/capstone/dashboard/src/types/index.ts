@@ -180,3 +180,17 @@ export interface Incident {
   affected: string[];
   resolvedAt?: string;
 }
+
+export interface Entitlement {
+  entitled: boolean | null;
+  source: 'magnate' | 'standalone' | 'unreachable' | 'unauthorized';
+  magnate_url: string;
+  reason?: string | null;
+  plan?: string | null;
+  slug?: string | null;
+  status?: string | null;
+  expires_at?: number | null;
+  phone_number?: string | null;
+  user?: string | null;
+  message?: string | null;
+}
