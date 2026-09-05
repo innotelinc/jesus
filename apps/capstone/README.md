@@ -39,7 +39,7 @@ OpenTelemetry observability throughout.
 | 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
 | 🧠 **Local intelligence** | Kokoro TTS, Speaches Whisper STT, and OmniRoute LLM gateway (OpenAI-compatible) — nothing leaves the box | 
 | ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
-| 🔐 **Authentik SSO** | Self-hosted identity in the compose stack at `auth.<domain>` — one login for every surface | 
+| 🔐 **Cerulean SSO** | Shared identity through Cerulean's Authentik at `auth.capstone.innotel.us` — one login for every surface, and the Control Center is gated behind it | 
 | 📊 **Control Center** | Live ops dashboard: services, health, ports, alerts, secrets inventory, users, host monitoring, and an in-browser softphone | 
 | 🌐 **Canonical subdomains** | `app`/`api`/`auth`/`voice`/`admin`/`pbx` proxy hosts provisioned automatically through Nginx Proxy Manager, with **wildcard Let's Encrypt** by default | 
 | 📡 **Observability** | OpenTelemetry → SigNoz: pipeline latency (STT → LLM → TTS) per call, importable dashboards | 
@@ -95,7 +95,7 @@ sudo systemctl enable --now capstone.service
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
 | Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |
-| Identity | Authentik — `:9100` | SSO, authentication, user management |
+| Identity | Cerulean Authentik — `auth.capstone.innotel.us` | SSO, authentication, user management (shared via Cerulean; the bundled `--profile authentik` replacement is optional) |
 | Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
 | LLM Router | OmniRoute — `:20128` | OpenAI-compatible gateway to local/free models |
