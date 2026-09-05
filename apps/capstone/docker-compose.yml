@@ -101,8 +101,8 @@ services:
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       MINIO_API_CORS_ALLOW_ORIGIN: "*"
     ports:
-      - "127.0.0.1:9000:9000"   # loopback only (matches upstream dograh compose)
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:9200:9000"   # loopback only; 9000 on the host is Cerulean Authentik
+      - "127.0.0.1:9201:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -143,7 +143,7 @@ services:
       # Host-mode URLs for the bridge services
       DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
       REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@127.0.0.1:6379"
-      MINIO_ENDPOINT: "127.0.0.1:9000"
+      MINIO_ENDPOINT: "127.0.0.1:9200"
       MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
       MINIO_BUCKET: "voice-audio"
