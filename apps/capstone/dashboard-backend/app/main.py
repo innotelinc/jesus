@@ -24,14 +24,27 @@ import re
 import shutil
 import threading
 import time
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
 
+from .auth import (
+    COOKIE_NAME,
+    OidcChallenge,
+    authorize_url,
+    exchange_and_user,
+    is_admin_user,
+    issue_session,
+    oidc_enabled,
+    read_session,
+    require_session,
+)
 from .entitlements import check_entitlement
 
 ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
@@ -1136,15 +1149,66 @@ def build_stats() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------
-# Routes
+# Auth routes (Cerulean OIDC)
 # --------------------------------------------------------------------------
+# PKCE verifier/state kept in-memory between the /auth/login redirect and the
+# /auth/callback (short-lived; a restart just forces a re-login).
+_pending: dict[str, OidcChallenge] = {}
+
+
+@app.get("/auth/login")
+async def auth_login(next: str = "/"):
+    """Redirect to Cerulean Authentik to start the login dance."""
+    if not oidc_enabled():
+        return RedirectResponse(url=next, status_code=302)
+    url, challenge = authorize_url(next)
+    _pending[challenge.state] = challenge
+    return RedirectResponse(url=url, status_code=302)
+
+
+@app.get("/auth/callback")
+async def auth_callback(code: str | None = None, state: str | None = None, error: str | None = None):
+    if error:
+        return RedirectResponse(url="/?auth_error=" + urllib.parse.quote(str(error)), status_code=302)
+    challenge = _pending.pop(state or "", None) if state else None
+    if not code or not state or challenge is None or state != challenge.state:
+        return RedirectResponse(url="/?auth_error=state_mismatch", status_code=302)
+    user = exchange_and_user(code, challenge.verifier)
+    if not is_admin_user(user):
+        return RedirectResponse(url="/?auth_error=not_authorized", status_code=302)
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.set_cookie(
+        COOKIE_NAME,
+        issue_session(user),
+        httponly=True,
+        samesite="lax",
+        secure=True,
+        max_age=8 * 60 * 60,
+        path="/",
+    )
+    return resp
+
+
+@app.get("/auth/logout")
+async def auth_logout():
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.delete_cookie(COOKIE_NAME, path="/")
+    return resp
+
+
+@app.get("/auth/me")
+async def auth_me(user: dict = Depends(require_session)):
+    return {"authenticated": True, "name": user.get("name"), "email": user.get("email")}
+
+
+# All data routes below require a valid session when OIDC is enabled.
 @app.get("/services")
-def services():
+def services(user: dict = Depends(require_session)):
     return build_services()
 
 
 @app.get("/services/{service_id}/logs")
-def service_logs(service_id: str, tail: int = 200):
+def service_logs(service_id: str, tail: int = 200, user: dict = Depends(require_session)):
     """Recent container stdout/stderr for one service (for the Logs action in
     the control center). Bounded tail so a chatty container can't stall us."""
     if service_id == SELF_ID:
@@ -1164,7 +1228,7 @@ def service_logs(service_id: str, tail: int = 200):
 
 
 @app.post("/services/{service_id}/restart")
-def service_restart(service_id: str):
+def service_restart(service_id: str, user: dict = Depends(require_session)):
     """Restart a service's container. Refuses to restart the aggregator
     itself (the dashboard-api container) to avoid self-inflicted outages."""
     if service_id == SELF_ID:
@@ -1181,64 +1245,64 @@ def service_restart(service_id: str):
 
 
 @app.get("/ports")
-def ports():
+def ports(user: dict = Depends(require_session)):
     return build_ports()
 
 
 @app.get("/secrets")
-def secrets():
+def secrets(user: dict = Depends(require_session)):
     return build_secrets()
 
 
 @app.get("/alerts")
-def alerts():
+def alerts(user: dict = Depends(require_session)):
     return build_alerts()
 
 
 @app.get("/users")
-def users():
+def users(user: dict = Depends(require_session)):
     return build_users()
 
 
 @app.get("/links")
-def links():
+def links(user: dict = Depends(require_session)):
     return build_links()
 
 
 @app.get("/health")
-def health():
+def health(user: dict = Depends(require_session)):
     matrix, _ = build_health()
     return matrix
 
 
 @app.get("/incidents")
-def incidents():
+def incidents(user: dict = Depends(require_session)):
     _, inc = build_health()
     return inc
 
 
 @app.get("/policies")
-def policies():
+def policies(user: dict = Depends(require_session)):
     return DEFAULT_POLICIES
 
 
 @app.get("/audit")
-def audit():
+def audit(user: dict = Depends(require_session)):
     return build_audit()
 
 
 @app.get("/stats")
-def stats():
+def stats(user: dict = Depends(require_session)):
     return build_stats()
 
 
 @app.get("/snapshot")
-def snapshot():
+def snapshot(user: dict = Depends(require_session)):
     return build_snapshot()
 
 
 @app.get("/metrics")
-def metrics():
+def metrics(user: dict = Depends(require_session)):
     return build_metrics(build_snapshot())
 
 
@@ -1247,6 +1311,7 @@ def entitlements(
     phone_number: str | None = None,
     plan: str | None = None,
     user: str | None = None,
+    _auth: dict = Depends(require_session),
 ):
     """Magnate (RevenueOps) entitlement decision for a number/plan.
 
@@ -1259,7 +1324,7 @@ def entitlements(
 
 
 @app.get("/turnconfig")
-def turnconfig():
+def turnconfig(user: dict = Depends(require_session)):
     """STUN/TURN endpoints for the in-browser softphone's ICE configuration.
     Read from the stack .env (coturn creds + relay ports) so the browser can
     configure its RTCPeerConnection without hardcoding secrets in the bundle.

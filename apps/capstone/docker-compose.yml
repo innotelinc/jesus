@@ -1040,6 +1040,14 @@ services:
       # unset → links fall back to http://<host>:<port>.
       NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
+      # Cerulean (Authentik) OIDC gate for the control center. When
+      # AUTHENTIK_ISSUER_URL is set the API requires a Cerulean session on
+      # every data endpoint; empty = open API (local dev / no auth stack).
+      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
+      AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
       # Shared Magnate storefront for entitlement checks (RevenueOps);
       # empty when running standalone (no billing).
       MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"

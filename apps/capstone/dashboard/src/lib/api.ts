@@ -19,6 +19,12 @@ async function getJSON<T>(path: string): Promise<T> {
     method: 'GET',
     headers: { Accept: 'application/json' },
   });
+  if (response.status === 401) {
+    // Cerulean gate: no (or expired) session → send the user through the
+    // Authentik login flow, then back to the page they were on.
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
   if (!response.ok) {
     throw new Error(`Dashboard API ${path} failed: ${response.status}`);
   }
@@ -30,6 +36,10 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE'): Pro
     method,
     headers: { Accept: 'application/json' },
   });
+  if (response.status === 401) {
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
   if (!response.ok) {
     throw new Error(`Dashboard API ${path} failed: ${response.status}`);
   }
