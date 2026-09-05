@@ -1093,6 +1093,83 @@ chown asterisk:asterisk \
   "${DEST}/pjsip.transports_custom.conf" \
   "${DEST}/pjsip.endpoint.conf" 2>/dev/null || true
 
+# ── AvantFAX + UCP durable bring-up (idempotent, every boot) ───────────────
+# The fullstack image ships /var/lib/asterisk/bin/fwconsole (and the
+# /usr/sbin/fwconsole symlink) WITHOUT the exec bit, so `fwconsole` fails
+# with "not executable" until someone chmods it. Self-heal it here so the
+# CLI works on every boot (and future image rebuilds bake the fix in).
+chmod +x /var/lib/asterisk/bin/fwconsole /usr/sbin/fwconsole 2>/dev/null || true
+
+# FreePBX's UCP module (web panel + softphone presence) must stay enabled.
+# The FreePBX module DB is volatile across container recreations until
+# fwconsole re-registers modules, so re-enable idempotently when MariaDB is
+# up (the module itself is installed in the image). Guarded: a failure here
+# must never kill the boot.
+set +e
+fwconsole ma enable ucp >/tmp/dograh-ucp-enable.log 2>&1
+set -e
+if grep -qi 'enabled' /tmp/dograh-ucp-enable.log 2>/dev/null; then
+  echo ">>> [dograh-ari] UCP module enabled"
+fi
+
+# AvantFAX (the fax UI at /fax) needs its MySQL user + schema aligned with
+# local_config.php on every boot. The stock entrypoint injects AFDB_PASS /
+# ADMIN_EMAIL into the config from env, but the avantfax DATABASE itself is
+# never bootstrapped by the image, so on a fresh (or rebuilt) MariaDB volume
+# AvantFAX reports "The AvantFAX database is DOWN". Converge all three:
+# db/user (idempotent), schema (import when empty), config (env-forced).
+ensure_avantfax() {
+  local dbpass="${AVANTFAX_DB_PASS:-1d18eb145d805ff7}"
+  local faxemail="${FAX_EMAIL:-fax@innotel.us}"
+  local faxhost="${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}"
+
+  # DB + user: never DROP (idempotent); set the password every boot so the
+  # user always matches the injected config value.
+  mysql -u root <<SQL
+CREATE DATABASE IF NOT EXISTS avantfax DEFAULT CHARACTER SET utf8;
+CREATE USER IF NOT EXISTS 'avantfax'@'localhost' IDENTIFIED BY '${dbpass}';
+ALTER USER 'avantfax'@'localhost' IDENTIFIED BY '${dbpass}';
+GRANT ALL PRIVILEGES ON avantfax.* TO 'avantfax'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+  # Schema: create_tables.sql ships with AvantFAX in the image and is
+  # all CREATE TABLE IF NOT EXISTS — safe to import whenever empty.
+  local n_tables
+  n_tables="$(mysql -u root avantfax -N -B -e 'SHOW TABLES;' 2>/dev/null | wc -l)"
+  if [ "${n_tables:-0}" -lt 5 ]; then
+    mysql -u root avantfax < /usr/src/avantfax/create_tables.sql 2>/dev/null || true
+    echo ">>> [dograh-ari] AvantFAX schema imported (${n_tables} tables before)"
+  fi
+
+  # Config: force the three env-driven values so they can never drift from
+  # the DB user / branding (python replace — values may contain any bytes).
+  local cfg="/var/www/html/fax/includes/local_config.php"
+  if [ -f "${cfg}" ]; then
+    python3 - "${cfg}" "${dbpass}" "${faxemail}" "${faxhost}" <<'PY'
+import sys
+p, dbpass, faxemail, faxhost = sys.argv[1:5]
+lines = open(p).read().split('\n')
+out = []
+for line in lines:
+    s = line.strip()
+    if s.startswith("define('AFDB_PASS'"):
+        line = "define('AFDB_PASS',     '" + dbpass + "');"
+    elif s.startswith("define('ADMIN_EMAIL'"):
+        line = "define('ADMIN_EMAIL', '" + faxemail + "');"
+    elif s.startswith('$AVANTFAX_SERVERNAME'):
+        line = "$AVANTFAX_SERVERNAME = '" + faxhost + "';"
+    out.append(line)
+open(p, 'w').write('\n'.join(out) + '\n')
+print('>>> [dograh-ari] AvantFAX config aligned (db pass / admin email / server name)')
+PY
+  fi
+}
+
+if mysqladmin ping --silent 2>/dev/null; then
+  ensure_avantfax
+fi
+
 # Final safety net: every edit above ran as root, and any file FreePBX
 # regenerates on Apply Config must be writable by the reload user or the
 # GUI dies with "Unknown Error. Please Run: fwconsole reload --verbose."

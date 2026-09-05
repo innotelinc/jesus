@@ -947,6 +947,11 @@ services:
       FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
       FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
       FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
+      # AvantFAX (fax UI at /fax) — the entrypoint converges the DB user +
+      # schema with local_config.php from these on every boot.
+      AVANTFAX_DB_PASS: ${AVANTFAX_DB_PASS:-1d18eb145d805ff7}
+      FAX_EMAIL: ${FAX_EMAIL:-fax@innotel.us}
+      AVANTFAX_HOSTNAME: ${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}
       ASTERISK_CONVERGE_TOOL: /opt/asterisk_converge.py
       VOIPMS_SIP_USER: ${VOIPMS_SIP_USER:-}
       VOIPMS_SIP_PASS: ${VOIPMS_SIP_PASS:-}
@@ -1001,6 +1006,7 @@ services:
       FREEPBX_URL: http://freepbx
       FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
       FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
+      AVANTFAX_HOSTNAME: ${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}
       ASTERISK_AMI_HOST: freepbx
       ASTERISK_AMI_PORT: "5038"
       ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
