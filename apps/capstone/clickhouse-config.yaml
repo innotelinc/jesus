@@ -1,4 +1,4 @@
-# ClickHouse server config for SigNoz (v0.138 "Foundry" topology).
+# ClickHouse server config for SigNoz (clickhouse 25.4 topology).
 # Single shard/replica cluster named `cluster`, coordinated by the separate
 # `signoz-clickhouse-keeper` container (referenced via the `zookeeper` block).
 display_name: cluster

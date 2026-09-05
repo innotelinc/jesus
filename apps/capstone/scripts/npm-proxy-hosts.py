@@ -18,7 +18,7 @@ What it does:
                  covering "*.base + base" is issued via DNS-01 and
                  auto-attached to every proxy host instead.
 
-Optional services (nocodb, portal) are skipped unless listed in
+Optional services (portal) are skipped unless listed in
 --include-optional / NPM_INCLUDE_OPTIONAL — they only exist when their
 compose profile is enabled. Note: a later run WITHOUT the include flag treats
 those hosts as stale and prunes them — pass --no-prune to keep them.
@@ -114,7 +114,6 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute"},
     {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 3301,  "websocket": True,  "name": "SigNoz"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
-    {"key": "nocodb",    "sub": "nocodb",    "scheme": "http",  "port": 8080,  "websocket": False, "name": "NocoDB",     "optional": True},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
 
@@ -315,7 +314,7 @@ def main() -> int:
 
     optional = {s.strip() for s in include_raw.split(",") if s.strip()}
     if "all" in optional:
-        optional = {"nocodb", "portal"}
+        optional = {"portal"}
 
     hosts = [dict(h) for h in HOSTS]
     if args.ws_scheme is not None or args.ws_port is not None:

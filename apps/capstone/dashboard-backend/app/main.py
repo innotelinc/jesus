@@ -65,7 +65,6 @@ NPM_SUBDOMAINS: dict[str, str] = {
     "grist": "grist",
     "signoz": "signoz",
     "workflow-studio": "workflow",
-    "nocodb": "nocodb",
     "dashboard": "admin",
     "ws": "voice",
 }
@@ -260,7 +259,7 @@ LINK_PORTS: dict[str, dict[str, str]] = {
 }
 
 # One-shot bootstrap/helper containers (restart: no) that aren't services.
-ONE_SHOT = {"sandbox-certs", "n8n-import", "signoz-schema-migrator", "nocodb"}
+ONE_SHOT = {"sandbox-certs", "n8n-import", "signoz-schema-migrator"}
 
 # List of compose service labels we consider "apps" (used for active-session
 # stand-in and to exclude infra-only noise from some tallies).

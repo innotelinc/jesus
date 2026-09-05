@@ -1,4 +1,4 @@
-# SigNoz otel-collector config (v0.138 topology).
+# SigNoz otel-collector config (clickhouse 25.4 topology).
 # The collector ingests OTLP and writes DIRECTLY to ClickHouse (no hop through
 # the query-service anymore). Traces go to signoz_traces, metrics to
 # signoz_metrics. The schema is created by signoz-schema-migrator.
