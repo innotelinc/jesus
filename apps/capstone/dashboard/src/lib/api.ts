@@ -78,6 +78,20 @@ export interface PbxExtension {
   callerId: string;
   hasPassword: true;
   authUser: string;
+  registered?: boolean;
+  contactUri?: string | null;
+}
+
+export interface ExtensionCall {
+  time: string;
+  src: string;
+  dst: string;
+  direction: 'in' | 'out';
+  peer: string;
+  disposition: string;
+  durationSeconds: number;
+  billableSeconds: number;
+  viaChannel: string;
 }
 
 export interface PbxExtensionCreate {
@@ -116,6 +130,8 @@ export const api = {
     deleteJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`),
   rotateExtensionPassword: (ext: string, password: string) =>
     postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}/password`, { password }),
+  extensionCalls: (ext: string) =>
+    getJSON<ExtensionCall[]>(`/extensions/${encodeURIComponent(ext)}/calls`),
 };
 
 /**

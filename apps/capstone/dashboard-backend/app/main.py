@@ -1389,14 +1389,72 @@ def _parse_webrtc_extensions() -> list[dict[str, Any]]:
 
 @app.get("/extensions")
 def extensions_list(user: dict = Depends(require_session)):
-    """WebRTC extensions provisioned on the PBX (from the durable custom conf)."""
+    """WebRTC extensions provisioned on the PBX (from the durable custom conf),
+    annotated with live registration state from pjsip."""
     try:
         exts = _parse_webrtc_extensions()
+        reg = _pbx_registration_map()
+        for ext in exts:
+            live = reg.get(ext["extension"])
+            ext["registered"] = bool(live)
+            ext["contactUri"] = (live or {}).get("contactUri")
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Extension read failed: {exc}")
     return exts
+
+
+def _pbx_registration_map() -> dict[str, dict[str, Any]]:
+    """Live pjsip contacts keyed by extension: {ext: {contactUri, state}}.
+
+    A WebRTC (WSS) contact appears as soon as the device has REGISTERed and
+    its Qualify state is typically "NonQual" until the next OPTIONS probe —
+    so the presence of a contact row is the registration signal, not the
+    Avail/Unavail qualifier column."""
+    code, text = _pbx_exec(["asterisk", "-rx", "pjsip show contacts"])
+    if code != 0:
+        return {}
+    reg: dict[str, dict[str, Any]] = {}
+    for line in text.splitlines():
+        m = re.match(r"Contact:\s+(\d{3,5})/(sip:\S+)\s+\S+\s+(\S+)\b", line.strip())
+        if m:
+            reg[m.group(1)] = {"contactUri": m.group(2), "state": m.group(3)}
+    return reg
+
+
+@app.get("/extensions/{extension}/calls")
+def extensions_calls(extension: str, limit: int = 25,
+                     user: dict = Depends(require_session)):
+    """Recent CDRs touching an extension (inbound + outbound), newest first."""
+    if not re.fullmatch(r"\d{3,5}", extension):
+        raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
+    limit = max(5, min(int(limit), 100))
+    sql = (
+        "SELECT calldate, src, dst, disposition, duration, billsec, dstchannel "
+        f"FROM cdr WHERE src = '{extension}' OR dst = '{extension}' "
+        f"ORDER BY calldate DESC LIMIT {limit}"
+    )
+    code, text = _pbx_exec(["sh", "-c",
+                            f"mysql -u root asteriskcdrdb -N -e \"{sql}\" 2>/dev/null || true"])
+    calls = []
+    for line in (text or "").splitlines():
+        parts = line.split("\t")
+        if len(parts) < 7:
+            continue
+        calldate, src, dst, disposition, duration, billsec, dstchannel = parts[:7]
+        calls.append({
+            "time": calldate,
+            "src": src,
+            "dst": dst,
+            "direction": "out" if src == extension else "in",
+            "peer": dst if src == extension else src,
+            "disposition": disposition,
+            "durationSeconds": int(duration or 0),
+            "billableSeconds": int(billsec or 0),
+            "viaChannel": dstchannel,
+        })
+    return calls
 
 
 @app.post("/extensions")
