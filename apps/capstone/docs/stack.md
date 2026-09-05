@@ -31,6 +31,7 @@ provides, and explicitly does not own.
 - Magnate — subscriptions and entitlements (`MAGNATE_PUBLIC_URL`; agents are
   a Magnate SKU — Capstone holds no Stripe keys)
 - Cerulean — certificates and DNS for every `capstone.innotel.us` host
+- NPM Edge — public routing, TLS termination at the edge
 
 ## Explicitly does NOT own
 
