@@ -41,9 +41,31 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE'): Pro
     throw new Error('Session required');
   }
   if (!response.ok) {
-    throw new Error(`Dashboard API ${path} failed: ${response.status}`);
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail || `Dashboard API ${path} failed: ${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${dashboardBaseUrl}${path}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 401) {
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail || `Dashboard API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function deleteJSON<T>(path: string): Promise<T> {
+  return sendJSON<T>(path, 'DELETE');
 }
 
 export interface ServiceLogs {
@@ -51,7 +73,27 @@ export interface ServiceLogs {
   lines: string[];
 }
 
+export interface PbxExtension {
+  extension: string;
+  callerId: string;
+  hasPassword: true;
+  authUser: string;
+}
+
+export interface PbxExtensionCreate {
+  extension: string;
+  password: string;
+  callerId?: string;
+}
+
+export interface Me {
+  authenticated: boolean;
+  name: string | null;
+  email: string | null;
+}
+
 export const api = {
+  me: () => getJSON<Me>('/auth/me'),
   services: () => getJSON<Service[]>('/services'),
   ports: () => getJSON<Port[]>('/ports'),
   secrets: () => getJSON<Secret[]>('/secrets'),
@@ -67,6 +109,13 @@ export const api = {
   serviceLogs: (id: string, tail = 200) =>
     getJSON<ServiceLogs>(`/services/${encodeURIComponent(id)}/logs?tail=${tail}`),
   restartService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/restart`, 'POST'),
+  extensions: () => getJSON<PbxExtension[]>('/extensions'),
+  createExtension: (body: PbxExtensionCreate) =>
+    postJSON<{ status: string; extension: string }>('/extensions', body),
+  deleteExtension: (ext: string) =>
+    deleteJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`),
+  rotateExtensionPassword: (ext: string, password: string) =>
+    postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}/password`, { password }),
 };
 
 /**

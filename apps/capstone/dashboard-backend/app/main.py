@@ -18,6 +18,7 @@ Endpoints (all JSON):
 from __future__ import annotations
 
 import hashlib
+import base64
 import math
 import os
 import re
@@ -1242,6 +1243,277 @@ def service_restart(service_id: str, user: dict = Depends(require_session)):
         raise HTTPException(status_code=500, detail=f"Restart failed: {exc}")
     invalidate_all()
     return {"status": "restarted", "service": service_id}
+
+
+# --------------------------------------------------------------------------
+# WebRTC extension management (PBX)
+# --------------------------------------------------------------------------
+# Extensions live as durable blocks in the PBX's *_custom.conf files (the
+# same files pbx/entrypoint-dograh.sh provisions on boot), so FreePBX's
+# "Apply Config" can never drop them. Each extension:
+#   pjsip.endpoint_custom.conf  -> [N](webrtc-template)  (DTLS/ICE/TURN/WSS)
+#   pjsip.auth_custom.conf      -> [N-auth] userpass
+#   pjsip.aor_custom.conf       -> [N] single contact, remove_existing
+# Inherit the WebRTC test password convention when no explicit one is given.
+
+# The PBX container's compose *service* name is `freepbx` (container_name
+# pbx-freepbx); container_for_service matches on the compose service label.
+PBX_SERVICE_ID = "freepbx"
+
+
+def _pbx_exec(cmd: list[str], stdin_text: str | None = None) -> tuple[int, str]:
+    """Run a command inside the PBX container. Returns (exit_code, output)."""
+    container = container_for_service(PBX_SERVICE_ID)
+    if container is None:
+        raise HTTPException(status_code=503, detail="PBX container not running")
+    try:
+        code, out = container.exec_run(cmd, stdin=False, socket=False,
+                                       demux=True, workdir=None, environment=[])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"PBX exec failed: {exc}")
+    stdout = (out[0] or b"").decode("utf-8", errors="replace") if isinstance(out, tuple) else ""
+    stderr = (out[1] or b"").decode("utf-8", errors="replace") if isinstance(out, tuple) else ""
+    text = (stdout + stderr).strip()
+    if stdin_text is not None:
+        raise HTTPException(status_code=500, detail="internal: stdin exec unsupported")
+    return code, text
+
+
+def _pbx_read_conf(rel_path: str) -> str:
+    code, text = _pbx_exec(["cat", rel_path])
+    if code != 0:
+        return ""
+    return text
+
+
+def _pbx_write_conf(rel_path: str, content: str) -> None:
+    """Replace a conf file inside the PBX via base64 (quote-safe)."""
+    b64 = base64.b64encode(content.encode()).decode()
+    code, text = _pbx_exec(["sh", "-c",
+                            f"echo {b64} | base64 -d > '{rel_path}'"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"PBX write failed: {text}")
+
+
+def _pbx_reload_pjsip() -> None:
+    # This Asterisk build has no 'pjsip reload' CLI; reloading res_pjsip.so
+    # re-reads all pjsip*.conf including the *_custom.conf files.
+    code, text = _pbx_exec(["asterisk", "-rx", "module reload res_pjsip.so"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"pjsip reload failed: {text}")
+
+
+def _conf_split(text: str) -> tuple[list[str], list[dict[str, Any]], list[str]]:
+    """Split an Asterisk conf into (prelude, sections, trailing).
+
+    Each section is {comment, header, body}: the comment/blank lines directly
+    above a [header] line travel with that section, so removing a section
+    removes its banner too. Option lines flush any pending comments into the
+    current section's body. Round-trips deterministically via _conf_join.
+    """
+    lines_ = text.splitlines()
+    prelude: list[str] = []
+    pending: list[str] = []
+    sections: list[dict[str, Any]] = []
+    for line in lines_:
+        if line.startswith("["):
+            sections.append({"comment": pending, "header": line, "body": []})
+            pending = []
+        elif not sections:
+            prelude.append(line)
+        elif line.startswith(";") or line.strip() == "":
+            pending.append(line)
+        else:
+            if pending:
+                sections[-1]["body"].extend(pending)
+                pending = []
+            sections[-1]["body"].append(line)
+    return prelude, sections, pending
+
+
+def _conf_join(prelude: list[str], sections: list[dict[str, Any]], trailing: list[str]) -> str:
+    out: list[str] = list(prelude)
+    for s in sections:
+        out.extend(s["comment"])
+        out.append(s["header"])
+        out.extend(s["body"])
+    out.extend(trailing)
+    return ("\n".join(out) + "\n") if out else ""
+
+
+def _section_name(header: str) -> str:
+    """'[103](webrtc-template)' -> '103'; '[103-auth]' -> '103-auth'."""
+    return header[1:].split("]", 1)[0]
+
+
+def _conf_remove_section(sections: list[dict[str, Any]], name: str) -> bool:
+    before = len(sections)
+    sections[:] = [s for s in sections if _section_name(s["header"]) != name]
+    return len(sections) < before
+
+
+def _parse_webrtc_extensions() -> list[dict[str, Any]]:
+    """Read the webrtc extensions out of the PBX's pjsip.endpoint_custom.conf."""
+    endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
+    auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
+    _, ep_sections, _ = _conf_split(endpoint_conf)
+    _, au_sections, _ = _conf_split(auth_conf)
+    auth_pw: dict[str, str | None] = {}
+    for s in au_sections:
+        name = _section_name(s["header"])
+        if re.fullmatch(r"\d{3,5}-auth", name):
+            pw = None
+            for line in s["body"]:
+                m = re.match(r"password\s*=\s*(\S+)", line)
+                if m:
+                    pw = m.group(1)
+            auth_pw[name[:-5]] = pw
+    exts: list[dict[str, Any]] = []
+    for s in ep_sections:
+        name = _section_name(s["header"])
+        if not (re.fullmatch(r"\d{3,5}", name) and "(webrtc-template)" in s["header"]):
+            continue
+        cid = None
+        for line in s["body"]:
+            m = re.match(r"callerid\s*=\s*(.+)$", line)
+            if m:
+                cid = m.group(1).strip()
+        exts.append({
+            "extension": name,
+            "callerId": cid or f"Extension {name}",
+            "hasPassword": auth_pw.get(name) is not None,
+            "authUser": f"{name}-auth",
+        })
+    return exts
+
+
+@app.get("/extensions")
+def extensions_list(user: dict = Depends(require_session)):
+    """WebRTC extensions provisioned on the PBX (from the durable custom conf)."""
+    try:
+        exts = _parse_webrtc_extensions()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Extension read failed: {exc}")
+    return exts
+
+
+@app.post("/extensions")
+def extensions_create(body: dict, user: dict = Depends(require_session)):
+    """Provision a new WebRTC extension on the PBX and reload pjsip."""
+    ext = str(body.get("extension") or "").strip()
+    password = str(body.get("password") or "").strip()
+    caller_id = str(body.get("callerId") or f"Extension {ext}").strip()[:60]
+    if not re.fullmatch(r"\d{3,5}", ext):
+        raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
+    if not password:
+        raise HTTPException(status_code=422, detail="password is required")
+    if any(c in password for c in "\r\n\";"):
+        raise HTTPException(status_code=422, detail="password contains unsupported characters")
+    if ext == "102":
+        raise HTTPException(status_code=409, detail="102 is the built-in test extension")
+
+    endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
+    if re.search(rf"(?m)^\[{re.escape(ext)}\]", endpoint_conf):
+        raise HTTPException(status_code=409, detail=f"Extension {ext} already exists")
+
+    endpoint_conf += (
+        f"\n; Extension {ext} — provisioned via Capstone control center\n"
+        f"[{ext}](webrtc-template)\n"
+        f"type = endpoint\n"
+        f"auth = {ext}-auth\n"
+        f"aors = {ext}\n"
+        f"callerid = {caller_id} <{ext}>\n"
+    )
+    auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
+    auth_conf += (
+        f"\n; Extension {ext} auth — provisioned via Capstone control center\n"
+        f"[{ext}-auth]\n"
+        f"type = auth\n"
+        f"auth_type = userpass\n"
+        f"username = {ext}\n"
+        f"password = {password}\n"
+    )
+    aor_conf = _pbx_read_conf("/etc/asterisk/pjsip.aor_custom.conf")
+    aor_conf += (
+        f"\n; Extension {ext} AOR (single WSS contact)\n"
+        f"[{ext}]\n"
+        f"type = aor\n"
+        f"max_contacts = 1\n"
+        f"remove_existing = yes\n"
+    )
+    _pbx_write_conf("/etc/asterisk/pjsip.endpoint_custom.conf", endpoint_conf)
+    _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", auth_conf)
+    _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", aor_conf)
+    _pbx_reload_pjsip()
+    return {"status": "created", "extension": ext, "callerId": caller_id}
+
+
+@app.delete("/extensions/{extension}")
+def extensions_delete(extension: str, user: dict = Depends(require_session)):
+    """Remove a WebRTC extension's endpoint/auth/aor sections and reload pjsip."""
+    if not re.fullmatch(r"\d{3,5}", extension):
+        raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
+    if extension == "102":
+        raise HTTPException(status_code=403, detail="102 is the built-in test extension and cannot be removed")
+
+    endpoint_conf = _pbx_read_conf("/etc/asterisk/pjsip.endpoint_custom.conf")
+    auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
+    aor_conf = _pbx_read_conf("/etc/asterisk/pjsip.aor_custom.conf")
+
+    ep_pre, ep_sec, ep_tail = _conf_split(endpoint_conf)
+    au_pre, au_sec, au_tail = _conf_split(auth_conf)
+    ao_pre, ao_sec, ao_tail = _conf_split(aor_conf)
+
+    # Match either the bare number (auth/aor) or the [N](webrtc-template)
+    # endpoint header; _section_name strips both variants to the same name.
+    changed = (
+        _conf_remove_section(ep_sec, extension)
+        | _conf_remove_section(au_sec, f"{extension}-auth")
+        | _conf_remove_section(ao_sec, extension)
+    )
+    if not changed:
+        raise HTTPException(status_code=404, detail=f"Extension {extension} not found")
+
+    _pbx_write_conf("/etc/asterisk/pjsip.endpoint_custom.conf", _conf_join(ep_pre, ep_sec, ep_tail))
+    _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", _conf_join(au_pre, au_sec, au_tail))
+    _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", _conf_join(ao_pre, ao_sec, ao_tail))
+    _pbx_reload_pjsip()
+    return {"status": "deleted", "extension": extension}
+
+
+@app.post("/extensions/{extension}/password")
+def extensions_password(extension: str, body: dict, user: dict = Depends(require_session)):
+    """Rotate a WebRTC extension's SIP password."""
+    if not re.fullmatch(r"\d{3,5}", extension):
+        raise HTTPException(status_code=422, detail="Extension must be 3-5 digits")
+    if extension == "102":
+        raise HTTPException(status_code=403, detail="102's password is managed by the stack (WEBRTC_TEST_PASSWORD)")
+    password = str(body.get("password") or "").strip()
+    if not password or any(c in password for c in "\r\n\";"):
+        raise HTTPException(status_code=422, detail="invalid password")
+
+    auth_conf = _pbx_read_conf("/etc/asterisk/pjsip.auth_custom.conf")
+    au_pre, au_sec, au_tail = _conf_split(auth_conf)
+    for s in au_sec:
+        if _section_name(s["header"]) != f"{extension}-auth":
+            continue
+        new_body = []
+        replaced = False
+        for line in s["body"]:
+            if re.match(r"password\s*=", line):
+                new_body.append(f"password = {password}")
+                replaced = True
+            else:
+                new_body.append(line)
+        if not replaced:
+            new_body.append(f"password = {password}")
+        s["body"] = new_body
+        _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", _conf_join(au_pre, au_sec, au_tail))
+        _pbx_reload_pjsip()
+        return {"status": "password-updated", "extension": extension}
+    raise HTTPException(status_code=404, detail=f"Extension {extension} auth not found")
 
 
 @app.get("/ports")

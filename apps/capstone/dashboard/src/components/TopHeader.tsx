@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { dashboardBaseUrl } from '../lib/config';
+import { api } from '../lib/api';
 import { useResolvedTheme } from './providers';
 import { useDashboardData } from '../context/DashboardDataContext';
 
@@ -150,11 +151,23 @@ function ThemeToggle() {
 
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  const [me, setMe] = useState<{ name: string | null; email: string | null } | null>(null);
   const navigate = useNavigate();
+
+  // Prefer the real signed-in identity from the Cerulean OIDC session; fall
+  // back to the sample admin when the aggregator isn't wired (local dev).
+  useEffect(() => {
+    let cancelled = false;
+    api.me()
+      .then(m => { if (!cancelled) setMe(m); })
+      .catch(() => { /* not wired — keep null */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const { users } = useDashboardData();
   const admin = users.find(u => u.role === 'admin');
-  const displayName = admin?.name ?? 'Admin';
-  const email = admin?.email ?? 'admin@capstone.internal';
+  const displayName = me?.name || admin?.name || 'Admin';
+  const email = me?.email || admin?.email || 'admin@capstone.internal';
   const initials =
     displayName
       .split(/[\s._-]+/)
