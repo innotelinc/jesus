@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Web } from 'sip.js';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import StatusBadge from '../components/StatusBadge';
 import { dashboardBaseUrl } from '../lib/config';
 import { cn } from '../lib/utils';
 
@@ -19,25 +18,50 @@ interface LogEntry {
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
-// StatusBadge derives its label from the status value — pick statuses whose
-// built-in labels read correctly for each phone state.
-function regBadge(state: RegState) {
-  switch (state) {
-    case 'registered': return <StatusBadge status="resolved" size="sm" />;   // “Healthy”
-    case 'connecting': return <StatusBadge status="pending" size="sm" />;    // “Warning”
-    case 'failed': return <StatusBadge status="escalated" size="sm" />;      // “Critical”
-    default: return <StatusBadge status="offline" size="sm" />;              // “Critical”
-  }
+// Phone-specific status chips. An idle phone is *not* an error — a generic
+// StatusBadge would have shown two “Critical” chips for a phone that simply
+// hasn't registered yet.
+function RegChip({ state }: { state: RegState }) {
+  const styles: Record<RegState, string> = {
+    idle: 'border-muted-foreground/30 text-muted-foreground',
+    connecting: 'border-warning/40 text-warning',
+    registered: 'border-success/40 text-success',
+    failed: 'border-danger/40 text-danger',
+  };
+  const labels: Record<RegState, string> = {
+    idle: 'Not registered',
+    connecting: 'Connecting…',
+    registered: 'Registered',
+    failed: 'Registration failed',
+  };
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium', styles[state])}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {labels[state]}
+    </span>
+  );
 }
 
-function callBadge(state: CallState) {
-  switch (state) {
-    case 'active': return <StatusBadge status="resolved" size="sm" />;       // “Healthy”
-    case 'held': return <StatusBadge status="pending" size="sm" />;          // “Warning”
-    case 'calling': return <StatusBadge status="pending" size="sm" />;       // “Warning”
-    case 'ringing': return <StatusBadge status="warning" size="sm" />;       // “Warning”
-    default: return <StatusBadge status="offline" size="sm" />;              // “Critical”
-  }
+function CallChip({ state }: { state: CallState }) {
+  if (state === 'idle') return null;
+  const styles: Record<Exclude<CallState, 'idle'>, string> = {
+    calling: 'border-warning/40 text-warning',
+    ringing: 'border-warning/40 text-warning',
+    active: 'border-success/40 text-success',
+    held: 'border-info/40 text-info',
+  };
+  const labels: Record<Exclude<CallState, 'idle'>, string> = {
+    calling: 'Calling…',
+    ringing: 'Ringing',
+    active: 'On call',
+    held: 'On hold',
+  };
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium', styles[state])}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {labels[state]}
+    </span>
+  );
 }
 
 export default function Softphone() {
@@ -70,7 +94,9 @@ export default function Softphone() {
   const simpleUserRef = useRef<InstanceType<typeof SimpleUser> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const callStateRef = useRef<CallState>('idle');
+  const autoStartedRef = useRef(false);
   const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
+  const [configLoaded, setConfigLoaded] = useState(!dashboardBaseUrl);
 
   const pushLog = useCallback((text: string, kind: LogEntry['kind'] = 'info') => {
     const t = new Date().toLocaleTimeString();
@@ -83,11 +109,15 @@ export default function Softphone() {
   // when a proxy domain is configured — otherwise the page-origin default
   // above stays in effect.
   useEffect(() => {
-    if (!dashboardBaseUrl) return;
+    if (!dashboardBaseUrl) {
+      setConfigLoaded(true);
+      return;
+    }
+    let cancelled = false;
     fetch(`${dashboardBaseUrl}/turnconfig`)
       .then(r => (r.ok ? r.json() : null))
       .then((cfg: { stunServers?: RTCIceServer[]; turnServers?: RTCIceServer[]; wssServer?: string } | null) => {
-        if (!cfg) return;
+        if (cancelled || !cfg) return;
         const list = [...(cfg.stunServers ?? []), ...(cfg.turnServers ?? [])];
         if (list.length) {
           setIceServers(list);
@@ -98,8 +128,12 @@ export default function Softphone() {
           pushLog(`WSS endpoint: ${cfg.wssServer}`, 'ok');
         }
       })
-      .catch(() => { /* aggregator unavailable — fall back to defaults */ });
+      .catch(() => { /* aggregator unavailable — fall back to defaults */ })
+      .finally(() => { if (!cancelled) setConfigLoaded(true); });
+    return () => { cancelled = true; };
   }, [dashboardBaseUrl, pushLog]);
+
+
 
   // Keep a ref mirror of callState so async SIP.js callbacks read fresh state.
   useEffect(() => {
@@ -185,6 +219,16 @@ export default function Softphone() {
       pushLog(`Registration failed: ${msg}`, 'err');
     }
   }, [ensureSimpleUser, server, pushLog]);
+
+  // Register automatically once the ICE/WSS config has settled (or we know
+  // there is none), so the phone is live as soon as the page opens. If the
+  // registration is later torn down the Register button starts it again.
+  useEffect(() => {
+    if (!configLoaded || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    const t = window.setTimeout(() => { void connectAndRegister(); }, 350);
+    return () => window.clearTimeout(t);
+  }, [configLoaded, connectAndRegister]);
 
   const unregister = useCallback(async () => {
     const su = simpleUserRef.current;
@@ -308,8 +352,8 @@ export default function Softphone() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {regState === 'registered' ? regBadge('registered') : regBadge(regState)}
-          {callBadge(callState)}
+          <RegChip state={regState} />
+          <CallChip state={callState} />
         </div>
       </div>
 
@@ -424,7 +468,7 @@ export default function Softphone() {
               {DIAL_KEYS.map(key => (
                 <button
                   key={key}
-                  disabled={!regState || busy}
+                  disabled={regState !== 'registered' || busy}
                   onClick={() => {
                     if (inCall) { sendDTMF(key); return; }
                     setDialInput(prev => prev + key);
@@ -440,7 +484,7 @@ export default function Softphone() {
           <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Notes</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-              <li>The PBX WSS endpoint uses the FreePBX integration certificate — if the browser refuses to connect (self-signed cert), open <span className="font-mono">{defaultServer}</span> in a new tab, accept the certificate warning, then re-register here.</li>
+              <li>Registration starts automatically on load. The WSS endpoint is <span className="font-mono">{server}</span>{server === defaultServer ? ' (page-origin fallback — configure a proxy domain for the PBX to serve it at the edge)' : ''} — same TLS as this page, so no certificate warnings.</li>
               <li>STUN/TURN come from the host coturn (fetched via the aggregator) so remote clients behind NAT get a working media path.</li>
               <li>Media (audio) uses DTLS-SRTP with ICE; STUN/TURN point at the host coturn, so remote WebRTC clients behind NAT work too.</li>
               <li>Only one WebRTC session at a time — start a second browser tab for extension 101 (password <span className="font-mono">101</span>) to call yourself.</li>

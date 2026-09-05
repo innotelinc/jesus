@@ -527,7 +527,10 @@ services:
       SANDBOX_RUNNER_API_KEYS: "${SANDBOX_API_RUNNER_API_KEY:-change-me-runner-key}"
       SANDBOX_RUNNER_REGISTRATION_TOKEN: "${SANDBOX_API_RUNNER_REGISTRATION_TOKEN:-change-me-runner-registration-token}"
       SANDBOX_RUNNER_API_GRPC_ADDR: sandbox-api:9090
-      SANDBOX_RUNNER_HTTP_BASE_URL: http://sandbox-runner-1:8080
+      # The runner image's HTTP listener on :8080 is TLS-only (cert SANs
+      # sandbox-runner-1/localhost, signed by the bootstrap CA) — advertise
+      # https so registrations and sandbox-api match reality.
+      SANDBOX_RUNNER_HTTP_BASE_URL: https://sandbox-runner-1:8080
       SANDBOX_RUNNER_CONTROL_GRPC_LISTEN_ADDR: ":9091"
       SANDBOX_RUNNER_CONTROL_GRPC_ADVERTISE_ADDR: sandbox-runner-1:9091
       SANDBOX_RUNNER_ID: runner-1
@@ -546,8 +549,10 @@ services:
     healthcheck:
       # The runner's control HTTP listener answers /healthz only after the
       # registration stream is established (heartbeats flowing) — a real
-      # liveness signal for the dashboard.
-      test: ["CMD-SHELL", "wget -qO- -T 5 http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      # liveness signal for the dashboard. The :8080 listener is TLS-only now
+      # (cert SANs are sandbox-runner-1/localhost), so probe it over https
+      # with cert verification off (BusyBox wget has no --ca-certificate).
+      test: ["CMD-SHELL", "wget -qO- -T 5 --no-check-certificate https://localhost:8080/healthz >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
