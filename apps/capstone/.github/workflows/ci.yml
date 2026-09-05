@@ -52,6 +52,20 @@ jobs:
             --source pbx/asterisk/extensions_custom.conf --owner capstone \
             --append from-internal-custom --check
 
+  # Magnate entitlement gate for the dograh route sync: dry-runs the REAL
+  # sync_dograh_routes.py --check through every gate state (standalone,
+  # disabled, entitled, not-entitled, plan 404, unauthorized abort,
+  # unreachable fail-open) against stubbed dograh/FreePBX/Magnate HTTP
+  # servers and a fake `docker` — no PBX, no Magnate, no network required.
+  dograh-sync-gate:
+    name: Route sync Magnate gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dry-run every Magnate gate state
+        run: python3 scripts/test_dograh_routes_gate.py
+
   dashboard-build:
     name: Dashboard build
     runs-on: ubuntu-latest

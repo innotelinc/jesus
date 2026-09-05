@@ -2,9 +2,9 @@
 
 Capstone (AgentOps) layers onto Zeus (VoiceOps): one shared FreePBX/Asterisk
 voice plane hosts both Zeus customer extensions and Capstone voice-agent
-extensions. Zeus keeps owning telephony, numbers, trunks, messaging, fax,
-billing and the customer portal; Capstone keeps owning the AI agent pipeline
-(dograh). They meet at the dialplan: DIDs hand calls to agents, agents
+extensions. Zeus keeps owning telephony, numbers, trunks, messaging, fax and the
+customer portal (with billing fronted by Magnate, RevenueOps); Capstone
+keeps owning the AI agent pipeline (dograh). They meet at the dialplan: DIDs hand calls to agents, agents
 transfer live calls back to Zeus users, and outcomes write back to Zeus
 records.
 
@@ -60,7 +60,7 @@ own dialplan contexts and ARI users.
 | Softphone | WebRTC PWA (SIP.js) over WSS (`ws.zeus.<domain>`), STUN/TURN |
 | Voicemail | Voicemail-to-email + transcripts, **AI summaries via Ollama** (`/api/voicemail/summary`) |
 | Fax | AvantFax / HylaFAX+ digital faxing |
-| Billing | Stripe checkout, invoices, plans, reseller/white-label |
+| Billing | Magnate (RevenueOps) is the billing platform: checkout, invoices, plans, reseller/white-label; Zeus's own `STRIPE_*` mode is a deprecated self-billing fallback, empty by default |
 
 ### Capstone owns
 
@@ -196,9 +196,12 @@ the mailbox — a per-number routing decision owned by the agent config.
    call history with playback.
 7. **Deprecate the bundled Capstone PBX** as the default topology — keep the
    standalone compose only for development/offline installs.
-8. **Add the Magnate entitlement** gating agent routing per number/plan —
-   config surface is in place (`MAGNATE_PUBLIC_URL`); the entitlement check
-   lands when Magnate's v2.1 entitlement API ships.
+8. **Add the Magnate entitlement** gating agent routing per number/plan
+   **(DONE)**. Magnate's v2.1 entitlement API has shipped; the dashboard
+   status card is live (`dashboard-backend` `GET /entitlements`, app/
+   entitlements.py, fail-open policy); and `scripts/sync_dograh_routes.py`
+   enforces the gate at write time — an unentitled number/plan never gets a
+   dograh inbound route (see §8 G7 for the exact contract).
 
 ## 8. Open gaps & decisions
 
@@ -269,6 +272,19 @@ the mailbox — a per-number routing decision owned by the agent config.
   number inventory, with per-campaign selection and plan/entitlement checks.
 - **G6 — SMS/fax for agents.** Later phase: letting agents send/receive SMS
   (VoIP.ms) and fax receipts is a natural extension of the same DID routes.
+- **G7 — Entitlement-gated route writing (RESOLVED).** `scripts/sync_dograh_routes.py`
+  now enforces the gate at write time. With `MAGNATE_PUBLIC_URL` +
+  `MAGNATE_AGENT_PLAN` configured it calls Magnate's v2.1 `/api/entitlements`
+  (bearer `ENTITLEMENTS_API_TOKEN` when set; `MAGNATE_AGENT_USER` optionally
+  scopes the check to a subscriber's active plan) before touching FreePBX.
+  Not entitled → no new inbound routes/custom extensions are written and
+  dograh-created ones are un-wired (user GUI routes are never touched;
+  `--no-prune` keeps entries for manual review). Unreachable → fail open so an
+  entitlements outage never blocks routing; 401 → the sync aborts instead of
+  un-wiring on a token config error. Note Magnate's v2.1 API decides on
+  plan(+user) only — `phone` is echoed, not resolved — so the gate is
+  deployment-scoped to the agent SKU; per-DID plan mapping for a multi-tenant
+  shared-PBX box is a possible later refinement.
 
 ## 9. Related
 

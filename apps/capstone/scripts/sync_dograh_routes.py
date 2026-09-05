@@ -43,6 +43,15 @@ Environment / args:
     --force            update existing entries (default: skip)
     --no-prune         never delete dograh-created entries for removed numbers
     --check            verify only, no writes
+
+    Magnate entitlement gate (RevenueOps — see docs/zeus-integration.md step 8):
+    agents are a Magnate add-on SKU, so when MAGNATE_PUBLIC_URL and
+    MAGNATE_AGENT_PLAN are configured the sync asks Magnate whether the SKU is
+    entitled before writing inbound routes (MAGNATE_AGENT_USER optionally
+    narrows the check to a subscriber's active plan). Not entitled → no new
+    routes are written and dograh-created ones are un-wired; unreachable →
+    fail open (an entitlements outage never blocks routing); 401 → abort.
+    Overrides: --magnate-url/--magnate-token/--magnate-plan/--magnate-user
 """
 
 from __future__ import annotations
@@ -52,6 +61,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -288,6 +298,61 @@ def _drop_include(container: str, fname: str) -> None:
        f"sed -i '/#include {fname}/d' {inc}")
 
 
+# ── Magnate entitlement gate (RevenueOps) ────────────────────────────────────
+MAGNATE_TIMEOUT_SECONDS = 10
+
+
+def magnate_entitlement(url: str, token: str, plan: str, user: str) -> dict[str, Any]:
+    """Ask Magnate's v2.1 entitlement API whether the agent add-on SKU may route.
+
+    Returns a dict whose ``mode`` the route writer acts on:
+
+      entitled      — 200 with entitled=true: routes may be (re)created.
+      not_entitled  — authoritative no (200 entitled=false or 404): the sync
+                      must not create inbound routes and should un-wire the
+                      dograh-created ones.
+      unauthorized  — 401: token mismatch. The caller aborts rather than
+                      silently un-wiring routes on a config error.
+      unreachable   — network/HTTP failure: fail open per Capstone policy (an
+                      entitlements outage never blocks agent routing).
+    """
+    params = {"plan": plan}
+    if user:
+        params["user"] = user
+    qs = urllib.parse.urlencode(params)
+    req = urllib.request.Request(
+        f"{url}/api/entitlements?{qs}", headers={"Accept": "application/json"}
+    )
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=MAGNATE_TIMEOUT_SECONDS) as resp:
+            data = json.loads(resp.read() or b"{}")
+        if data.get("entitled") is True:
+            return {"mode": "entitled", "reason": data.get("reason") or "ok",
+                    "plan": data.get("plan"), "slug": data.get("slug"),
+                    "status": data.get("status"), "expires_at": data.get("expires_at"),
+                    "http": resp.status}
+        return {"mode": "not_entitled", "reason": data.get("reason") or "denied",
+                "plan": data.get("plan"), "slug": data.get("slug"),
+                "status": data.get("status"), "expires_at": data.get("expires_at"),
+                "http": resp.status}
+    except urllib.error.HTTPError as e:
+        try:
+            data = json.loads(e.read() or b"{}")
+        except Exception:  # noqa: BLE001 — body may not be JSON
+            data = {}
+        if e.code == 401:
+            return {"mode": "unauthorized", "reason": data.get("reason", "unauthorized"),
+                    "http": e.code}
+        if e.code == 404:
+            return {"mode": "not_entitled", "reason": data.get("reason", "plan_not_found"),
+                    "http": e.code}
+        return {"mode": "unreachable", "reason": f"HTTP {e.code}", "http": e.code}
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        return {"mode": "unreachable", "reason": f"{e.__class__.__name__}: {e}", "http": None}
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -301,6 +366,16 @@ def main() -> int:
     parser.add_argument("--client-secret", default=os.environ.get("FREEPBX_CLIENT_SECRET", ""))
     parser.add_argument("--config-name",
                         default=os.environ.get("DOGRAH_CONFIG_NAME", "Asterisk ARI (dograh)"))
+    parser.add_argument("--magnate-url", default=os.environ.get("MAGNATE_PUBLIC_URL", ""),
+                        help="Magnate storefront base URL (env MAGNATE_PUBLIC_URL); "
+                             "empty = standalone, no entitlement gate")
+    parser.add_argument("--magnate-token", default=os.environ.get("ENTITLEMENTS_API_TOKEN", ""),
+                        help="bearer token for Magnate's entitlements API (env ENTITLEMENTS_API_TOKEN)")
+    parser.add_argument("--magnate-plan", default=os.environ.get("MAGNATE_AGENT_PLAN", ""),
+                        help="agent add-on SKU slug/id on Magnate (env MAGNATE_AGENT_PLAN)")
+    parser.add_argument("--magnate-user", default=os.environ.get("MAGNATE_AGENT_USER", ""),
+                        help="optional subscriber (username/email) whose active plan "
+                             "carries the SKU (env MAGNATE_AGENT_USER)")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--no-prune", action="store_true",
                         help="don't delete dograh-created entries for numbers removed in dograh")
@@ -312,6 +387,10 @@ def main() -> int:
     secret = args.client_secret or args.env.get("FREEPBX_CLIENT_SECRET", "")
     endpoint = args.dograh_endpoint or args.env.get("DOGRAH_API_ENDPOINT", "http://127.0.0.1:8000")
     stasis_app = args.env.get("DOGRAH_STASIS_APP_NAME", "")
+    magnate_url = (args.magnate_url or args.env.get("MAGNATE_PUBLIC_URL", "")).strip().rstrip("/")
+    magnate_token = args.magnate_token or args.env.get("ENTITLEMENTS_API_TOKEN", "")
+    magnate_plan = (args.magnate_plan or args.env.get("MAGNATE_AGENT_PLAN", "")).strip()
+    magnate_user = (args.magnate_user or args.env.get("MAGNATE_AGENT_USER", "")).strip()
 
     if not token:
         print("FAIL DOGRAH_API_TOKEN required (run scripts/dograh_wire.py once)", file=sys.stderr)
@@ -331,6 +410,42 @@ def main() -> int:
 
     current = {str(n.get("address", "")).strip() for n in numbers if str(n.get("address", "")).strip()}
     changed = False
+
+    # ── Magnate entitlement gate (RevenueOps) ────────────────────────────────
+    # Agents are a Magnate add-on SKU; when MAGNATE_PUBLIC_URL + MAGNATE_AGENT_PLAN
+    # are configured the sync must not (re)create inbound routes unless Magnate
+    # says the SKU is entitled. Unreachable → fail open (an entitlements outage
+    # never blocks routing); 401 → abort (a config error — never silently
+    # un-wire routes on a bad token). Unset plan with Magnate configured → the
+    # gate stays inactive so existing deployments keep working unchanged.
+    gate: dict[str, Any] = {"mode": "standalone", "reason": "standalone_no_billing"}
+    if magnate_url:
+        if not magnate_plan:
+            gate = {"mode": "disabled", "reason": "MAGNATE_AGENT_PLAN not set — gate inactive"}
+            print(f"[magnate] {gate['reason']} (MAGNATE_PUBLIC_URL={magnate_url})")
+        else:
+            gate = magnate_entitlement(magnate_url, magnate_token, magnate_plan, magnate_user)
+            if gate["mode"] == "unauthorized":
+                print(f"FAIL Magnate entitlements returned 401 ({gate['reason']}) — "
+                      "check ENTITLEMENTS_API_TOKEN; refusing to write routes", file=sys.stderr)
+                return 1
+            if gate["mode"] == "not_entitled":
+                print(f"[magnate] NOT entitled ({gate['reason']}, plan={magnate_plan}) — "
+                      "un-wiring dograh inbound routes")
+            else:
+                print(f"[magnate] gate {gate['mode']} ({gate['reason']}, "
+                      f"plan={gate.get('plan') or magnate_plan})")
+    closed = gate["mode"] == "not_entitled"
+    eff_numbers = [] if closed else numbers
+    if closed:
+        if args.check:
+            for n in numbers:
+                ext = str(n.get("address", "")).strip()
+                if ext:
+                    problems.append(f"DID {ext} not entitled ({gate['reason']}) — would be un-wired")
+        elif args.no_prune:
+            print("[magnate] --no-prune set — existing routes kept for manual review "
+                  "(gate is closed; no new routes will be written)")
 
     table = None
     if not args.check:
@@ -353,10 +468,10 @@ def main() -> int:
     # destination validation (Blacklist settings / bad-destination checks)
     # runs — a destination whose context is missing is flagged as "bad".
     if not args.check:
-        sync_dynamic_dialplan(container, numbers, stasis_app)
+        sync_dynamic_dialplan(container, eff_numbers, stasis_app)
 
     # ── create/update ────────────────────────────────────────────────────────
-    for num in numbers:
+    for num in eff_numbers:
         ext = str(num.get("address", "")).strip()
         label = num.get("label") or f"dograh ext {ext}"
         workflow_name = num.get("inbound_workflow_name") or label
@@ -428,6 +543,24 @@ def main() -> int:
                 print(f"PASS removed from dograh — deleted FreePBX entries for {ext}")
             except (FreepbxError, OSError) as e:
                 problems.append(f"prune {ext}: {e}")
+        # Entitlement gate closed → also un-wire numbers still present in
+        # dograh (they were routed before the SKU lapsed). Only dograh-created
+        # entries are ever deleted; user GUI routes are never touched.
+        if closed and not args.check:
+            for row in owned:
+                ext = row["ext"]
+                if ext not in current:
+                    continue
+                target = f"dograh-inbound,{ext},1"
+                try:
+                    delete_custom_extension(container, ext)
+                    delete_inbound_route(container, ext)
+                    if table:
+                        delete_custom_dest(container, table, target)
+                    changed = True
+                    print(f"PASS gate closed — deleted FreePBX entries for {ext}")
+                except (FreepbxError, OSError) as e:
+                    problems.append(f"un-wire {ext}: {e}")
 
     if changed and not args.check:
         print("[freepbx] running fwconsole reload (dialplan + registry)...")
@@ -442,7 +575,7 @@ def main() -> int:
     # destination so it never dangles on a deleted custom destination.
     targets = [
         f"dograh-inbound,{str(n.get('address', '')).strip()},1"
-        for n in numbers
+        for n in eff_numbers
         if str(n.get("address", "")).strip()
     ]
     if not args.check:
