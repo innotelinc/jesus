@@ -12,6 +12,7 @@ Endpoints (all JSON):
   /services  /ports  /secrets  /alerts  /users  /links
   /health    /incidents /policies /audit /stats
   /metrics   /snapshot
+  /entitlements
 """
 
 from __future__ import annotations
@@ -30,6 +31,8 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+from .entitlements import check_entitlement
 
 ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
 PASSWD_FILE = os.environ.get("HOST_PASSWD_FILE", "/etc/host-passwd")
@@ -1237,6 +1240,17 @@ def snapshot():
 @app.get("/metrics")
 def metrics():
     return build_metrics(build_snapshot())
+
+
+@app.get("/entitlements")
+def entitlements(phone_number: str | None = None, plan: str | None = None):
+    """Magnate (RevenueOps) entitlement decision for a number/plan.
+
+    STUB — always entitled until Magnate's v2.1 entitlement API ships
+    (docs/zeus-integration.md §7 step 8). The real lookup will be a call
+    to {MAGNATE_PUBLIC_URL}/api/entitlements; see app/entitlements.py.
+    """
+    return check_entitlement(phone_number=phone_number, plan=plan)
 
 
 @app.get("/turnconfig")

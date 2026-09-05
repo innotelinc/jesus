@@ -1040,6 +1040,9 @@ services:
       # unset → links fall back to http://<host>:<port>.
       NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
+      # Shared Magnate storefront for entitlement checks (RevenueOps);
+      # empty when running standalone (no billing).
+      MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"
       # Compose project(s) this control center reports on (comma-separated).
       # Defaults to this stack's own project so other projects on the same
       # Docker host never leak in.
