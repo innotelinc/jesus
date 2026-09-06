@@ -8,7 +8,7 @@ Capstone turns your phone line into an AI-powered receptionist and outreach team
 entirely on your own hardware — answers inbound calls, screens callers, runs natural
 conversations, dials out to chase leads, runs surveys and polls, and automates telephony
 workflows over **FreePBX/Asterisk**, with **local speech** (STT + TTS) and an **LLM**
-driving the conversation. User management and SSO are handled by **Authentik**. No cloud
+driving the conversation. User management and SSO are handled by **Cerulean Authentik**. No cloud
 APIs, no audio leaving the box.
 
 [![CI](https://github.com/innotelinc/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/ci.yml)
@@ -26,7 +26,7 @@ APIs, no audio leaving the box.
 > LLM driving the conversation. **Landing page:** [innotelinc.github.io/capstone](https://innotelinc.github.io/capstone)
 
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI,
-Cartesia, Vapi, Make.com) · Authentik for authentication and user management ·
+Cartesia, Vapi, Make.com) · Cerulean Authentik for authentication and user management ·
 OpenTelemetry observability throughout.
 
 ---
@@ -37,7 +37,7 @@ OpenTelemetry observability throughout.
 |---|---|---|
 | 🗣️ **Voice AI agents** | Prebuilt phone agents (receptionist, outreach, job interview, survey, GOTV poll) plus mock-interview agents for IT Help Desk, DevOps, and SQL | 
 | 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
-| 🧠 **Local intelligence** | Kokoro TTS, Speaches Whisper STT, and OmniRoute LLM gateway (OpenAI-compatible) — nothing leaves the box | 
+| 🧠 **Local intelligence** | Kokoro TTS, Speaches Whisper STT, and OmniRoute LLM gateway via Zeus (OpenAI-compatible) — nothing leaves the box | 
 | ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
 | 🔐 **Cerulean SSO** | Shared identity through Cerulean's Authentik at `auth.capstone.innotel.us` — one login for every surface, and the Control Center is gated behind it | 
 | 📊 **Control Center** | Live ops dashboard: services, health, ports, alerts, secrets inventory, users, host monitoring, and an in-browser softphone | 
@@ -95,7 +95,7 @@ sudo systemctl enable --now capstone.service
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
 | Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |
-| Identity | Cerulean Authentik — `auth.capstone.innotel.us` | SSO, authentication, user management (shared via Cerulean; the bundled `--profile authentik` replacement is optional) |
+| Identity | Cerulean Authentik — `auth.cerulean.innotel.us` | SSO, authentication, user management (shared via Cerulean; no local Authentik instance) |
 | Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
 | LLM Router | OmniRoute — `:20128` | OpenAI-compatible gateway to local/free models |

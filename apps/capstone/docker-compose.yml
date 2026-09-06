@@ -224,6 +224,7 @@ services:
   coturn:
     image: coturn/coturn:latest
     container_name: coturn
+    profiles: ["standalone"]  # Only start when Capstone runs alone (Zeus coturn is primary)
     restart: unless-stopped
     command:
       - turnserver
@@ -316,33 +317,6 @@ services:
 #  127.0.0.1:20128) and n8n (host.docker.internal:20128) point here.
   # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
   # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
-  omniroute:
-    image: ${OMNIROUTE_IMAGE:-diegosouzapw/omniroute:latest}
-    container_name: omniroute
-    restart: unless-stopped
-    environment:
-      DATA_DIR: /app/data
-      PORT: "20128"
-      DASHBOARD_PORT: "20128"
-      # Required secrets — set real random values in .env
-      # (openssl rand -base64 48 / -hex 32 / -base64 32)
-      JWT_SECRET: "${OMNIROUTE_JWT_SECRET:-change-me-omniroute-jwt}"
-      API_KEY_SECRET: "${OMNIROUTE_API_KEY_SECRET:-change-me-omniroute-api-key}"
-      INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-omniroute-admin}"
-      OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-omniroute-ws}"
-      # Rate-limiter backend: reuse the stack redis (own key namespace)
-      REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@redis:6379"
-    ports:
-      - "0.0.0.0:20128:20128"   # 0.0.0.0 — n8n reaches it via host.docker.internal:20128
-    volumes:
-      - omniroute_data:/app/data
-    healthcheck:
-      test: ["CMD", "node", "healthcheck.mjs"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    networks: [interview-net]
 
   # ── Workflow automation: n8n (Community Edition) ──────────────────────────
   n8n:
@@ -392,7 +366,6 @@ services:
       GRIST_API_KEY: "${GRIST_API_KEY:-}"
       # API key for the OpenAI-compatible OmniRoute gateway on 20128. setup.sh
       # mints this automatically and persists it in .env.
-      OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       # OpenTelemetry → SigNoz (bootstrap in n8n.Dockerfile reads these)
       OTEL_SERVICE_NAME: "n8n"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://signoz-otel-collector:4318/v1/traces"
@@ -594,9 +567,6 @@ services:
       PORT: "8090"
       # The gateway + dograh are reached through the host (dograh-api is host
       # mode); the UI container itself is on the bridge.
-      OMNIROUTE_URL: "http://host.docker.internal:20128"
-      OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
-      OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
       DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
     extra_hosts:
@@ -622,101 +592,9 @@ services:
   # runs host-mode and reaches S3 at 127.0.0.1:9000), and a 0.0.0.0 bind
   # cannot share a port with a loopback bind. The container still listens on
   # 9000 internally; only the host mapping differs.
-  authentik-postgres:
-    image: docker.io/library/postgres:16-alpine
-    container_name: authentik-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: authentik
-      POSTGRES_USER: authentik
-      POSTGRES_PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?set AUTHENTIK_POSTGRES_PASSWORD in your .env}"
-    volumes:
-      - authentik_postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    networks: [interview-net]
 
-  authentik-redis:
-    image: docker.io/library/redis:7-alpine
-    container_name: authentik-redis
-    restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${AUTHENTIK_REDIS_PASSWORD:?set AUTHENTIK_REDIS_PASSWORD in your .env}"]
-    volumes:
-      - authentik_redis:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${AUTHENTIK_REDIS_PASSWORD:?}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    networks: [interview-net]
 
-  authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_VERSION:-2025.6.3}
-    container_name: authentik-server
-    restart: unless-stopped
-    command: server
-    ports:
-      - "0.0.0.0:9100:9000"   # 0.0.0.0 — NPM proxy target (auth.<domain>); 9000 is minio's host port
-    environment:
-      AUTHENTIK_SECRET_KEY: "${AUTHENTIK_SECRET_KEY:?set AUTHENTIK_SECRET_KEY in your .env}"
-      AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:?set AUTHENTIK_TOKEN in your .env}"
-      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?}"
-      AUTHENTIK_REDIS__HOST: authentik-redis
-      AUTHENTIK_REDIS__PASSWORD: "${AUTHENTIK_REDIS_PASSWORD:?}"
-      # Public URL used in redirects/links — set to https://auth.<domain> when
-      # fronted by Nginx Proxy Manager (defaults to the auth subdomain).
-      AUTHENTIK_PUBLIC_URL: "${AUTHENTIK_PUBLIC_URL:-https://auth.${NPM_BASE_DOMAIN:-capstone.innotel.us}}"
-      AUTHENTIK_BOOTSTRAP_EMAIL: "${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@capstone.innotel.us}"
-      AUTHENTIK_BOOTSTRAP_PASSWORD: "${AUTHENTIK_BOOTSTRAP_PASSWORD:-}"
-      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-      AUTHENTIK_DEFAULT_TOKEN_LENGTH: "48"
-    volumes:
-      - authentik_media:/media
-      - authentik_templates:/templates
-    depends_on:
-      authentik-postgres: { condition: service_healthy }
-      authentik-redis: { condition: service_healthy }
-    # NB: this image has no wget/curl — probe with the bundled python3. The
-    # liveness path REQUIRES the trailing slash (/-/health/live without it 404s).
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:9000/-/health/live/',timeout=5)\" || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    networks: [interview-net]
 
-  authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_VERSION:-2025.6.3}
-    container_name: authentik-worker
-    restart: unless-stopped
-    command: worker
-    environment:
-      AUTHENTIK_SECRET_KEY: "${AUTHENTIK_SECRET_KEY:?}"
-      AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:?}"
-      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
-      AUTHENTIK_POSTGRESQL__USER: authentik
-      AUTHENTIK_POSTGRESQL__NAME: authentik
-      AUTHENTIK_POSTGRESQL__PASSWORD: "${AUTHENTIK_POSTGRES_PASSWORD:?}"
-      AUTHENTIK_REDIS__HOST: authentik-redis
-      AUTHENTIK_REDIS__PASSWORD: "${AUTHENTIK_REDIS_PASSWORD:?}"
-      AUTHENTIK_PUBLIC_URL: "${AUTHENTIK_PUBLIC_URL:-https://auth.${NPM_BASE_DOMAIN:-capstone.innotel.us}}"
-      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-    volumes:
-      - authentik_media:/media
-      - authentik_templates:/templates
-    depends_on:
-      authentik-postgres: { condition: service_healthy }
-      authentik-redis: { condition: service_healthy }
-    networks: [interview-net]
 
   # ── Storage & dashboard: Grist (single-binary, API-first, no SaaS) ────────
   grist:
@@ -909,7 +787,7 @@ services:
       - apparmor=unconfined
     entrypoint: ["/bin/bash", "/usr/local/bin/entrypoint-dograh.sh"]
     ports:
-      - "80:80"                         # FreePBX web UI
+      - "8083:80"                       # FreePBX web UI (8083 avoids conflict with monarch NPM)
       - "5060:5060/udp"                 # SIP
       - "5061:5061/tcp"                 # SIP TLS
       # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
@@ -1054,11 +932,6 @@ services:
       # Cerulean (Authentik) OIDC gate for the control center. When
       # AUTHENTIK_ISSUER_URL is set the API requires a Cerulean session on
       # every data endpoint; empty = open API (local dev / no auth stack).
-      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
-      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
-      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
-      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
-      AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
       # Shared Magnate storefront for entitlement checks (RevenueOps);
       # empty when running standalone (no billing).
       MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"
@@ -1107,7 +980,6 @@ volumes:
   minio-data:
   speaches_models:
   n8n_data:
-  omniroute_data:
   grist_data:
   clickhouse_data:
   keeper_data:
@@ -1137,10 +1009,6 @@ volumes:
     name: pbx-portal-data
     external: true
   # Authentik volumes (internal, compose-managed)
-  authentik_postgres:
-  authentik_redis:
-  authentik_media:
-  authentik_templates:
 
 networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the
