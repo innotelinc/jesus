@@ -110,6 +110,10 @@ Both fragment sets land on the same Asterisk:
 
 ## 4. Integration surface
 
+> **Portal API contract:** the Zeus repo's `docs/portal-api.md` publishes the
+> machine contract for the surfaces below — messages/fax/voicemail endpoints
+> (auth, request/response shapes, pagination) plus the transfer-resolver.
+
 | Zeus provides | Capstone consumes | Meeting point |
 |---|---|---|
 | DIDs + inbound routes | Agent inbound (`8000`–`8007` / dograh phone numbers) | FreePBX inbound route → `[dograh-inbound]` → `Stasis` |
@@ -272,6 +276,9 @@ the mailbox — a per-number routing decision owned by the agent config.
   number inventory, with per-campaign selection and plan/entitlement checks.
 - **G6 — SMS/fax for agents.** Later phase: letting agents send/receive SMS
   (VoIP.ms) and fax receipts is a natural extension of the same DID routes.
+  The portal API contract to build against is now published (Zeus repo
+  `docs/portal-api.md` — `POST /api/messages/send`, `POST /api/fax/send`, fax
+  history/download, voicemail list + AI summary).
 - **G7 — Entitlement-gated route writing (RESOLVED).** `scripts/sync_dograh_routes.py`
   now enforces the gate at write time. With `MAGNATE_PUBLIC_URL` +
   `MAGNATE_AGENT_PLAN` configured it calls Magnate's v2.1 `/api/entitlements`
