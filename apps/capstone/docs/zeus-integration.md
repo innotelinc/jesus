@@ -113,6 +113,12 @@ Both fragment sets land on the same Asterisk:
 > **Portal API contract:** the Zeus repo's `docs/portal-api.md` publishes the
 > machine contract for the surfaces below — messages/fax/voicemail endpoints
 > (auth, request/response shapes, pagination) plus the transfer-resolver.
+> **Capstone reference client:** `scripts/zeus_client.py` implements that
+> contract (SMS send, fax send/history/download, voicemail
+> list/summary/listened, transfer-resolve) with unit tests in CI
+> (`scripts/tests/`), configured via `ZEUS_API_URL` / `ZEUS_SESSION_TOKEN` /
+> `ZEUS_BEARER` in `.env`. dograh agent tools can shell out to it or import
+> its `ZeusClient` — Phase 2 wiring.
 
 | Zeus provides | Capstone consumes | Meeting point |
 |---|---|---|

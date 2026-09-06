@@ -52,6 +52,18 @@ jobs:
             --source pbx/asterisk/extensions_custom.conf --owner capstone \
             --append from-internal-custom --check
 
+  # Zeus portal API client (add-on mode, Phase 2): stdlib client implementing
+  # the zeus docs/portal-api.md contract. Tests mock urlopen — no network, no
+  # Zeus, no .env required.
+  zeus-client:
+    name: Zeus portal API client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests for the Zeus portal API client
+        run: python3 -m unittest discover -s scripts/tests -v
+
   # Magnate entitlement gate for the dograh route sync: dry-runs the REAL
   # sync_dograh_routes.py --check through every gate state (standalone,
   # disabled, entitled, not-entitled, plan 404, unauthorized abort,
