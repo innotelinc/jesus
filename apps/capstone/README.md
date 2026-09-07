@@ -14,6 +14,7 @@ driving the conversation. User management and SSO are handled by **Cerulean Auth
 APIs, no audio leaving the box.
 
 [![CI](https://github.com/innotelinc/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/ci.yml)
+[![Conformity](https://github.com/innotelinc/capstone/actions/workflows/conform.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/conform.yml)
 [![Release](https://github.com/innotelinc/capstone/actions/workflows/release.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://innotelinc.github.io/capstone/releases)
 
