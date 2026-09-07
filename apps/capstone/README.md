@@ -1,5 +1,7 @@
 <div align="center">
 
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0-or-later-brightgreen.svg)](LICENSE)
+
 # 🎙️ Capstone — Voice AI Agent Platform
 
 **Self-hosted AI phone agents over Asterisk/FreePBX — local speech, local LLM, no per-minute fees.**
@@ -18,6 +20,17 @@ APIs, no audio leaving the box.
 *One script, and your phone grows a brain.*
 
 </div>
+
+---
+
+## Why Capstone
+
+| Problem | Capstone answer |
+| --- | --- |
+| Cloud voice APIs leak audio + cost per minute | Local speech (STT+TTS) + local LLM over Asterisk/FreePBX; no audio leaves the box |
+| Identity sprawl across phone apps | Cerulean Authentik SSO; disable a user and their phone-agent access dies |
+| Telephony vendor lock-in | Skips OpenAI/Vapi/Cartesia/Make — runs on your own FreePBX + local LLM |
+| Agent observability is a black box | OpenTelemetry spans every step; traces live in the stack |
 
 > **About Capstone** — a completely self-hosted, open-source Voice AI Agent Platform: it
 > handles incoming calls, screens callers, conducts natural conversations, and automates
@@ -156,6 +169,13 @@ release archive. `dist/` and `.live-build/` are gitignored — regenerate them w
 All user management flows through Authentik; secrets live only in `.env` on the host.
 
 ---
+
+
+---
+
+## License
+
+Capstone is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See [LICENSE](LICENSE) for the full text.
 
 *Capstone — Voice AI Agent Platform. Self-hosted, open-source, no cloud required.*
 

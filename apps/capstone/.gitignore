@@ -31,3 +31,6 @@ dograh/upstream/
 .DS_Store
 .idea/
 .vscode/
+
+# Repo-local generated/tracked artifacts
+LICENSE
