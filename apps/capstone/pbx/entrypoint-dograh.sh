@@ -797,7 +797,8 @@ setup_voipms_trunk() {
   #      port, so forward it on the router + publish it in the compose file.
   local voipms_transport_line="" voipms_transport_extra=""
   local reg_port="${VOIPMS_REGISTER_PORT:-}"
-  local main_port="$(detect_pjsip_bind_port "$transport_name")"
+  local main_port
+  main_port="$(detect_pjsip_bind_port "$transport_name")"
   if [ -n "$reg_port" ] && [ "$reg_port" != "$main_port" ]; then
     voipms_transport_line="transport=voipms-register"
     voipms_transport_extra="
@@ -876,6 +877,7 @@ EOF
     echo "; dashboard-managed DID routes, then VOIPMS_DIDS agent mappings, and"
     echo "; finally falls back to the dograh default agent (8000)."
     echo "exten => _X.,1,NoOp(VoIP.ms inbound)"
+    # shellcheck disable=SC2016  # ${EXTEN} is Asterisk dialplan syntax, must stay literal
     echo ' same => n,Goto(webrtc-inbound,${EXTEN},1)'
     echo " same => n,Hangup()"
     echo ""
