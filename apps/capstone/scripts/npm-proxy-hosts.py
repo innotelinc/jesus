@@ -80,6 +80,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -116,6 +118,32 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
+
+
+def detect_lan_ip() -> str:
+    """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
+
+    The address a remote NPM edge can actually reach — never loopback, and
+    preferred over the docker-internal host.docker.internal alias.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))  # picks the default route, sends nothing
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    try:
+        out = subprocess.check_output(["hostname", "-I"], text=True, stderr=subprocess.DEVNULL)
+        for ip in out.split():
+            if ip and not ip.startswith("127."):
+                return ip.split("%")[0]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
 
 
 class NpmError(Exception):
@@ -301,7 +329,10 @@ def main() -> int:
 
     api_url = args.api_url or cfg(args, "NPM_API_URL", DEFAULT_API_URL)
     base_domain = (args.base_domain or cfg(args, "NPM_BASE_DOMAIN", "")).strip().lstrip(".")
-    upstream = args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "") or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+    # Stack convention (central stack-lib.sh): explicit wins, else the LAN IP,
+    # else the PBX media address from .env.
+    upstream = (args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
+                or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", ""))
     le_email = args.letsencrypt_email or cfg(args, "NPM_LETSENCRYPT_EMAIL", "") or cfg(args, "GRIST_ADMIN_EMAIL", "")
     include_raw = (args.include_optional or cfg(args, "NPM_INCLUDE_OPTIONAL", "")).lower()
 

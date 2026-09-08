@@ -94,6 +94,10 @@ services:
 
   minio:
     image: minio/minio
+    # Memory posture (docs/service-audit.md): cap the object store so a media
+    # burst can't crowd out the agent pipeline. memswap = mem (no swap spill).
+    mem_limit: 1g
+    memswap_limit: 1g
     container_name: minio
     command: server /data --console-address ":9001"
     environment:
@@ -268,6 +272,9 @@ services:
     image: ${KOKORO_IMAGE:-ghcr.io/remsky/kokoro-fastapi-cpu:latest}
     container_name: kokoro-fastapi
     restart: unless-stopped
+    # Memory posture: Kokoro-82M on CPU peaks ~1.5 GiB during synthesis.
+    mem_limit: 2g
+    memswap_limit: 2g
     # GPU? Use ghcr.io/remsky/kokoro-fastapi-gpu:latest and add:
     #   deploy: { resources: { reservations: { devices: [ { driver: nvidia, count: 1, capabilities: [gpu] } ] } } }
     # The image bakes in kokoro-v1.0.onnx + voices (entrypoint serves :8880).
@@ -292,6 +299,9 @@ services:
     image: ${SPEACHES_IMAGE:-ghcr.io/speaches-ai/speaches:latest-cpu}
     container_name: speaches
     restart: unless-stopped
+    # Memory posture: faster-whisper (small/int8) peaks ~1.5 GiB.
+    mem_limit: 2g
+    memswap_limit: 2g
     environment:
       WHISPER__INFERENCE_DEVICE: "${SPEACHES_WHISPER_DEVICE:-cpu}"      # cpu | cuda | auto
       WHISPER__COMPUTE_TYPE: "${SPEACHES_WHISPER_COMPUTE_TYPE:-int8}"
@@ -329,9 +339,15 @@ services:
     pull_policy: build
     container_name: n8n
     restart: unless-stopped
+    # Memory posture: workflow runs are bursty; NODE_OPTIONS (in the env block
+    # below) caps the V8 heap so a runaway workflow is OOM-killed inside the
+    # container, not the host.
+    mem_limit: 1g
+    memswap_limit: 1g
     ports:
       - "0.0.0.0:5678:5678"   # 0.0.0.0 — NPM proxy target + dograh webhook (host mode)
     environment:
+      NODE_OPTIONS: --max-old-space-size=768
       N8N_HOST: "${N8N_HOST:-localhost}"
       N8N_PORT: 5678
       N8N_PROTOCOL: http
@@ -601,6 +617,9 @@ services:
     image: gristlabs/grist:latest
     container_name: grist
     restart: unless-stopped
+    # Memory posture: dashboards are light; cap for node heap safety.
+    mem_limit: 768m
+    memswap_limit: 768m
     ports:
       - "0.0.0.0:8484:8484"   # 0.0.0.0 — n8n reaches it via host.docker.internal:8484 + NPM proxy target
     environment:
@@ -662,6 +681,10 @@ services:
     image: clickhouse/clickhouse-server:25.4
     container_name: signoz-clickhouse
     restart: unless-stopped
+    # Memory posture: telemetry store — cap it; old traces roll off before the
+    # cap matters at this fleet size.
+    mem_limit: 2g
+    memswap_limit: 2g
     environment:
       CLICKHOUSE_SKIP_USER_SETUP: "1"
       CLICKHOUSE_CONFIG: /etc/clickhouse-server/config.yaml
@@ -782,6 +805,10 @@ services:
   freepbx:
     image: ${FREEPBX_IMAGE:-ghcr.io/innotelinc/pbx-portal:latest-fullstack}
     container_name: pbx-freepbx
+    # CAPSTONE_PBX=zeus (add-on mode): skip the bundled PBX — dograh's ARI/WS
+    # point at the Zeus-owned shared Asterisk instead (docs/zeus-integration.md
+    # §1.1). Standalone (default) keeps the bundled FreePBX.
+    profiles: ["standalone"]
     restart: unless-stopped
     security_opt:
       - apparmor=unconfined
@@ -872,6 +899,8 @@ services:
     security_opt:
       - apparmor=unconfined
     profiles: ["portal"]
+    # Standalone-mode surface: fronts the bundled FreePBX. In zeus add-on mode
+    # (CAPSTONE_PBX=zeus) the bundled PBX is skipped — don't enable this profile.
     depends_on:
       - freepbx
     ports:
