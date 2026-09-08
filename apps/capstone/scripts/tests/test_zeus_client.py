@@ -209,3 +209,91 @@ class ThreadTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+# ── send_sms.py (SMS helper over zeus_client) ──────────────────────────────
+
+
+class SendSmsNormalisation(unittest.TestCase):
+    """Phone-number normalisation in scripts/send_sms."""
+
+    def test_strips_punctuation(self):
+        from send_sms import normalise_number
+
+        self.assertEqual(normalise_number("+1 (222) 333-4444"), "+12223334444")
+        self.assertEqual(normalise_number("1-222-333-4444"), "+12223334444")
+        self.assertEqual(normalise_number("+44 20 7946 0958"), "+442079460958")
+
+    def test_rejects_broken_input(self):
+        from send_sms import normalise_number
+
+        for bad in ("", "abc", "222", "+", "+++", "12345"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    normalise_number(bad)
+
+    def test_leans_on_e164_prefix(self):
+        from send_sms import normalise_number
+
+        # The validator is deliberately permissive on punctuation and will
+        # happily normalise a bare regional number like "20 7946 0958" into
+        # "+2079460958". We don't try to be a full ITU validator here — Zeus
+        # does its own reachability check — but we do enforce a minimum length
+        # so garbage like "7" is rejected early.
+        self.assertEqual(normalise_number("20 7946 0958"), "+2079460958")
+
+        # A single digit is not a phone number.
+        with self.assertRaises(ValueError):
+            normalise_number("7")
+
+
+class SendSmsNumberListNormalisation(unittest.TestCase):
+    """_normalise_number_list reconciles Zeus API shapes."""
+
+    def test_coalesces_quirky_keys(self):
+        from send_sms import _normalise_number_list
+
+        raw = [
+            {"number": "12223334444", "did_id": 7, "label": "Main line"},
+            {"phone": "+13025551002", "id": 12, "status": "active"},
+            {"phone_number": "0012223335555", "did": 99},  # looks like a number but isn't E.164
+            {"junk": "skip-me"},
+            {},
+        ]
+        normed = _normalise_number_list(raw)
+        # Only the two entries with a real leading country code survive.
+        self.assertEqual(len(normed), 2)
+        self.assertEqual(normed[0]["number"], "+12223334444")
+        self.assertEqual(normed[0]["did_id"], "7")
+        self.assertEqual(normed[1]["number"], "+13025551002")
+        self.assertEqual(normed[1]["did_id"], "12")
+
+
+class SendSmsCliParsing(unittest.TestCase):
+    """smoke-test the argparse surface without touching the network."""
+
+    def test_help_text_is_sensible(self):
+        import subprocess
+        import sys
+
+        proc = subprocess.run(
+            [sys.executable, "scripts/send_sms.py", "--help"],
+            capture_output=True,
+            text=True,
+            cwd="scripts/..",
+        )
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn("Send an SMS", proc.stdout)
+        self.assertIn("--list", proc.stdout)
+        self.assertIn("--json", proc.stdout)
+
+    def test_missing_args_exits_non_zero(self):
+        import subprocess
+        import sys
+
+        proc = subprocess.run(
+            [sys.executable, "scripts/send_sms.py"],
+            capture_output=True,
+            text=True,
+            cwd="scripts/..",
+        )
+        self.assertNotEqual(proc.returncode, 0)

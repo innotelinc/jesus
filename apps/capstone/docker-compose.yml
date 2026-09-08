@@ -266,6 +266,11 @@ services:
       retries: 3
       start_period: 10s
     networks: [interview-net]
+    # Note: this is Capstone's standalone-mode coturn only. When the stack runs
+    # in add-on mode (CAPSTONE_PBX=zeus), the shared Asterisk zone already owns
+    # a production coturn (diegosouzapw/omniroute on zeus-pbx:3478); Capstone
+    # consumes it through the TURN_* env vars rather than starting its own.
+    # See docs/zeus-integration.md §4 and .env TURN_EXTERNAL_IP.
 
   # ── Local TTS: Kokoro-82M via kokoro-fastapi (OpenAI-compatible) ──────────
   kokoro:
@@ -815,8 +820,10 @@ services:
     entrypoint: ["/bin/bash", "/usr/local/bin/entrypoint-dograh.sh"]
     ports:
       - "8083:80"                       # FreePBX web UI (8083 avoids conflict with monarch NPM)
-      - "5060:5060/udp"                 # SIP
-      - "5061:5061/tcp"                 # SIP TLS
+      - "5060:5060/udp"                 # SIP (standalone mode only; in add-on mode
+      #   Zeus owns 5060/5061 and Capstone consumes them — see .env
+      #   DOGRAH_ARI_HOST / DOGRAH_WS_URI and docs/zeus-integration.md)
+      - "5061:5061/tcp"                 # SIP TLS (standalone-mode only)
       # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
       # and advertises this port for signaling; forward it on the router too.
       - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
