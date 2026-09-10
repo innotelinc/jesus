@@ -279,8 +279,17 @@ services:
     # the full boot (torch + model + voice packs + inno tuner) transiently
     # overshoots even 4 GiB and gets OOM-killed (exit 137) — give the boot
     # plenty of headroom; steady-state after load is ~2-3 GiB.
-    mem_limit: 6g
-    memswap_limit: 6g
+    mem_limit: 8g
+    memswap_limit: 8g
+    # Torch/OpenMP size their thread pools (and thread-local arenas) from the
+    # core count; on an 8-core host that multiplies the load-time allocation
+    # spike past even 6 GiB. Two threads per pool keeps the boot allocation
+    # bounded — synthesis stays well under 1.5 GiB either way.
+    environment:
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      KMP_INIT_AT_FORK: "FALSE"
+      KMP_AFFINITY: "granularity=fine,compact,1,0"
     # GPU? Use ghcr.io/remsky/kokoro-fastapi-gpu:latest and add:
     #   deploy: { resources: { reservations: { devices: [ { driver: nvidia, count: 1, capabilities: [gpu] } ] } } }
     # The image bakes in kokoro-v1.0.onnx + voices (entrypoint serves :8880).

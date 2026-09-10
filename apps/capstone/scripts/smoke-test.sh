@@ -229,10 +229,18 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
     llm_model_args+=(-H "Authorization: Bearer ${OMNIROUTE_API_KEY}")
   fi
-  if (( ${#llm_model_args[@]} )); then
-    check_http "LLM gateway /v1/models" 200 "http://127.0.0.1:20128/v1/models" "${llm_model_args[@]}"
+  # OmniRoute guards model listing with dashboard-session auth (the API key
+  # only unlocks /v1/chat/completions), so a 401 here is expected even with
+  # OMNIROUTE_API_KEY set — the chat-completions round-trip below is the real
+  # probe. Anything else non-200 is a stack failure.
+  llm_models_code=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+    "${llm_model_args[@]}" http://127.0.0.1:20128/v1/models 2>/dev/null || echo 000)
+  if [[ "$llm_models_code" == "200" ]]; then
+    pass "LLM gateway /v1/models → HTTP 200"
+  elif [[ "$llm_models_code" == "401" ]]; then
+    warn "LLM gateway /v1/models → HTTP 401 — model listing is session-gated by design; /v1/chat/completions is the real probe"
   else
-    check_http "LLM gateway /v1/models" 200 "http://127.0.0.1:20128/v1/models"
+    fail "LLM gateway /v1/models → expected HTTP 200, got '$llm_models_code'"
   fi
   check_http "LLM gateway dashboard"    200 "http://127.0.0.1:20128/" -L
   check_http "n8n /healthz"             200 "http://127.0.0.1:5678/healthz"
@@ -336,7 +344,9 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   # When the Authentik OIDC gate is enabled (AUTHENTIK_ISSUER_URL in .env),
   # mint an HMAC-signed session cookie the same way auth.py does — the gate
   # reads CERULEAN_TENANT and the tenant group name from the cookie payload.
-  AGENTS_CURL=(curl -sS --max-time 10)
+  # The aggregator fans out to every upstream (dograh, kokoro, speaches, PBX…)
+  # before answering, so give it far more than the default 10s.
+  AGENTS_CURL=(curl -sS --max-time 45)
   AGENT_COOKIE=""
   if [[ -n "${AUTHENTIK_ISSUER_URL:-}" && -n "${AUTHENTIK_CLIENT_SECRET:-}" ]]; then
     AGENT_COOKIE=$(python3 - "$AUTHENTIK_CLIENT_SECRET" "${CERULEAN_TENANT:-default}" <<'PYEOF'
