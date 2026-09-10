@@ -667,7 +667,7 @@ services:
     networks: [interview-net]
 
   signoz-clickhouse-keeper:
-    image: clickhouse/clickhouse-keeper:25.4
+    image: clickhouse/clickhouse-keeper:25.12.5
     container_name: signoz-clickhouse-keeper
     restart: unless-stopped
     entrypoint: ["/usr/bin/clickhouse-keeper", "--config-file=/etc/clickhouse-keeper/keeper.yaml"]
@@ -683,7 +683,7 @@ services:
     networks: [interview-net]
 
   signoz-clickhouse:
-    image: clickhouse/clickhouse-server:25.4
+    image: clickhouse/clickhouse-server:25.12.5
     container_name: signoz-clickhouse
     restart: unless-stopped
     # Memory posture: telemetry store — cap it; old traces roll off before the
