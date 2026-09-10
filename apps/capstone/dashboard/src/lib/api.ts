@@ -109,6 +109,47 @@ export interface PbxExtensionCreate {
   dids?: string[];
 }
 
+export interface Agent {
+  id: number;
+  extension: string;
+  address: string;
+  label: string;
+  workflowId?: number | null;
+  workflowName?: string;
+  active: boolean;
+  pbx?: {
+    status: 'provisioned' | 'partial' | 'not-provisioned' | 'pending-sync' | 'error';
+    customExtension?: boolean | null;
+    inboundRoute?: boolean | null;
+    dialplan?: boolean | null;
+    detail?: string | null;
+  };
+}
+
+export interface AgentWorkflow {
+  id: number;
+  name: string;
+}
+
+export interface AgentsResponse {
+  mode: 'standalone' | 'addon';
+  configured: boolean;
+  agents: Agent[];
+  error?: string;
+}
+
+export interface AgentCreate {
+  address: string;
+  label: string;
+  workflowId?: number | null;
+}
+
+export interface AgentUpdate {
+  label?: string;
+  workflowId?: number | null;
+  active?: boolean;
+}
+
 export interface Me {
   authenticated: boolean;
   name: string | null;
@@ -143,6 +184,14 @@ export const api = {
     postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}/password`, { password }),
   extensionCalls: (ext: string) =>
     getJSON<ExtensionCall[]>(`/extensions/${encodeURIComponent(ext)}/calls`),
+  agents: () => getJSON<AgentsResponse>('/agents'),
+  agentWorkflows: () => getJSON<AgentWorkflow[]>('/agents/workflows'),
+  createAgent: (body: AgentCreate) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>('/agents', body),
+  updateAgent: (id: number, body: AgentUpdate) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}`, body, 'PUT'),
+  deleteAgent: (id: number) =>
+    deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
 };
 
 /**

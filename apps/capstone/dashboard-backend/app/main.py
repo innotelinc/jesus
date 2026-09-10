@@ -35,6 +35,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from . import agents
 from .auth import (
     COOKIE_NAME,
     OidcChallenge,
@@ -1812,6 +1813,281 @@ def extension_routes_delete(did: str, user: dict = Depends(require_session)):
         raise HTTPException(status_code=404, detail=f"Route for DID {did} not found")
     _write_webrtc_did_routes(routes)
     return {"status": "unrouted", "did": did}
+
+
+# --------------------------------------------------------------------------
+# Dograh voice agents (choose / add / edit / delete, wired into FreePBX)
+# --------------------------------------------------------------------------
+# An *agent* is a dograh telephony phone number (extension ↔ workflow) that
+# is also provisioned on FreePBX as a custom extension + inbound route, so
+# calls to its number are answered by the dograh AI pipeline. The FreePBX
+# wiring lives in app/agents.py as pure SQL/conf builders mirroring
+# scripts/sync_dograh_routes.py; this section executes them against the live
+# PBX (docker exec) in standalone mode, and reports "pending-sync" instead
+# in addon mode (Zeus shared PBX — the shared box applies the
+# *_custom.conf moniker itself).
+
+
+@app.get("/agents")
+def agents_list(user: dict = Depends(require_session)):
+    """Dograh agents + their FreePBX provisioning status."""
+    mode = agents.deploy_mode()
+    client = agents.DograhClient()
+    if not client.configured():
+        return {"mode": mode, "configured": False, "agents": [],
+                "error": "DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once, then set DOGRAH_API_TOKEN in .env"}
+    try:
+        rows = client.list_agents()
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    for a in rows:
+        a["pbx"] = _agent_pbx_status(mode, a.get("extension") or "")
+    return {"mode": mode, "configured": True, "agents": rows}
+
+
+@app.get("/agents/workflows")
+def agents_workflows(user: dict = Depends(require_session)):
+    """Workflows available to bind an agent to (dograh /api/v1/workflow/fetch)."""
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+    try:
+        return client.list_workflows()
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/agents")
+def agents_create(body: dict, user: dict = Depends(require_session)):
+    """Create a dograh agent + provision it on FreePBX (standalone)."""
+    mode = agents.deploy_mode()
+    address = str(body.get("address") or "").strip()
+    label = str(body.get("label") or "").strip()[:64]
+    workflow_id = body.get("workflowId")
+    ext = agents.extension_from_address(address)
+    if not ext:
+        raise HTTPException(status_code=422, detail="address must be a phone number (extension/DID)")
+    if not label:
+        raise HTTPException(status_code=422, detail="label is required")
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+    try:
+        agent = client.create_agent(address=address, label=label, workflow_id=workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    warnings = []
+    if mode == "standalone":
+        try:
+            _provision_agent_pbx(agent, client)
+        except HTTPException as exc:
+            warnings.append(exc.detail)
+    return {"agent": agent, "mode": mode, "warnings": warnings}
+
+
+@app.put("/agents/{phone_id}")
+def agents_update(phone_id: int, body: dict, user: dict = Depends(require_session)):
+    """Edit a dograh agent (label / workflow binding / active) and refresh its
+    FreePBX rows so the GUI title stays accurate (standalone)."""
+    mode = agents.deploy_mode()
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+    label = str(body.get("label") or "").strip()[:64]
+    workflow_id = body.get("workflowId")
+    is_active = body.get("active")
+    if is_active is not None:
+        is_active = bool(is_active)
+    try:
+        agent = client.update_agent(
+            int(phone_id),
+            label=label or None,
+            workflow_id=workflow_id,
+            is_active=is_active,
+        )
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    warnings = []
+    if mode == "standalone":
+        try:
+            _provision_agent_pbx(agent, client)
+        except HTTPException as exc:
+            warnings.append(exc.detail)
+    return {"agent": agent, "mode": mode, "warnings": warnings}
+
+
+@app.delete("/agents/{phone_id}")
+def agents_delete(phone_id: int, user: dict = Depends(require_session)):
+    """Delete a dograh agent and remove its FreePBX rows (standalone)."""
+    mode = agents.deploy_mode()
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+    # Resolve the extension before deleting so we can un-wire the PBX side.
+    try:
+        rows = client.list_agents()
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    ext = next((a.get("extension") for a in rows if a.get("id") == int(phone_id)), None)
+    try:
+        client.delete_agent(int(phone_id))
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    warnings = []
+    if mode == "standalone" and ext:
+        try:
+            _unprovision_agent_pbx(ext, client)
+        except HTTPException as exc:
+            warnings.append(exc.detail)
+    return {"status": "deleted", "id": int(phone_id), "mode": mode, "warnings": warnings}
+
+
+# ── FreePBX side of an agent (standalone mode; mirrors sync_dograh_routes) ──
+
+
+def _pbx_mysql(sql: str) -> str:
+    """Run SQL inside the freepbx container (asterisk DB), return stdout."""
+    b64 = base64.b64encode(sql.encode()).decode()
+    code, text = _pbx_exec(["sh", "-c", f"echo {b64} | base64 -d | mysql -N -B -u root asterisk"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"PBX SQL failed: {text}")
+    return text
+
+
+def _pbx_kvstore_table() -> str:
+    rows = _pbx_mysql(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema='asterisk' AND table_name LIKE 'kvstore\\_%ustomappsreg%' LIMIT 1"
+    )
+    if not rows:
+        raise HTTPException(status_code=502,
+                            detail="customappsreg kvstore table not found on the PBX")
+    return rows.splitlines()[0]
+
+
+def _pbx_find_dest_id(table: str, target: str) -> str | None:
+    rows = _pbx_mysql(agents.find_custom_dest_sql(table, target))
+    return rows.splitlines()[0] if rows else None
+
+
+def _pbx_ensure_custom_dest(table: str, target: str, description: str) -> None:
+    existing = _pbx_find_dest_id(table, target)
+    if existing:
+        _pbx_mysql(agents.refresh_custom_dest_description_sql(table, existing, description))
+        return
+    rows = _pbx_mysql(
+        f"SELECT COALESCE(MAX(CAST(`key` AS UNSIGNED)),0)+1 FROM `{table}` "
+        "WHERE `id`='dests'"
+    )
+    next_id = (rows.splitlines()[0] if rows else "1") or "1"
+    _pbx_mysql(agents.insert_custom_dest_sql(
+        table, int(next_id), agents.custom_dest_json(int(next_id), target, description)))
+    cur = _pbx_mysql(f"SELECT `val` FROM `{table}` WHERE `key`='currentid' AND `id`='noid'").strip()
+    if not cur or int(cur) <= int(next_id):
+        _pbx_mysql(agents.bump_dest_currentid_sql(table, int(next_id) + 1))
+
+
+def _pbx_ensure_inbound_route(did: str, description: str, target: str) -> None:
+    rows = _pbx_mysql(agents.count_inbound_route_sql(did))
+    if rows.splitlines() and int(rows.splitlines()[0]) > 0:
+        _pbx_mysql(agents.refresh_inbound_route_description_sql(did, description))
+        return
+    _pbx_mysql(agents.insert_inbound_route_sql(did, description, target))
+
+
+def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
+    """Regenerate extensions_custom_dograh.conf from the CURRENT dograh list,
+    and wire/drop the #include in extensions_custom.conf (standalone only)."""
+    try:
+        numbers = [a.get("address") for a in client.list_agents() if a.get("address")]
+    except agents.DograhError:
+        numbers = []
+    body = agents.dialplan_body(numbers)
+    conf = "/etc/asterisk/extensions_custom.conf"
+    if body:
+        _pbx_write_conf(agents.DIALPLAN_PATH, body)
+        inc = _pbx_read_conf(conf)
+        if f"#include {agents.DIALPLAN_CONF}" not in inc:
+            _pbx_write_conf(conf, inc.rstrip() + f"\n\n#include {agents.DIALPLAN_CONF}\n")
+    else:
+        # No dynamic numbers left — remove the include + file so FreePBX
+        # never sees a dangling context (mirrors sync_dograh_routes).
+        inc = _pbx_read_conf(conf)
+        kept = "\n".join(
+            ln for ln in inc.splitlines() if ln.strip() != f"#include {agents.DIALPLAN_CONF}"
+        )
+        _pbx_write_conf(conf, kept.rstrip() + "\n" if kept.strip() else "")
+        _pbx_exec(["rm", "-f", agents.DIALPLAN_PATH])
+
+
+def _pbx_reload_dograh() -> None:
+    """Apply the dograh FreePBX rows: chown (entrypoint edits /etc/asterisk as
+    root) then fwconsole reload so routes + dialplan go live."""
+    code, text = _pbx_exec(["fwconsole", "chown"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"fwconsole chown failed: {text}")
+    code, text = _pbx_exec(["fwconsole", "reload"])
+    if code != 0:
+        raise HTTPException(status_code=502, detail=f"fwconsole reload failed: {text}")
+
+
+def _provision_agent_pbx(agent: dict, client: agents.DograhClient) -> None:
+    """Provision (or refresh) one agent's FreePBX rows and reload."""
+    ext = agent.get("extension") or agents.extension_from_address(agent.get("address") or "")
+    if not ext:
+        return
+    label = agent.get("label") or f"Agent {ext}"
+    workflow_name = agent.get("workflowName") or label
+    desc = agents.agent_description(label, workflow_name)
+    target = f"dograh-inbound,{ext},1"
+    table = _pbx_kvstore_table()
+    _pbx_mysql(agents.upsert_custom_extension_sql(ext, label, workflow_name))
+    _pbx_ensure_custom_dest(table, target, desc)
+    _pbx_ensure_inbound_route(ext, desc, target)
+    _pbx_sync_dynamic_dialplan(client)
+    _pbx_reload_dograh()
+
+
+def _unprovision_agent_pbx(ext: str, client: agents.DograhClient) -> None:
+    """Remove one agent's FreePBX rows (dograh-created entries only) and reload."""
+    table = _pbx_kvstore_table()
+    target = f"dograh-inbound,{ext},1"
+    _pbx_mysql(agents.delete_custom_extension_sql(ext))
+    _pbx_mysql(agents.delete_inbound_route_sql(ext))
+    dest_id = _pbx_find_dest_id(table, target)
+    if dest_id:
+        _pbx_mysql(agents.delete_custom_dest_sql(table, dest_id))
+    _pbx_sync_dynamic_dialplan(client)
+    _pbx_reload_dograh()
+
+
+def _agent_pbx_status(mode: str, ext: str) -> dict:
+    """Provisioning status of one agent's FreePBX rows (for the list view)."""
+    if mode != "standalone":
+        return {
+            "status": "pending-sync",
+            "customExtension": None, "inboundRoute": None, "dialplan": None,
+            "detail": "Add-on mode: the shared box's reconcile applies the *_custom.conf moniker (extensions_custom_dograh.conf).",
+        }
+    try:
+        ext_rows = _pbx_mysql(agents.count_custom_extension_sql(ext))
+        route_rows = _pbx_mysql(agents.count_inbound_route_sql(ext))
+        has_ext = bool(ext_rows.splitlines() and int(ext_rows.splitlines()[0]) > 0)
+        has_route = bool(route_rows.splitlines() and int(route_rows.splitlines()[0]) > 0)
+        code, text = _pbx_exec(["asterisk", "-rx", "dialplan show dograh-inbound"])
+        has_dp = code == 0 and ext in text
+        status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
+        if not (has_ext or has_route or has_dp):
+            status = "not-provisioned"
+        return {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
+                "dialplan": has_dp}
+    except HTTPException as exc:
+        return {"status": "error", "customExtension": None, "inboundRoute": None,
+                "dialplan": None, "detail": exc.detail}
 
 
 @app.get("/ports")

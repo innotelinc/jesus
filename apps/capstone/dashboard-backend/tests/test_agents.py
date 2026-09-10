@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+"""Unit tests for dashboard-backend/app/agents.py — the dograh voice-agent
+client + FreePBX wiring builders used by the Control Center Agents page.
+
+Run:  python3 -m unittest discover -s dashboard-backend/tests -v
+
+Everything is mocked at urllib.request.urlopen — no network, no dograh, no
+FreePBX, no .env required. The SQL/conf builders are pure strings, so they
+are asserted byte-for-byte against the sync-tool contract
+(scripts/sync_dograh_routes.py / pbx/bootstrap_dograh_route.py).
+"""
+
+import io
+import json
+import os
+import sys
+import unittest
+import urllib.error
+import urllib.request
+from unittest import mock
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from app import agents  # noqa: E402
+
+BASE = "http://dograh.test:8000"
+CONFIG = "Asterisk ARI (dograh)"
+
+
+class FakeResponse:
+    def __init__(self, status=200, body=b"{}"):
+        self.status = status
+        self._body = body
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+def make_client(token="TOK"):
+    return agents.DograhClient(BASE, token, CONFIG)
+
+
+def captured_request(mock_urlopen):
+    mock_urlopen.assert_called_once()
+    return mock_urlopen.call_args[0][0]
+
+
+def header(req, name):
+    lowered = {k.lower(): v for k, v in req.headers.items()}
+    return lowered.get(name.lower())
+
+
+class DeployModeTest(unittest.TestCase):
+    def tearDown(self):
+        os.environ.pop("CAPSTONE_DEPLOY_MODE", None)
+
+    def test_standalone_default(self):
+        os.environ.pop("CAPSTONE_DEPLOY_MODE", None)
+        self.assertEqual(agents.deploy_mode(), "standalone")
+
+    def test_addon_aliases(self):
+        for raw in ("addon", "add-on", "zeus", "shared", "  ADDON  "):
+            with self.subTest(raw=raw):
+                os.environ["CAPSTONE_DEPLOY_MODE"] = raw
+                self.assertEqual(agents.deploy_mode(), "addon")
+
+    def test_anything_else_is_standalone(self):
+        os.environ["CAPSTONE_DEPLOY_MODE"] = "bogus"
+        self.assertEqual(agents.deploy_mode(), "standalone")
+
+
+class ExtensionFromAddressTest(unittest.TestCase):
+    def test_digits_only(self):
+        self.assertEqual(agents.extension_from_address("8003"), "8003")
+
+    def test_e164_strips_prefix(self):
+        self.assertEqual(agents.extension_from_address("+12125551234"), "12125551234")
+
+    def test_punctuation_stripped(self):
+        self.assertEqual(agents.extension_from_address("(212) 555-1234"), "2125551234")
+
+    def test_empty(self):
+        self.assertEqual(agents.extension_from_address(""), "")
+        self.assertEqual(agents.extension_from_address(None), "")
+
+
+class DescriptionTest(unittest.TestCase):
+    def test_marker_and_purpose(self):
+        self.assertEqual(
+            agents.agent_description("label", "Mock Interview"),
+            "Dograh Voice Agent (Mock Interview)",
+        )
+
+    def test_label_fallback_and_ascii_cap(self):
+        d = agents.agent_description("Business Receptionist — ☃", "")
+        self.assertLessEqual(len(d), 40)
+        self.assertNotIn("☃", d)
+        self.assertTrue(d.startswith("Dograh Voice Agent ("))
+
+
+class ConfigIdTest(unittest.TestCase):
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_resolves_config_by_name(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"configurations": [
+                {"id": 7, "name": "Other"},
+                {"id": 3, "name": CONFIG},
+            ]}).encode())
+        client = make_client()
+        self.assertEqual(client.config_id(), 3)
+        req = captured_request(m_url)
+        self.assertTrue(req.full_url.endswith("/api/v1/organizations/telephony-configs"))
+        self.assertEqual(header(req, "X-API-Key"), "TOK")
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_missing_config_raises(self, m_url):
+        m_url.return_value = FakeResponse(200, json.dumps({"configurations": []}).encode())
+        client = make_client()
+        with self.assertRaises(agents.DograhError) as ctx:
+            client.config_id()
+        self.assertIn("no telephony config", str(ctx.exception))
+
+    def test_unconfigured_client(self):
+        self.assertFalse(make_client("").configured())
+        self.assertTrue(make_client("TOK").configured())
+
+
+class ListAgentsTest(unittest.TestCase):
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_normalizes_phone_numbers(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"phone_numbers": [
+                {"id": 1, "address": "8000", "label": "IT Help Desk",
+                 "inbound_workflow_id": 42, "inbound_workflow_name": "Mock Interview",
+                 "is_active": True},
+                {"id": 2, "address": "+12125551234", "label": None,
+                 "inbound_workflow_id": None, "is_active": False},
+            ]}).encode())
+        client = make_client()
+        client._config_id = 3
+        rows = client.list_agents()
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["extension"], "8000")
+        self.assertEqual(rows[0]["workflowId"], 42)
+        self.assertEqual(rows[0]["workflowName"], "Mock Interview")
+        self.assertTrue(rows[0]["active"])
+        self.assertEqual(rows[1]["extension"], "12125551234")
+        self.assertEqual(rows[1]["workflowName"], "")
+        self.assertFalse(rows[1]["active"])
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_http_error_surfaces_dograh_detail(self, m_url):
+        m_url.side_effect = urllib.error.HTTPError(
+            f"{BASE}/x", 401, "Unauthorized", {},
+            io.BytesIO(b'{"detail":"bad token"}'))
+        client = make_client()
+        with self.assertRaises(agents.DograhError) as ctx:
+            client.list_agents()
+        self.assertIn("401", str(ctx.exception))
+        self.assertIn("bad token", str(ctx.exception))
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_unreachable_raises(self, m_url):
+        m_url.side_effect = urllib.error.URLError("connection refused")
+        client = make_client()
+        with self.assertRaises(agents.DograhError) as ctx:
+            client.list_agents()
+        self.assertIn("unreachable", str(ctx.exception))
+
+
+class WorkflowsTest(unittest.TestCase):
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_fetch_endpoint_returns_id_name_pairs(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps([
+                {"id": 9, "name": "Mock Interview", "status": "active"},
+                {"id": 10, "name": "Receptionist", "status": "archived"},
+            ]).encode())
+        client = make_client()
+        rows = client.list_workflows()
+        req = captured_request(m_url)
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/fetch"))
+        self.assertEqual(rows, [{"id": 9, "name": "Mock Interview"},
+                                {"id": 10, "name": "Receptionist"}])
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_dict_envelope_fallback(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"workflows": [{"id": 1, "title": "Survey"}]}).encode())
+        self.assertEqual(make_client().list_workflows(), [{"id": 1, "name": "Survey"}])
+
+
+class MutationsTest(unittest.TestCase):
+    def setUp(self):
+        # Config resolution is its own call (tested in ConfigIdTest); seed the
+        # per-client cache so mutation tests hit only the phone-numbers URL.
+        self.client = make_client()
+        self.client._config_id = 3
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_create_posts_phone_number(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"id": 5, "address": "8008", "label": "Receptionist",
+                             "inbound_workflow_id": 3, "is_active": True}).encode())
+        client = self.client
+        agent = client.create_agent(address="8008", label="Receptionist", workflow_id=3)
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "POST")
+        self.assertTrue(req.full_url.endswith(
+            "/api/v1/organizations/telephony-configs/3/phone-numbers"))
+        body = json.loads(req.data)
+        self.assertEqual(body["address"], "8008")
+        self.assertEqual(body["inbound_workflow_id"], 3)
+        self.assertEqual(body["is_active"], True)
+        self.assertEqual(agent["extension"], "8008")
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_update_uses_put_and_clear_flag(self, m_url):
+        m_url.return_value = FakeResponse(200, b"{}")
+        client = self.client
+        client.update_agent(5, label="New Label", clear_workflow=True)
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "PUT")
+        body = json.loads(req.data)
+        self.assertEqual(body["label"], "New Label")
+        self.assertTrue(body["clear_inbound_workflow"])
+        self.assertNotIn("inbound_workflow_id", body)
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_update_sends_workflow_when_bound(self, m_url):
+        m_url.return_value = FakeResponse(200, b"{}")
+        client = self.client
+        client.update_agent(5, workflow_id=8, is_active=False)
+        body = json.loads(captured_request(m_url).data)
+        self.assertEqual(body["inbound_workflow_id"], 8)
+        self.assertFalse(body["is_active"])
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_delete_uses_delete_method(self, m_url):
+        m_url.return_value = FakeResponse(204, b"")
+        client = self.client
+        client.delete_agent(5)
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "DELETE")
+        self.assertTrue(req.full_url.endswith(
+            "/api/v1/organizations/telephony-configs/3/phone-numbers/5"))
+
+
+class FreePbxBuildersTest(unittest.TestCase):
+    def test_upsert_custom_extension_markers(self):
+        sql = agents.upsert_custom_extension_sql("8008", "Receptionist", "Business")
+        self.assertIn("INSERT INTO `custom_extensions`", sql)
+        self.assertIn("Dograh Voice Agent (Business)", sql)
+        self.assertIn("dograh-managed", sql)
+        self.assertIn("ON DUPLICATE KEY UPDATE", sql)
+
+    def test_sql_escaping(self):
+        sql = agents.upsert_custom_extension_sql("8009", "O'Brien's Agent", "")
+        self.assertIn("O''Brien''s Agent", sql)
+
+    def test_delete_custom_extension_targets_ext_only(self):
+        sql = agents.delete_custom_extension_sql("8008")
+        self.assertIn("DELETE FROM `custom_extensions` WHERE `custom_exten`='8008'", sql)
+
+    def test_custom_dest_json_shape(self):
+        dest = agents.custom_dest_json(12, "dograh-inbound,8008,1", "desc")
+        self.assertEqual(dest["destid"], 12)
+        self.assertEqual(dest["target"], "dograh-inbound,8008,1")
+        self.assertEqual(dest["destret"], "")  # empty = fwconsole reload safe
+
+    def test_inbound_route_marker_guard(self):
+        sql = agents.delete_inbound_route_sql("8008")
+        self.assertIn("`description` LIKE '%Dograh Voice Agent%'", sql)
+
+    def test_counts_are_marker_scoped(self):
+        self.assertIn("Dograh Voice Agent", agents.count_custom_extension_sql("8008"))
+        self.assertIn("Dograh Voice Agent", agents.count_inbound_route_sql("8008"))
+
+    def test_find_custom_dest_orders_by_key(self):
+        sql = agents.find_custom_dest_sql("kvstore_Customappsreg", "dograh-inbound,8008,1")
+        self.assertIn("ORDER BY CAST(`key` AS UNSIGNED)", sql)
+        self.assertIn("LIMIT 1", sql)
+
+    def test_dialplan_body_dynamic_only(self):
+        # 8003 is in the static 8000-8007 set — never re-emitted.
+        body = agents.dialplan_body(["8003", "8008", "8012"])
+        self.assertIn("exten => 8008,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertIn("exten => 8012,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertNotIn("exten => 8003,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertIn("[dograh-inbound]", body)
+        self.assertIn("[from-internal-custom]", body)
+        self.assertIn("Stasis(dograh)", body)
+
+    def test_dialplan_body_empty_when_all_static(self):
+        self.assertEqual(agents.dialplan_body(["8000", "8007"]), "")
+        self.assertEqual(agents.dialplan_body([]), "")
+
+    def test_dialplan_body_dedupes_and_sorts(self):
+        body = agents.dialplan_body(["8010", "8009", "8009"])
+        self.assertLess(body.index("8009"), body.index("8010"))
+        # Duplicates collapse to one entry per context (the NoOp prefix
+        # appears twice: once in [dograh-inbound], once in
+        # [from-internal-custom]).
+        self.assertEqual(body.count("exten => 8009,1,NoOp"), 2)
+        self.assertEqual(body.count("exten => 8010,1,NoOp"), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -974,6 +974,16 @@ services:
       AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
       AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
       CERULEAN_TENANT: "${CERULEAN_TENANT:-}"
+      # Dograh voice-agent management (Agents page): dograh-api runs in host
+      # mode, so the dashboard reaches it via host.docker.internal. Token is
+      # minted by scripts/dograh_wire.py; empty = page shows setup guidance.
+      DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
+      DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
+      DOGRAH_CONFIG_NAME: "${DOGRAH_CONFIG_NAME:-Asterisk ARI (dograh)}"
+      # standalone (default): dashboard provisions FreePBX rows directly
+      # (docker exec). addon: Zeus shared PBX — dashboard only manages dograh;
+      # the shared box applies the *_custom.conf moniker on sync.
+      CAPSTONE_DEPLOY_MODE: "${CAPSTONE_DEPLOY_MODE:-standalone}"
       # Shared Magnate storefront for entitlement checks (RevenueOps);
       # empty when running standalone (no billing).
       MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"
@@ -987,6 +997,10 @@ services:
       - /etc/passwd:/etc/host-passwd:ro
       - /etc/group:/etc/host-groupfile:ro
       - /:/host:ro   # whole-host proc/disk for /metrics + /snapshot
+    extra_hosts:
+      # dograh-api is host-mode — resolve its host address from the bridge
+      # (used by the Agents page / DOGRAH_API_ENDPOINT above).
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8095/healthz', timeout=5)"]
       interval: 15s

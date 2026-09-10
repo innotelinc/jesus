@@ -327,6 +327,36 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
       fail "telephony wiring incomplete (see report above) — run: python3 scripts/dograh_wire.py"
     fi
   fi
+
+  section "Control Center — /agents API"
+  # The Agents page's endpoints: /agents lists dograh phone numbers + their
+  # FreePBX provisioning status; /agents/workflows lists bindable workflows.
+  # The aggregator (dashboard-api) serves them on :8095; with no
+  # AUTHENTIK_ISSUER_URL the API is open, so no session cookie is needed.
+  agents_code=$(http_code http://127.0.0.1:8095/agents)
+  if [[ "$agents_code" == "200" ]]; then
+    pass "GET /agents → HTTP 200 (Control Center aggregator :8095)"
+  else
+    fail "GET /agents → HTTP '$agents_code' — is dashboard-api up?"
+  fi
+  agents_json=$(curl -sS --max-time 10 http://127.0.0.1:8095/agents 2>/dev/null || true)
+  if [[ -n "$agents_json" ]] && echo "$agents_json" | grep -q '"agents"' && echo "$agents_json" | grep -q '"configured"'; then
+    if echo "$agents_json" | grep -q '"configured":true'; then
+      pass "/agents reports dograh configured (mode: $(echo "$agents_json" | grep -o '"mode":"[^"]*"' | head -1 | cut -d'"' -f4))"
+    else
+      warn "/agents: dograh not configured (DOGRAH_API_TOKEN missing) — page shows setup guidance"
+    fi
+  else
+    warn "/agents response malformed — check dashboard-api logs"
+  fi
+  workflows_code=$(http_code http://127.0.0.1:8095/agents/workflows)
+  if [[ "$workflows_code" == "200" ]]; then
+    pass "GET /agents/workflows → HTTP 200"
+  elif [[ "$workflows_code" == "503" ]]; then
+    warn "GET /agents/workflows → 503 (dograh not configured) — expected without DOGRAH_API_TOKEN"
+  else
+    fail "GET /agents/workflows → HTTP '$workflows_code'"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
