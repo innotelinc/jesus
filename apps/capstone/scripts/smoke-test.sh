@@ -333,13 +333,37 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   # FreePBX provisioning status; /agents/workflows lists bindable workflows.
   # The aggregator (dashboard-api) serves them on :8095; with no
   # AUTHENTIK_ISSUER_URL the API is open, so no session cookie is needed.
-  agents_code=$(http_code http://127.0.0.1:8095/agents)
+  # When the Authentik OIDC gate is enabled (AUTHENTIK_ISSUER_URL in .env),
+  # mint an HMAC-signed session cookie the same way auth.py does — the gate
+  # reads CERULEAN_TENANT and the tenant group name from the cookie payload.
+  AGENTS_CURL=(curl -sS --max-time 10)
+  AGENT_COOKIE=""
+  if [[ -n "${AUTHENTIK_ISSUER_URL:-}" && -n "${AUTHENTIK_CLIENT_SECRET:-}" ]]; then
+    AGENT_COOKIE=$(python3 - "$AUTHENTIK_CLIENT_SECRET" "${CERULEAN_TENANT:-default}" <<'PYEOF'
+import base64, hashlib, hmac, json, sys, time
+secret, tenant = sys.argv[1], sys.argv[2]
+payload = {
+    "sub": "smoke-test",
+    "email": "dhunter@innotel.us",
+    "name": "Smoke Test",
+    "groups": [tenant],
+    "tenant": tenant,
+    "exp": int(time.time()) + 3600,
+}
+body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+sig = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+print(f"{body}.{sig}")
+PYEOF
+)
+    AGENTS_CURL+=(-H "Cookie: capstone_session=$AGENT_COOKIE")
+  fi
+  agents_code=$("${AGENTS_CURL[@]}" -o /dev/null -w '%{http_code}' http://127.0.0.1:8095/agents 2>/dev/null)
   if [[ "$agents_code" == "200" ]]; then
     pass "GET /agents → HTTP 200 (Control Center aggregator :8095)"
   else
     fail "GET /agents → HTTP '$agents_code' — is dashboard-api up?"
   fi
-  agents_json=$(curl -sS --max-time 10 http://127.0.0.1:8095/agents 2>/dev/null || true)
+  agents_json=$("${AGENTS_CURL[@]}" http://127.0.0.1:8095/agents 2>/dev/null || true)
   if [[ -n "$agents_json" ]] && echo "$agents_json" | grep -q '"agents"' && echo "$agents_json" | grep -q '"configured"'; then
     if echo "$agents_json" | grep -q '"configured":true'; then
       pass "/agents reports dograh configured (mode: $(echo "$agents_json" | grep -o '"mode":"[^"]*"' | head -1 | cut -d'"' -f4))"
@@ -349,7 +373,7 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   else
     warn "/agents response malformed — check dashboard-api logs"
   fi
-  workflows_code=$(http_code http://127.0.0.1:8095/agents/workflows)
+  workflows_code=$("${AGENTS_CURL[@]}" -o /dev/null -w '%{http_code}' http://127.0.0.1:8095/agents/workflows 2>/dev/null)
   if [[ "$workflows_code" == "200" ]]; then
     pass "GET /agents/workflows → HTTP 200"
   elif [[ "$workflows_code" == "503" ]]; then
@@ -396,11 +420,14 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
     fail "PBX does not publish Webmin on TCP 10000"
   fi
   # Expected published set: 80, 5038, 5060, 5061, 8088, 8089, 10000/tcp,
-  # 5060/udp and the exact RTP block 10101-10120/udp — nothing else on UDP.
+  # 5060/udp, the exact RTP block 10101-10120/udp, and the dedicated
+  # VoIP.ms outbound register port (VOIPMS_REGISTER_PORT, default 5065) —
+  # nothing else on UDP.
   expected_rtp=$(seq 10101 10120 | sed 's/$/\/udp/')
-  actual_rtp=$(grep '/udp$' <<<"$pbx_ports" | grep -v '^5060/udp$' || true)
+  voipms_port="${VOIPMS_REGISTER_PORT:-5065}/udp"
+  actual_rtp=$(grep '/udp$' <<<"$pbx_ports" | grep -v '^5060/udp$' | grep -v "^${voipms_port}$" || true)
   if [[ -n "$actual_rtp" ]] && [[ "$(printf '%s\n' "$actual_rtp")" == "$(printf '%s\n' "$expected_rtp")" ]]; then
-    pass "PBX publishes exact RTP range UDP 10101-10120"
+    pass "PBX publishes exact RTP range UDP 10101-10120 (+ VoIP.ms ${voipms_port})"
   else
     fail "PBX RTP mapping is not exactly UDP 10101-10120 (got: $(tr '\n' ' ' <<<"$actual_rtp"))"
   fi

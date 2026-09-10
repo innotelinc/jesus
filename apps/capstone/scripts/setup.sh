@@ -183,6 +183,23 @@ fi
 # Load the env for the rest of the script
 set -a; source "$ENV_FILE"; set +a
 
+# Guard against pointing dograh's advertised API endpoint at the dograh-ui
+# Next.js port (3010). The UI proxies HTTP /api/v1/* to the backend, but
+# Next.js route handlers cannot perform WebSocket upgrades, so a test call
+# from the browser fails with "WebSocket connection failed" — the signaling
+# WebSocket (ws://…/api/v1/ws/signaling/…) must be served by dograh-api on
+# port 8000. Warn loudly instead of letting the call silently break.
+for _key in BACKEND_API_ENDPOINT PUBLIC_BASE_URL; do
+    _val="${!_key:-}"
+    if [[ "$_val" =~ :3010([/]|$) ]]; then
+        warn "$_key=$_val points at the dograh-ui port (3010). The browser builds its"
+        warn "    WebSocket signaling URL from this value, and Next.js cannot proxy WebSocket"
+        warn "    upgrades — test calls fail with 'WebSocket connection failed'. Point it at"
+        warn "    the dograh-api port instead: http://<host-LAN-IP>:8000"
+    fi
+done
+unset _key _val
+
 # Ensure existing installations also receive generated TURN settings. Explicit
 # non-placeholder values are preserved on reruns.
 turn_changed=0
