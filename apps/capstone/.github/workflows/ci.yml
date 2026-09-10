@@ -21,7 +21,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: ShellCheck tracked shell scripts
         run: |
@@ -35,7 +35,7 @@ jobs:
     name: PBX converge tool
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Unit tests for the per-context dialplan merge tool
         run: python3 -m unittest discover -s pbx/tests -v
@@ -59,7 +59,7 @@ jobs:
     name: Zeus portal API client
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Unit tests for the Zeus portal API client
         run: python3 -m unittest discover -s scripts/tests -v
@@ -73,7 +73,7 @@ jobs:
     name: Route sync Magnate gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Dry-run every Magnate gate state
         run: python3 scripts/test_dograh_routes_gate.py
@@ -86,7 +86,7 @@ jobs:
     name: Dashboard tenant gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Unit tests for the tenant gate
         run: python3 -m unittest discover -s dashboard-backend/tests -v
@@ -98,9 +98,9 @@ jobs:
       run:
         working-directory: dashboard
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -123,7 +123,7 @@ jobs:
     name: No docker-IP / localhost leaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Dashboard fallback data has no docker-bridge IPs or localhost links
         run: |
