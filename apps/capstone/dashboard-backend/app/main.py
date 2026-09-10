@@ -47,6 +47,7 @@ from .auth import (
     require_session,
 )
 from .entitlements import check_entitlement
+from .tenant_gate import has_tenant_access
 
 ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
 PASSWD_FILE = os.environ.get("HOST_PASSWD_FILE", "/etc/host-passwd")
@@ -1177,6 +1178,10 @@ async def auth_callback(code: str | None = None, state: str | None = None, error
     user = exchange_and_user(code, challenge.verifier)
     if not is_admin_user(user):
         return RedirectResponse(url="/?auth_error=not_authorized", status_code=302)
+    if not has_tenant_access(user):
+        # Cerulean tenant gate: the account is allowed in, but belongs to no
+        # tenant this dashboard serves (CERULEAN_TENANT).
+        return RedirectResponse(url="/?auth_error=no_tenant", status_code=302)
     resp = RedirectResponse(url="/", status_code=302)
     resp.set_cookie(
         COOKIE_NAME,

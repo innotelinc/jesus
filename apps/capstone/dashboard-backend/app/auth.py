@@ -27,6 +27,8 @@ from typing import Any
 from fastapi import Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from .tenant_gate import cerulean_tenant, user_groups
+
 COOKIE_NAME = "capstone_session"
 SESSION_TTL = 8 * 60 * 60  # 8 hours
 
@@ -72,6 +74,8 @@ def issue_session(user: dict[str, Any]) -> str:
         "sub": user.get("sub", ""),
         "email": (user.get("email") or "").lower(),
         "name": user.get("name") or user.get("preferred_username") or "",
+        "groups": sorted(user_groups(user)),
+        "tenant": cerulean_tenant() or None,
         "exp": int(time.time()) + SESSION_TTL,
     }
     body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
@@ -118,11 +122,13 @@ def authorize_url(next_path: str = "/") -> tuple[str, OidcChallenge]:
         hashlib.sha256(verifier.encode()).digest()
     ).decode().rstrip("=")
     state = secrets.token_urlsafe(24)
+    # `groups` scope is required so Authentik's userinfo includes the
+    # user's group memberships (needed for the Cerulean tenant gate).
     params = urllib.parse.urlencode({
         "response_type": "code",
         "client_id": os.environ["AUTHENTIK_CLIENT_ID"],
         "redirect_uri": redirect_uri(),
-        "scope": "openid profile email",
+        "scope": "openid profile email groups",
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
@@ -131,8 +137,27 @@ def authorize_url(next_path: str = "/") -> tuple[str, OidcChallenge]:
     return url, OidcChallenge(state=state, verifier=verifier)
 
 
+def _decode_jwt_claims(token: str) -> dict[str, Any]:
+    """Decode JWT payload without verification (for group fallback)."""
+    try:
+        parts = token.split(".")
+        if len(parts) < 2:
+            return {}
+        payload = parts[1]
+        padded = payload + "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(padded).decode())
+    except Exception:
+        return {}
+
+
 def exchange_and_user(code: str, verifier: str) -> dict[str, Any]:
-    """Exchange the auth code for tokens, then fetch userinfo."""
+    """Exchange the auth code for tokens, then fetch userinfo.
+
+    Merges `groups` from both userinfo and the id_token/access_token
+    claims, because Authentik only includes groups when the `groups` scope
+    is requested AND a property mapping exposes it — the JWT fallback keeps
+    the tenant gate working even when userinfo is minimal.
+    """
     disc = _discovery()
     token_body = urllib.parse.urlencode({
         "grant_type": "authorization_code",
@@ -158,9 +183,22 @@ def exchange_and_user(code: str, verifier: str) -> dict[str, Any]:
     ureq.add_header("Authorization", f"Bearer {access}")
     try:
         with urllib.request.urlopen(ureq, timeout=15) as resp:  # noqa: S310
-            return json.loads(resp.read().decode())
+            userinfo: dict[str, Any] = json.loads(resp.read().decode())
     except urllib.error.HTTPError as err:
         raise HTTPException(status_code=502, detail=f"Userinfo failed (HTTP {err.code})") from err
+
+    # Fallback: extract groups from the JWTs when userinfo omits them.
+    if not userinfo.get("groups") and not userinfo.get("group"):
+        for tok in (tokens.get("id_token"), access):
+            if tok:
+                claims = _decode_jwt_claims(tok)
+                if claims.get("groups"):
+                    userinfo["groups"] = claims["groups"]
+                    break
+                if claims.get("group"):
+                    userinfo["groups"] = claims["group"]
+                    break
+    return userinfo
 
 
 def is_admin_user(user: dict[str, Any]) -> bool:

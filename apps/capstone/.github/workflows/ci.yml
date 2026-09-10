@@ -78,6 +78,19 @@ jobs:
       - name: Dry-run every Magnate gate state
         run: python3 scripts/test_dograh_routes_gate.py
 
+  # Cerulean tenant gate: the Authentik group-NAME → tenant-slug matching that
+  # decides whether a signed-in user may use the control center at all (the
+  # dashboard's own "no tenant here" gate). Pure stdlib — no FastAPI, no
+  # Authentik, no .env required.
+  dashboard-tenant-gate:
+    name: Dashboard tenant gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests for the tenant gate
+        run: python3 -m unittest discover -s dashboard-backend/tests -v
+
   dashboard-build:
     name: Dashboard build
     runs-on: ubuntu-latest
