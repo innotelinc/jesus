@@ -2115,7 +2115,11 @@ def interview_reports(user: dict = Depends(require_session)):
     return {
         "configured": True,
         "docId": client.doc,
-        "reports": [interviews.row_to_report(r) for r in rows],
+        # Newest first (Grist record ids are monotonic) — the reports page
+        # table and the overview widget both expect most-recent-first.
+        "reports": interviews.sort_reports(
+            interviews.row_to_report(r) for r in rows
+        ),
     }
 
 

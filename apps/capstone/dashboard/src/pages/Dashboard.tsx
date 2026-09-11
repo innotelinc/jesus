@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Entitlement, Service } from '../types';
+import type { InterviewReport } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
 import { useMetricsPolling } from '../hooks/useMetricsPolling';
 import { api } from '../lib/api';
@@ -61,6 +62,7 @@ const quickLinks = [
   { label: 'Health & Status', to: '/health', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg> },
   { label: 'Softphone', to: '/softphone', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg> },
   { label: 'Secrets Vault', to: '/secrets', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg> },
+  { label: 'Interview Reports', to: '/interviews', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M16 13H8" /><path d="M16 17H8" /></svg> },
 ];
 
 export default function Dashboard() {
@@ -75,6 +77,26 @@ export default function Dashboard() {
 
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [entitlementState, setEntitlementState] = useState<'loading' | 'live' | 'error'>('loading');
+
+  // ── Interview reports (grader Grist doc, newest first) ────────────────
+  const [recentReports, setRecentReports] = useState<InterviewReport[]>([]);
+  const [reportsState, setReportsState] = useState<'loading' | 'live' | 'error' | 'unconfigured'>('loading');
+
+  const loadInterviewReports = useCallback(async () => {
+    try {
+      const res = await api.interviewReports();
+      if (!res.configured) {
+        setReportsState('unconfigured');
+        return;
+      }
+      setRecentReports(res.reports.slice(0, 5));
+      setReportsState('live');
+    } catch {
+      setReportsState('error');
+    }
+  }, []);
+
+  useEffect(() => { void loadInterviewReports(); }, [loadInterviewReports]);
 
   const loadEntitlement = useCallback(async () => {
     try {
@@ -179,7 +201,7 @@ export default function Dashboard() {
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 Export
               </Button>
-              <Button size="sm" disabled={dataState === 'loading'} onClick={() => { void refresh(); void refreshSnapshot(); void loadEntitlement(); }}>
+              <Button size="sm" disabled={dataState === 'loading'} onClick={() => { void refresh(); void refreshSnapshot(); void loadEntitlement(); void loadInterviewReports(); }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
                 Refresh
               </Button>
@@ -310,6 +332,76 @@ export default function Dashboard() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
             </a>
           </div>
+        )}
+      </section>
+
+      {/* ── Interview reports (latest grader results) ───────────────────── */}
+      <section className="rounded-2xl border bg-card shadow-sm">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Mock Interviews</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight">Latest interview reports</h2>
+          </div>
+          <Link to="/interviews" className="text-sm text-primary hover:underline">View all →</Link>
+        </div>
+        {reportsState === 'unconfigured' ? (
+          <div className="px-5 py-8 text-sm text-muted-foreground">
+            Grist is not configured — set <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">GRIST_DOC_ID</code>
+            and restart dashboard-api to show graded reports here.
+          </div>
+        ) : reportsState === 'error' ? (
+          <div className="px-5 py-8 text-sm text-muted-foreground">
+            Interview reports unavailable — the dashboard API could not reach Grist.
+          </div>
+        ) : reportsState === 'loading' ? (
+          <div className="flex items-center gap-3 px-5 py-8 text-sm text-muted-foreground">
+            <span className="inline-flex h-2 w-2 rounded-full bg-info animate-pulse-slow" />
+            Loading reports…
+          </div>
+        ) : recentReports.length === 0 ? (
+          <div className="flex items-center gap-3 px-5 py-8 text-sm text-muted-foreground">
+            <span className="inline-flex h-2 w-2 rounded-full bg-success animate-pulse-slow" />
+            No graded interviews yet — reports appear here after the first graded call hang-up.
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {recentReports.map(r => (
+              <li key={r.id}>
+                <Link
+                  to="/interviews"
+                  className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                >
+                  <span className={cn(
+                    'h-2 w-2 shrink-0 rounded-full',
+                    r.verdict === 'pass' ? 'bg-success' : r.verdict === 'review' ? 'bg-warning' : r.verdict === 'fail' ? 'bg-danger' : 'bg-muted-foreground/60',
+                  )} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{r.student || 'Unnamed candidate'}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.trackLabel}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className={cn(
+                      'text-sm font-semibold tabular-nums',
+                      r.score === null ? 'text-muted-foreground' : r.score >= 75 ? 'text-success' : r.score >= 60 ? 'text-warning' : 'text-danger',
+                    )}>
+                      {r.score === null ? '—' : Math.round(r.score)}
+                    </span>
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize',
+                        r.verdict === 'pass' ? 'border-success/40 text-success'
+                          : r.verdict === 'review' ? 'border-warning/40 text-warning'
+                          : r.verdict === 'fail' ? 'border-danger/40 text-danger'
+                          : 'border-muted-foreground/30 text-muted-foreground',
+                      )}
+                    >
+                      {r.verdict}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
