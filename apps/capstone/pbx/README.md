@@ -196,6 +196,59 @@ automatically from `/api/turnconfig`), and the internal `:8089` listener
 remains the direct-LAN fallback. See README → “NPM proxy hosts” for the
 full host list.
 
+**Simplest path — no extra proxy host.** The Control Center's own nginx
+already serves `/ws` on its origin (`dashboard/nginx.conf`: `location = /ws`
+→ `pbx-freepbx:8089`, upstream TLS verification off) and resolves the PBX per
+request, so the dashboard still boots if the PBX is down. The softphone on an
+HTTPS page targets its own origin (`wss://dashboard.<domain>/ws`), which means
+the **only** certificate the browser sees is the one the outer proxy already
+issued for the dashboard host — no `voice.` subdomain required. Two
+requirements on that outer proxy host: **Websocket Support enabled**, and the
+page itself served over HTTPS (a plain-HTTP origin is not a secure context, so
+`getUserMedia` has no microphone and the softphone can't place calls).
+
+> The browser will **not** accept the PBX's own `:8089` listener directly: the
+> image ships a build-time self-signed cert (`CN=buildkitsandbox`, no SAN) that
+> can't match any host, so the WSS handshake fails and the softphone reports
+> “Registration failed”. That listener is a LAN/`--insecure` fallback only —
+> use the proxied `/ws` path above for browsers.
+
+**Media (STUN/TURN).** `/turnconfig` hands the browser the STUN/TURN addresses
+it must use *and* the credentials: it advertises the host the browser reached
+the dashboard on (a LAN IP in a STUN URL is unreachable from a remote client, so
+ICE never gets a server-reflexive candidate) and returns `TURN_USERNAME` /
+`TURN_PASSWORD` from `.env`. Two `.env` settings make the relay actually work —
+coturn runs behind Docker NAT, so it must be told which public address to
+advertise for relayed candidates, and the credentials must not be the
+template's `turnuser` / `change-me-*` defaults:
+
+```bash
+# .env (see .env.example lines ~106-118)
+TURN_USERNAME=capstone-turn
+TURN_PASSWORD=<random secret>
+TURN_REALM=capstone.innotel.us
+TURN_EXTERNAL_IP=          # empty = auto-detect on every coturn start
+```
+
+`TURN_EXTERNAL_IP` is left **empty** on purpose: the coturn image's entrypoint
+`eval`s its arguments and ships `detect-external-ip` (a DNS query that returns
+the caller's public address), so the compose command uses
+`--external-ip=${TURN_EXTERNAL_IP:-$(detect-external-ip)}` and every container
+start re-detects. Pin an address only where that DNS probe is blocked — a
+pinned value goes stale when the WAN IP changes, and off-LAN calls then set up
+and carry no audio. `scripts/smoke-e2e.sh` fails when the running server
+advertises something other than the address this box resolves to now.
+
+Relay range `49152-49251/udp` plus `3478/tcp+udp` must be forwarded for remote
+clients; on-LAN clients work without the relay.
+
+Verify the browser's exact path (strict TLS, no `--insecure`):
+
+```bash
+# expect: 101 upgrade → 401 challenge → 200 OK → RESULT: PASS
+python3 scripts/webrtc-register-test.py --host dashboard.<domain> --port 443
+```
+
 The STUN/TURN address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
 compose service, same Docker network — always resolvable from inside the
 container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. TURN

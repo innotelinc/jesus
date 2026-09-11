@@ -241,7 +241,16 @@ services:
       - --min-port=${TURN_RELAY_PORT_START:-49152}
       - --max-port=${TURN_RELAY_PORT_END:-49251}
       - --listening-ip=0.0.0.0
-      - --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
+      # Public address coturn advertises for relayed candidates. Behind Docker
+      # NAT it cannot discover this itself, so it must be told — and a pinned
+      # address silently rots when the WAN IP changes (relay candidates then
+      # point at an address nobody can reach and calls carry no audio).
+      #
+      # The coturn image's entrypoint eval()s each argument and ships
+      # detect-external-ip (a DNS query that returns the caller's public IP),
+      # so this is detected on every container start. Pin TURN_EXTERNAL_IP in
+      # .env only for a box where the DNS probe is blocked.
+      - --external-ip=${TURN_EXTERNAL_IP:-$(detect-external-ip)}
       - --log-file=stdout
       - --simple-log
     environment:

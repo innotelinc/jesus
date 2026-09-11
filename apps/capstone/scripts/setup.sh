@@ -163,16 +163,21 @@ else
     HOST_IP="${HOST_IP:-127.0.0.1}"
     sed -i "s|^BACKEND_API_ENDPOINT=.*|BACKEND_API_ENDPOINT=http://${HOST_IP}:8000|" "$ENV_FILE"
     sed -i "s|^PUBLIC_BASE_URL=.*|PUBLIC_BASE_URL=http://${HOST_IP}:8000|" "$ENV_FILE"
-    # Coturn needs an externally reachable address and a matching realm. Use
-    # the host's public IPv4 when available; fall back to localhost for local
-    # development. Preserve explicit user values on reruns.
-    TURN_IP="${TURN_EXTERNAL_IP:-}"
-    if [ -z "$TURN_IP" ] || [ "$TURN_IP" = "127.0.0.1" ] || [ "$TURN_IP" = "203.0.113.10" ]; then
-        TURN_IP=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)
-    fi
-    TURN_IP="${TURN_IP:-127.0.0.1}"
-    sed -i "s|^TURN_EXTERNAL_IP=.*|TURN_EXTERNAL_IP=${TURN_IP}|" "$ENV_FILE"
-    sed -i "s|^TURN_REALM=.*|TURN_REALM=${TURN_IP}|" "$ENV_FILE"
+    # Coturn must be told the address it advertises for relayed candidates
+    # (behind Docker NAT it cannot discover its own WAN address) — but baking a
+    # detected IP in here rots: after the next WAN change every relay candidate
+    # points somewhere unreachable and off-LAN calls set up yet carry no audio.
+    # Leave TURN_EXTERNAL_IP EMPTY instead — the coturn image detects the public
+    # address on every container start (--external-ip=$(detect-external-ip)).
+    # An explicit non-placeholder pin is preserved.
+    TURN_PIN="${TURN_EXTERNAL_IP:-}"
+    case "$TURN_PIN" in
+        127.0.0.1|203.0.113.10) TURN_PIN="" ;;   # placeholders, not pins
+    esac
+    # The realm is only a stable string in the digest challenge (clients echo it
+    # back), so the public base domain is the natural choice.
+    sed -i "s|^TURN_EXTERNAL_IP=.*|TURN_EXTERNAL_IP=${TURN_PIN}|" "$ENV_FILE"
+    sed -i "s|^TURN_REALM=.*|TURN_REALM=${NPM_BASE_DOMAIN:-turn.example.com}|" "$ENV_FILE"
     sed -i "s|^TURN_LISTENING_PORT=.*|TURN_LISTENING_PORT=3478|" "$ENV_FILE"
     sed -i "s|^TURN_RELAY_PORT_START=.*|TURN_RELAY_PORT_START=49152|" "$ENV_FILE"
     sed -i "s|^TURN_RELAY_PORT_END=.*|TURN_RELAY_PORT_END=49251|" "$ENV_FILE"
@@ -211,13 +216,17 @@ if [ -z "${TURN_PASSWORD:-}" ] || [[ "${TURN_PASSWORD}" == change-me* ]]; then
     TURN_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=')"
     turn_changed=1
 fi
-if [ -z "${TURN_EXTERNAL_IP:-}" ] || [ "${TURN_EXTERNAL_IP}" = "127.0.0.1" ] || [ "${TURN_EXTERNAL_IP}" = "203.0.113.10" ]; then
-    TURN_EXTERNAL_IP="$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)"
-    TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
-    turn_changed=1
-fi
+# TURN_EXTERNAL_IP is deliberately never filled in with a detected address
+# (see the note at the top of this section): the coturn image detects the public
+# address on every start. Only migrate existing installs off a value an older
+# setup run wrote for localhost.
+case "${TURN_EXTERNAL_IP:-}" in
+    127.0.0.1|203.0.113.10)
+        TURN_EXTERNAL_IP=""
+        turn_changed=1 ;;
+esac
 if [ -z "${TURN_REALM:-}" ] || [ "${TURN_REALM}" = "turn.example.com" ]; then
-    TURN_REALM="$TURN_EXTERNAL_IP"
+    TURN_REALM="${NPM_BASE_DOMAIN:-turn.example.com}"
     turn_changed=1
 fi
 if [ "$turn_changed" -eq 1 ]; then

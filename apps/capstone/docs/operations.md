@@ -31,22 +31,29 @@ Status**, **Network Ports**, **Alerts**, **Secrets inventory**, **Users**, **Mon
 registers to the PBX over WSS (`/softphone`, extension 101 by default, STUN/TURN pulled
 from coturn via `/api/turnconfig`).
 
-> Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the public WSS
-> endpoint and connects to `wss://voice.<NPM_BASE_DOMAIN>/ws` when a proxy domain is
-> configured (see [NPM proxy hosts](#npm-proxy-hosts)); otherwise it falls back to the page
-> origin — `wss://<host>/ws` over HTTPS, or `wss://<host>:8089/ws` over plain HTTP on the
-> LAN. Hitting the PBX directly on `:8089` presents the self-signed integration cert, so a
-> browser will ask you to accept it once.
+> Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the STUN/TURN
+> endpoints (with credentials) and the WSS endpoint. On an HTTPS page that endpoint is this
+> dashboard's **own origin** — `wss://<dashboard host>/ws`, which `dashboard/nginx.conf`
+> (`location = /ws`) forwards to the PBX's PJSIP WSS listener. The browser therefore only
+> ever sees the certificate the reverse proxy issued for that host. `voice.<NPM_BASE_DOMAIN>`
+> (see [NPM proxy hosts](#npm-proxy-hosts)) remains supported when a proxy domain is
+> configured. The PBX's own `:8089` listener is a LAN/`--insecure` fallback only: it serves
+> the image's build-time self-signed cert (`CN=buildkitsandbox`, no SAN), which browsers
+> reject outright, so it cannot be made to work by accepting a warning. The page also has to
+> be served over **HTTPS** — a plain-HTTP origin is not a secure context, so `getUserMedia`
+> has no microphone and calls can't carry audio.
 
 ## PBX / Asterisk side
 
 FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports
 `10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict.
 Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*`
-variables in `.env`. Setup automatically generates the TURN username/password and uses the
-server's public IPv4 for `TURN_EXTERNAL_IP` and `TURN_REALM`, falling back to `127.0.0.1`
-when public-IP detection is unavailable. Asterisk HTTP/ARI is exposed on `8088`, with the
-Dograh ARI user and inbound dialplan injected during PBX startup.
+variables in `.env`. Setup generates the TURN username/password and points `TURN_REALM` at
+the public base domain. It leaves `TURN_EXTERNAL_IP` **empty**: the coturn image detects
+this host's public address on every start (`detect-external-ip`) and advertises it for
+relayed candidates, so a WAN IP change does not rot the relay. Pin an address only where
+that DNS probe is blocked. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI
+user and inbound dialplan injected during PBX startup.
 
 The PBX is a service in the main compose file, so one command brings up the entire stack:
 
@@ -135,16 +142,17 @@ reruns:
 ```bash
 TURN_USERNAME=<generated username>
 TURN_PASSWORD=<generated password>
-TURN_REALM=<public IPv4 or 127.0.0.1>
-TURN_EXTERNAL_IP=<public IPv4 or 127.0.0.1>
+TURN_REALM=<public base domain>
+TURN_EXTERNAL_IP=          # empty = detected by coturn on every start
 TURN_LISTENING_PORT=3478
 TURN_RELAY_PORT_START=49152
 TURN_RELAY_PORT_END=49251
 ```
 
 For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/udp` from the
-router to this host. Replace the localhost fallback with the real public IP before using
-TURN across NAT.
+router to this host. `scripts/smoke-e2e.sh` fails when the running coturn advertises an
+address other than the one this host resolves to now, and warns when the PBX's
+`external_media_address` disagrees with it (that one is set in FreePBX's SIP settings).
 
 ## NPM proxy hosts
 
