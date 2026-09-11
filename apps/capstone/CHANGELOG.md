@@ -3,6 +3,33 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.18 — Stack access is visible (and reviewable) from the Control Center
+
+Release `v3.18` makes the Cerulean Authentik access model inspectable: an
+operator can now see which stack each identity can reach and whether that
+stack is actually gated, without opening the Authentik admin UI.
+
+Highlights of v3.18:
+
+- **`--access-report` on `scripts/authentik_bootstrap.py`**: a read-only review
+  table of every stack (applications, how many are gated, members) plus a
+  user × stack reachability matrix, the tiles-only applications that have no
+  login flow to gate, and a warning listing any provider-backed application
+  that is still open to every authenticated user.
+- **Health page → "Stack SSO & access" panel**: the Control Center now renders
+  the same inventory (summary chips, per-stack gated counts and members, the
+  identity × stack matrix, and a banner for anything ungated). Backed by a new
+  session-gated `GET /authentik/access` endpoint and a dependency-free
+  `app/stack_access.py` module that derives the stack list from
+  `Application.group` (so it cannot drift from the live data), aggregates
+  reachability with one `?for_user=` call per identity, and caches for 60s.
+  The admin token stays server-side; the browser only sees the aggregate.
+- **`capstone.service` installable again**: the unit shipped a hard-coded
+  `WorkingDirectory=/usr/src/projects/capstone`, so on any host where the repo
+  lived elsewhere systemd could not start the stack. It now uses the
+  `/PATH/TO/CAPSTONE` placeholder `scripts/install-capstone.sh` rewrites (the
+  same convention as `capstone-pbx-sync.service`).
+
 ## v3.17 — Stack access enforced + PBX sync on a 12-hour reconciliation
 
 Release `v3.17` turns the per-stack Authentik groups from portal-organising

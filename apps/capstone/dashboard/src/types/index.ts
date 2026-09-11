@@ -181,6 +181,55 @@ export interface Incident {
   resolvedAt?: string;
 }
 
+/** Which stack an Authentik application belongs to, and how many of its
+ *  applications are actually gated by a group policy binding. */
+export interface StackAccessStack {
+  name: string;
+  applications: number;
+  enforced: number;
+  members: string[];
+}
+
+/** One Authentik identity and the stacks it can currently reach. */
+export interface StackAccessUser {
+  username: string;
+  type: string;
+  superuser: boolean;
+  active: boolean;
+  /** true for machine/service identities (never a human operator). */
+  machine: boolean;
+  stacks: string[];
+  applications: number;
+}
+
+/** Application with a login flow but no group binding — open to every
+ *  authenticated user. */
+export interface StackAccessOpenApp {
+  slug: string;
+  name: string;
+  stack: string;
+}
+
+export interface StackAccessStatus {
+  configured: boolean;
+  ok: boolean;
+  baseUrl: string;
+  generatedAt: string;
+  error: string | null;
+  summary: {
+    stacks: number;
+    users: number;
+    applications: number;
+    enforced: number;
+    ungated: number;
+  };
+  stacks: StackAccessStack[];
+  users: StackAccessUser[];
+  ungated: StackAccessOpenApp[];
+  /** Portal tiles with no provider — nothing to gate. */
+  tilesOnly: string[];
+}
+
 export interface Entitlement {
   entitled: boolean | null;
   source: 'magnate' | 'standalone' | 'unreachable' | 'unauthorized';

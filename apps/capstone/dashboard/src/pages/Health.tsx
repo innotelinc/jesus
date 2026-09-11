@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
-import type { HealthMatrixEntry } from '../types';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import type { HealthMatrixEntry, StackAccessStatus } from '../types';
+import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
@@ -36,10 +37,37 @@ export default function Health() {
   const { healthData, incidents } = useDashboardData();
   const [checkFilter, setCheckFilter] = useState('all');
 
+  const [stackAccess, setStackAccess] = useState<StackAccessStatus | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
+
+  // Stack SSO/access is a separate, slower call (it talks to the IdP), so it is
+  // fetched on its own instead of blocking the main dashboard payload.
+  const loadStackAccess = useCallback(async () => {
+    setAccessLoading(true);
+    try {
+      setStackAccess(await api.authentikAccess());
+    } catch {
+      setStackAccess(null);
+    } finally {
+      setAccessLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStackAccess();
+  }, [loadStackAccess]);
+
   const filtered = useMemo(() => {
     if (checkFilter === 'all') return healthData;
     return healthData.filter(e => e.status === checkFilter);
-  }, [checkFilter]);
+  }, [checkFilter, healthData]);
+
+  // Only stacks with a real login flow to gate are columns in the matrix — a
+  // tiles-only stack has nothing to be granted or denied.
+  const gatedStacks = useMemo(
+    () => (stackAccess?.stacks ?? []).filter(s => s.applications > 0),
+    [stackAccess],
+  );
 
   return (
     <div className="space-y-6">
@@ -133,6 +161,145 @@ export default function Health() {
             <p className="mt-2 text-sm font-medium">No services match the selected status.</p>
           </div>
         )}
+      </div>
+
+      {/* Stack SSO & access — which Cerulean Authentik identity can reach which
+          stack, and whether a group binding actually enforces it. */}
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Stack SSO &amp; access</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Which identity can reach which stack, and whether a group binding gates it.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void loadStackAccess()} disabled={accessLoading}>
+            {accessLoading ? 'Re-checking…' : 'Re-check'}
+          </Button>
+        </div>
+
+        <div className="mt-2">
+          {stackAccess === null ? (
+            <div className="border rounded-2xl bg-card shadow-sm p-4 text-sm text-muted-foreground">
+              {accessLoading ? 'Reading Authentik…' : 'Stack access inventory unavailable.'}
+            </div>
+          ) : !stackAccess.ok ? (
+            <div className="border rounded-2xl bg-card shadow-sm p-4">
+              <p className="text-sm font-medium text-warning">Couldn't read the Authentik access inventory</p>
+              <p className="mt-1 text-xs text-muted-foreground">{stackAccess.error || 'The identity provider did not answer.'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The Control Center needs <code>AUTHENTIK_TOKEN</code> (and <code>AUTHENTIK_PUBLIC_URL</code> or{' '}
+                <code>AUTHENTIK_API_URL</code> when the IdP is not reachable at auth.&lt;domain&gt;).
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  `${stackAccess.summary.stacks} stacks`,
+                  `${stackAccess.summary.applications} applications`,
+                  `${stackAccess.summary.enforced} gated`,
+                  `${stackAccess.summary.ungated} open`,
+                  `${stackAccess.summary.users} identities`,
+                ].map(chip => (
+                  <span key={chip} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{chip}</span>
+                ))}
+              </div>
+
+              {stackAccess.ungated.length > 0 && (
+                <div className="rounded-2xl border border-warning/40 bg-warning/8 p-4">
+                  <p className="text-sm font-medium text-warning">
+                    {stackAccess.ungated.length} application{stackAccess.ungated.length === 1 ? '' : 's'} not gated — every signed-in user can reach {stackAccess.ungated.length === 1 ? 'it' : 'them'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {stackAccess.ungated.map(app => (
+                      <span key={app.slug} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{app.slug} · {app.stack}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Stack</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Applications</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gated</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Members</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {stackAccess.stacks.map(stack => (
+                      <tr key={stack.name} className="hover:bg-muted/40 transition-colors">
+                        <td className="px-4 py-3 font-medium">{stack.name}</td>
+                        <td className="px-4 py-3 text-right">{stack.applications}</td>
+                        <td className="px-4 py-3 text-right">
+                          {stack.applications === 0 ? (
+                            <span className="text-xs text-muted-foreground">tiles only</span>
+                          ) : (
+                            <span className={cn('font-medium', stack.enforced === stack.applications ? 'text-success' : 'text-warning')}>
+                              {stack.enforced}/{stack.applications}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {stack.members.length ? stack.members.map(m => (
+                              <span key={m} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{m}</span>
+                            )) : <span className="text-xs text-muted-foreground">—</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="border rounded-2xl bg-card shadow-sm overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="sticky left-0 bg-card px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Identity</th>
+                      {gatedStacks.map(stack => (
+                        <th key={stack.name} className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">{stack.name}</th>
+                      ))}
+                      <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Reaches</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {stackAccess.users.map(u => (
+                      <tr key={u.username} className="hover:bg-muted/40 transition-colors">
+                        <td className="sticky left-0 bg-card px-3 py-2">
+                          <div className="font-medium">{u.username}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {u.superuser ? 'superuser' : u.machine ? 'machine account' : u.type}
+                          </div>
+                        </td>
+                        {gatedStacks.map(stack => (
+                          <td key={stack.name} className="px-2 py-2 text-center">
+                            {u.stacks.includes(stack.name)
+                              ? <span className="text-success" title="reachable">●</span>
+                              : <span className="text-muted-foreground/40" title="denied">·</span>}
+                          </td>
+                        ))}
+                        <td className={cn('px-3 py-2 text-right font-medium', u.stacks.length === 0 ? 'text-danger' : 'text-muted-foreground')}>
+                          {u.stacks.length}/{gatedStacks.length}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                ● reachable · denied{stackAccess.tilesOnly.length > 0
+                  ? ` · portal tiles without a provider (nothing to gate): ${stackAccess.tilesOnly.join(', ')}`
+                  : ''}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

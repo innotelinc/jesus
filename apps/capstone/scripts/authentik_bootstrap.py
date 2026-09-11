@@ -89,6 +89,9 @@ STACK_LEGACY_GROUPS: dict[str, list[str]] = {
 # machine identities must be seeded explicitly or enforcement locks them out.
 KEEP_ACCESS_USER_TYPES = {"internal", "service_account", "internal_service_account"}
 
+# Identities that are not people, for the --access-report rollup only.
+MACHINE_ACCOUNT_TYPES = {"service_account", "internal_service_account"}
+
 
 # Stack registry: the Authentik group each product's applications belong to.
 # Application.group is Authentik's native "which product does this app belong
@@ -350,6 +353,103 @@ def release_stack_access_api(base: str, token: str) -> bool:
     return True
 
 
+def print_access_report(base: str, token: str) -> bool:
+    """Print a review table of which user can reach which stack.
+
+    Read-only counterpart to ``--enforce-access``: stacks are derived from
+    ``Application.group``, "enforced" means the application has a provider AND
+    carries a group policy binding, and reachability comes from
+    ``/core/applications/?for_user=<pk>`` (one call per user rather than one per
+    user×app pair). Applications with no provider are reported separately —
+    they have no login flow, so every authenticated user reaches them from the
+    portal and a group binding there would do nothing.
+    """
+    users = _list_all(base, token, "/api/v3/core/users/?include_groups=true")
+    if not users:
+        print("FAIL no users returned — check AUTHENTIK_TOKEN / AUTHENTIK_PUBLIC_URL",
+              file=sys.stderr)
+        return False
+    groups = _list_all(base, token, "/api/v3/core/groups/")
+    apps = _list_all(base, token, "/api/v3/core/applications/", superuser_full_list="true")
+    bindings = _list_all(base, token, "/api/v3/policies/bindings/")
+
+    gated_pks = {b.get("target") for b in bindings if b.get("target") and b.get("group")}
+    members = {g["name"]: list(g.get("users") or []) for g in groups}
+    names = {u["pk"]: u.get("username", "") for u in users}
+
+    stacks: dict[str, dict] = {}
+    tiles: list[str] = []
+    open_apps: list[str] = []
+    for app in apps:
+        stack = app.get("group") or "Ungrouped"
+        entry = stacks.setdefault(stack, {"apps": 0, "enforced": 0})
+        if not app.get("provider"):
+            tiles.append(app["slug"])
+            continue
+        entry["apps"] += 1
+        if app["pk"] in gated_pks:
+            entry["enforced"] += 1
+        else:
+            open_apps.append(app["slug"])
+
+    ordered = sorted(stacks.items(), key=lambda kv: kv[0].lower())
+    index = {name: i + 1 for i, (name, _e) in enumerate(ordered)}
+    gated_slugs = {a["slug"] for a in apps if a.get("provider")}
+
+    # Only true service accounts are rolled up as "machine accounts" — Authentik's
+    # `internal` type is a normal local login (akadmin, dhunter), so those stay
+    # named in the member column.
+    machine = {u["pk"] for u in users if u.get("type") in MACHINE_ACCOUNT_TYPES}
+
+    def clip(value: str, width: int) -> str:
+        return value if len(value) <= width else value[: width - 1] + "…"
+
+    print(f"\nStack access — {sum(e['apps'] for _n, e in ordered)} applications across "
+          f"{len(ordered)} stacks")
+    print(f"Auth: {base}\n")
+    print(f"  {'#':>2}  {'Stack':24} {'Apps':>4} {'Enforced':>8}  Members")
+    for name, entry in ordered:
+        pks = members.get(name, [])
+        people = sorted(names.get(pk, str(pk)) for pk in pks if pk not in machine)
+        machines = sum(1 for pk in pks if pk in machine)
+        who = ", ".join(people)
+        if machines:
+            who = f"{who}{' + ' if who else ''}{machines} machine account(s)"
+        if not entry["apps"]:
+            who = f"{who or '—'} · tiles only, nothing to gate"
+        print(f"  {index[name]:>2}  {name:24} {entry['apps']:>4} {entry['enforced']:>8}  {who}")
+
+    live = [name for name, entry in ordered if entry["apps"]]
+    print("\nUser reachability (● reachable, · denied, – no application to reach)\n")
+    print(f"  {'User':20} {'Type':24} " + " ".join(f"{index[n]:>2}" for n, _e in ordered) + "   Total")
+    for user in sorted(users, key=lambda u: u.get("username", "")):
+        reachable = _list_all(base, token, "/api/v3/core/applications/", for_user=str(user["pk"]))
+        reached = {a.get("group") or "Ungrouped" for a in reachable if a.get("slug") in gated_slugs}
+        cells = []
+        for name, entry in ordered:
+            if not entry["apps"]:
+                cells.append("–")
+            else:
+                cells.append("●" if name in reached else "·")
+        kind = user.get("type", "")
+        if user.get("is_superuser"):
+            kind += " (superuser)"
+        print(f"  {clip(user.get('username', ''), 20):20} {clip(kind, 24):24} "
+              + " ".join(f"{c:>2}" for c in cells)
+              + f"   {len(reached & set(live))}/{len(live)}")
+
+    if tiles:
+        print("\nTiles only (no provider — nothing to gate, reachable from the portal): "
+              + ", ".join(sorted(tiles)))
+    if open_apps:
+        print("\nWARNING ungated (provider but no group binding — every authenticated user "
+              "can sign in): " + ", ".join(sorted(open_apps)))
+        print("        run --enforce-access to lock these to their stack group")
+    else:
+        print("\nPASS every provider-backed application is gated by a stack group")
+    return True
+
+
 def bootstrap_api(base: str, token: str, external_host: str, cookie_domain: str) -> int:
     """Provision via the REST API. Returns process exit code."""
     failed = False
@@ -521,6 +621,8 @@ def main() -> int:
                         help="print the ak-shell bootstrap code instead of calling the API")
     parser.add_argument("--shell", action="store_true", dest="shell",
                         help="read the shell script from stdin (companion to --emit-shell inside the container)")
+    parser.add_argument("--access-report", action="store_true",
+                        help="print which stack each user can reach (read-only review table)")
     parser.add_argument("--enforce-access", action="store_true",
                         help="also bind each stack group to its applications so only members "
                              "can reach them (seeds superusers/internal accounts/operators first)")
@@ -544,6 +646,10 @@ def main() -> int:
         print("FAIL no AUTHENTIK_TOKEN — mint one in Authentik (Directory → Tokens) "
               "or use --emit-shell inside the container", file=sys.stderr)
         return 1
+    if args.access_report:
+        # Read-only: report against the live instance without touching bootstrap.
+        return 0 if print_access_report(base, token) else 1
+
     rc = bootstrap_api(base, token, external_host, cookie_domain)
     if args.release_access or args.enforce_access:
         # Groups must exist first — bootstrap_api above guarantees that.

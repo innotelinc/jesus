@@ -1016,6 +1016,17 @@ services:
       AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
       AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
       AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
+      # Health page → "Stack SSO & access" panel: reads the stack/user access
+      # inventory from Authentik (which applications are gated by a group
+      # binding, and which user can reach which stack). Needs an admin token —
+      # scripts/authentik_bootstrap.py already uses the same one. The token
+      # stays server-side; the browser only ever sees the aggregated result.
+      AUTHENTIK_TOKEN: "${AUTHENTIK_TOKEN:-}"
+      AUTHENTIK_PUBLIC_URL: "${AUTHENTIK_PUBLIC_URL:-}"
+      # Optional direct IdP address for the API (defaults to the public URL),
+      # and an opt-out for self-signed certs on that direct address.
+      AUTHENTIK_API_URL: "${AUTHENTIK_API_URL:-}"
+      AUTHENTIK_API_INSECURE: "${AUTHENTIK_API_INSECURE:-}"
       CERULEAN_TENANT: "${CERULEAN_TENANT:-}"
       # Dograh voice-agent management (Agents page): dograh-api runs in host
       # mode, so the dashboard reaches it via host.docker.internal. Token is

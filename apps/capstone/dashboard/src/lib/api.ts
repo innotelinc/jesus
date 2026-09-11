@@ -11,6 +11,7 @@ import type {
   AuditEntry,
   DashboardStats,
   Entitlement,
+  StackAccessStatus,
 } from '../types';
 import { dashboardBaseUrl } from './config';
 import type { Verdict } from './utils';
@@ -260,6 +261,8 @@ export const api = {
   users: () => getJSON<User[]>('/users'),
   links: () => getJSON<ResourceLink[]>('/links'),
   health: () => getJSON<HealthMatrixEntry[]>('/health'),
+  /** Per-stack SSO / access inventory from the Cerulean Authentik instance. */
+  authentikAccess: () => getJSON<StackAccessStatus>('/authentik/access'),
   incidents: () => getJSON<Incident[]>('/incidents'),
   policies: () => getJSON<ConfigPolicy[]>('/policies'),
   audit: () => getJSON<AuditEntry[]>('/audit'),

@@ -39,6 +39,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from . import agents
 from . import hosts
 from . import interviews
+from . import stack_access
 from . import workflows
 from .auth import (
     COOKIE_NAME,
@@ -2385,6 +2386,18 @@ def links(user: dict = Depends(require_session)):
 def health(user: dict = Depends(require_session)):
     matrix, _ = build_health()
     return matrix
+
+
+@app.get("/authentik/access")
+def authentik_access(user: dict = Depends(require_session)):
+    """Per-stack SSO/access inventory from the Cerulean Authentik instance.
+
+    Backs the Health page's "Stack SSO & access" panel: which stacks exist,
+    which of their applications are actually gated by a group binding, and
+    which user can reach which stack. Read-only; never raises (an unreachable
+    IdP comes back as ``ok: false`` + ``error``).
+    """
+    return stack_access.build_access_status()
 
 
 @app.get("/incidents")

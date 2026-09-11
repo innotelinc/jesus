@@ -339,7 +339,21 @@ app tie alone does **not** gate access — that is what `--enforce-access` adds.
 python3 scripts/authentik_bootstrap.py --enforce-access --dry-run   # print the plan
 python3 scripts/authentik_bootstrap.py --enforce-access             # seed + bind + verify
 python3 scripts/authentik_bootstrap.py --release-access             # remove the bindings
+python3 scripts/authentik_bootstrap.py --access-report              # review who reaches what
 ```
+
+The review table lists every stack with its application/gated counts and members, then a
+user × stack reachability matrix (`●` reachable, `·` denied, `–` means the stack has no
+provider-backed application to reach). It also names the tiles-only applications (no provider, nothing to
+gate) and warns about any provider-backed application that is still **ungated**, i.e.
+reachable by every authenticated user.
+
+The same inventory is rendered on the Control Center's **Health → Stack SSO & access**
+panel (`GET /authentik/access`, session-gated). It needs `AUTHENTIK_TOKEN` for
+dashboard-api — already in `.env` — plus `AUTHENTIK_PUBLIC_URL` (or `AUTHENTIK_API_URL`
+when the container cannot reach the public `auth.<domain>` vhost, with
+`AUTHENTIK_API_INSECURE=1` to skip TLS verification on a direct address). The token never
+leaves the backend: the browser only receives the aggregated result.
 
 With enforcement on, an authenticated user only reaches the stacks they belong to instead
 of every product in the portal. Two things make this safe:

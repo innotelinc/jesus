@@ -8,7 +8,11 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/usr/src/projects/capstone
+# WorkingDirectory is rewritten to the real repo root at install time by
+# scripts/install-capstone.sh (install_service). Do not hard-code a host path —
+# a stale path here is why the unit refused to start for anyone who moved the
+# repo (docker compose runs relative to this directory, so it needs .env too).
+WorkingDirectory=/PATH/TO/CAPSTONE
 
 # Bring up the whole stack (PBX included) with one compose file.  --wait
 # holds until every service with a healthcheck reports healthy and all
