@@ -62,11 +62,11 @@ Usage (from the repo root):
 
 Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
 
-  app.<domain>      Capstone Voice App (dograh UI)            :3010
+  capstone.<domain> (apex) Capstone Voice App (dograh UI)    :3010
   api.<domain>      Capstone Voice API (dograh API)           :8000
   auth.<domain>     Authentik (SSO / user management)         :9000
   voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
-  admin.<domain>    Capstone Control Center                   :8096
+  admin/dashboard.<domain>  Capstone Control Center            :8096
   pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :8083
   n8n/grist/omniroute/signoz/workflow.<domain>                :5678/8484/20128/3301/8090
   portal/nocodb.<domain>   optional profile services          :3000/8080
@@ -115,16 +115,25 @@ DEFAULT_API_URL = "http://127.0.0.1:81"
 # dograh/dograh-ui/dashboard/ws names were folded into these in v3.11 and are
 # pruned as stale on the next sync).
 HOSTS: list[dict[str, Any]] = [
-    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API (apex origin)", "forward_auth": False},
-    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API", "forward_auth": False},
+    # The apex serves the dograh UI (what users hit on capstone.innotel.us);
+    # the API lives at api.<domain>. Matches the long-standing NPM edge state.
+    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (apex origin)"},
+    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": True,  "name": "Capstone Voice API", "forward_auth": False},
     {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
-    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": False, "name": "Authentik (SSO / user management)", "forward_auth": False},
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": True,  "name": "Authentik (SSO / user management)", "forward_auth": False},
     {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)", "forward_auth": False},
-    {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": False, "name": "Capstone Control Center"},
+    {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center", "forward_auth": False},
+    # dashboard.<domain> is the Control Center alias baked into
+    # AUTHENTIK_REDIRECT_URI — it must exist or OIDC login breaks.
+    {"key": "dashboard", "sub": "dashboard", "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center (OIDC redirect alias)", "forward_auth": False},
+    # Legacy alias kept so older integrations don't 404 after a sync.
+    {"key": "api-legacy", "sub": "backend.api", "scheme": "http", "port": 8000, "websocket": True, "name": "Capstone Voice API (legacy alias)", "forward_auth": False},
     {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 8083,  "websocket": False, "name": "FreePBX (+ AvantFAX at /fax)"},
     {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 5678,  "websocket": True,  "name": "n8n"},
     {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 8484,  "websocket": False, "name": "Grist"},
-    {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute"},
+    # OmniRoute holds the LLM API key — docs/networking.md: keep it internal.
+    # No DNS record exists for it; sync only when explicitly included.
+    {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
     {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 3301,  "websocket": True,  "name": "SigNoz"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
@@ -186,6 +195,7 @@ def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
 # requests by X-Forwarded-Host), so FreePBX/AvantFAX, dograh, n8n, Grist,
 # SigNoz, OmniRoute and the Workflow Studio all authenticate through
 # Cerulean before their own login pages are reachable.
+# NOTE: braces are doubled for .format() — only {outpost_url} is a field.
 FORWARD_AUTH_SNIPPET = """\
 # ── Cerulean Authentik forward auth (managed by npm-proxy-hosts.py) ──
 # Increase buffer size for large headers (SSO redirects are big).
@@ -205,7 +215,7 @@ proxy_set_header X-authentik-groups $authentik_groups;
 proxy_set_header X-authentik-email $authentik_email;
 proxy_set_header X-authentik-name $authentik_name;
 proxy_set_header X-authentik-uid $authentik_uid;
-location /outpost.goauthentik.io {
+location /outpost.goauthentik.io {{
     proxy_pass {outpost_url}/outpost.goauthentik.io;
     proxy_set_header Host $host;
     proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
@@ -213,38 +223,40 @@ location /outpost.goauthentik.io {
     auth_request_set $auth_cookie $upstream_http_set_cookie;
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
-}
-location @goauthentik_proxy_signin {
+}}
+location @goauthentik_proxy_signin {{
     internal;
     add_header Set-Cookie $auth_cookie;
-    return 302 {outpost_url}/outpost.goauthentik.io/start?rd=$scheme://$http_host$request_uri;
-}
+    return 302 {signin_url}/outpost.goauthentik.io/start?rd=$scheme://$http_host$request_uri;
+}}
 """
 
 
-def forward_auth_snippet(outpost_url: str) -> str:
-    """Render the auth_request nginx snippet for one proxy host."""
-    return FORWARD_AUTH_SNIPPET.format(outpost_url=outpost_url.rstrip("/"))
+def forward_auth_snippet(outpost_url: str, signin_url: str) -> str:
+    """Render the auth_request nginx snippet for one proxy host.
 
-
-def build_outpost_url(authentik_url: str, lan_ip: str) -> str:
-    """Public-ish URL of the Authentik embedded outpost as NPM reaches it.
-
-    The NPM edge lives on a different box, so it cannot use this host's
-    loopback; it forwards over the LAN. If the Cerulean auth domain is set,
-    use it (NPM already proxies auth.<domain> to :9000 — the outpost rides
-    the same vhost). Otherwise fall back to http://<lan-ip>:9000.
+    outpost_url is server-side only (NPM → Authentik over the LAN, direct —
+    never through NPM's own vhosts); signin_url is what the BROWSER is
+    redirected to on 401, so it must be the public auth domain.
     """
-    base = (authentik_url or "").strip().rstrip("/")
-    if base:
-        return base
-    if lan_ip:
-        return f"http://{lan_ip}:9000"
-    return "http://127.0.0.1:9000"
+    return FORWARD_AUTH_SNIPPET.format(outpost_url=outpost_url.rstrip("/"), signin_url=signin_url.rstrip("/"))
 
 
-def resolve_forward_auth(args: argparse.Namespace, env: dict[str, str]) -> tuple[bool, str, list[str]]:
-    """Resolve forward-auth settings: (enabled, outpost_url, excluded keys)."""
+def build_outpost_url(upstream_host: str) -> str:
+    """URL of the Authentik embedded outpost as NPM reaches it.
+
+    NPM must hit the outpost DIRECTLY (http://<upstream>:9000) — routing it
+    through https://auth.<domain> would re-enter NPM's own vhost selection
+    with the app's Host header and loop the request back to the app vhost.
+    The upstream host is the same box NPM already forwards every other
+    service to; Authentik publishes 9000 there for exactly this reason.
+    """
+    return f"http://{upstream_host}:9000"
+
+
+def resolve_forward_auth(args: argparse.Namespace, env: dict[str, str], upstream: str,
+                         base_domain: str) -> tuple[bool, str, str, list[str]]:
+    """Resolve forward-auth settings: (enabled, outpost_url, signin_url, excluded)."""
     enabled_env = cfg(args, "NPM_FORWARD_AUTH", "").strip().lower()
     enabled = True  # default ON — that's the point of the Cerulean SSO gate
     if enabled_env in {"0", "false", "no", "off"}:
@@ -256,17 +268,19 @@ def resolve_forward_auth(args: argparse.Namespace, env: dict[str, str]) -> tuple
     if excluded & {"all"}:
         enabled = False
 
-    lan_ip = detect_lan_ip()
-    authentik_url = (cfg(args, "NPM_AUTHENTIK_URL", "") or "").strip()
-    # Common pitfall: someone sets NPM_AUTHENTIK_URL to a loopback address in
-    # .env — NPM forwards over the network and would then 502 on every login.
-    if authentik_url.startswith("http://127.0.0.1") or authentik_url.startswith("http://localhost"):
-        authentik_url = ""
-    outpost = build_outpost_url(authentik_url, lan_ip)
-    return enabled, outpost, excluded
+    outpost = build_outpost_url(upstream)
+    # Browser-facing sign-in redirect target: the public auth domain when
+    # known (works off-LAN), else the direct LAN outpost as a fallback.
+    signin_url = (cfg(args, "NPM_AUTHENTIK_URL", "") or "").strip().rstrip("/")
+    if not signin_url and base_domain:
+        signin_url = f"https://auth.{base_domain}"
+    if not signin_url:
+        signin_url = outpost
+    return enabled, outpost, signin_url, excluded
 
 
-def snippet_for_host(h: dict, enabled: bool, outpost_url: str, excluded: set[str]) -> str:
+def snippet_for_host(h: dict, enabled: bool, outpost_url: str, signin_url: str,
+                     excluded: set[str]) -> str:
     """The auth snippet this host should carry ('' = no forward auth)."""
     if not enabled:
         return ""
@@ -274,7 +288,7 @@ def snippet_for_host(h: dict, enabled: bool, outpost_url: str, excluded: set[str
         return ""
     if h["key"] in excluded:
         return ""
-    return forward_auth_snippet(outpost_url)
+    return forward_auth_snippet(outpost_url, signin_url)
 
 
 class NpmApi:
@@ -364,6 +378,15 @@ def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
         cid = certs_by_domain.get(d.lower())
         if cid is not None:
             return cid
+        # Reuse a wildcard certificate covering this name (*.capstone.… —
+        # Cerulean attaches one to every host; never re-issue per-host certs).
+        # A wildcard matches exactly ONE label, so drop exactly the first:
+        # auth.capstone.innotel.us → *.capstone.innotel.us (NOT *.innotel.us).
+        labels = d.split(".")
+        if len(labels) > 2:
+            wild = certs_by_domain.get("*." + ".".join(labels[1:]))
+            if wild is not None:
+                return wild
     label = ", ".join(domains)
     if check:
         print(f"FAIL no Let's Encrypt certificate for {label}")
@@ -391,6 +414,46 @@ def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
         print(f"FAIL could not create certificate for {label}: {e}", file=sys.stderr)
         failed.append(domains[0])
         return None
+
+
+# Fields NPM's PUT /api/nginx/proxy-hosts schema accepts — the GET response
+# carries extra read-only fields (id, timestamps, owner) that a v2.x API
+# rejects with "must NOT have additional properties", so updates must be
+# projected onto this whitelist before being sent.
+PUT_ALLOWED_KEYS = (
+    "domain_names",
+    "forward_scheme",
+    "forward_host",
+    "forward_port",
+    "certificate_id",
+    "ssl_forced",
+    "hide_headers",
+    "http2_support",
+    "hsts_enabled",
+    "hsts_subdomains",
+    "block_exploits",
+    "caching_enabled",
+    "allow_websocket_upgrade",
+    "access_list_id",
+    "advanced_config",
+    "locations",
+    "meta",
+    "enabled",
+)
+
+
+def build_update_payload(existing: dict, want: dict) -> dict:
+    """Existing host fields we preserve, overridden by our desired state."""
+    payload = {k: existing[k] for k in PUT_ALLOWED_KEYS if k in existing}
+    payload.update(want)
+    # NPM may return meta with extra keys — keep whatever exists, but always
+    # carry the letsencrypt agreement flag the SSL flow needs.
+    meta = dict(existing.get("meta") or {})
+    meta.setdefault("letsencrypt_agree", False)
+    meta.setdefault("dns_challenge", False)
+    payload["meta"] = meta
+    payload.setdefault("locations", [])
+    return payload
 
 
 def desired(domain: str, h: dict, forward_host: str,
@@ -475,7 +538,7 @@ def main() -> int:
         hosts = [h for h in hosts if not h.get("optional")]
 
     # Cerulean Authentik forward auth: which hosts get the auth_request gate.
-    fa_enabled, fa_outpost, fa_excluded = resolve_forward_auth(args, args.env)
+    fa_enabled, fa_outpost, fa_signin, fa_excluded = resolve_forward_auth(args, args.env, upstream, base_domain)
     if args.forward_auth_exclude:
         fa_excluded = fa_excluded | {s.strip() for s in args.forward_auth_exclude.split(",") if s.strip()}
     if fa_enabled:
@@ -489,8 +552,8 @@ def main() -> int:
     if token:
         api.token = token
     else:
-        identity = args.email or cfg(args, "NPM_ADMIN_EMAIL", "")
-        secret = args.password or cfg(args, "NPM_ADMIN_PASSWORD", "")
+        identity = args.email or cfg(args, "NPM_ADMIN_EMAIL", "") or cfg(args, "NPM_EMAIL", "")
+        secret = args.password or cfg(args, "NPM_ADMIN_PASSWORD", "") or cfg(args, "NPM_PASSWORD", "")
         if not identity or not secret:
             print("FAIL NPM_ADMIN_EMAIL/NPM_ADMIN_PASSWORD (or NPM_API_TOKEN) required", file=sys.stderr)
             return 1
@@ -569,7 +632,7 @@ def main() -> int:
             if cert_id is None:
                 continue
 
-        auth_snippet = snippet_for_host(h, fa_enabled, fa_outpost, fa_excluded)
+        auth_snippet = snippet_for_host(h, fa_enabled, fa_outpost, fa_signin, fa_excluded)
         want = desired(domain, h, upstream, cert_id, ssl, auth_snippet)
         if existing is None:
             if args.check:
@@ -606,9 +669,7 @@ def main() -> int:
             failed.append(domain)
             continue
         try:
-            payload = dict(existing)
-            payload.update(want)
-            api.update_proxy_host(existing["id"], payload)
+            api.update_proxy_host(existing["id"], build_update_payload(existing, want))
             updated += 1
             print(f"PASS {label} — updated {domain} ({', '.join(diffs)})")
         except (NpmError, urllib.error.URLError, OSError) as e:

@@ -283,6 +283,33 @@ default — pass `--ws-scheme http --ws-port 8088` if your NPM validates upstrea
 (self-signed PBX cert). The `turn.<domain>` row stays out of scope: NPM's stream-forwarding
 API is separate and UDP STUN/TURN still needs direct NAT forwarding regardless.
 
+### Cerulean Authentik forward auth on every proxy host
+
+By default the script injects an nginx `auth_request` snippet into every web-UI proxy host
+(FreePBX/AvantFAX, dograh UI, n8n, Grist, SigNoz, Workflow Studio), so **all logins flow
+through Cerulean SSO** before each service's own login page is reachable. One domain-level
+proxy provider (`Cerulean NPM Forward Auth`) covers every `*.<domain>` host; provision it
+idempotently with `scripts/authentik_bootstrap.py` (API mode via `AUTHENTIK_TOKEN`, or
+`--emit-shell | docker exec -i cerulean-authentik ak shell`). The `api`/`apex`/`voice`/
+`auth`/`dashboard`+`admin` hosts stay open by design (telephony, OIDC redirect target, the
+IdP itself). Opt out with `NPM_FORWARD_AUTH=0` or exclude hosts with
+`NPM_FORWARD_AUTH_EXCLUDE=key1,key2`. The sign-in redirect always targets the public
+`https://auth.<domain>` (set `NPM_AUTHENTIK_URL` to override), while NPM reaches the
+embedded outpost directly at `http://<upstream>:9000` — routing the outpost through NPM's
+own vhosts would loop.
+
+### Verify the public surface
+
+`scripts/npm-smoke-test.py` checks every proxy host through the **public** edge with strict
+certificate verification: DNS + TLS validity, gated hosts must redirect to the Authentik
+sign-in (and answer the outpost ping through their own vhost), open hosts must serve
+without a bounce. Exit 0 only when everything is healthy — CI-friendly:
+
+```bash
+python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN / NPM_AUTHENTIK_URL)
+python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
+```
+
 ## Troubleshooting
 
 ### Interview voice cuts off early / sounds truncated
