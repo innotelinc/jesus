@@ -1,3 +1,15 @@
+# Local ignores
+.buildozer/
+*.apk
+*.exe
+*.mp4
+*.avi
+*.onnx
+test_codes/
+logs/
+bin/
+dist/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

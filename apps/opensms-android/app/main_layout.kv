@@ -1,0 +1,74 @@
+
+
+<BaseMDNavigationItem>
+    MDNavigationItemIcon:
+        icon: root.icon
+    MDNavigationItemLabel:
+        text: root.text
+
+MDScreen:
+    md_bg_color: self.theme_cls.backgroundColor
+
+    MainScreenBox: # main container
+        orientation: 'vertical'
+        #spacing: dp(4)
+
+        MDTopAppBar:
+            type: "small"
+            pos_hint: {"top": 1}
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "menu"
+                    on_release: nav_drawer.set_state("toggle")
+            MDTopAppBarTitle:
+                text: "OpenSMS"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "dots-vertical"
+
+        MDFloatLayout:
+
+            MDNavigationLayout:
+
+                MDScreenManager:
+                    id: screen_manager
+
+                    MDScreen:
+                        name: "SMS"
+                        MDLabel:
+                            text: "Hello"
+
+                    MDScreen:
+                        name: "Settings"
+                        MDLabel:
+                            text: "Again"
+
+                MDNavigationDrawer:
+                    id: nav_drawer
+                    radius: 0, dp(16), dp(16), 0
+
+                    MDNavigationDrawerMenu:
+                        MDNavigationDrawerLabel:
+                            text: "Operations"
+                        MDNavigationDrawerItem:
+                            MDNavigationDrawerItemLeadingIcon:
+                                icon: "file"
+                            MDNavigationDrawerItemText:
+                                text: "Logs"
+                            MDNavigationDrawerItemTrailingText:
+                                text: "24"
+                        MDNavigationDrawerDivider:
+
+            MDNavigationBar:
+                on_switch_tabs: app.on_switch_tabs(*args)
+
+                BaseMDNavigationItem
+                    icon: "api"
+                    text: "SMS"
+                    active: True
+
+                BaseMDNavigationItem
+                    icon: "wrench"
+                    text: "Settings"
+
