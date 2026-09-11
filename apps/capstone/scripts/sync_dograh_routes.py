@@ -35,7 +35,8 @@ Usage (from the repo root, with the capstone .env loaded):
 Environment / args:
     --dograh-endpoint  dograh API base (env DOGRAH_API_ENDPOINT, default http://127.0.0.1:8000)
     --dograh-token     X-API-Key (env DOGRAH_API_TOKEN, required)
-    --url              FreePBX base URL (env FREEPBX_URL, default http://127.0.0.1)
+    --url              FreePBX base URL (env FREEPBX_URL; default probes 127.0.0.1:80
+                       then the compose-published :8083)
     --container        freepbx container (env FREEPBX_CONTAINER, default pbx-freepbx)
     --client-id        OAuth client id (env FREEPBX_CLIENT_ID, default pbxportal-api)
     --client-secret    OAuth client secret (env FREEPBX_CLIENT_SECRET, required)
@@ -59,6 +60,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 import urllib.error
 import urllib.parse
@@ -452,7 +454,31 @@ def main() -> int:
         table = kvstore_table(container)
         ensure_custom_ext_table(container)
 
-    api = FreepbxApi(args.url, args.client_id, secret)
+    # FreePBX API base URL: --url > FREEPBX_URL (environment, then the .env
+    # file) > a quick port probe (80, then the compose-published 8083). The
+    # fallbacks keep the bare invocation (systemd timer, setup.sh) working on
+    # hosts where FreePBX is not published on port 80 — and fail fast with a
+    # hint instead of stalling in wait_ready() for 5 minutes.
+    freepbx_url = args.url
+    env_url = (os.environ.get("FREEPBX_URL") or args.env.get("FREEPBX_URL", "")).strip()
+    if env_url:
+        freepbx_url = env_url
+    elif freepbx_url == parser.get_default("url"):
+        open_port = None
+        for port in (80, 8083):
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    open_port = port
+                    break
+            except OSError:
+                continue
+        if open_port is None:
+            print("FAIL FreePBX API not reachable on 127.0.0.1:80 or :8083 — "
+                  "set FREEPBX_URL in .env or pass --url", file=sys.stderr)
+            return 1
+        freepbx_url = f"http://127.0.0.1:{open_port}"
+
+    api = FreepbxApi(freepbx_url, args.client_id, secret)
     try:
         api.wait_ready(timeout=300)
     except FreepbxError as e:
