@@ -172,10 +172,24 @@ export interface WorkflowStatusUpdate {
   force?: boolean;
 }
 
+/** Dialplan → ARI wiring health for Control-Center-created numbers. */
+export interface StasisHealth {
+  /** The Stasis app the generated dialplan routes into (dograh_<hex>). */
+  expected: string;
+  /** ARI applications Asterisk currently has registered. */
+  registered: string[];
+  /** true = wired up, false = mismatch (calls drop), null = couldn't check. */
+  ok: boolean | null;
+  /** Agent extensions outside the static 8000-8007 set. */
+  dynamicExtensions: string[];
+  detail?: string;
+}
+
 export interface AgentsResponse {
   mode: 'standalone' | 'addon';
   configured: boolean;
   agents: Agent[];
+  stasis?: StasisHealth;
   error?: string;
 }
 

@@ -3,6 +3,50 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.16 — Cerulean SSO across the edge + agent wiring self-heals
+
+Release `v3.16` makes every Capstone NPM host sign in through the correct
+Authentik vhost, groups the whole fleet by stack, and makes Control
+Center-created voice agents reliable end to end.
+
+Highlights of v3.16:
+
+- **"Redirect URI Error" on `capstone.innotel.us` fixed**: the embedded
+  Authentik outpost was pinned to the global `auth.innotel.us`, so the
+  forward-auth handshake finished on an origin that does not own the
+  `capstone-npm-forward-auth` provider and `/application/o/authorize/`
+  rejected the `redirect_uri`. The outpost's `authentik_host` now matches the
+  provider's `external_host` (`https://auth.<domain>`), making the whole flow
+  single-domain. The embedded outpost ignores `authentik_host_browser`
+  (goauthentik/authentik#5922), so both fields are pinned by
+  `scripts/authentik_bootstrap.py`.
+- **Forward-auth snippet hardened**: the injected outpost `location` now
+  forwards `X-Forwarded-Host/Proto/For`. A custom NPM location does not
+  inherit the generated `location /` headers, and the forward-auth provider
+  runs in `forward_domain` mode where the outpost identifies the target app
+  from the forwarded host — without them it logged "failed to detect a
+  forward URL from nginx".
+- **Edge audit + fix**: `scripts/npm-smoke-test.py` now walks the full
+  forward-auth handshake (start → authorize → not-400) so the cross-domain
+  class of failure cannot come back silently; all 13 Capstone hosts pass. The
+  fleet audit also surfaced `auth.signara.innotel.us` still forwarding to the
+  long-dead port `9100` (Authentik moved to `9000`) — corrected on the live
+  edge.
+- **Authentik groups per stack**: `scripts/authentik_bootstrap.py` creates
+  one Group per product (Capstone, Cerulean, Zeus, …) and ties every
+  application to its stack via `Application.group`, so the portal tiles are
+  grouped by product and membership/roles can be layered on later.
+- **Extension 8008 (and any Control Center number) fixed**: the generated
+  `extensions_custom_dograh.conf` called `Stasis(dograh)`, an ARI app nothing
+  registers, so Asterisk fell straight through to `Hangup()`. The builders now
+  emit dograh's real `dograh_<hex>` app, the Control Center discovers it live
+  from dograh's telephony config when the env var is missing, and the Agents
+  page shows a red banner when the dialplan's app is not registered.
+- **`capstone-pbx-sync` self-heal**: `scripts/sync_dograh_routes.py` resolves
+  the Stasis app from dograh on every run and persists it, so a stale
+  `DOGRAH_STASIS_APP_NAME` rewrites the dynamic dialplan with no rebuild or
+  restart.
+
 ## v3.14 — Shared-PBX gaps resolved + hardened networking
 
 Release `v3.14` closes the two remaining shared-PBX design gaps with Zeus,

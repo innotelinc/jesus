@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api, type Agent, type AgentWorkflow, type Workflow } from '../lib/api';
+import { api, type Agent, type AgentWorkflow, type StasisHealth, type Workflow } from '../lib/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
@@ -24,6 +24,32 @@ function ModeBanner({ mode }: { mode: 'standalone' | 'addon' }) {
     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
       <span className="font-semibold">Standalone mode.</span> Adding, editing, or deleting an agent
       wires the FreePBX side too — custom extension, inbound route, and dialplan — then reloads the PBX live.
+    </div>
+  );
+}
+
+/** Warn when the generated dialplan routes into an ARI app that isn't registered.
+ *  numbers beyond 8000-8007 call `Stasis(<app>)`; an unregistered app means
+ *  Asterisk hangs the channel up immediately — the call rings then drops. */
+function StasisBanner({ stasis }: { stasis?: StasisHealth }) {
+  if (!stasis || stasis.ok !== false) return null;
+  return (
+    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+      <p className="font-semibold">
+        Calls to {stasis.dynamicExtensions.join(', ')} will drop: the dialplan's Stasis app isn't registered.
+      </p>
+      <p className="mt-1">
+        {stasis.detail ??
+          `Extensions_custom_dograh.conf routes into Stasis(${stasis.expected}), but Asterisk has no ARI ` +
+          `application by that name.`}
+      </p>
+      <p className="mt-1 text-xs opacity-90">
+        Dialplan app: <code className="rounded bg-muted px-1 py-0.5 font-mono">{stasis.expected}</code>
+        {' · '}registered:{' '}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono">
+          {stasis.registered.length ? stasis.registered.join(', ') : 'none'}
+        </code>
+      </p>
     </div>
   );
 }
@@ -55,6 +81,7 @@ export default function Agents() {
   const [mode, setMode] = useState<'standalone' | 'addon'>('standalone');
   const [configured, setConfigured] = useState(true);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [stasis, setStasis] = useState<StasisHealth | undefined>();
   const [workflows, setWorkflows] = useState<AgentWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +117,7 @@ export default function Agents() {
       setMode(res.mode);
       setConfigured(res.configured);
       setAgents(res.agents);
+      setStasis(res.stasis);
       if (!res.configured && res.error) {
         setError(res.error);
       }
@@ -264,6 +292,8 @@ export default function Agents() {
           {error}
         </div>
       )}
+
+      {configured && <StasisBanner stasis={stasis} />}
 
       {configured && <ModeBanner mode={mode} />}
 

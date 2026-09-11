@@ -78,6 +78,27 @@ def extension_from_address(address: str) -> str:
     return re.sub(r"\D", "", address or "")
 
 
+def parse_ari_apps(output: str) -> list[str]:
+    """ARI application names from `asterisk -rx 'ari show apps'` output.
+
+    The CLI prints a header row, an `====` rule, then one app per line whose
+    first whitespace-delimited column is the name (trailing columns appear
+    once channels are attached). Anything before the rule — or an error
+    message instead of a table — yields an empty list, which the caller
+    reports as "nothing registered".
+    """
+    names: list[str] = []
+    after_rule = False
+    for raw in (output or "").splitlines():
+        line = raw.strip()
+        if not after_rule:
+            after_rule = line.startswith("===")
+            continue
+        if line:
+            names.append(line.split()[0])
+    return names
+
+
 def _ascii(value: str, maxlen: int) -> str:
     ascii_only = value.encode("ascii", "replace").decode("ascii")
     return ascii_only[:maxlen]

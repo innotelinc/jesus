@@ -14,6 +14,17 @@ https://auth.capstone.innotel.us):
   2. Application     "capstone-npm-forward-auth" bound to that provider.
   3. Outpost membership — the provider is added to the embedded outpost so its
        /outpost.goauthentik.io/auth/nginx endpoint serves every host.
+  4. Embedded outpost host — authentik_host / authentik_host_browser are pinned
+       to https://auth.<NPM_BASE_DOMAIN>, the SAME vhost the provider serves
+       from. The embedded outpost ignores authentik_host_browser
+       (goauthentik/authentik#5922), so a stale authentik_host (e.g. the global
+       auth.innotel.us) sends browsers to an Authentik origin that does not own
+       the provider → /application/o/authorize/ rejects the redirect_uri and the
+       user sees "Redirect URI Error".
+  5. Stack groups — one Authentik Group per product (Capstone, Cerulean, Zeus,
+       …) with every application tied to its stack through Application.group.
+       The group objects exist so membership/roles can be layered on later
+       without renaming anything; the app tie is what groups the portal tiles.
 
 This mirrors what scripts/npm-proxy-hosts.py expects when it injects the
 auth_request nginx snippet into each NPM proxy host (Cerulean SSO for FreePBX/
@@ -54,6 +65,32 @@ PROVIDER_NAME = "Cerulean NPM Forward Auth"
 APP_SLUG = "capstone-npm-forward-auth"
 OUTPOST_NAME = "authentik Embedded Outpost"
 
+# Stack registry: the Authentik group each product's applications belong to.
+# Application.group is Authentik's native "which product does this app belong
+# to" field (it groups the portal tiles); the group is ALSO created as a real
+# Group object so membership/roles can be layered on later without renaming.
+STACKS: list[tuple[str, list[str]]] = [
+    ("Capstone", ["capstone-dashboard", "capstone-npm-forward-auth"]),
+    ("Cerulean", ["cerulean"]),
+    ("Zeus", ["zeus"]),
+    ("Onyx", ["onyx-platform"]),
+    ("Magnate", ["magnate-admin"]),
+    ("Monarch", ["monarch"]),
+    ("Signara", ["signara"]),
+    ("Rizz Aura", ["rizz-aura"]),
+    ("Oasis", ["oasis-app", "oasis-admin", "oasis-api", "oasis-files", "oasis-mail"]),
+    ("ZapIt", ["zapit"]),
+    ("PLUTUS", ["plutus"]),
+    ("Atlas Chef", ["atlas-chef"]),
+    ("AthenIQ LMS", ["atheniq-lms"]),
+    ("Incus", ["incus"]),
+    ("Mail", ["mail"]),
+    ("Monit", ["monit"]),
+    ("PM3", ["pm3"]),
+    ("PM4", ["pm4"]),
+    ("Jellyfin", ["jellyfin-ldap"]),
+]
+
 
 def load_env_file(path: Path) -> dict[str, str]:
     env: dict[str, str] = {}
@@ -92,6 +129,42 @@ def find(results: list | None, **fields) -> dict | None:
         if all(item.get(k) == v for k, v in fields.items()):
             return item
     return None
+
+
+def ensure_stack_groups_api(base: str, token: str) -> bool:
+    """Create one Authentik Group per stack and tie each app to its stack.
+
+    Idempotent: existing groups are left alone, and an application already
+    carrying the right ``group`` is not rewritten. Returns False if any write
+    failed (so the caller can exit non-zero).
+    """
+    ok = True
+
+    _st, data = api_call("GET", "/api/v3/core/groups/?page_size=500", base, token)
+    existing = {g["name"] for g in ((data or {}).get("results") or [])} if isinstance(data, dict) else set()
+    for stack, _slugs in STACKS:
+        if stack in existing:
+            print(f"PASS group '{stack}' already exists")
+            continue
+        st, _ = api_call("POST", "/api/v3/core/groups/", base, token, {"name": stack, "is_superuser": False})
+        ok = ok and st < 400
+        print(f"{'PASS created' if st < 400 else 'FAIL'} group '{stack}'")
+
+    _st, data = api_call("GET", "/api/v3/core/applications/?page_size=500", base, token)
+    apps = {a["slug"]: a for a in ((data or {}).get("results") or [])} if isinstance(data, dict) else {}
+    for stack, slugs in STACKS:
+        for slug in slugs:
+            app = apps.get(slug)
+            if app is None:
+                print(f"WARN application '{slug}' (stack {stack}) not found — skipped")
+                continue
+            if app.get("group") == stack:
+                print(f"PASS app '{slug}' already in '{stack}'")
+                continue
+            st, _ = api_call("PATCH", f"/api/v3/core/applications/{slug}/", base, token, {"group": stack})
+            ok = ok and st < 400
+            print(f"{'PASS' if st < 400 else 'FAIL'} app '{slug}' → '{stack}'")
+    return ok
 
 
 def bootstrap_api(base: str, token: str, external_host: str, cookie_domain: str) -> int:
@@ -150,6 +223,24 @@ def bootstrap_api(base: str, token: str, external_host: str, cookie_domain: str)
     else:
         print("PASS embedded outpost already serves the provider")
 
+    # 4. Pin the embedded outpost's host to the provider's own vhost. The
+    # embedded outpost ignores authentik_host_browser (goauthentik/authentik
+    # #5922), so authentik_host is what the browser is redirected to; pointing
+    # it at a different Authentik origin makes /application/o/authorize/
+    # reject the redirect_uri ("Redirect URI Error").
+    cfg = dict(outpost.get("config") or {})
+    if cfg.get("authentik_host") != external_host or cfg.get("authentik_host_browser") != external_host:
+        cfg["authentik_host"] = external_host
+        cfg["authentik_host_browser"] = external_host
+        st, _ = api_call("PATCH", f"/api/v3/outposts/instances/{outpost['pk']}/", base, token, {"config": cfg})
+        failed = failed or st >= 400
+        print(f"PASS embedded outpost host → {external_host}" if st < 400 else "FAIL outpost host")
+    else:
+        print(f"PASS embedded outpost host already {external_host}")
+
+    # 5. Per-stack groups + application ties.
+    failed = not ensure_stack_groups_api(base, token) or failed
+
     return 1 if failed else 0
 
 
@@ -195,8 +286,45 @@ print("PASS outpost:", outpost.name, "providers:", list(outpost.providers.values
 '''
 
 
+# Shell-mode continuation: outpost host + per-stack groups. Uses the same
+# {external_host} placeholder convention as SHELL_SCRIPT.
+SHELL_STACKS = '''\
+_host = "{{external_host}}"
+if outpost.config.get("authentik_host") != _host or outpost.config.get("authentik_host_browser") != _host:
+    outpost.config["authentik_host"] = _host
+    outpost.config["authentik_host_browser"] = _host
+    outpost.save()
+    print("PASS outpost host:", _host)
+else:
+    print("PASS outpost host already:", _host)
+
+from authentik.core.models import Application, Group
+
+for _name in {stack_names!r}:
+    _g, _created = Group.objects.get_or_create(name=_name, defaults={{"is_superuser": False}})
+    print("PASS group:", _name, "created:", _created)
+
+for _stack, _slugs in {stack_map!r}.items():
+    for _slug in _slugs:
+        _app = Application.objects.filter(slug=_slug).first()
+        if _app is None:
+            print("WARN application missing:", _slug)
+            continue
+        if _app.group != _stack:
+            _app.group = _stack
+            _app.save()
+            print("PASS app grouped:", _slug, "->", _stack)
+        else:
+            print("PASS app already in:", _slug, "->", _stack)
+'''
+
+
 def emit_shell(external_host: str, cookie_domain: str) -> int:
-    code = SHELL_SCRIPT.replace("{external_host}", external_host).replace("{cookie_domain}", cookie_domain)
+    code = SHELL_SCRIPT + SHELL_STACKS.format(
+        stack_names=[name for name, _slugs in STACKS],
+        stack_map={name: slugs for name, slugs in STACKS},
+    )
+    code = code.replace("{external_host}", external_host).replace("{cookie_domain}", cookie_domain)
     sys.stdout.write(code)
     return 0
 

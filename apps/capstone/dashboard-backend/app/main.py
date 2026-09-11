@@ -1867,7 +1867,8 @@ def agents_list(user: dict = Depends(require_session)):
         raise HTTPException(status_code=502, detail=str(exc))
     for a in rows:
         a["pbx"] = _agent_pbx_status(mode, a.get("extension") or "")
-    return {"mode": mode, "configured": True, "agents": rows}
+    return {"mode": mode, "configured": True, "agents": rows,
+            "stasis": _stasis_health(client, rows)}
 
 
 @app.get("/agents/workflows")
@@ -2201,6 +2202,59 @@ def _unprovision_agent_pbx(ext: str, client: agents.DograhClient) -> None:
         _pbx_mysql(agents.delete_custom_dest_sql(table, dest_id))
     _pbx_sync_dynamic_dialplan(client)
     _pbx_reload_dograh()
+
+
+def _stasis_health(client: agents.DograhClient, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Is the dynamic dialplan's Stasis app one Asterisk actually registered?
+
+    Numbers beyond the static 8000-8007 set are routed by
+    ``Stasis(<app>)`` in extensions_custom_dograh.conf. When <app> is not a
+    registered ARI application Asterisk ejects the channel straight to
+    Hangup(), so the call rings once and drops. Surface that mismatch in the
+    Agents page instead of leaving it to `asterisk -rx 'ari show apps'`.
+    """
+    dynamic = sorted(
+        ext for ext in ((a.get("extension") or "") for a in rows)
+        if ext and ext not in agents.STATIC_EXTENSIONS
+    )
+    info: dict[str, Any] = {
+        "expected": agents.stasis_app_name(),
+        "registered": [],
+        "ok": True,
+        "dynamicExtensions": dynamic,
+        "detail": "",
+    }
+    if not dynamic:
+        info["detail"] = "No agent numbers beyond the static 8000-8007 set."
+        return info
+    try:
+        info["expected"] = client.discovered_stasis_app_name()
+    except agents.DograhError:
+        info["expected"] = agents.stasis_app_name()
+    if agents.deploy_mode() != "standalone":
+        info["detail"] = "Add-on mode: ARI registration is owned by the shared PBX."
+        return info
+    try:
+        code, text = _pbx_exec(["asterisk", "-rx", "ari show apps"])
+    except HTTPException as exc:
+        info["ok"] = None
+        info["detail"] = str(exc.detail)
+        return info
+    if code != 0:
+        info["ok"] = None
+        info["detail"] = (text or "asterisk -rx 'ari show apps' failed").strip()
+        return info
+    names = agents.parse_ari_apps(text)
+    info["registered"] = names
+    info["ok"] = info["expected"] in names
+    if not info["ok"]:
+        info["detail"] = (
+            f"Dialplan routes {', '.join(dynamic)} into Stasis({info['expected']}), but Asterisk has "
+            f"no ARI app registered under that name (registered: {', '.join(names) or 'none'}). "
+            "Calls hang up immediately — re-run scripts/dograh_wire.py to refresh "
+            "DOGRAH_STASIS_APP_NAME, then restart dashboard-api."
+        )
+    return info
 
 
 def _agent_pbx_status(mode: str, ext: str) -> dict:

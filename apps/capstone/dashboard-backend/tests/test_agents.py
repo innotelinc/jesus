@@ -428,6 +428,24 @@ class FreePbxBuildersTest(unittest.TestCase):
             client._request = boom  # type: ignore[method-assign]
             self.assertEqual(client.discovered_stasis_app_name(), "dograh")
 
+    def test_parse_ari_apps_reads_the_cli_table(self):
+        table = (
+            "Application Name         \n"
+            "=========================\n"
+            "dograh_72e590ef66eb\n"
+            "dograh_other\n"
+        )
+        self.assertEqual(agents.parse_ari_apps(table),
+                         ["dograh_72e590ef66eb", "dograh_other"])
+
+    def test_parse_ari_apps_handles_empty_and_error_output(self):
+        self.assertEqual(agents.parse_ari_apps(""), [])
+        self.assertEqual(agents.parse_ari_apps("No such command 'ari'\n"), [])
+
+    def test_parse_ari_apps_strips_channel_count_columns(self):
+        table = "Application Name         \n=========================\ndograh_abc      2\n"
+        self.assertEqual(agents.parse_ari_apps(table), ["dograh_abc"])
+
     def test_dialplan_body_empty_when_all_static(self):
         self.assertEqual(agents.dialplan_body(["8000", "8007"]), "")
         self.assertEqual(agents.dialplan_body([]), "")

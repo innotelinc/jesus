@@ -219,6 +219,14 @@ location /outpost.goauthentik.io {{
     proxy_pass {outpost_url}/outpost.goauthentik.io;
     proxy_set_header Host $host;
     proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+    # The outpost runs the forward-auth provider in `forward_domain` mode and
+    # identifies which app a request belongs to from the forwarded host. These
+    # live in NPM's generated `location /`, which a custom location does NOT
+    # inherit — without them the embedded outpost logs "failed to detect a
+    # forward URL from nginx" and 401s/500s the auth subrequest.
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     add_header Set-Cookie $auth_cookie;
     auth_request_set $auth_cookie $upstream_http_set_cookie;
     proxy_pass_request_body off;

@@ -87,6 +87,44 @@ def is_sso_redirect(location: str | None, signin_base: str) -> bool:
     )
 
 
+def check_sso_chain(start_url: str, signin_base: str, timeout: int) -> str | None:
+    """Walk the forward-auth handshake and return None when it is sound.
+
+    `start_url` is the `/outpost.goauthentik.io/start` the gate bounced to.
+    Two failure modes are #5922-shaped and invisible to a single-request
+    check, so they are asserted explicitly:
+
+      * the outpost's `authentik_host` points at a DIFFERENT Authentik vhost,
+        so the browser lands on an /application/o/authorize/ URL on a host
+        whose origin does not own the provider (cross-domain cookie/redirect
+        mismatch);
+      * that authorize call rejects the `redirect_uri`, which Authentik
+        renders as "Redirect URI Error" (HTTP 400) before the login flow.
+    """
+    try:
+        status, location = fetch(start_url, timeout)
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError, ssl.SSLError) as e:
+        return f"outpost start: {getattr(e, 'code', e)}"
+    if not location or "/application/o/authorize/" not in location:
+        return f"outpost start did not reach authorize (status {status})"
+    auth_host = urlparse(signin_base).netloc or urlparse(signin_base).path
+    loc_host = urlparse(location).netloc
+    if auth_host and loc_host != auth_host:
+        return (
+            f"authorize bounced to {loc_host!r} (outpost authentik_host is not {auth_host!r} — "
+            "cross-domain SSO, the classic redirect_uri mismatch)"
+        )
+    try:
+        status, _ = fetch(location, timeout)
+    except urllib.error.HTTPError as e:
+        return f"authorize returned {e.code} (redirect_uri rejected)"
+    except (urllib.error.URLError, OSError, ssl.SSLError) as e:
+        return f"authorize: {getattr(e, 'code', e)}"
+    if status >= 400:
+        return f"authorize returned {status} (redirect_uri rejected)"
+    return None
+
+
 def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tuple[str, str]:
     """One host → (verdict, note). Gated hosts must bounce to SSO; open
     hosts must serve without a bounce. Both must present a valid cert."""
@@ -107,7 +145,10 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
                     return "FAIL", f"SSO ok but outpost ping {st}"
             except (urllib.error.HTTPError, urllib.error.URLError, OSError, ssl.SSLError) as e:
                 return "FAIL", f"outpost ping: {getattr(e, 'code', e)}"
-            return "PASS", "SSO redirect + outpost ping 204"
+            chain_error = check_sso_chain(location, signin_base, timeout)
+            if chain_error:
+                return "FAIL", chain_error
+            return "PASS", "SSO redirect + outpost ping 204 + authorize ok"
         if status < 500:
             return "FAIL", f"NOT gated — served {status} without SSO"
         return "FAIL", f"upstream error {status}"

@@ -147,8 +147,12 @@ by the `capstone-pbx-sync.timer` systemd timer):
   fall straight through to `Hangup()`, so the call dies silently). `scripts/dograh_wire.py`
   persists the app name to `.env`, and the Control Center discovers it live from dograh's
   config detail when the env var is missing, so a freshly created agent works without a
-  re-run. If a new extension rings then drops immediately, check that the dialplan's app
-  name matches `docker exec pbx-freepbx asterisk -rx "ari show apps"`.
+  re-run. `scripts/sync_dograh_routes.py` (the `capstone-pbx-sync.timer`) resolves the app
+  name from dograh on **every** run and persists it, so a stale `DOGRAH_STASIS_APP_NAME`
+  self-heals the dialplan within the timer interval with no rebuild or restart. If a new
+  extension rings then drops immediately, check that the dialplan's app name matches
+  `docker exec pbx-freepbx asterisk -rx "ari show apps"` — the Control Center's **Agents**
+  page shows a red banner when it does not.
 
 Remove a number in the dograh UI and the next sync run **deletes** the matching FreePBX
 entries — but only the ones this script created (marked "Dograh Voice Agent" /
@@ -293,24 +297,54 @@ API is separate and UDP STUN/TURN still needs direct NAT forwarding regardless.
 ### Cerulean Authentik forward auth on every proxy host
 
 By default the script injects an nginx `auth_request` snippet into every web-UI proxy host
-(FreePBX/AvantFAX, dograh UI, n8n, Grist, SigNoz, Workflow Studio), so **all logins flow
-through Cerulean SSO** before each service's own login page is reachable. One domain-level
-proxy provider (`Cerulean NPM Forward Auth`) covers every `*.<domain>` host; provision it
-idempotently with `scripts/authentik_bootstrap.py` (API mode via `AUTHENTIK_TOKEN`, or
-`--emit-shell | docker exec -i cerulean-authentik ak shell`). The `api`/`apex`/`voice`/
-`auth`/`dashboard`+`admin` hosts stay open by design (telephony, OIDC redirect target, the
-IdP itself). Opt out with `NPM_FORWARD_AUTH=0` or exclude hosts with
-`NPM_FORWARD_AUTH_EXCLUDE=key1,key2`. The sign-in redirect always targets the public
-`https://auth.<domain>` (set `NPM_AUTHENTIK_URL` to override), while NPM reaches the
-embedded outpost directly at `http://<upstream>:9000` — routing the outpost through NPM's
-own vhosts would loop.
+(the apex + `app` dograh UI, FreePBX/AvantFAX, n8n, Grist, SigNoz, Workflow Studio), so
+**all logins flow through Cerulean SSO** before each service's own login page is reachable.
+One domain-level proxy provider (`Cerulean NPM Forward Auth`) covers every `*.<domain>`
+host; provision it idempotently with `scripts/authentik_bootstrap.py` (API mode via
+`AUTHENTIK_TOKEN`, or `--emit-shell | docker exec -i cerulean-authentik ak shell`).
+
+The `api`/`voice`/`auth`/`dashboard`+`admin` hosts stay open by design: the API and WS
+signaling carry machine traffic, `dashboard.<domain>` is the OIDC `redirect_uri` target
+(the Control Center does its own OIDC login with the `capstone-dashboard` client), and
+`auth.<domain>` is the IdP itself. Opt out with `NPM_FORWARD_AUTH=0` or exclude hosts with
+`NPM_FORWARD_AUTH_EXCLUDE=key1,key2`.
+
+The sign-in redirect always targets the public `https://auth.<domain>` (set
+`NPM_AUTHENTIK_URL` to override), while NPM reaches the embedded outpost directly at
+`http://<upstream>:9000` — routing the outpost through NPM's own vhosts would loop.
+The injected outpost `location` forwards `X-Forwarded-Host/Proto/For`: a custom location
+does **not** inherit NPM's generated `location /` headers, and the forward-auth provider
+runs in `forward_domain` mode where the outpost identifies the target app from the
+forwarded host (without them it logs "failed to detect a forward URL from nginx").
+
+> **The embedded outpost's `authentik_host` must equal the provider's `external_host`.**
+> Authentik's embedded outpost ignores `authentik_host_browser`
+> ([#5922](https://github.com/goauthentik/authentik/issues/5922)), so `authentik_host` is
+> what the browser is redirected to. If it points at a different Authentik vhost (e.g. the
+> global `auth.innotel.us`) then `/application/o/authorize/` runs on an origin that does
+> not own the provider and rejects the `redirect_uri` — the user sees **"Redirect URI
+> Error"** on `capstone.innotel.us`. `scripts/authentik_bootstrap.py` pins both fields to
+> `https://auth.<NPM_BASE_DOMAIN>`; re-run it after changing domains, and restart
+> `cerulean-authentik` so the embedded outpost reloads its config.
+
+### Authentik groups per stack
+
+`scripts/authentik_bootstrap.py` also creates one Authentik **Group** per product
+(`Capstone`, `Cerulean`, `Zeus`, …) and ties every application to its stack through
+Authentik's `Application.group` field, so the portal tiles are grouped by product. The
+group objects exist so membership/roles can be layered on later without renaming anything:
+the app tie alone does **not** gate access — add a policy binding to a group if a stack
+should be restricted to its own members.
 
 ### Verify the public surface
 
 `scripts/npm-smoke-test.py` checks every proxy host through the **public** edge with strict
 certificate verification: DNS + TLS validity, gated hosts must redirect to the Authentik
 sign-in (and answer the outpost ping through their own vhost), open hosts must serve
-without a bounce. Exit 0 only when everything is healthy — CI-friendly:
+without a bounce. For gated hosts it also **walks the forward-auth handshake** — `/start`
+must reach `/application/o/authorize/` on the sign-in host itself, and that call must not
+return 400 — which catches the cross-domain `authentik_host` misconfiguration behind the
+"Redirect URI Error" page. Exit 0 only when everything is healthy — CI-friendly:
 
 ```bash
 python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN / NPM_AUTHENTIK_URL)

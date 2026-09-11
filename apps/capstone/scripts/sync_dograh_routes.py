@@ -153,6 +153,45 @@ def dograh_phone_numbers(endpoint: str, token: str, config_name: str) -> list[di
         return (json.loads(resp.read() or b"{}") or {}).get("phone_numbers", [])
 
 
+def dograh_stasis_app(endpoint: str, token: str, config_name: str) -> str:
+    """The ARI app dograh registered for the config (dograh_<hex>).
+
+    dograh generates it per telephony config and exposes it as
+    ``credentials.stasis_app_name`` — the same field scripts/dograh_wire.py
+    persists as DOGRAH_STASIS_APP_NAME. The dialplan must call Stasis(<this>):
+    a bare "dograh" names an app no ARI client registered, so Asterisk falls
+    straight through to Hangup() and the call dies silently.
+    """
+    h = {"X-API-Key": token, "Accept": "application/json"}
+    req = urllib.request.Request(f"{endpoint}/api/v1/organizations/telephony-configs", headers=h)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        configs = (json.loads(resp.read() or b"{}") or {}).get("configurations", [])
+    cfg = next((c for c in configs if c.get("name") == config_name), None)
+    if not cfg:
+        return ""
+    req = urllib.request.Request(
+        f"{endpoint}/api/v1/organizations/telephony-configs/{cfg['id']}", headers=h)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        detail = json.loads(resp.read() or b"{}") or {}
+    return str((detail.get("credentials") or {}).get("stasis_app_name") or "").strip()
+
+
+def save_env_key(path: Path, key: str, value: str) -> None:
+    """Rewrite KEY=value in an env file in place (append when absent)."""
+    lines = path.read_text().splitlines() if path.exists() else []
+    out: list[str] = []
+    replaced = False
+    for line in lines:
+        if line.strip().startswith(f"{key}="):
+            out.append(f"{key}={value}")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n")
+
+
 # ── FreePBX custom extensions (customappsreg) ───────────────────────────────
 def ensure_custom_ext_table(container: str) -> None:
     """Create customappsreg's custom_extensions table if the module hasn't yet."""
@@ -401,8 +440,33 @@ def main() -> int:
         print("FAIL FREEPBX_CLIENT_SECRET required", file=sys.stderr)
         return 1
 
-    container = resolve_container(args.container)
     problems: list[str] = []
+
+    # Resolve the ARI app from dograh on every run, so a stale or missing
+    # DOGRAH_STASIS_APP_NAME can't leave the dynamic dialplan calling an app
+    # nothing registered (the "extension 8008 rings then drops" failure). The
+    # pbx-sync timer then self-heals the dialplan with no rebuild or restart.
+    try:
+        live_app = dograh_stasis_app(endpoint, token, args.config_name)
+    except (urllib.error.URLError, urllib.error.HTTPError, ValueError, FreepbxError) as e:
+        live_app = ""
+        print(f"WARN could not read the Stasis app name from dograh ({e}); "
+              f"using DOGRAH_STASIS_APP_NAME={stasis_app or '(unset)'}")
+    if live_app and live_app != stasis_app:
+        print(f"PASS Stasis app name from dograh: {live_app}"
+              + (f" (env had '{stasis_app}')" if stasis_app else " (env was unset)"))
+        stasis_app = live_app
+        if not args.check:
+            try:
+                save_env_key(Path(args.env_file), "DOGRAH_STASIS_APP_NAME", live_app)
+                print(f"PASS persisted DOGRAH_STASIS_APP_NAME={live_app} → {args.env_file}")
+            except OSError as e:
+                print(f"WARN could not persist DOGRAH_STASIS_APP_NAME: {e}")
+    elif not live_app and not stasis_app:
+        problems.append("Stasis app name unknown — the dynamic dialplan would call "
+                        "the legacy 'dograh' app, which no ARI client registers")
+
+    container = resolve_container(args.container)
 
     try:
         numbers = dograh_phone_numbers(endpoint, token, args.config_name)

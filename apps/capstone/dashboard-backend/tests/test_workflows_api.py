@@ -16,8 +16,10 @@ has been done, e.g.:
 Run with:  python3 -m unittest discover -s dashboard-backend/tests -v
 """
 
+import base64
 import json
 import os
+import re
 import sys
 import unittest
 from unittest import mock
@@ -76,6 +78,9 @@ class FakeDograh:
             },
         }
         self.next_id = 2
+        # The ARI app dograh generates per telephony config (dograh_<hex>).
+        # The PBX dialplan must route into THIS, never the bare "dograh".
+        self.stasis_app = "dograh_deadbeef"
         self.numbers = [
             {"id": 10, "address": "8003", "label": "Reception",
              "inbound_workflow_id": 1, "is_active": True},
@@ -123,6 +128,11 @@ class FakeDograh:
             return FakeResponse(self._workflow_response(wid))
         if method == "GET" and path == "/api/v1/organizations/telephony-configs":
             return FakeResponse({"configurations": [{"id": 7, "name": "Asterisk ARI (dograh)"}]})
+        if method == "GET" and path == "/api/v1/organizations/telephony-configs/7":
+            return FakeResponse({
+                "id": 7, "name": "Asterisk ARI (dograh)",
+                "credentials": {"stasis_app_name": self.stasis_app},
+            })
         if method == "GET" and path.endswith("/phone-numbers"):
             return FakeResponse({"phone_numbers": self.numbers})
         raise AssertionError(f"unexpected dograh request: {method} {path}")
@@ -237,6 +247,164 @@ class WorkflowRoutesTest(unittest.TestCase):
     def test_invalid_status_rejected(self):
         res = self.client.put("/workflows/1/status", json={"status": "deleted"})
         self.assertEqual(res.status_code, 422)
+
+
+class FakePbx:
+    """Stand-in for pbx-freepbx's exec surface: a dict-backed /etc/asterisk.
+
+    `main._pbx_exec` is patched to this callable, so `_pbx_read_conf` /
+    `_pbx_write_conf` / the `rm -f` cleanup all run for real against an
+    in-memory filesystem — no docker, no FreePBX.
+    """
+
+    def __init__(self, files: dict[str, str] | None = None,
+                 ari_apps: tuple[str, ...] = ("dograh_deadbeef",)) -> None:
+        self.files: dict[str, str] = dict(files or {})
+        self.commands: list[list[str]] = []
+        self.ari_apps: list[str] = list(ari_apps)
+
+    def __call__(self, cmd, stdin_text=None):  # noqa: ARG002 - _pbx_exec signature
+        self.commands.append(list(cmd))
+        if cmd[:1] == ["cat"] and len(cmd) == 2:
+            content = self.files.get(cmd[1])
+            return (0, content) if content is not None else (1, "")
+        if cmd[:2] == ["sh", "-c"]:
+            # _pbx_write_conf: echo <base64> | base64 -d > '<path>'.
+            # Anything else (e.g. _pbx_mysql's `... | mysql`) yields no rows.
+            m = re.fullmatch(r"echo (\S+) \| base64 -d > '(.+)'", cmd[2])
+            if m:
+                self.files[m.group(2)] = base64.b64decode(m.group(1)).decode()
+            return (0, "")
+        if cmd[:2] == ["rm", "-f"]:
+            self.files.pop(cmd[2], None)
+            return (0, "")
+        if cmd[:3] == ["asterisk", "-rx", "ari show apps"]:
+            return (0, "Application Name         \n=========================\n"
+                       + "\n".join(self.ari_apps) + "\n")
+        return (0, "")
+
+    def has(self, needle: str, path: str) -> bool:
+        return needle in self.files.get(path, "")
+
+
+@unittest.skipUnless(_HAVE_DEPS, "fastapi/httpx not installed — skipping route tests")
+class PbxDynamicDialplanTest(unittest.TestCase):
+    """`_pbx_sync_dynamic_dialplan` end-to-end with a live dograh client.
+
+    Regression for the "extension 8008 rings then drops" bug: the generated
+    extensions_custom_dograh.conf must call Stasis(<dograh_<hex>>) — the app
+    dograh actually registers — and must discover it from dograh's telephony
+    config even when DOGRAH_STASIS_APP_NAME is unset.
+    """
+
+    CONF = "/etc/asterisk/extensions_custom.conf"
+    DYN = "/etc/asterisk/extensions_custom_dograh.conf"
+
+    def setUp(self):
+        os.environ["DOGRAH_API_TOKEN"] = "TEST-TOKEN"
+        os.environ["DOGRAH_API_ENDPOINT"] = ENDPOINT
+        os.environ["DOGRAH_CONFIG_NAME"] = "Asterisk ARI (dograh)"
+        os.environ.pop("DOGRAH_STASIS_APP_NAME", None)
+        self.dograh = FakeDograh()
+        self.dograh.numbers.append({
+            "id": 11, "address": "8008", "label": "Mock Interview - Full Stack",
+            "inbound_workflow_id": 1, "is_active": True,
+        })
+        self.urlopen = mock.patch("urllib.request.urlopen", side_effect=self.dograh)
+        self.urlopen.start()
+        self.pbx = FakePbx({self.CONF: "[from-internal]\nexten => 101,1,Dial(SIP/101)\n"})
+        self.exec_patch = mock.patch.object(main, "_pbx_exec", side_effect=self.pbx)
+        self.exec_patch.start()
+
+    def tearDown(self):
+        self.exec_patch.stop()
+        self.urlopen.stop()
+        for key in ("DOGRAH_API_TOKEN", "DOGRAH_API_ENDPOINT", "DOGRAH_CONFIG_NAME",
+                    "DOGRAH_STASIS_APP_NAME"):
+            os.environ.pop(key, None)
+
+    def test_sync_writes_dynamic_dialplan_routing_to_the_registered_app(self):
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+
+        body = self.pbx.files[self.DYN]
+        self.assertIn("exten => 8008,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertIn("Stasis(dograh_deadbeef)", body)  # discovered live
+        self.assertIn("Goto(dograh-inbound,8008,1)", body)
+        # The static 8000-8007 set is never re-emitted.
+        self.assertNotIn("exten => 8003,1,NoOp", body)
+        # And the include is wired into extensions_custom.conf.
+        self.assertIn("#include extensions_custom_dograh.conf",
+                      self.pbx.files[self.CONF])
+
+    def test_sync_is_idempotent(self):
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        first = self.pbx.files[self.DYN]
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        self.assertEqual(first, self.pbx.files[self.DYN])
+        # The #include must not be appended twice.
+        self.assertEqual(
+            self.pbx.files[self.CONF].count("#include extensions_custom_dograh.conf"), 1
+        )
+
+    def test_env_override_wins_over_discovery(self):
+        with mock.patch.dict(os.environ, {"DOGRAH_STASIS_APP_NAME": "dograh_from_env"}):
+            main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        self.assertIn("Stasis(dograh_from_env)", self.pbx.files[self.DYN])
+        self.assertNotIn("Stasis(dograh_deadbeef)", self.pbx.files[self.DYN])
+
+    def test_sync_removes_include_when_no_dynamic_numbers(self):
+        self.pbx.files[self.DYN] = "; stale\n"
+        self.pbx.files[self.CONF] = (
+            "[from-internal]\n#include extensions_custom_dograh.conf\n"
+        )
+        self.dograh.numbers = [
+            {"id": 10, "address": "8003", "label": "Reception",
+             "inbound_workflow_id": 1, "is_active": True},
+        ]
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        self.assertNotIn(self.DYN, self.pbx.files)
+        self.assertNotIn("#include extensions_custom_dograh.conf",
+                         self.pbx.files[self.CONF])
+
+    # ── _stasis_health: the Agents page warning ────────────────────────────
+
+    def test_stasis_health_ok_when_the_app_is_registered(self):
+        health = main._stasis_health(
+            main.agents.DograhClient(), [{"extension": "8008"}]
+        )
+        self.assertTrue(health["ok"])
+        self.assertEqual(health["expected"], "dograh_deadbeef")
+        self.assertEqual(health["dynamicExtensions"], ["8008"])
+        self.assertEqual(health["registered"], ["dograh_deadbeef"])
+
+    def test_stasis_health_flags_an_unregistered_app(self):
+        self.pbx.ari_apps = ["some_other_app"]
+        health = main._stasis_health(
+            main.agents.DograhClient(), [{"extension": "8008", "id": 11}]
+        )
+        self.assertFalse(health["ok"])
+        self.assertIn("hang up immediately", health["detail"])
+        self.assertIn("dograh_deadbeef", health["detail"])
+
+    def test_stasis_health_ignores_static_only_agents(self):
+        health = main._stasis_health(
+            main.agents.DograhClient(), [{"extension": "8003"}]
+        )
+        self.assertTrue(health["ok"])
+        self.assertEqual(health["dynamicExtensions"], [])
+        # Never touches the PBX when nothing is dynamic.
+        self.assertEqual([c for c in self.pbx.commands if c[:1] == ["asterisk"]], [])
+
+    def test_agents_route_reports_stasis_health(self):
+        os.environ["DOGRAH_API_TOKEN"] = "TEST-TOKEN"
+        os.environ["DOGRAH_API_ENDPOINT"] = ENDPOINT
+        os.environ["DOGRAH_CONFIG_NAME"] = "Asterisk ARI (dograh)"
+        with mock.patch.dict(main.app.dependency_overrides,
+                             {main.require_session: lambda: {"email": "ops@test", "role": "admin"}}):
+            client = TestClient(main.app)
+            body = client.get("/agents").json()
+        self.assertIn("stasis", body)
+        self.assertTrue(body["stasis"]["ok"])
 
 
 if __name__ == "__main__":
