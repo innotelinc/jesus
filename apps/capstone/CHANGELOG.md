@@ -33,9 +33,81 @@ Highlights of v3.14:
   instead of localhost / docker-subnet IPs; the trusted-proxy default no
   longer trusts the docker overlay.
 - **CI regression guard**: a new `config-guard` job fails on docker-bridge IPs
-  or localhost links in dashboard fallback data, landing pages, and
-  non-comment env-template values — the 172.17.0.1 leak class can't come
+  or localhost links in dashboard fallback data, landing pages, and  non-comment env-template values — the 172.17.0.1 leak class can't come
   back silently.
+
+## v3.15 — Interview reports + working softphone signaling
+
+Release `v3.15` gives the Control Center a view over the graded mock interviews,
+makes the in-browser softphone register, and hardens the reports path and the
+dialplan smoke test.
+
+Highlights of v3.15:
+
+- **Interview Reports page**: a session-gated `GET /interviews/reports` reads the
+  Grist doc the n8n Interview Grader writes on every mock-interview hang-up
+  (dependency-free client in `app/interviews.py`, mirroring `app/agents.py`) and
+  returns newest-first reports. The page adds verdict/score summary chips, track
+  tabs (IT/DevOps/SQL), search, CSV export, a detail modal with per-dimension
+  evidence, strengths/improvements and the call transcript, plus an
+  unconfigured/error banner instead of an empty table.
+- **Latest reports on the overview**: the Dashboard hero links to the reports
+  page and an overview section lists the five most recent reports; each row
+  deep-links straight to that report (`/interviews?report=<id>`), so the open
+  report is shareable and the Back button closes it. Verdict chips, verdict dots
+  and score tones come from shared helpers (`lib/utils.ts`) so the widget and the
+  page can't drift apart.
+- **Reports path hardened**: a Grist payload that isn't the documented
+  `{"records": [...]}` envelope, and individual rows that aren't records, now
+  degrade to a clean 502 / skipped row (with tests) instead of a 500 that blanks
+  the page.
+- **Softphone registration fixed**: the Control Center's nginx now serves `/ws`
+  on its own origin and forwards the WebSocket upgrade to the PBX's PJSIP WSS
+  listener (`pbx-freepbx:8089`, upstream TLS verification off, upstream resolved
+  per request so the dashboard still boots when the PBX is down). The browser
+  therefore only ever sees the certificate the outer proxy issued for the
+  dashboard host. Previously the softphone fell back to the PBX's raw `:8089`
+  listener, whose build-time self-signed cert (`CN=buildkitsandbox`, no SAN)
+  browsers reject — every attempt ended in “Registration failed”. The same-origin
+  fallback also keeps the page's port now (`window.location.host`), and a failed
+  connect logs which of the two endpoints needs fixing.
+- **Softphone can place calls**: the dialer handed the raw digits ("8000") to
+  `SimpleUser.call()`, which passes its argument straight to `UserAgent.makeURI()`
+  and threw *Failed to create a valid URI from the target*. It now builds
+  `sip:<extension>@<wss-host>` (a full SIP URI still passes through), so an
+  extension lands in the PBX's `from-internal` context.
+- **TURN usable behind NAT**: `/turnconfig` now advertises the host the browser
+  actually reached us on (so a remote client gets a reachable STUN/TURN instead
+  of a LAN IP), and returns the `turnServers` credentials — previously no
+  `TURN_*` values were set, so the browser got no relay at all while coturn was
+  advertising `--external-ip=127.0.0.1` (every relay candidate unusable).
+  `TURN_USERNAME` / `TURN_PASSWORD` / `TURN_EXTERNAL_IP` / `TURN_REALM` are set
+  in `.env` now; credentials are only handed to a session-gated client.
+- **TURN public address is auto-detected**: coturn no longer takes a pinned
+  `TURN_EXTERNAL_IP`. The compose command uses
+  `--external-ip=${TURN_EXTERNAL_IP:-$(detect-external-ip)}`, and the coturn
+  image's entrypoint `eval`s it so its bundled `detect-external-ip` (a DNS
+  query) resolves this box's WAN address on every start. A pinned value used to
+  rot silently: the relay still answered, but every relayed candidate pointed
+  at an address nobody could reach, so off-LAN calls set up and carried no
+  audio. `scripts/smoke-e2e.sh` now fails when the running server advertises an
+  address other than the one this box resolves to, and warns when the PBX's
+  `external_media_address` disagrees.
+- **Per-request upstream resolution**: the Control Center's nginx resolves
+  `dashboard-api` (and the PBX for `/ws`) through Docker's embedded DNS, so
+  recreating either container no longer leaves the dashboard answering 502 until
+  nginx is reloaded.
+- **Softphone WSS smoke guard**: `scripts/smoke-e2e.sh` now asserts the
+  dashboard origin answers `/ws` with `101 Switching Protocols` and negotiates
+  the `sip` subprotocol — a SPA fallback (200 + `index.html`) or a 502 here is
+  exactly what shows up as "Registration failed".
+- **Dialplan smoke guard widened**: `scripts/smoke-e2e.sh` now checks that
+  `Stasis(dograh)` runs before the voicemail-fallback `GotoIf` on all eight agent
+  extensions (8000–8007), not just 8000 — the de02747 ordering bug is fixed per
+  block, so a hand-edit that breaks 8001 passes silently otherwise. The test call
+  also now asserts the Asterisk call counter advanced, replacing dead bookkeeping
+  that never compared anything.
+
 
 ## v3.11 — Capstone Voice AI Agent Platform
 
