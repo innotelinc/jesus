@@ -3,6 +3,36 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.17 — Stack access enforced + PBX sync on a 12-hour reconciliation
+
+Release `v3.17` turns the per-stack Authentik groups from portal-organising
+tiles into real access control, and drops the dialplan sync from every 2
+minutes to a 12-hour safety net.
+
+Highlights of v3.17:
+
+- **Per-stack access enforced** (`scripts/authentik_bootstrap.py --enforce-access`):
+  each stack group is now bound to its applications, so an authenticated user
+  only reaches the stacks they belong to instead of every product in the
+  portal. Accounts that must never lose access (superusers, machine/service
+  identities, legacy admin-group members, and the operator allowlist in
+  `STACK_KEEP_ACCESS`) are seeded into the group *before* the binding is
+  written, and the script then re-checks every seeded account with
+  `/core/applications/<slug>/check_access/`. Authentik has **no superuser
+  bypass** once an application has a group binding, so skipping the seed step
+  locks admins out. `--release-access` removes the bindings; `--dry-run`
+  prints the plan.
+- **Application listing fix**: Authentik's `/core/applications/` search
+  endpoint filters results by the calling token's own access, so a superuser
+  token saw a `count=24, results=1` list and every stack lookup silently
+  missed. The bootstrap now passes `superuser_full_list=true`, which is what
+  makes enforcement apply to all 21 provider-backed applications.
+- **PBX sync cadence**: `capstone-pbx-sync.timer` now runs once 10 minutes
+  after boot and then every **12 hours** instead of every 2 minutes. Creating
+  or editing an agent in the Control Center syncs FreePBX synchronously, so
+  the timer only exists to reconcile drift (a PBX restart, a hand-edit, a
+  dograh change made outside the dashboard).
+
 ## v3.16 — Cerulean SSO across the edge + agent wiring self-heals
 
 Release `v3.16` makes every Capstone NPM host sign in through the correct

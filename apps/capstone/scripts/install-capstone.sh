@@ -86,9 +86,9 @@ install_service() {
   $SUDO mkdir -p "$root/etc/capstone"
   $SUDO cp "$root$TARGET/systemd/capstone.service" "$root/etc/systemd/system/capstone.service"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone.service"
-  # dograh → FreePBX sync: a timer re-runs scripts/sync_dograh_routes.py
-  # every 2 minutes so numbers created/removed in the dograh UI land in
-  # FreePBX (custom extensions + inbound routes) automatically. Install with
+  # dograh → FreePBX sync: the dashboard syncs the PBX synchronously when an
+  # agent is created/edited, so the timer is only a drift-reconciliation safety
+  # net. It runs once 10 minutes after boot, then every 12 hours. Install with
   # the main service; the timer starts only when the stack is up.
   $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.service" "$root/etc/systemd/system/capstone-pbx-sync.service"
   $SUDO cp "$root$TARGET/systemd/capstone-pbx-sync.timer" "$root/etc/systemd/system/capstone-pbx-sync.timer"

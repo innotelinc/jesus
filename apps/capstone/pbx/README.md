@@ -77,7 +77,9 @@ no voicemail, no call waiting), a Custom Destination + Inbound Route, and a
 dynamic `extensions_custom_dograh.conf` dialplan include for numbers beyond
 the static `8000-8007` set. Removing a number in dograh deletes the matching
 dograh-created entries on the next sync run (`capstone-pbx-sync.timer` runs
-it every 2 minutes); user-created FreePBX entries are never touched. To (re)run by hand:
+it every 12 hours as a drift safety net; the Control Center also syncs
+immediately when an agent is created or edited); user-created FreePBX entries are
+never touched. To (re)run by hand:
 
 ```bash
 # requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth

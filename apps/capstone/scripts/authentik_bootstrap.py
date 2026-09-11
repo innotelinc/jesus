@@ -65,6 +65,31 @@ PROVIDER_NAME = "Cerulean NPM Forward Auth"
 APP_SLUG = "capstone-npm-forward-auth"
 OUTPOST_NAME = "authentik Embedded Outpost"
 
+# Users who must keep access to a stack even after enforcement. Internal and
+# service accounts are added automatically (see KEEP_ACCESS_USER_TYPES), so this
+# only lists EXTERNAL humans — the operators who actually sign in.
+STACK_KEEP_ACCESS: dict[str, list[str]] = {
+    "Capstone": ["justin"],
+}
+
+# Groups that already express "who owns this stack" — their members seed the
+# stack group, so enforcement preserves the intent that was being carried by the
+# older per-product admin groups.
+STACK_LEGACY_GROUPS: dict[str, list[str]] = {
+    "Cerulean": ["cerulean-platform"],
+    "Signara": ["signara-admins"],
+    "PLUTUS": ["plutus-admins"],
+    "Rizz Aura": ["rizz-aura-admins"],
+}
+
+# User types granted access to every stack. Authentik's application policy
+# engine has NO superuser bypass (verified against
+# /api/v3/core/applications/<slug>/check_access/ with a group binding: a
+# superuser outside the bound group gets passing=false), so superusers and
+# machine identities must be seeded explicitly or enforcement locks them out.
+KEEP_ACCESS_USER_TYPES = {"internal", "service_account", "internal_service_account"}
+
+
 # Stack registry: the Authentik group each product's applications belong to.
 # Application.group is Authentik's native "which product does this app belong
 # to" field (it groups the portal tiles); the group is ALSO created as a real
@@ -150,8 +175,11 @@ def ensure_stack_groups_api(base: str, token: str) -> bool:
         ok = ok and st < 400
         print(f"{'PASS created' if st < 400 else 'FAIL'} group '{stack}'")
 
-    _st, data = api_call("GET", "/api/v3/core/applications/?page_size=500", base, token)
-    apps = {a["slug"]: a for a in ((data or {}).get("results") or [])} if isinstance(data, dict) else {}
+    # superuser_full_list: the Application search endpoint filters results by the
+    # calling user's own access, so without this flag a superuser token still
+    # sees a single-row list and every stack lookup misses.
+    apps = {a["slug"]: a for a in _list_all(base, token, "/api/v3/core/applications/",
+                                            superuser_full_list="true")}
     for stack, slugs in STACKS:
         for slug in slugs:
             app = apps.get(slug)
@@ -165,6 +193,161 @@ def ensure_stack_groups_api(base: str, token: str) -> bool:
             ok = ok and st < 400
             print(f"{'PASS' if st < 400 else 'FAIL'} app '{slug}' → '{stack}'")
     return ok
+
+
+def _list_all(base: str, token: str, path: str, **extra: str) -> list[dict]:
+    """GET every page of a list endpoint (Authentik caps page_size at 100).
+
+    ``extra`` appends query parameters. The important one is
+    ``superuser_full_list=true`` for /core/applications/: Authentik's search
+    endpoints filter results down to the applications the *requesting token's
+    user* can access, so even a superuser token sees only its own apps (count=24
+    but results=1 at one point). Without the flag every stack lookup misses its
+    applications and enforcement silently becomes a no-op.
+    """
+    out: list[dict] = []
+    page = 1
+    while True:
+        sep = "&" if "?" in path else "?"
+        qs = "&".join(f"{k}={v}" for k, v in extra.items())
+        suffix = f"&{qs}" if qs else ""
+        st, data = api_call("GET", f"{path}{sep}page_size=100&page={page}{suffix}", base, token)
+        if not isinstance(data, dict):
+            break
+        out.extend(data.get("results") or [])
+        if not data.get("pagination", {}).get("next"):
+            break
+        page += 1
+    return out
+
+
+def _stack_access_plan(base: str, token: str) -> tuple[dict[str, list[int]], list[dict], list[dict], list[dict]]:
+    """Resolve (seed_users_by_stack, applications, groups, users).
+
+    seed_users_by_stack maps a stack name to the user pks that must retain
+    access, computed from: superusers + non-external (machine/internal)
+    accounts + the stack's legacy admin group members + STACK_KEEP_ACCESS.
+    """
+    users = _list_all(base, token, "/api/v3/core/users/?include_groups=true")
+    groups = _list_all(base, token, "/api/v3/core/groups/")
+    apps = _list_all(base, token, "/api/v3/core/applications/", superuser_full_list="true")
+
+    by_username = {u["username"]: u for u in users}
+    members_by_group = {g["name"]: list(g.get("users") or []) for g in groups}
+
+    always = {u["pk"] for u in users if u.get("is_superuser") or u.get("type") in KEEP_ACCESS_USER_TYPES}
+    seeds: dict[str, list[int]] = {}
+    for stack, _slugs in STACKS:
+        keep = set(always)
+        for legacy in STACK_LEGACY_GROUPS.get(stack, []):
+            keep.update(members_by_group.get(legacy, []))
+        for name in STACK_KEEP_ACCESS.get(stack, []):
+            user = by_username.get(name)
+            if user:
+                keep.add(user["pk"])
+            else:
+                print(f"WARN keep-access user '{name}' ({stack}) not found — skipped")
+        seeds[stack] = sorted(keep)
+    return seeds, apps, groups, users
+
+
+def enforce_stack_access_api(base: str, token: str, *, dry_run: bool = False) -> bool:
+    """Bind each stack group to its applications so only members can reach them.
+
+    An application with NO bindings is open to every authenticated user
+    (Authentik's AppAccessWithoutBindings default), so enforcement adds one
+    group PolicyBinding per application. Every stack group is seeded with the
+    accounts that must keep access BEFORE the binding is created, then the
+    result is verified with check_access: without that, seeding misses (and the
+    engine's lack of a superuser bypass means) admins get locked out.
+
+    Applications without a provider (plain tiles) are skipped — there is no
+    login flow to gate.
+    """
+    ok = True
+    seeds, apps, groups, users = _stack_access_plan(base, token)
+    group_pk = {g["name"]: g["pk"] for g in groups}
+    group_members = {g["name"]: list(g.get("users") or []) for g in groups}
+
+    # 1. Seed memberships first — never bind before the keep-access users are in.
+    for stack, keep in seeds.items():
+        pk = group_pk.get(stack)
+        if pk is None:
+            print(f"FAIL stack group '{stack}' missing — run without --enforce-access first")
+            ok = False
+            continue
+        current = sorted(set(group_members.get(stack, [])))
+        merged = sorted(set(current) | set(keep))
+        if merged == current:
+            print(f"PASS '{stack}' members already seeded ({len(merged)})")
+            continue
+        if dry_run:
+            print(f"PLAN '{stack}' members {current} → {merged}")
+            continue
+        st, _ = api_call("PATCH", f"/api/v3/core/groups/{pk}/", base, token, {"users": merged})
+        ok = ok and st < 400
+        print(f"{'PASS seeded' if st < 400 else 'FAIL seeding'} '{stack}' members "
+              f"({len(current)} → {len(merged)})")
+
+    # 2. One group binding per (provider-backed) application.
+    bindings = _list_all(base, token, "/api/v3/policies/bindings/")
+    have = {(b.get("target"), b.get("group")) for b in bindings}
+    gated: list[dict] = []
+    for stack, slugs in STACKS:
+        pk = group_pk.get(stack)
+        if pk is None:
+            continue
+        for app in apps:
+            if app["slug"] not in slugs:
+                continue
+            if not app.get("provider"):
+                print(f"SKIP '{app['slug']}' — no provider (tile only, nothing to gate)")
+                continue
+            gated.append(app)
+            if (app["pk"], pk) in have:
+                print(f"PASS binding '{app['slug']}' ↔ '{stack}' already present")
+                continue
+            if dry_run:
+                print(f"PLAN bind '{app['slug']}' → group '{stack}'")
+                continue
+            st, _ = api_call("POST", "/api/v3/policies/bindings/", base, token,
+                             {"target": app["pk"], "group": pk, "order": 0, "enabled": True})
+            ok = ok and st < 400
+            print(f"{'PASS bound' if st < 400 else 'FAIL binding'} '{app['slug']}' → '{stack}'")
+    if dry_run:
+        return ok
+
+    # 3. Verify every seeded account still passes for every app it is seeded for.
+    names = {u["pk"]: u["username"] for u in users}
+    for app in gated:
+        stack = next(s for s, slugs in STACKS if app["slug"] in slugs)
+        for pk in seeds[stack]:
+            st, data = api_call(
+                "GET",
+                f"/api/v3/core/applications/{app['slug']}/check_access/?for_user={pk}",
+                base, token,
+            )
+            if not (isinstance(data, dict) and data.get("passing")):
+                print(f"FAIL '{names.get(pk, pk)}' is seeded for {stack} but cannot reach "
+                      f"'{app['slug']}' — enforcement would lock them out")
+                ok = False
+    print("PASS stack access verified" if ok else "FAIL stack access verification")
+    return ok
+
+
+def release_stack_access_api(base: str, token: str) -> bool:
+    """Delete the group bindings enforcement created (leaves memberships alone)."""
+    groups = {g["name"]: g["pk"] for g in _list_all(base, token, "/api/v3/core/groups/")}
+    apps = {a["slug"]: a["pk"] for a in _list_all(base, token, "/api/v3/core/applications/", superuser_full_list="true")}
+    stack_pks = {groups[s] for s, _ in STACKS if s in groups}
+    app_pks = {apps[slug] for _s, slugs in STACKS for slug in slugs if slug in apps}
+    removed = 0
+    for b in _list_all(base, token, "/api/v3/policies/bindings/"):
+        if b.get("target") in app_pks and b.get("group") in stack_pks:
+            st, _ = api_call("DELETE", f"/api/v3/policies/bindings/{b['pk']}/", base, token)
+            removed += st < 400
+    print(f"PASS released {removed} stack access binding(s)")
+    return True
 
 
 def bootstrap_api(base: str, token: str, external_host: str, cookie_domain: str) -> int:
@@ -338,6 +521,13 @@ def main() -> int:
                         help="print the ak-shell bootstrap code instead of calling the API")
     parser.add_argument("--shell", action="store_true", dest="shell",
                         help="read the shell script from stdin (companion to --emit-shell inside the container)")
+    parser.add_argument("--enforce-access", action="store_true",
+                        help="also bind each stack group to its applications so only members "
+                             "can reach them (seeds superusers/internal accounts/operators first)")
+    parser.add_argument("--release-access", action="store_true",
+                        help="delete the stack access bindings this script created")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="with --enforce-access, print the plan without writing")
     args = parser.parse_args()
     env = load_env_file(Path(args.env_file))
 
@@ -354,7 +544,13 @@ def main() -> int:
         print("FAIL no AUTHENTIK_TOKEN — mint one in Authentik (Directory → Tokens) "
               "or use --emit-shell inside the container", file=sys.stderr)
         return 1
-    return bootstrap_api(base, token, external_host, cookie_domain)
+    rc = bootstrap_api(base, token, external_host, cookie_domain)
+    if args.release_access or args.enforce_access:
+        # Groups must exist first — bootstrap_api above guarantees that.
+        ok = (release_stack_access_api(base, token) if args.release_access
+              else enforce_stack_access_api(base, token, dry_run=args.dry_run))
+        rc = rc or (0 if ok else 1)
+    return rc
 
 
 if __name__ == "__main__":

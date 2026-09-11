@@ -132,8 +132,9 @@ Outbound Routes) so internal extensions can dial out through the trunk automatic
 
 Every phone number registered on dograh (the shipped agents plus anything you add later in
 the dograh UI or the Workflow Studio) is automatically mirrored into FreePBX by
-`scripts/sync_dograh_routes.py` (idempotent, run by `setup.sh` and re-run every 2 minutes
-by the `capstone-pbx-sync.timer` systemd timer):
+`scripts/sync_dograh_routes.py` (idempotent, run by `setup.sh` and re-run every 12 hours
+by the `capstone-pbx-sync.timer` systemd timer — a reconciliation safety net; the Control
+Center already syncs the PBX synchronously when you create or edit an agent):
 
 - **Custom Extensions** — Applications → Extensions lists each dograh agent as a basic
   **Custom Extension** (registry-only: no voicemail, no call waiting, by design).
@@ -149,7 +150,7 @@ by the `capstone-pbx-sync.timer` systemd timer):
   config detail when the env var is missing, so a freshly created agent works without a
   re-run. `scripts/sync_dograh_routes.py` (the `capstone-pbx-sync.timer`) resolves the app
   name from dograh on **every** run and persists it, so a stale `DOGRAH_STASIS_APP_NAME`
-  self-heals the dialplan within the timer interval with no rebuild or restart. If a new
+  self-heals the dialplan on the next timer run (within 12 hours) with no rebuild or restart. If a new
   extension rings then drops immediately, check that the dialplan's app name matches
   `docker exec pbx-freepbx asterisk -rx "ari show apps"` — the Control Center's **Agents**
   page shows a red banner when it does not.
@@ -327,14 +328,38 @@ forwarded host (without them it logs "failed to detect a forward URL from nginx"
 > `https://auth.<NPM_BASE_DOMAIN>`; re-run it after changing domains, and restart
 > `cerulean-authentik` so the embedded outpost reloads its config.
 
-### Authentik groups per stack
+### Authentik groups per stack (and per-stack access)
 
-`scripts/authentik_bootstrap.py` also creates one Authentik **Group** per product
+`scripts/authentik_bootstrap.py` creates one Authentik **Group** per product
 (`Capstone`, `Cerulean`, `Zeus`, …) and ties every application to its stack through
 Authentik's `Application.group` field, so the portal tiles are grouped by product. The
-group objects exist so membership/roles can be layered on later without renaming anything:
-the app tie alone does **not** gate access — add a policy binding to a group if a stack
-should be restricted to its own members.
+app tie alone does **not** gate access — that is what `--enforce-access` adds.
+
+```bash
+python3 scripts/authentik_bootstrap.py --enforce-access --dry-run   # print the plan
+python3 scripts/authentik_bootstrap.py --enforce-access             # seed + bind + verify
+python3 scripts/authentik_bootstrap.py --release-access             # remove the bindings
+```
+
+With enforcement on, an authenticated user only reaches the stacks they belong to instead
+of every product in the portal. Two things make this safe:
+
+- **Accounts that must keep access are seeded before the binding is written** — every
+  superuser, machine/service identity (`type` in `internal`, `service_account`,
+  `internal_service_account`), member of a stack's legacy admin group
+  (`STACK_LEGACY_GROUPS`), and the operator allowlist (`STACK_KEEP_ACCESS`). Authentik has
+  **no superuser bypass** once an application carries a group binding: a superuser outside
+  the bound group fails `/core/applications/<slug>/check_access/`, so a missed seed locks
+  an admin out.
+- **The result is verified**: after binding, the script calls `check_access` for every
+  seeded account on every gated application and fails loudly if anyone cannot reach a
+  stack they were seeded for.
+
+Two gotchas learned the hard way: applications with **no provider** (plain portal tiles
+like `zeus`, `jellyfin-ldap`) are skipped — there is no login flow to gate; and the
+`/core/applications/` list endpoint **filters by the calling token's own access**, so the
+script passes `superuser_full_list=true` (without it a superuser token sees a one-row list
+and enforcement silently applies to nothing).
 
 ### Verify the public surface
 
