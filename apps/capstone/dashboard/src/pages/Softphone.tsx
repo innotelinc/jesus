@@ -18,6 +18,11 @@ interface LogEntry {
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
+/** Host part of a WSS endpoint — the SIP domain a bare extension is dialed at. */
+function hostFromServer(server: string) {
+  try { return new URL(server).hostname; } catch { return window.location.hostname; }
+}
+
 // Phone-specific status chips. An idle phone is *not* an error — a generic
 // StatusBadge would have shown two “Critical” chips for a phone that simply
 // hasn't registered yet.
@@ -71,13 +76,22 @@ export default function Softphone() {
   // Preferred: the aggregator's /turnconfig returns the public WSS endpoint
   // (wss://voice.<NPM_BASE_DOMAIN>/ws) when a proxy domain is configured — set
   // below. Without a proxy domain we fall back to the page origin: same-host
-  // /ws when served over HTTPS, or the PBX's raw WSS listener on :8089 when
-  // served over plain HTTP (direct LAN access).
-  const defaultServer = typeof window !== 'undefined'
-    ? (window.location.protocol === 'https:'
-        ? `wss://${window.location.hostname}/ws`
-        : `wss://${window.location.hostname}:8089/ws`)
+  // /ws when served over HTTPS (the dashboard's nginx proxies it to the PBX's
+  // WSS listener, so the browser sees the reverse proxy's trusted cert —
+  // Asterisk's own cert is self-signed and browsers refuse it), or the PBX's
+  // raw WSS listener on :8089 when served over plain HTTP (direct LAN access).
+  //
+  // window.location.host (not .hostname) so a page served on a non-default
+  // port keeps it: wss://host:8443/ws, not wss://host/ws on :443.
+  const pageOriginServer = typeof window !== 'undefined'
+    ? `wss://${window.location.host}/ws`
+    : 'wss://localhost/ws';
+  const pbxDirectServer = typeof window !== 'undefined'
+    ? `wss://${window.location.hostname}:8089/ws`
     : 'wss://localhost:8089/ws';
+  const defaultServer = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    ? pageOriginServer
+    : pbxDirectServer;
   const [server, setServer] = useState(defaultServer);
   const [extension, setExtension] = useState('101');
   const [password, setPassword] = useState('webrtc-test-101');
@@ -123,7 +137,11 @@ export default function Softphone() {
           setIceServers(list);
           pushLog('Loaded STUN/TURN ICE config from aggregator', 'ok');
         }
-        if (cfg.wssServer) {
+        // Only adopt the advertised endpoint on an HTTPS page: off HTTPS there
+        // is no secure context for the microphone anyway, and a wss:// URL
+        // pointing at a plain-HTTP origin would just fail. The page-origin /
+        // direct-PBX defaults above stay in effect instead.
+        if (cfg.wssServer && window.location.protocol === 'https:') {
           setServer(cfg.wssServer);
           pushLog(`WSS endpoint: ${cfg.wssServer}`, 'ok');
         }
@@ -142,9 +160,7 @@ export default function Softphone() {
 
   const ensureSimpleUser = useCallback(() => {
     if (simpleUserRef.current) return simpleUserRef.current;
-    const host = (() => {
-      try { return new URL(server).hostname; } catch { return window.location.hostname; }
-    })();
+    const host = hostFromServer(server);
     const su = new SimpleUser(server, {
       aor: `sip:${extension}@${host}`,
       media: {
@@ -217,8 +233,19 @@ export default function Softphone() {
       const msg = e instanceof Error ? e.message : String(e);
       setRegState('failed');
       pushLog(`Registration failed: ${msg}`, 'err');
+      if (server === pageOriginServer) {
+        pushLog(
+          'Hint: this origin must forward /ws to the PBX with WebSocket support and a trusted certificate — check the reverse proxy (and that the PBX is up).',
+          'err',
+        );
+      } else if (server === pbxDirectServer) {
+        pushLog(
+          'Hint: the PBX serves its own self-signed certificate on :8089, which browsers reject — serve this page over HTTPS so it uses the same-origin /ws path instead.',
+          'err',
+        );
+      }
     }
-  }, [ensureSimpleUser, server, pushLog]);
+  }, [ensureSimpleUser, server, pushLog, pageOriginServer, pbxDirectServer]);
 
   // Register automatically once the ICE/WSS config has settled (or we know
   // there is none), so the phone is live as soon as the page opens. If the
@@ -244,8 +271,15 @@ export default function Softphone() {
   }, [pushLog]);
 
   const call = useCallback(async () => {
-    const target = dialInput.trim().replace(/^sip:/i, '');
-    if (!target) return;
+    const dialed = dialInput.trim().replace(/^sips?:/i, '');
+    if (!dialed) return;
+    // SimpleUser.call() hands its argument straight to UserAgent.makeURI(), so a
+    // bare extension throws "Failed to create a valid URI from the target."
+    // Build the URI here: a full SIP URI passes through, a bare number/extension
+    // is dialed at this UA's own host (the PBX sees it in from-internal).
+    const target = dialed.includes('@')
+      ? `sip:${dialed}`
+      : `sip:${dialed}@${hostFromServer(server)}`;
     const su = ensureSimpleUser();
     if (!(await su.isConnected())) {
       try {
@@ -255,17 +289,17 @@ export default function Softphone() {
         return;
       }
     }
-    setRemoteParty(target);
+    setRemoteParty(dialed);
     setCallState('calling');
     setIncoming(false);
-    pushLog(`Calling ${target}…`);
+    pushLog(`Calling ${dialed}…`);
     try {
       await su.call(target);
     } catch (e) {
       setCallState('idle');
       pushLog(`Call failed: ${e instanceof Error ? e.message : String(e)}`, 'err');
     }
-  }, [dialInput, ensureSimpleUser, pushLog]);
+  }, [dialInput, ensureSimpleUser, pushLog, server]);
 
   const answer = useCallback(async () => {
     const su = simpleUserRef.current;
@@ -487,7 +521,7 @@ export default function Softphone() {
               <li>Registration starts automatically on load. The WSS endpoint is <span className="font-mono">{server}</span>{server === defaultServer ? ' (page-origin fallback — configure a proxy domain for the PBX to serve it at the edge)' : ''} — same TLS as this page, so no certificate warnings.</li>
               <li>STUN/TURN come from the host coturn (fetched via the aggregator) so remote clients behind NAT get a working media path.</li>
               <li>Media (audio) uses DTLS-SRTP with ICE; STUN/TURN point at the host coturn, so remote WebRTC clients behind NAT work too.</li>
-              <li>Only one WebRTC session at a time — start a second browser tab for extension 101 (password <span className="font-mono">101</span>) to call yourself.</li>
+              <li>Only one WebRTC session at a time — open a second browser tab, register again as extension <span className="font-mono">101</span> (password <span className="font-mono">webrtc-test-101</span>, or <span className="font-mono">WEBRTC_TEST_PASSWORD</span>) to call yourself.</li>
             </ul>
           </div>
         </div>

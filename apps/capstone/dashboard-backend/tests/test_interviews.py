@@ -98,6 +98,27 @@ class GristClientRequestTest(unittest.TestCase):
         self.assertIn("404", str(ctx.exception))
         self.assertIn("document not found", str(ctx.exception))
 
+    def test_non_dict_payload_becomes_grist_error(self):
+        client = make_client()
+        # A JSON array (not the docs envelope) must not raise AttributeError.
+        with mock.patch("urllib.request.urlopen", return_value=FakeResponse(200, b'[]')):
+            with self.assertRaises(interviews.GristError) as ctx:
+                client.list_records()
+        self.assertIn("unexpected payload", str(ctx.exception))
+
+    def test_records_not_a_list_becomes_grist_error(self):
+        client = make_client()
+        body = json.dumps({"records": {"id": 1}}).encode()
+        with mock.patch("urllib.request.urlopen", return_value=FakeResponse(200, body)):
+            with self.assertRaises(interviews.GristError) as ctx:
+                client.list_records()
+        self.assertIn("unexpected 'records'", str(ctx.exception))
+
+    def test_missing_records_key_is_empty_list(self):
+        client = make_client()
+        with mock.patch("urllib.request.urlopen", return_value=FakeResponse(200, b'{"tables":[]}')):
+            self.assertEqual(client.list_records(), [])
+
     def test_unreachable_becomes_grist_error(self):
         import urllib.request as _ur
 
@@ -200,6 +221,31 @@ class TrackLabelTest(unittest.TestCase):
     def test_unknown_and_empty(self):
         self.assertEqual(interviews.track_label("golang"), "golang")
         self.assertEqual(interviews.track_label(""), "—")
+
+
+class RowsToReportsTest(unittest.TestCase):
+    def test_maps_and_sorts_newest_first(self):
+        rows = [
+            {"id": 2, "fields": {"Student": "Grace", "Verdict": "fail"}},
+            GRADED_ROW,
+        ]
+        reports = interviews.rows_to_reports(rows)
+        self.assertEqual([r["id"] for r in reports], [7, 2])
+        self.assertEqual(reports[0]["student"], "Ada Lovelace")
+        self.assertEqual(reports[1]["verdict"], "fail")
+
+    def test_skips_non_record_rows(self):
+        rows = [None, "oops", 5, [{}], {"id": 3, "fields": {}}]
+        reports = interviews.rows_to_reports(rows)
+        self.assertEqual([r["id"] for r in reports], [3])
+
+    def test_empty_input(self):
+        self.assertEqual(interviews.rows_to_reports([]), [])
+
+    def test_non_dict_fields_row_is_safe(self):
+        reports = interviews.rows_to_reports([{"id": 4, "fields": "nope"}])
+        self.assertEqual(reports[0]["trackLabel"], "—")
+        self.assertEqual(reports[0]["dimensions"], [])
 
 
 class SortFilterStatsTest(unittest.TestCase):

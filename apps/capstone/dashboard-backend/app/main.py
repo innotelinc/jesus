@@ -36,6 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import agents
+from . import hosts
 from . import interviews
 from .auth import (
     COOKIE_NAME,
@@ -2117,9 +2118,7 @@ def interview_reports(user: dict = Depends(require_session)):
         "docId": client.doc,
         # Newest first (Grist record ids are monotonic) — the reports page
         # table and the overview widget both expect most-recent-first.
-        "reports": interviews.sort_reports(
-            interviews.row_to_report(r) for r in rows
-        ),
+        "reports": interviews.rows_to_reports(rows),
     }
 
 
@@ -2203,7 +2202,7 @@ def entitlements(
 
 
 @app.get("/turnconfig")
-def turnconfig(user: dict = Depends(require_session)):
+def turnconfig(request: Request, user: dict = Depends(require_session)):
     """STUN/TURN endpoints for the in-browser softphone's ICE configuration.
     Read from the stack .env (coturn creds + relay ports) so the browser can
     configure its RTCPeerConnection without hardcoding secrets in the bundle.
@@ -2213,7 +2212,19 @@ def turnconfig(user: dict = Depends(require_session)):
     turn_relay_end = _env_value("TURN_RELAY_PORT_END") or "49251"
     username = _env_value("TURN_USERNAME")
     password = _env_value("TURN_PASSWORD")
-    host = public_host()
+    # Address the browser actually reached us on — the public entry point for
+    # this stack (e.g. dashboard.capstone.innotel.us), where coturn's STUN/TURN
+    # listeners are reachable. A LAN IP from BACKEND_API_ENDPOINT is not, and a
+    # remote client that can't reach STUN never gets a server-reflexive
+    # candidate, so ICE falls back to host candidates that NAT then drops.
+    host = hosts.browser_host(
+        request.headers.get("x-forwarded-host", ""),
+        request.headers.get("host", ""),
+        public_host(),
+    )
+    https = hosts.is_https(
+        request.headers.get("x-forwarded-proto", ""), request.url.scheme
+    )
     return {
         "stunServers": [{"urls": [f"stun:{host}:{turn_port}"]}],
         "turnServers": [{
@@ -2222,9 +2233,12 @@ def turnconfig(user: dict = Depends(require_session)):
             "credential": password,
         }] if username and password else [],
         "turnRelayPorts": [int(turn_relay_start), int(turn_relay_end)],
-        # Public WSS signaling endpoint for the softphone. Empty when no proxy
-        # domain is configured — the client then falls back to the page origin.
-        "wssServer": f"wss://voice.{NPM_BASE_DOMAIN}/ws" if NPM_BASE_DOMAIN else "",
+        # WSS signaling endpoint for the softphone. Only advertised for an
+        # HTTPS page: this dashboard's origin serves /ws itself (nginx → the
+        # PBX's PJSIP WSS listener), so the browser sees exactly the certificate
+        # the outer proxy issued for this host. Falls back to the configured
+        # voice.<domain> proxy host, then to "" (client-side defaults).
+        "wssServer": hosts.wss_endpoint(host if https else "", NPM_BASE_DOMAIN),
     }
 
 

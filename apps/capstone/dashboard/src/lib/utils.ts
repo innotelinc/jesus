@@ -23,6 +23,36 @@ export function formatUptime(seconds: number) {
   return `${m}m`;
 }
 
+export type Verdict = 'pass' | 'review' | 'fail' | 'unknown';
+
+/** Border/text tone for a verdict chip (shared by the reports table + overview widget). */
+export function verdictChipClass(verdict: Verdict) {
+  return verdict === 'pass'
+    ? 'border-success/40 text-success'
+    : verdict === 'review'
+      ? 'border-warning/40 text-warning'
+      : verdict === 'fail'
+        ? 'border-danger/40 text-danger'
+        : 'border-muted-foreground/30 text-muted-foreground';
+}
+
+/** Background tone for the small verdict status dot. */
+export function verdictDotClass(verdict: Verdict) {
+  return verdict === 'pass'
+    ? 'bg-success'
+    : verdict === 'review'
+      ? 'bg-warning'
+      : verdict === 'fail'
+        ? 'bg-danger'
+        : 'bg-muted-foreground/60';
+}
+
+/** Text tone for a 0–100 interview score; muted when the report wasn't scored. */
+export function scoreToneClass(score: number | null) {
+  if (score === null || Number.isNaN(score)) return 'text-muted-foreground';
+  return score >= 75 ? 'text-success' : score >= 60 ? 'text-warning' : 'text-danger';
+}
+
 export function formatRelativeTime(date: string | Date) {
   const diff = Date.now() - new Date(date).getTime();
   const minutes = Math.floor(diff / 60000);

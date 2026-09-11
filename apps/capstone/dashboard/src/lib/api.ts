@@ -13,6 +13,7 @@ import type {
   Entitlement,
 } from '../types';
 import { dashboardBaseUrl } from './config';
+import type { Verdict } from './utils';
 
 async function getJSON<T>(path: string): Promise<T> {
   const response = await fetch(`${dashboardBaseUrl}${path}`, {
@@ -164,7 +165,7 @@ export interface InterviewReport {
   phone: string;
   runId: string;
   score: number | null;
-  verdict: 'pass' | 'review' | 'fail' | 'unknown';
+  verdict: Verdict;
   dimensions: DimensionScore[];
   strengths: string[];
   improvements: string[];

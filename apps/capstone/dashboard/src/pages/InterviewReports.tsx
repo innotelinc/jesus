@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, type DimensionScore, type InterviewReport } from '../lib/api';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
-import { cn } from '../lib/utils';
+import { cn, scoreToneClass, verdictChipClass } from '../lib/utils';
 
 const TRACKS = [
   { value: 'all', label: 'All tracks' },
@@ -12,19 +13,12 @@ const TRACKS = [
   { value: 'sql', label: 'SQL' },
 ] as const;
 
-const VERDICT_STYLES: Record<InterviewReport['verdict'], string> = {
-  pass: 'border-success/40 text-success',
-  review: 'border-warning/40 text-warning',
-  fail: 'border-danger/40 text-danger',
-  unknown: 'border-muted-foreground/30 text-muted-foreground',
-};
-
 function VerdictChip({ verdict }: { verdict: InterviewReport['verdict'] }) {
   return (
     <span
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize',
-        VERDICT_STYLES[verdict],
+        verdictChipClass(verdict),
       )}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
@@ -37,10 +31,8 @@ function ScoreBadge({ score }: { score: number | null }) {
   if (score === null || Number.isNaN(score)) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
-  const tone =
-    score >= 75 ? 'text-success' : score >= 60 ? 'text-warning' : 'text-danger';
   return (
-    <span className={cn('text-sm font-semibold tabular-nums', tone)}>
+    <span className={cn('text-sm font-semibold tabular-nums', scoreToneClass(score))}>
       {Math.round(score)}
       <span className="text-xs font-normal text-muted-foreground">/100</span>
     </span>
@@ -175,7 +167,31 @@ export default function InterviewReports() {
 
   const [track, setTrack] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<InterviewReport | null>(null);
+
+  // The open report lives in the URL (?report=<id>) so the overview widget
+  // can deep-link into a single report, the URL is shareable, and the
+  // browser's Back button closes the modal.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reportParam = searchParams.get('report');
+  const selected = useMemo(
+    () => (reportParam ? reports.find(r => String(r.id) === reportParam) ?? null : null),
+    [reports, reportParam],
+  );
+
+  const openReport = useCallback(
+    (report: InterviewReport) => {
+      const next = new URLSearchParams(searchParams);
+      next.set('report', String(report.id));
+      setSearchParams(next);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const closeReport = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('report');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -278,7 +294,7 @@ export default function InterviewReports() {
         <StatChip
           label="Average score"
           value={stats.avg !== null ? `${stats.avg}` : '—'}
-          tone={stats.avg !== null ? (stats.avg >= 75 ? 'text-success' : stats.avg >= 60 ? 'text-warning' : 'text-danger') : undefined}
+          tone={stats.avg !== null ? scoreToneClass(stats.avg) : undefined}
         />
       </div>
 
@@ -334,7 +350,7 @@ export default function InterviewReports() {
                 <tr
                   key={r.id}
                   className="cursor-pointer transition-colors hover:bg-muted/40"
-                  onClick={() => setSelected(r)}
+                  onClick={() => openReport(r)}
                 >
                   <td className="px-4 py-3 text-sm font-medium">{r.student || '—'}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{r.trackLabel}</td>
@@ -346,7 +362,7 @@ export default function InterviewReports() {
                       variant="ghost"
                       size="sm"
                       className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                      onClick={e => { e.stopPropagation(); setSelected(r); }}
+                      onClick={e => { e.stopPropagation(); openReport(r); }}
                     >
                       View
                     </Button>
@@ -370,7 +386,7 @@ export default function InterviewReports() {
         </div>
       )}
 
-      <ReportModal report={selected} onClose={() => setSelected(null)} />
+      <ReportModal report={selected} onClose={closeReport} />
     </div>
   );
 }

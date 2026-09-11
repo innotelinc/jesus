@@ -10,7 +10,7 @@ import StatusBadge from '../components/StatusBadge';
 import ServiceCard from '../components/ServiceCard';
 import ServiceDetailDrawer, { type ServiceTab } from '../components/ServiceDetailDrawer';
 import Button from '../components/Button';
-import { cn, formatBytes, formatRelativeTime } from '../lib/utils';
+import { cn, formatBytes, formatRelativeTime, scoreToneClass, verdictChipClass, verdictDotClass } from '../lib/utils';
 
 function HealthRing({ pct, size = 84 }: { pct: number; size?: number }) {
   const stroke = 7;
@@ -368,31 +368,23 @@ export default function Dashboard() {
             {recentReports.map(r => (
               <li key={r.id}>
                 <Link
-                  to="/interviews"
+                  to={`/interviews?report=${r.id}`}
+                  title="Open this report"
                   className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
                 >
-                  <span className={cn(
-                    'h-2 w-2 shrink-0 rounded-full',
-                    r.verdict === 'pass' ? 'bg-success' : r.verdict === 'review' ? 'bg-warning' : r.verdict === 'fail' ? 'bg-danger' : 'bg-muted-foreground/60',
-                  )} />
+                  <span className={cn('h-2 w-2 shrink-0 rounded-full', verdictDotClass(r.verdict))} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{r.student || 'Unnamed candidate'}</p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.trackLabel}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    <span className={cn(
-                      'text-sm font-semibold tabular-nums',
-                      r.score === null ? 'text-muted-foreground' : r.score >= 75 ? 'text-success' : r.score >= 60 ? 'text-warning' : 'text-danger',
-                    )}>
+                    <span className={cn('text-sm font-semibold tabular-nums', scoreToneClass(r.score))}>
                       {r.score === null ? '—' : Math.round(r.score)}
                     </span>
                     <span
                       className={cn(
                         'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize',
-                        r.verdict === 'pass' ? 'border-success/40 text-success'
-                          : r.verdict === 'review' ? 'border-warning/40 text-warning'
-                          : r.verdict === 'fail' ? 'border-danger/40 text-danger'
-                          : 'border-muted-foreground/30 text-muted-foreground',
+                        verdictChipClass(r.verdict),
                       )}
                     >
                       {r.verdict}

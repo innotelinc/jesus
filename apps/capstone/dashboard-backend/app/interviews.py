@@ -94,10 +94,21 @@ class GristClient:
         return self._request("GET", f"/api/docs/{self.doc}") or {}
 
     def list_records(self, table_id: str = "Interviews") -> list[dict[str, Any]]:
-        raw = self._request(
-            "GET", f"/api/docs/{self.doc}/tables/{table_id}/records"
-        ) or {}
-        return raw.get("records", [])
+        path = f"/api/docs/{self.doc}/tables/{table_id}/records"
+        raw = self._request("GET", path)
+        # Grist answers with {"records": [...]}; anything else (an HTML error
+        # page parsed as JSON, a truncated body, a list) must surface as a
+        # GristError — a bare AttributeError/TypeError would 500 the endpoint.
+        if not isinstance(raw, dict):
+            raise GristError(
+                f"GET {path} -> unexpected payload ({type(raw).__name__})"
+            )
+        records = raw.get("records") or []
+        if not isinstance(records, list):
+            raise GristError(
+                f"GET {path} -> unexpected 'records' ({type(records).__name__})"
+            )
+        return records
 
 
 def track_label(track: str) -> str:
@@ -146,6 +157,8 @@ def parse_str_list(raw: str) -> list[str]:
 def row_to_report(row: dict[str, Any]) -> dict[str, Any]:
     """Grist record -> flat report dict for the dashboard."""
     fields = row.get("fields", {}) or {}
+    if not isinstance(fields, dict):
+        fields = {}
     score = fields.get("Score")
     verdict = str(fields.get("Verdict") or "").strip().lower()
     return {
@@ -165,12 +178,20 @@ def row_to_report(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_VERDICT_ORDER = {"fail": 0, "review": 1, "pass": 2, "unknown": 3}
-
-
 def sort_reports(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Newest record id first (Grist record ids are monotonic)."""
     return sorted(reports, key=lambda r: -(r.get("id") or 0))
+
+
+def rows_to_reports(rows: list[Any]) -> list[dict[str, Any]]:
+    """Grist records -> report dicts, newest first.
+
+    Rows that aren't records (``None``, a bare scalar from a malformed
+    payload) are skipped rather than raising, so one bad row can't blank the
+    whole Interview Reports page.
+    """
+    reports = [row_to_report(row) for row in rows if isinstance(row, dict)]
+    return sort_reports(reports)
 
 
 def filter_reports(
