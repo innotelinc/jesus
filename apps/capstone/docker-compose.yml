@@ -1023,6 +1023,12 @@ services:
       DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
       DOGRAH_CONFIG_NAME: "${DOGRAH_CONFIG_NAME:-Asterisk ARI (dograh)}"
+      # ARI app dograh generates per telephony config (dograh_<hex>). The
+      # generated extensions_custom_dograh.conf must call Stasis(<this>): a
+      # bare Stasis(dograh) names an app no ARI client registered, so
+      # Asterisk falls through to Hangup() and inbound calls die silently.
+      # scripts/dograh_wire.py persists it when it wires the telephony config.
+      DOGRAH_STASIS_APP_NAME: "${DOGRAH_STASIS_APP_NAME:-}"
       # "Describe it with AI" workflow authoring on the Workflows page / agent
       # modal: OmniRoute is on the host (host-mode dograh + published 20128),
       # same route the Workflow Studio uses. Empty key is fine.

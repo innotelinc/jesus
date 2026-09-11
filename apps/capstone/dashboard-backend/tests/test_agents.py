@@ -358,14 +358,75 @@ class FreePbxBuildersTest(unittest.TestCase):
         self.assertIn("LIMIT 1", sql)
 
     def test_dialplan_body_dynamic_only(self):
-        # 8003 is in the static 8000-8007 set — never re-emitted.
-        body = agents.dialplan_body(["8003", "8008", "8012"])
+        # 8003 is in the static 8000-8007 set — never re-emitted. Env cleared
+        # so the resolved Stasis name is the deterministic legacy default.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            body = agents.dialplan_body(["8003", "8008", "8012"])
         self.assertIn("exten => 8008,1,NoOp(Dograh voice agent inbound)", body)
         self.assertIn("exten => 8012,1,NoOp(Dograh voice agent inbound)", body)
         self.assertNotIn("exten => 8003,1,NoOp(Dograh voice agent inbound)", body)
         self.assertIn("[dograh-inbound]", body)
         self.assertIn("[from-internal-custom]", body)
         self.assertIn("Stasis(dograh)", body)
+
+    def test_stasis_app_name_env_overrides_placeholder(self):
+        with mock.patch.dict(os.environ, {"DOGRAH_STASIS_APP_NAME": "dograh_72e590ef66eb"}):
+            self.assertEqual(agents.stasis_app_name(), "dograh_72e590ef66eb")
+            # An explicit argument still wins over the environment.
+            self.assertEqual(agents.stasis_app_name("dograh_explicit"), "dograh_explicit")
+
+    def test_stasis_app_name_falls_back_to_legacy_default(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(agents.stasis_app_name(), "dograh")
+            self.assertEqual(agents.stasis_app_name(""), "dograh")
+
+    def test_dialplan_body_uses_env_stasis_app(self):
+        # Regression: dashboard-generated numbers used to emit Stasis(dograh),
+        # an app no ARI client registers — Asterisk fell through to Hangup()
+        # and every call to an agent beyond 8000-8007 died.
+        with mock.patch.dict(os.environ, {"DOGRAH_STASIS_APP_NAME": "dograh_72e590ef66eb"}):
+            body = agents.dialplan_body(["8008"])
+        self.assertIn("Stasis(dograh_72e590ef66eb)", body)
+
+    def test_dialplan_body_explicit_stasis_app_wins(self):
+        with mock.patch.dict(os.environ, {"DOGRAH_STASIS_APP_NAME": "dograh_env"}):
+            body = agents.dialplan_body(["8008"], "dograh_arg")
+        self.assertIn("Stasis(dograh_arg)", body)
+        self.assertNotIn("Stasis(dograh_env)", body)
+
+    def test_discovered_stasis_app_prefers_env(self):
+        client = agents.DograhClient(endpoint="http://example.invalid", token="t")
+        with mock.patch.dict(os.environ, {"DOGRAH_STASIS_APP_NAME": "dograh_env"}):
+            self.assertEqual(client.discovered_stasis_app_name(), "dograh_env")
+
+    def test_discovered_stasis_app_reads_live_config(self):
+        # Regression for the 8008 failure: with no env var the dashboard must
+        # discover the registered app from dograh, not emit Stasis(dograh).
+        client = agents.DograhClient(endpoint="http://example.invalid", token="t")
+        client._config_id = 7
+        calls: list[tuple[str, str]] = []
+
+        def fake_request(method: str, path: str, body=None):
+            calls.append((method, path))
+            return {"credentials": {"stasis_app_name": "dograh_72e590ef66eb"}}
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            client._request = fake_request  # type: ignore[method-assign]
+            self.assertEqual(client.discovered_stasis_app_name(), "dograh_72e590ef66eb")
+            # Cached — a second lookup makes no further call.
+            self.assertEqual(client.discovered_stasis_app_name(), "dograh_72e590ef66eb")
+        self.assertEqual(calls, [("GET", "/api/v1/organizations/telephony-configs/7")])
+
+    def test_discovered_stasis_app_falls_back_when_unavailable(self):
+        client = agents.DograhClient(endpoint="http://example.invalid", token="t")
+        client._config_id = 7
+
+        def boom(method: str, path: str, body=None):
+            raise agents.DograhError("nope")
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            client._request = boom  # type: ignore[method-assign]
+            self.assertEqual(client.discovered_stasis_app_name(), "dograh")
 
     def test_dialplan_body_empty_when_all_static(self):
         self.assertEqual(agents.dialplan_body(["8000", "8007"]), "")

@@ -2140,7 +2140,11 @@ def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
         numbers = [a.get("address") for a in client.list_agents() if a.get("address")]
     except agents.DograhError:
         numbers = []
-    body = agents.dialplan_body(numbers)
+    try:
+        app = client.discovered_stasis_app_name()
+    except agents.DograhError:
+        app = agents.stasis_app_name()
+    body = agents.dialplan_body(numbers, app)
     conf = "/etc/asterisk/extensions_custom.conf"
     if body:
         _pbx_write_conf(agents.DIALPLAN_PATH, body)

@@ -394,6 +394,12 @@ if [ -f "${SRC}/extensions_custom.conf" ]; then
   # keeps the legacy "dograh" default for pre-split configs).
   if [ -n "${DOGRAH_STASIS_APP_NAME:-}" ]; then
     sed -i "s/Stasis(dograh)/Stasis(${DOGRAH_STASIS_APP_NAME})/g" "${DEST}/extensions_custom.conf"
+    # extensions_custom_dograh.conf (numbers beyond the static 8000-8007 set,
+    # written by the Control Center's Agents page) needs the same rewrite —
+    # a bare Stasis(dograh) names an unregistered app and the call hangs up.
+    if [ -f "${DEST}/extensions_custom_dograh.conf" ]; then
+      sed -i "s/Stasis(dograh)/Stasis(${DOGRAH_STASIS_APP_NAME})/g" "${DEST}/extensions_custom_dograh.conf"
+    fi
     echo ">>> [dograh-ari] dialplan Stasis app name -> ${DOGRAH_STASIS_APP_NAME}"
   fi
 fi

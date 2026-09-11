@@ -140,8 +140,15 @@ by the `capstone-pbx-sync.timer` systemd timer):
 - **Custom Destination + Inbound Route** — Connectivity → Inbound Routes shows a route per
   agent (DID = the extension) ready for you to map VoIP.ms DIDs onto.
 - **Dynamic dialplan** — numbers beyond the static `8000-8007` set (e.g. one created in the
-  Workflow Studio) get `[dograh-inbound]` entries from `extensions_custom_dograh.conf`, so
-  they're actually reachable.
+  Workflow Studio or the Control Center's Agents page) get `[dograh-inbound]` entries from
+  `extensions_custom_dograh.conf`, so they're actually reachable. Those entries call
+  `Stasis(<DOGRAH_STASIS_APP_NAME>)` — the `dograh_<hex>` app dograh registers for its ARI
+  telephony config, **not** the literal name `dograh` (an unregistered app makes Asterisk
+  fall straight through to `Hangup()`, so the call dies silently). `scripts/dograh_wire.py`
+  persists the app name to `.env`, and the Control Center discovers it live from dograh's
+  config detail when the env var is missing, so a freshly created agent works without a
+  re-run. If a new extension rings then drops immediately, check that the dialplan's app
+  name matches `docker exec pbx-freepbx asterisk -rx "ari show apps"`.
 
 Remove a number in the dograh UI and the next sync run **deletes** the matching FreePBX
 entries — but only the ones this script created (marked "Dograh Voice Agent" /
