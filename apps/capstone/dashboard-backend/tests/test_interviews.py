@@ -72,14 +72,14 @@ class ConfigTest(unittest.TestCase):
 class GristClientRequestTest(unittest.TestCase):
     def test_list_records_sends_bearer_and_parses(self):
         client = make_client()
-        payload = {"records": [{"id": 1, "fields": {"Student": "Ada"}}]}
+        payload = {"records": [{"id": 1, "fields": {"Prospect": "Ada"}}]}
         with mock.patch("urllib.request.urlopen", return_value=FakeResponse(200, json.dumps(payload).encode())) as m:
             rows = client.list_records()
         req = m.call_args[0][0]
         self.assertEqual(req.get_method(), "GET")
         self.assertEqual(req.full_url, f"{BASE}/api/docs/{DOC}/tables/Interviews/records")
         self.assertEqual(req.headers.get("Authorization"), "Bearer grist_test")
-        self.assertEqual(rows[0]["fields"]["Student"], "Ada")
+        self.assertEqual(rows[0]["fields"]["Prospect"], "Ada")
 
     def test_list_records_no_key_omits_header(self):
         client = make_client(key="")
@@ -133,13 +133,15 @@ class GristClientRequestTest(unittest.TestCase):
 
 
 # A row exactly as the n8n grader writes it (Dimensions/Strengths/
-# Improvements are JSON *strings* in Text columns).
+# Improvements are JSON *strings* in Text columns). New rows carry the
+# prospect's name in the Prospect column; older rows only have Student.
 GRADED_ROW = {
     "id": 7,
     "fields": {
         "Track": "devops",
-        "Student": "Ada Lovelace",
-        "Phone": "8001",
+        "Prospect": "Ada Lovelace",
+        "Student": "",
+        "Phone": "+15551234567",
         "RunID": "run-42",
         "Score": 82.5,
         "Verdict": "pass",
@@ -161,8 +163,8 @@ class RowToReportTest(unittest.TestCase):
         self.assertEqual(report["id"], 7)
         self.assertEqual(report["track"], "devops")
         self.assertEqual(report["trackLabel"], "DevOps")
-        self.assertEqual(report["student"], "Ada Lovelace")
-        self.assertEqual(report["phone"], "8001")
+        self.assertEqual(report["prospect"], "Ada Lovelace")
+        self.assertEqual(report["phone"], "+15551234567")
         self.assertEqual(report["runId"], "run-42")
         self.assertEqual(report["score"], 82.5)
         self.assertEqual(report["verdict"], "pass")
@@ -174,6 +176,10 @@ class RowToReportTest(unittest.TestCase):
         self.assertEqual(report["improvements"], ["document the timeline"])
         self.assertIn("Welcome", report["transcript"])
         self.assertEqual(report["parseError"], "")
+
+    def test_legacy_student_column_still_reads(self):
+        row = {"id": 8, "fields": dict(GRADED_ROW["fields"], Prospect="", Student="Grace Hopper")}
+        self.assertEqual(interviews.row_to_report(row)["prospect"], "Grace Hopper")
 
     def test_unknown_verdict_normalised(self):
         row = {"id": 1, "fields": {"Verdict": "PASS "}}
@@ -231,7 +237,7 @@ class RowsToReportsTest(unittest.TestCase):
         ]
         reports = interviews.rows_to_reports(rows)
         self.assertEqual([r["id"] for r in reports], [7, 2])
-        self.assertEqual(reports[0]["student"], "Ada Lovelace")
+        self.assertEqual(reports[0]["prospect"], "Ada Lovelace")
         self.assertEqual(reports[1]["verdict"], "fail")
 
     def test_skips_non_record_rows(self):
@@ -249,10 +255,10 @@ class RowsToReportsTest(unittest.TestCase):
 
 
 class SortFilterStatsTest(unittest.TestCase):
-    def make(self, rid, verdict="pass", score=80, track="it", student="S", phone="8000"):
+    def make(self, rid, verdict="pass", score=80, track="it", prospect="P", phone="8000"):
         return {
             "id": rid, "verdict": verdict, "score": score, "track": track,
-            "student": student, "phone": phone, "runId": f"run-{rid}",
+            "prospect": prospect, "phone": phone, "runId": f"run-{rid}",
         }
 
     def test_sort_newest_first(self):
@@ -261,9 +267,9 @@ class SortFilterStatsTest(unittest.TestCase):
 
     def test_filter_track_and_search(self):
         rows = [
-            self.make(1, track="it", student="Ada"),
-            self.make(2, track="devops", student="Grace"),
-            self.make(3, track="sql", student="Alan", phone="8002"),
+            self.make(1, track="it", prospect="Ada"),
+            self.make(2, track="devops", prospect="Grace"),
+            self.make(3, track="sql", prospect="Alan", phone="8002"),
         ]
         self.assertEqual(len(interviews.filter_reports(rows, track="devops")), 1)
         self.assertEqual(len(interviews.filter_reports(rows, search="ada")), 1)

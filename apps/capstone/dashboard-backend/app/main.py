@@ -13,6 +13,7 @@ Endpoints (all JSON):
   /health    /incidents /policies /audit /stats
   /metrics   /snapshot
   /entitlements
+  /agents    /workflows   (dograh voice agents + call workflows)
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from . import agents
 from . import hosts
 from . import interviews
+from . import workflows
 from .auth import (
     COOKIE_NAME,
     OidcChallenge,
@@ -690,6 +692,15 @@ def _risk_for(port_num: str, proto: str, svc: str) -> str:
     return "low"
 
 
+# Acknowledge/resolve/escalate state for alerts. Alerts are derived from live
+# Docker state on every request, so the operator's disposition (status, owner,
+# escalation reason) is remembered here — keyed by the alert's deterministic id
+# — and re-applied each time the list is built. In-memory by design: a
+# dashboard-api restart clears it, exactly like a page reload would.
+_ALERT_OVERRIDES: dict[str, dict[str, Any]] = {}
+_ALERT_LOCK = threading.Lock()
+
+
 def build_alerts() -> list[dict[str, Any]]:
     containers = inspect_containers()
     alerts = []
@@ -739,6 +750,18 @@ def build_alerts() -> list[dict[str, Any]]:
             "tags": ["health"],
         })
     alerts.sort(key=lambda a: a["time"], reverse=True)
+    # Re-apply any operator disposition (acknowledged / resolved / escalated).
+    with _ALERT_LOCK:
+        overrides = dict(_ALERT_OVERRIDES)
+    for alert in alerts:
+        override = overrides.get(alert["id"])
+        if not override:
+            continue
+        alert["status"] = override.get("status", alert["status"])
+        if override.get("assignedTo"):
+            alert["assignedTo"] = override["assignedTo"]
+        if override.get("note"):
+            alert["escalationReason"] = override["note"]
     return alerts
 
 
@@ -1850,14 +1873,123 @@ def agents_list(user: dict = Depends(require_session)):
 @app.get("/agents/workflows")
 def agents_workflows(user: dict = Depends(require_session)):
     """Workflows available to bind an agent to (dograh /api/v1/workflow/fetch)."""
+    return workflows_list(user)
+
+
+# --------------------------------------------------------------------------
+# Dograh workflows — list / create / edit from the Control Center. Creating
+# or editing here writes the same definition the dograh UI canvas would
+# (POST /workflow/create/definition, PUT /workflow/{id} + publish), so the
+# Workflows page and the inline agent editor are a drop-in for dograh itself.
+
+
+def _workflow_client() -> agents.DograhClient:
     client = agents.DograhClient()
     if not client.configured():
-        raise HTTPException(status_code=503,
-                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+        raise HTTPException(
+            status_code=503,
+            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once",
+        )
+    return client
+
+
+@app.get("/workflows")
+def workflows_list(user: dict = Depends(require_session)):
+    """All dograh workflows (id / name / status)."""
+    client = _workflow_client()
     try:
         return client.list_workflows()
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/workflows/{workflow_id}")
+def workflows_get(workflow_id: int, user: dict = Depends(require_session)):
+    """A workflow definition plus its editable prompt nodes."""
+    client = _workflow_client()
+    try:
+        workflow = client.get_workflow(workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {
+        **workflow,
+        "nodes": workflows.editable_nodes(workflow.get("definition")),
+    }
+
+
+@app.post("/workflows")
+def workflows_create(body: dict, user: dict = Depends(require_session)):
+    """Create a workflow in dograh (mode: ai | guided | blank) and return it."""
+    name = str(body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    client = _workflow_client()
+    try:
+        definition = workflows.generate_definition(name, body.get("mode", "guided"), body)
+        workflow = client.create_workflow(name=name, definition=definition)
+    except workflows.WorkflowError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {
+        **workflow,
+        "nodes": workflows.editable_nodes(workflow.get("definition")),
+    }
+
+
+@app.put("/workflows/{workflow_id}/status")
+def workflows_set_status(workflow_id: int, body: dict, user: dict = Depends(require_session)):
+    """Archive (or restore) a workflow — dograh's own delete action.
+
+    Refuses to archive a workflow still bound to an agent unless ``force`` is
+    set, so a stray click can't silently leave a number with no inbound
+    workflow. (This is a safety net on top of dograh, which allows it.)
+    """
+    status = str(body.get("status") or "").strip().lower()
+    if status not in {"active", "archived"}:
+        raise HTTPException(status_code=422, detail="status must be 'active' or 'archived'")
+    client = _workflow_client()
+    if status == "archived" and not body.get("force"):
+        try:
+            bound = [a for a in client.list_agents() if a.get("workflowId") == int(workflow_id)]
+        except agents.DograhError:
+            bound = []  # can't resolve the phone-number list — let dograh decide
+        if bound:
+            names = ", ".join(f"{a.get('label')} ({a.get('extension')})" for a in bound)
+            raise HTTPException(
+                status_code=409,
+                detail=f"Workflow is bound to {len(bound)} agent(s): {names}. Archive anyway with force.",
+            )
+    try:
+        workflow = client.set_workflow_status(workflow_id, status)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {
+        **workflow,
+        "nodes": workflows.editable_nodes(workflow.get("definition")),
+    }
+
+
+@app.put("/workflows/{workflow_id}")
+def workflows_update(workflow_id: int, body: dict, user: dict = Depends(require_session)):
+    """Edit a workflow's name and/or prompt nodes, then publish the draft so
+    inbound calls to any agent bound to it pick the change up immediately."""
+    client = _workflow_client()
+    name = str(body.get("name") or "").strip() or None
+    try:
+        current = client.get_workflow(workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    definition = workflows.apply_node_edits(current.get("definition"), body.get("nodes"))
+    try:
+        updated = client.update_workflow(workflow_id, definition=definition, name=name)
+        client.publish_workflow(workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {
+        **updated,
+        "nodes": workflows.editable_nodes(definition),
+    }
 
 
 @app.post("/agents")
@@ -2135,6 +2267,50 @@ def secrets(user: dict = Depends(require_session)):
 @app.get("/alerts")
 def alerts(user: dict = Depends(require_session)):
     return build_alerts()
+
+
+def _set_alert_state(
+    alert_id: str,
+    status: str,
+    assigned_to: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Record an alert disposition and return the alert with it applied."""
+    current = next((a for a in build_alerts() if a.get("id") == alert_id), None)
+    if current is None:
+        raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
+    with _ALERT_LOCK:
+        entry = _ALERT_OVERRIDES.setdefault(alert_id, {})
+        entry["status"] = status
+        if assigned_to:
+            entry["assignedTo"] = assigned_to
+        if note:
+            entry["note"] = note
+    return next((a for a in build_alerts() if a.get("id") == alert_id), current)
+
+
+def _operator(user: dict[str, Any]) -> str:
+    """Who to attribute an alert action to ('' when auth is disabled)."""
+    return str((user or {}).get("email") or (user or {}).get("name") or "")
+
+
+@app.post("/alerts/{alert_id}/acknowledge")
+def alert_acknowledge(alert_id: str, user: dict = Depends(require_session)):
+    return _set_alert_state(alert_id, "acknowledged", assigned_to=_operator(user))
+
+
+@app.post("/alerts/{alert_id}/resolve")
+def alert_resolve(alert_id: str, user: dict = Depends(require_session)):
+    return _set_alert_state(alert_id, "resolved", assigned_to=_operator(user))
+
+
+@app.post("/alerts/{alert_id}/escalate")
+def alert_escalate(alert_id: str, body: dict | None = None,
+                   user: dict = Depends(require_session)):
+    body = body or {}
+    assign_to = str(body.get("assignTo") or "").strip() or _operator(user)
+    reason = str(body.get("reason") or "").strip()
+    return _set_alert_state(alert_id, "escalated", assigned_to=assign_to, note=reason)
 
 
 @app.get("/users")

@@ -155,8 +155,58 @@ class DograhClient:
             if wid is None:
                 continue
             name = str(w.get("name") or w.get("title") or wid)
-            out.append({"id": int(wid), "name": name})
+            out.append({"id": int(wid), "name": name, "status": str(w.get("status") or "")})
         return out
+
+    def get_workflow(self, workflow_id: int) -> dict[str, Any]:
+        """Fetch one workflow (draft if the user was editing, else published)."""
+        data = self._request("GET", f"/api/v1/workflow/fetch/{int(workflow_id)}")
+        return normalize_workflow(data)
+
+    def create_workflow(self, *, name: str, definition: dict[str, Any]) -> dict[str, Any]:
+        """Create a workflow; dograh publishes v1 immediately."""
+        data = self._request(
+            "POST",
+            "/api/v1/workflow/create/definition",
+            {"name": name, "workflow_definition": definition},
+        )
+        return normalize_workflow(data)
+
+    def update_workflow(
+        self,
+        workflow_id: int,
+        *,
+        definition: dict[str, Any] | None = None,
+        name: str | None = None,
+    ) -> dict[str, Any]:
+        """Save edits as a draft (dograh semantics) — call ``publish_workflow``
+        to make the change live for inbound calls, exactly as the dograh UI does."""
+        body: dict[str, Any] = {}
+        if name is not None:
+            body["name"] = name
+        if definition is not None:
+            body["workflow_definition"] = definition
+        if not body:
+            raise DograhError("nothing to update")
+        data = self._request("PUT", f"/api/v1/workflow/{int(workflow_id)}", body)
+        return normalize_workflow(data)
+
+    def publish_workflow(self, workflow_id: int) -> dict[str, Any]:
+        """Promote the current draft so calls to a bound agent use it."""
+        data = self._request("POST", f"/api/v1/workflow/{int(workflow_id)}/publish")
+        return data if isinstance(data, dict) else {}
+
+    def set_workflow_status(self, workflow_id: int, status: str) -> dict[str, Any]:
+        """Archive (``status='archived'``) or restore (``'active'``) a workflow.
+
+        dograh has no workflow delete endpoint — archiving is what its UI does.
+        """
+        data = self._request(
+            "PUT",
+            f"/api/v1/workflow/{int(workflow_id)}/status",
+            {"status": status},
+        )
+        return normalize_workflow(data)
 
     def create_agent(
         self,
@@ -207,6 +257,18 @@ class DograhClient:
 
     def delete_agent(self, phone_id: int) -> None:
         self._request("DELETE", f"{self._phone_path()}/{int(phone_id)}")
+
+
+def normalize_workflow(p: dict[str, Any] | None) -> dict[str, Any]:
+    """Map a dograh workflow row/response to the dashboard Workflow shape."""
+    w = p if isinstance(p, dict) else {}
+    definition = w.get("workflow_definition")
+    return {
+        "id": w.get("id"),
+        "name": str(w.get("name") or w.get("title") or w.get("id") or ""),
+        "status": str(w.get("status") or ""),
+        "definition": definition if isinstance(definition, dict) else None,
+    }
 
 
 def normalize_agent(p: dict[str, Any]) -> dict[str, Any]:

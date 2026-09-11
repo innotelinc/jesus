@@ -35,12 +35,14 @@ import {
   dashboardStats as sampleStats,
 } from '../lib/data';
 import { api } from '../lib/api';
+import { pollIntervalMs, SETTINGS_CHANGED_EVENT, settingsStore } from '../lib/settings';
 
 export type DataState = 'loading' | 'live' | 'error';
 
-// How often the dashboard re-fetches the whole payload in the background so
-// services, alerts, and KPIs stay live without a manual refresh.
-const POLL_INTERVAL_MS = 30_000;
+// Fallback poll cadence when no saved Dashboard setting exists. The interval
+// itself comes from Settings → Dashboard (auto-refresh) and is read fresh on
+// every SETTINGS_CHANGED_EVENT, so changing it takes effect without a reload.
+const DEFAULT_POLL_INTERVAL_MS = 30_000;
 
 export interface DashboardData {
   services: Service[];
@@ -121,14 +123,36 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
     void fetchAll();
-    const timer = setInterval(() => {
-      if (mountedRef.current) {
-        void fetchAll();
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const arm = (ms: number) => {
+      if (timer) clearInterval(timer);
+      timer = null;
+      if (ms > 0) {
+        timer = setInterval(() => {
+          if (mountedRef.current) {
+            void fetchAll();
+          }
+        }, ms);
       }
-    }, POLL_INTERVAL_MS);
+    };
+
+    const applySavedInterval = () => {
+      const ms = pollIntervalMs(settingsStore.loadDashboard().autoRefreshSeconds);
+      arm(ms || DEFAULT_POLL_INTERVAL_MS);
+      // '0' (Off) really means off: zero-interval polls would hammer the API.
+      if (ms === 0) {
+        if (timer) clearInterval(timer);
+        timer = null;
+      }
+    };
+    applySavedInterval();
+
+    window.addEventListener(SETTINGS_CHANGED_EVENT, applySavedInterval);
     return () => {
       mountedRef.current = false;
-      clearInterval(timer);
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, applySavedInterval);
+      if (timer) clearInterval(timer);
     };
   }, [fetchAll]);
 

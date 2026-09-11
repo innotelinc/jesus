@@ -130,6 +130,46 @@ export interface Agent {
 export interface AgentWorkflow {
   id: number;
   name: string;
+  status?: string;
+}
+
+/** A prompt-bearing node of a dograh workflow (editable without the canvas). */
+export interface WorkflowNode {
+  id: string;
+  type: string;
+  name: string;
+  prompt: string;
+  greeting?: string;
+}
+
+export interface Workflow {
+  id: number;
+  name: string;
+  status?: string;
+  nodes?: WorkflowNode[];
+}
+
+export type WorkflowMode = 'ai' | 'guided' | 'blank';
+
+export interface WorkflowCreate {
+  name: string;
+  mode: WorkflowMode;
+  description?: string;
+  role?: string;
+  goal?: string;
+  prompt?: string;
+  useCase?: string;
+}
+
+export interface WorkflowUpdate {
+  name?: string;
+  nodes?: Array<{ id: string; name?: string; prompt?: string; greeting?: string }>;
+}
+
+export interface WorkflowStatusUpdate {
+  status: 'active' | 'archived';
+  /** Archive even when agents are still bound (they keep the binding, unused). */
+  force?: boolean;
 }
 
 export interface AgentsResponse {
@@ -161,7 +201,7 @@ export interface InterviewReport {
   id: number;
   track: string;
   trackLabel: string;
-  student: string;
+  prospect: string;
   phone: string;
   runId: string;
   score: number | null;
@@ -186,12 +226,23 @@ export interface Me {
   email: string | null;
 }
 
+export interface AlertEscalation {
+  reason?: string;
+  assignTo?: string;
+}
+
 export const api = {
   me: () => getJSON<Me>('/auth/me'),
   services: () => getJSON<Service[]>('/services'),
   ports: () => getJSON<Port[]>('/ports'),
   secrets: () => getJSON<Secret[]>('/secrets'),
   alerts: () => getJSON<Alert[]>('/alerts'),
+  acknowledgeAlert: (id: string) =>
+    sendJSON<Alert>(`/alerts/${encodeURIComponent(id)}/acknowledge`, 'POST'),
+  resolveAlert: (id: string) =>
+    sendJSON<Alert>(`/alerts/${encodeURIComponent(id)}/resolve`, 'POST'),
+  escalateAlert: (id: string, body: AlertEscalation) =>
+    postJSON<Alert>(`/alerts/${encodeURIComponent(id)}/escalate`, body),
   users: () => getJSON<User[]>('/users'),
   links: () => getJSON<ResourceLink[]>('/links'),
   health: () => getJSON<HealthMatrixEntry[]>('/health'),
@@ -216,6 +267,13 @@ export const api = {
     getJSON<ExtensionCall[]>(`/extensions/${encodeURIComponent(ext)}/calls`),
   agents: () => getJSON<AgentsResponse>('/agents'),
   agentWorkflows: () => getJSON<AgentWorkflow[]>('/agents/workflows'),
+  workflows: () => getJSON<AgentWorkflow[]>('/workflows'),
+  workflow: (id: number) => getJSON<Workflow>(`/workflows/${id}`),
+  createWorkflow: (body: WorkflowCreate) => postJSON<Workflow>('/workflows', body),
+  updateWorkflow: (id: number, body: WorkflowUpdate) =>
+    postJSON<Workflow>(`/workflows/${id}`, body, 'PUT'),
+  setWorkflowStatus: (id: number, body: WorkflowStatusUpdate) =>
+    postJSON<Workflow>(`/workflows/${id}/status`, body, 'PUT'),
   createAgent: (body: AgentCreate) =>
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>('/agents', body),
   updateAgent: (id: number, body: AgentUpdate) =>

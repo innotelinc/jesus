@@ -643,16 +643,13 @@ services:
     networks: [interview-net]
 
   # ── Authentik — identity provider + SSO (auth.<domain>) ─────────────────
-  # Self-hosted authentication and user management for the whole platform.
-  # Serves the web UI on host port 9100 (NPM proxy target); behind the proxy
-  # it is reached at https://auth.<NPM_BASE_DOMAIN>. The bootstrap admin is
-  # created from AUTHENTIK_BOOTSTRAP_EMAIL / AUTHENTIK_BOOTSTRAP_PASSWORD on
-  # first boot (default: admin@capstone.innotel.us / AUTHENTIK_BOOTSTRAP_PASSWORD).
-  #
-  # Host port is 9100, NOT 9000: minio publishes 127.0.0.1:9000 (dograh-api
-  # runs host-mode and reaches S3 at 127.0.0.1:9000), and a 0.0.0.0 bind
-  # cannot share a port with a loopback bind. The container still listens on
-  # 9000 internally; only the host mapping differs.
+  # NOTE: this stack does NOT run its own Authentik — Cerulean's shared
+  # Authentik (containers cerulean-authentik*) is the IdP, published on host
+  # ports 9000 (HTTP) / 9443 (HTTPS) and proxied by NPM at auth.<domain>.
+  # The AUTHENTIK_* / OIDC env below points the Control Center (dashboard-api)
+  # at that instance (issuer https://auth.<domain>/application/o/<client>).
+  # The comment block below is retained from an earlier iteration that bundled
+  # Authentik in this compose file; it is intentionally inert.
 
 
 
@@ -1026,6 +1023,12 @@ services:
       DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
       DOGRAH_CONFIG_NAME: "${DOGRAH_CONFIG_NAME:-Asterisk ARI (dograh)}"
+      # "Describe it with AI" workflow authoring on the Workflows page / agent
+      # modal: OmniRoute is on the host (host-mode dograh + published 20128),
+      # same route the Workflow Studio uses. Empty key is fine.
+      OMNIROUTE_URL: "${OMNIROUTE_URL:-http://host.docker.internal:20128}"
+      OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
+      OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
       # standalone (default): dashboard provisions FreePBX rows directly
       # (docker exec). addon: Zeus shared PBX — dashboard only manages dograh;
       # the shared box applies the *_custom.conf moniker on sync.

@@ -70,7 +70,7 @@ function ReportModal({
   useEffect(() => setShowTranscript(false), [report]);
   if (!report) return null;
   return (
-    <Modal open={!!report} onClose={onClose} title={`${report.student || 'Candidate'} — ${report.trackLabel}`} size="lg">
+    <Modal open={!!report} onClose={onClose} title={`${report.prospect || 'Prospect'} — ${report.trackLabel}`} size="lg">
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
           <VerdictChip verdict={report.verdict} />
@@ -215,7 +215,7 @@ export default function InterviewReports() {
     return reports.filter(r => {
       if (track !== 'all' && r.track !== track) return false;
       if (!needle) return true;
-      const haystack = `${r.student} ${r.phone} ${r.runId} ${r.trackLabel}`.toLowerCase();
+      const haystack = `${r.prospect} ${r.phone} ${r.runId} ${r.trackLabel}`.toLowerCase();
       return haystack.includes(needle);
     });
   }, [reports, track, search]);
@@ -235,9 +235,9 @@ export default function InterviewReports() {
   }, [filtered]);
 
   const exportCsv = () => {
-    const header = 'student,track,phone,score,verdict,runId';
+    const header = 'prospect,track,phone,score,verdict,runId';
     const rows = filtered.map(r =>
-      [r.student, r.track, r.phone, r.score ?? '', r.verdict, r.runId]
+      [r.prospect, r.track, r.phone, r.score ?? '', r.verdict, r.runId]
         .map(v => `"${String(v).replace(/"/g, '""')}"`)
         .join(','),
     );
@@ -257,6 +257,8 @@ export default function InterviewReports() {
           <h1 className="text-2xl font-semibold tracking-tight">Interview Reports</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Graded mock-interview reports written by the n8n Interview Grader on call hang-up.
+            The prospect is whoever called in — their name is picked up from the conversation and
+            the phone column is the number they called from.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -305,7 +307,7 @@ export default function InterviewReports() {
           </svg>
           <input
             type="search"
-            placeholder="Search by student, phone, run…"
+            placeholder="Search by prospect, phone, run…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="h-9 w-full min-w-[220px] rounded-md border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none"
@@ -337,7 +339,7 @@ export default function InterviewReports() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Student</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Prospect</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Track</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Score</th>
@@ -352,7 +354,7 @@ export default function InterviewReports() {
                   className="cursor-pointer transition-colors hover:bg-muted/40"
                   onClick={() => openReport(r)}
                 >
-                  <td className="px-4 py-3 text-sm font-medium">{r.student || '—'}</td>
+                  <td className="px-4 py-3 text-sm font-medium">{r.prospect || '—'}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{r.trackLabel}</td>
                   <td className="px-4 py-3 font-mono text-sm text-muted-foreground">{r.phone || '—'}</td>
                   <td className="px-4 py-3"><ScoreBadge score={r.score} /></td>

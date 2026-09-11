@@ -240,7 +240,13 @@ function ProfileMenu() {
   );
 }
 
-export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
+export default function TopHeader({
+  sidebarWidth,
+  onToggleSidebar,
+}: {
+  sidebarWidth: string;
+  onToggleSidebar?: () => void;
+}) {
   const { alerts } = useDashboardData();
   const location = useLocation();
   const navigate = useNavigate();
@@ -258,6 +264,18 @@ export default function TopHeader({ sidebarWidth }: { sidebarWidth: string }) {
       style={{ left: sidebarWidth, width: `calc(100% - ${sidebarWidth})` }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-4">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" />
+            </svg>
+          </button>
+        )}
         <div className="hidden shrink-0 items-center gap-2 text-sm md:flex">
           <span className="text-muted-foreground">Control Center</span>
           <span className="text-muted-foreground/50">/</span>

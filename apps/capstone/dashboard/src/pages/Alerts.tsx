@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Alert } from '../types';
+import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
@@ -18,11 +19,16 @@ function severityColor(severity: string) {
 }
 
 export default function Alerts() {
-  const { alerts } = useDashboardData();
+  const { alerts, refresh } = useDashboardData();
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [escalateModalOpen, setEscalateModalOpen] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  const [assignee, setAssignee] = useState('Automation');
 
   const filtered = useMemo(() => {
     return alerts.filter(a => {
@@ -30,11 +36,47 @@ export default function Alerts() {
       const matchesStatus = statusFilter === 'all' || a.status === statusFilter;
       return matchesSeverity && matchesStatus;
     });
-  }, [severityFilter, statusFilter]);
+  }, [alerts, severityFilter, statusFilter]);
+
+  const flash = (msg: string) => {
+    setNotice(msg);
+    window.setTimeout(() => setNotice(null), 5000);
+  };
+
+  const run = async (id: string, act: () => Promise<unknown>, ok: string) => {
+    setBusy(id);
+    setActionError(null);
+    try {
+      await act();
+      await refresh();
+      flash(ok);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Action failed');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const acknowledge = (alert: Alert) =>
+    run(alert.id, () => api.acknowledgeAlert(alert.id), `Alert acknowledged — ${alert.service}.`);
+
+  const resolveAlert = (alert: Alert) =>
+    run(alert.id, () => api.resolveAlert(alert.id), `Alert resolved — ${alert.service}.`);
 
   const escalate = (alert: Alert) => {
     setSelectedAlert(alert);
+    setReason('');
     setEscalateModalOpen(true);
+  };
+
+  const submitEscalation = () => {
+    if (!selectedAlert) return;
+    const alert = selectedAlert;
+    void run(
+      alert.id,
+      () => api.escalateAlert(alert.id, { reason: reason.trim(), assignTo: assignee }),
+      `Alert escalated — ${alert.service} → ${assignee}.`,
+    ).then(() => setEscalateModalOpen(false));
   };
 
   return (
@@ -75,6 +117,17 @@ export default function Alerts() {
           </div>
         </div>
       </div>
+
+      {notice && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400">
+          {notice}
+        </div>
+      )}
+      {actionError && (
+        <div className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          {actionError}
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-4">
         <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
@@ -130,18 +183,36 @@ export default function Alerts() {
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     {alert.status === 'open' && (
-                      <Button variant="outline" size="sm" className="h-7 text-xs">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={busy === alert.id}
+                        onClick={() => void acknowledge(alert)}
+                      >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M9 12l2 2 4-4" /></svg>
-                        Acknowledge
+                        {busy === alert.id ? 'Working…' : 'Acknowledge'}
                       </Button>
                     )}
                     {alert.status === 'open' && (
-                      <Button variant="secondary" size="sm" className="h-7 text-xs">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={busy === alert.id}
+                        onClick={() => void resolveAlert(alert)}
+                      >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                         Resolve
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => escalate(alert)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      disabled={busy === alert.id}
+                      onClick={() => escalate(alert)}
+                    >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M18 15a3 3 0 0 0 3-3 3 3 0 0 0-3-3M15 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3" /><path d="M3 9h6m2 5l3-3 3 3" /></svg>
                       Escalate
                     </Button>
@@ -178,11 +249,17 @@ export default function Alerts() {
                 rows={3}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none resize-none"
                 placeholder="Enter escalation reason…"
+                value={reason}
+                onChange={e => setReason(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium">Assign to</label>
-              <select className="h-9 w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" defaultValue="Automation">
+              <select
+                className="h-9 w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                value={assignee}
+                onChange={e => setAssignee(e.target.value)}
+              >
                 <option>Automation</option>
                 <option>DevOps</option>
                 <option>SRE</option>
@@ -193,7 +270,14 @@ export default function Alerts() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={() => setEscalateModalOpen(false)}>Cancel</Button>
-              <Button variant="destructive" size="sm">Escalate</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={selectedAlert !== null && busy === selectedAlert.id}
+                onClick={submitEscalation}
+              >
+                {selectedAlert !== null && busy === selectedAlert.id ? 'Escalating…' : 'Escalate'}
+              </Button>
             </div>
           </div>
         )}

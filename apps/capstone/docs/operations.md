@@ -27,9 +27,11 @@ The dashboard shows: **Services** (live Docker health + latency probes), **Healt
 Status**, **Network Ports**, **Alerts**, **Secrets inventory**, **Users**, **Monitoring**
 (real CPU/mem/disk/network from the host), **Logs** (recent Docker events), **Links**
 (service URLs derived from `PUBLIC_BASE_URL` / `NPM_BASE_DOMAIN` — see
-[NPM proxy hosts](#npm-proxy-hosts)), and a **Softphone** — an in-browser WebRTC phone that
+[NPM proxy hosts](#npm-proxy-hosts)), a **Softphone** — an in-browser WebRTC phone that
 registers to the PBX over WSS (`/softphone`, extension 101 by default, STUN/TURN pulled
-from coturn via `/api/turnconfig`).
+from coturn via `/api/turnconfig`) — and the voice-agent surfaces: **Agents**,
+**Workflows**, **Extensions** and **Interview Reports** (see
+[Authoring agents & workflows](#authoring-agents--workflows-from-the-control-center)).
 
 > Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the STUN/TURN
 > endpoints (with credentials) and the WSS endpoint. On an HTTPS page that endpoint is this
@@ -42,6 +44,41 @@ from coturn via `/api/turnconfig`).
 > reject outright, so it cannot be made to work by accepting a warning. The page also has to
 > be served over **HTTPS** — a plain-HTTP origin is not a secure context, so `getUserMedia`
 > has no microphone and calls can't carry audio.
+
+### Authoring agents & workflows from the Control Center
+
+The **Agents** and **Workflows** pages are a drop-in for the dograh editor, so a phone
+number and the AI workflow behind it can be set up without leaving the dashboard (or
+opening the dograh UI). Both write the same definitions dograh's own editor would and are
+gated behind the Control Center's Cerulean session like every other page.
+
+- **Agents** (`/agents`) — each row is a dograh phone number bound to a workflow, plus its
+  FreePBX provisioning status. The **Add agent** and **Edit agent** dialogs can:
+  - **create a workflow inline** — *Describe it (AI)* (expanded by the local OmniRoute
+    gateway), a **guided template** (role/goal/script), or a **blank** starter — which is
+    imported into dograh and selected for the agent in one step; or
+  - **edit the bound workflow's prompts** (persona, greeting/opening, main script, closing)
+    directly, then save + publish it.
+  - pick any existing workflow, and jump to a workflow's editor via the Workflow column.
+  - Archived workflows are not offered for new bindings; the one already bound stays
+    visible (marked `(archived)`) so the selector never goes blank.
+- **Workflows** (`/workflows`) — every dograh workflow with its status, the agents using it
+  (each links straight to the agent's edit dialog), and actions:
+  - **New workflow** — same AI / guided / blank modes as the agent dialog.
+  - **Edit prompts** — edit the prompt-bearing nodes and save; the change is written to
+    dograh **and published**, so calls to any bound agent pick it up immediately.
+  - **Archive / Restore** — dograh has no workflow *delete* (its UI archives), so the
+    dashboard does the same via `PUT /api/v1/workflow/{id}/status`. Archiving is refused
+    while an agent is still bound unless you confirm, so a stray click can't silently leave
+    a number with no inbound workflow. A **Show archived** toggle filters the list.
+
+Under the hood `dashboard-api` proxies to dograh: `GET /workflows`,
+`GET /workflows/{id}` (definition + editable nodes), `POST /workflows`
+(`/api/v1/workflow/create/definition`), `PUT /workflows/{id}`
+(`/api/v1/workflow/{id}` then `/publish`) and `PUT /workflows/{id}/status`. The AI mode
+reaches the OmniRoute gateway through `OMNIROUTE_URL` (defaults to
+`http://host.docker.internal:20128`), the same gateway the Workflow Studio uses; set
+`OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
 
 ## PBX / Asterisk side
 
@@ -182,10 +219,10 @@ and handles renewal):
 |---|---|---|
 | `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
 | `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
-| `auth.<domain>` | `http://<host>:9100` | Authentik SSO / user management |
+| `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
 | `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
 | `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
-| `pbx.<domain>` | `http://<host>:80` | FreePBX GUI |
+| `pbx.<domain>` | `http://<host>:8083` | FreePBX GUI (+ AvantFAX at `/fax`) |
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
 | `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
 | `grist.<domain>` | `http://<host>:8484` | Grist documents |
@@ -288,13 +325,20 @@ the workflow itself:
   python3 scripts/dograh_wire.py --env-file .env   # idempotent re-import
   ```
 
-- **AI-generated agents** (Workflow Studio): either regenerate from a new description in the
-  Studio (`workflow.<domain>`, port `8090`) and import as a new agent, or edit the imported
-  workflow's JSON in the Studio preview and re-import it — the Studio's import button
-  registers the next free extension automatically.
+- **AI-generated agents** — three authoring surfaces, all writing to the same dograh
+  workflow:
+  - **Control Center** (`admin.<domain>`, port `8096`): open the agent under **Agents** →
+    *Edit workflow prompts*, or **Workflows** → *Edit prompts*. Edits are saved and
+    **published** in one step. This is the quickest path for a text tweak.
+  - **Workflow Studio** (`workflow.<domain>`, port `8090`): regenerate from a new
+    description and import as a new agent, or enter an existing **workflow id** to update
+    it in place (the import button re-points the workflow's existing number, or registers
+    the next free extension for a new one).
+  - **Shipped agents** (`dograh/*-workflow.json`): edit the JSON prompt text, then re-import
+    + re-wire with `python3 scripts/dograh_wire.py --env-file .env` (idempotent).
 
-  The dograh UI is intentionally read-only for prompts: it's the telephony configuration
-  surface, while the Studio is the authoring surface.
+  The dograh UI itself is intentionally read-only for prompts: it's the telephony
+  configuration surface.
 
 ## Verification
 

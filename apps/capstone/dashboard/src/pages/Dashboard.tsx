@@ -374,7 +374,7 @@ export default function Dashboard() {
                 >
                   <span className={cn('h-2 w-2 shrink-0 rounded-full', verdictDotClass(r.verdict))} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{r.student || 'Unnamed candidate'}</p>
+                    <p className="truncate text-sm font-medium">{r.prospect || 'Unnamed prospect'}</p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.trackLabel}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">

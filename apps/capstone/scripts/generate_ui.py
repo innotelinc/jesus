@@ -9,6 +9,7 @@ browser instead of the terminal:
   • or fill the guided template fields (role / goal / script)
   • preview the generated workflow JSON in the page
   • one-click import into dograh + register a phone extension
+  • or update an existing workflow in place (enter its id) and publish it
 
 Run (from the repo root):
     python3 scripts/generate_ui.py            # http://127.0.0.1:8090
@@ -106,6 +107,10 @@ PAGE = """<!doctype html>
    <option value="survey">survey</option><option value="interview">interview</option>
  </select></div>
 </div>
+<div class="row">
+ <div><label>Existing workflow ID (optional — updates it instead of creating)</label><input type="text" id="wfid" placeholder="leave blank to create a new workflow"></div>
+ <div><label>Extension (optional — binds this agent's number)</label><input type="text" id="ext" placeholder="blank = next free 8xxx"></div>
+</div>
 <button onclick="generate()">Generate workflow</button>
 <button class="secondary" onclick="importWf()">Import into dograh + assign extension</button>
 <div id="status"></div>
@@ -132,11 +137,13 @@ async function generate(){
 }
 async function importWf(){
  if(!current){document.getElementById('status').innerHTML='<span class=err>Generate a workflow first.</span>';return;}
+ const wfid=document.getElementById('wfid').value.trim();
+ const ext=document.getElementById('ext').value.trim();
  const r=await fetch('/import',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({workflow:current,extension:true})});
+   body:JSON.stringify({workflow:current,extension:true,workflow_id:wfid||null,address:ext||null})});
  const j=await r.json();
  document.getElementById('status').innerHTML=j.ok
-   ?'<span class=ok>Imported: workflow #'+j.workflow_id+(j.extension?(' on extension '+j.extension):'')+'</span>'
+   ?(j.updated?'<span class=ok>Updated + published workflow #'+j.workflow_id+'</span>':'<span class=ok>Imported: workflow #'+j.workflow_id+'</span>')+(j.extension?(' on extension '+j.extension):'')
    :'<span class=err>'+j.error+'</span>';
 }
 </script></body></html>"""
@@ -228,44 +235,81 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {"ok": False,
                              "error": "DOGRAH_API_TOKEN not set (run scripts/dograh_wire.py once, or set it in .env)"})
             return
+        existing_id = data.get("workflow_id")
         try:
-            # 1. create the workflow in dograh
-            req = urllib.request.Request(
-                f"{DOGRAH}/api/v1/workflow/create/definition",
-                data=json.dumps({"name": name, "workflow_definition": wf}).encode(),
-                headers={"Content-Type": "application/json", "X-API-Key": DOGRAH_TOKEN},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                wf_id = (json.loads(resp.read() or b"{}") or {}).get("id")
+            # 1. create the workflow in dograh — or, when an ID is given, update
+            # it and publish the draft (dograh's own save-then-publish flow) so
+            # live calls pick the change up immediately.
+            updated = bool(existing_id)
+            if updated:
+                wf_id = int(existing_id)
+                self._dograh_send("PUT", f"/api/v1/workflow/{wf_id}",
+                                  {"name": name, "workflow_definition": wf})
+                self._dograh_send("POST", f"/api/v1/workflow/{wf_id}/publish", None)
+            else:
+                created = self._dograh_send(
+                    "POST", "/api/v1/workflow/create/definition",
+                    {"name": name, "workflow_definition": wf})
+                wf_id = (created or {}).get("id")
+                if wf_id is None:
+                    raise RuntimeError("dograh did not return a workflow id")
+                wf_id = int(wf_id)
 
-            # 2. optionally register the next free extension as its phone number
-            ext = None
+            # 2. optionally bind a phone number (the agent) to the workflow
+            ext = (data.get("address") or "").strip() or None
             if data.get("extension"):
-                cfgs = self._dograh_get("/api/v1/organizations/telephony-configs")
-                configs = (cfgs or {}).get("configurations", [])
-                if not configs:
-                    raise RuntimeError("no telephony config found — run scripts/dograh_wire.py first")
-                cfg_id = configs[0]["id"]
-                nums = self._dograh_get(
-                    f"/api/v1/organizations/telephony-configs/{cfg_id}/phone-numbers")
-                used = {n.get("address") for n in (nums or {}).get("phone_numbers", [])} | USED_EXTS
-                ext = next(f"8{i:03d}" for i in range(8, 200) if f"8{i:03d}" not in used)
-                urllib.request.urlopen(urllib.request.Request(
-                    f"{DOGRAH}/api/v1/organizations/telephony-configs/{cfg_id}/phone-numbers",
-                    data=json.dumps({
-                        "address": ext, "label": name,
-                        "inbound_workflow_id": wf_id, "is_active": True,
-                        "is_default_caller_id": False, "extra_metadata": {},
-                    }).encode(),
-                    headers={"Content-Type": "application/json", "X-API-Key": DOGRAH_TOKEN},
-                    method="POST",
-                ), timeout=30).read()
-            self._json(200, {"ok": True, "workflow_id": wf_id, "extension": ext})
+                ext = self._bind_extension(wf_id, name, requested=ext, skip_if_bound=updated)
+            self._json(200, {"ok": True, "workflow_id": wf_id, "updated": updated,
+                             "extension": ext})
         except urllib.error.HTTPError as e:
             self._json(502, {"ok": False, "error": f"dograh API HTTP {e.code}: {e.read().decode(errors='replace')[:300]}"})
         except Exception as e:  # noqa: BLE001
             self._json(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
+
+    def _bind_extension(self, wf_id: int, name: str, requested: str | None = None,
+                        skip_if_bound: bool = False) -> str:
+        """Register (or re-point) a phone number as the agent for this workflow.
+        Reuses the number already bound to the workflow when updating, so a
+        prompt edit never mints a duplicate agent."""
+        cfgs = self._dograh_get("/api/v1/organizations/telephony-configs")
+        configs = (cfgs or {}).get("configurations", [])
+        if not configs:
+            raise RuntimeError("no telephony config found — run scripts/dograh_wire.py first")
+        cfg_id = configs[0]["id"]
+        nums = (self._dograh_get(
+            f"/api/v1/organizations/telephony-configs/{cfg_id}/phone-numbers") or {}).get(
+            "phone_numbers", [])
+        by_address = {n.get("address"): n for n in nums}
+        address = requested
+        if address is None and skip_if_bound:
+            address = next((n.get("address") for n in nums
+                            if n.get("inbound_workflow_id") == wf_id), None)
+        if address is None:
+            used = set(by_address) | USED_EXTS
+            address = next(f"8{i:03d}" for i in range(8, 200) if f"8{i:03d}" not in used)
+        existing = by_address.get(address)
+        if existing:
+            self._dograh_send(
+                "PUT",
+                f"/api/v1/organizations/telephony-configs/{cfg_id}/phone-numbers/{existing['id']}",
+                {"label": name, "inbound_workflow_id": wf_id, "is_active": True})
+        else:
+            self._dograh_send(
+                "POST",
+                f"/api/v1/organizations/telephony-configs/{cfg_id}/phone-numbers",
+                {"address": address, "label": name, "inbound_workflow_id": wf_id,
+                 "is_active": True, "is_default_caller_id": False, "extra_metadata": {}})
+        return address
+
+    def _dograh_send(self, method: str, path: str, body: dict | None) -> dict | None:
+        data = json.dumps(body).encode() if body is not None else None
+        headers = {"X-API-Key": DOGRAH_TOKEN, "Accept": "application/json"}
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(f"{DOGRAH}{path}", data=data, headers=headers, method=method)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            raw = resp.read()
+            return json.loads(raw) if raw else None
 
     def _dograh_get(self, path: str) -> dict | None:
         req = urllib.request.Request(

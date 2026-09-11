@@ -2,7 +2,11 @@
 
 The Interview Grader workflow (n8n) POSTs a graded JSON report to Grist on
 every mock-interview hang-up: one row of the ``Interviews`` table per call
-(track, student, phone, score, verdict, per-dimension evidence, transcript).
+(track, prospect, phone, score, verdict, per-dimension evidence, transcript).
+
+The prospect's *name* is derived from the call (their transcript) rather than
+supplied up front, and the phone column is the number they called from
+(dograh's ``initial_context.caller_number``).
 
 This module is the dashboard's read-only client for those rows. Grist runs on
 the same ``interview-net`` bridge as dashboard-api, so we talk to it directly
@@ -165,7 +169,9 @@ def row_to_report(row: dict[str, Any]) -> dict[str, Any]:
         "id": row.get("id"),
         "track": str(fields.get("Track") or "").strip().lower(),
         "trackLabel": track_label(str(fields.get("Track") or "")),
-        "student": str(fields.get("Student") or "").strip(),
+        # "Prospect" is the current column; fall back to the legacy "Student"
+        # column so pre-rename rows keep showing their name.
+        "prospect": str(fields.get("Prospect") or fields.get("Student") or "").strip(),
         "phone": str(fields.get("Phone") or "").strip(),
         "runId": str(fields.get("RunID") or "").strip(),
         "score": score if isinstance(score, (int, float)) else None,
@@ -197,7 +203,7 @@ def rows_to_reports(rows: list[Any]) -> list[dict[str, Any]]:
 def filter_reports(
     reports: list[dict[str, Any]], track: str = "all", search: str = ""
 ) -> list[dict[str, Any]]:
-    """Track filter + substring search across student/phone/runId."""
+    """Track filter + substring search across prospect/phone/runId."""
     needle = (search or "").strip().lower()
     out = []
     for report in reports:
@@ -206,7 +212,7 @@ def filter_reports(
         if needle:
             haystack = " ".join(
                 str(report.get(field) or "")
-                for field in ("student", "phone", "runId")
+                for field in ("prospect", "phone", "runId")
             ).lower()
             if needle not in haystack:
                 continue

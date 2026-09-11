@@ -3,8 +3,14 @@
 
 Creates (or reuses) the Grist document and ensures the `Interviews` table
 exists with exactly the columns the n8n grader workflow writes:
-Track, Student, Phone, RunID, Score, Verdict, Dimensions, Strengths,
-Improvements, Transcript.
+Track, Prospect, Student (legacy), Phone, RunID, Score, Verdict, Dimensions,
+Strengths, Improvements, Transcript.
+
+The caller is a **prospect**: the grader derives their name from the call
+transcript (falling back to `initial_context`), and `Phone` is the number
+they called from (dograh's `initial_context.caller_number`). The legacy
+`Student` column is kept so pre-rename rows stay readable; new rows write
+`Prospect`.
 
 The n8n Save-to-Grist node targets
 `http://grist:8484/api/docs/<GRIST_DOC_ID>/tables/Interviews/records`, so the
@@ -49,8 +55,9 @@ from typing import Any
 # (column id, Grist type, human label)
 COLUMNS: list[tuple[str, str, str]] = [
     ("Track", "Text", "Interview track (it / devops / sql)"),
-    ("Student", "Text", "Student name"),
-    ("Phone", "Text", "Phone number"),
+    ("Prospect", "Text", "Prospect name (derived from the call)"),
+    ("Student", "Text", "Legacy name column (pre-prospect rows)"),
+    ("Phone", "Text", "Number the prospect called from"),
     ("RunID", "Text", "dograh workflow run id"),
     ("Score", "Numeric", "Overall score (0-100)"),
     ("Verdict", "Text", "pass / review / fail"),

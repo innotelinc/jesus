@@ -1,15 +1,112 @@
-import { useState } from 'react';import { useResolvedTheme } from '../components/providers';
+import { useEffect, useRef, useState } from 'react';
+import { useResolvedTheme } from '../components/providers';
 import Button from '../components/Button';
 import { cn } from '../lib/utils';
 import Modal from '../components/Modal';
 import Input from '../components/Input';
 import Select from '../components/Select';
+import {
+  NOTIFY_ON_OPTIONS,
+  settingsStore,
+  type AccessSettings,
+  type DashboardSettings,
+  type NotificationsSettings,
+  type ProfileSettings,
+} from '../lib/settings';
+
+/**
+ * Shared save machinery for every settings card: loads its slice from the
+ * browser-side settings store, tracks dirty/saved state, and persists through
+ * settingsStore on Save (which broadcasts SETTINGS_CHANGED_EVENT so live
+ * consumers like the dashboard poll interval react without a reload).
+ */
+function useSavableSettings<T extends object>(
+  load: () => T,
+  save: (value: T) => boolean,
+) {
+  const [value, setValue] = useState<T>(load);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const update = (patch: Partial<T>) => {
+    setValue(current => ({ ...current, ...patch }));
+    setDirty(true);
+    setSaved(false);
+  };
+
+  const saveNow = () => {
+    save(value);
+    setDirty(false);
+    setSaved(true);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setSaved(false), 5000);
+  };
+
+  return { value, update, save: saveNow, dirty, saved };
+}
+
+/** Save button + "saved." confirmation row shared by all settings cards. */
+function SaveRow({
+  saved,
+  dirty,
+  onSave,
+  label,
+}: {
+  saved: boolean;
+  dirty: boolean;
+  onSave: () => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-between pt-1">
+      <span
+        className={cn('text-xs transition-opacity', saved ? 'text-success opacity-100' : 'opacity-0')}
+        role="status"
+      >
+        Settings saved.
+      </span>
+      <Button size="sm" onClick={onSave} disabled={!dirty}>
+        {label}
+      </Button>
+    </div>
+  );
+}
 
 export default function Settings() {
   const { theme, setTheme } = useResolvedTheme();
-  const [notifEmail, setNotifEmail] = useState('maya@capstone.internal');
-  const [notifSlack, setNotifSlack] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const access = useSavableSettings<AccessSettings>(
+    settingsStore.loadAccess,
+    settingsStore.saveAccess,
+  );
+  const notifications = useSavableSettings<NotificationsSettings>(
+    settingsStore.loadNotifications,
+    settingsStore.saveNotifications,
+  );
+  const dashboard = useSavableSettings<DashboardSettings>(
+    settingsStore.loadDashboard,
+    settingsStore.saveDashboard,
+  );
+  const profile = useSavableSettings<ProfileSettings>(
+    settingsStore.loadProfile,
+    settingsStore.saveProfile,
+  );
+
+  const toggleNotifyOn = (label: string, enabled: boolean) => {
+    const set = new Set(notifications.value.notifyOn);
+    if (enabled) set.add(label);
+    else set.delete(label);
+    notifications.update({ notifyOn: [...set] });
+  };
 
   return (
     <div className="space-y-6">
@@ -52,23 +149,48 @@ export default function Settings() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notifications</h2>
           <div>
             <label className="text-sm font-medium">Email</label>
-            <Input className="mt-1" value={notifEmail} onChange={e => setNotifEmail(e.target.value)} />
+            <Input
+              className="mt-1"
+              value={notifications.value.email}
+              onChange={e => notifications.update({ email: e.target.value })}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="notifSlack" className="h-4 w-4 rounded border input accent-primary" checked={notifSlack} onChange={e => setNotifSlack(e.target.checked)} />
+            <input
+              type="checkbox"
+              id="notifSlack"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={notifications.value.slackAlerts}
+              onChange={e => notifications.update({ slackAlerts: e.target.checked })}
+            />
             <label htmlFor="notifSlack" className="text-sm cursor-pointer">Slack alerts</label>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Notify on</label>
             <div className="flex flex-col gap-2">
-              {['Critical alerts', 'Warning alerts', 'Secret expiry reminders', 'Config changes', 'Audit log events'].map(label => (
+              {NOTIFY_ON_OPTIONS.map(label => (
                 <label key={label} className="flex items-center gap-2 cursor-pointer text-sm">
-                  <input type="checkbox" className="h-4 w-4 rounded border input accent-primary" defaultChecked={label === 'Critical alerts' || label === 'Secret expiry reminders'} />
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border input accent-primary"
+                    checked={notifications.value.notifyOn.includes(label)}
+                    onChange={e => toggleNotifyOn(label, e.target.checked)}
+                  />
                   {label}
                 </label>
               ))}
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Delivery targets are stored with this browser's profile; alert routing
+            itself is handled by the alerts endpoints.
+          </p>
+          <SaveRow
+            saved={notifications.saved}
+            dirty={notifications.dirty}
+            onSave={notifications.save}
+            label="Save notification settings"
+          />
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
@@ -76,7 +198,7 @@ export default function Settings() {
           <div>
             <label className="text-sm font-medium">Auto-refresh interval (seconds)</label>
             <Select
-              value="30"
+              value={dashboard.value.autoRefreshSeconds}
               options={[
                 { value: '15', label: '15' },
                 { value: '30', label: '30' },
@@ -84,45 +206,80 @@ export default function Settings() {
                 { value: '120', label: '120' },
                 { value: '0', label: 'Off' },
               ]}
-              onChange={() => {}}
+              onChange={v => dashboard.update({ autoRefreshSeconds: v })}
               className="mt-1"
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applies to live polling immediately after saving — no reload needed.
+            </p>
           </div>
           <div>
             <label className="text-sm font-medium">Default export format</label>
             <Select
-              value="csv"
+              value={dashboard.value.exportFormat}
               options={[
                 { value: 'csv', label: 'CSV' },
                 { value: 'json', label: 'JSON' },
                 { value: 'pdf', label: 'PDF (browser)' },
               ]}
-              onChange={() => {}}
+              onChange={v => dashboard.update({ exportFormat: v as DashboardSettings['exportFormat'] })}
               className="mt-1"
             />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="compactView" className="h-4 w-4 rounded border input accent-primary" />
+            <input
+              type="checkbox"
+              id="compactView"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={dashboard.value.compactView}
+              onChange={e => dashboard.update({ compactView: e.target.checked })}
+            />
             <label htmlFor="compactView" className="text-sm cursor-pointer">Compact table view</label>
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="showTrends" className="h-4 w-4 rounded border input accent-primary" defaultChecked />
+            <input
+              type="checkbox"
+              id="showTrends"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={dashboard.value.showTrends}
+              onChange={e => dashboard.update({ showTrends: e.target.checked })}
+            />
             <label htmlFor="showTrends" className="text-sm cursor-pointer">Show trend indicators</label>
           </div>
+          <SaveRow
+            saved={dashboard.saved}
+            dirty={dashboard.dirty}
+            onSave={dashboard.save}
+            label="Save dashboard settings"
+          />
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profile</h2>
           <div>
             <label className="text-sm font-medium">Display name</label>
-            <Input className="mt-1" defaultValue="Maya K." />
+            <Input
+              className="mt-1"
+              value={profile.value.displayName}
+              onChange={e => profile.update({ displayName: e.target.value })}
+            />
           </div>
           <div>
             <label className="text-sm font-medium">Email</label>
-            <Input className="mt-1" defaultValue="maya@capstone.internal" />
+            <Input
+              className="mt-1"
+              value={profile.value.email}
+              onChange={e => profile.update({ email: e.target.value })}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="showEmail" className="h-4 w-4 rounded border input accent-primary" defaultChecked />
+            <input
+              type="checkbox"
+              id="showEmail"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={profile.value.showEmail}
+              onChange={e => profile.update({ showEmail: e.target.checked })}
+            />
             <label htmlFor="showEmail" className="text-sm cursor-pointer">Show email on dashboard</label>
           </div>
           <div className="pt-2">
@@ -131,6 +288,12 @@ export default function Settings() {
               Change password
             </Button>
           </div>
+          <SaveRow
+            saved={profile.saved}
+            dirty={profile.dirty}
+            onSave={profile.save}
+            label="Save profile"
+          />
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
@@ -138,29 +301,56 @@ export default function Settings() {
           <div>
             <label className="text-sm font-medium">Session timeout (minutes)</label>
             <Select
-              value="60"
+              value={access.value.sessionTimeout}
               options={[
                 { value: '15', label: '15' },
                 { value: '30', label: '30' },
                 { value: '60', label: '60' },
                 { value: '120', label: '120' },
               ]}
-              onChange={() => {}}
+              onChange={v => access.update({ sessionTimeout: v })}
               className="mt-1"
             />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="requireMfa" className="h-4 w-4 rounded border input accent-primary" />
+            <input
+              type="checkbox"
+              id="requireMfa"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={access.value.requireMfa}
+              onChange={e => access.update({ requireMfa: e.target.checked })}
+            />
             <label htmlFor="requireMfa" className="text-sm cursor-pointer">Require MFA for admin actions</label>
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="ipAllowList" className="h-4 w-4 rounded border input accent-primary" defaultChecked />
+            <input
+              type="checkbox"
+              id="ipAllowList"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={access.value.ipAllowList}
+              onChange={e => access.update({ ipAllowList: e.target.checked })}
+            />
             <label htmlFor="ipAllowList" className="text-sm cursor-pointer">IP allow list enforcement</label>
           </div>
           <div>
             <label className="text-sm font-medium">Allowed IP ranges</label>
-            <Input className="mt-1" placeholder="e.g. 192.168.1.0/24 (LAN subnet)" defaultValue="203.0.113.0/24" />
+            <Input
+              className="mt-1"
+              placeholder="e.g. 192.168.1.0/24 (LAN subnet)"
+              value={access.value.ipRanges}
+              onChange={e => access.update({ ipRanges: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Comma-separated CIDR ranges. Stored with this browser's profile and applied on
+              your next visits — the API itself is gated by the Cerulean session.
+            </p>
           </div>
+          <SaveRow
+            saved={access.saved}
+            dirty={access.dirty}
+            onSave={access.save}
+            label="Save access settings"
+          />
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">

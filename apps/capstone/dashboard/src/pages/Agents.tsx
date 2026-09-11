@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import { api, type Agent, type AgentWorkflow } from '../lib/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { api, type Agent, type AgentWorkflow, type Workflow } from '../lib/api';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
+import WorkflowForm from '../components/WorkflowForm';
 import { cn } from '../lib/utils';
 
 function ModeBanner({ mode }: { mode: 'standalone' | 'addon' }) {
@@ -69,6 +71,17 @@ export default function Agents() {
   const [editWorkflow, setEditWorkflow] = useState('');
   const [editActive, setEditActive] = useState(true);
 
+  // Inline workflow authoring: create a new workflow while adding an agent, or
+  // edit the prompts of the workflow bound to the agent being edited. Both
+  // write to dograh exactly as its own editor would, then rebind here.
+  const [createWorkflowOpen, setCreateWorkflowOpen] = useState(false);
+  const [editWorkflowData, setEditWorkflowData] = useState<Workflow | null>(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+
+  // Deep link from the Workflows page: /agents?agent=<id> opens that agent.
+  const [searchParams] = useSearchParams();
+  const openedAgentParam = useRef<string | null>(null);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -117,6 +130,7 @@ export default function Agents() {
         workflowId,
       });
       setCreateOpen(false);
+      setCreateWorkflowOpen(false);
       setNewAddress(''); setNewLabel(''); setNewWorkflow('');
       showWarnings(res.warnings, `Agent ${res.agent.label} created and wired into the PBX`);
       await refresh();
@@ -132,7 +146,40 @@ export default function Agents() {
     setEditLabel(agent.label);
     setEditWorkflow(agent.workflowId != null ? String(agent.workflowId) : '');
     setEditActive(agent.active);
+    setEditWorkflowData(null);
   };
+
+  const reloadWorkflowOptions = async () => {
+    try {
+      setWorkflows(await api.agentWorkflows());
+    } catch {
+      // the agent save still works; the option list is just stale
+    }
+  };
+
+  const openEditWorkflow = async () => {
+    if (!editAgent?.workflowId) return;
+    setWorkflowLoading(true);
+    setError(null);
+    try {
+      setEditWorkflowData(await api.workflow(editAgent.workflowId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load workflow');
+    } finally {
+      setWorkflowLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const raw = searchParams.get('agent');
+    if (!raw || openedAgentParam.current === raw || agents.length === 0) return;
+    const agent = agents.find(a => String(a.id) === raw);
+    if (!agent) return;
+    openedAgentParam.current = raw;
+    openEdit(agent);
+    // openEdit is stable in effect here; it only runs once per ?agent= value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, agents]);
 
   const handleSaveEdit = async () => {
     if (!editAgent) return;
@@ -184,6 +231,13 @@ export default function Agents() {
     }
   };
 
+  // Archived workflows aren't offered for new bindings; the one already bound
+  // to the agent being edited stays listed so the selector never goes blank.
+  const bindableWorkflows = workflows.filter(w => w.status !== 'archived');
+  const editWorkflowChoices = workflows.filter(
+    w => w.status !== 'archived' || String(w.id) === String(editAgent?.workflowId ?? ''),
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -196,7 +250,7 @@ export default function Agents() {
           </p>
         </div>
         {configured && (
-          <Button onClick={() => setCreateOpen(true)} disabled={!configured}>Add agent</Button>
+          <Button onClick={() => { setCreateWorkflowOpen(false); setCreateOpen(true); }} disabled={!configured}>Add agent</Button>
         )}
       </div>
 
@@ -257,9 +311,19 @@ export default function Agents() {
                     <td className="px-5 py-3.5">{agent.label}</td>
                     <td className="px-5 py-3.5">
                       {agent.workflowName ? (
-                        <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                          {agent.workflowName}
-                        </span>
+                        agent.workflowId != null ? (
+                          <Link
+                            to={`/workflows?workflow=${agent.workflowId}`}
+                            title="Edit this workflow"
+                            className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {agent.workflowName}
+                          </Link>
+                        ) : (
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                            {agent.workflowName}
+                          </span>
+                        )
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
@@ -326,7 +390,7 @@ export default function Agents() {
       )}
 
       {/* Create modal */}
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Add agent">
+      <Modal open={createOpen} onClose={() => { setCreateOpen(false); setCreateWorkflowOpen(false); }} title="Add agent" size="xl">
         <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Phone number / extension</label>
@@ -342,21 +406,49 @@ export default function Agents() {
               onChange={e => setNewLabel(e.target.value.slice(0, 64))} />
           </div>
           <div>
-            <label className="text-sm font-medium">Workflow</label>
-            <select
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              value={newWorkflow}
-              onChange={e => setNewWorkflow(e.target.value)}
-            >
-              <option value="">— no inbound workflow (outbound only) —</option>
-              {workflows.map(w => (
-                <option key={w.id} value={String(w.id)}>{w.name}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Calls to this number run this workflow. Workflows come from dograh
-              (<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/api/v1/workflow/fetch</code>).
-            </p>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Workflow</label>
+              {!createWorkflowOpen && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => setCreateWorkflowOpen(true)}
+                >
+                  + Create new workflow
+                </button>
+              )}
+            </div>
+            {createWorkflowOpen ? (
+              <div className="mt-2 rounded-xl border bg-muted/20 p-3">
+                <WorkflowForm
+                  onCancel={() => setCreateWorkflowOpen(false)}
+                  onSaved={wf => {
+                    setCreateWorkflowOpen(false);
+                    setNewWorkflow(String(wf.id));
+                    void reloadWorkflowOptions();
+                    flash(`Workflow ${wf.name} created in dograh and selected for this agent.`);
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <select
+                  className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  value={newWorkflow}
+                  onChange={e => setNewWorkflow(e.target.value)}
+                >
+                  <option value="">— no inbound workflow (outbound only) —</option>
+                  {bindableWorkflows.map(w => (
+                    <option key={w.id} value={String(w.id)}>{w.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Calls to this number run this workflow. Create one here — describe it, or use the
+                  guided template — and it's imported into dograh automatically, or pick one that
+                  already exists (<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">/api/v1/workflow/fetch</code>).
+                </p>
+              </>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -368,8 +460,8 @@ export default function Agents() {
       </Modal>
 
       {/* Edit modal */}
-      <Modal open={editAgent !== null} onClose={() => setEditAgent(null)}
-        title={`Edit agent — ${editAgent?.label ?? ''}`}>
+      <Modal open={editAgent !== null} onClose={() => { setEditAgent(null); setEditWorkflowData(null); }}
+        title={`Edit agent — ${editAgent?.label ?? ''}`} size="xl">
         {editAgent && (
           <div className="space-y-4">
             <div>
@@ -378,20 +470,53 @@ export default function Agents() {
                 onChange={e => setEditLabel(e.target.value.slice(0, 64))} />
             </div>
             <div>
-              <label className="text-sm font-medium">Workflow</label>
-              <select
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                value={editWorkflow}
-                onChange={e => setEditWorkflow(e.target.value)}
-              >
-                <option value="">— no inbound workflow (outbound only) —</option>
-                {workflows.map(w => (
-                  <option key={w.id} value={String(w.id)}>{w.name}</option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-muted-foreground">
-                The number itself is immutable in dograh — to renumber an agent, delete it and create a new one.
-              </p>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Workflow</label>
+                {editWorkflowData === null && editAgent.workflowId != null && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                    disabled={workflowLoading}
+                    onClick={() => void openEditWorkflow()}
+                  >
+                    {workflowLoading ? 'Loading…' : 'Edit workflow prompts'}
+                  </button>
+                )}
+              </div>
+              {editWorkflowData ? (
+                <div className="mt-2 rounded-xl border bg-muted/20 p-3">
+                  <WorkflowForm
+                    workflow={editWorkflowData}
+                    onCancel={() => setEditWorkflowData(null)}
+                    onSaved={wf => {
+                      setEditWorkflowData(null);
+                      setEditWorkflow(String(wf.id));
+                      void reloadWorkflowOptions();
+                      flash(`Workflow ${wf.name} updated and published in dograh.`);
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  <select
+                    className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    value={editWorkflow}
+                    onChange={e => setEditWorkflow(e.target.value)}
+                  >
+                    <option value="">— no inbound workflow (outbound only) —</option>
+                    {editWorkflowChoices.map(w => (
+                      <option key={w.id} value={String(w.id)}>
+                        {w.name}{w.status === 'archived' ? ' (archived)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Edit the workflow's persona/greeting/script right here, or re-point the number at
+                    another one. The number itself is immutable in dograh — to renumber an agent,
+                    delete it and create a new one.
+                  </p>
+                </>
+              )}
             </div>
             <label className="flex items-center gap-2 text-sm font-medium">
               <input

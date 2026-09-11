@@ -13,6 +13,7 @@ const PasswordGenerator = lazy(() => import('./pages/PasswordGenerator'));
 const Softphone = lazy(() => import('./pages/Softphone'));
 const Extensions = lazy(() => import('./pages/Extensions'));
 const Agents = lazy(() => import('./pages/Agents'));
+const Workflows = lazy(() => import('./pages/Workflows'));
 const InterviewReports = lazy(() => import('./pages/InterviewReports'));
 const Links = lazy(() => import('./pages/Links'));
 const Alerts = lazy(() => import('./pages/Alerts'));
@@ -46,6 +47,7 @@ export default function AppRoutes() {
         <Route path="/softphone" element={<Softphone />} />
         <Route path="/extensions" element={<Extensions />} />
         <Route path="/agents" element={<Agents />} />
+        <Route path="/workflows" element={<Workflows />} />
         <Route path="/interviews" element={<InterviewReports />} />
         <Route path="/links" element={<Links />} />
         <Route path="/alerts" element={<Alerts />} />

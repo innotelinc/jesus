@@ -185,14 +185,85 @@ class WorkflowsTest(unittest.TestCase):
         rows = client.list_workflows()
         req = captured_request(m_url)
         self.assertTrue(req.full_url.endswith("/api/v1/workflow/fetch"))
-        self.assertEqual(rows, [{"id": 9, "name": "Mock Interview"},
-                                {"id": 10, "name": "Receptionist"}])
+        self.assertEqual(rows, [{"id": 9, "name": "Mock Interview", "status": "active"},
+                                {"id": 10, "name": "Receptionist", "status": "archived"}])
 
     @mock.patch.object(urllib.request, "urlopen")
     def test_dict_envelope_fallback(self, m_url):
         m_url.return_value = FakeResponse(
             200, json.dumps({"workflows": [{"id": 1, "title": "Survey"}]}).encode())
-        self.assertEqual(make_client().list_workflows(), [{"id": 1, "name": "Survey"}])
+        self.assertEqual(make_client().list_workflows(),
+                         [{"id": 1, "name": "Survey", "status": ""}])
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_get_workflow_returns_definition(self, m_url):
+        definition = {"nodes": [{"id": "node-start", "type": "startCall"}], "edges": []}
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"id": 4, "name": "Receptionist", "status": "active",
+                             "workflow_definition": definition}).encode())
+        wf = make_client().get_workflow(4)
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "GET")
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/fetch/4"))
+        self.assertEqual(wf["id"], 4)
+        self.assertEqual(wf["name"], "Receptionist")
+        self.assertEqual(wf["status"], "active")
+        self.assertEqual(wf["definition"], definition)
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_get_workflow_without_definition_sets_none(self, m_url):
+        m_url.return_value = FakeResponse(200, json.dumps({"id": 4, "name": "X"}).encode())
+        self.assertIsNone(make_client().get_workflow(4)["definition"])
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_create_workflow_posts_definition(self, m_url):
+        m_url.return_value = FakeResponse(200, json.dumps({"id": 11, "name": "Dental"}).encode())
+        client = make_client()
+        wf = client.create_workflow(name="Dental", definition={"nodes": [], "edges": []})
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "POST")
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/create/definition"))
+        body = json.loads(req.data)
+        self.assertEqual(body["name"], "Dental")
+        self.assertEqual(body["workflow_definition"], {"nodes": [], "edges": []})
+        self.assertEqual(wf["id"], 11)
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_update_workflow_puts_and_can_rename(self, m_url):
+        m_url.return_value = FakeResponse(200, json.dumps({"id": 4, "name": "New"}).encode())
+        client = make_client()
+        client.update_workflow(4, definition={"nodes": []}, name="New")
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "PUT")
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/4"))
+        body = json.loads(req.data)
+        self.assertEqual(body["name"], "New")
+        self.assertEqual(body["workflow_definition"], {"nodes": []})
+
+    def test_update_workflow_without_changes_raises(self):
+        with self.assertRaises(agents.DograhError):
+            make_client().update_workflow(4)
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_publish_workflow_posts_publish(self, m_url):
+        m_url.return_value = FakeResponse(200, json.dumps({"status": "published"}).encode())
+        result = make_client().publish_workflow(4)
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "POST")
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/4/publish"))
+        self.assertEqual(result["status"], "published")
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_set_workflow_status_puts_status(self, m_url):
+        m_url.return_value = FakeResponse(
+            200, json.dumps({"id": 4, "name": "Receptionist", "status": "archived"}).encode())
+        wf = make_client().set_workflow_status(4, "archived")
+        req = captured_request(m_url)
+        self.assertEqual(req.get_method(), "PUT")
+        self.assertTrue(req.full_url.endswith("/api/v1/workflow/4/status"))
+        self.assertEqual(json.loads(req.data)["status"], "archived")
+        self.assertEqual(wf["status"], "archived")
+        self.assertEqual(wf["name"], "Receptionist")
 
 
 class MutationsTest(unittest.TestCase):

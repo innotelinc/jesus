@@ -64,12 +64,23 @@ Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
 
   app.<domain>      Capstone Voice App (dograh UI)            :3010
   api.<domain>      Capstone Voice API (dograh API)           :8000
-  auth.<domain>     Authentik (SSO / user management)         :9100
+  auth.<domain>     Authentik (SSO / user management)         :9000
   voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
   admin.<domain>    Capstone Control Center                   :8096
-  pbx.<domain>      FreePBX                                   :80
+  pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :8083
   n8n/grist/omniroute/signoz/workflow.<domain>                :5678/8484/20128/3301/8090
   portal/nocodb.<domain>   optional profile services          :3000/8080
+
+Cerulean Authentik forward auth (on by default):
+
+  Every web UI host except api/apex/voice/auth gets an nginx auth_request
+  gate against the Cerulean Authentik embedded outpost, so FreePBX,
+  AvantFAX (served under pbx.<domain>/fax), dograh, n8n, Grist, SigNoz,
+  OmniRoute and Workflow Studio all sign in through Cerulean SSO before
+  their own login page is ever reachable. Requires a domain-level proxy
+  provider in Authentik (scripts/setup.sh + scripts/authentik_bootstrap.py
+  create "capstone-npm-forward-auth"). Disable with NPM_FORWARD_AUTH=0 or
+  --no-forward-auth; exclude more hosts with NPM_FORWARD_AUTH_EXCLUDE.
 
 The old pre-v3.11 names (dograh, dograh-ui, dashboard, ws) are pruned as
 stale on the next run — pass --no-prune to keep them around.
@@ -104,13 +115,13 @@ DEFAULT_API_URL = "http://127.0.0.1:81"
 # dograh/dograh-ui/dashboard/ws names were folded into these in v3.11 and are
 # pruned as stale on the next sync).
 HOSTS: list[dict[str, Any]] = [
-    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API (apex origin)"},
-    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API"},
+    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API (apex origin)", "forward_auth": False},
+    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": False, "name": "Capstone Voice API", "forward_auth": False},
     {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
-    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9100,  "websocket": False, "name": "Authentik (SSO / user management)"},
-    {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)"},
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": False, "name": "Authentik (SSO / user management)", "forward_auth": False},
+    {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)", "forward_auth": False},
     {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": False, "name": "Capstone Control Center"},
-    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 80,    "websocket": False, "name": "FreePBX"},
+    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 8083,  "websocket": False, "name": "FreePBX (+ AvantFAX at /fax)"},
     {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 5678,  "websocket": True,  "name": "n8n"},
     {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 8484,  "websocket": False, "name": "Grist"},
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute"},
@@ -168,6 +179,104 @@ def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
     return os.environ.get(key) or args.env.get(key) or default
 
 
+# ── Cerulean Authentik forward auth ─────────────────────────────────────
+# Injected as each proxy host's nginx "advanced config": an auth_request
+# against the Authentik embedded outpost. The outpost is the domain-level
+# proxy provider's app: one provider covers every host (the outpost matches
+# requests by X-Forwarded-Host), so FreePBX/AvantFAX, dograh, n8n, Grist,
+# SigNoz, OmniRoute and the Workflow Studio all authenticate through
+# Cerulean before their own login pages are reachable.
+FORWARD_AUTH_SNIPPET = """\
+# ── Cerulean Authentik forward auth (managed by npm-proxy-hosts.py) ──
+# Increase buffer size for large headers (SSO redirects are big).
+proxy_buffers 8 16k;
+proxy_buffer_size 32k;
+auth_request /outpost.goauthentik.io/auth/nginx;
+error_page 401 = @goauthentik_proxy_signin;
+auth_request_set $auth_cookie $upstream_http_set_cookie;
+add_header Set-Cookie $auth_cookie;
+auth_request_set $authentik_username $upstream_http_x_authentik_username;
+auth_request_set $authentik_groups $upstream_http_x_authentik_groups;
+auth_request_set $authentik_email $upstream_http_x_authentik_email;
+auth_request_set $authentik_name $upstream_http_x_authentik_name;
+auth_request_set $authentik_uid $upstream_http_x_authentik_uid;
+proxy_set_header X-authentik-username $authentik_username;
+proxy_set_header X-authentik-groups $authentik_groups;
+proxy_set_header X-authentik-email $authentik_email;
+proxy_set_header X-authentik-name $authentik_name;
+proxy_set_header X-authentik-uid $authentik_uid;
+location /outpost.goauthentik.io {
+    proxy_pass {outpost_url}/outpost.goauthentik.io;
+    proxy_set_header Host $host;
+    proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+    add_header Set-Cookie $auth_cookie;
+    auth_request_set $auth_cookie $upstream_http_set_cookie;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+}
+location @goauthentik_proxy_signin {
+    internal;
+    add_header Set-Cookie $auth_cookie;
+    return 302 {outpost_url}/outpost.goauthentik.io/start?rd=$scheme://$http_host$request_uri;
+}
+"""
+
+
+def forward_auth_snippet(outpost_url: str) -> str:
+    """Render the auth_request nginx snippet for one proxy host."""
+    return FORWARD_AUTH_SNIPPET.format(outpost_url=outpost_url.rstrip("/"))
+
+
+def build_outpost_url(authentik_url: str, lan_ip: str) -> str:
+    """Public-ish URL of the Authentik embedded outpost as NPM reaches it.
+
+    The NPM edge lives on a different box, so it cannot use this host's
+    loopback; it forwards over the LAN. If the Cerulean auth domain is set,
+    use it (NPM already proxies auth.<domain> to :9000 — the outpost rides
+    the same vhost). Otherwise fall back to http://<lan-ip>:9000.
+    """
+    base = (authentik_url or "").strip().rstrip("/")
+    if base:
+        return base
+    if lan_ip:
+        return f"http://{lan_ip}:9000"
+    return "http://127.0.0.1:9000"
+
+
+def resolve_forward_auth(args: argparse.Namespace, env: dict[str, str]) -> tuple[bool, str, list[str]]:
+    """Resolve forward-auth settings: (enabled, outpost_url, excluded keys)."""
+    enabled_env = cfg(args, "NPM_FORWARD_AUTH", "").strip().lower()
+    enabled = True  # default ON — that's the point of the Cerulean SSO gate
+    if enabled_env in {"0", "false", "no", "off"}:
+        enabled = False
+    if args.no_forward_auth:
+        enabled = False
+
+    excluded = {s.strip() for s in cfg(args, "NPM_FORWARD_AUTH_EXCLUDE", "").split(",") if s.strip()}
+    if excluded & {"all"}:
+        enabled = False
+
+    lan_ip = detect_lan_ip()
+    authentik_url = (cfg(args, "NPM_AUTHENTIK_URL", "") or "").strip()
+    # Common pitfall: someone sets NPM_AUTHENTIK_URL to a loopback address in
+    # .env — NPM forwards over the network and would then 502 on every login.
+    if authentik_url.startswith("http://127.0.0.1") or authentik_url.startswith("http://localhost"):
+        authentik_url = ""
+    outpost = build_outpost_url(authentik_url, lan_ip)
+    return enabled, outpost, excluded
+
+
+def snippet_for_host(h: dict, enabled: bool, outpost_url: str, excluded: set[str]) -> str:
+    """The auth snippet this host should carry ('' = no forward auth)."""
+    if not enabled:
+        return ""
+    if h.get("forward_auth") is False:  # explicit per-host opt-out in HOSTS
+        return ""
+    if h["key"] in excluded:
+        return ""
+    return forward_auth_snippet(outpost_url)
+
+
 class NpmApi:
     """Minimal Nginx Proxy Manager REST API client (stdlib only)."""
 
@@ -219,7 +328,7 @@ class NpmApi:
 
 
 def build_payload(domain: str, h: dict, forward_host: str,
-                  cert_id: int | None, ssl: bool) -> dict:
+                  cert_id: int | None, ssl: bool, auth_snippet: str = "") -> dict:
     return {
         "domain_names": [domain],
         "forward_scheme": h["scheme"],
@@ -231,7 +340,7 @@ def build_payload(domain: str, h: dict, forward_host: str,
         "caching_enabled": False,
         "allow_websocket_upgrade": h["websocket"],
         "access_list_id": "0",
-        "advanced_config": "",
+        "advanced_config": auth_snippet,
         "meta": {"letsencrypt_agree": False, "dns_challenge": False},
         "locations": [],
         "hsts_enabled": False,
@@ -285,7 +394,7 @@ def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
 
 
 def desired(domain: str, h: dict, forward_host: str,
-            cert_id: int | None, ssl: bool) -> dict:
+            cert_id: int | None, ssl: bool, auth_snippet: str = "") -> dict:
     """The field values we own, used to diff an existing host against the map."""
     return {
         "domain_names": [domain],
@@ -296,6 +405,7 @@ def desired(domain: str, h: dict, forward_host: str,
         "ssl_forced": ssl,
         "certificate_id": cert_id if cert_id else None,  # NPM wants null, not 0
         "enabled": True,
+        "advanced_config": auth_snippet,
     }
 
 
@@ -320,6 +430,10 @@ def main() -> int:
                         help="upstream scheme for the voice.<domain> host (default https)")
     parser.add_argument("--ws-port", type=int, default=None,
                         help="upstream port for the voice.<domain> host (default 8089; use 8088 with --ws-scheme http)")
+    parser.add_argument("--no-forward-auth", action="store_true",
+                        help="disable the Cerulean Authentik forward-auth gate on all hosts (env NPM_FORWARD_AUTH=0)")
+    parser.add_argument("--forward-auth-exclude", default=None,
+                        help="comma list of host keys to leave unauthenticated (env NPM_FORWARD_AUTH_EXCLUDE)")
     parser.add_argument("--no-ssl", action="store_true", help="skip certificates and HTTPS forcing")
     parser.add_argument("--no-prune", action="store_true", help="never delete NPM hosts")
     parser.add_argument("--check", action="store_true", help="verify only — no writes, exit 1 if out of sync")
@@ -359,6 +473,15 @@ def main() -> int:
         hosts = [h for h in hosts if not h.get("optional") or h["key"] in optional]
     else:
         hosts = [h for h in hosts if not h.get("optional")]
+
+    # Cerulean Authentik forward auth: which hosts get the auth_request gate.
+    fa_enabled, fa_outpost, fa_excluded = resolve_forward_auth(args, args.env)
+    if args.forward_auth_exclude:
+        fa_excluded = fa_excluded | {s.strip() for s in args.forward_auth_exclude.split(",") if s.strip()}
+    if fa_enabled:
+        print(f"PASS Cerulean Authentik forward auth enabled (outpost: {fa_outpost})")
+    else:
+        print("WARN forward auth disabled — proxy hosts will NOT require Cerulean sign-in", file=sys.stderr)
 
     # Auth
     api = NpmApi(api_url)
@@ -446,14 +569,15 @@ def main() -> int:
             if cert_id is None:
                 continue
 
-        want = desired(domain, h, upstream, cert_id, ssl)
+        auth_snippet = snippet_for_host(h, fa_enabled, fa_outpost, fa_excluded)
+        want = desired(domain, h, upstream, cert_id, ssl, auth_snippet)
         if existing is None:
             if args.check:
                 print(f"FAIL {label} — proxy host {domain} missing")
                 failed.append(domain)
                 continue
             try:
-                api.create_proxy_host(build_payload(domain, h, upstream, cert_id, ssl))
+                api.create_proxy_host(build_payload(domain, h, upstream, cert_id, ssl, auth_snippet))
                 created += 1
                 print(f"PASS {label} — created {domain} → {h['scheme']}://{upstream}:{h['port']}")
             except (NpmError, urllib.error.URLError, OSError) as e:

@@ -8,7 +8,7 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export default function Modal({ open, onClose, title, children, className, size = 'md' }: ModalProps) {
@@ -40,6 +40,7 @@ export default function Modal({ open, onClose, title, children, className, size 
           size === 'sm' && 'max-w-sm',
           size === 'md' && 'max-w-lg',
           size === 'lg' && 'max-w-xl',
+          size === 'xl' && 'max-w-2xl',
           className,
         )}
         role="dialog"

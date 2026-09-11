@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useResolvedTheme } from './components/providers';
 import Sidebar from './components/Sidebar';
@@ -6,6 +7,17 @@ import AppRoutes from './AppRoutes';
 import { DashboardDataProvider } from './context/DashboardDataContext';
 
 const sidebarWidth = '240px';
+const sidebarCollapsedWidth = '64px';
+// Persist the collapse choice across reloads.
+const SIDEBAR_COLLAPSED_KEY = 'capstone.sidebar.collapsed';
+
+function loadSidebarCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /** Gate failures set `?auth_error=` on the callback redirect; explain them. */
 const AUTH_ERRORS: Record<string, string> = {
@@ -43,15 +55,31 @@ function AuthErrorBanner() {
 
 export default function App() {
   useResolvedTheme();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      // storage blocked — collapse state just doesn't persist
+    }
+  }, [sidebarCollapsed]);
 
   return (
     <DashboardDataProvider>
       <div className="flex h-screen bg-background text-foreground overflow-hidden">
-        <Sidebar className="flex-shrink-0 h-full" width={sidebarWidth} />
+        <Sidebar
+          className="flex-shrink-0 h-full"
+          width={sidebarWidth}
+          collapsedWidth={sidebarCollapsedWidth}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(c => !c)}
+ />
         <div className="flex flex-1 flex-col min-w-0">
-          <TopHeader sidebarWidth={sidebarWidth} />
-          {/* The flex row already reserves `sidebarWidth` for the sidebar and the
-              fixed header floats above — only pad the top so content clears it. */}
+          <TopHeader sidebarWidth={sidebarCollapsed ? sidebarCollapsedWidth : sidebarWidth} onToggleSidebar={() => setSidebarCollapsed(c => !c)} />
+          {/* The flex row already reserves the sidebar width (fixed in the flex
+              row) and the fixed header floats above — only pad the top so
+              content clears it. */}
           <main className="flex-1 overflow-y-auto scrollbar-thin" style={{ paddingTop: 56 }}>
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
               <AuthErrorBanner />
