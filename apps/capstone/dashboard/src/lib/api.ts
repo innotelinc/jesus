@@ -150,6 +150,35 @@ export interface AgentUpdate {
   active?: boolean;
 }
 
+export interface DimensionScore {
+  name: string;
+  score: number | null;
+  evidence: string;
+}
+
+export interface InterviewReport {
+  id: number;
+  track: string;
+  trackLabel: string;
+  student: string;
+  phone: string;
+  runId: string;
+  score: number | null;
+  verdict: 'pass' | 'review' | 'fail' | 'unknown';
+  dimensions: DimensionScore[];
+  strengths: string[];
+  improvements: string[];
+  transcript: string;
+  parseError: string;
+}
+
+export interface InterviewReportsResponse {
+  configured: boolean;
+  docId: string;
+  reports: InterviewReport[];
+  error?: string;
+}
+
 export interface Me {
   authenticated: boolean;
   name: string | null;
@@ -192,6 +221,7 @@ export const api = {
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}`, body, 'PUT'),
   deleteAgent: (id: number) =>
     deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
+  interviewReports: () => getJSON<InterviewReportsResponse>('/interviews/reports'),
 };
 
 /**

@@ -996,6 +996,12 @@ services:
       # unset → links fall back to http://<host>:<port>.
       NPM_BASE_DOMAIN: "${NPM_BASE_DOMAIN:-}"
       DASHBOARD_ADMIN_EMAIL: "${GRIST_ADMIN_EMAIL:-}"
+      # Interview reports page: read-only access to the Grist doc the n8n
+      # grader writes to (same key setup.sh minted for the grader). Grist is
+      # on the same interview-net bridge, so the service name resolves.
+      GRIST_URL: "http://grist:8484"
+      GRIST_DOC_ID: "${GRIST_DOC_ID:-}"
+      GRIST_API_KEY: "${GRIST_API_KEY:-}"
       # Cerulean (Authentik) OIDC gate for the control center. When
       # AUTHENTIK_ISSUER_URL is set the API requires a Cerulean session on
       # every data endpoint; empty = open API (local dev / no auth stack).

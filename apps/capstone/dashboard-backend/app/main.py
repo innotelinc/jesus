@@ -36,6 +36,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import agents
+from . import interviews
 from .auth import (
     COOKIE_NAME,
     OidcChallenge,
@@ -2088,6 +2089,34 @@ def _agent_pbx_status(mode: str, ext: str) -> dict:
     except HTTPException as exc:
         return {"status": "error", "customExtension": None, "inboundRoute": None,
                 "dialplan": None, "detail": exc.detail}
+
+
+# --------------------------------------------------------------------------
+# Interview reports — read-only view over the Grist doc the n8n Interview
+# Grader writes to on every mock-interview hang-up. Client lives in
+# app/interviews.py (urllib only, mirrors app/agents.py conventions).
+
+
+@app.get("/interviews/reports")
+def interview_reports(user: dict = Depends(require_session)):
+    """Graded interview reports from Grist + config state for the UI."""
+    client = interviews.GristClient()
+    if not client.configured():
+        return {
+            "configured": False,
+            "docId": "",
+            "reports": [],
+            "error": "GRIST_DOC_ID not configured — run scripts/grist_bootstrap.py, then set GRIST_DOC_ID in .env",
+        }
+    try:
+        rows = client.list_records("Interviews")
+    except interviews.GristError as exc:
+        raise HTTPException(status_code=502, detail=f"Grist: {exc}")
+    return {
+        "configured": True,
+        "docId": client.doc,
+        "reports": [interviews.row_to_report(r) for r in rows],
+    }
 
 
 @app.get("/ports")
