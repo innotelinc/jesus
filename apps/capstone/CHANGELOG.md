@@ -3,6 +3,26 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## Unreleased — `scripts/backup-capstone.sh`: DB + config backup for a host move
+
+Moving the stack to another server needs the data layer, not the images. The
+new `scripts/backup-capstone.sh` captures exactly that into
+`$HOME/capstone-backup/` (plus a single `$HOME/capstone-backup-<UTC>.tar.gz`):
+
+- **config/** — `docker-compose*.yml`, `.env`, the dograh workflow JSON, the
+  n8n workflow export, `scripts/`, `ansible/` and `pbx/`
+- **db/** — `pg_dumpall` of the stack Postgres, a dump of the SigNoz metastore
+  (dashboards/alerts), tars of the Grist / n8n / Redis / OmniRoute / MinIO
+  volumes, and the n8n `export:workflow` JSON
+- **repo.bundle** — `git bundle --all`, so every tracked file at HEAD is in the
+  archive (uncommitted work is deliberately not)
+- **MANIFEST.txt** / **SHA256SUMS** — provenance, the restore order, and
+  checksums; telemetry (SigNoz ClickHouse), model caches and image layers are
+  intentionally out of scope and get rebuilt on the new host.
+
+Idempotent and re-runnable: `CAPSTONE_BACKUP_DIR=... bash scripts/backup-capstone.sh`,
+or `SKIP_TARBALL=1` to leave just the directory.
+
 ## v3.18 — Stack access is visible (and reviewable) from the Control Center
 
 Release `v3.18` makes the Cerulean Authentik access model inspectable: an
