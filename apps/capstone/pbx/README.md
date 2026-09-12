@@ -417,6 +417,62 @@ Blacklisted Calls" when it dangles on a deleted custom destination
 (`custom-app,dest-<n>,1` → reset to the module's own
 `app-blacklist-check,s,1` = Terminate Call). Idempotent, runs on every sync.
 
+## Blocking invalid SIP registrations (fail2ban)
+
+This port is on the public internet, so it is found by scanners within minutes
+and probed forever after: a few hours of `full` log contained **2 321 rejected
+requests** from a handful of hosts (`172.110.223.87` alone accounted for 1 550).
+None of that traffic can be rejected by Asterisk itself, and a ban applied inside
+the container cannot work either — the container is on a bridge network and never
+sees the packets before Docker has already DNAT'd them. The ban has to happen on
+the **host**, in Docker's `DOCKER-USER` chain.
+
+```bash
+sudo scripts/install-fail2ban.sh              # install, start, verify
+sudo scripts/install-fail2ban.sh --status     # jails + live bans
+sudo scripts/install-fail2ban.sh --dry-run    # preview the rendered jail
+sudo scripts/install-fail2ban.sh --uninstall  # stop + remove
+```
+
+| File | Role |
+|---|---|
+| `pbx/fail2ban/jail.local.in` | jail template — rendered to `/etc/fail2ban/jail.local` with the log dir, `ignoreip` and ban policy substituted in |
+| `pbx/fail2ban/filter.d/asterisk-security.conf` | matches `res_security_log` records, anchoring `<HOST>` on `RemoteAddress` (never `SuccessfulAuth`) |
+| `pbx/fail2ban/filter.d/asterisk-registration.conf` | matches the `failed for '<ip>:<port>'` notices in `full` — the wider net, and the one that catches scanner waves |
+| `pbx/fail2ban/action.d/docker-user.conf` | bans into `DOCKER-USER` (idempotent insert, so two jails on one address leave exactly one rule) |
+| `scripts/install-fail2ban.sh` | host installer: volume, package, configs, service, verification |
+
+**Policy.** `maxretry = 1`, `bantime = 172800` (48 h), `findtime = 3600` — the
+first invalid registration from an address drops all of its traffic for two
+days. Loopback and the auto-detected LAN are exempt so the pair of `48h` and
+`first packet` cannot lock out the operator's own softphone; three fresh bans in
+a week escalate to 30 days through `recidive`. Override with `F2B_IGNOREIP`,
+`F2B_BANTIME`, `F2B_MAXRETRY`, `F2B_LOG_DIR` or the matching CLI flags.
+
+**Wiring.** The `freepbx` service mounts the `asterisk-logs` volume at
+`/var/log/asterisk`, and `pbx/entrypoint-dograh.sh` adds `security => security`
+to `logger_logfiles_custom.conf` — the include FreePBX keeps when it regenerates
+`logger.conf`, so a GUI *Apply Config* cannot turn the security log back off.
+The host daemon then reads `security` and `full` straight off disk; there is no
+log shipper and no `docker exec` in the loop.
+
+```bash
+# confirm the channel survived a FreePBX reload
+docker exec pbx-freepbx bash -c 'grep security /etc/asterisk/logger_logfiles_custom.conf'
+docker exec pbx-freepbx bash -c 'tail -1 /var/log/asterisk/security'
+
+# what the host can see
+sudo scripts/install-fail2ban.sh --status
+iptables -S DOCKER-USER | grep DROP
+```
+
+> **Related fix:** the same entrypoint now converges `UCPMGRPASS` onto the real
+> `[ucp_events]` secret. The image only wrote that value when the row was empty,
+> so on an existing MariaDB volume the UCP NodeJS server authenticated with a
+> stale password forever — the node process sat at **100 % CPU with 72 restarts**
+> and every attempt logged an `InvalidPassword`. See `docs/operations.md` →
+> "Blocking invalid SIP registrations" for the measurement.
+
 ## Troubleshooting
 
 - **`UNVERIFIED media socket` in dograh logs** — dograh signs the media WS URL

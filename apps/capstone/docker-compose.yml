@@ -937,6 +937,10 @@ services:
       - asterisk-config:/etc/asterisk
       - asterisk-sounds:/var/lib/asterisk/sounds
       - asterisk-spool:/var/spool/asterisk
+      # Asterisk's log dir on a named volume so host-side fail2ban can read the
+      # rejected-registration records straight off disk (scripts/install-fail2ban.sh,
+      # pbx/fail2ban/). See pbx/README.md → "Blocking invalid SIP registrations".
+      - asterisk-logs:/var/log/asterisk
       - freepbx-www:/var/www/html
       - mariadb-data:/var/lib/mysql
     extra_hosts:
@@ -1137,6 +1141,10 @@ volumes:
     external: true
   asterisk-spool:
     name: pbx-asterisk-spool
+    external: true
+  # Read by host-side fail2ban; created by scripts/setup.sh / the installer.
+  asterisk-logs:
+    name: pbx-asterisk-logs
     external: true
   freepbx-www:
     name: pbx-freepbx-www

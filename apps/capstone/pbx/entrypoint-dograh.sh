@@ -216,6 +216,33 @@ EOF
 chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
 echo ">>> [dograh-ari] rtp_custom.conf canonical (${RTP_START}-${RTP_END}, STUN/TURN ${STUN_TURN_ADDR})"
 
+# ── logger security channel — rejected-SIP records for fail2ban ────────────
+# FreePBX owns logger.conf and regenerates it on Apply Config, but it ships
+# `#include logger_logfiles_custom.conf` inside the [logfiles] section — the
+# documented hook for extra channels. Adding `security => security` there makes
+# Asterisk write one res_security_log record per rejected SIP message to
+# /var/log/asterisk/security, which host-side fail2ban reads through the
+# asterisk-logs volume (scripts/install-fail2ban.sh + pbx/fail2ban/).
+#
+# Only the security channel is added: the `full` channel already carries the
+# "No matching endpoint found" / "Failed to authenticate" NOTICEs at the
+# image's default level, and the registration jail matches those there.
+# Idempotent — re-running never stacks duplicate channel lines, and an operator
+# who already added the channel keeps their version.
+LOGGER_CUSTOM="${DEST}/logger_logfiles_custom.conf"
+touch "${LOGGER_CUSTOM}"
+if ! grep -qE '^[[:space:]]*security[[:space:]]*=>' "${LOGGER_CUSTOM}"; then
+  {
+    echo
+    echo "; capstone: rejected-SIP records for fail2ban (scripts/install-fail2ban.sh)"
+    echo "security => security"
+  } >> "${LOGGER_CUSTOM}"
+  echo ">>> [dograh-ari] logger.conf security channel enabled (fail2ban)"
+else
+  echo ">>> [dograh-ari] logger.conf security channel already present"
+fi
+chown asterisk:asterisk "${LOGGER_CUSTOM}" 2>/dev/null || true
+
 # ── FreePBX API module: fix a corrupted line in the image ──────────────────
 # pbx-portal fullstack images shipped a stray 't' on Api.class.php:290
 # ("tif (!isset($activeModules[$module]))") which is a PHP parse error — it
@@ -1196,8 +1223,78 @@ PY
   fi
 }
 
+# ── UCP node AMI credential converge ───────────────────────────────────────
+# The image's stock entrypoint writes UCPMGRPASS only when the row is empty
+# (`WHERE keyword='UCPMGRPASS' AND (value IS NULL OR value = '')`) and then
+# rewrites every `secret =` line in manager_custom.conf to FREEPBX_AMI_SECRET.
+# On an existing MariaDB volume those two disagree, so the UCP NodeJS server
+# authenticates as `ucp_events` with a stale password: Asterisk rejects every
+# attempt, the security log fills with InvalidPassword for a loopback client,
+# and the node process pins a core restarting roughly once a minute (observed
+# live: 100% CPU, 72 restarts). Converge the DB value onto the [ucp_events]
+# secret actually present in manager_custom.conf, and only bounce the process
+# when it really changed (restarting UCP on every boot is pointless churn).
+sync_ucp_ami_secret() {
+  local secret current
+  secret="$(awk '/^\[ucp_events\]/{f=1} f && /^secret[[:space:]]*=/{sub(/^[^=]*=[[:space:]]*/, ""); print; exit}' \
+            "${DEST}/manager_custom.conf" 2>/dev/null)"
+  [ -n "${secret}" ] || return 0
+  # The secret is base64-without-/,+ and hex in every shipped .env, so it can
+  # never contain a quote — safe to interpolate into this single-quoted UPDATE.
+# The secret is base64/hex in every shipped .env; reject anything that could
+  # break out of the single-quoted SQL below.
+  case "${secret}" in
+    *[!A-Za-z0-9+/=_-]*) return 0 ;;
+  esac
+  current="$(mysql -u root asterisk -N -B \
+      -e 'SELECT value FROM freepbx_settings WHERE keyword="UCPMGRPASS" LIMIT 1;' 2>/dev/null)"
+  [ "${current}" = "${secret}" ] && return 0
+  mysql -u root asterisk \
+    -e "UPDATE freepbx_settings SET value = '${secret}' WHERE keyword = 'UCPMGRPASS';" 2>/dev/null || return 0
+  echo ">>> [dograh-ari] UCP AMI credential converged (ucp_events) — restarting ucp node"
+  fwconsole pm2 --restart ucp >/dev/null 2>&1 || true
+}
+
+# ── Tighten the [pbxportal] AMI ACL ────────────────────────────────────────
+# The image writes `permit = 0.0.0.0/0.0.0.0` for the portal's AMI user, which
+# means any address that can reach 5038 may authenticate against it (the port is
+# published on every interface, so that is the whole LAN plus anything the
+# router ever forwards). Narrow it to loopback and the private ranges the stack
+# actually connects from.
+#
+# ORDER MATTERS: Asterisk takes the LAST matching ACL entry, so the permits must
+# come AFTER the deny. Putting them before it leaves the deny last and makes
+# every login fail (observed live while tightening this: both loopback and the
+# compose bridge were rejected until the permits moved below the deny line).
+# Idempotent: existing permit lines in the section are replaced, not stacked.
+tighten_ami_acl() {
+  local f="${DEST}/manager_custom.conf"
+  [ -f "${f}" ] || return 0
+  python3 - "${f}" <<'PYEOF'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+perms = ["127.0.0.1/255.255.255.255", "172.16.0.0/255.240.0.0", "10.0.0.0/255.0.0.0"]
+m = re.search(r"(\[pbxportal\]\n)(.*?)(?=\n\[|\Z)", text, re.S)
+if not m:
+    sys.exit(0)
+body = [ln for ln in m.group(2).splitlines() if not ln.startswith("permit")]
+body = [ln for ln in body if ln.strip() != ""]
+if not any(ln.startswith("deny") for ln in body):
+    body.append("deny = 0.0.0.0/0.0.0.0")
+body += ["permit = " + p for p in perms]
+new = m.group(1) + "\n".join(body) + "\n"
+if new != m.group(0):
+    open(path, "w").write(text[:m.start()] + new + text[m.end():])
+    print(">>> [dograh-ari] [pbxportal] AMI permit narrowed to loopback + private ranges")
+PYEOF
+  asterisk -rx "manager reload" >/dev/null 2>&1 || true
+}
+
 if mysqladmin ping --silent 2>/dev/null; then
   ensure_avantfax
+  sync_ucp_ami_secret
+  tighten_ami_acl
 fi
 
 # Final safety net: every edit above ran as root, and any file FreePBX

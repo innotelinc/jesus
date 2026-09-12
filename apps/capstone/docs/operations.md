@@ -411,6 +411,96 @@ python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN /
 python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
 ```
 
+## Blocking invalid SIP registrations (fail2ban)
+
+The PBX publishes 5060/udp to the internet, so it is scanned continuously: in a
+single few-hour window the `full` log carried **2 321 rejected requests**, led by
+`172.110.223.87` (1 550), `172.110.223.118` (992) and `5.39.57.91` (498). Every one
+is an attacker-chosen SIP message that Asterisk has to parse, identify and reject.
+Host-side fail2ban drops them.
+
+```bash
+sudo scripts/install-fail2ban.sh              # install + start + verify
+sudo scripts/install-fail2ban.sh --status     # jails, counters, live bans
+sudo scripts/install-fail2ban.sh --dry-run    # render the config, change nothing
+sudo scripts/install-fail2ban.sh --uninstall  # stop and remove the jails
+```
+
+| Piece | Where | What it does |
+|---|---|---|
+| Jails | `pbx/fail2ban/jail.local.in` → `/etc/fail2ban/jail.local` | `asterisk-security`, `asterisk-registration`, `recidive` |
+| Filters | `pbx/fail2ban/filter.d/` | Asterisk security events; rejected requests in `full` |
+| Action | `pbx/fail2ban/action.d/docker-user.conf` | ban → `iptables -I DOCKER-USER` |
+| Log source | `asterisk-logs` volume → `/var/log/asterisk` | `security` + `full`, read straight off disk |
+| Asterisk side | `pbx/entrypoint-dograh.sh` | adds `security => security` to `logger_logfiles_custom.conf` |
+
+**Policy — one invalid attempt, 48 hours.** `maxretry = 1`, `bantime = 172800`,
+`findtime = 3600`: the first rejected registration from an address drops all of
+its traffic for two days. Loopback and the detected LAN are exempt (`ignoreip`),
+because the only thing a 48h ban is likely to catch otherwise is the operator's
+own desk phone. Three fresh bans inside a week escalate to 30 days via `recidive`.
+
+**Why `DOCKER-USER` and not `INPUT`.** Every PBX port is *published* by Docker:
+packets are DNAT'd to the container and then traverse the FORWARD path, where
+Docker inserts `-j DOCKER-USER` as the first rule. A stock `iptables`/`iptables-multiport`
+ban lands in `INPUT`, never sees those packets, and the scanner keeps hammering
+Asterisk while fail2ban reports it as banned. The action inserts at the head of
+`DOCKER-USER`, ahead of Docker's own accepts and its conntrack accept, so the
+48h ban is real — and it applies to every published port on the host, not just SIP.
+
+Verify:
+
+```bash
+sudo scripts/install-fail2ban.sh --status
+#   asterisk-registration … Currently banned: 2  Banned IP list: 172.110.223.87 …
+iptables -S DOCKER-USER | grep DROP          # one rule per banned address
+
+# Prove the filter against the PBX's own captured attack traffic (expect 0 missed):
+docker exec pbx-freepbx bash -c 'grep -E "failed for .[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" /var/log/asterisk/full | tail -300' > /tmp/attacks.log
+fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.conf
+
+# End-to-end: append a rejected REGISTER for a TEST-NET-3 address and watch it
+# get dropped (then unban it) — see the CI job for the exact line.
+```
+
+**AMI is no longer reachable from anywhere.** `5038` is published on every
+interface, and the image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's AMI
+user — so any address that could reach the port could authenticate against it.
+`pbx/entrypoint-dograh.sh` now narrows `[pbxportal]` to loopback, `172.16/12`
+(the compose bridge) and `10/8`, idempotently, on every boot:
+
+```bash
+docker exec pbx-freepbx asterisk -rx "manager show user pbxportal" | tail -5
+#  0:  deny - 0.0.0.0/0.0.0.0
+#  1: allow - 127.0.0.1/255.255.255.255
+#  2: allow - 172.16.0.0/255.240.0.0
+#  3: allow - 10.0.0.0/255.0.0.0
+```
+
+The ordering is load-bearing: Asterisk honours the **last** matching ACL entry,
+so the permits must come *after* the deny. Put them before it and every AMI login
+fails — including the stack's own clients — which is exactly what happened on the
+first attempt at this change.
+
+Two related fixes ship with it, both aimed at the same problem — a PBX that is
+busy rather than serving calls:
+
+- **UCP AMI credential converge.** The image's entrypoint wrote `UCPMGRPASS` only
+  when the row was empty, then rewrote `manager_custom.conf` to the current
+  secret. On an existing MariaDB volume those disagree, so the UCP NodeJS server
+  authenticated as `ucp_events` with a stale password forever: Asterisk rejected
+  every attempt and the node process pinned a core restarting (**measured live:
+  100 % CPU, 72 restarts**). `pbx/entrypoint-dograh.sh` now converges the DB
+  value onto the real secret and bounces UCP only when it changed.
+- **The `security` log channel.** Enabled through
+  `logger_logfiles_custom.conf` — the include FreePBX keeps when it regenerates
+  `logger.conf` on Apply Config — so the security events survive a GUI reload.
+
+> The jails read the `pbx-asterisk-logs` volume. If the freepbx service has never
+> been recreated since this change, run
+> `docker compose --profile standalone up -d freepbx` first (the entrypoint then
+> adds the channel, ~2 min).
+
 ## Troubleshooting
 
 ### Interview (or any call) cut off at a fixed time

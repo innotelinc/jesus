@@ -3,6 +3,46 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## Unreleased — SIP registration bans + a PBX that stops burning a core
+
+The PBX is scanned continuously and rejects thousands of messages a day, none of
+which it can act on itself. This release installs host-side **fail2ban** and fixes
+the credential loop that was pinning a CPU core.
+
+- **`scripts/install-fail2ban.sh`** (host, idempotent, `--status` / `--dry-run` /
+  `--uninstall`) installs the package, resolves the Asterisk log volume, renders
+  `pbx/fail2ban/jail.local.in`, loads two SIP jails plus `recidive`, and verifies.
+- **Policy: one invalid registration attempt ⇒ 48 h ban** (`maxretry=1`,
+  `bantime=172800`, `findtime=3600`). Loopback and the detected LAN are exempt; a
+  third ban inside a week escalates to 30 days.
+- **Bans land in `DOCKER-USER`**, not `INPUT`: published ports are DNAT'd to the
+  container and traverse FORWARD, so a stock ban would never see the packets.
+  The action inserts only when absent, so two jails on one address leave one rule.
+- **Filters provably catch the real traffic** — `asterisk-registration` matched
+  **37/37** captured attack lines with 0 missed, and an injected rejected
+  `REGISTER` was banned, verified in `DOCKER-USER`, and unbanned cleanly (3 s
+  end-to-end).
+- **Asterisk writes its security channel** through
+  `logger_logfiles_custom.conf`, an include FreePBX keeps across Apply Config,
+  surfaced on the new `asterisk-logs` volume.
+- **Fixed: the UCP AMI credential loop.** The image wrote `UCPMGRPASS` only when
+  the row was empty, so on an existing MariaDB volume the UCP NodeJS server
+  authenticated as `ucp_events` with a stale password forever — **100 % CPU and
+  72 restarts** on the node process, plus an endless `InvalidPassword` stream.
+  `pbx/entrypoint-dograh.sh` now converges the value and bounces UCP only on a
+  real change (live: CPU 100 % → 0.4 %, authentication now succeeds).
+- **Tightened the `[pbxportal]` AMI ACL.** The image shipped
+  `permit = 0.0.0.0/0.0.0.0` for the portal's AMI user, so any address that could
+  reach 5038 could authenticate against it. `pbx/entrypoint-dograh.sh` now
+  converges it to loopback + `172.16/12` + `10/8` on every boot, idempotently,
+  and leaves the other AMI users alone. Order matters here — Asterisk takes the
+  **last** matching ACL entry, so the permits have to sit *after* the `deny`;
+  placed before it, every login (including the in-stack ones) is refused.
+  Verified from both loopback and the compose bridge: **Authentication
+  accepted** in each case, with a wildcard source no longer admitted.
+- Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the
+  mechanism, and the verification commands; `.env.example` gains the `F2B_*` knobs.
+
 ## Unreleased — `scripts/backup-capstone.sh`: DB + config backup for a host move
 
 Moving the stack to another server needs the data layer, not the images. The
