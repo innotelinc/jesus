@@ -49,8 +49,21 @@ export default function WorkflowForm({ workflow, onSaved, onCancel }: WorkflowFo
   const [goal, setGoal] = useState('');
   const [script, setScript] = useState('');
   const [nodes, setNodes] = useState<WorkflowNode[]>(workflow?.nodes ?? []);
+  // '' = dograh's default (no explicit limit), '0' = no limit, else seconds.
+  const [duration, setDuration] = useState(
+    workflow?.maxCallDuration == null ? '' : String(workflow.maxCallDuration),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** '' -> undefined (unchanged); a valid number -> seconds; invalid -> null. */
+  const durationSeconds = (): number | undefined | null => {
+    const raw = duration.trim();
+    if (raw === '') return undefined;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) return null;
+    return n === workflow?.maxCallDuration ? undefined : n;
+  };
 
   const updateNode = (id: string, patch: Partial<WorkflowNode>) => {
     setNodes(current => current.map(n => (n.id === id ? { ...n, ...patch } : n)));
@@ -64,8 +77,15 @@ export default function WorkflowForm({ workflow, onSaved, onCancel }: WorkflowFo
     setError(null);
     try {
       if (editing && workflow) {
+        const seconds = durationSeconds();
+        if (seconds === null) {
+          setError('Call length must be a whole number of seconds (0 = no limit).');
+          setBusy(false);
+          return;
+        }
         const saved = await api.updateWorkflow(workflow.id, {
           name: name.trim() !== workflow.name ? name.trim() : undefined,
+          maxCallDuration: seconds,
           nodes: nodes.map(n => ({
             id: n.id,
             name: n.name,
@@ -188,6 +208,42 @@ export default function WorkflowForm({ workflow, onSaved, onCancel }: WorkflowFo
 
       {editing && (
         <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium">Call length limit</label>
+            <div className="mt-1 flex gap-2">
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                placeholder="dograh default (300 s)"
+                value={duration}
+                onChange={e => setDuration(e.target.value)}
+                className="w-44"
+                disabled={busy}
+              />
+              <button
+                type="button"
+                className="rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                disabled={busy || duration === '0'}
+                onClick={() => setDuration('0')}
+              >
+                No limit
+              </button>
+              <button
+                type="button"
+                className="rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                disabled={busy || duration === ''}
+                onClick={() => setDuration('')}
+              >
+                Reset to default
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Seconds before dograh ends the call. Leave empty for the deployment default
+              (300 s); 0 lets the call run until the interview itself hangs up. Changes apply
+              to the next call after saving.
+            </p>
+          </div>
           {nodes.length === 0 && (
             <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               This workflow has no editable prompt nodes — open it on the dograh canvas to change its graph.

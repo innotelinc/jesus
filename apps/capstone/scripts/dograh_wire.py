@@ -163,16 +163,52 @@ class Dograh:
         res = self.request("GET", "/api/v1/workflow/summary")
         return res if isinstance(res, list) else (res or {}).get("workflows", [])
 
-    def import_workflow(self, name: str, definition: dict) -> int:
-        res = self.request(
-            "POST",
-            "/api/v1/workflow/create/definition",
-            {"name": name, "workflow_definition": definition},
-        )
+    def import_workflow(
+        self, name: str, definition: dict, configurations: dict | None = None
+    ) -> int:
+        body: dict = {"name": name, "workflow_definition": definition}
+        if configurations:
+            body["workflow_configurations"] = configurations
+        try:
+            res = self.request("POST", "/api/v1/workflow/create/definition", body)
+        except ApiError as e:
+            if not (configurations and 400 <= e.status < 500):
+                raise
+            # A dograh image built before the call-duration change rejects a
+            # max_call_duration of 0 (upstream caps it at 1200). Import the
+            # graph anyway and say so — failing the whole setup over an
+            # optional setting would be worse.
+            print(f"WARN agent '{name}' settings refused by dograh ({e}) — importing "
+                  "without them; the call-duration limit will still apply until "
+                  "the dograh image is rebuilt (docker-compose.dograh-build.yml)")
+            res = self.request(
+                "POST",
+                "/api/v1/workflow/create/definition",
+                {"name": name, "workflow_definition": definition},
+            )
         wf_id = (res or {}).get("id")
         if wf_id is None:
             raise ApiError(500, f"workflow create response had no id: {res!r}")
         return int(wf_id)
+
+    def workflow_configurations(self, workflow_id: Any) -> dict:
+        """The live workflow_configurations (masked secrets, but the numbers we
+        care about — max_call_duration — come through)."""
+        res = self.request("GET", f"/api/v1/workflow/fetch/{int(workflow_id)}")
+        return ((res or {}).get("workflow_configurations") or {})
+
+    def set_workflow_configurations(self, workflow_id: Any, configurations: dict) -> None:
+        """Apply configurations to an existing workflow and publish the change.
+
+        A PUT only saves a draft in dograh; publishing is what a bound agent
+        actually runs, so a config-only reconcile would otherwise be inert.
+        """
+        self.request(
+            "PUT",
+            f"/api/v1/workflow/{int(workflow_id)}",
+            {"workflow_configurations": configurations},
+        )
+        self.request("POST", f"/api/v1/workflow/{int(workflow_id)}/publish")
 
     # ── telephony ────────────────────────────────────────────────────────────
     def list_configs(self) -> list[dict]:
@@ -326,15 +362,32 @@ def main() -> int:
             track_ids[ext] = None
             continue
         wf_name = doc.pop("name", None) or path.stem.replace("-", " ").title()
+        # Workflow-level settings live beside the graph, not inside it (they
+        # are a separate column on the workflow), so lift them out before the
+        # rest of the document is treated as the definition. The mock
+        # interviews ship max_call_duration=0 (no time limit) here.
+        wf_config = doc.pop("workflow_configurations", None) or None
         definition = doc.get("workflow_definition", doc)
         if wf_name in existing:
             track_ids[ext] = existing[wf_name]
             print(f"PASS agent '{wf_name}' already imported (id {existing[wf_name]})")
+            if wf_config and not args.check:
+                # Reconcile settings on an install that imported the workflow
+                # before the JSON changed — import alone is a no-op for these.
+                try:
+                    live = api.workflow_configurations(track_ids[ext])
+                    if any(live.get(k) != v for k, v in wf_config.items()):
+                        api.set_workflow_configurations(track_ids[ext], wf_config)
+                        settings = ", ".join(f"{k}={v}" for k, v in wf_config.items())
+                        print(f"PASS agent '{wf_name}' settings updated ({settings})")
+                except ApiError as e:
+                    problems.append(f"agent workflow '{wf_name}' settings: {e}")
+                    print(f"FAIL agent '{wf_name}' settings not applied: {e}")
         elif args.check:
             track_ids[ext] = None
             problems.append(f"agent workflow '{wf_name}' not imported")
         else:
-            track_ids[ext] = api.import_workflow(wf_name, definition)
+            track_ids[ext] = api.import_workflow(wf_name, definition, wf_config)
             existing[wf_name] = track_ids[ext]
             print(f"PASS agent '{wf_name}' imported (id {track_ids[ext]})")
 

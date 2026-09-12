@@ -263,6 +263,69 @@ add it to `scripts/dograh_wire.py` `TRACKS` + the dialplan; for a one-off,
 import it with `python3 dograh/import_workflow.py dograh/<name>-workflow.json`.
 Env: `OMNIROUTE_URL` / `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` (default `auto`).
 
+## Call length (no time limit on the interviews)
+
+Upstream dograh ends a call at **300 s** unless the workflow asks for more,
+and caps the request at **1200 s** (`max_call_duration` in the workflow's
+`workflow_configurations`). The interview tracks never set it, which is why a
+real interview was cut off at the five-minute mark — a timer, not a
+misbehaving call.
+
+The Capstone fork (see `scripts/sync-dograh-fork.sh`) makes both numbers
+deployment settings and treats `0` as **no time limit**:
+
+| Setting (`.env`) | Meaning | Default |
+|---|---|---|
+| `DEFAULT_MAX_CALL_DURATION_SECONDS` | Cap for workflows that don't set one | `300` |
+| `MAX_CALL_DURATION_SECONDS` | Ceiling a workflow may request; `0` = no ceiling | `0` |
+| `STALE_CALL_TIMEOUT_SECONDS` | Age at which the concurrency limiter purges a slot as leaked | `7200` |
+
+`dograh-api` must run the fork's image for these to apply. The change is
+committed on the fork (`innotelinc/dograh`), so the next image build from it
+has it; on a box still running an older image, build one locally first:
+
+```sh
+git -C dograh/upstream submodule update --init --recursive   # once
+docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+  up -d --build dograh-api
+```
+
+An image built before this change rejects any `max_call_duration` above 1200 s
+(`0` included), so the shipped interviews would fail to import against it.
+
+The four interview workflows (`interview-workflow.json`,
+`devops-workflow.json`, `sql-workflow.json`, `job-interview-workflow.json`)
+carry `"workflow_configurations": {"max_call_duration": 0}` at the top level,
+beside the graph. `scripts/dograh_wire.py` sends those settings on import and
+reconciles them on an already-imported workflow (PUT + publish), so re-running
+`./scripts/setup.sh` (or `python3 scripts/dograh_wire.py`) retires the cap on
+an existing install. Assistant workflows (receptionist, outreach, survey,
+GOTV) deliberately keep the 300 s default.
+
+## Which workflows are graded
+
+Grading is opt-in per workflow from the Control Center's **Workflows** page
+(*Graded* column) — see `n8n-interview-grader.md`. Ticking a workflow enables
+its post-call webhook and generates a grading plan from its own prompts (via
+the local OmniRoute LLM); unticking writes `graded: false`. A workflow that has
+no post-call webhook at all (the mock-interview JSONs are the only ones that
+ship with one) gets the same `Notify n8n Grader` node appended when you tick it,
+so any workflow can be instrumented from the page — no canvas editing. Both the selection
+and the plan live on this workflow's webhook `payload_template`, so the
+setting travels with the workflow and `` dograh `` stays the source of truth:
+
+```json
+{
+  "run_id": "{{workflow_run_id}}",
+  "transcript_url": "{{transcript_url}}",
+  "graded": true,
+  "grading_plan": "You are a senior assessor grading a phone call from ...",
+  "grading_meta": {"title": "SQL interview rubric", "dimensions": [
+    {"key": "join_logic", "label": "Join logic", "weight": 35}
+  ], "pass_score": 75, "review_score": 60}
+}
+```
+
 ## Customizing the mock interviews
 
 The IT/DevOps/SQL mock interviews are templates driven by `initial_context`,

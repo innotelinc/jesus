@@ -37,6 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from . import agents
+from . import grading
 from . import hosts
 from . import interviews
 from . import stack_access
@@ -1972,10 +1973,53 @@ def workflows_set_status(workflow_id: int, body: dict, user: dict = Depends(requ
     }
 
 
+def normalize_call_duration(
+    value: Any, current: dict[str, Any]
+) -> dict[str, Any] | None:
+    """The PUT body's ``maxCallDuration`` -> workflow_configurations to send.
+
+    ``None``/omitted leaves the setting untouched; a number (0 = no limit)
+    is validated here so the UI gets a 422 instead of dograh's 400. Only the
+    changed key is sent — dograh merges the rest of the stored configuration.
+    """
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or int(value) != value  # 1.5, 2.0001 — seconds are whole numbers
+    ):
+        raise HTTPException(
+            status_code=422, detail="maxCallDuration must be a number of seconds (0 = no limit)"
+        )
+    seconds = int(value)
+    if seconds < 0:
+        raise HTTPException(status_code=422, detail="maxCallDuration cannot be negative (0 = no limit)")
+    ceiling = _env_seconds("MAX_CALL_DURATION_SECONDS")
+    if ceiling and seconds > ceiling:
+        raise HTTPException(
+            status_code=422,
+            detail=f"maxCallDuration must be <= {ceiling} (or 0 for no limit; raise "
+                   "MAX_CALL_DURATION_SECONDS in .env to allow longer calls)",
+        )
+    live = current.get("maxCallDuration")
+    if live is not None and int(live) == seconds:
+        return None  # unchanged — skip the PUT field entirely
+    return {"max_call_duration": seconds}
+
+
+def _env_seconds(name: str) -> int:
+    """The deployment ceiling for workflow call lengths (0 = none)."""
+    try:
+        return max(0, int(float(os.environ.get(name, "0") or 0)))
+    except ValueError:
+        return 0
+
+
 @app.put("/workflows/{workflow_id}")
 def workflows_update(workflow_id: int, body: dict, user: dict = Depends(require_session)):
-    """Edit a workflow's name and/or prompt nodes, then publish the draft so
-    inbound calls to any agent bound to it pick the change up immediately."""
+    """Edit a workflow's name, prompt nodes and/or call length, then publish the
+    draft so inbound calls to any agent bound to it pick the change up."""
     client = _workflow_client()
     name = str(body.get("name") or "").strip() or None
     try:
@@ -1983,8 +2027,11 @@ def workflows_update(workflow_id: int, body: dict, user: dict = Depends(require_
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     definition = workflows.apply_node_edits(current.get("definition"), body.get("nodes"))
+    configs = normalize_call_duration(body.get("maxCallDuration"), current)
     try:
-        updated = client.update_workflow(workflow_id, definition=definition, name=name)
+        updated = client.update_workflow(
+            workflow_id, definition=definition, name=name, workflow_configurations=configs
+        )
         client.publish_workflow(workflow_id)
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -1992,6 +2039,85 @@ def workflows_update(workflow_id: int, body: dict, user: dict = Depends(require_
         **updated,
         "nodes": workflows.editable_nodes(definition),
     }
+
+
+# --------------------------------------------------------------------------
+# Grading selection — which workflows produce a graded report, and the plan
+# (rubric) each one is graded with. The selection and the plan are written
+# onto the workflow's post-call webhook payload in dograh (app/grading.py), so
+# the n8n Interview Grader reads them straight off the hang-up payload: no
+# second copy of the state to drift, and the setting follows the workflow.
+
+
+def _grading_apply(workflow_id: int, *, enabled: bool, regenerate: bool = False) -> dict:
+    """Select/deselect a workflow for grading, generating its plan if needed."""
+    client = _workflow_client()
+    try:
+        workflow = client.get_workflow(workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    definition = workflow.get("definition")
+    state = grading.grading_state(definition)
+    # A workflow with no post-call webhook is still selectable: enabling adds
+    # the grader's webhook node to it (see app/grading.py).
+    added_webhook = enabled and not state.get("has_webhook", False)
+    plan = str(state.get("plan") or "")
+    meta = state.get("meta") or {}
+    if enabled and (regenerate or not plan):
+        name = str(workflow.get("name") or f"workflow {workflow_id}")
+        try:
+            plan, meta = grading.generate_plan(name, definition)
+        except grading.GradingError as exc:
+            raise HTTPException(status_code=502, detail=f"grading plan: {exc}")
+    if not enabled:
+        plan, meta = "", {}
+    try:
+        updated = grading.apply_grading(definition, enabled=enabled, plan=plan, meta=meta)
+    except grading.GradingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    try:
+        client.update_workflow(workflow_id, definition=updated)
+        client.publish_workflow(workflow_id)
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {
+        "id": workflow_id,
+        "name": workflow.get("name"),
+        "addedWebhook": added_webhook,
+        "grading": grading.grading_state(updated),
+    }
+
+
+@app.get("/grading/workflows")
+def grading_workflows(user: dict = Depends(require_session)):
+    """Every dograh workflow with its grading selection + plan summary."""
+    client = _workflow_client()
+    try:
+        return {"workflows": grading.describe_workflows(client)}
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.post("/grading/workflows/{workflow_id}")
+def grading_workflow_enable(
+    workflow_id: int, body: dict | None = None, user: dict = Depends(require_session)
+):
+    """Grade this workflow: generate its plan (if it has none) and publish it.
+
+    ``{"regenerate": true}`` replaces an existing plan with a fresh one.
+    """
+    body = body or {}
+    return _grading_apply(
+        workflow_id,
+        enabled=bool(body.get("enabled", True)),
+        regenerate=bool(body.get("regenerate")),
+    )
+
+
+@app.delete("/grading/workflows/{workflow_id}")
+def grading_workflow_disable(workflow_id: int, user: dict = Depends(require_session)):
+    """Stop grading this workflow's calls (the grader skips the run)."""
+    return _grading_apply(workflow_id, enabled=False)
 
 
 @app.post("/agents")

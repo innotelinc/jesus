@@ -148,6 +148,8 @@ export interface Workflow {
   name: string;
   status?: string;
   nodes?: WorkflowNode[];
+  /** Seconds until dograh ends the call; 0 = no limit; null = dograh's default. */
+  maxCallDuration?: number | null;
 }
 
 export type WorkflowMode = 'ai' | 'guided' | 'blank';
@@ -165,12 +167,57 @@ export interface WorkflowCreate {
 export interface WorkflowUpdate {
   name?: string;
   nodes?: Array<{ id: string; name?: string; prompt?: string; greeting?: string }>;
+  /** Seconds until dograh ends the call; 0 = no limit. Omitted = unchanged. */
+  maxCallDuration?: number;
 }
 
 export interface WorkflowStatusUpdate {
   status: 'active' | 'archived';
   /** Archive even when agents are still bound (they keep the binding, unused). */
   force?: boolean;
+}
+
+/** How (or whether) a dograh workflow's calls get graded. */
+export interface WorkflowGrading {
+  /** false only when the workflow's state couldn't be read at all. */
+  available: boolean;
+  /** false when the workflow has no post-call webhook; enabling adds one. */
+  has_webhook: boolean;
+  enabled: boolean;
+  /** custom = a generated plan, builtin = the grader's track rubric, off = skipped. */
+  mode: 'custom' | 'builtin' | 'off' | 'none';
+  endpoint: string;
+  /** false when the webhook node itself is switched off in dograh's canvas. */
+  webhook_enabled?: boolean;
+  /** The generated rubric (empty on the built-in rubric). */
+  plan: string;
+  meta: {
+    title?: string;
+    dimensions?: Array<{ key: string; label: string; weight: number | null }>;
+    pass_score?: number | null;
+    review_score?: number | null;
+    model?: string;
+    generated_at?: string;
+  };
+  error?: string;
+}
+
+export interface GradableWorkflow extends AgentWorkflow {
+  grading: WorkflowGrading;
+}
+
+export interface GradingUpdate {
+  enabled?: boolean;
+  /** Write a fresh plan even when one already exists. */
+  regenerate?: boolean;
+}
+
+export interface GradingResult {
+  id: number;
+  name: string;
+  /** true when enabling grading appended the grader's webhook to the workflow. */
+  addedWebhook?: boolean;
+  grading: WorkflowGrading;
 }
 
 /** Dialplan → ARI wiring health for Control-Center-created numbers. */
@@ -226,8 +273,22 @@ export interface InterviewReport {
   improvements: string[];
   transcript: string;
   parseError: string;
+  /** Which grading plan scored this call (absent on pre-Rubric-column rows). */
+  rubric?: Partial<ReportRubric>;
   /** Soft-deleted from the Control Center: kept in Grist, restorable. */
   deleted: boolean;
+}
+
+/** The rubric a report was graded with, as stamped by the n8n grader. */
+export interface ReportRubric {
+  /** `plan` = a generated plan; `builtin` = the grader's per-track rubric. */
+  source: 'plan' | 'builtin';
+  title: string;
+  model: string;
+  generatedAt: string;
+  passScore: number | null;
+  reviewScore: number | null;
+  dimensions: Array<{ key: string; label: string; weight: number | null }>;
 }
 
 export interface InterviewReportsResponse {
@@ -300,6 +361,12 @@ export const api = {
     postJSON<Workflow>(`/workflows/${id}`, body, 'PUT'),
   setWorkflowStatus: (id: number, body: WorkflowStatusUpdate) =>
     postJSON<Workflow>(`/workflows/${id}/status`, body, 'PUT'),
+  /** Which workflows get graded + the plan each one is graded with. */
+  gradingWorkflows: () => getJSON<{ workflows: GradableWorkflow[] }>('/grading/workflows'),
+  enableGrading: (id: number, body: GradingUpdate = {}) =>
+    postJSON<GradingResult>(`/grading/workflows/${id}`, body),
+  disableGrading: (id: number) =>
+    deleteJSON<GradingResult>(`/grading/workflows/${id}`),
   createAgent: (body: AgentCreate) =>
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>('/agents', body),
   updateAgent: (id: number, body: AgentUpdate) =>

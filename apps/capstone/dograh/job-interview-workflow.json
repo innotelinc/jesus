@@ -1,5 +1,8 @@
 {
   "name": "Job Interview",
+  "workflow_configurations": {
+    "max_call_duration": 0
+  },
   "nodes": [
     {
       "id": "node-global",

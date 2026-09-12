@@ -67,6 +67,10 @@ COLUMNS: list[tuple[str, str, str]] = [
     ("Strengths", "Text", "Strengths (JSON list)"),
     ("Improvements", "Text", "Improvements (JSON list)"),
     ("Transcript", "Text", "Full call transcript"),
+    # Which grading plan scored the call: written by the grader from the
+    # payload's grading_meta (generated plan) or marked "builtin" when the
+    # workflow has no plan (the Control Center shows it on the report).
+    ("Rubric", "Text", "Grading plan used (JSON: title, dimensions, model)"),
     ("parse_error", "Text", "LLM grade parse error (debug)"),
     # Set by the Control Center (soft delete), never by the grader: deleted
     # rows stay in the document so the dashboard can restore or purge them.

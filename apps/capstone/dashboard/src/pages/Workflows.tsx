@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api, type Agent, type AgentWorkflow, type Workflow } from '../lib/api';
+import {
+  api,
+  type Agent,
+  type AgentWorkflow,
+  type GradableWorkflow,
+  type Workflow,
+} from '../lib/api';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
@@ -20,6 +26,10 @@ export default function Workflows() {
   const [editTarget, setEditTarget] = useState<Workflow | null>(null);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  // Grading selection + plan per workflow (see the Graded column).
+  const [gradings, setGradings] = useState<GradableWorkflow[] | null>(null);
+  const [gradingError, setGradingError] = useState<string | null>(null);
+  const [planTarget, setPlanTarget] = useState<GradableWorkflow | null>(null);
 
   // Deep link from the Agents page: /workflows?workflow=<id> opens it to edit.
   const [searchParams] = useSearchParams();
@@ -36,6 +46,15 @@ export default function Workflows() {
       if (!res.configured && res.error) setError(res.error);
       if (res.configured) {
         setWorkflows(await api.workflows());
+        // A grading lookup failure must not blank the workflows table, so it
+        // gets its own banner rather than the page-level error.
+        try {
+          setGradings((await api.gradingWorkflows()).workflows);
+          setGradingError(null);
+        } catch (e) {
+          setGradings(null);
+          setGradingError(e instanceof Error ? e.message : 'Failed to load grading state');
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load workflows');
@@ -101,6 +120,49 @@ export default function Workflows() {
     }
   };
 
+  const gradingFor = (id: number) => gradings?.find(g => g.id === id) ?? null;
+  const planGrading = planTarget?.grading ?? null;
+  const planDimensions = planGrading?.meta?.dimensions ?? [];
+
+  /** Select/deselect a workflow for grading (enabling writes a plan if needed). */
+  const toggleGrading = async (id: number, name: string, next: boolean) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = next
+        ? await api.enableGrading(id)
+        : await api.disableGrading(id);
+      flash(next
+        ? `Grading enabled for ${name} in dograh — `
+          + (res.addedWebhook ? 'a post-call webhook was added, and ' : '')
+          + (res.grading.mode === 'custom'
+            ? 'a grading plan was generated from its prompts.'
+            : 'using the built-in rubric; generate a plan to tailor it.')
+        : `Grading disabled for ${name} — its calls are no longer scored.`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Grading change failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Ask the LLM for a fresh plan for this workflow (and publish it). */
+  const regeneratePlan = async (workflow: GradableWorkflow) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.enableGrading(workflow.id, { enabled: true, regenerate: true });
+      setPlanTarget({ ...workflow, grading: res.grading });
+      flash(`New grading plan generated for ${workflow.name}.`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Plan generation failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -136,6 +198,12 @@ export default function Workflows() {
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
           {error}
+        </div>
+      )}
+      {gradingError && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          Couldn't load which workflows are graded ({gradingError}) — the Graded column is
+          unavailable until the API is reachable.
         </div>
       )}
 
@@ -177,6 +245,7 @@ export default function Workflows() {
                 <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-5 py-3 font-medium">Name</th>
                   <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">Graded</th>
                   <th className="px-5 py-3 font-medium">Used by</th>
                   <th className="px-5 py-3 text-right font-medium">Actions</th>
                 </tr>
@@ -185,6 +254,7 @@ export default function Workflows() {
                 {visibleWorkflows.map(w => {
                   const bound = agents.filter(a => a.workflowId === w.id);
                   const archived = w.status === 'archived';
+                  const grading = gradingFor(w.id)?.grading ?? null;
                   return (
                     <tr key={w.id} className={cn('border-b last:border-0', archived && 'opacity-60')}>
                       <td className="px-5 py-3.5">
@@ -200,6 +270,67 @@ export default function Workflows() {
                         >
                           {w.status || 'active'}
                         </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {grading === null ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : !grading.available ? (
+                          <span className="text-xs text-muted-foreground" title={grading.error ?? 'Grading state unavailable'}>
+                            unavailable
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label
+                              className="inline-flex cursor-pointer items-center gap-2"
+                              title={grading.enabled
+                                ? 'Calls to this workflow are graded on hang-up.'
+                                : grading.has_webhook
+                                  ? 'Calls to this workflow are not graded.'
+                                  : 'Calls to this workflow are not sent to the grader yet — ticking adds a post-call webhook so they can be graded.'}
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-muted-foreground/40"
+                                checked={grading.enabled}
+                                disabled={busy}
+                                onChange={e => void toggleGrading(w.id, w.name, e.target.checked)}
+                              />
+                              <span
+                                className={cn(
+                                  'text-xs',
+                                  grading.enabled ? 'text-success' : 'text-muted-foreground',
+                                )}
+                              >
+                                {grading.enabled ? 'Graded' : 'Not graded'}
+                              </span>
+                            </label>
+                            {!grading.has_webhook && (
+                              <span
+                                className="text-xs text-muted-foreground/80"
+                                title="Ticking adds the grader's post-call webhook to this workflow in dograh."
+                              >
+                                adds a webhook
+                              </span>
+                            )}
+                            {grading.enabled && (
+                              <button
+                                className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                disabled={busy}
+                                onClick={() => setPlanTarget(gradingFor(w.id))}
+                              >
+                                {grading.mode === 'custom' ? 'Plan' : 'Generate plan'}
+                              </button>
+                            )}
+                            {grading.enabled && grading.webhook_enabled === false && (
+                              <span
+                                className="text-xs text-amber-600 dark:text-amber-400"
+                                title="The webhook node is switched off in dograh, so the grader never receives the call."
+                              >
+                                webhook off
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3.5">
                         {bound.length === 0 ? (
@@ -287,6 +418,85 @@ export default function Workflows() {
               void refresh();
             }}
           />
+        )}
+      </Modal>
+
+      {/* Grading plan modal — what the LLM will score this workflow's calls on */}
+      <Modal
+        open={planTarget !== null && planGrading !== null}
+        onClose={() => setPlanTarget(null)}
+        title={`Grading plan — ${planTarget?.name ?? ''}`}
+        size="xl"
+      >
+        {planTarget !== null && planGrading !== null && (
+          <div className="space-y-4 text-sm">
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                className={cn(
+                  'rounded-md px-1.5 py-0.5 text-xs',
+                  planGrading.mode === 'custom'
+                    ? 'bg-success/10 text-success'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {planGrading.mode === 'custom'
+                  ? 'generated plan'
+                  : planGrading.mode === 'none' ? 'no webhook yet' : 'built-in rubric'}
+              </span>
+              {planGrading.meta?.title && (
+                <span className="font-medium">{planGrading.meta.title}</span>
+              )}
+              {planGrading.meta?.generated_at && (
+                <span className="text-xs text-muted-foreground">
+                  {planGrading.meta.model || 'llm'} · {planGrading.meta.generated_at}
+                </span>
+              )}
+            </div>
+
+            {planDimensions.length > 0 && (
+              <div className="overflow-hidden rounded-xl border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40 text-left uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Dimension</th>
+                      <th className="px-3 py-2 font-medium">Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {planDimensions.map(d => (
+                      <tr key={d.key} className="border-t">
+                        <td className="px-3 py-2">{d.label || d.key}</td>
+                        <td className="px-3 py-2">{d.weight ?? '—'}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {planGrading.mode === 'custom' ? (
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border bg-muted/40 p-4 font-mono text-[11px] leading-relaxed">
+                {planGrading.plan}
+              </pre>
+            ) : (
+              <p className="rounded-xl border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                This workflow is graded with the n8n grader's built-in rubric for its track.
+                Generate a plan to score it against the scenarios in its own prompts instead.
+              </p>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              The plan is stored on the workflow's post-call webhook in dograh and published,
+              so the next graded call uses it. Regenerating replaces the current plan.
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setPlanTarget(null)}>Close</Button>
+              <Button disabled={busy} onClick={() => void regeneratePlan(planTarget)}>
+                {planGrading.mode === 'custom' ? 'Regenerate plan' : 'Generate plan'}
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
     </div>

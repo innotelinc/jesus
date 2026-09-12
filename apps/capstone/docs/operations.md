@@ -392,6 +392,22 @@ python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
 
 ## Troubleshooting
 
+### Interview (or any call) cut off at a fixed time
+
+Upstream dograh ends a call at **300 s** unless the workflow sets
+`max_call_duration` — that was the original "interview cut off at 5 minutes".
+The fork makes the cap configurable (and `0` = no limit); see `dograh/README.md`
+"Call length" for the env knobs. Per workflow:
+
+- **Control Center** → **Workflows** → *Edit prompts*: the **Call length limit**
+  field sets seconds (`0` = no limit; empty = deployment default). Saving
+  publishes the change, so the next call uses it.
+- The shipped interview workflows default to **no limit**
+  (`workflow_configurations.max_call_duration = 0`); `scripts/dograh_wire.py`
+  re-applies that on every run.
+- Verify what a call actually ran: the run's `cost_info.call_duration_seconds`
+  in dograh, or the `duration_s` key the webhook sends to the grader.
+
 ### Interview voice cuts off early / sounds truncated
 
 The interviewer's TTS is cut mid-sentence when the mock candidate's next line starts while

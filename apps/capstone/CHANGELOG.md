@@ -50,6 +50,52 @@ Highlights of v3.18:
   now sits between the webhook and the fetch and returns zero items when the URL
   is missing, blank, or not a string, so the probe ends as a clean success while
   real payloads pass through unchanged.
+- **Mock interviews are no longer cut off at five minutes**: upstream dograh
+  caps a call at 300 s unless the workflow asks for more (`max_call_duration`,
+  itself hard-limited to 1200 s), and the interview workflows never set it — so
+  a real interview was ended mid-answer by a timer nobody configured. The fork
+  now reads both numbers from the deployment
+  (`DEFAULT_MAX_CALL_DURATION_SECONDS`, `MAX_CALL_DURATION_SECONDS`) and treats
+  `0` as *no time limit*; the interview tracks (`interview`, `devops`, `sql`,
+  `job-interview`) ship `workflow_configurations.max_call_duration = 0`, and
+  `scripts/dograh_wire.py` now sends `workflow_configurations` on import and
+  reconciles them on an existing install (PUT + publish), so re-running setup
+  retires the cap without a re-import. `STALE_CALL_TIMEOUT_SECONDS` keeps the
+  concurrency rate limiter's slot age-out above the longest call you allow.
+  Accepting `0` needs the fork's image: the change is pushed to
+  `innotelinc/dograh` (so the next published image carries it) and the live
+  `dograh-api` was rebuilt from the fork with
+  `docker-compose.dograh-build.yml`. An image built before the change rejects
+  anything above 1200 s; `scripts/dograh_wire.py` then imports the workflow
+  without the setting and says so, rather than failing setup over it.
+- **Choose which workflows are graded — and let the LLM write the rubric**: the
+  Workflows page gains a **Graded** column. Ticking a workflow that has no
+  post-call webhook appends one (the same node the shipped interviews use), so
+  any workflow can be instrumented from the page instead of rebuilt in dograh's
+  canvas. Ticking then enables that webhook and asks the local OmniRoute model
+  to write a scoring plan
+  from the workflow's own prompts — dimensions, weights and pass/review marks —
+  which is validated, renormalised to total 100, stored on the workflow's
+  webhook payload in dograh and published. Unticking writes `graded: false`, so
+  the grader skips the run instead of scoring it against a rubric the operator
+  removed. `GET /grading/workflows`, `POST /grading/workflows/<id>`
+  (`{"regenerate": true}` for a fresh plan) and `DELETE /grading/workflows/<id>`
+  back the page; the n8n grader reads the plan straight off the hang-up payload
+  and falls back to its built-in per-track rubric for workflows that predate
+  the feature, so nothing existing changes behaviour. The grader now also
+  stamps **which rubric produced each report** into a new `Rubric` column
+  (`scripts/grist_bootstrap.py` adds it; re-run to apply to an existing doc):
+  the generated plan's title, model, dimension weights and pass/review marks,
+  or a `builtin` marker. The report detail shows it ("Graded with" panel) and
+  the CSV export carries it. Verified live: a real SQL-track call (workflow run
+  24) produced a report whose grade came from the plan's dimensions
+  (`join_fanout_detection`, `slow_query_diagnosis`, …), with the same plan
+  visible on the report.
+- **Call length is editable per workflow from the Control Center**: the
+  workflow edit dialog has a **Call length limit** field (seconds; `0` = no
+  limit; empty = the deployment default). `GET/PUT /workflows/<id>` now surface
+  `maxCallDuration`, validated against the deployment ceiling
+  (`MAX_CALL_DURATION_SECONDS`) with a clear 422 instead of dograh's 400.
 
 ## v3.17 — Stack access enforced + PBX sync on a 12-hour reconciliation
 

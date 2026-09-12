@@ -29,7 +29,7 @@ dograh Webhook node ──POST──▶ n8n Webhook trigger
         ▼
 [1] HTTP Request  ──GET transcript_url──▶  transcript text
         ▼
-[2] Code node  ──pick rubric by track (it|devops|sql, default it)──▶  messages
+[2] Code node  ──graded:false? skip · grading_plan? use it · else track rubric──▶  messages
         ▼
 [3] HTTP Request  ──POST OmniRoute auto /v1/chat/completions──▶  JSON grade
         ▼
@@ -38,11 +38,48 @@ dograh Webhook node ──POST──▶ n8n Webhook trigger
 [5] HTTP Request  ──POST Grist /api/docs/<doc>/tables/Interviews/records──▶  row saved
 ```
 
+## Which workflows are graded, and with what plan
+
+Grading is **opt-in per workflow**, chosen on the Control Center's Workflows
+page (*Graded* column — `GET/POST/DELETE /grading/workflows/<id>`, see
+`CHANGELOG.md` v3.18). The selection and the plan are written onto the dograh
+workflow's webhook `payload_template`, so this node stays a pure payload read
+— there is no lookup, no extra credential and no second copy of the state.
+
+A workflow with no post-call webhook (anything but the shipped interview JSONs)
+has the `Notify n8n Grader` node appended when it is ticked — endpoint
+`http://127.0.0.1:5678/webhook/interview-graded`, method POST, and the same
+payload keys the interviews send — so the page can instrument a workflow that
+was created in the Workflow Studio.
+
+The `Build grade request` node decides in this order:
+
+| Payload | Behaviour |
+|---|---|
+| `"graded": false` | The workflow was explicitly un-ticked. The node returns **zero items**, so the run ends cleanly and no Grist row is written. |
+| `"grading_plan": "…"` | The plan generated for this workflow (an LLM-written rubric over its own prompts). Used verbatim as the system prompt. |
+| neither key | A workflow that predates the feature — falls back to the built-in per-track rubric below, exactly as before. |
+
+A generated plan is a full system prompt with the same OUTPUT FORMAT the parse
+node expects (`overall_score`, `verdict`, per-dimension `{score, evidence}`,
+`strengths`, `improvements`, `summary`), so the shared parse and Grist nodes
+are unchanged. `"grading_meta"` rides along with the human-readable title,
+dimension weights and pass/review marks: the `Parse grade` node stamps a JSON
+summary of it (plan or builtin, title, model, generated-at, weights, pass/review
+marks) into the new **`Rubric`** Grist column, so the Control Center's report
+detail can show which rubric produced each grade. `scripts/grist_bootstrap.py`
+owns the column — re-run it against an existing doc to add it.
+
+Restoring the built-in rubric is one un-tick + re-tick: un-ticking writes
+`graded: false` (the plan is dropped), and re-ticking regenerates a plan from
+the workflow's prompts.
+
 ## Track-based rubric branching
 
 The grader is one workflow for all three interview tracks: the `Build grade
 request` code node reads the webhook payload's `track` field and selects the
-system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
+system prompt from a `RUBRICS` map (`it`, `devops`, `sql`). It is the
+**fallback** for workflows with no generated plan (see the table above).
 
 - The dograh workflows send `"track": "devops"` / `"track": "sql"` in the
   webhook payload (the IT workflow predates the field). A missing or unknown
@@ -387,6 +424,19 @@ confirmed the rubric selection for `track=sql` → SQL rubric, `track=devops`
 → DevOps rubric, missing/unknown `track` → IT rubric (fallback). The Grist
 `Track` column was added to the live doc via `scripts/grist_bootstrap.py`
 (idempotent add-column).
+
+The per-workflow plan/selection was validated live on 2026-09-12: the three
+interview tracks were enabled from the Control Center (each got a generated
+plan — 5–7 dimensions, weights summing to 100), the updated workflow was
+deployed via `n8n-import`, and a payload carrying the real generated SQL plan
+was POSTed to the live webhook with a served transcript. The Grist row came
+back with the **plan's** dimension keys (`join_fanout_detection`,
+`slow_query_diagnosis`, …) rather than the built-in SQL rubric's, which is only
+possible if the plan text was the one sent to the model. The node's branches
+were also exercised directly: `{"graded": false}` → 0 items (run ends clean),
+`grading_plan` present → used verbatim as the system message, neither key →
+`track` rubric, missing `track` → IT rubric. The probe row was purged
+afterwards.
 
 Gotchas surfaced and fixed in the verified workflow:
 

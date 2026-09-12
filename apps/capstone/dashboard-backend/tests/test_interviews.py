@@ -318,8 +318,78 @@ class RowToReportTest(unittest.TestCase):
 class ParseHelpersTest(unittest.TestCase):
     def test_parse_dimensions_malformed(self):
         self.assertEqual(interviews.parse_dimensions("not json"), [])
-        self.assertEqual(interviews.parse_dimensions('["a","b"]'), [])
+        self.assertEqual(interviews.parse_dimensions('["a","b"]'), []),
         self.assertEqual(interviews.parse_dimensions(""), [])
+
+
+class ParseRubricTest(unittest.TestCase):
+    """The Rubric column: which grading plan scored the report."""
+
+    PLAN = {
+        "source": "plan",
+        "title": "SQL Mock Interview Rubric",
+        "model": "auto/offline",
+        "generated_at": "2026-09-12T04:07:12+00:00",
+        "pass_score": 75,
+        "review_score": 60,
+        "dimensions": [
+            {"key": "schema_probing", "label": "Schema Probing", "weight": 15},
+            {"key": "join_fanout_detection", "label": "Join Fan-Out", "weight": 20},
+            "junk",
+        ],
+    }
+
+    def test_plan_row_parses_with_typed_fields(self):
+        out = interviews.parse_rubric(json.dumps(self.PLAN))
+        self.assertEqual(out["source"], "plan")
+        self.assertEqual(out["title"], "SQL Mock Interview Rubric")
+        self.assertEqual(out["passScore"], 75)
+        self.assertEqual(out["reviewScore"], 60)
+        # The junk entry is dropped; the weights survive.
+        self.assertEqual(out["dimensions"], [
+            {"key": "schema_probing", "label": "Schema Probing", "weight": 15},
+            {"key": "join_fanout_detection", "label": "Join Fan-Out", "weight": 20},
+        ])
+
+    def test_builtin_marker_parses(self):
+        out = interviews.parse_rubric(
+            json.dumps({"source": "builtin", "title": "sql track rubric"})
+        )
+        self.assertEqual(out["source"], "builtin")
+        self.assertEqual(out["dimensions"], [])
+        self.assertIsNone(out["passScore"])
+
+    def test_unknown_source_maps_to_builtin(self):
+        out = interviews.parse_rubric(json.dumps({"source": "??", "title": "x"}))
+        self.assertEqual(out["source"], "builtin")
+
+    def test_missing_or_blank_column_reads_as_empty(self):
+        self.assertEqual(interviews.parse_rubric(None), {})
+        self.assertEqual(interviews.parse_rubric(""), {})
+        self.assertEqual(interviews.parse_rubric("   "), {})
+
+    def test_garbage_column_reads_as_empty(self):
+        self.assertEqual(interviews.parse_rubric("{not json"), {})
+        self.assertEqual(interviews.parse_rubric('["a"]'), {})
+        self.assertEqual(interviews.parse_rubric(123), {})
+
+    def test_report_row_carries_the_rubric(self):
+        row = {"id": 1, "fields": {"Rubric": json.dumps(self.PLAN)}}
+        self.assertEqual(
+            interviews.row_to_report(row)["rubric"]["title"],
+            "SQL Mock Interview Rubric",
+        )
+
+    def test_pre_rubric_rows_have_no_rubric(self):
+        self.assertEqual(interviews.row_to_report({"id": 2, "fields": {}})["rubric"], {})
+
+    def test_bad_weights_read_as_none(self):
+        spec = json.dumps({**self.PLAN,
+                           "pass_score": "high", "dimensions": [{"key": "k", "weight": "?"}]})
+        out = interviews.parse_rubric(spec)
+        self.assertIsNone(out["passScore"])
+        self.assertEqual(out["dimensions"],
+                         [{"key": "k", "label": "k", "weight": None}])
 
     def test_parse_dimensions_flat_scores(self):
         out = interviews.parse_dimensions('{"greeting": 3}')

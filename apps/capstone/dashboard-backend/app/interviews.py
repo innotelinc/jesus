@@ -193,6 +193,49 @@ def normalize_record_ids(raw: Any) -> list[int]:
     return out
 
 
+def parse_rubric(raw: Any) -> dict[str, Any]:
+    """The ``Rubric`` column -> which grading plan scored this report.
+
+    Written by the n8n grader as JSON: the generated plan's title, model and
+    dimension weights, or a marker that the built-in track rubric was used.
+    Rows written before the column existed (and anything unparseable) yield
+    ``{}`` so the page shows a fallback instead of breaking.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    dimensions: list[dict[str, Any]] = []
+    for item in data.get("dimensions") or []:
+        if not isinstance(item, dict):
+            continue
+        weight = item.get("weight")
+        dimensions.append(
+            {
+                "key": str(item.get("key") or ""),
+                "label": str(item.get("label") or item.get("key") or ""),
+                "weight": weight if isinstance(weight, (int, float)) else None,
+            }
+        )
+
+    def _int(value: Any) -> int | None:
+        return int(value) if isinstance(value, (int, float)) else None
+
+    return {
+        "source": "plan" if data.get("source") == "plan" else "builtin",
+        "title": str(data.get("title") or "").strip(),
+        "model": str(data.get("model") or "").strip(),
+        "generatedAt": str(data.get("generated_at") or "").strip(),
+        "passScore": _int(data.get("pass_score")),
+        "reviewScore": _int(data.get("review_score")),
+        "dimensions": dimensions,
+    }
+
+
 def parse_dimensions(raw: str) -> list[dict[str, Any]]:
     """Dimensions JSON string -> ordered list of {name, score, evidence}.
 
@@ -252,6 +295,8 @@ def row_to_report(row: dict[str, Any]) -> dict[str, Any]:
         "dimensions": parse_dimensions(fields.get("Dimensions") or ""),
         "strengths": parse_str_list(fields.get("Strengths") or ""),
         "improvements": parse_str_list(fields.get("Improvements") or ""),
+        # Which rubric produced this grade (the grader stamps it per row).
+        "rubric": parse_rubric(fields.get("Rubric")),
         "transcript": str(fields.get("Transcript") or ""),
         "parseError": str(fields.get("parse_error") or "").strip(),
         # Soft delete: rows the Control Center threw away but kept restorable.

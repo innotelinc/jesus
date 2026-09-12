@@ -112,6 +112,54 @@ function ReportModal({
 
         <div>
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Graded with
+          </h3>
+          {report.rubric?.title ? (
+            <div className="space-y-2 rounded-lg border px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{report.rubric.title}</span>
+                <span
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 text-xs',
+                    report.rubric.source === 'plan'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {report.rubric.source === 'plan' ? 'generated plan' : 'built-in rubric'}
+                </span>
+                {report.rubric.model && (
+                  <span className="text-xs text-muted-foreground">
+                    {report.rubric.model}
+                    {report.rubric.generatedAt ? ` · ${report.rubric.generatedAt}` : ''}
+                  </span>
+                )}
+              </div>
+              {!!report.rubric.dimensions?.length && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {report.rubric.dimensions.map(d => (
+                    <span key={d.label}>
+                      {d.label}
+                      {d.weight != null && <span className="text-muted-foreground/70"> {d.weight}%</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(report.rubric.passScore != null || report.rubric.reviewScore != null) && (
+                <p className="text-xs text-muted-foreground">
+                  pass ≥ {report.rubric.passScore ?? '—'} · review ≥ {report.rubric.reviewScore ?? '—'}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Not recorded — this report predates the grader stamping the rubric it used.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Dimension scores
           </h3>
           {report.dimensions.length ? (
@@ -429,9 +477,9 @@ export default function InterviewReports() {
   }, [filtered]);
 
   const exportCsv = () => {
-    const header = 'prospect,track,phone,score,verdict,runId';
+    const header = 'prospect,track,phone,score,verdict,runId,rubric';
     const rows = filtered.map(r =>
-      [r.prospect, r.track, r.phone, r.score ?? '', r.verdict, r.runId]
+      [r.prospect, r.track, r.phone, r.score ?? '', r.verdict, r.runId, r.rubric?.title ?? '']
         .map(v => `"${String(v).replace(/"/g, '""')}"`)
         .join(','),
     );
