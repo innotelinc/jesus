@@ -71,6 +71,27 @@ gated behind the Control Center's Cerulean session like every other page.
     dashboard does the same via `PUT /api/v1/workflow/{id}/status`. Archiving is refused
     while an agent is still bound unless you confirm, so a stray click can't silently leave
     a number with no inbound workflow. A **Show archived** toggle filters the list.
+  - **Graded** — the per-workflow switch that decides whether a run is graded and
+    with what rubric. Ticking it (a) attaches the `Notify n8n Grader` post-call
+    webhook node if the workflow has none, so newly-created workflows are
+    selectable, and (b) asks the local OmniRoute model to write a rubric **from
+    that workflow's own prompts** (2–10 weighted dimensions, weights
+    renormalised to exactly 100, pass > review). **Plan** opens the generated
+    rubric (weights, model, generated-at, pass/review marks) and **Regenerate**
+    replaces it. Unticking writes `graded: false`, and the grader then returns
+    zero items and the run ends clean. Workflows with neither key keep the
+    built-in per-track rubric, so nothing existing changes.
+
+    The plan and the selection live on the workflow's webhook `payload_template`
+    in dograh and are published — dograh stays the source of truth, and n8n just
+    reads them off the payload it receives. The rubric that produced each grade
+    is stamped onto the report (`Rubric` in Grist) and shown in the report
+    detail's **"Graded with"** panel, so a score can always be traced back to
+    the rubric behind it.
+
+    API: `GET /grading/workflows/<id>`, `POST /grading/workflows/<id>` (enable +
+    generate), `POST /grading/workflows/<id>/regenerate`, `DELETE
+    /grading/workflows/<id>` (disable) — all session-gated.
 
 Under the hood `dashboard-api` proxies to dograh: `GET /workflows`,
 `GET /workflows/{id}` (definition + editable nodes), `POST /workflows`
