@@ -29,6 +29,13 @@ Highlights of v3.18:
   lived elsewhere systemd could not start the stack. It now uses the
   `/PATH/TO/CAPSTONE` placeholder `scripts/install-capstone.sh` rewrites (the
   same convention as `capstone-pbx-sync.service`).
+- **Grader webhook tolerates liveness probes**: `scripts/smoke-test.sh` proves
+  `/webhook/interview-graded` is registered by POSTing an empty `{}` body, which
+  made the grader's fetch node fail on an undefined `transcript_url` and left a
+  failed execution behind on every smoke run. A `Has transcript URL?` code node
+  now sits between the webhook and the fetch and returns zero items when the URL
+  is missing, blank, or not a string, so the probe ends as a clean success while
+  real payloads pass through unchanged.
 
 ## v3.17 — Stack access enforced + PBX sync on a 12-hour reconciliation
 

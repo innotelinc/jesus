@@ -25,6 +25,8 @@ dograh Webhook node ──POST──▶ n8n Webhook trigger
         │  payload: workflow_run_id, initial_context{student_name, phone},
         │  gathered_context, transcript_url, track
         ▼
+[1b] Code node  ──transcript_url missing?──▶  0 items: run ends cleanly
+        ▼
 [1] HTTP Request  ──GET transcript_url──▶  transcript text
         ▼
 [2] Code node  ──pick rubric by track (it|devops|sql, default it)──▶  messages
@@ -86,6 +88,47 @@ system prompt from a `RUBRICS` map (`it`, `devops`, `sql`).
 > **Gotcha:** the GET node returns a text response wrapped as `{ data: "..." }`
 > in n8n 2.x — read it as `$('Fetch transcript').item.json.data` (the verified
 > workflow already does this with a fallback).
+
+## Node 1b — Code: ignore payloads without a transcript URL
+
+`scripts/smoke-test.sh` probes this webhook with a deliberately empty body
+(`POST /webhook/interview-graded -d '{}'`) to prove the endpoint is registered
+and answering. That probe carries no `transcript_url`, so without a guard the
+fetch node failed with *URL parameter must be a string, got undefined* and every
+smoke run left a red execution behind.
+
+The `Has transcript URL?` code node sits between the webhook and the fetch: it
+reads `$json.body.transcript_url` and returns `[]` when it is missing, blank, or
+not a string, which ends the run as a clean success. Any other payload passes
+through untouched.
+
+```js
+const items = $input.all();
+const body = (items[0] && items[0].json && items[0].json.body) || {};
+const url = body.transcript_url;
+if (typeof url !== 'string' || url.trim() === '') {
+  return [];
+}
+return items;
+```
+
+> The webhook uses `responseMode: "onReceived"`, so the probe already got its
+> 200 before this node runs — the guard is about the *execution* ending cleanly
+> (and about not sending a bogus grading request for a malformed payload), not
+> about the HTTP status the probe sees.
+
+> The guard's code was exercised locally against the four payload shapes it has
+> to handle (`{}`, a blank `transcript_url`, a payload with no `body` key, and a
+> real payload): only the last one yields an item.
+
+Previously every probe left a failed execution behind — 14, 15, 16 and 20 all
+died at `Fetch transcript` with `NodeOperationError: URL parameter must be a
+string, got undefined` (execution 15's stored webhook body is literally `{}`).
+After deploying via the `n8n-import` service (import + publish + activate +
+restart), the same probe against the live instance returned HTTP 200 and landed
+as **execution 25, `success`**, with only `Webhook → Has transcript URL?` in the
+execution log — the fetch never ran. Retrying an *old* failed execution still
+fails, because a retry replays that execution's stored (empty) payload.
 
 ## Node 2 — HTTP Request: fetch the transcript
 
@@ -361,6 +404,9 @@ Gotchas surfaced and fixed in the verified workflow:
    and attempts delimiter repair before recording a failed parse.
 5. A JSON transcript response must be normalized to its text value; passing the
    `{data: ...}` wrapper or an object directly to Grist causes 400 `Invalid payload`.
+6. The smoke test's liveness probe posts an empty body, which made the fetch
+   node fail on an undefined URL. The `Has transcript URL?` guard node now
+   short-circuits those payloads (0 items → clean run) before the fetch.
 
 > Verified end-to-end on 2026-08-20 against the real stack (n8n 2.x, Grist,
 > OmniRoute on `20128`, and local Ollama): webhook → transcript fetch →
