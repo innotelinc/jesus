@@ -42,6 +42,13 @@ the credential loop that was pinning a CPU core.
   accepted** in each case, with a wildcard source no longer admitted.
 - Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the
   mechanism, and the verification commands; `.env.example` gains the `F2B_*` knobs.
+- Docs: `docs/zeus-integration.md` §3.1 records the shared **RTP plane** — Zeus
+  owns it and the Zeus repo now carries the same `rtp_custom.conf` fragment, the
+  same env names (`FREEPBX_RTP_PORT_START/END`, `PJSIP_STUN_TURN_ADDR`,
+  `TURN_LISTENING_PORT`) and the same durable `kvstore_Sipsettings` write, so a
+  standalone Capstone box and a Capstone add-on on a Zeus PBX cap Asterisk
+  identically (and the add-on publishes no RTP of its own). `pbx/README.md`
+  cross-references it.
 
 ## Unreleased — `scripts/backup-capstone.sh`: DB + config backup for a host move
 

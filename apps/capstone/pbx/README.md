@@ -377,6 +377,13 @@ rtpstart=10101
 rtpend=10120
 ```
 
+The range is parameterized by `FREEPBX_RTP_PORT_START` / `FREEPBX_RTP_PORT_END`
+(default `10101-10120`) and **Zeus mirrors this file, these env names and the
+`kvstore_Sipsettings` write one-for-one** (`docs/zeus-integration.md` §3.1). A
+Capstone add-on on a Zeus PBX therefore rides Zeus's range instead of publishing
+a second one — the bundled `freepbx` (and `coturn`) services stay profile-off
+(`standalone`) in add-on mode.
+
 Verify:
 
 ```bash

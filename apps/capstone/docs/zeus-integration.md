@@ -108,6 +108,37 @@ Both fragment sets land on the same Asterisk:
   `[dograh-inbound]` (→ `Stasis(dograh_*)`), agent Custom Extensions
   `8000+`.
 
+### 3.1 One RTP plane (Zeus owns it, Capstone mirrors it)
+
+RTP is the other shared layer, and it is owned by **Zeus**. The two repos carry
+the same shape so a shared box has one media plane instead of two:
+
+| Layer | Zeus (owner) | Capstone (add-on) |
+|---|---|---|
+| Host publish | `docker-compose.full.yml` → `${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp` | **none** — the bundled PBX is profile-gated off in add-on mode, so Capstone publishes no RTP |
+| File cap | `docker-entrypoint-full.sh` → `/etc/asterisk/rtp_custom.conf` | `pbx/entrypoint-dograh.sh` → the same file, same shape (`pbx/asterisk/rtp_custom.conf`) |
+| Durable row | `kvstore_Sipsettings.rtpstart` / `.rtpend`, written at boot | the same write in `pbx/entrypoint-dograh.sh` |
+| STUN/TURN | `PJSIP_STUN_TURN_ADDR`, default `coturn:<TURN_LISTENING_PORT>` | the same env, defaulting to the local `coturn` service |
+
+Both products use the **same env names and defaults**
+(`FREEPBX_RTP_PORT_START`, `FREEPBX_RTP_PORT_END`, `PJSIP_STUN_TURN_ADDR`,
+`TURN_LISTENING_PORT`), so a standalone Capstone box and the shared Zeus box cap
+Asterisk identically — a mode switch stays a pointer change, exactly like the
+dialplan.
+
+The one non-obvious rule: **the settings-DB row is what sticks.** FreePBX's
+Sipsettings module regenerates `rtp_additional.conf` from `kvstore_Sipsettings`
+on every *Apply Config*, and Asterisk reads configs *first-wins* — so an included
+`rtp_custom.conf` is shadowed by the generated file. Without the DB write,
+Asterisk silently falls back to FreePBX's default `10000-20000`, which nothing
+publishes or forwards; media then escapes the published block and calls go
+one-way. Both entrypoints therefore write the same row, and both smoke tests
+assert the effective range sits inside the published one.
+
+On a shared box this means Capstone's `freepbx` service stays **profile-off**
+(`standalone`), and its `coturn` too (also `standalone` — Zeus's is primary).
+Pointing `DOGRAH_ARI_*` / `DOGRAH_WS_URI` at the Zeus PBX remains the only switch.
+
 ## 4. Integration surface
 
 > **Portal API contract:** the Zeus repo's `docs/portal-api.md` publishes the
