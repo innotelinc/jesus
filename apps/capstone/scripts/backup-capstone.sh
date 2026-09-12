@@ -99,7 +99,8 @@ fi
 step "Postgres (SigNoz metastore)"
 if docker ps --format '{{.Names}}' | grep -qx "$SIGNOZ_PG_CONTAINER"; then
   docker exec "$SIGNOZ_PG_CONTAINER" pg_dump -U "$SIGNOZ_PG_USER" "$SIGNOZ_PG_DB" \
-    | gzip -9 > "$BACKUP_DIR/db/signoz-metastore.sql.gz"    log "db/signoz-metastore.sql.gz ($(size "$BACKUP_DIR/db/signoz-metastore.sql.gz"))"
+    | gzip -9 > "$BACKUP_DIR/db/signoz-metastore.sql.gz"
+  log "db/signoz-metastore.sql.gz ($(size "$BACKUP_DIR/db/signoz-metastore.sql.gz"))"
 else
   log "SKIP $SIGNOZ_PG_CONTAINER not running"
 fi
@@ -120,9 +121,11 @@ done
 step "n8n workflows"
 if docker ps --format '{{.Names}}' | grep -qx n8n; then
   if docker exec n8n n8n export:workflow --all --output=/tmp/n8n-workflows.json >/dev/null 2>&1; then
-    docker cp n8n:/tmp/n8n-workflows.json "$BACKUP_DIR/config/n8n-workflows.json" >/dev/null 2>&1 \
-      && log "config/n8n-workflows.json" \
-      || log "WARN workflow export copy failed"
+    if docker cp n8n:/tmp/n8n-workflows.json "$BACKUP_DIR/config/n8n-workflows.json" >/dev/null 2>&1; then
+      log "config/n8n-workflows.json"
+    else
+      log "WARN workflow export copy failed"
+    fi
     docker exec n8n rm -f /tmp/n8n-workflows.json >/dev/null 2>&1 || true
   else
     log "WARN n8n export:workflow failed (volume tar still has database.sqlite)"
@@ -134,9 +137,11 @@ fi
 # ── 5. Git bundle — every tracked file at HEAD ────────────────────────────
 step "Repo bundle"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git bundle create "$BACKUP_DIR/repo.bundle" --all >/dev/null 2>&1 \
-    && log "repo.bundle ($(size "$BACKUP_DIR/repo.bundle"))" \
-    || log "WARN git bundle failed (uncommitted work is NOT included)"
+  if git bundle create "$BACKUP_DIR/repo.bundle" --all >/dev/null 2>&1; then
+    log "repo.bundle ($(size "$BACKUP_DIR/repo.bundle"))"
+  else
+    log "WARN git bundle failed (uncommitted work is NOT included)"
+  fi
 else
   log "SKIP not a git checkout"
 fi
@@ -166,6 +171,7 @@ GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
 } > "$BACKUP_DIR/MANIFEST.txt"
 log "MANIFEST.txt"
 
+# shellcheck disable=SC2094  # SHA256SUMS is excluded by name, so this only adds
 ( cd "$BACKUP_DIR" && find . -type f ! -name SHA256SUMS -print0 \
   | sort -z | xargs -0 sha256sum > SHA256SUMS )
 log "SHA256SUMS ($(wc -l < "$BACKUP_DIR/SHA256SUMS" | tr -d ' ') files)"
@@ -180,4 +186,4 @@ fi
 
 step "Done"
 log "directory: $BACKUP_DIR"
-[ -z "${SKIP_TARBALL:-}" ] && log "tarball:   $TARBALL"
+if [ -z "${SKIP_TARBALL:-}" ]; then log "tarball:   $TARBALL"; fi

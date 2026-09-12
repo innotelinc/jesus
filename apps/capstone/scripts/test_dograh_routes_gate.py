@@ -122,20 +122,29 @@ def serve(routes) -> tuple[threading.Thread, int]:
     return t, srv.server_address[1]
 
 
-def dograh_routes(dograh_port: int) -> dict:
+def dograh_routes(dograh_port: int, stasis: str = "dograh_harness_1") -> dict:
+    """Stub dograh. `stasis` is what the config detail reports as
+    credentials.stasis_app_name; an empty value means dograh can't report it
+    (the detail route 404s), which is the case the sync must refuse to write
+    routes on."""
     cfg = f"http://127.0.0.1:{dograh_port}"
-    return {
-        "GET": {
-            "/api/v1/organizations/telephony-configs": (
-                200,
-                {"configurations": [{"id": "c1", "name": CONFIG_NAME}]},
-            ),
-            "/api/v1/organizations/telephony-configs/c1/phone-numbers": (
-                200,
-                {"phone_numbers": NUMBERS},
-            ),
-        }
+    get = {
+        "/api/v1/organizations/telephony-configs": (
+            200,
+            {"configurations": [{"id": "c1", "name": CONFIG_NAME}]},
+        ),
+        "/api/v1/organizations/telephony-configs/c1/phone-numbers": (
+            200,
+            {"phone_numbers": NUMBERS},
+        ),
     }
+    if stasis:
+        get["/api/v1/organizations/telephony-configs/c1"] = (
+            200,
+            {"id": "c1", "name": CONFIG_NAME,
+             "credentials": {"stasis_app_name": stasis}},
+        )
+    return {"GET": get}
 
 
 def freepbx_routes(freepbx_port: int) -> dict:
@@ -159,7 +168,8 @@ def freepbx_routes(freepbx_port: int) -> dict:
     }
 
 
-def run_sync(tmp: pathlib.Path, magnate_url: str | None, plan: str, user: str = "") -> subprocess.CompletedProcess:
+def run_sync(tmp: pathlib.Path, magnate_url: str | None, plan: str,
+             user: str = "", stasis: str = "dograh_harness_1") -> subprocess.CompletedProcess:
     """Run the real sync in --check mode against the stub fleet."""
     fakebin = tmp / "bin"
     fakebin.mkdir(parents=True, exist_ok=True)
@@ -167,7 +177,7 @@ def run_sync(tmp: pathlib.Path, magnate_url: str | None, plan: str, user: str = 
     docker_bin.write_text(FAKE_DOCKER)
     docker_bin.chmod(0o755)
 
-    dograh_t, dograh_port = serve(dograh_routes(0))
+    dograh_t, dograh_port = serve(dograh_routes(0, stasis))
     freepbx_t, freepbx_port = serve(freepbx_routes(0))
     magnate_t = None
     try:
@@ -220,7 +230,14 @@ def main() -> int:
         p = run_sync(tmp, None, "")
         results.append(scenario("standalone (no Magnate)", p, 0,
                                 "PASS custom extension 8000 present",
-                                "PASS inbound route DID 8000"))
+                                "PASS inbound route DID 8000",
+                                "PASS Stasis app name from dograh: dograh_harness_1"))
+
+        # dograh can't report its ARI app — writing routes would leave the
+        # dialplan calling an app nothing registered, so the sync must refuse
+        p = run_sync(tmp, None, "", stasis="")
+        results.append(scenario("dograh app unknown aborts", p, 1,
+                                "PROBLEM: Stasis app name unknown"))
 
         # disabled — Magnate URL present, no plan (must not gate)
         magnate_t, mp = serve({"GET": {}})
