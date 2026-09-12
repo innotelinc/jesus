@@ -917,6 +917,53 @@ def create_tts_service(
             skip_aggregator_types=["recording_router", "recording"],
             silence_time_s=1.0,
         )
+    elif user_config.tts.provider == ServiceProviders.SPEECHIFY.value:
+        # SpeechifyHttpTTSService ships in upstream pipecat; imported lazily so
+        # this module keeps loading on pipecat checkouts that predate it.
+        try:
+            from api.services.pipecat.speechify_tts import (
+                SpeechifyOwnedSessionTTSService,
+            )
+            from pipecat.services.speechify.tts import SpeechifyTTSSettings
+        except ModuleNotFoundError as e:
+            missing = e.name or ""
+            if missing != "pipecat.services.speechify" and not missing.startswith(
+                "pipecat.services.speechify."
+            ):
+                raise
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Speechify TTS requires a pipecat build that includes "
+                    "pipecat.services.speechify; the installed pipecat does not."
+                ),
+            ) from e
+
+        voice = getattr(user_config.tts, "voice", None) or "beatrice_32"
+        model = getattr(user_config.tts, "model", None) or "simba-3.2"
+        language_code = getattr(user_config.tts, "language", None) or "en"
+        language: Language | str
+        try:
+            language = Language(language_code)
+        except ValueError:
+            # The config allows custom language codes; codes the pipecat enum
+            # doesn't model (e.g. "en-ZA") are sent to Speechify verbatim
+            # rather than silently replaced with English.
+            language = language_code
+        session = aiohttp.ClientSession()
+        return SpeechifyOwnedSessionTTSService(
+            api_key=user_config.tts.api_key,
+            aiohttp_session=session,
+            sample_rate=audio_config.transport_out_sample_rate,
+            settings=SpeechifyTTSSettings(
+                voice=voice,
+                model=model,
+                language=language,
+            ),
+            text_filters=[xml_function_tag_filter],
+            skip_aggregator_types=["recording_router", "recording"],
+            silence_time_s=1.0,
+        )
     else:
         raise HTTPException(
             status_code=400, detail=f"Invalid TTS provider {user_config.tts.provider}"
