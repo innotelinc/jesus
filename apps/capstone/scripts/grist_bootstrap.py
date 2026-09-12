@@ -4,7 +4,9 @@
 Creates (or reuses) the Grist document and ensures the `Interviews` table
 exists with exactly the columns the n8n grader workflow writes:
 Track, Prospect, Student (legacy), Phone, RunID, Score, Verdict, Dimensions,
-Strengths, Improvements, Transcript.
+Strengths, Improvements, Transcript. It also owns `Deleted`, the soft-delete
+flag the Control Center sets when a report is deleted from the dashboard (the
+grader never writes it), so a deleted report can be restored or purged later.
 
 The caller is a **prospect**: the grader derives their name from the call
 transcript (falling back to `initial_context`), and `Phone` is the number
@@ -66,6 +68,9 @@ COLUMNS: list[tuple[str, str, str]] = [
     ("Improvements", "Text", "Improvements (JSON list)"),
     ("Transcript", "Text", "Full call transcript"),
     ("parse_error", "Text", "LLM grade parse error (debug)"),
+    # Set by the Control Center (soft delete), never by the grader: deleted
+    # rows stay in the document so the dashboard can restore or purge them.
+    ("Deleted", "Bool", "Soft-deleted from the Control Center (restorable)"),
 ]
 
 TABLE_ID = "Interviews"

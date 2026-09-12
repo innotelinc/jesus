@@ -2284,14 +2284,20 @@ def _agent_pbx_status(mode: str, ext: str) -> dict:
 
 
 # --------------------------------------------------------------------------
-# Interview reports — read-only view over the Grist doc the n8n Interview
-# Grader writes to on every mock-interview hang-up. Client lives in
-# app/interviews.py (urllib only, mirrors app/agents.py conventions).
+# Interview reports — view over the Grist doc the n8n Interview Grader writes
+# to on every mock-interview hang-up, plus the delete actions the page uses to
+# throw away test/bad grades. Client lives in app/interviews.py (urllib only,
+# mirrors app/agents.py conventions).
 
 
 @app.get("/interviews/reports")
-def interview_reports(user: dict = Depends(require_session)):
-    """Graded interview reports from Grist + config state for the UI."""
+def interview_reports(includeDeleted: bool = False, user: dict = Depends(require_session)):
+    """Graded interview reports from Grist + config state for the UI.
+
+    Soft-deleted rows are hidden unless ``?includeDeleted=1`` — the reports
+    page asks for them when its "show deleted" toggle is on, so it can offer
+    Restore / Delete permanently.
+    """
     client = interviews.GristClient()
     if not client.configured():
         return {
@@ -2304,13 +2310,77 @@ def interview_reports(user: dict = Depends(require_session)):
         rows = client.list_records("Interviews")
     except interviews.GristError as exc:
         raise HTTPException(status_code=502, detail=f"Grist: {exc}")
+    # Newest first (Grist record ids are monotonic) — the reports page table
+    # and the overview widget both expect most-recent-first.
+    reports = interviews.rows_to_reports(rows)
+    if not includeDeleted:
+        reports = [r for r in reports if not r.get("deleted")]
     return {
         "configured": True,
         "docId": client.doc,
-        # Newest first (Grist record ids are monotonic) — the reports page
-        # table and the overview widget both expect most-recent-first.
-        "reports": interviews.rows_to_reports(rows),
+        "reports": reports,
     }
+
+
+def _interview_grist_client() -> interviews.GristClient:
+    """A configured Grist client, or 503 when the doc isn't wired up."""
+    client = interviews.GristClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="GRIST_DOC_ID not configured — run scripts/grist_bootstrap.py, then set it in .env")
+    return client
+
+
+def _touch_interview_reports(ids: Any, action: str) -> list[int]:
+    """Run a delete-family action over report ids, returning the ids touched.
+
+    ``action`` is one of ``delete`` (soft), ``restore`` (clear the flag) or
+    ``purge`` (permanent). Ids are normalised first: junk, duplicates and
+    non-positive values are dropped, and an empty result is a no-op, so a
+    malformed or stale selection can't delete the wrong rows or 500 the page.
+    """
+    wanted = interviews.normalize_record_ids(ids)
+    if not wanted:
+        return []
+    client = _interview_grist_client()
+    try:
+        if action == "delete":
+            return client.set_deleted(wanted, True, "Interviews")
+        if action == "restore":
+            return client.set_deleted(wanted, False, "Interviews")
+        return client.purge_records(wanted, "Interviews")
+    except interviews.GristError as exc:
+        raise HTTPException(status_code=502, detail=f"Grist: {exc}")
+
+
+@app.delete("/interviews/reports/{report_id}")
+def interview_report_delete(report_id: int, user: dict = Depends(require_session)):
+    """Soft-delete one graded report (restorable from the reports page)."""
+    if report_id <= 0:
+        raise HTTPException(status_code=422, detail="report_id must be a positive record id")
+    _touch_interview_reports([report_id], "delete")
+    return {"status": "deleted", "id": report_id}
+
+
+@app.post("/interviews/reports/delete")
+def interview_reports_delete(body: dict, user: dict = Depends(require_session)):
+    """Soft-delete several graded reports (row selection / delete-all-shown)."""
+    ids = _touch_interview_reports(body.get("ids"), "delete")
+    return {"status": "deleted", "ids": ids, "count": len(ids)}
+
+
+@app.post("/interviews/reports/restore")
+def interview_reports_restore(body: dict, user: dict = Depends(require_session)):
+    """Undo a soft delete (the page's Undo action / the deleted view's Restore)."""
+    ids = _touch_interview_reports(body.get("ids"), "restore")
+    return {"status": "restored", "ids": ids, "count": len(ids)}
+
+
+@app.post("/interviews/reports/purge")
+def interview_reports_purge(body: dict, user: dict = Depends(require_session)):
+    """Permanently remove already-deleted reports; there is no undo after this."""
+    ids = _touch_interview_reports(body.get("ids"), "purge")
+    return {"status": "purged", "ids": ids, "count": len(ids)}
 
 
 @app.get("/ports")

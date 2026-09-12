@@ -81,9 +81,13 @@ export default function Dashboard() {
   // ── Interview reports (grader Grist doc, newest first) ────────────────
   const [recentReports, setRecentReports] = useState<InterviewReport[]>([]);
   const [reportsState, setReportsState] = useState<'loading' | 'live' | 'error' | 'unconfigured'>('loading');
+  const [deletingReport, setDeletingReport] = useState<number | null>(null);
+  const [reportActionError, setReportActionError] = useState<string | null>(null);
 
   const loadInterviewReports = useCallback(async () => {
     try {
+      // The API hides soft-deleted reports by default, which is exactly what a
+      // "latest reports" list wants.
       const res = await api.interviewReports();
       if (!res.configured) {
         setReportsState('unconfigured');
@@ -95,6 +99,24 @@ export default function Dashboard() {
       setReportsState('error');
     }
   }, []);
+
+  // Deleting here is the same soft delete as the reports page, so the report
+  // stays restorable there; full deletion (and undo) lives on that page.
+  const deleteReport = async (report: InterviewReport) => {
+    if (!window.confirm(
+      `Delete the ${report.prospect || 'unnamed prospect'} interview report (${report.trackLabel})?\n\n`
+      + 'It disappears from this list and is kept restorable — undo or restore it from Interview Reports → “Show deleted”.')) return;
+    setDeletingReport(report.id);
+    setReportActionError(null);
+    try {
+      await api.deleteInterviewReport(report.id);
+      await loadInterviewReports();
+    } catch (e) {
+      setReportActionError(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeletingReport(null);
+    }
+  };
 
   useEffect(() => { void loadInterviewReports(); }, [loadInterviewReports]);
 
@@ -366,11 +388,11 @@ export default function Dashboard() {
         ) : (
           <ul className="divide-y divide-border">
             {recentReports.map(r => (
-              <li key={r.id}>
+              <li key={r.id} className="flex items-center gap-2 px-5 pr-3 transition-colors hover:bg-muted/40">
                 <Link
                   to={`/interviews?report=${r.id}`}
                   title="Open this report"
-                  className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                  className="flex min-w-0 flex-1 items-center gap-3 py-3.5"
                 >
                   <span className={cn('h-2 w-2 shrink-0 rounded-full', verdictDotClass(r.verdict))} />
                   <div className="min-w-0 flex-1">
@@ -391,9 +413,25 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 text-xs text-muted-foreground hover:text-danger"
+                  disabled={deletingReport === r.id}
+                  onClick={() => void deleteReport(r)}
+                  aria-label={`Delete report for ${r.prospect || 'unnamed prospect'}`}
+                  title="Delete this report (restorable)"
+                >
+                  {deletingReport === r.id ? 'Deleting…' : 'Delete'}
+                </Button>
               </li>
             ))}
           </ul>
+        )}
+        {reportActionError && (
+          <div className="border-t border-danger/30 bg-danger/10 px-5 py-2.5 text-xs text-danger">
+            {reportActionError}
+          </div>
         )}
       </section>
 

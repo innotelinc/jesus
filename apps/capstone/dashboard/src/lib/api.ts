@@ -226,6 +226,8 @@ export interface InterviewReport {
   improvements: string[];
   transcript: string;
   parseError: string;
+  /** Soft-deleted from the Control Center: kept in Grist, restorable. */
+  deleted: boolean;
 }
 
 export interface InterviewReportsResponse {
@@ -233,6 +235,13 @@ export interface InterviewReportsResponse {
   docId: string;
   reports: InterviewReport[];
   error?: string;
+}
+
+/** Result of a delete / restore / purge over interview reports. */
+export interface InterviewReportWrite {
+  status: string;
+  ids: number[];
+  count: number;
 }
 
 export interface Me {
@@ -297,7 +306,19 @@ export const api = {
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}`, body, 'PUT'),
   deleteAgent: (id: number) =>
     deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
-  interviewReports: () => getJSON<InterviewReportsResponse>('/interviews/reports'),
+  /** Deleted rows are hidden unless `includeDeleted` (the reports page toggle). */
+  interviewReports: (includeDeleted = false) =>
+    getJSON<InterviewReportsResponse>(
+      includeDeleted ? '/interviews/reports?includeDeleted=1' : '/interviews/reports',
+    ),
+  deleteInterviewReport: (id: number) =>
+    deleteJSON<{ status: string; id: number }>(`/interviews/reports/${id}`),
+  deleteInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/delete', { ids }),
+  restoreInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/restore', { ids }),
+  purgeInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/purge', { ids }),
 };
 
 /**

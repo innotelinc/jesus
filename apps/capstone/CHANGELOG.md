@@ -29,6 +29,20 @@ Highlights of v3.18:
   lived elsewhere systemd could not start the stack. It now uses the
   `/PATH/TO/CAPSTONE` placeholder `scripts/install-capstone.sh` rewrites (the
   same convention as `capstone-pbx-sync.service`).
+- **Interview reports can be deleted — and brought back — from the Control
+  Center**: the Interview Reports page can now drop graded rows (per-row
+  **Delete**, checkboxes with **Delete selected (n)**, and **Delete all shown**,
+  which honours the active track/search filter), and the overview page's
+  latest-reports list has its own **Delete**. Deleting is a *soft* delete: it
+  sets a new `Deleted` flag on the Grist row (`scripts/grist_bootstrap.py` owns
+  the column — re-run it to add it to an existing doc), so the page offers an
+  **Undo** right after, and a **Show deleted** view with **Restore** and
+  **Delete permanently** (the only path that removes a row for good). Backed by
+  session-gated routes — `GET /interviews/reports?includeDeleted=1`,
+  `DELETE /interviews/reports/<id>`, `POST /interviews/reports/{delete,restore,
+  purge}` — over a PATCH of the flag / `POST .../records/delete` in Grist; an
+  empty or stale selection is a no-op, and a Grist failure surfaces as 502
+  instead of a silent success.
 - **Grader webhook tolerates liveness probes**: `scripts/smoke-test.sh` proves
   `/webhook/interview-graded` is registered by POSTing an empty `{}` body, which
   made the grader's fetch node fail on an undefined `transcript_url` and left a

@@ -8,10 +8,14 @@ The prospect's *name* is derived from the call (their transcript) rather than
 supplied up front, and the phone column is the number they called from
 (dograh's ``initial_context.caller_number``).
 
-This module is the dashboard's read-only client for those rows. Grist runs on
-the same ``interview-net`` bridge as dashboard-api, so we talk to it directly
-by service name; auth is the same owner API key setup.sh minted for the
-grader (GRIST_API_KEY + GRIST_DOC_ID in the mounted .env).
+This module is the dashboard's client for those rows: it lists them for the
+Interview Reports page and deletes a selected row (or a batch of them) when an
+operator throws a bad/test grade away. Deleting is *soft* by default — it sets
+the ``Deleted`` flag (owned by scripts/grist_bootstrap.py) so the row survives a
+mis-click: the page offers an undo, a "show deleted" view, and a permanent
+purge. Grist runs on the same ``interview-net`` bridge as dashboard-api, so we
+talk to it directly by service name; auth is the same owner API key setup.sh
+minted for the grader (GRIST_API_KEY + GRIST_DOC_ID in the mounted .env).
 
 Mirrors ``app/agents.py`` conventions: urllib only (no pip deps) so it
 unit-tests without the stack, and degrades to an "unconfigured" state instead
@@ -28,6 +32,9 @@ from typing import Any
 
 DEFAULT_URL = "http://grist:8484"
 DEFAULT_DOC_ID = ""
+
+# Soft-delete flag on the Interviews table (owned by scripts/grist_bootstrap.py).
+DELETED_COLUMN = "Deleted"
 
 # Columns the n8n grader writes (scripts/grist_bootstrap.py owns the schema).
 TRACKS = {
@@ -58,7 +65,7 @@ class GristError(RuntimeError):
 
 
 class GristClient:
-    """Thin read-only client for the Grist REST API (Bearer token auth)."""
+    """Thin Grist REST client (Bearer token auth) — list + delete records."""
 
     def __init__(
         self,
@@ -73,12 +80,16 @@ class GristClient:
     def configured(self) -> bool:
         return bool(self.doc)
 
-    def _request(self, method: str, path: str) -> Any:
+    def _request(self, method: str, path: str, body: Any = None) -> Any:
         headers: dict[str, str] = {"Accept": "application/json"}
         if self.key:
             headers["Authorization"] = f"Bearer {self.key}"
+        data = None
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+            data = json.dumps(body).encode()
         req = urllib.request.Request(
-            f"{self.base_url}{path}", headers=headers, method=method
+            f"{self.base_url}{path}", headers=headers, data=data, method=method
         )
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:  # noqa: S310 - configured endpoint
@@ -114,10 +125,72 @@ class GristClient:
             )
         return records
 
+    def set_deleted(
+        self, record_ids: list[Any], deleted: bool = True, table_id: str = "Interviews"
+    ) -> list[int]:
+        """Flip the soft-delete flag on records; returns the ids actually sent.
+
+        A PATCH on the records collection is what Grist's own UI does for a
+        cell edit. An empty id list is a no-op, so a stale UI selection can't
+        turn into an accidental "delete everything".
+        """
+        ids = normalize_record_ids(record_ids)
+        if not ids:
+            return []
+        path = f"/api/docs/{self.doc}/tables/{table_id}/records"
+        body = {
+            "records": [
+                {"id": rid, "fields": {DELETED_COLUMN: bool(deleted)}} for rid in ids
+            ]
+        }
+        self._request("PATCH", path, body=body)
+        return ids
+
+    def purge_records(
+        self, record_ids: list[Any], table_id: str = "Interviews"
+    ) -> list[int]:
+        """Permanently remove records; returns the ids actually sent.
+
+        Grist's delete endpoint takes a bare JSON array of row ids
+        (``POST /api/docs/<doc>/tables/<table>/records/delete``) and answers
+        200 with an empty body. Reserved for rows that are already flagged
+        ``Deleted`` — the page's permanent-delete action.
+        """
+        ids = normalize_record_ids(record_ids)
+        if not ids:
+            return []
+        path = f"/api/docs/{self.doc}/tables/{table_id}/records/delete"
+        self._request("POST", path, body=ids)
+        return ids
+
 
 def track_label(track: str) -> str:
     """Human label for a track value ('devops' -> 'DevOps'); unknown -> as-is."""
     return TRACKS.get((track or "").strip().lower(), (track or "").strip() or "—")
+
+
+def normalize_record_ids(raw: Any) -> list[int]:
+    """Coerce a UI-supplied id list into unique positive ints.
+
+    Anything that isn't a row id (booleans are ints in Python, so they are
+    rejected explicitly, as are floats, dicts and negative/zero values) is
+    dropped rather than raising — a malformed selection must not 500 the page.
+    """
+    if not isinstance(raw, (list, tuple)):
+        return []
+    out: list[int] = []
+    for item in raw:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            value = item
+        elif isinstance(item, str) and item.strip().lstrip("-").isdigit():
+            value = int(item.strip())
+        else:
+            continue
+        if value > 0 and value not in out:
+            out.append(value)
+    return out
 
 
 def parse_dimensions(raw: str) -> list[dict[str, Any]]:
@@ -181,6 +254,9 @@ def row_to_report(row: dict[str, Any]) -> dict[str, Any]:
         "improvements": parse_str_list(fields.get("Improvements") or ""),
         "transcript": str(fields.get("Transcript") or ""),
         "parseError": str(fields.get("parse_error") or "").strip(),
+        # Soft delete: rows the Control Center threw away but kept restorable.
+        # Rows written before the column existed have no value -> not deleted.
+        "deleted": bool(fields.get(DELETED_COLUMN)),
     }
 
 
