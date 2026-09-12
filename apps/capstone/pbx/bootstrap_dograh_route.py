@@ -378,17 +378,37 @@ def ensure_custom_dest(container: str, table: str, target: str, description: str
     return next_id
 
 
-def resolve_container(default: str) -> str:
-    """Resolve the freepbx container: exact name first, else the first running
-    container whose name contains 'pbx-freepbx' (a daemon hiccup can rename it)."""
+def _is_running(name: str) -> bool:
+    """True only for a container that exists *and* is up."""
     try:
-        sh("docker", "inspect", default)
-        return default
+        return sh("docker", "inspect", "-f", "{{.State.Running}}", name).strip() == "true"
     except FreepbxError:
-        out = sh("docker", "ps", "--format", "{{.Names}}")
-        for name in out.splitlines():
-            if "pbx-freepbx" in name:
-                return name
+        return False
+
+
+def resolve_container(default: str) -> str:
+    """Resolve the FreePBX container to run module/SQL commands in.
+
+    Which container that is depends on who owns the voice plane: Capstone's
+    bundled FreePBX (`pbx-freepbx`) when it runs standalone, or Zeus's
+    (`zeus-freepbx`) when Capstone is deployed as the add-on on a shared Zeus
+    PBX. Both can be *present* at once — the hand-off leaves the old container
+    stopped rather than deleted, so a rollback is a container start — which is
+    why this checks that the candidate is **running** instead of merely
+    existing: `docker exec` against a stopped container fails, and the sync
+    timer would then report a PBX that is perfectly healthy as unreachable.
+
+    Falls back to any running container whose name mentions freepbx, to survive
+    a rename or a daemon hiccup.
+    """
+    if _is_running(default):
+        return default
+    for name in ("zeus-freepbx", "pbx-freepbx"):
+        if name != default and _is_running(name):
+            return name
+    for name in sh("docker", "ps", "--format", "{{.Names}}").splitlines():
+        if "freepbx" in name:
+            return name
     return default
 
 

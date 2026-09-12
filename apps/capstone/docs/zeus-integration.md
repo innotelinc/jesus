@@ -62,6 +62,24 @@ own dialplan contexts and ARI users.
 | Fax | AvantFax / HylaFAX+ digital faxing |
 | Billing | Magnate (RevenueOps) is the billing platform: checkout, invoices, plans, reseller/white-label; Zeus's own `STRIPE_*` mode is a deprecated self-billing fallback, empty by default |
 
+### Shared box — the voice plane has moved to Zeus
+
+The production box now runs the **Zeus full-stack container** (`zeus-freepbx`,
+`ghcr.io/innotelinc/zeus:latest-fullstack`) as the owner of the PBX. Capstone's
+bundled FreePBX (`pbx-freepbx`, the `standalone` compose profile) stays stopped
+rather than deleted, so rolling the plane back is a container swap.
+
+What made that a swap instead of a migration:
+
+| Concern | How it is shared |
+|---|---|
+| Data | Both compose files reference the **same six `pbx-*` volumes** (`pbx-mariadb-data`, `pbx-freepbx-www`, `pbx-asterisk-{config,spool,sounds,logs}`), declared `external: true` in each. Extensions, routes, CDRs, voicemail, ARI/AMI users and the web root never move. |
+| DB credentials | Each image bakes a *random* `AMPDBPASS` at build time while the database outlives images, so `PBX_DB_PASS` in Zeus's `.env` carries the volume's password and `docker-entrypoint-full.sh` reconciles `/etc/freepbx.conf` + the MariaDB grant to it. Without it, `fwconsole` dies with "Access denied for user 'freepbxuser'@'localhost'" while Asterisk keeps running. Unset = fresh volume, image default is correct. |
+| Access paths | Zeus's compose publishes the ports the add-on's docs and proxy hosts already used — `:80` **and** `:8083` for the GUI, plus `5060/udp`, `5061`, `8088`, `8089`, `5038`, `10000`, `10101-10120/udp`. |
+| Dialplan / ARI | Each product's fragments are converged by owner (`--owner zeus` / `--owner capstone`), so `[dograh-inbound]`, the `capstone` append-shared segment and the `[dograh]` ARI user survive a Zeus boot untouched. |
+| Container lookup | `resolve_container()` in `pbx/bootstrap_dograh_route.py` requires the candidate to be **running**, and prefers `zeus-freepbx`; a stopped `pbx-freepbx` no longer shadows the live PBX for the 12 h route-sync timer. |
+| TURN | `coturn` is still the add-on's container but is attached to Zeus's `pbx-net` so the PBX resolves it exactly as it did before. Unifying TURN ownership and the credentials in `rtp_additional.conf` vs Zeus's `TURN_*` is open work. |
+
 ### Capstone owns
 
 | Area | Detail |
@@ -217,6 +235,10 @@ the mailbox — a per-number routing decision owned by the agent config.
 1. **Stand up the shared PBX** from the Zeus deployment and apply *both*
    fragment sets through the per-context converge tool that now owns
    `extensions_custom.conf` — implemented in the Zeus repo as
+   — **DONE on the shared box**: `zeus-freepbx` runs the published
+   `ghcr.io/innotelinc/zeus:latest-fullstack` on the shared `pbx-*` volumes,
+   with the add-on's `standalone` freepbx profile left off (see §2, "Shared
+   box").
    `pbx/asterisk_converge.py` (see G1), already wired into
    `bootstrap-zeus-pbx.sh` with unit tests in CI. On the shared box run it
    once per product: the zeus half via the bootstrap, the capstone half by
