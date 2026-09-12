@@ -144,6 +144,20 @@ services:
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
       BACKEND_API_ENDPOINT: "${BACKEND_API_ENDPOINT:-http://localhost:8000}"
 
+      # ── Authentication ─────────────────────────────────────────────────
+      # 'oidc' = sign in exclusively through Cerulean (Authentik). Local
+      # password routes 404 in this mode — there is deliberately no
+      # break-glass. The client secret is held by the API only.
+      AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
+      AUTHENTIK_POST_LOGIN_REDIRECT: "${AUTHENTIK_POST_LOGIN_REDIRECT:-}"
+      AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
+      AUTHENTIK_ALLOWED_EMAILS: "${AUTHENTIK_ALLOWED_EMAILS:-}"
+      AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-}"
+
       # Host-mode URLs for the bridge services
       DATABASE_URL: "postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@127.0.0.1:5432/postgres"
       REDIS_URL: "redis://:${REDIS_PASSWORD:-redissecret}@127.0.0.1:6379"
