@@ -896,7 +896,21 @@ services:
       - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
       - "8088:8088"                     # Asterisk HTTP / ARI (dograh host-mode)
       - "8089:8089"                     # PJSIP WebSocket (WSS)
-      - "5038:5038"                     # Asterisk AMI
+      # AMI answers on the host LAN IP and nothing else — not 0.0.0.0, not a
+      # docker address (project rule: README → Addressing). Binding it on every
+      # interface is what let public scanners reach 5038 and fill the security
+      # log with RequestBadFormat records.
+      #
+      # The portal dials this same LAN IP (`ASTERISK_AMI_HOST` below), so both
+      # ends of the rule agree: the host masquerades the connection, Asterisk
+      # sees the LAN address, and the [pbxportal] ACL's LAN permit admits it.
+      # Point the portal at a docker address instead and the ACL refuses it.
+      #
+      # On a shared Zeus PBX the port belongs to that stack
+      # (zeus-pbx-platform/docker-compose.full.yml) and needs the same pin —
+      # that file currently publishes it on 0.0.0.0. See docs/operations.md →
+      # "The PBX".
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:5038:5038"  # Asterisk AMI (LAN IP only)
       - "${FREEPBX_WEBMIN_PORT:-10000}:10000" # Webmin admin panel (optional; host port configurable)
       - "${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp" # RTP media (20 ports / 10 active calls)
     environment:
@@ -992,7 +1006,10 @@ services:
       FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
       FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
       AVANTFAX_HOSTNAME: ${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}
-      ASTERISK_AMI_HOST: freepbx
+      # The host LAN IP, not a compose service name: docker addresses do not
+      # resolve correctly for this project, and the [pbxportal] ACL admits the
+      # LAN address the host masquerades this connection to.
+      ASTERISK_AMI_HOST: "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}"
       ASTERISK_AMI_PORT: "5038"
       ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
       ASTERISK_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}

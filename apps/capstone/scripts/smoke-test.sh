@@ -429,10 +429,11 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
   else
     fail "PBX does not publish Webmin on TCP 10000"
   fi
-  # Expected published set: 80, 5038, 5060, 5061, 8088, 8089, 10000/tcp,
-  # 5060/udp, the exact RTP block 10101-10120/udp, and the dedicated
-  # VoIP.ms outbound register port (VOIPMS_REGISTER_PORT, default 5065) —
-  # nothing else on UDP.
+  # Expected published set: 80, 5060, 5061, 8088, 8089, 10000/tcp, 5060/udp,
+  # the exact RTP block 10101-10120/udp, and the dedicated VoIP.ms outbound
+  # register port (VOIPMS_REGISTER_PORT, default 5065) — nothing else on UDP.
+  # AMI (5038) is not part of the off-box set: the compose binds it to the host
+  # LAN IP only, and the portal dials that same address (ASTERISK_AMI_HOST).
   expected_rtp=$(seq 10101 10120 | sed 's/$/\/udp/')
   voipms_port="${VOIPMS_REGISTER_PORT:-5065}/udp"
   actual_rtp=$(grep '/udp$' <<<"$pbx_ports" | grep -v '^5060/udp$' | grep -v "^${voipms_port}$" || true)

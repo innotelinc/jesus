@@ -497,19 +497,38 @@ fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.con
 # get dropped (then unban it) — see the CI job for the exact line.
 ```
 
-**AMI is no longer reachable from anywhere.** `5038` is published on every
-interface, and the image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's AMI
-user — so any address that could reach the port could authenticate against it.
-`pbx/entrypoint-dograh.sh` now narrows `[pbxportal]` to loopback, `172.16/12`
-(the compose bridge) and `10/8`, idempotently, on every boot:
+**AMI answers on the host LAN IP only.** Two independent things keep it that way,
+and only one of them actually stops a client:
 
-```bash
-docker exec pbx-freepbx asterisk -rx "manager show user pbxportal" | tail -5
-#  0:  deny - 0.0.0.0/0.0.0.0
-#  1: allow - 127.0.0.1/255.255.255.255
-#  2: allow - 172.16.0.0/255.240.0.0
-#  3: allow - 10.0.0.0/255.0.0.0
-```
+- **The port binding.** `docker-compose.yml` publishes `5038` on the host LAN IP
+  (`PJSIP_MEDIA_ADDRESS`) — never `0.0.0.0`, never a docker address (project
+  rule: README → Addressing). The portal dials that same LAN IP, so the bind and
+  the target agree. On a shared Zeus PBX the port belongs to that stack
+  (`zeus-pbx-platform/docker-compose.full.yml`), which still publishes it on
+  `0.0.0.0` and needs the same pin.
+- **The AMI ACL.** The image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's
+  AMI user, so any address that could reach the port could also authenticate
+  against it. `pbx/entrypoint-dograh.sh` now narrows `[pbxportal]` to loopback
+  plus this host's LAN subnet, idempotently, on every boot:
+
+  ```bash
+  docker exec pbx-freepbx asterisk -rx "manager show user pbxportal" | tail -3
+  #  0:  deny - 0.0.0.0/0.0.0.0
+  #  1:  allow - 127.0.0.1/255.255.255.255
+  #  2:  allow - 192.168.1.0/255.255.255.0   (PJSIP_LOCAL_NET)
+  ```
+
+  The ACL is the half that decides, and what it decides on is the source
+  address. The portal dials the host LAN IP, the host masquerades that
+  connection, and Asterisk sees the LAN address — which the LAN permit admits.
+  A client that reaches Asterisk by any other route is refused
+  (`SecurityEvent="FailedACL"`). Same user, same secret, opposite outcomes — so
+  check the address a client's packets carry before touching the secret.
+
+  A scanner that clears the ACL — through the router's forward, or the Zeus
+  stack's own binding — lands in the security log as `Service="AMI"` /
+  `RequestType="Action: NONE"` and is banned by the `asterisk-security` jail
+  (see the filter's `RequestBadFormat` entry).
 
 The ordering is load-bearing: Asterisk honours the **last** matching ACL entry,
 so the permits must come *after* the deny. Put them before it and every AMI login

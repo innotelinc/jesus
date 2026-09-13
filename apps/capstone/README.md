@@ -135,16 +135,28 @@ bridge subnet, or `host.docker.internal` is not usable:
   while its bridge is `172.31.0.0/16`) makes Asterisk classify a range that does
   not exist here as on-net, which mangles Contact and SDP.
 * AMI permits were `172.16.0.0/12` + `10.0.0.0/8` to allow a bridge address.
-  They are now loopback plus the LAN subnet, because nothing connects from a
-  docker address any more.
+  They are now loopback plus the LAN subnet: the portal dials the LAN IP, so the
+  connection arrives as the LAN address, and nothing connects from a docker
+  address any more.
 
-Set the LAN IP once — `LAN_IP` / `PJSIP_MEDIA_ADDRESS` — and let the entrypoints
-derive the rest (`PJSIP_LOCAL_NET`, the AMI permit, `DOGRAH_WS_URI`). The same
-rule is documented in the Zeus repo, which owns the shared PBX.
+**The rule, in one line: a service target is this host's LAN IP — no docker IPs,
+no compose service names, no `host.docker.internal`.**
 
-Exceptions, deliberately: `scripts/install-fail2ban.sh` keeps its bridge ranges
-— those are *firewall exemptions*, not service addresses, and dropping them
-lets another stack's bridge AMI probe earn a 48h ban.
+The bind follows the target: if a service is reached at the LAN IP, publish it
+on the LAN IP (`${PJSIP_MEDIA_ADDRESS}:port:port`), never on `0.0.0.0` — that is
+what put AMI in front of public scanners — and not on loopback either, which
+would lock out the LAN client that is the whole reason the port is published.
+
+Set the LAN IP once — `PJSIP_MEDIA_ADDRESS` — and let the entrypoints derive the
+rest (`PJSIP_LOCAL_NET`, the AMI permit, the AMI bind, `DOGRAH_WS_URI`). The
+same rule is documented in the Zeus repo, which owns the shared PBX.
+
+**Enforced, not just documented.** CI's `config-guard` job fails on a
+docker-bridge address in `docker-compose*.yml`, `pbx/`, `scripts/` or
+`.env.example` outside a comment, so one cannot come back in as a target. The
+only deliberate exception is `scripts/install-fail2ban.sh`'s bridge ranges:
+those are *firewall exemptions*, not service addresses, and dropping them lets
+another stack's bridge AMI probe earn a 48h ban.
 
 ## 📚 Documentation
 
