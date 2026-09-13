@@ -15,7 +15,14 @@ dograh_admin_email: "{{ lookup('env', 'DOGRAH_ADMIN_EMAIL') | default('ops@capst
 dograh_admin_password: "{{ lookup('env', 'DOGRAH_ADMIN_PASSWORD') | default('', true) }}"
 dograh_admin_name: "{{ lookup('env', 'DOGRAH_ADMIN_NAME') | default('Capstone Ops', true) }}"
 
-dograh_ari_endpoint: "{{ lookup('env', 'DOGRAH_ARI_ENDPOINT') | default('http://127.0.0.1:8088', true) }}"
+# Service targets are this host's LAN IP — never a docker address and never
+# loopback (README → Addressing). dograh runs in host-network mode, so it *can*
+# reach ARI on 127.0.0.1; the PBX stopped publishing that leg precisely because
+# this default was pointing the only ARI client at it. Keep the two in step: a
+# playbook run PUTs this value on every invocation, so a loopback default here
+# silently reverses the LAN-IP rule on the next run.
+dograh_lan_ip: "{{ lookup('env', 'PJSIP_MEDIA_ADDRESS') | default('192.168.1.46', true) }}"
+dograh_ari_endpoint: "{{ lookup('env', 'DOGRAH_ARI_ENDPOINT') | default('http://' ~ dograh_lan_ip ~ ':8088', true) }}"
 dograh_ari_app_name: "{{ lookup('env', 'DOGRAH_ARI_APP_NAME') | default('dograh', true) }}"
 dograh_ari_password: "{{ lookup('env', 'DOGRAH_ARI_PASSWORD') | default('', true) }}"
 dograh_ws_client_name: "{{ lookup('env', 'DOGRAH_WS_CLIENT_NAME') | default('dograh', true) }}"

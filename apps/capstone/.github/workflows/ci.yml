@@ -214,19 +214,45 @@ jobs:
             fi
           done < <(git ls-files pbx/asterisk)
 
-          # A key that carries a voice-path target holds the LAN IP: empty means
-          # unset, and a ${VAR...} reference is checked where the variable is
-          # defined. Anything else — a service name, localhost, a docker alias —
-          # is exactly the failure this exists to stop.
-          keys='ASTERISK_AMI_HOST|DOGRAH_ARI_HOST|DOGRAH_WS_URI|PJSIP_MEDIA_ADDRESS|PJSIP_STUN_TURN_ADDR|NPM_UPSTREAM_HOST'
+          # A key that carries a voice-path target holds the LAN IP, a reference
+          # to a variable that does (PJSIP_MEDIA_ADDRESS / LAN_IP /
+          # dograh_lan_ip), or nothing at all. Anything else — a service name,
+          # localhost, a docker alias — is exactly the failure this exists to
+          # stop. ansible/group_vars is in scope because it is where the ARI
+          # endpoint is set, and the playbook PUTs that value on every run: a
+          # loopback default there silently reverses the whole rule. The same
+          # goes for DOGRAH_ARI_ENDPOINT, the endpoint dograh's ARI manager
+          # dials.
+          keys='ASTERISK_AMI_HOST|DOGRAH_ARI_HOST|DOGRAH_ARI_ENDPOINT|DOGRAH_WS_URI|PJSIP_MEDIA_ADDRESS|PJSIP_STUN_TURN_ADDR|NPM_UPSTREAM_HOST|dograh_ari_endpoint|dograh_lan_ip'
           while IFS= read -r f; do
             if hits=$(sed 's/#.*//' "$f" \
                         | grep -E "^[[:space:]]*(${keys})[[:space:]]*[:=]" \
                         | sed -E "s/^[[:space:]]*(${keys})[[:space:]]*[:=][[:space:]]*//; s/[\"' ]//g" \
-                        | grep -vE '^\$|^$|192\.168\.'); then
+                        | grep -vE '^\$|^$|192\.168\.|PJSIP_MEDIA_ADDRESS|LAN_IP|dograh_lan_ip'); then
               echo "::error file=$f::voice-path target is not the host LAN IP"
               printf '  %s\n' "$hits"
               bad=1
             fi
-          done < <(git ls-files 'docker-compose*.yml' .env.example)
+          done < <(git ls-files 'docker-compose*.yml' .env.example ansible/group_vars)
+          exit $bad
+
+      # The same rule from the host side: the scripts that probe and configure
+      # the PBX dial the address the services dial. 8088 has no loopback leg any
+      # more, so `127.0.0.1:8088` in a script either reports a healthy PBX as
+      # down (the smoke tests) or writes an unreachable endpoint into dograh's
+      # telephony config (dograh_wire.py). They resolve it instead —
+      # DOGRAH_ARI_ENDPOINT, then DOGRAH_ARI_HOST/PORT, then
+      # PJSIP_MEDIA_ADDRESS, then the route-selected LAN IP. 8089 keeps a
+      # loopback leg and is deliberately not matched.
+      - name: Host-side scripts dial the LAN IP, not loopback
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if hits=$(grep -nE '(127\.0\.0\.1|localhost):8088' "$f"); then
+              echo "::error file=$f::script dials ARI on loopback — 8088 is published on the host LAN IP"
+              echo "$hits"
+              bad=1
+            fi
+          done < <(git ls-files scripts)
           exit $bad

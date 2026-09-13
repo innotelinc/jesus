@@ -14,7 +14,8 @@
 #     • ARI user [dograh] present in `ari show users`
 #     • Asterisk HTTP server ENABLED on 8088 (the entrypoint flips
 #       HTTPENABLED in freepbx_settings so it survives fwconsole reloads)
-#     • host-side ARI REST: GET /ari/asterisk/info with the dograh user → 200
+#     • host-side ARI REST: GET /ari/asterisk/info with the dograh user at the
+#       host LAN IP (8088 is LAN-only — never loopback) → 200
 #
 #   Dialplan
 #     • [dograh-inbound] context has exten 8000 → Stasis(dograh)
@@ -65,6 +66,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/env-lib.sh disable=SC1091
+. "$ROOT/scripts/env-lib.sh"   # env_lib_load: .env as data, never as shell code
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
 BOOT="${1:-boot}"
@@ -86,6 +89,21 @@ warn() { WARN=$((WARN+1)); WARNINGS+=("$*"); printf '%s %s[WARN]%s %s\n' "$(ts)"
 fail() { FAIL=$((FAIL+1)); FAILURES+=("$*"); printf '%s %s[FAIL]%s %s\n' "$(ts)" "$C_RED" "$C_NC" "$*"; }
 skip() { SKIP=$((SKIP+1)); printf '%s %s[SKIP]%s %s\n' "$(ts)" "$C_YELLOW" "$C_NC" "$*"; }
 section() { printf '\n%s=== %s ===%s\n' "$C_BOLD" "$*" "$C_NC"; }
+
+# Host-side ARI REST base. Every probe and originate dials the address the
+# services dial: the host LAN IP (README → Addressing). 8088 has no loopback
+# leg, so a 127.0.0.1 call reports a healthy PBX as down. DOGRAH_ARI_ENDPOINT
+# wins (the value dograh itself dials), then PJSIP_MEDIA_ADDRESS, then the
+# route-selected LAN IP; empty means neither the env nor the host could name one.
+ari_base() {
+  if [[ -n "${DOGRAH_ARI_ENDPOINT:-}" ]]; then printf '%s' "$DOGRAH_ARI_ENDPOINT"; return; fi
+  local host="${PJSIP_MEDIA_ADDRESS:-}"
+  if [[ -z "$host" ]]; then
+    host="$(ip -4 route get 1 2>/dev/null | sed -n 's/.*src \([0-9.]*\).*/\1/p' | head -1)"
+  fi
+  [[ "$host" == "127.0.0.1" ]] && host=""
+  [[ -n "$host" ]] && printf 'http://%s:8088' "$host"
+}
 
 # Resolve the freepbx container dynamically — the container_name is
 # pbx-freepbx, but a daemon hiccup can leave a differently-named container
@@ -130,8 +148,7 @@ fi
 pass "docker daemon reachable"
 
 if [[ -f "$ENV_FILE" ]]; then
-  set -a; # shellcheck disable=SC1090
-  source "$ENV_FILE"; set +a
+  env_lib_load "$ENV_FILE"
   pass ".env loaded"
 else
   warn ".env not found — ARI REST / test-call checks will be skipped (set DOGRAH_ARI_PASSWORD)"
@@ -247,15 +264,18 @@ fi
 # host-side ARI REST (needs the dograh password from .env)
 if [[ -z "${DOGRAH_ARI_PASSWORD:-}" || "$DOGRAH_ARI_PASSWORD" == "CHANGE_ME_ARI_PASSWORD" ]]; then
   skip "ARI REST check — set DOGRAH_ARI_PASSWORD in .env"
+elif [[ -z "$(ari_base)" ]]; then
+  fail "ARI REST check — cannot resolve the host LAN IP (set PJSIP_MEDIA_ADDRESS in .env)"
 else
+  ari_url="$(ari_base)/ari/asterisk/info"
   ari_body=$(mktemp)
   ari_code=$(curl -sS -o "$ari_body" -w '%{http_code}' --max-time 10 \
     -u "dograh:${DOGRAH_ARI_PASSWORD}" \
-    http://127.0.0.1:8088/ari/asterisk/info 2>/dev/null)
+    "$ari_url" 2>/dev/null)
   if [[ "$ari_code" == "200" ]] && grep -q '"version"' "$ari_body"; then
-    pass "ARI REST /ari/asterisk/info → HTTP 200 (Asterisk $(grep -o '"version":"[^"]*"' "$ari_body" | head -1 | cut -d'"' -f4))"
+    pass "ARI REST $ari_url → HTTP 200 (Asterisk $(grep -o '"version":"[^"]*"' "$ari_body" | head -1 | cut -d'"' -f4))"
   else
-    fail "ARI REST /ari/asterisk/info → HTTP '$ari_code' (check DOGRAH_ARI_PASSWORD + port 8088 publish)"
+    fail "ARI REST $ari_url → HTTP '$ari_code' (check DOGRAH_ARI_PASSWORD + the 8088 publish on the LAN IP)"
   fi
   rm -f "$ari_body"
 fi
@@ -325,7 +345,7 @@ if $ASTERISK "ari show apps" 2>/dev/null | grep -q "dograh"; then
   dograh_connected=true
   pass "dograh-api connected to ARI as app 'dograh'"
 else
-  warn "dograh-api is NOT connected to ARI — its telephony configuration (ARI URL http://127.0.0.1:8088, App Name 'dograh', App Password, WS Client Name) must be set in the dograh UI (Telephony Configurations). Until then the full media loop can't run."
+  warn "dograh-api is NOT connected to ARI — its telephony configuration (ARI URL $(ari_base), App Name 'dograh', App Password, WS Client Name) must be set in the dograh UI (Telephony Configurations). Until then the full media loop can't run."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -398,6 +418,8 @@ section "Test call (end-to-end)"
 
 if [[ -z "${DOGRAH_ARI_PASSWORD:-}" || "$DOGRAH_ARI_PASSWORD" == "CHANGE_ME_ARI_PASSWORD" ]]; then
   skip "test call — set DOGRAH_ARI_PASSWORD in .env first"
+elif [[ -z "$(ari_base)" ]]; then
+  skip "test call — cannot resolve the host LAN IP (set PJSIP_MEDIA_ADDRESS in .env)"
 else
   # Lifetime call counter, sampled before/after the test call: a call that
   # never entered the dialplan leaves it unchanged, so it corroborates the
@@ -408,7 +430,7 @@ else
 
   # 1. Originate the call through the dograh inbound path via ARI REST.
   ch_json=$(curl -sS --max-time 15 -u "dograh:${DOGRAH_ARI_PASSWORD}" -X POST \
-    "http://127.0.0.1:8088/ari/channels?endpoint=Local/8000@dograh-inbound&app=${DOGRAH_STASIS_APP_NAME:-dograh}" 2>/dev/null)
+    "$(ari_base)/ari/channels?endpoint=Local/8000@dograh-inbound&app=${DOGRAH_STASIS_APP_NAME:-dograh}" 2>/dev/null)
   ch_id=$(echo "$ch_json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
   if [[ -n "$ch_id" ]]; then
     pass "originated call via ARI REST → channel $ch_id"
@@ -443,7 +465,7 @@ else
   # 4. Hang up.
   if [[ -n "$ch_id" ]]; then
     hc=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -u "dograh:${DOGRAH_ARI_PASSWORD}" \
-      -X DELETE "http://127.0.0.1:8088/ari/channels/$ch_id" 2>/dev/null)
+      -X DELETE "$(ari_base)/ari/channels/$ch_id" 2>/dev/null)
     if [[ "$hc" == "204" || "$hc" == "200" ]]; then
       pass "hung up channel $ch_id (ARI REST DELETE → $hc)"
     else

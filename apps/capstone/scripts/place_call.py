@@ -19,18 +19,18 @@ channel — this injects audio into the exact WS stream STT hears. (Playing on
 the dialed leg produces silence; playing on dograh-ext is the proven path.)
 
 Requires the PBX to be up and dograh connected to ARI, and the loop WAV to be
-present in the PBX sounds dir (see scripts/gen_loops.py).
+present in the PBX sounds dir (see scripts/gen_loops.py). ARI is reached at the
+host LAN IP — 8088 has no loopback leg (README → Addressing).
 """
 
 import argparse
 import base64
 import json
 import os
+import socket
 import sys
 import time
 import urllib.request
-
-ARI_HOST = "http://127.0.0.1:8088/ari"
 
 # Path to the repo root / .env, resolved relative to this script so it works
 # from any cwd.
@@ -38,15 +38,70 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_PATH = os.path.join(REPO_ROOT, ".env")
 
 
+def env_value(key: str, default: str = "") -> str:
+    """Resolve a setting: real env first, then the repo .env, then default."""
+    if os.environ.get(key):
+        return os.environ[key]
+    if os.path.exists(ENV_PATH):
+        for line in open(ENV_PATH):
+            line = line.strip()
+            if line.startswith(f"{key}="):
+                val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    return val
+    return default
+
+
+def detect_lan_ip() -> str:
+    """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
+
+    The address a service dials is the LAN IP — never loopback (README →
+    Addressing).
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))  # picks the default route, sends nothing
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    return ""
+
+
+def ari_base() -> str:
+    """Host-side ARI REST base — the host LAN IP, not loopback.
+
+    8088 is published on the host LAN IP only (README → Addressing): the
+    loopback leg went away once dograh — its last client — started dialling the
+    LAN IP, so a 127.0.0.1 request would fail against a perfectly healthy PBX.
+    DOGRAH_ARI_ENDPOINT wins (the value dograh itself dials), then the shared-PBX
+    override (DOGRAH_ARI_HOST:DOGRAH_ARI_PORT), then PJSIP_MEDIA_ADDRESS, then
+    the route-selected LAN IP.
+    """
+    endpoint = env_value("DOGRAH_ARI_ENDPOINT")
+    if endpoint:
+        return endpoint.rstrip("/") + "/ari"
+    host = env_value("DOGRAH_ARI_HOST") or env_value("PJSIP_MEDIA_ADDRESS") or detect_lan_ip()
+    if not host:
+        sys.exit(
+            "ERROR: cannot resolve the host LAN IP — set PJSIP_MEDIA_ADDRESS "
+            "(or DOGRAH_ARI_ENDPOINT) in .env"
+        )
+    if "://" in host:  # a full URL was supplied
+        return host.rstrip("/") + "/ari"
+    port = env_value("DOGRAH_ARI_PORT", "8088") or "8088"
+    return f"http://{host}:{port}/ari"
+
+
 def ari_password() -> str:
-    """Read DOGRAH_ARI_PASSWORD from the repo .env."""
-    if not os.path.exists(ENV_PATH):
-        sys.exit(f"ERROR: {ENV_PATH} not found")
-    for line in open(ENV_PATH):
-        line = line.strip()
-        if line.startswith("DOGRAH_ARI_PASSWORD="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    sys.exit("ERROR: DOGRAH_ARI_PASSWORD not set in .env")
+    """Read DOGRAH_ARI_PASSWORD from the environment or the repo .env."""
+    password = env_value("DOGRAH_ARI_PASSWORD")
+    if not password:
+        sys.exit(f"ERROR: DOGRAH_ARI_PASSWORD not set (env or {ENV_PATH})")
+    return password
 
 
 def stasis_app_name() -> str:
@@ -56,18 +111,13 @@ def stasis_app_name() -> str:
     to the legacy "dograh" (pre-split configs). The dialplan's Stasis() and
     the originate app must both name this app.
     """
-    if os.path.exists(ENV_PATH):
-        for line in open(ENV_PATH):
-            line = line.strip()
-            if line.startswith("DOGRAH_STASIS_APP_NAME=") and line.split("=", 1)[1].strip():
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "dograh"
+    return env_value("DOGRAH_STASIS_APP_NAME", "dograh")
 
 
 def ari(path: str, method: str = "GET", params: dict | None = None):
     """Call the Asterisk ARI REST endpoint (returns decoded JSON)."""
     auth = base64.b64encode(f"dograh:{ari_password()}".encode()).decode()
-    url = f"{ARI_HOST}{path}"
+    url = f"{ari_base()}{path}"
     if params:
         url += "?" + "&".join(f"{k}={v}" for k, v in params.items())
     req = urllib.request.Request(url, method=method)

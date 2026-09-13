@@ -104,23 +104,56 @@ the credential loop that was pinning a CPU core.
   the LAN IP — no docker IPs, no compose service names, no
   `host.docker.internal`), and stops naming a `LAN_IP` variable that does not
   exist.
-- **ARI and the WSS stop listening on every interface, without breaking
-  host-mode dograh.** `8088`/`8089` were published on `0.0.0.0` too. They are not
-  simply moved to the LAN IP, because the client decides here: `dograh-api` runs
-  `network_mode: host` and connects to ARI at `127.0.0.1:8088` (measured on the
-  live host with `ss`), while the edge proxy and LAN clients use the host LAN IP.
-  Both legs are now published explicitly, so host-mode dograh and the proxy keep
-  working and neither leg lands on the WAN interface. The same pin went into the
-  shared PBX stack (`zeus-pbx-platform/docker-compose.full.yml`, which owns this
-  host's `zeus-freepbx`): `5038` on the LAN IP alone, `8088` on loopback + the
-  LAN IP. That file's edit takes effect when that stack recreates the container.
+- **ARI and the WSS stop listening on every interface.** `8088`/`8089` were
+  published on `0.0.0.0` too, and the client decides what a bind has to serve:
+  `dograh-api` runs `network_mode: host`, so `ss` showed it dialling ARI at
+  `127.0.0.1:8088` while the edge proxy and LAN clients use the host LAN IP.
+  Both legs were published at first, which is the honest answer while a client
+  dials loopback — and then the client moved instead. `dograh`'s stored ARI
+  endpoint is now `http://192.168.1.46:8088`, applied through its own API (the
+  app name and password survive: `preserve_masked_fields` restores the masked
+  secret and an update never mints a new Stasis name, so the dialplan's
+  `dograh_72e590ef66eb` still routes), and its ARI manager picked the change up
+  on the next 60 s tick with no restart. With its last loopback client gone,
+  `8088` is now published **only** on the LAN IP; `8089` keeps its loopback leg
+  because no client has been measured there. `5038` stays LAN-only. The same
+  pins went into the shared PBX stack (`zeus-pbx-platform/docker-compose.full.yml`,
+  which owns this host's `zeus-freepbx`) and take effect when that stack
+  recreates the container.
+- **The ARI endpoint default was the reason that loopback leg had to exist.**
+  `ansible/group_vars/all.yml` shipped `dograh_ari_endpoint` as
+  `http://127.0.0.1:8088` and the playbook PUTs it on every run — so pointing
+  the live config at the LAN IP by hand would have been silently reverted on the
+  next playbook run, and removing the loopback leg would then have broken ARI
+  with no error anywhere. The default is now `http://<dograh_lan_ip>:8088`
+  (`PJSIP_MEDIA_ADDRESS`, then `192.168.1.46`), and `pbx/README.md` stops
+  telling operators to enter loopback in dograh's ARI dialog.
 - **The guard also watches the paths that were still open.** It now fails on the
   docker alias in any fragment Asterisk loads, and on a voice-path key
-  (`ASTERISK_AMI_HOST`, `DOGRAH_ARI_HOST`, `DOGRAH_WS_URI`,
-  `PJSIP_MEDIA_ADDRESS`, `PJSIP_STUN_TURN_ADDR`, `NPM_UPSTREAM_HOST`) whose value
-  is neither empty, nor a `${VAR}` reference, nor a LAN IP — so the next
-  `ASTERISK_AMI_HOST: freepbx` cannot land. `pbx/entrypoint-dograh.sh` stays out
-  of scope on purpose: it is the code that repairs a leftover alias.
+  (`ASTERISK_AMI_HOST`, `DOGRAH_ARI_HOST`, `DOGRAH_ARI_ENDPOINT`,
+  `DOGRAH_WS_URI`, `PJSIP_MEDIA_ADDRESS`, `PJSIP_STUN_TURN_ADDR`,
+  `NPM_UPSTREAM_HOST`) whose value is neither empty, nor a `${VAR}` reference,
+  nor a LAN IP — so the next `ASTERISK_AMI_HOST: freepbx` cannot land.
+  `pbx/entrypoint-dograh.sh` stays out of scope on purpose: it is the code that
+  repairs a leftover alias.
+- **The host-side scripts dial what the services dial.** `place_call.py`,
+  `dograh_wire.py` and both smoke tests still reached ARI at
+  `http://127.0.0.1:8088` — the leg that was just removed — so a healthy PBX
+  would have read as down, and `dograh_wire.py` would have written an
+  unreachable endpoint into dograh's telephony configuration on its next run.
+  They resolve the LAN IP instead: `DOGRAH_ARI_ENDPOINT`, then
+  `DOGRAH_ARI_HOST`/`DOGRAH_ARI_PORT`, then `PJSIP_MEDIA_ADDRESS`, then the
+  route-selected address (`ip -4 route get 1` / the socket convention already
+  used by `npm-proxy-hosts.py`). `config-guard` now fails on `127.0.0.1:8088` /
+  `localhost:8088` anywhere under `scripts/` — 8089 keeps its loopback leg and is
+  deliberately not matched — and the smoke tests probe the URL they report, so a
+  failure names the address it tried. Verified against the live PBX: the LAN IP
+  answers `/ari/asterisk/info` with `200`, the loopback probe gets no connection
+  at all.
+- Docs: `docs/networking.md` §3 splits the host-only ports into a loopback table
+  and a host-LAN-IP table (`8088`/`5038` on the LAN IP; `8089` on both), and
+  `docs/operations.md` records the ARI/AMI bind and the order the smoke tests
+  resolve the endpoint in.
 - Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the
   mechanism, and the verification commands; `.env.example` gains the `F2B_*` knobs.
   `docs/operations.md` also records the Workflows page's **Graded** toggle — the

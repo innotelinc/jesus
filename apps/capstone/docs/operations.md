@@ -110,8 +110,11 @@ variables in `.env`. Setup generates the TURN username/password and points `TURN
 the public base domain. It leaves `TURN_EXTERNAL_IP` **empty**: the coturn image detects
 this host's public address on every start (`detect-external-ip`) and advertises it for
 relayed candidates, so a WAN IP change does not rot the relay. Pin an address only where
-that DNS probe is blocked. Asterisk HTTP/ARI is exposed on `8088`, with the Dograh ARI
-user and inbound dialplan injected during PBX startup.
+that DNS probe is blocked. Asterisk HTTP/ARI is exposed on `8088` at the host LAN IP
+(`${PJSIP_MEDIA_ADDRESS}`) — LAN-only, never loopback and never forwarded, because 8088 has
+no loopback leg and everything that dials ARI (dograh, the edge proxy, the host-side scripts)
+dials the LAN IP. The Dograh ARI user and inbound dialplan are injected during PBX startup.
+The AMI on `5038` follows the same rule.
 
 The PBX is a service in the main compose file, so one command brings up the entire stack:
 
@@ -639,7 +642,9 @@ Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh
 SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when
 `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent
 workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions
-8000/8001/8002 bound to their agents.
+8000/8001/8002 bound to their agents. The ARI checks dial the host LAN IP
+(`DOGRAH_ARI_ENDPOINT`, else `PJSIP_MEDIA_ADDRESS`, else the route-selected address) — 8088 is
+not on loopback, so a loopback probe would report a healthy PBX as down.
 
 ## Live/install USB and offline installation
 

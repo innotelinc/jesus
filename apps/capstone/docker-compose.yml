@@ -174,7 +174,8 @@ services:
       MINIO_PUBLIC_ENDPOINT: "${MINIO_PUBLIC_ENDPOINT:-http://minio:9000}"
 
       # ARI is configured per-organization in the dograh UI (ari_endpoint etc.),
-      # not via env. Point it at http://127.0.0.1:8088 (or the PBX LAN IP).
+      # not via env. Point it at the PBX LAN IP (http://192.168.x.x:8088) — 8088
+      # has no loopback leg (README → Addressing).
       ENABLE_ARI_MANAGER: "true"
       ENABLE_ARI_STASIS: "true"
       ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
@@ -894,14 +895,12 @@ services:
       # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
       # and advertises this port for signaling; forward it on the router too.
       - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
-      # 8088/8089 are dialled two ways, so publish the two addresses that are
-      # actually used instead of every interface: dograh-api runs
-      # `network_mode: host` and connects to ARI at 127.0.0.1:8088, while the
-      # edge proxy and LAN clients use the host LAN IP. The loopback leg keeps
-      # host-mode clients working, the LAN leg is the address the addressing
-      # rule allows (README → Addressing), and neither lands on the WAN
-      # interface.
-      - "127.0.0.1:8088:8088"                            # Asterisk HTTP / ARI (host-mode dograh)
+      # 8088 is dialled at the host LAN IP and nothing else: dograh's ARI
+      # telephony config points there (ansible/group_vars/all.yml, and the live
+      # config was moved to match), as do the edge proxy and LAN clients. The
+      # loopback leg was dropped once dograh — its last client — stopped dialling
+      # 127.0.0.1. 8089 keeps a loopback leg because no client has been measured
+      # on it yet; check `ss -tnp | grep :8089` before narrowing that one.
       - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:8088:8088" # Asterisk HTTP / ARI (LAN + edge proxy)
       - "127.0.0.1:8089:8089"                            # PJSIP WebSocket (WSS, host-mode)
       - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:8089:8089" # PJSIP WebSocket (WSS, LAN + edge proxy)

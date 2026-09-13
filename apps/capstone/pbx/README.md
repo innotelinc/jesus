@@ -143,7 +143,7 @@ the PBX half.
 
 | Field | Value |
 |---|---|
-| ARI Endpoint URL | `http://127.0.0.1:8088` (dograh runs host-mode; same box) |
+| ARI Endpoint URL | `http://<host LAN IP>:8088` — the LAN IP, not loopback (see README → Addressing) |
 | Stasis App Name | `dograh` (section name converged into `ari.conf`) |
 | App Password | `DOGRAH_ARI_PASSWORD` value |
 | WebSocket Client Name | `dograh` (section name in `websocket_client.conf`) |
@@ -289,8 +289,8 @@ asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000, 8001, 8002 �
 asterisk -rx "dialplan show from-internal-custom"  # expect: 8000/8001/8002 → Goto(dograh-inbound,…)
 exit
 
-# From the host (dograh's host-mode view of ARI):
-curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://127.0.0.1:8088/ari/asterisk/info
+# From the host (dograh's view of ARI — the LAN IP; loopback is not published):
+curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://$PJSIP_MEDIA_ADDRESS:8088/ari/asterisk/info
 ```
 
 Place a test call to `8000` (IT), `8001` (DevOps), or `8002` (SQL). Watch
@@ -319,7 +319,7 @@ The PBX publishes these ports (freepbx service in `docker-compose.yml`):
 | 10101-10120 | udp | RTP media | ✅ forward |
 | 8089 | tcp   | PJSIP WSS (WebRTC softphones) | ✅ if using WebRTC |
 | 80   | tcp   | FreePBX web UI | ❌ admin only |
-| 8088 | tcp   | Asterisk HTTP/ARI | ❌ dograh reaches it on loopback |
+| 8088 | tcp   | Asterisk HTTP/ARI | ❌ dograh reaches it on the LAN IP |
 | 5038 | tcp   | AMI | ❌ admin only |
 | 10000 | tcp  | Webmin | ❌ admin only |
 

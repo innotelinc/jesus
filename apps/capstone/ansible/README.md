@@ -112,6 +112,8 @@ playbook writes to `.env` on its first run), then re-run the playbook.
   picks up rotated ARI passwords automatically.
 - **Dograh reconnects on its own** — the ARI manager polls
   `list_active_telephony_configurations_by_provider("ari")` and connects to
-  new/updated configs without a dograh-api restart (observed live: config
-  created → `WebSocket connected to http://127.0.0.1:8088` within seconds,
-  `ari show apps` → `dograh`).
+  new/updated configs without a dograh-api restart (observed live: changing the
+  endpoint → `[ARI Manager] Config 2 changed for org 1, reconnecting...` on its
+  next 60 s tick, no restart, `ari show apps` → `dograh_72e590ef66eb`).
+- **The endpoint is the host LAN IP**, not `127.0.0.1` — see README → Addressing
+  and `dograh_lan_ip` in `group_vars/all.yml`.

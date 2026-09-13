@@ -23,7 +23,8 @@
 #     • freepbx container healthy; n8n-import completed (workflow activated)
 #     • Asterisk: ARI user [dograh], HTTP server on 8088,
 #       res_websocket_client module, [dograh-inbound] dialplan → Stasis(dograh)
-#     • host-side ARI REST: GET /ari/asterisk/info with the dograh user
+#     • host-side ARI REST: GET /ari/asterisk/info with the dograh user at the
+#       host LAN IP (8088 is LAN-only — never loopback)
 #
 # Usage (run from the repo root):
 #   ./scripts/smoke-test.sh            # everything
@@ -36,6 +37,8 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/env-lib.sh disable=SC1091
+. "$ROOT/scripts/env-lib.sh"   # env_lib_load: .env as data, never as shell code
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
 COMPOSE_PBX="$ROOT/docker-compose.yml"  # freepbx is a service in the main compose now
@@ -89,6 +92,21 @@ check_alive() { # name url [curl args...]
   else
     fail "$name → no response ($url)"
   fi
+}
+
+# Host-side ARI REST base. Probes dial the same address the services do: the
+# host LAN IP (README → Addressing). 8088 has no loopback leg, so a 127.0.0.1
+# probe reports a healthy PBX as down. DOGRAH_ARI_ENDPOINT wins (the value
+# dograh itself dials), then PJSIP_MEDIA_ADDRESS, then the route-selected LAN
+# IP; empty means neither the env nor the host could name one.
+ari_base() {
+  if [[ -n "${DOGRAH_ARI_ENDPOINT:-}" ]]; then printf '%s' "$DOGRAH_ARI_ENDPOINT"; return; fi
+  local host="${PJSIP_MEDIA_ADDRESS:-}"
+  if [[ -z "$host" ]]; then
+    host="$(ip -4 route get 1 2>/dev/null | sed -n 's/.*src \([0-9.]*\).*/\1/p' | head -1)"
+  fi
+  [[ "$host" == "127.0.0.1" ]] && host=""
+  [[ -n "$host" ]] && printf 'http://%s:8088' "$host"
 }
 
 # Container health: healthy if the compose healthcheck says so; falls back to
@@ -201,8 +219,7 @@ fi
 pass "docker daemon reachable"
 
 if [[ -f "$ENV_FILE" ]]; then
-  set -a; # shellcheck disable=SC1090
-  source "$ENV_FILE"; set +a
+  env_lib_load "$ENV_FILE"
   pass ".env loaded (${ENV_FILE})"
 else
   warn ".env not found — ARI REST checks will be skipped (set DOGRAH_ARI_PASSWORD)"
@@ -518,15 +535,18 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
   section "PBX stack — host-side ARI REST"
   if [[ -z "${DOGRAH_ARI_PASSWORD:-}" || "$DOGRAH_ARI_PASSWORD" == "CHANGE_ME_ARI_PASSWORD" ]]; then
     skip "ARI REST check — set DOGRAH_ARI_PASSWORD in .env"
+  elif [[ -z "$(ari_base)" ]]; then
+    fail "ARI REST check — cannot resolve the host LAN IP (set PJSIP_MEDIA_ADDRESS in .env)"
   else
+    ari_url="$(ari_base)/ari/asterisk/info"
     ari_body=$(mktemp)
     ari_code=$(curl -sS -o "$ari_body" -w '%{http_code}' --max-time 10 \
       -u "dograh:${DOGRAH_ARI_PASSWORD}" \
-      http://127.0.0.1:8088/ari/asterisk/info 2>/dev/null)
+      "$ari_url" 2>/dev/null)
     if [[ "$ari_code" == "200" ]] && grep -q '"version"' "$ari_body"; then
-      pass "ARI REST /ari/asterisk/info → HTTP 200 (Asterisk $(grep -o '"version":"[^"]*"' "$ari_body" | head -1 | cut -d'"' -f4))"
+      pass "ARI REST $ari_url → HTTP 200 (Asterisk $(grep -o '"version":"[^"]*"' "$ari_body" | head -1 | cut -d'"' -f4))"
     else
-      fail "ARI REST /ari/asterisk/info → HTTP '$ari_code' (check DOGRAH_ARI_PASSWORD + port 8088 publish)"
+      fail "ARI REST $ari_url → HTTP '$ari_code' (check DOGRAH_ARI_PASSWORD + the 8088 publish on the LAN IP)"
     fi
     rm -f "$ari_body"
   fi

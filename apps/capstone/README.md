@@ -144,11 +144,17 @@ no compose service names, no `host.docker.internal`.**
 
 The bind follows the target: a service reached at the LAN IP is published on the
 LAN IP (`${PJSIP_MEDIA_ADDRESS}:port:port`), never on `0.0.0.0` — that is what
-put AMI in front of public scanners. One exception, because the client decides
-it: `dograh-api` runs `network_mode: host` and dials ARI at `127.0.0.1:8088`, so
-8088/8089 carry a loopback leg **as well as** the LAN one. Publish the addresses
-that are actually dialled; check with `ss -tnp | grep :8088` before narrowing
-one.
+put AMI in front of public scanners. Publish the addresses that are actually
+dialled and nothing else: AMI and ARI are LAN-only, while 8089 still carries a
+loopback leg because no client has been measured on it.
+
+Check before narrowing — `ss -tnp | grep :8088` — **and keep the target in
+step.** A port is only reachable at the address its client dials, so a loopback
+leg can be removed the moment the client moves, and not before. The ARI endpoint
+(`ansible/group_vars/all.yml` → `dograh_ari_endpoint`) is exactly that case: it
+defaulted to `http://127.0.0.1:8088` and was the reason the loopback leg existed;
+the playbook PUTs it on every run, so a loopback default there would silently
+reverse this rule and break ARI on the next run.
 
 Set the LAN IP once — `PJSIP_MEDIA_ADDRESS` — and let the entrypoints derive the
 rest (`PJSIP_LOCAL_NET`, the AMI permit, the AMI bind, `DOGRAH_WS_URI`). The
@@ -159,8 +165,11 @@ docker-bridge address used as a *value* in `docker-compose*.yml`, `pbx/`,
 `scripts/` or `.env.example`; on the docker alias in any fragment Asterisk loads;
 and on a voice-path key whose value is neither empty, nor a `${VAR}` reference,
 nor a LAN IP. The keys it holds to that are `ASTERISK_AMI_HOST`,
-`DOGRAH_ARI_HOST`, `DOGRAH_WS_URI`, `PJSIP_MEDIA_ADDRESS`,
-`PJSIP_STUN_TURN_ADDR` and `NPM_UPSTREAM_HOST`.
+`DOGRAH_ARI_HOST`, `DOGRAH_ARI_ENDPOINT`, `DOGRAH_WS_URI`,
+`PJSIP_MEDIA_ADDRESS`, `PJSIP_STUN_TURN_ADDR` and `NPM_UPSTREAM_HOST`. It also
+fails on `127.0.0.1:8088` / `localhost:8088` anywhere under `scripts/`: the
+host-side probes and `dograh_wire.py` must dial the same LAN IP the services
+do, and 8088 has no loopback leg to dial. (8089 keeps one and is not matched.)
 
 The one deliberate exception is `scripts/install-fail2ban.sh`'s bridge ranges:
 those are *firewall exemptions*, not service addresses, and dropping them lets

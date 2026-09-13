@@ -6,8 +6,9 @@ into three tiers:
 1. **Nginx Proxy Manager** — reverse-proxy the web/API surfaces over HTTPS.
 2. **Router port-forward** — raw UDP/TCP for SIP/RTP telephony (and the NPM
    entry itself).
-3. **Loopback only** — credentials-bearing control/DB planes that must never
-   be exposed.
+3. **Host-only** — credentials-bearing control/DB planes that must never be
+   exposed: bound to loopback, or to this host's LAN IP where the service that
+   dials them does (README → Addressing).
 
 The port inventory below is the actual published mapping from
 `docker-compose.yml` (the PBX/Asterisk service lives in the same file).
@@ -71,8 +72,9 @@ ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
 > ⚠️ Only the Asterisk-facing ports need router exposure. Do **not** forward
 > `8088` (ARI), `5038` (AMI), `5432` (postgres), `6379` (redis),
 > `9000`/`9001` (minio), `3301`, `8484`, `5678` — those are
-> credentials-bearing control/DB planes. They stay loopback (or go through
-> NPM with auth, never raw).
+> credentials-bearing control/DB planes. They stay host-only (loopback or this
+> host's LAN IP, per README → Addressing) or go through NPM with auth, never
+> raw.
 
 ### RTP note
 
@@ -84,10 +86,14 @@ range for media.
 
 ---
 
-## 3. Loopback only (no NPM, no router)
+## 3. Host-only (no NPM, no router)
 
-Bound to `127.0.0.1` in compose — reachable only from the host (and dograh,
-which runs in host mode).
+Bound to `127.0.0.1`, or to this host's LAN IP where a service dials it there
+(README → Addressing), and never on `0.0.0.0`. The bind follows the client: a
+port reached at the LAN IP is published on `${PJSIP_MEDIA_ADDRESS}`, because
+that is the address the dialler actually uses.
+
+### Loopback (`127.0.0.1`)
 
 | Port | Service |
 |---|---|
@@ -96,8 +102,6 @@ which runs in host mode).
 | `9000` / `9001` | minio API / console |
 | `8880` | kokoro TTS |
 | `8001` | speaches STT (host `8001` → container `8000`) |
-| `8088` | Asterisk ARI (control plane — never expose) |
-| `5038` | Asterisk AMI (never expose) |
 | `4317` / `4318` | OTel gRPC / HTTP ingest |
 | `8888` / `8889` | otel-collector metrics |
 | `19000` / `8123` | ClickHouse native / HTTP |
@@ -108,6 +112,22 @@ which runs in host mode).
 | `49152–49251` (UDP) | Coturn relay ports |
 | `3000` | pbx-portal (optional, `--profile portal`) |
 | `9000` / `9443` | Cerulean Authentik (SSO — proxy via `auth.<domain>`, do not expose raw) |
+
+Also bound on `127.0.0.1` **in addition to** the LAN IP: `8089` (PJSIP WebSocket
+/ WSS). WebRTC softphones dial the WSS at the LAN IP, and no client has been
+measured on the loopback leg yet, so it stays until one is (`ss -tnp | grep
+:8089`).
+
+### This host's LAN IP (`${PJSIP_MEDIA_ADDRESS}`)
+
+Reached by the services themselves and by the host-side scripts that probe and
+configure the PBX — a loopback probe here reports a healthy PBX as down, since
+nothing listens on `127.0.0.1`.
+
+| Port | Service |
+|---|---|
+| `8088` | Asterisk ARI (control plane — LAN only, never expose) |
+| `5038` | Asterisk AMI (LAN only, never expose) |
 
 ---
 

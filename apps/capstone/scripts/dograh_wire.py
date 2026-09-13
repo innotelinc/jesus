@@ -26,7 +26,7 @@ Environment variables (falls back to --env-file, then defaults):
   DOGRAH_ADMIN_PASSWORD   dograh UI login password (required on first run)
   DOGRAH_ADMIN_NAME       display name             (Capstone Ops)
   DOGRAH_ARI_PASSWORD     ARI app password — MUST match pbx/asterisk/ari.conf
-  DOGRAH_ARI_ENDPOINT     Asterisk ARI URL         (http://127.0.0.1:8088)
+  DOGRAH_ARI_ENDPOINT     Asterisk ARI URL         (http://<host LAN IP>:8088)
   DOGRAH_ARI_APP_NAME     Stasis app name          (dograh)
   DOGRAH_WS_CLIENT_NAME   media WS client name     (dograh)
   DOGRAH_CONFIG_NAME      telephony config name    (Asterisk ARI (dograh))
@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 import time
 import urllib.error
@@ -279,6 +280,46 @@ def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
     return os.environ.get(key) or args.env.get(key) or default
 
 
+def detect_lan_ip() -> str:
+    """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
+
+    The address a service dials is the LAN IP — never loopback (README →
+    Addressing).
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))  # picks the default route, sends nothing
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    return ""
+
+
+def ari_dial_url(args: argparse.Namespace) -> str:
+    """The ARI REST base dograh should dial — the host LAN IP, not loopback.
+
+    8088 is published on the host LAN IP only (README → Addressing), so a
+    loopback endpoint here leaves dograh's ARI manager dialling an address
+    nothing listens on. DOGRAH_ARI_HOST/PORT wins when set (the shared-PBX
+    override), then PJSIP_MEDIA_ADDRESS, then the route-selected LAN IP.
+    """
+    host = (
+        cfg(args, "DOGRAH_ARI_HOST", "")
+        or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+        or detect_lan_ip()
+    )
+    if not host:
+        return ""
+    if "://" in host:  # a full URL was supplied
+        return host.rstrip("/")
+    port = cfg(args, "DOGRAH_ARI_PORT", "") or "8088"
+    return f"http://{host}:{port}"
+
+
 def main() -> int:
     repo = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description=__doc__)
@@ -307,7 +348,14 @@ def main() -> int:
     admin_password = cfg(args, "DOGRAH_ADMIN_PASSWORD", "")
     admin_name = cfg(args, "DOGRAH_ADMIN_NAME", "Capstone Ops")
     ari_password = cfg(args, "DOGRAH_ARI_PASSWORD", "")
-    ari_endpoint = cfg(args, "DOGRAH_ARI_ENDPOINT", "http://127.0.0.1:8088")
+    ari_endpoint = cfg(args, "DOGRAH_ARI_ENDPOINT", "") or ari_dial_url(args)
+    if not ari_endpoint:
+        print(
+            "FAIL cannot resolve the ARI endpoint — set PJSIP_MEDIA_ADDRESS "
+            "(or DOGRAH_ARI_ENDPOINT) in .env; 8088 is LAN-only "
+            "(README → Addressing)"
+        )
+        return 1
     app_name = cfg(args, "DOGRAH_ARI_APP_NAME", "dograh")
     ws_client = cfg(args, "DOGRAH_WS_CLIENT_NAME", "dograh")
     config_name = cfg(args, "DOGRAH_CONFIG_NAME", "Asterisk ARI (dograh)")

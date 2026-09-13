@@ -33,6 +33,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/env-lib.sh disable=SC1091
+. "$REPO/scripts/env-lib.sh"   # env_lib_load: .env as data, never as shell code
 ENV_FILE="$REPO/.env"
 ENV_EXAMPLE="$REPO/.env.example"
 DOGRAH_ADMIN_EMAIL="${DOGRAH_ADMIN_EMAIL:-ops@capstone.example}"
@@ -185,8 +187,9 @@ else
     pass "secrets written — DOGRAH_ARI_PASSWORD, OMNIROUTE passwords, JWT secrets, etc."
 fi
 
-# Load the env for the rest of the script
-set -a; source "$ENV_FILE"; set +a
+# Load the env for the rest of the script (values are data - a password with
+# shell metacharacters can no longer abort the load).
+env_lib_load "$ENV_FILE"
 
 # Guard against pointing dograh's advertised API endpoint at the dograh-ui
 # Next.js port (3010). The UI proxies HTTP /api/v1/* to the backend, but
@@ -267,8 +270,8 @@ seed_var N8N_IMAGE                   "capstone-n8n-otel:local"
 seed_var WORKFLOW_STUDIO_IMAGE       "capstone-workflow-studio:local"
 seed_var DASHBOARD_IMAGE             "capstone-dashboard:local"
 seed_var DASHBOARD_API_IMAGE         "capstone-dashboard-api:local"
-# Re-source so the rest of the script sees the seeded values.
-set -a; source "$ENV_FILE"; set +a
+# Re-load so the rest of the script sees the seeded values.
+env_lib_load "$ENV_FILE"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 2c. dograh platform source

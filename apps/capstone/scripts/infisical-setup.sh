@@ -4,11 +4,10 @@
 # keys) in .env first. Safe to re-run — idempotent.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
+# shellcheck source=scripts/env-lib.sh disable=SC1091
+. ./scripts/env-lib.sh
 if [ -f .env ]; then
-  set -a
-  # shellcheck source=/dev/null
-  . ./.env
-  set +a
+  env_lib_load ./.env
 fi
 COMPOSE_FILES="${COMPOSE_FILES:-docker-compose.yml compose.infisical.yml}"
 # shellcheck disable=SC2086
