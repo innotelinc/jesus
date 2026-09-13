@@ -894,8 +894,17 @@ services:
       # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
       # and advertises this port for signaling; forward it on the router too.
       - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
-      - "8088:8088"                     # Asterisk HTTP / ARI (dograh host-mode)
-      - "8089:8089"                     # PJSIP WebSocket (WSS)
+      # 8088/8089 are dialled two ways, so publish the two addresses that are
+      # actually used instead of every interface: dograh-api runs
+      # `network_mode: host` and connects to ARI at 127.0.0.1:8088, while the
+      # edge proxy and LAN clients use the host LAN IP. The loopback leg keeps
+      # host-mode clients working, the LAN leg is the address the addressing
+      # rule allows (README → Addressing), and neither lands on the WAN
+      # interface.
+      - "127.0.0.1:8088:8088"                            # Asterisk HTTP / ARI (host-mode dograh)
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:8088:8088" # Asterisk HTTP / ARI (LAN + edge proxy)
+      - "127.0.0.1:8089:8089"                            # PJSIP WebSocket (WSS, host-mode)
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:8089:8089" # PJSIP WebSocket (WSS, LAN + edge proxy)
       # AMI answers on the host LAN IP and nothing else — not 0.0.0.0, not a
       # docker address (project rule: README → Addressing). Binding it on every
       # interface is what let public scanners reach 5038 and fill the security

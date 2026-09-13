@@ -142,19 +142,27 @@ bridge subnet, or `host.docker.internal` is not usable:
 **The rule, in one line: a service target is this host's LAN IP — no docker IPs,
 no compose service names, no `host.docker.internal`.**
 
-The bind follows the target: if a service is reached at the LAN IP, publish it
-on the LAN IP (`${PJSIP_MEDIA_ADDRESS}:port:port`), never on `0.0.0.0` — that is
-what put AMI in front of public scanners — and not on loopback either, which
-would lock out the LAN client that is the whole reason the port is published.
+The bind follows the target: a service reached at the LAN IP is published on the
+LAN IP (`${PJSIP_MEDIA_ADDRESS}:port:port`), never on `0.0.0.0` — that is what
+put AMI in front of public scanners. One exception, because the client decides
+it: `dograh-api` runs `network_mode: host` and dials ARI at `127.0.0.1:8088`, so
+8088/8089 carry a loopback leg **as well as** the LAN one. Publish the addresses
+that are actually dialled; check with `ss -tnp | grep :8088` before narrowing
+one.
 
 Set the LAN IP once — `PJSIP_MEDIA_ADDRESS` — and let the entrypoints derive the
 rest (`PJSIP_LOCAL_NET`, the AMI permit, the AMI bind, `DOGRAH_WS_URI`). The
 same rule is documented in the Zeus repo, which owns the shared PBX.
 
 **Enforced, not just documented.** CI's `config-guard` job fails on a
-docker-bridge address in `docker-compose*.yml`, `pbx/`, `scripts/` or
-`.env.example` outside a comment, so one cannot come back in as a target. The
-only deliberate exception is `scripts/install-fail2ban.sh`'s bridge ranges:
+docker-bridge address used as a *value* in `docker-compose*.yml`, `pbx/`,
+`scripts/` or `.env.example`; on the docker alias in any fragment Asterisk loads;
+and on a voice-path key whose value is neither empty, nor a `${VAR}` reference,
+nor a LAN IP. The keys it holds to that are `ASTERISK_AMI_HOST`,
+`DOGRAH_ARI_HOST`, `DOGRAH_WS_URI`, `PJSIP_MEDIA_ADDRESS`,
+`PJSIP_STUN_TURN_ADDR` and `NPM_UPSTREAM_HOST`.
+
+The one deliberate exception is `scripts/install-fail2ban.sh`'s bridge ranges:
 those are *firewall exemptions*, not service addresses, and dropping them lets
 another stack's bridge AMI probe earn a 48h ban.
 
