@@ -189,3 +189,44 @@ jobs:
             fi
           done < <(git ls-files 'docker-compose*.yml' pbx scripts .env.example)
           exit $bad
+
+      # The same rule from the other side: a voice-path target may not be a
+      # docker alias, a loopback name, or a compose service name either — the
+      # address a service dials is the host LAN IP (README → Addressing). Scoped
+      # to the fragments Asterisk itself loads and to the keys that carry a
+      # voice-path target, so the `host.docker.internal` targets other services
+      # keep on purpose (with `extra_hosts: host-gateway`) stay untouched.
+      - name: Voice-path targets are the host LAN IP
+        run: |
+          set -euo pipefail
+          bad=0
+
+          # A fragment Asterisk loads must not name the docker alias: the PBX
+          # container carries no extra_hosts entry, so ast_sockaddr_resolve fails
+          # and STUN/media die silently. `;` is the comment leader in Asterisk
+          # conf files. pbx/entrypoint-dograh.sh is deliberately out of scope —
+          # it is the code that repairs a leftover alias.
+          while IFS= read -r f; do
+            if hits=$(sed 's/;.*//' "$f" | grep -nE 'host\.docker\.internal'); then
+              echo "::error file=$f::docker alias in a fragment Asterisk loads"
+              echo "$hits"
+              bad=1
+            fi
+          done < <(git ls-files pbx/asterisk)
+
+          # A key that carries a voice-path target holds the LAN IP: empty means
+          # unset, and a ${VAR...} reference is checked where the variable is
+          # defined. Anything else — a service name, localhost, a docker alias —
+          # is exactly the failure this exists to stop.
+          keys='ASTERISK_AMI_HOST|DOGRAH_ARI_HOST|DOGRAH_WS_URI|PJSIP_MEDIA_ADDRESS|PJSIP_STUN_TURN_ADDR|NPM_UPSTREAM_HOST'
+          while IFS= read -r f; do
+            if hits=$(sed 's/#.*//' "$f" \
+                        | grep -E "^[[:space:]]*(${keys})[[:space:]]*[:=]" \
+                        | sed -E "s/^[[:space:]]*(${keys})[[:space:]]*[:=][[:space:]]*//; s/[\"' ]//g" \
+                        | grep -vE '^\$|^$|192\.168\.'); then
+              echo "::error file=$f::voice-path target is not the host LAN IP"
+              printf '  %s\n' "$hits"
+              bad=1
+            fi
+          done < <(git ls-files 'docker-compose*.yml' .env.example)
+          exit $bad
