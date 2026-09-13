@@ -21,7 +21,8 @@
 #
 # Env overrides (from the compose .env):
 #   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
-#   DOGRAH_WS_URI        media WebSocket URI (default ws://host.docker.internal:8000/...)
+#   DOGRAH_WS_URI        media WebSocket URI (default ws://<LAN IP>:8000/...;
+#                        host.docker.internal is not resolvable here)
 #   PJSIP_LOCAL_NET      LAN subnet for the pjsip transport local_net (default 192.168.1.0/24)
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -387,6 +388,14 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
   if [ -n "${DOGRAH_WS_URI:-}" ]; then
     sed -i "s|^uri = .*|uri = ${DOGRAH_WS_URI}|" "${DEST}/websocket_client.conf"
     echo ">>> [dograh-ari] websocket_client.conf uri set from DOGRAH_WS_URI"
+  elif grep -q 'host\.docker\.internal' "${DEST}/websocket_client.conf"; then
+    # PROJECT RULE: LAN addresses only. A volume carried over from an older
+    # image can still hold host.docker.internal, which is not resolvable here
+    # (ast_sockaddr_resolve fails on that alias) — repair it to the host LAN IP
+    # rather than leaving a URI whose failure is silent (no audio, empty log).
+    _ws_lan="${PJSIP_MEDIA_ADDRESS:-192.168.1.46}"
+    sed -i "s|host\.docker\.internal|${_ws_lan}|" "${DEST}/websocket_client.conf"
+    echo ">>> [dograh-ari] websocket_client.conf repaired: host.docker.internal -> ${_ws_lan}"
   fi
 fi
 
