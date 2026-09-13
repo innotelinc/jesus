@@ -80,15 +80,21 @@ jobs:
 
   # Cerulean tenant gate: the Authentik group-NAME → tenant-slug matching that
   # decides whether a signed-in user may use the control center at all (the
-  # dashboard's own "no tenant here" gate). Pure stdlib — no FastAPI, no
-  # Authentik, no .env required.
+  # dashboard's own "no tenant here" gate). The tenant gate itself is pure
+  # stdlib, but the same directory holds the route-level API tests, which
+  # import fastapi/httpx and pass over silently in a bare interpreter — 46 of
+  # 230 cases were being skipped here. Installing the module's own requirements
+  # first makes them run instead of skip.
   dashboard-tenant-gate:
     name: Dashboard tenant gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Unit tests for the tenant gate
+      - name: Install dashboard-api dependencies
+        run: python3 -m pip install --quiet -r dashboard-backend/requirements.txt
+
+      - name: Unit tests for the tenant gate + the API routes
         run: python3 -m unittest discover -s dashboard-backend/tests -v
 
   dashboard-build:
