@@ -118,6 +118,34 @@ sudo systemctl enable --now capstone.service
 | Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency tracking |
 | Control Center | `dashboard` (React/nginx) + `dashboard-api` (FastAPI) | Live ops UI |
 
+### Addressing: LAN IPs only, never docker addresses
+
+**Docker addresses do not resolve correctly for this project.** Anything that
+acts as a *service target* — the address one container/service dials to reach
+another — must be this host's LAN IP (`192.168.x.x`). A compose service name, a
+bridge subnet, or `host.docker.internal` is not usable:
+
+* `host.docker.internal` only resolves in containers that carry an
+  `extra_hosts: host.docker.internal:host-gateway` mapping. The PBX container
+  does **not**, so `ast_sockaddr_resolve` fails there and STUN is disabled with
+  no error at all.
+* A media WebSocket URI that cannot resolve fails **silently**: calls connect
+  with no audio and nothing appears in the Asterisk log.
+* A docker subnet recorded as `local_net` (this box carried `172.18.0.0/16`
+  while its bridge is `172.31.0.0/16`) makes Asterisk classify a range that does
+  not exist here as on-net, which mangles Contact and SDP.
+* AMI permits were `172.16.0.0/12` + `10.0.0.0/8` to allow a bridge address.
+  They are now loopback plus the LAN subnet, because nothing connects from a
+  docker address any more.
+
+Set the LAN IP once — `LAN_IP` / `PJSIP_MEDIA_ADDRESS` — and let the entrypoints
+derive the rest (`PJSIP_LOCAL_NET`, the AMI permit, `DOGRAH_WS_URI`). The same
+rule is documented in the Zeus repo, which owns the shared PBX.
+
+Exceptions, deliberately: `scripts/install-fail2ban.sh` keeps its bridge ranges
+— those are *firewall exemptions*, not service addresses, and dropping them
+lets another stack's bridge AMI probe earn a 48h ban.
+
 ## 📚 Documentation
 
 | Document | Covers |

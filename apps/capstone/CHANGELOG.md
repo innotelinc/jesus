@@ -34,10 +34,19 @@ the credential loop that was pinning a CPU core.
 - **Tightened the `[pbxportal]` AMI ACL.** The image shipped
   `permit = 0.0.0.0/0.0.0.0` for the portal's AMI user, so any address that could
   reach 5038 could authenticate against it. `pbx/entrypoint-dograh.sh` now
-  converges it to loopback + `172.16/12` + `10/8` on every boot, idempotently,
+  converges it to loopback + the host's LAN subnet on every boot, idempotently,
   and leaves the other AMI users alone. Order matters here — Asterisk takes the
   **last** matching ACL entry, so the permits have to sit *after* the `deny`;
   placed before it, every login (including the in-stack ones) is refused.
+- **Project rule: LAN addresses only.** Service targets must be this host's LAN
+  IP — docker addresses do not resolve correctly here. The ACL above used to
+  carry `172.16/12` + `10/8` purely to admit a compose-bridge address; both are
+  gone, derived from `PJSIP_LOCAL_NET` / `PJSIP_MEDIA_ADDRESS` instead.
+  `.env.example` no longer ships `host.docker.internal` as the `DOGRAH_WS_URI`
+  default: that alias only resolves in containers carrying an `extra_hosts`
+  mapping, and the PBX is not one of them, so the media WebSocket failed
+  *silently* (calls connect, no audio, nothing in the log). See README →
+  Addressing.
   Verified from both loopback and the compose bridge: **Authentication
   accepted** in each case, with a wildcard source no longer admitted.
 - Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the

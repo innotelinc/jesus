@@ -1268,8 +1268,13 @@ sync_ucp_ami_secret() {
 # The image writes `permit = 0.0.0.0/0.0.0.0` for the portal's AMI user, which
 # means any address that can reach 5038 may authenticate against it (the port is
 # published on every interface, so that is the whole LAN plus anything the
-# router ever forwards). Narrow it to loopback and the private ranges the stack
-# actually connects from.
+# router ever forwards). Narrow it to loopback and the host's own LAN subnet.
+#
+# PROJECT RULE: LAN addresses only. This used to permit 172.16.0.0/12 and
+# 10.0.0.0/8 — docker ranges the stack was reached from when the portal ran on
+# a compose bridge. Both are dead weight now that every service target is the
+# host LAN IP, and 10.0.0.0/8 in particular admitted addresses that exist
+# nowhere on this box.
 #
 # ORDER MATTERS: Asterisk takes the LAST matching ACL entry, so the permits must
 # come AFTER the deny. Putting them before it leaves the deny last and makes
@@ -1279,11 +1284,21 @@ sync_ucp_ami_secret() {
 tighten_ami_acl() {
   local f="${DEST}/manager_custom.conf"
   [ -f "${f}" ] || return 0
-  python3 - "${f}" <<'PYEOF'
+  python3 - "${f}" "${PJSIP_LOCAL_NET:-}" "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}" <<'PYEOF'
 import re, sys
-path = sys.argv[1]
+path, want, lan_ip = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(path).read()
-perms = ["127.0.0.1/255.255.255.255", "172.16.0.0/255.240.0.0", "10.0.0.0/255.0.0.0"]
+perms = ["127.0.0.1/255.255.255.255"]
+# Asterisk wants net/mask, the env carries CIDR; derive it from the LAN IP when
+# the subnet was not pinned explicitly.
+cidr = want or (lan_ip.rsplit(".", 1)[0] + ".0/24")
+try:
+    net, _, plen = cidr.partition("/")
+    plen = int(plen or 24)
+    m = (0xFFFFFFFF << (32 - plen)) & 0xFFFFFFFF
+    perms.append("%s/%d.%d.%d.%d" % (net, m >> 24 & 255, m >> 16 & 255, m >> 8 & 255, m & 255))
+except ValueError:
+    pass
 m = re.search(r"(\[pbxportal\]\n)(.*?)(?=\n\[|\Z)", text, re.S)
 if not m:
     sys.exit(0)
@@ -1295,7 +1310,7 @@ body += ["permit = " + p for p in perms]
 new = m.group(1) + "\n".join(body) + "\n"
 if new != m.group(0):
     open(path, "w").write(text[:m.start()] + new + text[m.end():])
-    print(">>> [dograh-ari] [pbxportal] AMI permit narrowed to loopback + private ranges")
+    print(">>> [dograh-ari] [pbxportal] AMI permit narrowed to loopback + " + ", ".join(perms[1:]))
 PYEOF
   asterisk -rx "manager reload" >/dev/null 2>&1 || true
 }
