@@ -136,6 +136,10 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
     {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 3301,  "websocket": True,  "name": "SigNoz"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
+    # subscribe.<domain> → the shared Innotel subscribe portal (one nginx on
+    # :3040 that picks the page by Host header). Public by design — pricing and
+    # checkout are public; no Authentik gate on the subscribe pages.
+    {"key": "subscribe", "sub": "subscribe", "scheme": "http",  "port": 3040,  "websocket": False, "name": "Subscribe portal (pricing / checkout)", "forward_auth": False},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
 
