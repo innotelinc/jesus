@@ -3,10 +3,15 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
-## Unreleased — SIP registration bans + a PBX that stops burning a core
+## v3.20 — SIP registration bans, a PBX that stops burning a core, and a backup for the host move
+
+Work landed after the `v3.19` tag: host-side SIP registration bans for a PBX
+that is scanned continuously, and a data-layer backup for the next host move.
+
+### SIP registration bans + a PBX that stops burning a core
 
 The PBX is scanned continuously and rejects thousands of messages a day, none of
-which it can act on itself. This release installs host-side **fail2ban** and fixes
+which it can act on itself. This work installs host-side **fail2ban** and fixes
 the credential loop that was pinning a CPU core.
 
 - **`scripts/install-fail2ban.sh`** (host, idempotent, `--status` / `--dry-run` /
@@ -18,10 +23,37 @@ the credential loop that was pinning a CPU core.
 - **Bans land in `DOCKER-USER`**, not `INPUT`: published ports are DNAT'd to the
   container and traverse FORWARD, so a stock ban would never see the packets.
   The action inserts only when absent, so two jails on one address leave one rule.
-- **Filters provably catch the real traffic** — `asterisk-registration` matched
-  **37/37** captured attack lines with 0 missed, and an injected rejected
-  `REGISTER` was banned, verified in `DOCKER-USER`, and unbanned cleanly (3 s
-  end-to-end).
+- **Filters provably catch the real traffic** — re-verified against the live
+  logs: `asterisk-registration` matched **122/122** rejected-request lines with 0
+  missed (77 `Failed to authenticate` + 45 `No matching endpoint found`, out of
+  28,409 lines) and `asterisk-security` matched **212/212** bannable events. The
+  events of a *healthy* phone (`ChallengeSent`, `SuccessfulAuth`) match neither
+  filter. An injected rejected `REGISTER` was banned, verified in `DOCKER-USER`,
+  and unbanned cleanly (3 s end-to-end).
+- **Fixed: public AMI probes were logged and left unbanned.**
+  `RequestBadFormat` was in neither filter's event list, so a scanner that
+  reached the published 5038 and sent garbage (`Service="AMI"`,
+  `RequestType="Action: NONE"`) produced a security record and nothing else.
+  The event is now bannable, and it is safe to ban on: the ACL on **every** AMI
+  user admits only loopback and the LAN, so no legitimate peer can send a
+  malformed request — three addresses (`185.233.247.245`, `172.236.228.202`,
+  `172.236.228.245`) had sent ten such records unnoticed. `asterisk-security`
+  went 202 → 212 matches on the live security log, with the two legitimate
+  events still unmatched.
+- **Fixed: the route sync exec'd into a stopped PBX.** On a shared Zeus box the
+  hand-off leaves both containers on the host — `zeus-freepbx` running, the
+  bundled `pbx-freepbx` stopped rather than deleted, so rolling the voice plane
+  back is a container start. `resolve_container()` only checked that a container
+  *existed*, so it kept returning the stopped one and every `docker exec` in the
+  sync — and the 12 h timer that runs it — failed against a PBX that was
+  perfectly healthy. It now requires the candidate to be running, prefers the
+  Zeus container, and falls back to any running name mentioning `freepbx`
+  (rename / daemon hiccup); six unit tests cover the hand-off, the standalone
+  case, the rename fallback and the nothing-running case.
+- **dograh can sign in through Cerulean alone.** `AUTH_PROVIDER=oidc` plus the
+  `AUTHENTIK_*` settings come from the host `.env` and are passed through to
+  dograh-api, so SSO is the only way in and the local password routes 404. The
+  defaults keep a plain-local deployment unchanged.
 - **Asterisk writes its security channel** through
   `logger_logfiles_custom.conf`, an include FreePBX keeps across Apply Config,
   surfaced on the new `asterisk-logs` volume.
@@ -47,10 +79,39 @@ the credential loop that was pinning a CPU core.
   mapping, and the PBX is not one of them, so the media WebSocket failed
   *silently* (calls connect, no audio, nothing in the log). See README →
   Addressing.
-  Verified from both loopback and the compose bridge: **Authentication
-  accepted** in each case, with a wildcard source no longer admitted.
+  Verified on this host with one credential after the change: the portal's own
+  path — the host LAN IP, where the host masquerades the connection so Asterisk
+  sees the LAN address — is admitted by the LAN permit, while a client that
+  reaches Asterisk by any other route is refused
+  (`SecurityEvent="FailedACL"`). Same user, same secret, opposite outcomes. A
+  wildcard source is no longer admitted at all.
+- **AMI answers on the LAN IP only, and the portal dials the LAN IP.** The
+  compose published `5038` on every interface while the portal dialled the PBX
+  by its compose service name, so the port sat on the WAN interface and the
+  target ignored the addressing rule. That is also why the standalone portal
+  would have broken on its next reconnect once the ACL narrowed: a bridge-source
+  dial (`freepbx:5038`) is exactly what the new ACL refuses, while the LAN IP it
+  now dials arrives as the LAN address the permit admits. Both ends are the host
+  LAN IP (`PJSIP_MEDIA_ADDRESS`) — the bind and `ASTERISK_AMI_HOST`. On a shared
+  Zeus PBX the port belongs to that stack
+  (`zeus-pbx-platform/docker-compose.full.yml`), which still publishes it on
+  `0.0.0.0` and needs the same pin.
+- **The rule is enforced, not just written down.** CI's `config-guard` job now
+  fails on a docker-bridge address used as a *value* in
+  `docker-compose*.yml`, `pbx/`, `scripts/` or `.env.example`; comments and
+  CIDR ranges are exempt, so `install-fail2ban.sh`'s deliberate firewall
+  exemptions stay. README → Addressing states the rule in one line (targets are
+  the LAN IP — no docker IPs, no compose service names, no
+  `host.docker.internal`), and stops naming a `LAN_IP` variable that does not
+  exist.
 - Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the
   mechanism, and the verification commands; `.env.example` gains the `F2B_*` knobs.
+  `docs/operations.md` also records the Workflows page's **Graded** toggle — the
+  LLM-written plan, the Plan/Regenerate actions, the `payload_template` the plan
+  lives on, and the API behind it — and the VoIP.ms registration failure whose
+  every symptom points at the PBX but whose cause is the router's own static UDP
+  5060 forward colliding with Asterisk's outbound source port, with the capture
+  commands that tell the two apart.
 - Docs: `docs/zeus-integration.md` §3.1 records the shared **RTP plane** — Zeus
   owns it and the Zeus repo now carries the same `rtp_custom.conf` fragment, the
   same env names (`FREEPBX_RTP_PORT_START/END`, `PJSIP_STUN_TURN_ADDR`,
@@ -59,7 +120,7 @@ the credential loop that was pinning a CPU core.
   identically (and the add-on publishes no RTP of its own). `pbx/README.md`
   cross-references it.
 
-## Unreleased — `scripts/backup-capstone.sh`: DB + config backup for a host move
+### `scripts/backup-capstone.sh` — DB + config backup for a host move
 
 Moving the stack to another server needs the data layer, not the images. The
 new `scripts/backup-capstone.sh` captures exactly that into
@@ -79,46 +140,28 @@ new `scripts/backup-capstone.sh` captures exactly that into
 Idempotent and re-runnable: `CAPSTONE_BACKUP_DIR=... bash scripts/backup-capstone.sh`,
 or `SKIP_TARBALL=1` to leave just the directory.
 
-## v3.18 — Stack access is visible (and reviewable) from the Control Center
+- **Fixed: the first cut of this script never got past the SigNoz dump.** CI went
+  red on the backup job, and the failure was real: the newline after the dump was
+  missing, so `log` was parsed as extra operands to `gzip`, the dump was written
+  0 bytes, `gzip` exited 1 and `set -e` aborted before the volumes, bundle,
+  manifest and tarball. Reproduced in isolation (0-byte file, exit 1), then
+  verified by a real run into a scratch dir: 9.0K dump, `gzip -t` OK, 81/81
+  checksums verify. The `A && B || C` pairs are now `if`/`else` (SC2015) and
+  `--skip-tarball` no longer returns 1 under `set -e`.
+- **Fixed: the Magnate gate harness stubbed dograh without its telephony-config
+  route**, so resolving the Stasis app 404'd and four of seven gate scenarios
+  failed. The route is stubbed, and a scenario now pins the guard itself: when
+  dograh cannot report the app, the sync must refuse to write routes instead of
+  registering an app no ARI client names. Gate harness: **8/8**.
 
-Release `v3.18` makes the Cerulean Authentik access model inspectable: an
-operator can now see which stack each identity can reach and whether that
-stack is actually gated, without opening the Authentik admin UI.
+## v3.19 — Grading you can choose, calls that can run long
 
-Highlights of v3.18:
+Release `v3.19` hands the operator control of grading: which workflows are
+graded, what they are graded against, and how long a call is allowed to run. The
+five-minute interview cut-off was a dograh default nobody had configured, and
+the rubric behind every report is now a plan built from the workflow's own
+prompts instead of a fixed list inside the grader.
 
-- **`--access-report` on `scripts/authentik_bootstrap.py`**: a read-only review
-  table of every stack (applications, how many are gated, members) plus a
-  user × stack reachability matrix, the tiles-only applications that have no
-  login flow to gate, and a warning listing any provider-backed application
-  that is still open to every authenticated user.
-- **Health page → "Stack SSO & access" panel**: the Control Center now renders
-  the same inventory (summary chips, per-stack gated counts and members, the
-  identity × stack matrix, and a banner for anything ungated). Backed by a new
-  session-gated `GET /authentik/access` endpoint and a dependency-free
-  `app/stack_access.py` module that derives the stack list from
-  `Application.group` (so it cannot drift from the live data), aggregates
-  reachability with one `?for_user=` call per identity, and caches for 60s.
-  The admin token stays server-side; the browser only sees the aggregate.
-- **`capstone.service` installable again**: the unit shipped a hard-coded
-  `WorkingDirectory=/usr/src/projects/capstone`, so on any host where the repo
-  lived elsewhere systemd could not start the stack. It now uses the
-  `/PATH/TO/CAPSTONE` placeholder `scripts/install-capstone.sh` rewrites (the
-  same convention as `capstone-pbx-sync.service`).
-- **Interview reports can be deleted — and brought back — from the Control
-  Center**: the Interview Reports page can now drop graded rows (per-row
-  **Delete**, checkboxes with **Delete selected (n)**, and **Delete all shown**,
-  which honours the active track/search filter), and the overview page's
-  latest-reports list has its own **Delete**. Deleting is a *soft* delete: it
-  sets a new `Deleted` flag on the Grist row (`scripts/grist_bootstrap.py` owns
-  the column — re-run it to add it to an existing doc), so the page offers an
-  **Undo** right after, and a **Show deleted** view with **Restore** and
-  **Delete permanently** (the only path that removes a row for good). Backed by
-  session-gated routes — `GET /interviews/reports?includeDeleted=1`,
-  `DELETE /interviews/reports/<id>`, `POST /interviews/reports/{delete,restore,
-  purge}` — over a PATCH of the flag / `POST .../records/delete` in Grist; an
-  empty or stale selection is a no-op, and a Grist failure surfaces as 502
-  instead of a silent success.
 - **Grader webhook tolerates liveness probes**: `scripts/smoke-test.sh` proves
   `/webhook/interview-graded` is registered by POSTing an empty `{}` body, which
   made the grader's fetch node fail on an undefined `transcript_url` and left a
@@ -172,6 +215,47 @@ Highlights of v3.18:
   limit; empty = the deployment default). `GET/PUT /workflows/<id>` now surface
   `maxCallDuration`, validated against the deployment ceiling
   (`MAX_CALL_DURATION_SECONDS`) with a clear 422 instead of dograh's 400.
+
+## v3.18 — Stack access is visible (and reviewable) from the Control Center
+
+Release `v3.18` makes the Cerulean Authentik access model inspectable: an
+operator can now see which stack each identity can reach and whether that
+stack is actually gated, without opening the Authentik admin UI.
+
+Highlights of v3.18:
+
+- **`--access-report` on `scripts/authentik_bootstrap.py`**: a read-only review
+  table of every stack (applications, how many are gated, members) plus a
+  user × stack reachability matrix, the tiles-only applications that have no
+  login flow to gate, and a warning listing any provider-backed application
+  that is still open to every authenticated user.
+- **Health page → "Stack SSO & access" panel**: the Control Center now renders
+  the same inventory (summary chips, per-stack gated counts and members, the
+  identity × stack matrix, and a banner for anything ungated). Backed by a new
+  session-gated `GET /authentik/access` endpoint and a dependency-free
+  `app/stack_access.py` module that derives the stack list from
+  `Application.group` (so it cannot drift from the live data), aggregates
+  reachability with one `?for_user=` call per identity, and caches for 60s.
+  The admin token stays server-side; the browser only sees the aggregate.
+- **`capstone.service` installable again**: the unit shipped a hard-coded
+  `WorkingDirectory=/usr/src/projects/capstone`, so on any host where the repo
+  lived elsewhere systemd could not start the stack. It now uses the
+  `/PATH/TO/CAPSTONE` placeholder `scripts/install-capstone.sh` rewrites (the
+  same convention as `capstone-pbx-sync.service`).
+- **Interview reports can be deleted — and brought back — from the Control
+  Center**: the Interview Reports page can now drop graded rows (per-row
+  **Delete**, checkboxes with **Delete selected (n)**, and **Delete all shown**,
+  which honours the active track/search filter), and the overview page's
+  latest-reports list has its own **Delete**. Deleting is a *soft* delete: it
+  sets a new `Deleted` flag on the Grist row (`scripts/grist_bootstrap.py` owns
+  the column — re-run it to add it to an existing doc), so the page offers an
+  **Undo** right after, and a **Show deleted** view with **Restore** and
+  **Delete permanently** (the only path that removes a row for good). Backed by
+  session-gated routes — `GET /interviews/reports?includeDeleted=1`,
+  `DELETE /interviews/reports/<id>`, `POST /interviews/reports/{delete,restore,
+  purge}` — over a PATCH of the flag / `POST .../records/delete` in Grist; an
+  empty or stale selection is a no-op, and a Grist failure surfaces as 502
+  instead of a silent success.
 
 ## v3.17 — Stack access enforced + PBX sync on a 12-hour reconciliation
 
