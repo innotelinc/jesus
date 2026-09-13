@@ -149,6 +149,40 @@ registrations"` (state `Registered`).
 The entrypoint also creates the **FreePBX outbound route** (`voipms` trunk, Connectivity →
 Outbound Routes) so internal extensions can dial out through the trunk automatically.
 
+### The trunk sits at `Rejected` and nothing is logged: check the router's UDP 5060 forward
+
+A static **UDP 5060 port-forward on the router collides with the PBX's own outbound SIP**,
+because both want source port 5060. The router remaps the PBX's REGISTER to a different
+source port, the provider's reply comes back for a mapping that no longer matches, and it
+is dropped before it ever reaches this host. Asterisk then retransmits into the void and the
+registration times out — no error, no reply, nothing in the log beyond
+`Registration timed out.`
+
+Confirm it before touching any PBX config: capture everything from the provider, not just
+port 5060 — a mis-ported reply is invisible to a port filter.
+
+```bash
+tcpdump -n -nn -i eth0 'host newyork1.voip.ms' &
+docker exec pbx-freepbx asterisk -rx 'pjsip send unregister voipms-reg'
+docker exec pbx-freepbx asterisk -rx 'pjsip send register voipms-reg'
+```
+
+Nothing inbound at all ⇒ the router is eating it. To prove the path itself is fine, send an
+OPTIONS from any *other* source port:
+
+```bash
+python3 -c "import socket;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('0.0.0.0',5070));s.settimeout(5);\\
+s.sendto(b'OPTIONS sip:newyork1.voip.ms SIP/2.0\\r\\nVia: SIP/2.0/UDP 0.0.0.0:5070;branch=z9hG4bKx;rport\\r\\nFrom: <sip:p@x>;tag=1\\r\\nTo: <sip:newyork1.voip.ms>\\r\\nCall-ID: p1\\r\\nCSeq: 1 OPTIONS\\r\\nMax-Forwards: 70\\r\\nContent-Length: 0\\r\\n\\r\\n',('208.100.60.66',5060));print(s.recvfrom(4096)[0].splitlines()[0])"
+```
+
+A `SIP/2.0 200 OK` in ~25 ms proves the provider and the WAN path are healthy and that only
+the 5060 source port is affected. **Remove the UDP 5060 port-forward** and let inbound ride
+the registration's own NAT mapping — `qualify_frequency=60` keeps it warm. Registration then
+completes the normal `REGISTER → 401 → REGISTER(auth) → 200 OK` exchange and
+`pjsip show registrations` reports `Registered`. Do **not** work around it by registering from
+a different local port: the provider is reached on 5060, the router forwards 5060, and a
+dedicated transport only moves the problem to the inbound path.
+
 ### Auto-mapped agents in FreePBX (dograh UI → inbound routes + extensions)
 
 Every phone number registered on dograh (the shipped agents plus anything you add later in
