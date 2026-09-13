@@ -104,6 +104,23 @@ the credential loop that was pinning a CPU core.
   the LAN IP — no docker IPs, no compose service names, no
   `host.docker.internal`), and stops naming a `LAN_IP` variable that does not
   exist.
+- **ARI and the WSS stop listening on every interface, without breaking
+  host-mode dograh.** `8088`/`8089` were published on `0.0.0.0` too. They are not
+  simply moved to the LAN IP, because the client decides here: `dograh-api` runs
+  `network_mode: host` and connects to ARI at `127.0.0.1:8088` (measured on the
+  live host with `ss`), while the edge proxy and LAN clients use the host LAN IP.
+  Both legs are now published explicitly, so host-mode dograh and the proxy keep
+  working and neither leg lands on the WAN interface. The same pin went into the
+  shared PBX stack (`zeus-pbx-platform/docker-compose.full.yml`, which owns this
+  host's `zeus-freepbx`): `5038` on the LAN IP alone, `8088` on loopback + the
+  LAN IP. That file's edit takes effect when that stack recreates the container.
+- **The guard also watches the paths that were still open.** It now fails on the
+  docker alias in any fragment Asterisk loads, and on a voice-path key
+  (`ASTERISK_AMI_HOST`, `DOGRAH_ARI_HOST`, `DOGRAH_WS_URI`,
+  `PJSIP_MEDIA_ADDRESS`, `PJSIP_STUN_TURN_ADDR`, `NPM_UPSTREAM_HOST`) whose value
+  is neither empty, nor a `${VAR}` reference, nor a LAN IP — so the next
+  `ASTERISK_AMI_HOST: freepbx` cannot land. `pbx/entrypoint-dograh.sh` stays out
+  of scope on purpose: it is the code that repairs a leftover alias.
 - Docs: `pbx/README.md` and `docs/operations.md` describe the policy, the
   mechanism, and the verification commands; `.env.example` gains the `F2B_*` knobs.
   `docs/operations.md` also records the Workflows page's **Graded** toggle — the
