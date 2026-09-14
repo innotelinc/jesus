@@ -117,15 +117,20 @@ export function EmailHoverActions({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeTagPicker();
     };
-    // The anchor moves with the list, so scrolling dismisses rather than chases it.
+    // The anchor moves with the list, so scrolling dismisses rather than chases
+    // it - but the picker's own tag list scrolls too, and that must not close it.
+    const onScroll = (event: Event) => {
+      if (pickerRef.current?.contains(event.target as Node)) return;
+      closeTagPicker();
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", closeTagPicker, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", closeTagPicker);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", closeTagPicker, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", closeTagPicker);
     };
   }, [tagPickerPos, closeTagPicker]);
@@ -234,7 +239,8 @@ export function EmailHoverActions({
           <div
             ref={pickerRef}
             data-testid="hover-tag-picker"
-            className="fixed z-50 w-56 max-w-[18rem] max-h-[20rem] overflow-y-auto rounded-lg border border-border bg-popover py-1 shadow-lg"
+            role="menu"
+            className="fixed z-50 w-56 max-w-[18rem] rounded-lg border border-border bg-popover py-1 shadow-lg"
             style={{ top: tagPickerPos.top, left: tagPickerPos.left }}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.stopPropagation()}
