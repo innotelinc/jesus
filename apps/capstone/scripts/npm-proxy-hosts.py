@@ -153,6 +153,35 @@ HOSTS: list[dict[str, Any]] = [
 ]
 
 
+# ── Media (recordings / transcripts) ────────────────────────────────────
+# Call recordings and transcripts live in MinIO, and the API hands the browser
+# URLs of the form MINIO_PUBLIC_ENDPOINT + /<bucket>/<key> — i.e.
+# https://<app host>/voice-audio/recordings/<id>.wav. Those URLs are unsigned
+# (the bucket is anonymous-read by design: services/filesystem/minio.py returns
+# `{public_endpoint}/{bucket}/{key}` and never signs), so the only thing they
+# need is to be routable: MinIO is published LAN-only and the edge is remote,
+# so each app origin proxies that one prefix to it.
+#
+# Reads only. The vendor's own deployment forwards the whole prefix, but this
+# bucket grants anonymous GetObject *and* PutObject, and the route is public —
+# so writes are refused here rather than left open on the internet. OPTIONS
+# stays allowed because the transcript is fetched with fetch(), which is
+# CORS-restricted when the UI is opened on a different one of the app hosts.
+MEDIA_PATH = "/voice-audio"
+MEDIA_PORT = 9200
+MEDIA_LOCATION_ADVANCED = "limit_except GET HEAD OPTIONS { deny all; }"
+
+
+def media_location(upstream: str) -> dict[str, Any]:
+    return {
+        "path": MEDIA_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": MEDIA_PORT,
+        "advanced_config": MEDIA_LOCATION_ADVANCED,
+    }
+
+
 def detect_lan_ip() -> str:
     """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
 
@@ -377,7 +406,7 @@ def build_payload(domain: str, h: dict, forward_host: str,
         "access_list_id": "0",
         "advanced_config": auth_snippet,
         "meta": {"letsencrypt_agree": False, "dns_challenge": False},
-        "locations": [],
+        "locations": h.get("locations", []),
         "hsts_enabled": False,
         "hsts_subdomains": False,
         "http2_support": True,
@@ -471,6 +500,37 @@ PUT_ALLOWED_KEYS = (
 )
 
 
+# A custom location NPM echoes back carries read-only fields (id, timestamps)
+# and NPM normalises whitespace, so a diff compares only the keys we manage and
+# canonicalises the two values that legitimately round-trip differently: the
+# path (leading/trailing slashes) and the advanced_config text.
+LOCATION_MANAGED_KEYS = (
+    "path",
+    "forward_scheme",
+    "forward_host",
+    "forward_port",
+    "advanced_config",
+)
+
+
+def normalize_locations(locations: Any) -> list[dict]:
+    out: list[dict] = []
+    for loc in locations or []:
+        if not isinstance(loc, dict):
+            continue
+        norm = {k: loc.get(k) for k in LOCATION_MANAGED_KEYS}
+        norm["forward_port"] = int(norm["forward_port"] or 0)
+        path = (norm["path"] or "").strip().strip("/")
+        norm["path"] = f"/{path}" if path else "/"
+        norm["advanced_config"] = "\n".join(
+            line.strip()
+            for line in (norm["advanced_config"] or "").splitlines()
+            if line.strip()
+        )
+        out.append(norm)
+    return sorted(out, key=lambda x: x["path"])
+
+
 def build_update_payload(existing: dict, want: dict) -> dict:
     """Existing host fields we preserve, overridden by our desired state."""
     payload = {k: existing[k] for k in PUT_ALLOWED_KEYS if k in existing}
@@ -498,6 +558,7 @@ def desired(domain: str, h: dict, forward_host: str,
         "certificate_id": cert_id if cert_id else None,  # NPM wants null, not 0
         "enabled": True,
         "advanced_config": auth_snippet,
+        "locations": h.get("locations", []),
     }
 
 
@@ -567,6 +628,13 @@ def main() -> int:
         optional = {"portal"}
 
     hosts = [dict(h) for h in HOSTS]
+    # Every origin that serves the app also serves its media prefix: the API's
+    # MINIO_PUBLIC_ENDPOINT is one of them (PUBLIC_BASE_URL = dograh.<domain>),
+    # and the others are the same UI under a different name, so a recording URL
+    # resolves whichever one the operator opened.
+    for h in hosts:
+        if h["key"] in {"apex", "app", "dograh"}:
+            h.setdefault("locations", [media_location(upstream)])
     if args.ws_scheme is not None or args.ws_port is not None:
         for h in hosts:
             if h["key"] == "voice":
@@ -698,6 +766,8 @@ def main() -> int:
                 cur, v = int(cur or 0), int(v or 0)
             elif k == "domain_names":
                 cur, v = sorted(cur or []), sorted(v)
+            elif k == "locations":
+                cur, v = normalize_locations(cur), normalize_locations(v)
             if cur != v:
                 diffs.append(k)
 

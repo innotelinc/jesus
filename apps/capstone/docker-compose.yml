@@ -107,6 +107,12 @@ services:
     ports:
       - "127.0.0.1:9200:9000"   # loopback only; 9000 on the host is Cerulean Authentik
       - "127.0.0.1:9201:9001"
+      # Also reachable on the LAN plane (same convention as the Asterisk ports
+      # below). The remote NPM edge serves /voice-audio out of this bucket —
+      # browsers fetch recordings/transcripts straight from MinIO through that
+      # route — and the edge can only reach the host's LAN address, never its
+      # loopback. See npm-proxy-hosts.py MEDIA_* and MINIO_PUBLIC_ENDPOINT.
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:9200:9000"
     volumes:
       - minio-data:/data
     healthcheck:

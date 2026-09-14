@@ -9,6 +9,10 @@
 #       grist, postgres, redis, minio, SigNoz + ClickHouse)
 #     • HTTP endpoints: kokoro /health, speaches /health, OmniRoute :20128,
 #       n8n /healthz, Grist :8484, SigNoz :3301, OTel ingest :4318
+#     • dograh UI auth surfaces: the sign-in screen responds, an anonymous
+#       /workflow lands on that form instead of a dead-end error, and every
+#       /auth/login?error=<slug> state still renders (see the OIDC notes in
+#       dograh/patches/ for why the slug has to be read)
 #     • Control Center: dashboard-api :8095 aggregator + dashboard UI :8096
 #       (built React SPA; /api proxied to the aggregator)
 #     • round-trips: Kokoro TTS → WAV → Speaches STT transcription, and the
@@ -91,6 +95,22 @@ check_alive() { # name url [curl args...]
     pass "$name → HTTP $code (endpoint alive)"
   else
     fail "$name → no response ($url)"
+  fi
+}
+
+# Where a guarded route lands after its redirects. Page *copy* is not checkable
+# from here — the auth screens render on the client (the HTML is a spinner), so
+# their wording needs a browser — but the redirect target is decided server-side
+# and is what a mis-guarded route breaks.
+check_redirect() { # name url expected_substring_of_final_url [curl args...]
+  local name="$1" url="$2" expected="$3"
+  shift 3
+  local final
+  final=$(curl -sS -o /dev/null -L --max-time 10 -w '%{url_effective}' "$url" "$@" 2>/dev/null)
+  if [[ "$final" == *"$expected"* ]]; then
+    pass "$name → $final"
+  else
+    fail "$name → expected to end at *$expected, got '${final:-no response}' ($url)"
   fi
 }
 
@@ -268,6 +288,21 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   check_http "Dashboard API /healthz"   200 "http://127.0.0.1:8095/healthz"
   check_http "Control Center UI :8096"  200 "http://127.0.0.1:8096/" -L
   check_alive "Control Center /api proxy" "http://127.0.0.1:8096/api/services"
+
+  # The dograh UI signs in through Cerulean (Authentik), and the backend funnels
+  # every OIDC failure back to /auth/login?error=<slug>. A guarded route must
+  # land on that form rather than render a dead-end error the operator cannot act
+  # on, and each error slug must still render: the page reads `searchParams`,
+  # which is a Promise in Next 15 — getting that wrong turns every bounced
+  # sign-in into a 500 instead of an explanation.
+  section "Main stack — dograh UI auth surfaces"
+  DOGRAH_UI="http://127.0.0.1:3010"
+  check_http     "Dograh UI sign-in screen"  200 "$DOGRAH_UI/auth/login"
+  check_redirect "Anonymous /workflow gate"     "$DOGRAH_UI/workflow"                    "/auth/login"
+  check_http     "Sign-in error: not allowed" 200 "$DOGRAH_UI/auth/login?error=not_allowed"
+  check_http     "Sign-in error: expired"     200 "$DOGRAH_UI/auth/login?error=expired"
+  check_http     "Sign-in error: denied"      200 "$DOGRAH_UI/auth/login?error=denied"
+  check_http     "Sign-in error: unavailable" 200 "$DOGRAH_UI/auth/login?error=unavailable"
 
   section "Main stack — round-trips"
 
