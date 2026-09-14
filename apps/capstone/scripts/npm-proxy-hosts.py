@@ -82,8 +82,10 @@ Cerulean Authentik forward auth (on by default):
   create "capstone-npm-forward-auth"). Disable with NPM_FORWARD_AUTH=0 or
   --no-forward-auth; exclude more hosts with NPM_FORWARD_AUTH_EXCLUDE.
 
-The old pre-v3.11 names (dograh, dograh-ui, dashboard, ws) are pruned as
-stale on the next run — pass --no-prune to keep them around.
+The old pre-v3.11 names dograh-ui and ws are pruned as stale on the next run
+— pass --no-prune to keep them around. dograh and dashboard are NOT pruned:
+both are still OIDC redirect targets (.env AUTHENTIK_REDIRECT_URI / the
+Control Center's baked-in redirect), so they stay in the map as aliases.
 """
 
 from __future__ import annotations
@@ -112,8 +114,8 @@ DEFAULT_API_URL = "http://127.0.0.1:81"
 #   optional  only synced when explicitly included (compose profile services)
 #
 # The canonical Capstone subdomains: app/api/auth/voice/admin/pbx (the legacy
-# dograh/dograh-ui/dashboard/ws names were folded into these in v3.11 and are
-# pruned as stale on the next sync).
+# dograh-ui/ws names were folded into these in v3.11 and are pruned as stale on
+# the next sync; dograh/dashboard were kept as OIDC redirect aliases).
 HOSTS: list[dict[str, Any]] = [
     # The apex serves the dograh UI (what users hit on capstone.innotel.us);
     # the API lives at api.<domain>. Matches the long-standing NPM edge state.
@@ -128,6 +130,13 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "dashboard", "sub": "dashboard", "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center (OIDC redirect alias)", "forward_auth": False},
     # Legacy alias kept so older integrations don't 404 after a sync.
     {"key": "api-legacy", "sub": "backend.api", "scheme": "http", "port": 8000, "websocket": True, "name": "Capstone Voice API (legacy alias)", "forward_auth": False},
+    # dograh.<domain> is the pre-v3.11 name for the app, but .env still uses it
+    # as PUBLIC_BASE_URL / AUTHENTIK_REDIRECT_URI / AUTHENTIK_POST_LOGIN_REDIRECT,
+    # so it is a live OIDC redirect target, not stale: without this row a sync
+    # silently prunes it and the OIDC callback 404s. Unlike app./apex it carries
+    # no forward-auth gate — it is the landing target of the OIDC dance, and the
+    # app authenticates that callback itself (same as dashboard./admin.).
+    {"key": "dograh",    "sub": "dograh",    "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (legacy OIDC redirect alias)", "forward_auth": False},
     {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 8083,  "websocket": False, "name": "FreePBX (+ AvantFAX at /fax)"},
     {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 5678,  "websocket": True,  "name": "n8n"},
     {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 8484,  "websocket": False, "name": "Grist"},
@@ -404,12 +413,20 @@ def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
         print(f"FAIL no Let's Encrypt certificate for {label}")
         failed.append(domains[0])
         return None
-    meta = {"letsencrypt_email": le_email, "letsencrypt_agree": True, "dns_challenge": False}
+    # NPM's certificate meta schema is strict (additionalProperties: false) and
+    # keeps the Let's Encrypt account email globally (Settings → Let's Encrypt),
+    # so a "letsencrypt_email"/"letsencrypt_agree" key here is a 400, not a
+    # setting — that is why issuing failed on this NPM version. Allowed keys:
+    # dns_challenge, dns_provider, dns_provider_credentials,
+    # propagation_seconds, key_type (+ certificate/certificate_key for manual).
+    # NPM_LETSENCRYPT_EMAIL still gates SSL on/off below; it just isn't sent.
+    meta: dict[str, Any] = {"dns_challenge": False, "key_type": "ecdsa"}
     if dns_provider and dns_credentials:
         meta.update({
             "dns_challenge": True,
             "dns_provider": dns_provider,
             "dns_provider_credentials": dns_credentials,
+            "propagation_seconds": 60,
         })
     try:
         cert = api.create_certificate({
