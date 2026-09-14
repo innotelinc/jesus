@@ -10,6 +10,18 @@
 # takes 15-25 minutes; the ui build needs npm and also takes a while):
 #
 #   git -C dograh/upstream submodule update --init --recursive
+#   ./scripts/apply-dograh-patches.sh    # this repo's fixes to dograh
+#
+# That second step matters: dograh/upstream is gitignored, so the fixes this
+# repo makes to the dograh UI (OIDC session handling, the workflow pages) live
+# in dograh/patches/ and are applied here. scripts/setup.sh does it
+# automatically; a bare build-from-source does not.
+#
+# On a memory-constrained host the UI build can be capped instead of being
+# OOM-killed (Next's webpack pass and its type-check are run sequentially):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     build --build-arg NODE_BUILD_HEAP_MB=3072 dograh-ui
 #
 # Build + start dograh-api and dograh-ui from that source (the rest of the
 # stack is unaffected — keep using docker-compose.yml):

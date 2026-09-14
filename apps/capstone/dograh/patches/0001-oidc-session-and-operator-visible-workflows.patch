@@ -1,0 +1,203 @@
+diff --git a/ui/Dockerfile b/ui/Dockerfile
+index 5846490..1fb5910 100644
+--- a/ui/Dockerfile
++++ b/ui/Dockerfile
+@@ -11,8 +11,12 @@ RUN apk add --no-cache python3 make g++ libc6-compat
+ # Copy package files
+ COPY ui/package*.json ./
+ 
+-# Clean install with proper handling of native modules
+-RUN --mount=type=cache,target=/root/.npm npm ci
++# Clean install with proper handling of native modules.
++# Heap is settable so this image can be built on a memory-constrained box:
++#   docker compose ... build --build-arg NODE_BUILD_HEAP_MB=2048 dograh-ui
++ARG NODE_BUILD_HEAP_MB=4096
++RUN --mount=type=cache,target=/root/.npm \
++    NODE_OPTIONS="--max-old-space-size=${NODE_BUILD_HEAP_MB}" npm ci
+ 
+ # Stage 2: Builder
+ FROM node:22-alpine AS builder
+@@ -42,9 +46,18 @@ ENV NEXT_PUBLIC_CHATWOOT_URL="https://chat.dograh.com"
+ ENV NEXT_PUBLIC_CHATWOOT_TOKEN="3fkFx2mCEjNHjM9gaNc4A82X"
+ ENV BACKEND_URL="http://api:8000"
+ 
+-# Build the application with standalone mode
+-# Increase Node.js heap size to prevent out-of-memory errors during build
+-ENV NODE_OPTIONS="--max-old-space-size=4096"
++# Build the application with standalone mode.
++# The heap is an ARG (see the deps stage) so a build on a small host can cap it
++# instead of being OOM-killed: Next's webpack pass and its type-check child both
++# live under this number.
++ARG NODE_BUILD_HEAP_MB=4096
++ENV NODE_OPTIONS="--max-old-space-size=${NODE_BUILD_HEAP_MB}"
++# Type-check first, on its own line, then build with Next's own check disabled
++# (NEXT_SKIP_TYPECHECK). Same verification, but the two memory-heavy phases no
++# longer overlap — running them together is what got this build OOM-killed on a
++# 16 GB host. A type error still fails the image build here.
++ENV NEXT_SKIP_TYPECHECK="1"
++RUN npx tsc --noEmit
+ RUN npm run build && \
+     rm -rf /tmp/* /root/.npm /root/.next/cache
+ 
+diff --git a/ui/next.config.ts b/ui/next.config.ts
+index 2e6a15b..468b42a 100644
+--- a/ui/next.config.ts
++++ b/ui/next.config.ts
+@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
+   output: 'standalone',
+   experimental: {
+     serverSourceMaps: true,
++    // One static-generation worker instead of one per core. The default spawns
++    // a Node process per CPU, and on this box that peak (workers + webpack +
++    // the type-check child) is what got the build OOM-killed; the extra
++    // parallelism only shaves a little wall-clock time.
++    cpus: Number(process.env.NEXT_BUILD_CPUS ?? 1),
+   },
+   async rewrites() {
+     return [
+@@ -25,6 +30,15 @@ const nextConfig: NextConfig = {
+   },
+   // This is required to support PostHog trailing slash API requests
+   skipTrailingSlashRedirect: true,
++
++  // Next runs its type-check inside `next build`, at the same time webpack is
++  // still holding the module graph — on a memory-constrained host that combined
++  // peak is what gets the build OOM-killed. The image build runs
++  // `tsc --noEmit` on its own line first (same check, sequential peaks) and sets
++  // this flag to stop Next repeating it. Dev/CI builds are unaffected.
++  typescript: {
++    ignoreBuildErrors: process.env.NEXT_SKIP_TYPECHECK === '1',
++  },
+ };
+ 
+ export default withSentryConfig(nextConfig, {
+diff --git a/ui/src/app/handler/[...stack]/page.tsx b/ui/src/app/handler/[...stack]/page.tsx
+index a862d5e..00f6612 100644
+--- a/ui/src/app/handler/[...stack]/page.tsx
++++ b/ui/src/app/handler/[...stack]/page.tsx
+@@ -1,4 +1,5 @@
+ import { StackHandler, StackTheme } from "@stackframe/stack";
++import { redirect } from "next/navigation";
+ 
+ import { AuthEnterpriseCTA } from "@/components/auth/AuthEnterpriseCTA";
+ import { AuthShell } from "@/components/auth/AuthShell";
+@@ -39,6 +40,12 @@ export default async function Handler(props: unknown) {
+     );
+   }
+ 
++  // OIDC signs in through the UI's own login form (the backend starts the
++  // Authentik redirect), so Stack's handler has nothing to serve here.
++  if (authProvider === "oidc") {
++    redirect("/auth/login");
++  }
++
+   // Lazily import the real StackServerApp only when needed
+   const { getStackServerApp } = await import("@/lib/auth/server");
+   const app = await getStackServerApp();
+diff --git a/ui/src/app/page.tsx b/ui/src/app/page.tsx
+index 8977f92..87649e0 100644
+--- a/ui/src/app/page.tsx
++++ b/ui/src/app/page.tsx
+@@ -13,9 +13,11 @@ export default async function Home() {
+   const authProvider = await getServerAuthProvider();
+   logger.debug('[HomePage] Auth provider:', authProvider);
+ 
+-  // For local/OSS provider, check if user has workflows
+-  if (authProvider === 'local') {
+-    logger.debug('[HomePage] Local provider detected, checking for workflows');
++  // For local/OSS and OIDC providers, check if user has workflows. Both keep
++  // the session in the same cookie, so both need this branch — without `oidc`
++  // an Authentik user fell through to the Stack-only sign-in route below.
++  if (authProvider === 'local' || authProvider === 'oidc') {
++    logger.debug('[HomePage] Local/OIDC provider detected, checking for workflows');
+ 
+     try {
+       const accessToken = await getServerAccessToken();
+@@ -91,6 +93,12 @@ export default async function Home() {
+     }
+   }
+ 
+-  logger.debug('[HomePage] Redirecting unauthenticated Stack user to /handler/sign-in');
+-  redirect('/handler/sign-in');
++  // Only Stack has a client-side sign-in handler; the cookie providers sign in
++  // through the UI's own login form.
++  if (authProvider === 'stack') {
++    logger.debug('[HomePage] Redirecting unauthenticated Stack user to /handler/sign-in');
++    redirect('/handler/sign-in');
++  }
++  logger.debug('[HomePage] Redirecting unauthenticated user to /auth/login');
++  redirect('/auth/login');
+ }
+diff --git a/ui/src/app/workflow/page.tsx b/ui/src/app/workflow/page.tsx
+index 0aa0869..71decc8 100644
+--- a/ui/src/app/workflow/page.tsx
++++ b/ui/src/app/workflow/page.tsx
+@@ -21,17 +21,15 @@ async function WorkflowList() {
+     const accessToken = await getServerAccessToken();
+ 
+     if (!accessToken) {
+-        // If no token, user needs to sign in
++        // If no token, user needs to sign in. `oidc` belongs with `local` here:
++        // both hold their session in the OSS cookie and both sign in through
++        // /auth/login, so an incomplete session should be bounced to the form
++        // rather than rendering a dead-end error the user cannot act on.
+         const { redirect } = await import('next/navigation');
+         if (authProvider === 'stack') {
+             redirect('/');
+         } else {
+-            // For OSS mode, this shouldn't happen as token is auto-generated
+-            return (
+-                <div className="text-red-500">
+-                    Authentication required. Please refresh the page.
+-                </div>
+-            );
++            redirect('/auth/login');
+         }
+     }
+ 
+diff --git a/ui/src/components/SignInClient.tsx b/ui/src/components/SignInClient.tsx
+index 72d15cb..5b454e5 100644
+--- a/ui/src/components/SignInClient.tsx
++++ b/ui/src/components/SignInClient.tsx
+@@ -20,7 +20,9 @@ export default function SignInClient() {
+   const router = useRouter();
+ 
+   useEffect(() => {
+-    if (provider === 'local') {
++    // `oidc` has no Stack sign-in component either: its login form lives at
++    // /auth/login, so send it there instead of spinning forever.
++    if (provider === 'local' || provider === 'oidc') {
+       router.replace('/auth/login');
+     }
+   }, [provider, router]);
+diff --git a/ui/src/lib/auth/server.ts b/ui/src/lib/auth/server.ts
+index 2fd881e..1537695 100644
+--- a/ui/src/lib/auth/server.ts
++++ b/ui/src/lib/auth/server.ts
+@@ -65,8 +65,10 @@ export async function getServerUser(): Promise<CurrentUser | LocalUser | null> {
+         return null;
+       }
+     }
+-  } else if (authProvider === 'local') {
+-    // For OSS mode, get user from cookies (created by middleware)
++  } else if (authProvider === 'local' || authProvider === 'oidc') {
++    // For OSS mode and OIDC, get user from cookies (created by middleware).
++    // `oidc` shares the OSS session mechanism: an Authentik sign-in ends in the
++    // same `dograh_auth_token` cookie, so the lookup is identical.
+     const user = await getOSSUser();
+     return user;
+   }
+@@ -142,8 +144,11 @@ export async function getServerAccessToken(): Promise<string | null> {
+       const auth = await user.getAuthJson();
+       return auth?.accessToken ?? null;
+     }
+-  } else if (authProvider === 'local') {
+-    // Get token from cookies (created by middleware)
++  } else if (authProvider === 'local' || authProvider === 'oidc') {
++    // Get token from cookies (created by middleware). `oidc` must be handled
++    // here too: it shares the session mechanism with `local`, and omitting it
++    // made every authenticated SSR page render "Authentication required"
++    // because the token looked missing on the server.
+     return await getOSSToken();
+   }
+ 
