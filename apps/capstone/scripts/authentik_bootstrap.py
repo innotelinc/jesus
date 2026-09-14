@@ -633,6 +633,19 @@ def main() -> int:
     args = parser.parse_args()
     env = load_env_file(Path(args.env_file))
 
+    # Guard against a stale ambient NPM_* environment. This repo's .env is the
+    # authority on which domain it owns; a leftover NPM_BASE_DOMAIN exported by
+    # another stack would otherwise be written into Authentik as this app's
+    # external host and session cookie domain. Refuse instead of writing it.
+    ambient_domain = (os.environ.get("NPM_BASE_DOMAIN") or "").strip().lstrip(".").lower()
+    env_domain = (env.get("NPM_BASE_DOMAIN") or "").strip().lstrip(".").lower()
+    if ambient_domain and env_domain and ambient_domain != env_domain and not args.base_domain:
+        print(f"FAIL NPM_BASE_DOMAIN={ambient_domain} is exported in the environment but this "
+              f"repo's .env says {env_domain} — refusing to write {ambient_domain} into "
+              f"Authentik (unset the variable, or pass --base-domain explicitly).",
+              file=sys.stderr)
+        return 1
+
     base_domain = (args.base_domain or os.environ.get("NPM_BASE_DOMAIN") or env.get("NPM_BASE_DOMAIN") or "capstone.innotel.us")
     external_host = f"https://auth.{base_domain}"
     cookie_domain = base_domain
