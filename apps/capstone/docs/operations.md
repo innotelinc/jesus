@@ -36,7 +36,9 @@ from coturn via `/api/turnconfig`) — and the voice-agent surfaces: **Agents**,
 > Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the STUN/TURN
 > endpoints (with credentials) and the WSS endpoint. On an HTTPS page that endpoint is this
 > dashboard's **own origin** — `wss://<dashboard host>/ws`, which `dashboard/nginx.conf`
-> (`location = /ws`) forwards to the PBX's PJSIP WSS listener. The browser therefore only
+> (`location = /ws`) forwards to the PBX's PJSIP WSS listener at
+> `DASHBOARD_PBX_WSS_HOST:8089` (`pbx-freepbx` by default, `zeus-freepbx` on a
+> shared Zeus box, or this host's LAN IP in any mode). The browser therefore only
 > ever sees the certificate the reverse proxy issued for that host. `voice.<NPM_BASE_DOMAIN>`
 > (see [NPM proxy hosts](#npm-proxy-hosts)) remains supported when a proxy domain is
 > configured. The PBX's own `:8089` listener is a LAN/`--insecure` fallback only: it serves

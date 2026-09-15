@@ -6,7 +6,53 @@ product landing page; this file keeps the per-release detail.
 ## v3.20 — SIP registration bans, a PBX that stops burning a core, and a backup for the host move
 
 Work landed after the `v3.19` tag: host-side SIP registration bans for a PBX
-that is scanned continuously, and a data-layer backup for the next host move.
+that is scanned continuously, a data-layer backup for the next host move, the
+shared-box softphone signaling that a profile-off PBX container had broken, and
+an Agents page that stopped paying one PBX round trip per agent, per row.
+
+### The softphone registers on a shared box again, and the Agents page stops paying N×
+
+- **Fixed: every WSS registration 502'd on the shared PBX.**
+  `dashboard/nginx.conf` hard-coded `https://pbx-freepbx:8089` as the signaling
+  upstream, but on a Zeus-owned box the bundled `pbx-freepbx` is
+  profile-gated **off** and that name is not even in DNS — the container that
+  serves `:8089` is `zeus-freepbx`. The upstream host is now
+  `DASHBOARD_PBX_WSS_HOST` (default `pbx-freepbx`, so standalone behaviour is
+  byte-identical), rendered at container start: the config ships as an nginx
+  template and `envsubst` fills it in, since the target depends on which network
+  the container is joined to at `up` time and cannot be baked at build time.
+  `docker-compose.yml` also declares the shared `pbx-net` bridge (`external`, as
+  Zeus owns it) and joins the dashboard to it — **a name only resolves from
+  inside the network its container lives on** — which `scripts/setup.sh` now
+  pre-creates on a host that has no Zeus stack. Verified live on this box:
+  `curl -i -H 'Upgrade: websocket' http://127.0.0.1:8096/ws` reaches Asterisk and
+  returns its own `400` + `Sec-WebSocket-Version: 7, 8, 13` (a bare upgrade is
+  rejected by the PBX, not by the proxy), where `pbx-freepbx` now answers
+  NXDOMAIN. The LAN IP remains an override in every mode.
+- **The Agents page probes the PBX once, not once per agent.** `/agents` reads
+  every agent's FreePBX provisioning state, and each read was its own
+  `docker exec` into the PBX — two per agent (extension + inbound route) plus a
+  fresh `dialplan show dograh-inbound`, all serial. It is now **one statement
+  for the whole page** (`agent_probe_bulk_sql`: `UNION ALL`, one row per
+  extension carrying both counts, `mysql -N -B` tab-separated) plus one cached
+  dialplan read (`_DIALPLAN_TTL`, 5 s). Measured on this box with 9 agents:
+  **5.7 s → 1.4 s** warm, 2.5 s cold, same statuses.
+
+  The first attempt at this halved the execs (one combined SQL per agent) and
+  ran the probes concurrently across 8 workers — worth keeping as a
+  measurement, because it shows concurrency is the wrong lever here: 8
+  concurrent `SELECT 1` execs each took **~4 s** against a **0.78 s** idle
+  baseline, so 8 agents went 11.6 s → 5.9 s (~2×, not 8×) while loading the
+  shared PBX harder. Fewer execs beat more parallelism. The dialplan cache
+  keeps its lock either way: the *miss* is serialized and re-checked, so two
+  requests arriving together (two browser tabs) still cost one `docker exec` —
+  measured **8 execs for 8 concurrent callers** without it, **1** with.
+
+  Verified against the live PBX: the bulk probe returns exactly what the two
+  single-row builders return (1/1 for a provisioned agent, 0/0 for an
+  unprovisioned extension), and a unit test pins each row's subqueries
+  byte-for-byte to `count_custom_extension_sql` / `count_inbound_route_sql` so
+  a probe can never disagree with the deletes guarded by the same markers.
 
 ### SIP registration bans + a PBX that stops burning a core
 

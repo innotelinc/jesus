@@ -468,6 +468,22 @@ def count_inbound_route_sql(did: str) -> str:
     )
 
 
+def agent_probe_bulk_sql(exts: list[str]) -> str:
+    """One statement covering every agent: per row, (ext, custom-ext count,
+    inbound-route count).
+
+    The Agents page needs the same two counts for every agent, and each query
+    is a `docker exec` into the PBX (~0.7 s idle, several seconds under load),
+    so they come back from one statement rather than one per agent. Each row
+    embeds the single-row builders verbatim, so a probe can never disagree with
+    the deletes/refreshes guarded by the same markers.
+    """
+    return " UNION ALL ".join(
+        f"SELECT '{_sql(e)}', ({count_custom_extension_sql(e)}), ({count_inbound_route_sql(e)})"
+        for e in exts
+    )
+
+
 def find_custom_dest_sql(table: str, target: str) -> str:
     return (
         f"SELECT `key` FROM `{table}` WHERE `id`='dests' AND `type`='json-arr' "

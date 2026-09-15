@@ -142,6 +142,19 @@ bridge subnet, or `host.docker.internal` is not usable:
 **The rule, in one line: a service target is this host's LAN IP — no docker IPs,
 no compose service names, no `host.docker.internal`.**
 
+One leg is deliberately exempt, and it is the only one: the **softphone's WSS
+signaling**, which the browser reaches at `wss://<dashboard host>/ws` and
+`dashboard/nginx.conf` forwards to the PBX's `:8089` listener. Both ends are
+containers on a shared user-defined bridge, so Docker's embedded DNS answers a
+compose service name there — the rule above exists because an Asterisk fragment
+or a host-mode service *cannot* resolve one, and neither end of this leg is such
+a client. The upstream host is `DASHBOARD_PBX_WSS_HOST` (`pbx-freepbx` by
+default, `zeus-freepbx` on a shared Zeus box — the dashboard joins that box's
+`pbx-net` bridge so the name resolves; see `docker-compose.yml`), so the LAN IP
+stays a one-variable override in every mode. That name is also why the key is
+not in `config-guard`'s voice-path key set: the guard admits only a `${VAR}`
+reference, an empty value or a LAN IP, and adding it would fail the build.
+
 The bind follows the target: a service reached at the LAN IP is published on the
 LAN IP (`${PJSIP_MEDIA_ADDRESS}:port:port`), never on `0.0.0.0` — that is what
 put AMI in front of public scanners. Publish the addresses that are actually

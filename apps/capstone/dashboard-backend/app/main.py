@@ -1867,8 +1867,13 @@ def agents_list(user: dict = Depends(require_session)):
         rows = client.list_agents()
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
-    for a in rows:
-        a["pbx"] = _agent_pbx_status(mode, a.get("extension") or "")
+    # One PBX query answers the whole page (the per-agent probe used to be one
+    # `docker exec` each — 8-way concurrency only got that down to ~2× wall
+    # clock, because the execs then contend).
+    exts = [a.get("extension") or "" for a in rows]
+    statuses = _agent_pbx_statuses(mode, exts)
+    for a, ext in zip(rows, exts):
+        a["pbx"] = statuses[ext]
     return {"mode": mode, "configured": True, "agents": rows,
             "stasis": _stasis_health(client, rows)}
 
@@ -2390,29 +2395,82 @@ def _stasis_health(client: agents.DograhClient, rows: list[dict[str, Any]]) -> d
     return info
 
 
-def _agent_pbx_status(mode: str, ext: str) -> dict:
-    """Provisioning status of one agent's FreePBX rows (for the list view)."""
+_DIALPLAN_TTL = 5.0  # seconds — short: provisioning changes should show fast
+_dialplan_cache: dict[str, tuple[float, str]] = {}
+# Serializes the cache *miss*, not every read: the Agents list probes its
+# agents concurrently (ThreadPoolExecutor), so on a cold cache all of them
+# would otherwise exec `asterisk -rx` at once — the N× cost this cache exists
+# to remove. One fetch, the rest wait and read it.
+_dialplan_lock = threading.Lock()
+
+
+def _pbx_dialplan_text() -> str:
+    """`dialplan show dograh-inbound` output, cached briefly — identical for
+    every agent, so the Agents list fetches it once per request cycle, not
+    once per agent."""
+    hit = _dialplan_cache.get("text")
+    if hit and time.time() - hit[0] < _DIALPLAN_TTL:
+        return hit[1]
+    with _dialplan_lock:
+        # Re-check under the lock: the workers queued behind the first miss
+        # all read the value that miss just stored.
+        hit = _dialplan_cache.get("text")
+        if hit and time.time() - hit[0] < _DIALPLAN_TTL:
+            return hit[1]
+        code, text = _pbx_exec(["asterisk", "-rx", "dialplan show dograh-inbound"])
+        val = text if code == 0 else ""
+        _dialplan_cache["text"] = (time.time(), val)
+        return val
+
+
+def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool) -> dict:
+    status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
+    if not (has_ext or has_route or has_dp):
+        status = "not-provisioned"
+    return {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
+            "dialplan": has_dp}
+
+
+def _pbx_provisioning_counts(exts: list[str]) -> dict[str, tuple[bool, bool]]:
+    """Per-extension (customExtension, inboundRoute) from ONE PBX query.
+
+    `mysql -N -B` prints one tab-separated row per extension. Extensions with
+    no rows at all don't come back, so callers treat a miss as (False, False).
+    """
+    wanted = sorted({e for e in exts if e})
+    if not wanted:
+        return {}
+    out: dict[str, tuple[bool, bool]] = {}
+    for line in _pbx_mysql(agents.agent_probe_bulk_sql(wanted)).splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        try:
+            out[parts[0].strip()] = (int(parts[1]) > 0, int(parts[2]) > 0)
+        except ValueError:
+            continue
+    return out
+
+
+def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
+    """Provisioning status per extension, in the shape the list view expects.
+
+    Whole page in one PBX query plus one cached `dialplan show`: the Agents list
+    probes every agent, and each probe used to be its own `docker exec`.
+    """
     if mode != "standalone":
-        return {
+        return {e: {
             "status": "pending-sync",
             "customExtension": None, "inboundRoute": None, "dialplan": None,
             "detail": "Add-on mode: the shared box's reconcile applies the *_custom.conf moniker (extensions_custom_dograh.conf).",
-        }
+        } for e in exts}
     try:
-        ext_rows = _pbx_mysql(agents.count_custom_extension_sql(ext))
-        route_rows = _pbx_mysql(agents.count_inbound_route_sql(ext))
-        has_ext = bool(ext_rows.splitlines() and int(ext_rows.splitlines()[0]) > 0)
-        has_route = bool(route_rows.splitlines() and int(route_rows.splitlines()[0]) > 0)
-        code, text = _pbx_exec(["asterisk", "-rx", "dialplan show dograh-inbound"])
-        has_dp = code == 0 and ext in text
-        status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
-        if not (has_ext or has_route or has_dp):
-            status = "not-provisioned"
-        return {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
-                "dialplan": has_dp}
+        counts = _pbx_provisioning_counts(exts)
+        dp = _pbx_dialplan_text()
     except HTTPException as exc:
-        return {"status": "error", "customExtension": None, "inboundRoute": None,
-                "dialplan": None, "detail": exc.detail}
+        return {e: {"status": "error", "customExtension": None, "inboundRoute": None,
+                    "dialplan": None, "detail": exc.detail} for e in exts}
+    return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp) for e in exts}
 
 
 # --------------------------------------------------------------------------

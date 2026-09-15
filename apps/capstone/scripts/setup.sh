@@ -322,6 +322,15 @@ if ! docker network inspect interview-net >/dev/null 2>&1; then
         || fail "could not create Docker network interview-net"
     pass "created Docker network interview-net"
 fi
+# The dashboard also joins the shared voice plane's bridge (pbx-net) so its
+# /ws signaling upstream can name the PBX container instead of a LAN IP. On a
+# Zeus add-on box Zeus already owns it and it is reused untouched; a standalone
+# host needs it to exist because the compose declares it `external`.
+if ! docker network inspect pbx-net >/dev/null 2>&1; then
+    docker network create pbx-net >/dev/null \
+        || fail "could not create Docker network pbx-net"
+    pass "created Docker network pbx-net"
+fi
 # The PBX services reuse named external volumes so they can share state with a
 # standalone pbx-portal deployment. Create them on a fresh host; existing
 # volumes remain untouched.

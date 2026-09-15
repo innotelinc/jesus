@@ -78,6 +78,7 @@ What made that a swap instead of a migration:
 | Access paths | Zeus's compose publishes the ports the add-on's docs and proxy hosts already used — `:8083` for the GUI (host `:80` belongs to the NPM edge since the cutover), plus `5060/udp`, `5061`, `8088`, `8089`, `5038`, `10000`, `10101-10120/udp`. |
 | Dialplan / ARI | Each product's fragments are converged by owner (`--owner zeus` / `--owner capstone`), so `[dograh-inbound]`, the `capstone` append-shared segment and the `[dograh]` ARI user survive a Zeus boot untouched. |
 | Container lookup | `resolve_container()` in `pbx/bootstrap_dograh_route.py` requires the candidate to be **running**, and prefers `zeus-freepbx`; a stopped `pbx-freepbx` no longer shadows the live PBX for the 12 h route-sync timer. |
+| Softphone WSS | The Control Center proxies the browser's `wss://<dashboard host>/ws` to the PBX, so its `DASHBOARD_PBX_WSS_HOST` names the box that actually owns `:8089` — `zeus-freepbx` here, `pbx-freepbx` (the bundled, profile-off service) in standalone. The dashboard joins Zeus's `pbx-net` bridge in `docker-compose.yml`, because a container name only resolves from inside the network that container lives on; the LAN IP works in every mode as an override. |
 | TURN | `coturn` is still the add-on's container but is attached to Zeus's `pbx-net` so the PBX resolves it exactly as it did before. Unifying TURN ownership and the credentials in `rtp_additional.conf` vs Zeus's `TURN_*` is open work. |
 
 ### Capstone owns

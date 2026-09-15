@@ -1168,6 +1168,12 @@ services:
     pull_policy: build
     container_name: dashboard
     restart: unless-stopped
+    environment:
+      # Which host the /ws signaling upstream dials (dashboard/nginx.conf).
+      # Standalone default: the bundled PBX on this compose network. In zeus
+      # add-on mode the real PBX is the shared zeus-freepbx container on the
+      # pbx-net bridge, which this service is joined to below.
+      DASHBOARD_PBX_WSS_HOST: "${DASHBOARD_PBX_WSS_HOST:-pbx-freepbx}"
     depends_on:
       dashboard-api:
         condition: service_started
@@ -1179,7 +1185,11 @@ services:
       start_period: 5s
     ports:
       - "8096:80"   # the Control Center: http://<host>:8096
-    networks: [interview-net]
+    # pbx-net as well as its own bridge: DASHBOARD_PBX_WSS_HOST names the PBX
+    # from *this* container's networks (Docker's embedded DNS only answers for
+    # names on a network the querier shares). Standalone is unaffected — the
+    # default `pbx-freepbx` resolves over interview-net either way.
+    networks: [interview-net, pbx-net]
 
 volumes:
   postgres_data:
@@ -1232,4 +1242,16 @@ networks:
   # beat compose to it, e.g. on a wiped host).
   interview-net:
     name: interview-net
+    external: true
+  # The shared voice plane's bridge. When Capstone runs as an add-on on a
+  # Zeus-owned PBX, Zeus's compose declares this same pinned name and owns it,
+  # hence `external` — compose refuses to adopt a pinned name it did not label
+  # itself. The dashboard joins it so its /ws signaling upstream can name the
+  # real PBX container (`zeus-freepbx`) instead of the LAN IP; a container name
+  # only resolves from inside the network that container lives on. A
+  # standalone box runs nothing else on it and scripts/setup.sh pre-creates it
+  # (drop the network before handing the voice plane to Zeus, or Zeus's compose
+  # meets these labels).
+  pbx-net:
+    name: pbx-net
     external: true

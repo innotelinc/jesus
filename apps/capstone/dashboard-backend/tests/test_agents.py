@@ -352,6 +352,34 @@ class FreePbxBuildersTest(unittest.TestCase):
         self.assertIn("Dograh Voice Agent", agents.count_custom_extension_sql("8008"))
         self.assertIn("Dograh Voice Agent", agents.count_inbound_route_sql("8008"))
 
+    def test_bulk_probe_covers_every_agent_in_one_statement(self):
+        # The Agents list probes every agent through this builder, and each
+        # statement costs a `docker exec` into the PBX — so the whole page has
+        # to come back from one statement (`mysql -e`, no multi-statement
+        # support), one row per extension.
+        sql = agents.agent_probe_bulk_sql(["8000", "8003", "8008"])
+        self.assertNotIn(";", sql)
+        self.assertEqual(sql.count("SELECT COUNT(*)"), 2 * 3)
+        self.assertEqual(sql.count("UNION ALL"), 2)
+        for ext in ("8000", "8003", "8008"):
+            self.assertIn(f"SELECT '{ext}',", sql)
+
+    def test_bulk_probe_rows_are_the_single_row_builders(self):
+        # Byte-for-byte with count_custom_extension_sql / count_inbound_route_sql:
+        # the probe reports the same rows those counts do, so a probe that says
+        # "provisioned" can never disagree with the deletes and refreshes
+        # guarded by the same markers.
+        sql = agents.agent_probe_bulk_sql(["8008"])
+        self.assertIn(agents.count_custom_extension_sql("8008"), sql)
+        self.assertIn(agents.count_inbound_route_sql("8008"), sql)
+        self.assertIn("dograh-managed", sql)
+        self.assertIn("O''Brien", agents.agent_probe_bulk_sql(["O'Brien"]))
+
+    def test_bulk_probe_of_nothing_is_empty(self):
+        # No agents on the page must not become a syntax error: the caller
+        # sends no statement at all rather than a bare `UNION ALL` tail.
+        self.assertEqual(agents.agent_probe_bulk_sql([]), "")
+
     def test_find_custom_dest_orders_by_key(self):
         sql = agents.find_custom_dest_sql("kvstore_Customappsreg", "dograh-inbound,8008,1")
         self.assertIn("ORDER BY CAST(`key` AS UNSIGNED)", sql)

@@ -20,5 +20,11 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# DASHBOARD_PBX_WSS_HOST names the PBX for the /ws upstream at RUNTIME (the
+# zeus add-on's shared PBX is only reachable from a network joined at
+# `docker compose up`, so it cannot be baked at build time). envsubst
+# renders it into the config on start; the image's own envsubst template
+# machinery handles the rest of the nginx defaults.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+ENV DASHBOARD_PBX_WSS_HOST=pbx-freepbx
 EXPOSE 80
