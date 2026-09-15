@@ -67,8 +67,9 @@ Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
   auth.<domain>     Authentik (SSO / user management)         :9000
   voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
   admin/dashboard.<domain>  Capstone Control Center            :8096
-  pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :8083
-  n8n/grist/omniroute/signoz/workflow.<domain>                :5678/8484/20128/3301/8090
+  pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :14014 (SSO gateway)
+  n8n/grist/omniroute/signoz/workflow.<domain>               :14010/14011/20128/14012/14013
+      (the SSO gateways' host ports; OmniRoute has no gateway and stays internal)
   portal/nocodb.<domain>   optional profile services          :3000/8080
 
 SSO: there is no forward-auth gate any more — no host carries an nginx
@@ -136,14 +137,18 @@ HOSTS: list[dict[str, Any]] = [
     # no forward-auth gate — it is the landing target of the OIDC dance, and the
     # app authenticates that callback itself (same as dashboard./admin.).
     {"key": "dograh",    "sub": "dograh",    "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (legacy OIDC redirect alias)"},
-    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 8083,  "websocket": False, "name": "FreePBX (+ AvantFAX at /fax)"},
-    {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 5678,  "websocket": True,  "name": "n8n"},
-    {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 8484,  "websocket": False, "name": "Grist"},
+    # SSO-gated rows: the port is the app's oauth2-proxy gateway (`<key>-sso` in
+    # docker-compose.yml), not the app's own — FreePBX, n8n, Grist, SigNoz and the
+    # Workflow Studio have no OIDC of their own and the gateway is what performs
+    # the Authentik code flow in front of them.
+    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 14014, "websocket": False, "name": "FreePBX (+ AvantFAX at /fax) — via SSO gateway"},
+    {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 14010, "websocket": True,  "name": "n8n — via SSO gateway"},
+    {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 14011, "websocket": False, "name": "Grist — via SSO gateway"},
     # OmniRoute holds the LLM API key — docs/networking.md: keep it internal.
     # No DNS record exists for it; sync only when explicitly included.
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
-    {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 3301,  "websocket": True,  "name": "SigNoz"},
-    {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 8090,  "websocket": False, "name": "Workflow Studio"},
+    {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 14012, "websocket": True,  "name": "SigNoz — via SSO gateway"},
+    {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "name": "Workflow Studio — via SSO gateway"},
     # subscribe.<domain> → the shared Innotel subscribe portal (one nginx on
     # :3040 that picks the page by Host header). Public by design — pricing and
     # checkout are public; no Authentik gate on the subscribe pages.

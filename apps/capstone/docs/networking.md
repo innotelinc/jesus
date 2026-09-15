@@ -20,16 +20,22 @@ The port inventory below is the actual published mapping from
 Terminate TLS in NPM and forward to these local ports. Do **not** expose the
 raw port to the internet.
 
+The five services with no OIDC of their own (FreePBX, n8n, Grist, SigNoz,
+Workflow Studio) are fronted by an **`oauth2-proxy` SSO gateway**, so the NPM
+host forwards to the gateway's port — not the app's. The app's own port is still
+published on the LAN (see `ips/docs/sign-in-posture.md`, open items); the
+gateway is what puts Cerulean Authentik in front of the public name.
+
 | Service | Host port | NPM forward-to | Suggested hostname |
 |---|---|---|---|
 | Capstone Voice App (dograh UI) | `3010` | `http://127.0.0.1:3010` | `app.<domain>` |
 | Capstone Voice API | `8000` (host-mode) | `http://127.0.0.1:8000` | `api.<domain>` |
 | Authentik (SSO) | `9000` | `http://127.0.0.1:9000` | `auth.<domain>` |
-| FreePBX web UI (+ AvantFAX at `/fax`) | `8083` | `http://127.0.0.1:8083` | `pbx.<domain>` |
-| n8n | `5678` | `http://127.0.0.1:5678` | `n8n.<domain>` |
-| Grist | `8484` | `http://127.0.0.1:8484` | `grist.<domain>` |
-| SigNoz UI | `3301` | `http://127.0.0.1:3301` | `signoz.<domain>` |
-| Workflow Studio | `8090` | `http://127.0.0.1:8090` | `workflow.<domain>` |
+| FreePBX web UI (+ AvantFAX at `/fax`) | `8083` | `http://127.0.0.1:14014` (`pbx-sso`) | `pbx.<domain>` |
+| n8n | `5678` | `http://127.0.0.1:14010` (`n8n-sso`) | `n8n.<domain>` |
+| Grist | `8484` | `http://127.0.0.1:14011` (`grist-sso`) | `grist.<domain>` |
+| SigNoz UI | `3301` | `http://127.0.0.1:14012` (`signoz-sso`) | `signoz.<domain>` |
+| Workflow Studio | `8090` | `http://127.0.0.1:14013` (`workflow-sso`) | `workflow.<domain>` |
 | Capstone Control Center | `8096` | `http://127.0.0.1:8096` | `admin.<domain>` |
 | WebRTC WSS (softphone) | `8089` | `https://127.0.0.1:8089/ws` (WSS) | `voice.<domain>` |
 | OmniRoute dashboard (optional) | `20128` | `http://127.0.0.1:20128` | keep internal |

@@ -63,6 +63,72 @@
 # repo is checked out (the mesh puts it in 2-voice/capstone).
 name: capstone
 
+###############################################
+# Authentik SSO gateways (oauth2-proxy)
+###############################################
+# Every service in this stack that has no OIDC of its own — n8n, Grist, SigNoz,
+# the Workflow Studio and the FreePBX/AvantFax GUI — is fronted by a real OIDC
+# relying party instead of a password form: oauth2-proxy runs the browser
+# through a code flow against Cerulean Authentik and only then proxies the app.
+# There is no nginx auth_request and no Authentik outpost in the path.
+#
+# All of them share ONE session store (the platform's `cerulean-sso-sessions`
+# redis on the edge host) and one `_innotel_sso` cookie on .innotel.us, so a
+# single Authentik sign-in covers every gateway on the platform. See
+# ips/docs/sign-in-posture.md.
+#
+# Three flags are load-bearing and were each measured, not guessed (see
+# 1-primary/npm/docs/stack.md):
+#   * --insecure-oidc-allow-unverified-email: Authentik's `email` scope mapping
+#     sets email_verified: false and oauth2-proxy refuses such a token, so
+#     without it every callback dies with HTTP 500.
+#   * --oidc-groups-claim=groups: without it --allowed-group restricts nothing.
+#   * --session-store-type=redis: a cookie session overflows 4KB, and the extra
+#     Set-Cookie headers then overflow the edge's proxy_buffer_size, so the
+#     callback that finishes the login answers 502.
+#
+# The NPM proxy host for each app forwards to the gateway's HOST port instead of
+# the app's own; the app itself keeps its own port (several are still reachable
+# on the LAN - see the sign-in posture document).
+x-sso-gateway: &sso-gateway
+  image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.2
+  restart: unless-stopped
+  logging:
+    driver: json-file
+  environment: &sso-gateway-env
+    OAUTH2_PROXY_PROVIDER: oidc
+    # Endpoints are explicit (no discovery): Authentik advertises its *base* URL
+    # as the issuer while the app-scoped endpoints live under
+    # /application/o/<slug>/, which go-oidc's discovery issuer check would
+    # reject. --skip-oidc-discovery + these URLs are the supported way around it.
+    OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+    OAUTH2_PROXY_OIDC_ISSUER_URL: ${SSO_AUTHENTIK_BASE:-https://auth.cerulean.innotel.us}/
+    OAUTH2_PROXY_LOGIN_URL: ${SSO_AUTHENTIK_BASE:-https://auth.cerulean.innotel.us}/application/o/authorize/
+    OAUTH2_PROXY_REDEEM_URL: ${SSO_AUTHENTIK_BASE:-https://auth.cerulean.innotel.us}/application/o/token/
+    OAUTH2_PROXY_PROFILE_URL: ${SSO_AUTHENTIK_BASE:-https://auth.cerulean.innotel.us}/application/o/userinfo/
+    OAUTH2_PROXY_OIDC_JWKS_URL: ${SSO_AUTHENTIK_BASE:-https://auth.cerulean.innotel.us}/application/o/${SSO_APP_SLUG:-innotel-app-gateway}/jwks/
+    OAUTH2_PROXY_CLIENT_ID: ${SSO_CLIENT_ID:-innotel-app-gateway}
+    OAUTH2_PROXY_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
+    OAUTH2_PROXY_COOKIE_SECRET: ${SSO_COOKIE_SECRET:-}
+    OAUTH2_PROXY_COOKIE_NAME: _innotel_sso
+    OAUTH2_PROXY_COOKIE_DOMAINS: ${SSO_COOKIE_DOMAIN:-.innotel.us}
+    OAUTH2_PROXY_COOKIE_SECURE: "true"
+    OAUTH2_PROXY_COOKIE_SAMESITE: lax
+    OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+    OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
+    OAUTH2_PROXY_OIDC_GROUPS_CLAIM: groups
+    OAUTH2_PROXY_ALLOWED_GROUPS: ${SSO_REQUIRED_GROUP:-cerulean-platform}
+    OAUTH2_PROXY_SCOPE: openid email profile groups
+    OAUTH2_PROXY_SESSION_STORE_TYPE: redis
+    OAUTH2_PROXY_REDIS_CONNECTION_URL: redis://:${SSO_SESSION_REDIS_PASSWORD:-}@${SSO_SESSION_REDIS_HOST:-192.168.1.46}:${SSO_SESSION_REDIS_PORT:-16380}/0
+    OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
+    OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
+    OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+    OAUTH2_PROXY_REVERSE_PROXY: "true"
+    OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+    OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+    OAUTH2_PROXY_WHITELIST_DOMAINS: ${SSO_COOKIE_DOMAIN:-.innotel.us}
+
 services:
   # ── dograh core ──────────────────────────────────────────────────────────
   postgres:
@@ -1190,6 +1256,89 @@ services:
     # names on a network the querier shares). Standalone is unaffected — the
     # default `pbx-freepbx` resolves over interview-net either way.
     networks: [interview-net, pbx-net]
+
+  ###############################################
+  # SSO gateways — one per app that has no OIDC of its own
+  ###############################################
+  # Each listens on 4180 inside the stack and is published on a distinct host
+  # port; scripts/npm-proxy-hosts.py forwards the matching proxy host there.
+  n8n-sso:
+    <<: *sso-gateway
+    container_name: n8n-sso
+    environment:
+      <<: *sso-gateway-env
+      # n8n's whole point is receiving webhooks from outside, so those paths are
+      # exempted from the login; /healthz is liveness. The editor and the REST API
+      # stay gated.
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: '^/webhook/,^/webhook-test/,^/healthz$'
+      OAUTH2_PROXY_UPSTREAMS: http://n8n:5678
+    ports:
+      - "${N8N_SSO_PORT:-14010}:4180"
+    networks: [interview-net]
+
+  grist-sso:
+    <<: *sso-gateway
+    container_name: grist-sso
+    environment:
+      <<: *sso-gateway-env
+      # NOTHING is skipped here on purpose. Grist runs in single-identity mode
+      # (GRIST_DEFAULT_EMAIL), so its /api is effectively unauthenticated —
+      # exempting it would publish the dashboards to the internet. n8n writes to
+      # Grist over the compose network by container name, so it needs no edge
+      # route.
+      OAUTH2_PROXY_UPSTREAMS: http://grist:8484
+    ports:
+      - "${GRIST_SSO_PORT:-14011}:4180"
+    networks: [interview-net]
+
+  signoz-sso:
+    <<: *sso-gateway
+    container_name: signoz-sso
+    environment:
+      <<: *sso-gateway-env
+      # Liveness only. Traces arrive at the OTel collector's own ports, not here.
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: '^/api/v1/health$'
+      OAUTH2_PROXY_UPSTREAMS: http://signoz:8080
+    ports:
+      - "${SIGNOZ_SSO_PORT:-14012}:4180"
+    networks: [interview-net]
+
+  workflow-sso:
+    <<: *sso-gateway
+    container_name: workflow-sso
+    environment:
+      <<: *sso-gateway-env
+      OAUTH2_PROXY_UPSTREAMS: http://workflow-studio:8090
+    ports:
+      - "${WORKFLOW_SSO_PORT:-14013}:4180"
+    networks: [interview-net]
+
+  pbx-sso:
+    <<: *sso-gateway
+    container_name: pbx-sso
+    environment:
+      <<: *sso-gateway-env
+      # FreePBX publishes :8083 on the host (the Zeus portal and the dograh
+      # route sync both reach it there), so the gateway uses that address rather
+      # than a container name — it deliberately does not join pbx-net.
+      OAUTH2_PROXY_UPSTREAMS: http://192.168.1.46:8083
+    ports:
+      - "${PBX_SSO_PORT:-14014}:4180"
+    networks: [interview-net]
+
+  technitium-sso:
+    <<: *sso-gateway
+    container_name: technitium-sso
+    environment:
+      <<: *sso-gateway-env
+      # Technitium runs with host networking, so it is reachable on the host's
+      # address from this bridge. Cerulean writes DNS-01 challenge records
+      # through host.docker.internal:5380, never this public name, so there is
+      # no API route to exempt.
+      OAUTH2_PROXY_UPSTREAMS: http://192.168.1.46:5380
+    ports:
+      - "${TECHNITIUM_SSO_PORT:-14015}:4180"
+    networks: [interview-net]
 
 volumes:
   postgres_data:
