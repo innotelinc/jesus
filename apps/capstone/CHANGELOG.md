@@ -203,6 +203,18 @@ or `SKIP_TARBALL=1` to leave just the directory.
   failed. The route is stubbed, and a scenario now pins the guard itself: when
   dograh cannot report the app, the sync must refuse to write routes instead of
   registering an app no ARI client names. Gate harness: **8/8**.
+- **Fixed: fresh installs died on `pull access denied for minio/minio`.** The
+  compose file pinned the MinIO image to upstream `minio/minio` on docker.io,
+  where an unauthenticated daemon pull is rate-limited (or blocked outright once
+  the host's IP has burned the quota) — so `setup.sh` aborted before the stack
+  ever booted. The image is now mirrored into this repo's GHCR namespace as
+  `ghcr.io/innotelinc/capstone/minio` (upstream `RELEASE.2025-09-07T16-13-09Z`,
+  amd64 — the platform the offline bundle ships), published by the release
+  pipeline: packages first-pushed with this repo's `GITHUB_TOKEN` inherit the
+  repo's public visibility, the same mechanism that keeps `capstone/dograh-api`
+  anonymous-pullable. The compose default points at the mirror (`MINIO_IMAGE`
+  overrides; `.env.example` documents it) and `scripts/offline-images.txt`
+  ships the mirror so offline bundles stay consistent.
 
 ### Control Center login returns to the Control Center
 

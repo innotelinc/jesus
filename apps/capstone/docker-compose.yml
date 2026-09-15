@@ -97,7 +97,12 @@ services:
     networks: [interview-net]
 
   minio:
-    image: minio/minio
+    # Mirrored into this repo's GHCR namespace by the release pipeline
+    # (.github/workflows/release.yml) — upstream docker.io unauthenticated
+    # pulls get rate-limited and fail setup.sh with "pull access denied for
+    # minio/minio". The pinned upstream RELEASE tag is mirrored verbatim;
+    # override with MINIO_IMAGE in .env to use a different build.
+    image: ${MINIO_IMAGE:-ghcr.io/innotelinc/capstone/minio:RELEASE.2025-09-07T16-13-09Z}
     # Memory posture (docs/service-audit.md): cap the object store so a media
     # burst can't crowd out the agent pipeline. memswap = mem (no swap spill).
     mem_limit: 1g

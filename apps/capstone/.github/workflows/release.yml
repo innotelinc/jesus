@@ -84,6 +84,22 @@ jobs:
           build_and_push capstone-dashboard        dashboard/Dockerfile        dashboard
           build_and_push capstone-dashboard-api    dashboard-backend/Dockerfile dashboard-backend
 
+          # Mirror the third-party MinIO image the compose file references into
+          # the repo namespace. Images pushed with GITHUB_TOKEN from this public
+          # repo publish as PUBLIC packages, so fresh hosts can pull them
+          # anonymously — upstream docker.io unauthenticated pulls get
+          # rate-limited and fail setup.sh with "pull access denied for
+          # minio/minio". Upstream publishes multi-arch manifests; mirror the
+          # amd64 image only (the platform the offline bundle ships).
+          minio_tag="${MINIO_IMAGE_TAG:-RELEASE.2025-09-07T16-13-09Z}"
+          full="$REGISTRY/$IMAGE_NAMESPACE/minio"
+          docker pull --platform linux/amd64 "minio/minio:$minio_tag"
+          docker tag "minio/minio:$minio_tag" "$full:$minio_tag"
+          docker tag "minio/minio:$minio_tag" "$full:latest"
+          docker push "$full:$minio_tag"
+          docker push "$full:latest"
+          echo "::notice::published $full:$minio_tag (minio/minio mirror)"
+
   release-artifacts:
     name: Generate release artifacts
     needs: build-and-publish
@@ -114,6 +130,8 @@ jobs:
           \`ghcr.io/${{ github.repository }}/capstone-n8n-otel:${{ github.ref_name }}\`, plus
           \`capstone-workflow-studio\`, \`capstone-dashboard\`, \`capstone-dashboard-api\`
           (each also tagged \`:latest\`).
+          \`ghcr.io/${{ github.repository }}/minio\` mirrors upstream \`minio/minio\`
+          (pinned upstream RELEASE tag + \`:latest\`).
           NOTESEOF
           )
           # The tag already exists (created by the push); create-or-update the

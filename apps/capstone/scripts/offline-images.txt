@@ -6,7 +6,10 @@
 
 pgvector/pgvector:pg17
 redis:7
-minio/minio
+# ghcr.io/innotelinc/capstone/minio is the repo mirror of minio/minio
+# (published by the release workflow; docker.io unauthenticated pulls are
+# rate-limited — see docker-compose.yml minio service).
+ghcr.io/innotelinc/capstone/minio:RELEASE.2025-09-07T16-13-09Z
 coturn/coturn:latest
 ghcr.io/innotelinc/dograh-api:latest
 ghcr.io/innotelinc/dograh-ui:latest
