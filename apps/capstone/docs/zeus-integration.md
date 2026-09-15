@@ -222,7 +222,7 @@ the mailbox — a per-number routing decision owned by the agent config.
 - **Media:** recordings live in Minio (ONYX StorageOps in the stack); Zeus
   gains an S3 read path, never stores the audio itself.
 - **Secrets:** shared credentials (FREEPBX AMI/ARI/GraphQL, dograh ARI
-  password + WS URI, trunk creds) come from Infisical once — never from two
+  password + WS URI, trunk creds) come from Cerulean Vault once — never from two
   `.env` files.
 - **Billing:** Magnate monetizes agents as an add-on SKU on a Zeus
   number/plan (entitlement gates whether a DID may route to an agent).

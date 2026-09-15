@@ -688,20 +688,16 @@ echo "    Grist:    http://localhost:8484"
 echo "    SigNoz:   http://localhost:3301"
 echo "    OmniRoute: http://localhost:20128"
 echo ""
-# ── Infisical (SecretOps) — opt-in secret provisioning ──────────────
-# Secrets for the Innotel Platform Stack live in Infisical. Enable by
-# setting INFISICAL_ADMIN_EMAIL / INFISICAL_ADMIN_PASSWORD and the
-# INFISICAL_* keys in .env, then re-run setup (idempotent).
-if grep -qE '^INFISICAL_ADMIN_EMAIL=.+' .env 2>/dev/null && \
-   grep -qE '^INFISICAL_ADMIN_PASSWORD=.+' .env 2>/dev/null; then
-  __root="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
-  case "$__root" in
-    */scripts) __root="$(dirname "$__root")" ;;
-  esac
-  if [ -f "$__root/scripts/infisical-setup.sh" ]; then
-    echo ">> provisioning secrets into Infisical (SecretOps)..."
-    bash "$__root/scripts/infisical-setup.sh" \
-      || echo "!! infisical setup failed (see above); .env values remain valid" >&2
-  fi
-  unset __root
+# ── Cerulean Vault (SecretOps) — secret posture ─────────────────────
+# Secrets for the Innotel Platform Stack live in Cerulean Vault (HashiCorp
+# Vault, KV v2, hosted by Cerulean); this repo owns the `capstone` path.
+# Set VAULT_ADDR / VAULT_TOKEN_FILE / VAULT_PREFIX / VAULT_PATH in .env, and
+# any value there may be a `vault://cerulean/capstone#KEY` reference instead
+# of the secret itself. There is no local secret service to provision:
+#   - move plaintext values into Vault:  python3 scripts/vault-migrate.py
+#   - push what this setup generates:    bash scripts/mesh.sh ... --vault
+if grep -qE '^VAULT_ADDR=.+' .env 2>/dev/null; then
+  echo ">> Cerulean Vault configured — vault:// references resolve against it"
+else
+  echo ">> Cerulean Vault not configured (VAULT_ADDR unset in .env) — values read as-is"
 fi

@@ -34,3 +34,8 @@ dograh/upstream/
 .vscode/
 
 # Repo-local generated/tracked artifacts
+
+# Cerulean Vault token copies (data/vault/token/<product>.token) — live credentials.
+data/vault/token/
+data/vault/init/
+data/vault/file/

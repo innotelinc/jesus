@@ -10,11 +10,14 @@ interface SidebarProps {
   onToggle?: () => void;
 }
 
-type NavItem = { label: string; path: string; icon: ReactNode };
+type NavItem = { label: string; path: string; icon?: ReactNode };
 
 const icon = (path: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">{path}</svg>
 );
+
+/** First alphanumeric character of a label, uppercased — a monogram fallback. */
+const monogram = (label: string): string => (label.match(/[A-Za-z0-9]/)?.[0] ?? '?').toUpperCase();
 
 const groups: { label: string; items: NavItem[] }[] = [
   {
@@ -92,7 +95,19 @@ export default function Sidebar({
                 {group.label}
               </div>
             )}
-            {collapsed && <div className="mx-auto mb-1.5 h-px w-6 bg-border/60" />}
+            {collapsed && (
+              // Collapsed, the group label is gone — a bare divider says only
+              // "a break here". A monogram keeps the grouping legible: the
+              // section is still identifiable at a glance, and the title reveals
+              // the full name on hover.
+              <div
+                className="mx-auto mb-1.5 flex h-5 w-5 items-center justify-center rounded-md bg-muted/60 text-[10px] font-semibold uppercase leading-none text-muted-foreground/70"
+                title={group.label}
+                aria-hidden="true"
+              >
+                {monogram(group.label)}
+              </div>
+            )}
             <div className="flex flex-col gap-0.5">
               {group.items.map(item => {
                 const isActive = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
@@ -112,7 +127,13 @@ export default function Sidebar({
                     )}
                   >
                     <span className={cn('shrink-0 transition-colors', isActive ? 'text-primary' : 'text-muted-foreground/80')}>
-                      {item.icon}
+                      {/* An item without an icon still reads in the collapsed
+                          rail: its monogram stands in, so no row is ever blank. */}
+                      {item.icon ?? (
+                        <span className="flex h-[18px] w-[18px] items-center justify-center rounded text-[10px] font-semibold uppercase leading-none">
+                          {monogram(item.label)}
+                        </span>
+                      )}
                     </span>
                     {!collapsed && <span className="truncate">{item.label}</span>}
                   </NavLink>
