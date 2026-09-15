@@ -519,17 +519,19 @@ def main() -> int:
         ensure_custom_ext_table(container)
 
     # FreePBX API base URL: --url > FREEPBX_URL (environment, then the .env
-    # file) > a quick port probe (80, then the compose-published 8083). The
-    # fallbacks keep the bare invocation (systemd timer, setup.sh) working on
-    # hosts where FreePBX is not published on port 80 — and fail fast with a
-    # hint instead of stalling in wait_ready() for 5 minutes.
+    # file) > a quick port probe (8083, then 80). The compose-published 8083 is
+    # probed FIRST since the NPM-edge cutover (ips/docs/npm-edge-migration.md
+    # §4.2): host :80 now belongs to the NPM edge, and probing it first would
+    # hand the sync the edge instead of the PBX. The fallbacks keep the bare
+    # invocation (systemd timer, setup.sh) working and fail fast with a hint
+    # instead of stalling in wait_ready() for 5 minutes.
     freepbx_url = args.url
     env_url = (os.environ.get("FREEPBX_URL") or args.env.get("FREEPBX_URL", "")).strip()
     if env_url:
         freepbx_url = env_url
     elif freepbx_url == parser.get_default("url"):
         open_port = None
-        for port in (80, 8083):
+        for port in (8083, 80):
             try:
                 with socket.create_connection(("127.0.0.1", port), timeout=1):
                     open_port = port
