@@ -247,6 +247,40 @@ class ApplyGradingTest(unittest.TestCase):
         )
         self.assertTrue(grading.find_webhook_node(updated)["data"]["enabled"])
 
+    def test_enable_writes_the_workflows_own_track(self):
+        # A Studio-created workflow has no track in its payload, and without
+        # one the grader files every report under the built-in IT rubric.
+        definition = interview_definition()
+        updated = grading.apply_grading(
+            definition, enabled=True, plan="PLAN", track=grading.track_slug("Full Stack Developer")
+        )
+        template = grading.find_webhook_node(updated)["data"]["payload_template"]
+        self.assertEqual(template[grading.TRACK_KEY], "full_stack_developer")
+
+    def test_a_shipped_tracks_own_value_is_never_overwritten(self):
+        definition = interview_definition()
+        template = grading.find_webhook_node(definition)["data"]["payload_template"]
+        template[grading.TRACK_KEY] = "devops"
+        updated = grading.apply_grading(
+            definition, enabled=True, plan="PLAN", track=grading.track_slug("DevOps Mock Interview")
+        )
+        updated_template = grading.find_webhook_node(updated)["data"]["payload_template"]
+        self.assertEqual(updated_template[grading.TRACK_KEY], "devops")
+
+    def test_disable_does_not_add_a_track(self):
+        updated = grading.apply_grading(
+            interview_definition(graded=True), enabled=False, track="full_stack_developer"
+        )
+        template = grading.find_webhook_node(updated)["data"]["payload_template"]
+        self.assertNotIn(grading.TRACK_KEY, template)
+
+    def test_track_slug_matches_the_dashboard_label_map(self):
+        from app import interviews
+
+        slug = grading.track_slug("Full Stack Developer")
+        self.assertIn(slug, interviews.TRACKS)
+        self.assertEqual(interviews.track_label(slug), "Full Stack Developer")
+
     def test_enabling_appends_the_grader_webhook(self):
         updated = grading.apply_grading(
             {"nodes": [{"id": "n", "type": "agentNode", "data": {"prompt": "hi"}}]},

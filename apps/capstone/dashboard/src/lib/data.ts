@@ -358,7 +358,7 @@ export const services: Service[] = [
 // Fallback/placeholder data shown only until the live API payload arrives (or
 // while it's unreachable). Hosts must never be localhost or docker bridge IPs:
 // derive the host from where this dashboard is actually served — the NPM
-// subdomain when proxied (e.g. admin.capstone.innotel.us), otherwise the LAN
+// subdomain when proxied (e.g. dashboard.capstone.innotel.us), otherwise the LAN
 // IP the operator opened. Ports stay per-service because the fallback predates
 // the live port map.
 function fallbackHost(): string {

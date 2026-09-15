@@ -37,10 +37,14 @@ DEFAULT_DOC_ID = ""
 DELETED_COLUMN = "Deleted"
 
 # Columns the n8n grader writes (scripts/grist_bootstrap.py owns the schema).
+# The three shipped tracks send their own values; a workflow instrumented from
+# the Control Center sends the slug of its name (app/grading.py:track_slug),
+# e.g. the "Full Stack Developer" workflow -> full_stack_developer.
 TRACKS = {
     "it": "IT Help Desk (Tier 1)",
     "devops": "DevOps",
     "sql": "SQL (junior data analyst)",
+    "full_stack_developer": "Full Stack Developer",
 }
 
 

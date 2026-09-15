@@ -83,9 +83,10 @@ Cerulean Authentik forward auth (on by default):
   --no-forward-auth; exclude more hosts with NPM_FORWARD_AUTH_EXCLUDE.
 
 The old pre-v3.11 names dograh-ui and ws are pruned as stale on the next run
-— pass --no-prune to keep them around. dograh and dashboard are NOT pruned:
-both are still OIDC redirect targets (.env AUTHENTIK_REDIRECT_URI / the
-Control Center's baked-in redirect), so they stay in the map as aliases.
+— pass --no-prune to keep them around. Neither dograh nor dashboard is pruned:
+dograh's .env AUTHENTIK_REDIRECT_URI is a live OIDC redirect target, and
+dashboard.<domain> is the Control Center's own host (the callback the Authentik
+"Capstone Dashboard" client registers), with admin.<domain> as its alias.
 """
 
 from __future__ import annotations
@@ -125,8 +126,10 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": True,  "name": "Authentik (SSO / user management)", "forward_auth": False},
     {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)", "forward_auth": False},
     {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center", "forward_auth": False},
-    # dashboard.<domain> is the Control Center alias baked into
-    # AUTHENTIK_REDIRECT_URI — it must exist or OIDC login breaks.
+    # dashboard.<domain> is the Control Center's canonical name: the Authentik
+    # "Capstone Dashboard" client it signs in as has it as its launch URL and
+    # as its ONLY registered redirect_uri (…/api/auth/callback). It must exist
+    # or OIDC login breaks; admin.<domain> is the alias.
     {"key": "dashboard", "sub": "dashboard", "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center (OIDC redirect alias)", "forward_auth": False},
     # Legacy alias kept so older integrations don't 404 after a sync.
     {"key": "api-legacy", "sub": "backend.api", "scheme": "http", "port": 8000, "websocket": True, "name": "Capstone Voice API (legacy alias)", "forward_auth": False},

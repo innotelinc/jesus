@@ -64,6 +64,68 @@ class BrowserHostTest(unittest.TestCase):
         self.assertEqual(hosts.browser_host("", "", "192.168.1.46"), "192.168.1.46")
 
 
+class CallbackUrlTest(unittest.TestCase):
+    """The Control Center's OIDC redirect_uri must point at the Control Center.
+
+    A wrong value sends the browser somewhere else after login — borrowing
+    dograh's shared AUTHENTIK_REDIRECT_URI landed it on the voice app.
+    """
+
+    def test_explicit_dashboard_var_wins(self):
+        self.assertEqual(
+            hosts.callback_url(
+                "https://control.example.test/api/auth/callback",
+                "https://dograh.example.test/api/v1/auth/oidc/callback",
+                "example.test",
+                "",
+            ),
+            "https://control.example.test/api/auth/callback",
+        )
+
+    def test_dograh_redirect_uri_is_ignored(self):
+        # The value Authentik's "Capstone Dashboard" provider registers, and the
+        # name in its launch URL — not dograh's callback, not admin.<domain>.
+        self.assertEqual(
+            hosts.callback_url(
+                "",
+                "https://dograh.capstone.innotel.us/api/v1/auth/oidc/callback",
+                "capstone.innotel.us",
+                "http://localhost:8096",
+            ),
+            "https://dashboard.capstone.innotel.us/api/auth/callback",
+        )
+
+    def test_legacy_value_that_is_our_callback_is_kept(self):
+        self.assertEqual(
+            hosts.callback_url(
+                "",
+                "https://control.example.test/api/auth/callback?x=1",
+                "example.test",
+                "",
+            ),
+            "https://control.example.test/api/auth/callback?x=1",
+        )
+
+    def test_canonical_dashboard_subdomain_and_domain_normalisation(self):
+        self.assertEqual(
+            hosts.callback_url("", "", ".Capstone.Innotel.us", ""),
+            "https://dashboard.capstone.innotel.us/api/auth/callback",
+        )
+
+    def test_direct_host_fallback_keeps_scheme(self):
+        self.assertEqual(
+            hosts.callback_url("", "", "", "http://192.168.1.46:8096"),
+            "http://192.168.1.46/api/auth/callback",
+        )
+        self.assertEqual(
+            hosts.callback_url("", "", "", "https://admin.capstone.innotel.us/"),
+            "https://admin.capstone.innotel.us/api/auth/callback",
+        )
+
+    def test_nothing_configured(self):
+        self.assertEqual(hosts.callback_url("", "", "", ""), "")
+
+
 class WssEndpointTest(unittest.TestCase):
     def test_same_origin_when_https_host_known(self):
         self.assertEqual(

@@ -3,8 +3,7 @@
 Registers **Zeus portal actions as dograh `http_api` custom tools** so an
 agent can send SMS and read/handle voicemail on the account's Zeus
 (VoiceOps) side. No dograh engine changes: these are plain REST tools
-executed by dograh's generic `execute_http_tool` path against the machine
-contract in the Zeus repo's [`docs/portal-api.md`](../../zeus-pbx-platform/docs/portal-api.md).
+executed by dograh's generic `execute_http_tool` path against the machine  contract in the Zeus repo's [`docs/portal-api.md`](../../zeus/docs/portal-api.md).
 
 The pack lives in [`zeus-tool-pack.json`](zeus-tool-pack.json) — four
 definitions conforming to `dograh/upstream/api/schemas/tool.py`

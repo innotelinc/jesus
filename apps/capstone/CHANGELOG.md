@@ -204,6 +204,40 @@ or `SKIP_TARBALL=1` to leave just the directory.
   dograh cannot report the app, the sync must refuse to write routes instead of
   registering an app no ARI client names. Gate harness: **8/8**.
 
+### Control Center login returns to the Control Center
+
+- **Fixed: the dashboard's OIDC login landed on the voice app.** `dashboard-api`
+  borrowed the shared `AUTHENTIK_*` vars — dograh's issuer, client and callback
+  (`…/api/v1/auth/oidc/callback`) — so Authentik signed the operator into the
+  "Dograh" provider and returned them to `dograh.<domain>`, whose login then
+  looped (`/api/v1/auth/oidc/login?next=%2Fafter-sign-in`). The dashboard now
+  signs in as its own `capstone-dashboard` application
+  (`DASHBOARD_AUTHENTIK_ISSUER_URL` / `_CLIENT_ID` / `_CLIENT_SECRET`) and
+  resolves its own callback (`DASHBOARD_AUTHENTIK_REDIRECT_URI` → a legacy
+  value only when it already points at `/api/auth/callback` →
+  `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback`, the provider's single
+  registered redirect URI). The stale `admin.<domain>` and
+  `dashboard.capstone.innotel.us` hardcodes are gone.
+
+### Dograh sign-in actually leaves the app origin
+
+- **Fixed: "Sign in with Cerulean" never reached Cerulean.** The UI hands the
+  browser `/api/v1/auth/oidc/login`, which it serves itself through its
+  `/api/v1/[...path]` proxy route — and that route called `fetch()` in the
+  default redirect mode, so Node followed the API's 307 to the identity provider
+  *server-side*, landed on Authentik's login flow and returned that page as a
+  **200 on `dograh.<domain>`**. The operator got an Authentik form whose API
+  calls went to the voice app's origin (404) instead of a redirect, so the
+  address bar stayed on the login URL and there was no working sign-in. The
+  route now fetches with `redirect: "manual"` — what a transparent proxy should
+  always do — so the 3xx and its `Location` reach the browser untouched. Checked
+  against the live API: `manual` returns the `307` + `set-cookie:
+  dograh_oidc_state=…`, `follow` returns the flow page at
+  `auth.<domain>/if/flow/default-authentication-flow/`. Kept in
+  `dograh/patches/`, and the live `dograh-ui` was rebuilt from the fork to carry
+  it (the Next build peaks around 6.6 GiB — more than this host has free with
+  the stack up, so the build is a stop-services-then-build operation here).
+
 ## v3.19 — Grading you can choose, calls that can run long
 
 Release `v3.19` hands the operator control of grading: which workflows are

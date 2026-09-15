@@ -59,6 +59,10 @@
 # configured per-organization in the dograh UI, not here.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Project name is pinned so container/volume names never depend on where this
+# repo is checked out (the mesh puts it in 2-voice/capstone).
+name: capstone
+
 services:
   # ── dograh core ──────────────────────────────────────────────────────────
   postgres:
@@ -921,7 +925,7 @@ services:
       # Point the portal at a docker address instead and the ACL refuses it.
       #
       # On a shared Zeus PBX the port belongs to that stack
-      # (zeus-pbx-platform/docker-compose.full.yml) and needs the same pin —
+      # (zeus/docker-compose.full.yml) and needs the same pin —
       # that file currently publishes it on 0.0.0.0. See docs/operations.md →
       # "The PBX".
       - "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}:5038:5038"  # Asterisk AMI (LAN IP only)
@@ -1076,10 +1080,21 @@ services:
       # Cerulean (Authentik) OIDC gate for the control center. When
       # AUTHENTIK_ISSUER_URL is set the API requires a Cerulean session on
       # every data endpoint; empty = open API (local dev / no auth stack).
-      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
-      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
-      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
-      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
+      #
+      # These are the dashboard's OWN Authentik application "Capstone Dashboard"
+      # (slug/client_id ``capstone-dashboard``), NOT the bare AUTHENTIK_* vars
+      # above — those are dograh's, and signing in with them bounces the browser
+      # to the voice app (Authentik's Dograh provider only allows its own
+      # callback). Empty = the dashboard falls back to an open API, so set all
+      # three whenever the stack has an auth stack.
+      AUTHENTIK_ISSUER_URL: "${DASHBOARD_AUTHENTIK_ISSUER_URL:-}"
+      AUTHENTIK_CLIENT_ID: "${DASHBOARD_AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${DASHBOARD_AUTHENTIK_CLIENT_SECRET:-}"
+      # The dashboard's OWN callback — the single redirect_uri registered on
+      # that provider. AUTHENTIK_REDIRECT_URI is dograh's
+      # (…/api/v1/auth/oidc/callback) and must not reach this container. When
+      # unset the API derives https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback.
+      DASHBOARD_AUTHENTIK_REDIRECT_URI: "${DASHBOARD_AUTHENTIK_REDIRECT_URI:-}"
       AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
       # Health page → "Stack SSO & access" panel: reads the stack/user access
       # inventory from Authentik (which applications are gated by a group

@@ -27,6 +27,7 @@ from typing import Any
 from fastapi import Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from . import hosts
 from .tenant_gate import cerulean_tenant, user_groups
 
 COOKIE_NAME = "capstone_session"
@@ -46,10 +47,19 @@ def issuer_base() -> str:
 
 
 def redirect_uri() -> str:
-    explicit = (os.environ.get("AUTHENTIK_REDIRECT_URI") or "").strip()
-    if explicit:
-        return explicit
-    return "https://dashboard.capstone.innotel.us/api/auth/callback"
+    """This dashboard's OIDC callback, never dograh's.
+
+    Must resolve to the Control Center's own host (``admin.<NPM_BASE_DOMAIN>``):
+    the value here is both what we send to Authentik and what the browser is
+    returned to, so borrowing dograh's ``AUTHENTIK_REDIRECT_URI`` lands the
+    operator on the voice app after login. See ``hosts.callback_url``.
+    """
+    return hosts.callback_url(
+        explicit=(os.environ.get("DASHBOARD_AUTHENTIK_REDIRECT_URI") or "").strip(),
+        legacy=(os.environ.get("AUTHENTIK_REDIRECT_URI") or "").strip(),
+        npm_domain=os.environ.get("NPM_BASE_DOMAIN") or "",
+        dashboard_host=os.environ.get("DASHBOARD_HOST") or "",
+    )
 
 
 def _discovery() -> dict[str, Any]:

@@ -20,6 +20,13 @@ set -euo pipefail
 #   repo.bundle  `git bundle` of this checkout — every tracked file at HEAD
 #   MANIFEST.txt / SHA256SUMS
 #
+# Project name: the compose file pins `name: capstone`, so the live container is
+# `capstone-postgres-1` and the volumes are `capstone_*`. On a host that still
+# runs the pre-rename project (`capstone-voice-aiagent-platform`), either point
+# PG_CONTAINER / VOLUME_PREFIX at the old names or move the stack over:
+#
+#   docker volume rename capstone-voice-aiagent-platform_<vol> capstone_<vol>
+#
 # Output: $HOME/capstone-backup/ (working tree) and
 #         $HOME/capstone-backup-<UTC timestamp>.tar.gz (the copy to move).
 #
@@ -36,13 +43,13 @@ STAMP="$(date -u +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${CAPSTONE_BACKUP_DIR:-$HOME/capstone-backup}"
 TARBALL="$HOME/capstone-backup-$STAMP.tar.gz"
 
-PG_CONTAINER="${PG_CONTAINER:-capstone-voice-aiagent-platform-postgres-1}"
+PG_CONTAINER="${PG_CONTAINER:-capstone-postgres-1}"
 PG_USER="${PG_USER:-postgres}"
 SIGNOZ_PG_CONTAINER="${SIGNOZ_PG_CONTAINER:-signoz-metastore-postgres}"
 SIGNOZ_PG_USER="${SIGNOZ_PG_USER:-signoz}"
 SIGNOZ_PG_DB="${SIGNOZ_PG_DB:-signoz}"
 
-VOLUME_PREFIX="${VOLUME_PREFIX:-capstone-voice-aiagent-platform_}"
+VOLUME_PREFIX="${VOLUME_PREFIX:-capstone_}"
 DOCKER_VOLUME_ROOT="${DOCKER_VOLUME_ROOT:-/var/lib/docker/volumes}"
 
 log() { printf '  %s\n' "$*"; }

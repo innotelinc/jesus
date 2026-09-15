@@ -50,6 +50,12 @@ DEFAULT_MODEL = "auto"
 GRADED_KEY = "graded"
 PLAN_KEY = "grading_plan"
 META_KEY = "grading_meta"
+# Which interview track the call belongs to. The shipped interview workflows
+# hardcode it ("it"/"devops"/"sql"); a workflow instrumented from the Control
+# Center has no such key, and the grader then defaults every report to the IT
+# rubric — a full-stack call lands as "IT Help Desk". So the track is written
+# here, derived from the workflow's own name.
+TRACK_KEY = "track"
 
 # A plan with fewer than two dimensions can't produce a meaningful weighted
 # score, and more than ten is noise on the report page.
@@ -81,8 +87,24 @@ class GradingError(RuntimeError):
 # ── reading the grading state off a workflow ────────────────────────────────
 
 
-def build_webhook_node() -> dict[str, Any]:
+def track_slug(name: str) -> str:
+    """Track value for a workflow: its name slugged ('Full Stack Developer' ->
+    'full_stack_developer'). Shipped interview workflows keep their own
+    hardcoded track (see ``apply_grading``)."""
+    return _slug(name)
+
+
+def build_webhook_node(track: str = "") -> dict[str, Any]:
     """The grader's post-call webhook node, as the shipped interviews define it."""
+    template: dict[str, Any] = {
+        "run_id": "{{workflow_run_id}}",
+        "student_name": "{{initial_context.student_name}}",
+        "phone": "{{initial_context.phone}}",
+        "transcript_url": "{{transcript_url}}",
+        "duration_s": "{{cost_info.call_duration_seconds}}",
+    }
+    if track:
+        template[TRACK_KEY] = track
     return {
         "id": "node-webhook-grader",
         "type": "webhook",
@@ -92,13 +114,7 @@ def build_webhook_node() -> dict[str, Any]:
             "enabled": True,
             "http_method": "POST",
             "endpoint_url": os.environ.get("GRADER_WEBHOOK_URL", GRADER_WEBHOOK_URL),
-            "payload_template": {
-                "run_id": "{{workflow_run_id}}",
-                "student_name": "{{initial_context.student_name}}",
-                "phone": "{{initial_context.phone}}",
-                "transcript_url": "{{transcript_url}}",
-                "duration_s": "{{cost_info.call_duration_seconds}}",
-            },
+            "payload_template": template,
         },
     }
 
@@ -240,12 +256,18 @@ def apply_grading(
     enabled: bool,
     plan: str = "",
     meta: dict[str, Any] | None = None,
+    track: str = "",
 ) -> dict[str, Any]:
     """Return a copy of ``definition`` with the grading keys set on its webhook.
 
     Enabling without a plan leaves the workflow on the grader's built-in track
     rubric (``mode: builtin``); disabling writes ``graded: false`` so the run is
     skipped rather than graded with a rubric the operator removed.
+
+    ``track`` labels the reports this workflow produces. It is only written
+    when the payload doesn't already carry one, so a shipped interview
+    workflow's own ``track`` ("it"/"devops"/"sql") always wins over the
+    name-derived slug.
     """
     merged = copy.deepcopy(definition or {})
     node = find_webhook_node(merged)
@@ -257,7 +279,7 @@ def apply_grading(
             merged["nodes"] = []
         if not isinstance(merged.get("edges"), list):
             merged["edges"] = []
-        node = build_webhook_node()
+        node = build_webhook_node(track)
         merged["nodes"].append(node)
     data = node.get("data")
     if not isinstance(data, dict):
@@ -274,6 +296,8 @@ def apply_grading(
         template.pop(META_KEY, None)
         return merged
 
+    if track and not str(template.get(TRACK_KEY) or "").strip():
+        template[TRACK_KEY] = track
     template[GRADED_KEY] = True
     if plan:
         template[PLAN_KEY] = plan

@@ -241,8 +241,8 @@ Capstone is licensed under the GNU Affero General Public License v3.0 or later (
 
 Capstone is the ecosystem's **AgentOps** platform — voice AI agents, call screening, AI receptionists, and telephony automation in the
 [**Innotel Platform Stack**](https://github.com/innotelinc/innotel-platform-stack) — the
-canonical single-responsibility architecture where Authentik owns identity, Infisical owns
+canonical single-responsibility architecture where Authentik owns identity, Cerulean Vault owns
 secrets, Cerulean owns trust, ONYX owns storage, Magnate owns revenue, NPM Edge owns the edge, and every other
 platform is a business function that consumes them. See
 [docs/stack.md](docs/stack.md) for this platform's owns/consumes boundaries and its
-Infisical secret setup.
+Cerulean Vault secret setup.

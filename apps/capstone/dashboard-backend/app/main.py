@@ -64,7 +64,7 @@ SELF_ID = os.environ.get("SELF_CONTAINER", "dashboard-api")
 # projects on the same Docker host (media stacks, other platforms, …) must
 # never leak into the dashboard; override with a comma-separated list to
 # aggregate multiple stacks on a shared box (e.g. capstone + zeus).
-PROJECTS = [p.strip().lower() for p in os.environ.get("DASHBOARD_PROJECTS", "capstone-voice-aiagent-platform").split(",") if p.strip()]
+PROJECTS = [p.strip().lower() for p in os.environ.get("DASHBOARD_PROJECTS", "capstone").split(",") if p.strip()]
 HOST = os.environ.get("DASHBOARD_HOST", "")  # reachable address for links (LAN IP / hostname)
 # Normalise an origin URL (from BACKEND_API_ENDPOINT) down to just the host.
 _m = re.match(r"(?:https?://)?([^/:]+)", HOST or "")
@@ -90,7 +90,7 @@ NPM_SUBDOMAINS: dict[str, str] = {
     "grist": "grist",
     "signoz": "signoz",
     "workflow-studio": "workflow",
-    "dashboard": "admin",
+    "dashboard": hosts.DASHBOARD_SUBDOMAIN,
     "ws": "voice",
 }
 
@@ -109,7 +109,7 @@ def public_host() -> str:
     """Host for endpoints that stay on the apex domain (STUN/TURN, Webmin):
     the NPM base domain when configured, otherwise the DASHBOARD_HOST host.
     Keeps them correct even when the dashboard itself moves to its own
-    subdomain (e.g. admin.capstone.innotel.us)."""
+    subdomain (e.g. dashboard.capstone.innotel.us)."""
     return NPM_BASE_DOMAIN or HOST or "localhost"
 
 app = FastAPI(title="Capstone Control Panel Aggregator", version="1.0.0")
@@ -2071,8 +2071,14 @@ def _grading_apply(workflow_id: int, *, enabled: bool, regenerate: bool = False)
             raise HTTPException(status_code=502, detail=f"grading plan: {exc}")
     if not enabled:
         plan, meta = "", {}
+    # Label this workflow's reports with its own track. Studio-created
+    # workflows have no track in their payload, and without one the grader
+    # files every call under the built-in IT rubric.
+    track = grading.track_slug(str(workflow.get("name") or ""))
     try:
-        updated = grading.apply_grading(definition, enabled=enabled, plan=plan, meta=meta)
+        updated = grading.apply_grading(
+            definition, enabled=enabled, plan=plan, meta=meta, track=track
+        )
     except grading.GradingError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     try:

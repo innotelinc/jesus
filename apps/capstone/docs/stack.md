@@ -27,7 +27,7 @@ provides, and explicitly does not own.
 
 - Zeus — telephony (PBX/Asterisk/FreePBX) as the voice plane
 - Authentik — identity, SSO, user management
-- Infisical — secrets, API keys, service credentials
+- Cerulean Vault — secrets, API keys, service credentials
 - Magnate — subscriptions and entitlements (`MAGNATE_PUBLIC_URL`; agents are
   a Magnate SKU — Capstone holds no Stripe keys)
 - Cerulean — certificates and DNS for every `capstone.innotel.us` host
@@ -36,7 +36,7 @@ provides, and explicitly does not own.
 ## Explicitly does NOT own
 
 - Identity (Authentik)
-- Secrets (Infisical)
+- Secrets (Cerulean Vault)
 - Billing (Magnate)
 - Certificates / trust (Cerulean)
 - Storage (ONYX)
@@ -46,10 +46,15 @@ provides, and explicitly does not own.
 > See the [**Capstone ↔ Zeus convergence plan**](https://github.com/innotelinc/innotel-platform-stack/blob/main/docs/convergence-capstone-zeus.md)
 > for the target architecture (Capstone standalone + Zeus add-on) and phased work.
 
-## Secrets (Infisical)
+## Secrets (Cerulean Vault)
 
-Secrets for this platform live in **Infisical** (SecretOps): credentials are imported
-into an Infisical workspace and the stack's `.env` is derived from it. Enable it with:
+The platform's SecretOps is **Cerulean Vault** — HashiCorp Vault, KV v2, hosted by
+Cerulean — with `vault://<mount>/<path>#<key>` references in `.env`.
+
+### Legacy: the Infisical profile
+
+This stack currently still imports its credentials into an **Infisical** workspace and
+derives `.env` from it. Enable it with:
 
 ```bash
 # generate the required keys and add them to .env
@@ -67,7 +72,7 @@ See [compose.infisical.yml](../compose.infisical.yml) and
 
 ## Golden rules
 
-- **Authentik = Identity** · **Infisical = Secrets** · **Cerulean = Trust** ·
+- **Authentik = Identity** · **Cerulean Vault = Secrets** · **Cerulean = Trust** ·
   **ONYX = Storage** · **Magnate = Revenue** · **NPM Edge = Edge** — everything else is a business function.
 - No platform duplicates another's responsibility.
 - No credit in commits, footers, or headers to anyone but the project owner.

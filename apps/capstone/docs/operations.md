@@ -275,9 +275,10 @@ When set, the Control Center's Links page and the softphone's `/api/turnconfig` 
 subdomain URLs automatically. When unset, everything falls back to `http://<host>:<port>`
 links.
 
-The dashboard itself is served at its **own** subdomain via `DASHBOARD_PUBLIC_URL` (e.g.
-`https://admin.capstone.innotel.us` — the canonical name; the pre-v3.11
-`dashboard.capstone.innotel.us` is retired and its DNS/NPM entries are gone). Keep
+The dashboard itself is served at its **own** subdomain via `DASHBOARD_PUBLIC_URL`, i.e.
+`https://dashboard.<domain>` — the name the Authentik **Capstone Dashboard** application
+(`client_id: capstone-dashboard`) has as its launch URL *and* as the only `redirect_uri`
+its provider registers. `admin.<domain>` proxies to the same container as an alias. Keep
 `PUBLIC_BASE_URL` for dograh's advertised origin — the two are deliberately separate vars
 so the dashboard can move without breaking dograh.
 
@@ -291,7 +292,8 @@ and handles renewal):
 | `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
 | `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
 | `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
-| `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`) |
+| `dashboard.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`; the OIDC-bound name) |
+| `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (alias) |
 | `pbx.<domain>` | `http://<host>:8083` | FreePBX GUI (+ AvantFAX at `/fax`) |
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
 | `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
@@ -385,6 +387,26 @@ forwarded host (without them it logs "failed to detect a forward URL from nginx"
 > Error"** on `capstone.innotel.us`. `scripts/authentik_bootstrap.py` pins both fields to
 > `https://auth.<NPM_BASE_DOMAIN>`; re-run it after changing domains, and restart
 > `cerulean-authentik` so the embedded outpost reloads its config.
+
+### Control Center login (dashboard OIDC)
+
+The Control Center has its own Authentik provider (`capstone-dashboard`) and must be
+returned to **its own** host after login. `dashboard-api` resolves its `redirect_uri` as:
+`DASHBOARD_AUTHENTIK_REDIRECT_URI` → a legacy `AUTHENTIK_REDIRECT_URI` that already points
+at `/api/auth/callback` → `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback` (or
+directly the browser host when no proxy domain is set). It deliberately **ignores**
+dograh's `AUTHENTIK_REDIRECT_URI` (`…/api/v1/auth/oidc/callback`) — that value is dograh's
+and would send the operator to the voice app instead of the dashboard after login (see
+`dashboard-backend/app/hosts.py::callback_url`).
+
+`dashboard-api` must also authenticate as **that** application, not as dograh's: it reads
+`DASHBOARD_AUTHENTIK_ISSUER_URL` / `_CLIENT_ID` / `_CLIENT_SECRET`, which
+`docker-compose.yml` feeds to `AUTHENTIK_ISSUER_URL` / `AUTHENTIK_CLIENT_ID` /
+`AUTHENTIK_CLIENT_SECRET` inside the container. Leaving them empty disables the gate
+(open API), so set all three on any host with an auth stack. The issuer is
+`https://auth.<NPM_BASE_DOMAIN>/application/o/capstone-dashboard/`, and the provider's
+redirect URI is `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback` — strict, exactly
+one entry.
 
 ### Authentik groups per stack (and per-stack access)
 
@@ -507,7 +529,7 @@ and only one of them actually stops a client:
   (`PJSIP_MEDIA_ADDRESS`) — never `0.0.0.0`, never a docker address (project
   rule: README → Addressing). The portal dials that same LAN IP, so the bind and
   the target agree. On a shared Zeus PBX the port belongs to that stack
-  (`zeus-pbx-platform/docker-compose.full.yml`), which still publishes it on
+  (`zeus/docker-compose.full.yml`), which still publishes it on
   `0.0.0.0` and needs the same pin.
 - **The AMI ACL.** The image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's
   AMI user, so any address that could reach the port could also authenticate

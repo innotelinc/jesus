@@ -11,6 +11,9 @@ const TRACKS = [
   { value: 'it', label: 'IT Help Desk' },
   { value: 'devops', label: 'DevOps' },
   { value: 'sql', label: 'SQL' },
+  // A workflow instrumented from the Control Center reports the slug of its
+  // own name as its track (app/grading.py:track_slug → interviews.TRACKS).
+  { value: 'full_stack_developer', label: 'Full Stack' },
 ] as const;
 
 function VerdictChip({ verdict }: { verdict: InterviewReport['verdict'] }) {
@@ -372,6 +375,20 @@ export default function InterviewReports() {
   const live = useMemo(() => reports.filter(r => !r.deleted), [reports]);
   const deleted = useMemo(() => reports.filter(r => r.deleted), [reports]);
 
+  // Every track the loaded data actually carries gets a chip, even one this
+  // page has never heard of: a new interview type is filterable as soon as
+  // its first call is graded, with no frontend rebuild.
+  const trackOptions = useMemo(() => {
+    const known = new Set(TRACKS.map(t => t.value as string));
+    const extra: Array<{ value: string; label: string }> = [];
+    for (const report of reports) {
+      if (!report.track || known.has(report.track)) continue;
+      known.add(report.track);
+      extra.push({ value: report.track, label: report.trackLabel || report.track });
+    }
+    return [...TRACKS, ...extra];
+  }, [reports]);
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return (showDeleted ? deleted : live).filter(r => {
@@ -445,7 +462,7 @@ export default function InterviewReports() {
     const ids = filtered.map(r => r.id);
     if (!ids.length) return;
     const scope = [
-      track !== 'all' ? `track “${TRACKS.find(t => t.value === track)?.label ?? track}”` : '',
+      track !== 'all' ? `track “${trackOptions.find(t => t.value === track)?.label ?? track}”` : '',
       search.trim() ? `search “${search.trim()}”` : '',
     ].filter(Boolean).join(' + ');
     const where = `currently shown${scope ? ` (${scope})` : ''}`;
@@ -590,7 +607,7 @@ export default function InterviewReports() {
           {deleted.length > 0 && <span className="ml-1.5 tabular-nums">({deleted.length})</span>}
         </button>
         <div className="flex rounded-md border bg-background p-1" role="group" aria-label="Track filter">
-          {TRACKS.map(t => (
+          {trackOptions.map(t => (
             <button
               key={t.value}
               onClick={() => setTrack(t.value)}
