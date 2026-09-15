@@ -296,12 +296,21 @@ and handles renewal):
 | `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
 | `dashboard.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`; the OIDC-bound name) |
 | `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (alias) |
-| `pbx.<domain>` | `http://<host>:8083` | FreePBX GUI (+ AvantFAX at `/fax`) |
+| `pbx.<domain>` | `http://<host>:14014` | FreePBX GUI (+ AvantFAX at `/fax`) — via the `pbx-sso` gateway; the GUI's own `:8083` is loopback-only |
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
-| `n8n.<domain>` | `http://<host>:5678` | n8n workflows (also the dograh webhook target) |
-| `grist.<domain>` | `http://<host>:8484` | Grist documents |
-| `signoz.<domain>` | `http://<host>:3301` | SigNoz UI + dashboards |
-| `workflow.<domain>` | `http://<host>:8090` | Workflow Studio |
+| `n8n.<domain>` | `http://<host>:14010` | n8n workflows — via the `n8n-sso` gateway; webhooks (`/webhook/*`) are exempt, the editor is not |
+| `grist.<domain>` | `http://<host>:14011` | Grist documents — via the `grist-sso` gateway; nothing is exempt, its API runs in single-identity mode |
+| `signoz.<domain>` | `http://<host>:14012` | SigNoz UI + dashboards — via the `signoz-sso` gateway |
+| `workflow.<domain>` | `http://<host>:14013` | Workflow Studio — via the `workflow-sso` gateway |
+| `dns.internal.innotel.us` | `http://<host>:14015` | Technitium console — via the `technitium-sso` gateway (the container is Cerulean's; its own `:5380` answers only on loopback + the docker0 gateway) |
+
+Every gateway above is an `oauth2-proxy` sidecar; the apps behind them have no
+OIDC of their own and their local logins are switched off, which is why their
+ports are bound to `127.0.0.1`. `scripts/verify-sso.py` is the committed
+regression test: it creates a throwaway Authentik identity, drives a real OIDC
+flow through each gateway, asserts the session opens the app, asserts an identity
+outside `SSO_REQUIRED_GROUP` is refused, and asserts each app port answers on
+loopback and refuses on the LAN (exit 0 pass / 1 fail / 2 cannot run).
 | `nocodb.<domain>` | `http://<host>:8080` | NocoDB |
 | `portal.<domain>` *(optional)* | `http://<host>:3000` | PBX Customer Portal (Next.js) — enable with `docker compose --profile portal up -d` |
 | `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |

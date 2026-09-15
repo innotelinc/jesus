@@ -47,11 +47,14 @@
 #  8123  ClickHouse HTTP                 9093  alertmanager
 #  8095  dashboard-api (control-panel aggregator)   8096  dashboard (Control Center UI)
 #
-# Binding policy: everything except n8n (5678), Grist (8484), OmniRoute (20128),
-# Workflow Studio (8090) and SigNoz UI (3301) binds to 127.0.0.1 — not reachable
-# on the LAN. The five exceptions must stay on 0.0.0.0 because n8n reaches
-# 8484/20128 via host.docker.internal (host gateway IP) and 5678/3301/8090 are
-# NPM proxy targets.
+# Binding policy: every web UI/API in this stack binds to 127.0.0.1 and is
+# reachable only from this host or over the compose network by service name.
+# The public door is the NPM edge, which forwards each subdomain to that app's
+# oauth2-proxy gateway (see the SSO gateways below) — never to the app port.
+# n8n reaches Grist as `http://grist:8484` on interview-net, and host-mode
+# dograh reaches n8n on 127.0.0.1:5678, so neither needs a LAN binding.
+# The only exceptions are the ports a LAN client genuinely dials: OmniRoute
+# (20128, dialled by dograh-ui in the browser) and the Asterisk/RTP plane.
 # dograh-api is host-mode (port 8000 — its original uvicorn port) and the
 # dograh-ui (port 3010) published 0.0.0.0; both are only reachable on the LAN
 # unless you reverse-proxy them (e.g. Nginx Proxy Manager).
@@ -502,7 +505,9 @@ services:
     mem_limit: 1g
     memswap_limit: 1g
     ports:
-      - "0.0.0.0:5678:5678"   # 0.0.0.0 — NPM proxy target + dograh webhook (host mode)
+      # 127.0.0.1 — host-mode dograh posts its webhook events to
+      # 127.0.0.1:5678, and the public door is n8n.<domain> → n8n-sso (14010).
+      - "127.0.0.1:5678:5678"
     environment:
       NODE_OPTIONS: --max-old-space-size=768
       N8N_HOST: "${N8N_HOST:-localhost}"
@@ -735,7 +740,8 @@ services:
     container_name: workflow-studio
     restart: unless-stopped
     ports:
-      - "0.0.0.0:8090:8090"   # 0.0.0.0 — LAN-reachable UI (NPM proxy target)
+      # 127.0.0.1 — the public door is workflow.<domain> → workflow-sso (14013).
+      - "127.0.0.1:8090:8090"
     environment:
       PORT: "8090"
       # The gateway + dograh are reached through the host (dograh-api is host
@@ -775,7 +781,9 @@ services:
     mem_limit: 768m
     memswap_limit: 768m
     ports:
-      - "0.0.0.0:8484:8484"   # 0.0.0.0 — n8n reaches it via host.docker.internal:8484 + NPM proxy target
+      # 127.0.0.1 — n8n writes to Grist as `http://grist:8484` over
+      # interview-net; the public door is grist.<domain> → grist-sso (14011).
+      - "127.0.0.1:8484:8484"
     environment:
       # GRIST_DEFAULT_EMAIL = single-identity mode (no password): Grist attributes
       # every request to this address, so the REST API needs no Authorization
@@ -918,7 +926,9 @@ services:
     container_name: signoz
     restart: unless-stopped
     ports:
-      - "0.0.0.0:3301:8080"   # SigNoz UI + API → http://localhost:3301 — 0.0.0.0 (NPM proxy target)
+      # 127.0.0.1 — the public door is signoz.<domain> → signoz-sso (14012);
+      # traces arrive at the OTel collector's own ports, not here.
+      - "127.0.0.1:3301:8080"
     environment:
       SIGNOZ_SQLSTORE_PROVIDER: "postgres"
       SIGNOZ_SQLSTORE_POSTGRES_DSN: "postgres://signoz:${SIGNOZ_POSTGRES_PASSWORD:-signoz}@signoz-metastore-postgres:5432/signoz?sslmode=disable"
@@ -1318,24 +1328,28 @@ services:
     container_name: pbx-sso
     environment:
       <<: *sso-gateway-env
-      # FreePBX publishes :8083 on the host (the Zeus portal and the dograh
-      # route sync both reach it there), so the gateway uses that address rather
-      # than a container name — it deliberately does not join pbx-net.
-      OAUTH2_PROXY_UPSTREAMS: http://192.168.1.46:8083
+      # FreePBX's own GUI is on the shared voice plane, so the gateway reaches
+      # it by container name over pbx-net (`zeus-freepbx`, owned by Zeus's
+      # compose; the network is declared external above). Its host :8083 mapping
+      # is loopback-only now, so this is the only path in — hence the extra
+      # network rather than a host address.
+      OAUTH2_PROXY_UPSTREAMS: http://zeus-freepbx:80
     ports:
       - "${PBX_SSO_PORT:-14014}:4180"
-    networks: [interview-net]
+    networks: [interview-net, pbx-net]
 
   technitium-sso:
     <<: *sso-gateway
     container_name: technitium-sso
     environment:
       <<: *sso-gateway-env
-      # Technitium runs with host networking, so it is reachable on the host's
-      # address from this bridge. Cerulean writes DNS-01 challenge records
-      # through host.docker.internal:5380, never this public name, so there is
-      # no API route to exempt.
-      OAUTH2_PROXY_UPSTREAMS: http://192.168.1.46:5380
+      # Technitium runs with host networking, and its web console listens only
+      # on loopback + the docker0 gateway (DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES)
+      # so nothing on the LAN can reach :5380 — including this bridge, which
+      # therefore dials the docker0 address rather than the host's LAN address.
+      # Cerulean writes DNS-01 challenge records the same way (TECHNITIUM_URL),
+      # never through this public name, so there is no API route to exempt.
+      OAUTH2_PROXY_UPSTREAMS: http://${DOCKER_BRIDGE_GATEWAY:-172.17.0.1}:5380
     ports:
       - "${TECHNITIUM_SSO_PORT:-14015}:4180"
     networks: [interview-net]

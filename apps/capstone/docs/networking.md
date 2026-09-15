@@ -145,12 +145,20 @@ Internet ──► Router
               ├─ 10101-10120/udp ───► Asterisk (RTP)
               ├─ 3478/tcp+udp ──────► Coturn (TURN)
               └─ 49152-49251/udp ───► Coturn (relay)
-              └─ 443/tcp (HTTPS) ────► NPM ──► n8n:5678, grist:8484,
-                                       ├──► signoz:3301, freepbx:80
+              └─ 443/tcp (HTTPS) ────► NPM ──► *-sso gateway ──► the app
+                                       │      (n8n 14010, grist 14011, signoz 14012,
+                                       │       workflow 14013, pbx 14014, technitium 14015)
                                        └──► dograh-ui:3010 → api:8000 (your own NPM)
 ```
+
+The apps in that first branch have no OIDC of their own and their local logins
+are switched off, so the gateway is the only door: their own ports (`:5678`,
+`:8484`, `:3301`, `:8090`) are bound to `127.0.0.1` and reachable on the LAN from
+nowhere.
 
 **Rule of thumb:** if a port is `127.0.0.1:`-bound in compose, it stays
 loopback. If it's `0.0.0.0:`-bound, it's a NPM proxy candidate (or, for
 telephony, a router forward). Asterisk's SIP/RTP/WS ports are the only ones
-that must cross the router raw.
+that must cross the router raw. Host-mode services (Technitium) are the
+exception that compose cannot bind for you — they are restricted by their own
+settings instead (see `docs/operations.md`).
