@@ -240,6 +240,9 @@ services:
       AUTHENTIK_POST_LOGIN_REDIRECT: "${AUTHENTIK_POST_LOGIN_REDIRECT:-}"
       AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
       AUTHENTIK_ALLOWED_EMAILS: "${AUTHENTIK_ALLOWED_EMAILS:-}"
+      # Group gate: any Authentik identity carrying one of these groups (from
+      # the 'groups' scope) is admitted alongside the email allowlist.
+      AUTHENTIK_ALLOWED_GROUPS: "${AUTHENTIK_ALLOWED_GROUPS:-}"
       AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-}"
 
       # Host-mode URLs for the bridge services
