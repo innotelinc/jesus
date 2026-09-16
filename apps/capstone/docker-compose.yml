@@ -491,7 +491,18 @@ services:
     environment:
       OMNIROUTE_JWT_SECRET: "${OMNIROUTE_JWT_SECRET:-change-me-jwt-secret}"
       OMNIROUTE_API_KEY_SECRET: "${OMNIROUTE_API_KEY_SECRET:-change-me-api-key-secret}"
-      OMNIROUTE_INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-admin-password}"
+      # The image reads INITIAL_PASSWORD, and only INITIAL_PASSWORD: 114
+      # references to process.env.INITIAL_PASSWORD in its tree, and none at all
+      # to OMNIROUTE_INITIAL_PASSWORD. Passing only the OMNIROUTE_ name (as this
+      # file used to) leaves the dashboard with no password configured at all —
+      # POST /api/auth/login answers 403 "No password configured. Complete
+      # onboarding first.", which is not an error anyone can act on. Everything
+      # that mints a key through this gateway then fails: setup.sh's grader key,
+      # and the distro control plane, which disables the account it could not
+      # provision and never revisits it. The .env key stays OMNIROUTE_* — that
+      # is the name setup.sh and the control plane read — so only the name
+      # handed to the container is translated here.
+      INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-admin-password}"
       OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-ws-bridge-secret}"
     ports:
       # Two bindings, and deliberately not the LAN. The consumers of this port reach
