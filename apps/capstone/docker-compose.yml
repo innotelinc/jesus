@@ -1066,6 +1066,17 @@ services:
       # reuse FreePBX's main transport). Set when the router's 5060 port-forward
       # drops the PBX's own outbound REGISTERs (same source port as the rule).
       VOIPMS_REGISTER_PORT: ${VOIPMS_REGISTER_PORT:-}
+      # Cloudonix SIP peering (see pbx/entrypoint-dograh.sh setup_cloudonix_trunk).
+      # Enabled when CLOUDONIX_SIP_ENABLED=1, or automatically when a server,
+      # edge IP or SIP credentials are provided.
+      CLOUDONIX_SIP_ENABLED: ${CLOUDONIX_SIP_ENABLED:-}
+      CLOUDONIX_SIP_SERVER: ${CLOUDONIX_SIP_SERVER:-sip.cloudonix.net}
+      CLOUDONIX_EDGE_IP: ${CLOUDONIX_EDGE_IP:-18.219.128.166}
+      CLOUDONIX_SIP_PORT: ${CLOUDONIX_SIP_PORT:-5060}
+      CLOUDONIX_SIP_USER: ${CLOUDONIX_SIP_USER:-}
+      CLOUDONIX_SIP_PASS: ${CLOUDONIX_SIP_PASS:-}
+      # DID → dograh agent extension map, e.g. "4132643964:8000"
+      CLOUDONIX_DIDS: ${CLOUDONIX_DIDS:-}
       ASTERISK_WATCHDOG_INTERVAL: ${ASTERISK_WATCHDOG_INTERVAL:-30}
       ASTERISK_WATCHDOG_COOLDOWN: ${ASTERISK_WATCHDOG_COOLDOWN:-60}
     volumes:
