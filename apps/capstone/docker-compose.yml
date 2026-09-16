@@ -506,6 +506,14 @@ services:
       # A client on another machine uses that door instead: `192.168.1.46:20129/v1`.
       - "127.0.0.1:20128:20128"
       - "172.17.0.1:20128:20128"
+      # Bind for stacks that live on ANOTHER host. This service stays on the
+      # Cerulean/trust host while capstone and zeus move off it, so from their
+      # server neither this host's loopback nor its docker0 gateway is
+      # reachable — `host.docker.internal:20128` resolves to *their* docker0,
+      # where nothing is listening. Off by default (the loopback default keeps
+      # this host-only unless an operator opts in) and still password-protected
+      # by OMNIROUTE_INITIAL_PASSWORD. Set it to this host's LAN IP.
+      - "${OMNIROUTE_LAN_BIND:-127.0.0.1}:20128:20128"
     volumes:
       - omniroute_data:/data
     networks: [interview-net]
