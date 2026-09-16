@@ -481,9 +481,18 @@ services:
       OMNIROUTE_INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-admin-password}"
       OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-ws-bridge-secret}"
     ports:
-      # 0.0.0.0 — n8n reaches it via host.docker.internal:20128 and dograh
-      # (host mode) via 127.0.0.1:20128.
-      - "0.0.0.0:20128:20128"
+      # Two bindings, and deliberately not the LAN. The consumers of this port reach
+      # the host by one of two names and these cover both: a container via
+      # `host.docker.internal:20128`, which `host-gateway` resolves to 172.17.0.1 (n8n,
+      # olympus-studio, cerulean and the distro control plane all use it), and a
+      # host-mode process via 127.0.0.1:20128 (dograh).
+      #
+      # Publishing on 0.0.0.0 also satisfied those two, and put the dashboard on the
+      # LAN — where the only gate is its own password login, because Authentik and the
+      # `cerulean-platform` group check live in the proxy that fronts this, not here.
+      # A client on another machine uses that door instead: `192.168.1.46:20129/v1`.
+      - "127.0.0.1:20128:20128"
+      - "172.17.0.1:20128:20128"
     volumes:
       - omniroute_data:/data
     networks: [interview-net]
