@@ -485,10 +485,27 @@ services:
     container_name: omniroute
     restart: unless-stopped
     # Memory posture: the gateway buffers model streams; cap it so it never
-    # crowds the rest of the stack (steady ~0.5 GiB).
-    mem_limit: 1g
-    memswap_limit: 1g
+    # crowds the rest of the stack — but cap it ABOVE where it settles, because
+    # this gateway refuses work when its own cgroup runs near the limit.
+    #
+    # MEASURED. At 1g the container sits at ~0.59 GiB right after a restart and
+    # climbs past 1 GiB under combo load; OmniRoute's resource-pressure guard
+    # (highRatio .85, criticalRatio .92 of the cgroup limit) then trips with
+    # `reason=cgroup_ratio` — 56 times in 35 minutes here — and *every* model
+    # call gets
+    #
+    #   503 Service temporarily unavailable due to resource pressure. Retry shortly.
+    #
+    # in ~30 ms. Nothing downstream can tell that apart from a broken provider,
+    # so an app build stalls and the edge turns the wait into a 504. 3g keeps
+    # the guard's own threshold (~2.55 GiB) clear of the working set the gateway
+    # actually needs; the host has the headroom (15 GiB, ~9 GiB available).
+    mem_limit: 3g
+    memswap_limit: 3g
     environment:
+      # The image ships a 1 GiB V8 heap; raise it with the cgroup, since the
+      # pressure guard also watches heap ratio (85% of the heap limit).
+      NODE_OPTIONS: --max-old-space-size=2048
       OMNIROUTE_JWT_SECRET: "${OMNIROUTE_JWT_SECRET:-change-me-jwt-secret}"
       OMNIROUTE_API_KEY_SECRET: "${OMNIROUTE_API_KEY_SECRET:-change-me-api-key-secret}"
       # The image reads INITIAL_PASSWORD, and only INITIAL_PASSWORD: 114
