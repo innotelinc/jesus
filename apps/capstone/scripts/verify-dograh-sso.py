@@ -129,6 +129,9 @@ def drive_oidc_login(cfg, username: str, password: str) -> str:
                 if "access_token=" in nxt:
                     jwt_url = nxt
                     break
+                if "error=not_allowed" in nxt:
+                    raise v.CheckFailed(
+                        "dograh refused the identity: ?error=not_allowed")
                 url = absolute(nxt)
                 continue
             break
@@ -169,8 +172,62 @@ def main() -> int:
     v.require(status == 200, f"superuser workflow-runs -> {status}: settings surface closed")
     print("  settings: superuser surface reachable ✓")
 
+    check_group_gate(cfg)
+
     print("PASS: dograh SSO lands the admin in the organization that owns the agents")
     return 0
+
+
+def check_group_gate(cfg) -> None:
+    """The group admission gate, exercised with real identities.
+
+    A member of the SSO group who is NOT an admin must be admitted, and an
+    identity outside the group must be refused (`?error=not_allowed`). This is
+    what catches the two ways the gate silently fails: the 'groups' scope
+    dropped from the authorize request (everyone refused), or the scope
+    mapping removed from the provider (only admins admitted, everyone else
+    locked out).
+    """
+    api = v.AuthApi(cfg)
+    api.delete_user("e2e-dograh-group")
+    pk = api.call("POST", "/core/users/", {
+        "username": "e2e-dograh-group", "name": "E2E dograh group check",
+        "email": "e2e-dograh-group@innotel.us", "is_active": True,
+        "path": "users", "type": "internal",
+    })["pk"]
+    api.call("POST", f"/core/users/{pk}/set_password/", {"password": cfg.password})
+    try:
+        # ── member of the SSO group, not an admin ──
+        api.call("POST", f"/core/groups/{api.find_group(cfg.group)}/add_user/", {"pk": pk})
+        jwt = drive_oidc_login(cfg, "e2e-dograh-group", cfg.password)
+        status, me = _api_get(jwt, "/api/v1/user/auth/user")
+        v.require(status == 200, f"group member admitted but auth/user -> {status}")
+        print("  group gate: member of the SSO group is admitted ✓")
+
+        # ── same identity, outside the group ──
+        group_pk = api.find_group(cfg.group)
+        api.call("POST", f"/core/groups/{group_pk}/remove_user/", {"pk": pk})
+        try:
+            drive_oidc_login(cfg, "e2e-dograh-group", cfg.password)
+        except v.CheckFailed as failure:
+            v.require("not_allowed" in str(failure) or "404" in str(failure),
+                      f"non-member should be refused, instead: {failure}")
+            print("  group gate: identity outside the group is refused ✓")
+        else:
+            raise v.CheckFailed("a non-member was admitted — the group gate is not applied")
+    finally:
+        api.call("DELETE", f"/core/users/{pk}/")
+        print("  group gate: temp identity deleted")
+
+
+def _api_get(jwt: str, path: str):
+    req = urllib.request.Request(DOGrah_BASE + path,
+                                 headers={"Authorization": "Bearer " + jwt})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.status, json.load(resp)
+    except urllib.error.HTTPError as err:
+        return err.code, (err.read() or b"").decode("utf-8", "replace")[:200]
 
 
 if __name__ == "__main__":
