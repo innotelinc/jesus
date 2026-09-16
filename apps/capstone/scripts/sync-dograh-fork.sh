@@ -64,7 +64,13 @@ echo "── 1. Cloning fork ($FORK_REPO) + fetching upstream ($UPSTREAM_REPO) �
 git clone --quiet "https://github.com/${FORK_REPO}.git" "$WORK/fork"
 cd "$WORK/fork"
 git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
-git fetch --quiet upstream main --tags
+# --force on the tag fetch: the fork carries its own copies of upstream's
+# release tags from its creation (e.g. dograh-v1.46.0), and when upstream
+# moves or re-points a tag the plain fetch aborts with "would clobber existing
+# tag" — which silently killed the whole sync in CI (set -e + --quiet).
+# Upstream's tags are the authority for the version classification below, so
+# shadowing copies are meant to be overwritten here.
+git fetch --quiet --force upstream main --tags
 
 FORK_HEAD="$(git rev-parse origin/main)"
 UPSTREAM_HEAD="$(git rev-parse upstream/main)"
