@@ -181,8 +181,19 @@ jobs:
           bad=0
           # A docker-bridge address used as a value (not a CIDR range, not a
           # comment). The trailing group rejects 172.16.0.0/12 style ranges.
+          #
+          # Published-port bindings are excluded: `- "172.17.0.1:20128:20128"`
+          # is a LISTEN address, not a target. The rule this job enforces is
+          # about the address one service dials another through (README →
+          # Addressing); omniroute's host-gateway binding is deliberate — it is
+          # what lets a bridge container reach it at host.docker.internal
+          # without exposing the dashboard on the LAN. What the exclusion looks
+          # for is the `ip:hostport:containerport` shape only, so a target
+          # written either way (`KEY=value` or `- KEY=value`) is still caught.
           while IFS= read -r f; do
-            if hits=$(sed 's/#.*//' "$f" | grep -nE '(172\.(1[6-9]|2[0-9]|3[01])\.|10\.42\.)[0-9]{1,3}\.[0-9]{1,3}([^0-9/]|$)'); then
+            if hits=$(sed 's/#.*//' "$f" \
+                 | grep -vE '^[[:space:]]*-[[:space:]]*["'"'"']?[0-9.]+:[0-9]+:[0-9]+(/(udp|tcp))?["'"'"']?[[:space:]]*$' \
+                 | grep -nE '(172\.(1[6-9]|2[0-9]|3[01])\.|10\.42\.)[0-9]{1,3}\.[0-9]{1,3}([^0-9/]|$)'); then
               echo "::error file=$f::docker-bridge address used as a service target"
               echo "$hits"
               bad=1

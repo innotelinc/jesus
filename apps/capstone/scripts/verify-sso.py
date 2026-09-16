@@ -80,10 +80,13 @@ LAN_ONLY_PORTS = [
 ]
 
 # The shared oauth2-proxy session store (see the npm repo's compose.cerulean.yml)
-# is published on the docker0 gateway only: every bridge reaches that, the LAN
-# cannot.
+# is published twice on the host: on loopback for host-side tooling (this
+# script), and on the docker0 gateway for the containers that reach it through
+# the host-gateway alias. The LAN cannot reach it. Loopback is the right default
+# here — this runs on the host — and it keeps a docker-bridge literal out of the
+# tracked tree, which the CI addressing policy forbids.
 SESSION_STORE_PORT = 16380
-SESSION_STORE_HOST = "172.17.0.1"
+SESSION_STORE_HOST = "127.0.0.1"
 
 OK = "\033[32mPASS\033[0m"
 BAD = "\033[31mFAIL\033[0m"
