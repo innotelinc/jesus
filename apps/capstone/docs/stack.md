@@ -46,6 +46,43 @@ provides, and explicitly does not own.
 > See the [**Capstone ↔ Zeus convergence plan**](https://github.com/innotelinc/innotel-platform-stack/blob/main/docs/convergence-capstone-zeus.md)
 > for the target architecture (Capstone standalone + Zeus add-on) and phased work.
 
+## Roadmap — where Capstone stands (17 September 2026)
+
+**Live and verified on the deployment (`.30`):**
+
+- [x] **Voice core is up and attributed** — Postgres, Redis, MinIO, Dograh API
+      (`/health` 200) and UI, dashboard API + console, Zeus FreePBX + portal +
+      coturn on the shared host; Dograh's ARI connection to Zeus/FreePBX is
+      active, so calls already ride the Zeus voice plane on this deployment.
+- [x] **Observability restored after the capacity pass** — Prometheus (healthy),
+      Grafana (healthy, SSO-gated), the OTel collector, and the provisioning that
+      ships in-tree (`prometheus/prometheus.yml`, `grafana/dashboards/`).
+- [x] **Dashboard bundle in sync** — the rebuilt `dashboard/dist` (hashed assets,
+      monitoring/softphone views) is committed, so the repo builds what runs.
+- [x] **Authentik-first sign-in** — the dashboard authenticates through Cerulean
+      Authentik (`capstone-dashboard` provider); error codes surface on the login
+      view instead of silent failures.
+
+**Open, in priority order:**
+
+1. **Zeus convergence phase 2 — retire the bundled PBX.** Compose still ships
+      `zeus-freepbx` locally for standalone installs; the target is a
+      Capstone-standalone profile that dials the Zeus add-on as the only voice
+      plane. The structural-parity checklist is the gate.
+2. **ONYX as the authoritative store.** `voice-audio` recordings, transcripts and
+      backups still live on MinIO behind the `MINIO_*` contract (see
+      `docs/legacy-dependencies.md`). Migration happens behind that same
+      contract once ONYX's S3 compatibility, signed URLs and restore behavior
+      are tested — apps should not notice the move.
+3. **Vault-first secrets.** Like Monarch, this repo has no runtime resolver, so
+      host `.env` carries resolved values; adopt the resolving-env sidecar when
+      Cerulean offers it (`docs/stack.md` § Secrets).
+4. **N8n + Grist restart posture.** Both were parked in the 17 Sep capacity pass
+      and come back with `docker compose up -d n8n grist` — a compose profile
+      (`--profile tools`) would make "dev tools on demand" explicit instead of
+      always-on.
+
+
 ## Secrets (Cerulean Vault)
 
 The platform's SecretOps is **Cerulean Vault** — HashiCorp Vault, KV v2, hosted by
