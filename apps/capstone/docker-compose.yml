@@ -1,5 +1,5 @@
 # Capstone — self-hosted Voice AI Agent Platform
-# (dograh/Pipecat + local TTS/STT/LLM + n8n + Grist + Authentik + SigNoz observability)
+# (dograh/Pipecat + local TTS/STT/LLM + n8n + Grist + Authentik + Prometheus/Grafana)
 #
 # Canonical single-file compose for the capstone repo. All services are 100%
 # open-source and self-hosted — nothing calls a paid SaaS.
@@ -18,15 +18,17 @@
 # Services: postgres/redis/minio (dograh's own DB/cache/storage), kokoro-fastapi
 # (TTS, port 8880), speaches (STT, port 8001), OmniRoute LLM gateway on 20128,
 # n8n + self-hosted AI-assistant sandbox
-# (SearXNG), Grist (default dashboard), and SigNoz
-# (Postgres metastore + ClickHouse Keeper + unified binary + OTel collector).
+# (SearXNG), Grist (default dashboard), and the metrics-only observability
+# trio (OTel collector → Prometheus → Grafana; nothing stores traces).
 # The n8n Interview Grader workflow is auto-imported and activated at startup
 # by the n8n-import service.
 #
 # LLM gateway on 20128: the MIT-licensed OmniRoute container
-# (diegosouzapw/omniroute), OpenAI-compatible /v1. dograh (host mode) and n8n
-# both point at the same port (127.0.0.1:20128 / host.docker.internal:20128),
-# so the gateway is a single drop-in service for the whole stack.
+# (diegosouzapw/omniroute), OpenAI-compatible /v1. dograh (host mode) reaches it
+# on 127.0.0.1:20128 and everything else through the SSO proxy in front of it on
+# 20129 — the gateway's own port has no LAN binding, so 20129 is the one address
+# that works from anywhere for /v1. Either way it is a single drop-in service
+# for the whole stack.
 #
 # Run from THIS directory (all paths are relative to it):
 #     cp .env.example .env      # set OSS_JWT_SECRET etc. first
@@ -42,9 +44,8 @@
 #  20128 LLM gateway (OmniRoute)         5678  n8n
 #  8090  Workflow Studio (browser UI for creating phone agents)
 #  8484  Grist
-#  3301  SigNoz UI + API (unified binary)  4317/4318  OTel gRPC/HTTP ingest
-#  8888/8889  otel-collector metrics     19000 ClickHouse native (remapped)
-#  8123  ClickHouse HTTP                 9093  alertmanager
+#  3301  Grafana (held SigNoz's port)    4317/4318  OTel gRPC/HTTP ingest
+#  9090  prometheus (the metrics store)  8888/8889  otel-collector metrics
 #  8095  dashboard-api (control-panel aggregator)   8096  dashboard (Control Center UI)
 #
 # Binding policy: every web UI/API in this stack binds to 127.0.0.1 and is
@@ -69,7 +70,7 @@ name: capstone
 ###############################################
 # Authentik SSO gateways (oauth2-proxy)
 ###############################################
-# Every service in this stack that has no OIDC of its own — n8n, Grist, SigNoz,
+# Every service in this stack that has no OIDC of its own — n8n, Grist, Grafana,
 # the Workflow Studio and the FreePBX/AvantFax GUI — is fronted by a real OIDC
 # relying party instead of a password form: oauth2-proxy runs the browser
 # through a code flow against Cerulean Authentik and only then proxies the app.
@@ -123,11 +124,15 @@ x-sso-gateway: &sso-gateway
     OAUTH2_PROXY_ALLOWED_GROUPS: ${SSO_REQUIRED_GROUP:-cerulean-platform}
     OAUTH2_PROXY_SCOPE: openid email profile groups
     OAUTH2_PROXY_SESSION_STORE_TYPE: redis
-    # The session store is published on the host, so the gateway dials it through
-    # the host-gateway alias (which resolves to the docker0 gateway) rather than
-    # a LAN address — a LAN address is not reachable from the bridge by design,
-    # and a literal gateway IP is what the CI addressing policy forbids in
-    # service targets. extra_hosts below supplies the alias.
+    # The session store runs on the EDGE host. While edge and stack shared a box
+    # the gateway dialled the host-gateway alias (its own docker0); Capstone now
+    # has a server of its own, so SSO_SESSION_REDIS_HOST names the edge host's
+    # LAN address — the address the store is published on for exactly this case.
+    # The alias stays as the fallback and is correct only on the edge host
+    # itself: a gateway pointed at a docker0 that holds no store exits on
+    # "dial tcp 172.17.0.1:16380: connect: connection refused" rather than
+    # degrading. extra_hosts below supplies the alias; a literal gateway IP is
+    # what the CI addressing policy forbids in service targets.
     OAUTH2_PROXY_REDIS_CONNECTION_URL: redis://:${SSO_SESSION_REDIS_PASSWORD:-}@${SSO_SESSION_REDIS_HOST:-host.docker.internal}:${SSO_SESSION_REDIS_PORT:-16380}/0
     OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
     OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "false"
@@ -277,17 +282,21 @@ services:
       ENABLE_ARI_STASIS: "true"
       ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
 
-      # ── OpenTelemetry → SigNoz ────────────────────────────────────────────
+      # ── OpenTelemetry → the stack's collector ─────────────────────────────
       # Standard OTel SDK auto-config vars (used by any exporter that reads them)
       OTEL_SERVICE_NAME: "dograh-interview-agent"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318"
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
       OTEL_METRICS_EXPORTER: "otlp"
-      OTEL_LOGS_EXPORTER: "otlp"
+      # No log pipeline exists in the metrics-only collector; exporting them
+      # only produced per-batch drop warnings. Traces + metrics are the surfaces.
+      OTEL_LOGS_EXPORTER: "none"
       # dograh's tracing_config.py builds its default exporter from this var
       # (wired in api/constants.py + api/services/pipecat/tracing_config.py):
-      # spans go to SigNoz instead of being dropped when no Langfuse creds are
-      # set. See README "Observability wiring".
+      # spans go to the OTel collector instead of being dropped when no Langfuse
+      # creds are set. The name is the fork's, not SigNoz's — the collector
+      # converts each span to a RED histogram and drops the span. See README
+      # "Observability wiring".
       SIGNOZ_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces"
 
       # ── Call length ───────────────────────────────────────────────────────
@@ -440,6 +449,52 @@ services:
       start_period: 60s
     networks: [interview-net]
 
+  # ── TTS shim: one OpenAI-compatible door in front of the TTS engines ──────
+  # Speaks exactly what pipecat's SpeachesTTSService dials — POST
+  # /v1/audio/speech, response_format=pcm, s16le mono at 24 kHz — so dograh is
+  # pointed at it with a model-configuration change and no fork patch. Behind
+  # the door: a second engine for A/B, and a synthesized-audio cache, because
+  # the interview script is fixed text re-spoken on every call and upstream's
+  # cache covers recordings/ambient noise only. See tts-shim/README.md.
+  tts-shim:
+    build:
+      context: ./tts-shim
+      args:
+        WITH_PIPER: "${TTS_SHIM_WITH_PIPER:-1}"
+    image: ${TTS_SHIM_IMAGE:-capstone-tts-shim:local}
+    container_name: tts-shim
+    restart: unless-stopped
+    # Memory posture: the cache is on a volume and the engines are remote
+    # (Kokoro) or a subprocess (Piper), so the process itself stays small.
+    mem_limit: 2g
+    memswap_limit: 2g
+    environment:
+      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-kokoro}"
+      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-kokoro}"
+      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://kokoro-fastapi:8880}"
+      TTS_SHIM_PIPER_VOICE: "${TTS_SHIM_PIPER_VOICE:-}"
+      TTS_SHIM_CACHE_ENABLED: "${TTS_SHIM_CACHE_ENABLED:-true}"
+      TTS_SHIM_CACHE_MAX_BYTES: "${TTS_SHIM_CACHE_MAX_BYTES:-536870912}"
+      TTS_SHIM_SAMPLE_RATE: "24000"
+    ports:
+      # 8881 on the host: 8880 is kokoro-fastapi's own loopback port.
+      - "127.0.0.1:8881:8880"   # loopback only
+    volumes:
+      - tts_shim_cache:/var/cache/tts-shim
+      # Piper voice packs (.onnx + .onnx.json). On a volume rather than in the
+      # image so a voice is a data decision, not a rebuild: fetch one with
+      # `docker exec tts-shim python -m piper.download_voices <voice>`.
+      - tts_piper_voices:/opt/piper-voices
+    depends_on:
+      - kokoro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:8880/health', timeout=5)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [interview-net]
+
   # ── Local STT: Speaches (faster-whisper, OpenAI-compatible) ──────────────
   # dograh's native "speaches" STT provider points here (base_url …/v1). Host
   # Host port 8001 (dograh-api is host-mode on 8000, so 8001 stays free of
@@ -476,8 +531,10 @@ services:
   # MIT-licensed AI gateway (github.com/diegosouzapw/OmniRoute), official image
   # diegosouzapw/omniroute. Model "auto" = zero-config routing across its free
   # connected providers with automatic failover; the dashboard also runs on
-  # :20128 (first login uses OMNIROUTE_INITIAL_PASSWORD). dograh (host mode →
-  # 127.0.0.1:20128) and n8n (host.docker.internal:20128) point here.
+  # :20128, but it is no longer on the LAN — the dashboard is reached through the
+  # Authentik-fronted proxy on :20129 (5-dev/olympus/docs/gateway-sso.md) and the
+  # gateway's own login is off. dograh (host mode) dials 127.0.0.1:20128; every
+  # other consumer dials the proxy on 20129.
   # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
   # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
   omniroute:
@@ -523,10 +580,15 @@ services:
       OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-ws-bridge-secret}"
     ports:
       # Two bindings, and deliberately not the LAN. The consumers of this port reach
-      # the host by one of two names and these cover both: a container via
-      # `host.docker.internal:20128`, which `host-gateway` resolves to 172.17.0.1 (n8n,
-      # olympus-studio, cerulean and the distro control plane all use it), and a
+      # the host by one of two names and these cover both: a container *on this host*
+      # via `host.docker.internal:20128`, which `host-gateway` resolves to 172.17.0.1
+      # (olympus-studio, cerulean and the distro control plane all use it), and a
       # host-mode process via 127.0.0.1:20128 (dograh).
+      #
+      # A consumer on ANY OTHER host is not covered here, and must not try to be: its
+      # `host.docker.internal` is its own docker0. That is what n8n and this stack's
+      # dashboard-api do from `.30`, and it is why the two defaults above name the
+      # proxy on 20129 rather than this port.
       #
       # Publishing on 0.0.0.0 also satisfied those two, and put the dashboard on the
       # LAN — where the only gate is its own password login, because Authentik and the
@@ -534,14 +596,19 @@ services:
       # A client on another machine uses that door instead: `192.168.1.46:20129/v1`.
       - "127.0.0.1:20128:20128"
       - "172.17.0.1:20128:20128"
-      # Bind for stacks that live on ANOTHER host. This service stays on the
-      # Cerulean/trust host while capstone and zeus move off it, so from their
-      # server neither this host's loopback nor its docker0 gateway is
-      # reachable — `host.docker.internal:20128` resolves to *their* docker0,
-      # where nothing is listening. Off by default (the loopback default keeps
-      # this host-only unless an operator opts in) and still password-protected
-      # by OMNIROUTE_INITIAL_PASSWORD. Set it to this host's LAN IP.
-      - "${OMNIROUTE_LAN_BIND:-127.0.0.1}:20128:20128"
+      #
+      # THERE IS NO LAN BINDING, and that is now load-bearing rather than tidy.
+      # There used to be a third one (`OMNIROUTE_LAN_BIND`) for stacks that moved to
+      # another host, kept safe by the dashboard's own password. That safety is gone
+      # by design: `make gateway-auth-mode` sets `requireLogin=false`, so the gateway
+      # has no gate of its own and this port's reachability IS the control — see
+      # scripts/gateway-auth-mode.py, which refuses to make that change while the
+      # port answers anywhere but this host. So the LAN door is the proxy that
+      # fronts this service (`oauth2-proxy`, `192.168.1.46:20129`), which exempts
+      # `/v1` for inference clients and requires an Authentik session in
+      # `cerulean-platform` for the dashboard. Same host as this container, so it
+      # reaches the two bindings above and nothing else needs the LAN.
+      # See 5-dev/olympus/docs/gateway-sso.md.
     volumes:
       - omniroute_data:/data
     networks: [interview-net]
@@ -549,7 +616,7 @@ services:
   # ── Workflow automation: n8n (Community Edition) ──────────────────────────
   n8n:
     # Custom image: adds OpenTelemetry auto-instrumentation (see n8n.Dockerfile)
-    # so the grading workflow's LLM call exports spans to SigNoz.
+    # so the grading workflow's LLM call exports spans to the collector.
     build:
       context: .
       dockerfile: n8n.Dockerfile
@@ -602,17 +669,27 @@ services:
       GRIST_API_KEY: "${GRIST_API_KEY:-}"
       # API key for the OpenAI-compatible OmniRoute gateway on 20128. setup.sh
       # mints this automatically and persists it in .env.
-      # OpenTelemetry → SigNoz (bootstrap in n8n.Dockerfile reads these)
+      # OpenTelemetry → the collector (bootstrap in n8n.Dockerfile reads these)
       OTEL_SERVICE_NAME: "n8n"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://signoz-otel-collector:4318/v1/traces"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318/v1/traces"
 
       # ── n8n AI Assistant (self-hosted, open-source) ───────────────────────
       # instance-ai module + locally-run sandbox (n8n-sandbox) + SearXNG search.
-      # The model is served by OmniRoute (OpenAI-compatible /v1 on 20128);
-      # model "auto" routes across its free/connected providers.
+      # The model is served by OmniRoute (OpenAI-compatible /v1); model "auto"
+      # routes across its free/connected providers.
+      #
+      # 20129, NOT 20128. 20128 is the gateway's own port and it is published on
+      # loopback + this host's docker0 only — no LAN binding, because
+      # `make gateway-auth-mode` leaves the gateway with no login of its own and
+      # the reachability of that port is then the entire control (see the ports
+      # block under `omniroute`). 20129 is the oauth2-proxy in front of it, which
+      # exempts /v1 precisely so inference clients are unaffected. Through the
+      # alias this is correct on the host running that proxy; a stack on another
+      # host pins the LAN address of that host in .env instead, because the alias
+      # resolves to *its own* docker0 where nothing listens.
       N8N_ENABLED_MODULES: "${N8N_ENABLED_MODULES:-instance-ai}"
       N8N_INSTANCE_AI_MODEL: "${N8N_INSTANCE_AI_MODEL:-auto}"
-      N8N_INSTANCE_AI_MODEL_URL: "${N8N_INSTANCE_AI_MODEL_URL:-http://host.docker.internal:20128/v1}"
+      N8N_INSTANCE_AI_MODEL_URL: "${N8N_INSTANCE_AI_MODEL_URL:-http://host.docker.internal:20129/v1}"
       N8N_INSTANCE_AI_MODEL_API_KEY: "${N8N_INSTANCE_AI_MODEL_API_KEY:-omniroute}"
       N8N_INSTANCE_AI_SANDBOX_ENABLED: "true"
       N8N_INSTANCE_AI_SANDBOX_PROVIDER: "n8n-sandbox"
@@ -859,166 +936,97 @@ services:
       start_period: 30s
     networks: [interview-net]
 
-  # ── Observability: SigNoz — postgres metastore + separate
-  # ClickHouse Keeper + unified `signoz` binary (UI + API on 8080). Config
-  # YAMLs live next to this file. Grist is the sole record store (NocoDB
-  # removed — see docs/legacy-dependencies.md).
-  signoz-metastore-postgres:
-    image: postgres:16
-    container_name: signoz-metastore-postgres
+  # ── Observability: metrics-only — OTel Collector (span metrics) →
+  # Prometheus → Grafana. The collector converts inbound OTLP spans into RED
+  # histograms (calls + duration, dimensioned by span.name) and then DROPS the
+  # spans: there is no trace or log store to run. That is what removes the
+  # ClickHouse + Keeper + metastore + SigNoz cluster, which was measured here
+  # holding ~400 KiB of telemetry while pinning ~125% CPU and 1.18 GiB RSS.
+  # Every latency number the old SigNoz dashboard charted is still available as
+  # a Prometheus metric — see grafana/dashboards/pipeline-latency.json. Config
+  # lives in otel-collector-config.yaml and prometheus/. Grist is the sole
+  # record store (NocoDB removed — see docs/legacy-dependencies.md).
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.161.0}
+    container_name: otel-collector
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: signoz
-      POSTGRES_USER: signoz
-      POSTGRES_PASSWORD: "${SIGNOZ_POSTGRES_PASSWORD:-signoz}"
-    volumes:
-      - signoz_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U signoz -d signoz"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-    networks: [interview-net]
-
-  signoz-clickhouse-keeper:
-    image: clickhouse/clickhouse-keeper:25.12.5
-    container_name: signoz-clickhouse-keeper
-    restart: unless-stopped
-    entrypoint: ["/usr/bin/clickhouse-keeper", "--config-file=/etc/clickhouse-keeper/keeper.yaml"]
-    volumes:
-      - keeper_data:/var/lib/clickhouse-keeper
-      - ./clickhouse-keeper.yaml:/etc/clickhouse-keeper/keeper.yaml:ro
-    healthcheck:
-      test: ["CMD", "clickhouse-keeper-client", "-h", "localhost", "-p", "9181", "-q", "ls"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 40s
-    networks: [interview-net]
-
-  signoz-clickhouse:
-    image: clickhouse/clickhouse-server:25.12.5
-    container_name: signoz-clickhouse
-    restart: unless-stopped
-    # Memory posture: telemetry store — cap it; old traces roll off before the
-    # cap matters at this fleet size.
-    mem_limit: 2g
-    memswap_limit: 2g
-    environment:
-      CLICKHOUSE_SKIP_USER_SETUP: "1"
-      CLICKHOUSE_CONFIG: /etc/clickhouse-server/config.yaml
-    ports:
-      - "127.0.0.1:19000:9000"   # native protocol — remapped off 9000 (minio owns it); loopback only
-      - "127.0.0.1:8123:8123"    # HTTP — loopback only
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./clickhouse-config.yaml:/etc/clickhouse-server/config.yaml:ro
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    depends_on:
-      signoz-clickhouse-keeper: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 40s
-    networks: [interview-net]
-
-  signoz-schema-migrator:
-    # One-shot: creates the ClickHouse schema (bootstrap + sync + async
-    # migrations) before the collector/query-service start.
-    image: signoz/signoz-otel-collector:latest
-    container_name: signoz-schema-migrator
-    restart: "no"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - >-
-        for attempt in 1 2 3 4 5 6 7 8 9 10; do
-          /signoz-otel-collector migrate ready &&
-          /signoz-otel-collector migrate bootstrap &&
-          /signoz-otel-collector migrate sync up &&
-          /signoz-otel-collector migrate async up && exit 0;
-          echo "SigNoz schema migration attempt $${attempt} failed; retrying";
-          sleep 15;
-        done;
-        exit 1
-    environment:
-      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN: "tcp://signoz-clickhouse:9000"
-    depends_on:
-      signoz-clickhouse: { condition: service_healthy }
-      signoz-clickhouse-keeper: { condition: service_healthy }
-    networks: [interview-net]
-
-  signoz-otel-collector:
-    image: signoz/signoz-otel-collector:latest
-    container_name: signoz-otel-collector
-    restart: unless-stopped
-    command: ["--config=/etc/otel-collector-config.yaml"]
+    # Memory posture: this collector only holds span→metric aggregation state
+    # (bounded by the spanmetrics dimension set), so a small cap is real.
+    mem_limit: 512m
+    memswap_limit: 512m
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
     ports:
       - "127.0.0.1:4317:4317"   # OTLP gRPC — loopback only (dograh host mode → 127.0.0.1:4317)
       - "127.0.0.1:4318:4318"   # OTLP HTTP — loopback only (dograh host mode → 127.0.0.1:4318)
-      - "127.0.0.1:8888:8888"   # collector metrics — loopback only
-      - "127.0.0.1:8889:8889"
-    # Minimal image (bash only): a TCP connect to the OTLP HTTP listener proves
-    # the collector is accepting ingest.
+      - "127.0.0.1:8888:8888"   # collector internal metrics — loopback only
+      - "127.0.0.1:8889:8889"   # span metrics, in Prometheus format — loopback only
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    # No healthcheck: this image is distroless — no shell and no wget to probe
+    # with. It fails closed regardless: a bad config exits 1 and the restart
+    # policy surfaces it as `Restarting`, which is what the Control Center reads.
+    networks: [interview-net]
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.13.3}
+    container_name: prometheus
+    restart: unless-stopped
+    # Memory posture: metrics + a bounded TSDB WAL. Both retention knobs are
+    # set (time AND size) so a busy week can't fill the disk before the window
+    # rolls — the old ClickHouse had only a 2 GiB memory cap and grew freely.
+    mem_limit: 1g
+    memswap_limit: 1g
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}"
+      - "--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}"
+      - "--web.listen-address=0.0.0.0:9090"
+    ports:
+      - "127.0.0.1:9090:9090"   # loopback only
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/4318' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
-    depends_on:
-      signoz-schema-migrator: { condition: service_completed_successfully }
+      start_period: 20s
     networks: [interview-net]
 
-  signoz:
-    # Unified binary (v0.138): serves BOTH the query API and the UI on 8080,
-    # replacing the old signoz-query-service + signoz-frontend split.
-    image: signoz/signoz:latest
-    container_name: signoz
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.2.2}
+    container_name: grafana
     restart: unless-stopped
-    ports:
-      # 127.0.0.1 — the public door is signoz.<domain> → signoz-sso (14012);
-      # traces arrive at the OTel collector's own ports, not here.
-      - "127.0.0.1:3301:8080"
+    # Memory posture: UI + dashboard rendering only; the store is Prometheus.
+    mem_limit: 512m
+    memswap_limit: 512m
     environment:
-      SIGNOZ_SQLSTORE_PROVIDER: "postgres"
-      SIGNOZ_SQLSTORE_POSTGRES_DSN: "postgres://signoz:${SIGNOZ_POSTGRES_PASSWORD:-signoz}@signoz-metastore-postgres:5432/signoz?sslmode=disable"
-      SIGNOZ_TELEMETRYSTORE_PROVIDER: "clickhouse"
-      SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: "tcp://signoz-clickhouse:9000"
-      # Session-signing key. Override via .env (SIGNOZ_JWT_SECRET); the default
-      # is a random value generated at setup so sessions aren't forgeable.
-      SIGNOZ_TOKENIZER_JWT_SECRET: "${SIGNOZ_JWT_SECRET:-0df51a148293dcf934bdf22c2c1a1be797732f98a977ecb2e7b4e851826cc67b}"
-    volumes:
-      - signoz_data:/var/lib/signoz
-    depends_on:
-      signoz-metastore-postgres: { condition: service_healthy }
-      signoz-clickhouse: { condition: service_healthy }
-      signoz-schema-migrator: { condition: service_completed_successfully }
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/v1/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    networks: [interview-net]
-
-  signoz-alertmanager:
-    image: signoz/alertmanager:latest
-    container_name: signoz-alertmanager
-    restart: unless-stopped
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-http://localhost:3301}"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     ports:
-      - "127.0.0.1:9093:9093"   # loopback only
+      # 3301 is deliberately the port the SigNoz UI held: the NPM proxy host,
+      # the dashboard catalog and any firewall rule keep pointing at the same
+      # number, and only the upstream behind it changed.
+      - "127.0.0.1:3301:3000"   # loopback only; public door is grafana.<domain> → grafana-sso (14012)
     volumes:
-      - alertmanager-data:/data
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks: [interview-net]
-    profiles: ["alertmanager"]   # optional
 
   # ── PBX / FreePBX (Asterisk 22 + FreePBX 17 + AvantFax) ───────────────────
   # FreePBX fullstack image + dograh ARI wiring. Was a separate compose file
@@ -1271,9 +1279,10 @@ services:
       # scripts/dograh_wire.py persists it when it wires the telephony config.
       DOGRAH_STASIS_APP_NAME: "${DOGRAH_STASIS_APP_NAME:-}"
       # "Describe it with AI" workflow authoring on the Workflows page / agent
-      # modal: OmniRoute is on the host (host-mode dograh + published 20128),
-      # same route the Workflow Studio uses. Empty key is fine.
-      OMNIROUTE_URL: "${OMNIROUTE_URL:-http://host.docker.internal:20128}"
+      # modal: the same route the Workflow Studio uses, through the SSO proxy
+      # (20129) rather than the gateway's own port (20128, loopback + docker0
+      # only — see the ports block under `omniroute`). Empty key is fine.
+      OMNIROUTE_URL: "${OMNIROUTE_URL:-http://host.docker.internal:20129}"
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
       # standalone (default): dashboard provisions FreePBX rows directly
@@ -1370,16 +1379,16 @@ services:
       - "${GRIST_SSO_PORT:-14011}:4180"
     networks: [interview-net]
 
-  signoz-sso:
+  grafana-sso:
     <<: *sso-gateway
-    container_name: signoz-sso
+    container_name: grafana-sso
     environment:
       <<: *sso-gateway-env
-      # Liveness only. Traces arrive at the OTel collector's own ports, not here.
-      OAUTH2_PROXY_SKIP_AUTH_ROUTES: '^/api/v1/health$'
-      OAUTH2_PROXY_UPSTREAMS: http://signoz:8080
+      # Liveness only. OTLP arrives at the collector's own ports, not here.
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: '^/api/health$'
+      OAUTH2_PROXY_UPSTREAMS: http://grafana:3000
     ports:
-      - "${SIGNOZ_SSO_PORT:-14012}:4180"
+      - "${GRAFANA_SSO_PORT:-14012}:4180"
     networks: [interview-net]
 
   workflow-sso:
@@ -1407,23 +1416,20 @@ services:
       - "${PBX_SSO_PORT:-14014}:4180"
     networks: [interview-net, pbx-net]
 
-  technitium-sso:
-    <<: *sso-gateway
-    container_name: technitium-sso
-    environment:
-      <<: *sso-gateway-env
-      # Technitium runs with host networking, and its web console listens only
-      # on loopback + the docker0 gateway (DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES)
-      # so nothing on the LAN can reach :5380 — including this bridge, which
-      # therefore dials the host gateway rather than the host's LAN address.
-      # Cerulean writes DNS-01 challenge records the same way (TECHNITIUM_URL),
-      # never through this public name, so there is no API route to exempt.
-      # DOCKER_BRIDGE_GATEWAY still overrides it for a host whose gateway is not
-      # the default (set it in .env, not here — see .env.example).
-      OAUTH2_PROXY_UPSTREAMS: http://${DOCKER_BRIDGE_GATEWAY:-host.docker.internal}:5380
-    ports:
-      - "${TECHNITIUM_SSO_PORT:-14015}:4180"
-    networks: [interview-net]
+  # ── Technitium's console is not gated from here ───────────────────────────
+  # `technitium-sso` used to be the sixth gateway in this stack. That was right
+  # only while every product shared one host: Cerulean owns the container
+  # (`dns.internal.innotel.us` → `cerulean-technitium`), and the console is
+  # host-networked with its web listener pinned to `127.0.0.1,172.17.0.1`, so a
+  # gateway on *another* server has nothing to dial — on `.30` both of those
+  # addresses are that host's own, and every signed-in request to the name
+  # answered `502` while the redirect to Authentik still looked healthy.
+  #
+  # The gateway now runs beside the console it fronts, in the cerulean stack
+  # (`1-primary/cerulean/docker-compose.yml`, profile `technitium`), on the same
+  # shared client, cookie and session store — so nothing about the sign-in
+  # changed and there is still one Authentik session across the platform.
+
 
 volumes:
   postgres_data:
@@ -1433,12 +1439,11 @@ volumes:
   speaches_models:
   n8n_data:
   grist_data:
-  clickhouse_data:
-  keeper_data:
-  signoz_postgres_data:
-  signoz_data:
+  prometheus_data:
+  grafana_data:
+  tts_shim_cache:
+  tts_piper_voices:
   sandbox-tls:
-  alertmanager-data:
   # PBX volumes (named + external so the stack shares state with a
   # standalone pbx-portal deployment). Created by scripts/setup.sh on a
   # fresh host.
@@ -1468,7 +1473,7 @@ volumes:
 
 networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the
-  # same bridge for all services (grist, signoz, kokoro, pbx). Without `name:`,
+  # same bridge for all services (grist, grafana, kokoro, pbx). Without `name:`,
   # compose creates a second `capstone_interview-net` and n8n can't reach
   # minio/grist. setup.sh pre-creates it on a fresh host, so it is `external`
   # here: compose must reuse the existing network instead of demanding its own

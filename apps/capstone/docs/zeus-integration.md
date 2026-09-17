@@ -89,7 +89,7 @@ What made that a swap instead of a migration:
 | Agents | FreePBX Custom Extensions `8000`–`8007`, mirrored into inbound routes every 2 min (`sync_dograh_routes.py`), plus anything created in the dograh UI/Workflow Studio |
 | Intelligence | Local STT (Speaches/Whisper), local TTS (Kokoro), LLM via the OmniRoute gateway |
 | Call control | Inbound screening, outbound originate for outreach/campaigns, **`transfer_call` tool** — destinations like `PJSIP/<ext>`, `+1…`, pre-transfer message, disposition write-back, call-time resolver |
-| Records | Recordings → Minio; grading via n8n webhook; OTel → SigNoz |
+| Records | Recordings → Minio; grading via n8n webhook; OTel → Prometheus + Grafana |
 
 ## 3. Target architecture (one voice plane)
 

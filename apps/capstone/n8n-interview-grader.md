@@ -178,10 +178,13 @@ fails, because a retry replays that execution's stored (empty) payload.
 
 ## Node 3 — HTTP Request: grade via OmniRoute (auto)
 
-- Method `POST`, URL `http://host.docker.internal:20128/v1/chat/completions`
+- Method `POST`, URL `http://192.168.1.46:20129/v1/chat/completions`
   (OmniRoute gateway, model `auto` — routes across its free/connected
-  providers. Reachable from the n8n container via the `host-gateway` extra
-  host).
+  providers). That address is the gateway host and the SSO proxy in front of the
+  gateway, which exempts `/v1` for API clients. It used to be
+  `host.docker.internal:20128`, which resolves to the *n8n container's own*
+  docker0 — nothing listens there, and nothing had since the gateway/PBX host
+  split either.
 - Headers: `Content-Type: application/json`.
 - **Must set `specifyBody: "json"`** on the node, or n8n ignores `jsonBody`
   and sends an empty body (`{"":""}`). The URL field has no such gate, which
@@ -391,8 +394,10 @@ Rules:
 ## Quick sanity check
 
 After the first real call, open Grist and confirm the row has a Score, Verdict,
-and per-dimension scores. Then open SigNoz → `dograh-pipeline` traces and
-confirm the pipeline spans (STT → LLM → TTS) and their latencies are visible.
+and per-dimension scores. Then open Grafana → **Interview Pipeline Latency**
+(`:3301`) and confirm the pipeline stages (STT → LLM → TTS) and their latencies
+are visible — each stage is a span-name series produced by the collector, not a
+stored trace.
 
 ## Verified end-to-end (this repo, 2026-08-19)
 

@@ -6,9 +6,11 @@
 #
 #   Main stack  (docker-compose.yml)
 #     • every container healthy (dograh, kokoro, speaches, omniroute, n8n,
-#       grist, postgres, redis, minio, SigNoz + ClickHouse)
+#       grist, postgres, redis, minio, otel-collector, prometheus, grafana,
+#       tts-shim)
 #     • HTTP endpoints: kokoro /health, speaches /health, OmniRoute :20128,
-#       n8n /healthz, Grist :8484, SigNoz :3301, OTel ingest :4318
+#       n8n /healthz, Grist :8484, Grafana :3301, OTel ingest :4318,
+#       TTS shim :8881
 #     • dograh UI auth surfaces: the sign-in screen responds, an anonymous
 #       /workflow lands on that form instead of a dead-end error, and every
 #       /auth/login?error=<slug> state still renders (see the OIDC notes in
@@ -17,7 +19,8 @@
 #       (built React SPA; /api proxied to the aggregator)
 #     • round-trips: Kokoro TTS → WAV → Speaches STT transcription, and the
 #       LLM gateway /v1/chat/completions (the same call n8n's grader makes)
-#     • observability: ClickHouse ping + dograh-pipeline trace count (24h)
+#     • observability: Prometheus scrape health, the span→metric series the
+#       pipeline dashboard reads, and what the collector refused
 #     • dograh telephony wiring (when DOGRAH_API_TOKEN is in .env): the three
 #       interview agent workflows imported, the Asterisk ARI telephony
 #       config present, and extensions 8000/8001/8002 bound to their agents
@@ -251,8 +254,7 @@ fi
 if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — containers"
   for svc in postgres redis minio dograh-api dograh-ui kokoro speaches omniroute n8n grist \
-             signoz-metastore-postgres signoz-clickhouse-keeper signoz-clickhouse \
-             signoz-otel-collector signoz dashboard-api dashboard; do
+             otel-collector prometheus grafana tts-shim dashboard-api dashboard; do
     check_container "$COMPOSE_MAIN" "$svc"
   done
   check_exit_code "$COMPOSE_MAIN" n8n-import
@@ -283,8 +285,11 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   check_http "n8n /healthz"             200 "http://127.0.0.1:5678/healthz"
   check_http "n8n grader webhook"        200 "http://127.0.0.1:5678/webhook/interview-graded" -X POST -H "Content-Type: application/json" -d '{}'
   check_http "Grist :8484"              200 "http://127.0.0.1:8484/" -L
-  check_http "SigNoz UI+API :3301"      200 "http://127.0.0.1:3301/api/v1/health"
+  # Grafana holds the port the SigNoz UI had (3301), so proxy hosts and
+  # firewall rules did not have to move with the stack underneath them.
+  check_http "Grafana /api/health :3301" 200 "http://127.0.0.1:3301/api/health"
   check_alive "OTel collector :4318"    "http://127.0.0.1:4318/v1/traces" -X POST
+  check_http "TTS shim /health :8881"   200 "http://127.0.0.1:8881/health"
   check_http "Dashboard API /healthz"   200 "http://127.0.0.1:8095/healthz"
   check_http "Control Center UI :8096"  200 "http://127.0.0.1:8096/" -L
   check_alive "Control Center /api proxy" "http://127.0.0.1:8096/api/services"
@@ -356,23 +361,38 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   fi
 
   section "Main stack — observability"
-  ch_ping=$(curl -sS --max-time 10 "http://127.0.0.1:8123/ping" 2>/dev/null)
-  if [[ "$ch_ping" == "Ok." ]]; then
-    pass "ClickHouse ping (host :8123)"
+  # Prometheus replaced the ClickHouse + SigNoz pair: the collector converts
+  # spans into the `traces_span_metrics_*` series and drops the spans, so there
+  # is nothing to ping on :8123 any more. `up` proves the store answers, a
+  # non-zero span counter proves the span→metric conversion is landing (rather
+  # than only the collector being reachable), and the refused counter is what a
+  # broken pipeline looks like before the dashboard shows a gap.
+  prom_url="http://127.0.0.1:9090/api/v1/query"
+  prom_scalar() { # expression → the first sample's value, empty on error
+    curl -sS --max-time 10 --get "$prom_url" --data-urlencode "query=$1" 2>/dev/null \
+      | grep -o '"value":\[[0-9.]*,"[^"]*"\]' | head -1 | cut -d'"' -f4
+  }
+
+  up_targets=$(curl -sS --max-time 10 --get "$prom_url" --data-urlencode 'query=up' 2>/dev/null \
+    | grep -o '"value":\[' | wc -l)
+  if [[ "${up_targets:-0}" -gt 0 ]]; then
+    pass "Prometheus scraping ${C_BOLD}${up_targets}${C_NC} target(s) — http://127.0.0.1:9090/targets shows any gap"
   else
-    fail "ClickHouse ping → '${ch_ping:-no response}'"
+    fail "Prometheus reported no targets — check its /targets over an SSH tunnel"
   fi
 
-  ch_q='SELECT count() FROM signoz_traces.signoz_index_v3 WHERE serviceName='"'"'dograh-pipeline'"'"' AND timestamp >= now() - INTERVAL 24 HOUR'
-  span_count=$(curl -sS --max-time 15 --get "http://127.0.0.1:8123/" --data-urlencode "query=$ch_q" 2>/dev/null | tr -d '[:space:]')
-  if [[ "$span_count" =~ ^[0-9]+$ ]]; then
-    if [[ "$span_count" -gt 0 ]]; then
-      pass "dograh-pipeline spans in SigNoz (24h): ${C_BOLD}${span_count}${C_NC}"
-    else
-      warn "no dograh-pipeline spans yet — expected before the first call"
-    fi
+  span_count=$(prom_scalar 'sum(traces_span_metrics_calls_total)')
+  if [[ -n "$span_count" && "$span_count" != "NaN" && "${span_count%%.*}" -gt 0 ]]; then
+    pass "pipeline spans converted to metrics: ${C_BOLD}${span_count}${C_NC} over the retention window"
   else
-    warn "trace query failed (${span_count:-no data}) — check the SigNoz dashboard after a real call"
+    warn "no span metrics yet (got '${span_count:-no data}') — expected before the first call; after one, check the collector's refused counter"
+  fi
+
+  refused=$(prom_scalar 'sum(otelcol_receiver_refused_spans_total)')
+  if [[ -z "$refused" || "$refused" == "0" ]]; then
+    pass "collector has refused no spans"
+  else
+    warn "collector refused ${refused} span(s) — they never became metrics"
   fi
 
   rm -f "$TTS_WAV" "$stt_body" "$llm_body"

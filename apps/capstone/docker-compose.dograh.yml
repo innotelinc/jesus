@@ -55,12 +55,17 @@ services:
       ENABLE_ARI_STASIS: "true"
       ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
 
-      # ── OpenTelemetry → SigNoz ────────────────────────────────────────────
+      # ── OpenTelemetry → the stack's collector ─────────────────────────────
+      # Spans are converted to RED metrics and dropped (see
+      # otel-collector-config.yaml), and there is no log pipeline, so
+      # OTEL_LOGS_EXPORTER is "none" — exporting them only logs a drop warning
+      # per batch. SIGNOZ_OTLP_ENDPOINT is the fork's variable name, not an
+      # address that has to be SigNoz's (see .env.example).
       OTEL_SERVICE_NAME: "dograh-interview-agent"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318"
       OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
       OTEL_METRICS_EXPORTER: "otlp"
-      OTEL_LOGS_EXPORTER: "otlp"
+      OTEL_LOGS_EXPORTER: "none"
       SIGNOZ_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)\""]

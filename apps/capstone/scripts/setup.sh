@@ -115,8 +115,7 @@ else
     sed -i "s|^SANDBOX_API_RUNNER_REGISTRATION_TOKEN=.*|SANDBOX_API_RUNNER_REGISTRATION_TOKEN=$(openssl rand -hex 32)|" "$ENV_FILE"
     sed -i "s|^SANDBOX_API_RUNNER_API_KEY=.*|SANDBOX_API_RUNNER_API_KEY=$(openssl rand -hex 32)|" "$ENV_FILE"
     sed -i "s|^SEARXNG_SECRET=.*|SEARXNG_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
-    sed -i "s|^SIGNOZ_POSTGRES_PASSWORD=.*|SIGNOZ_POSTGRES_PASSWORD=$(openssl rand -hex 16)|" "$ENV_FILE"
-    sed -i "s|^SIGNOZ_JWT_SECRET=.*|SIGNOZ_JWT_SECRET=$(openssl rand -hex 32)|" "$ENV_FILE"
+    sed -i "s|^GRAFANA_PASSWORD=.*|GRAFANA_PASSWORD=$(openssl rand -hex 16)|" "$ENV_FILE"
     # Authentik (SSO / user management)
     sed -i "s|^AUTHENTIK_SECRET_KEY=.*|AUTHENTIK_SECRET_KEY=$(openssl rand -base64 36)|" "$ENV_FILE"
     sed -i "s|^AUTHENTIK_TOKEN=.*|AUTHENTIK_TOKEN=$(openssl rand -base64 36)|" "$ENV_FILE"
@@ -369,14 +368,14 @@ if [ "$NEED_BUILD" -eq 1 ]; then
     # Pass only the --build flag, not service names: `docker compose up ...
     # <service> <service>` would limit `up` to just those services (plus their
     # dependencies), silently leaving the rest of the stack — n8n, grist,
-    # signoz, freepbx, kokoro, speaches, omniroute, coturn — unstarted, which
+    # grafana, freepbx, kokoro, speaches, omniroute, coturn — unstarted, which
     # then breaks every later bootstrap step.
     BUILD_ARGS=(--build)
 else
     BUILD_ARGS=()
 fi
 # Don't use `up --wait` here: the stack contains one-shot services (n8n-import,
-# sandbox-certs, signoz-schema-migrator) that run their job and exit 0, which
+# sandbox-certs) that run their job and exit 0, which
 # `--wait` reports as a boot failure even when everything else is healthy.
 # Plain `up -d` + the wait loop below is the boot verification.
 if ! docker compose "${BASE_COMPOSE[@]}" up -d --remove-orphans "${BUILD_ARGS[@]}" >"$COMPOSE_LOG" 2>&1; then
@@ -390,7 +389,7 @@ pass "both composes up — waiting for healthy…"
 
 # Wait for every service to become healthy (a single check races the boot,
 # which is exactly how the Grist bootstrap below failed on fresh installs).
-for svc in postgres redis minio kokoro speaches omniroute n8n grist signoz freepbx dograh-api dashboard-api dashboard; do
+for svc in postgres redis minio kokoro speaches omniroute n8n grist grafana prometheus otel-collector freepbx dograh-api dashboard-api dashboard; do
     # dograh-api uses host mode, so `docker compose ps` won't show a healthcheck —
     # we check its port instead.
     if [ "$svc" = "dograh-api" ]; then
@@ -614,7 +613,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 # Creates/updates every NPM proxy host from the README table (scripts/
 # npm-proxy-hosts.py): the canonical subdomains app, api, auth, voice, admin,
-# pbx + n8n, grist, omniroute, signoz, workflow (+ optional portal/nocodb),
+# pbx + n8n, grist, omniroute, grafana, workflow (+ optional portal/nocodb),
 # with Let's Encrypt certs — ONE wildcard cert for all of them when
 # NPM_WILDCARD_CERT=1 and DNS credentials are configured (see README "NPM
 # proxy hosts"). NPM itself runs OUTSIDE this compose file (usually port 81)
@@ -685,7 +684,7 @@ echo "    Control Center: http://localhost:8096"
 echo "    FreePBX:  http://localhost:80"
 echo "    n8n:      http://localhost:5678"
 echo "    Grist:    http://localhost:8484"
-echo "    SigNoz:   http://localhost:3301"
+echo "    Grafana:  http://localhost:3301"
 echo "    OmniRoute: http://localhost:20128"
 echo ""
 # ── Cerulean Vault (SecretOps) — secret posture ─────────────────────

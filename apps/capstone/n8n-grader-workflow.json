@@ -69,7 +69,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:20128/v1/chat/completions",
+        "url": "http://192.168.1.46:20129/v1/chat/completions",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

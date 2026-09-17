@@ -20,7 +20,7 @@ The port inventory below is the actual published mapping from
 Terminate TLS in NPM and forward to these local ports. Do **not** expose the
 raw port to the internet.
 
-The five services with no OIDC of their own (FreePBX, n8n, Grist, SigNoz,
+The five services with no OIDC of their own (FreePBX, n8n, Grist, Grafana,
 Workflow Studio) are fronted by an **`oauth2-proxy` SSO gateway**, so the NPM
 host forwards to the gateway's port — not the app's. The app's own port is still
 published on the LAN (see `ips/docs/sign-in-posture.md`, open items); the
@@ -34,7 +34,7 @@ gateway is what puts Cerulean Authentik in front of the public name.
 | FreePBX web UI (+ AvantFAX at `/fax`) | `8083` | `http://127.0.0.1:14014` (`pbx-sso`) | `pbx.<domain>` |
 | n8n | `5678` | `http://127.0.0.1:14010` (`n8n-sso`) | `n8n.<domain>` |
 | Grist | `8484` | `http://127.0.0.1:14011` (`grist-sso`) | `grist.<domain>` |
-| SigNoz UI | `3301` | `http://127.0.0.1:14012` (`signoz-sso`) | `signoz.<domain>` |
+| Grafana | `3301` | `http://127.0.0.1:14012` (`grafana-sso`) | `grafana.<domain>` |
 | Workflow Studio | `8090` | `http://127.0.0.1:14013` (`workflow-sso`) | `workflow.<domain>` |
 | Capstone Control Center | `8096` | `http://127.0.0.1:8096` | `admin.<domain>` |
 | WebRTC WSS (softphone) | `8089` | `https://127.0.0.1:8089/ws` (WSS) | `voice.<domain>` |
@@ -42,15 +42,23 @@ gateway is what puts Cerulean Authentik in front of the public name.
 
 Notes:
 
-- **Enable WebSockets** on the n8n and SigNoz proxy hosts — their UIs use
+- **Enable WebSockets** on the n8n and Grafana proxy hosts — their UIs use
   WSS (and dograh's UI does too, if you proxy it).
 - **n8n public webhook** — dograh POSTs the grading webhook to
   `http://127.0.0.1:5678` (same host), so it works internally today. Only
   proxy n8n if you want remote editor access or webhooks from outside the
   LAN.
-- **OmniRoute (`20128`)** holds the LLM API key and is bound `0.0.0.0` only
-  so n8n can reach it via `host.docker.internal:20128`. Keep it **internal**,
-  do not proxy it.
+- **OmniRoute (`20128`)** holds the LLM API key and is bound to `127.0.0.1` and
+  this host's docker0 (`172.17.0.1`) — **not** the LAN. It stopped being reachable
+  by address when its host split from the stack, because the dashboard's own login
+  was turned off (`make gateway-auth-mode`, `requireLogin=false`) and the port's
+  reachability is then the only control. The door is the identity-aware proxy in
+  front of it, `192.168.1.46:20129`, which exempts `/v1` for inference clients and
+  requires Authentik for the dashboard. Keep **that** internal too: the dashboard
+  name is published with `/v1` refused at the edge. Consumers here dial
+  `host.docker.internal:20129`; a stack on another host pins the LAN address of
+  the proxy's host in `.env`. See `docs/operations.md` → Addressing, and
+  `5-dev/olympus/docs/gateway-sso.md`.
 - **dograh API (`8000`)** runs in host network mode on its original uvicorn
   port — the PBX reaches it back via `host.docker.internal:8000` media
   WebSocket and the n8n container calls it via the LAN IP. The **dograh UI
@@ -110,8 +118,8 @@ that is the address the dialler actually uses.
 | `8001` | speaches STT (host `8001` → container `8000`) |
 | `4317` / `4318` | OTel gRPC / HTTP ingest |
 | `8888` / `8889` | otel-collector metrics |
-| `19000` / `8123` | ClickHouse native / HTTP |
-| `9093` | alertmanager |
+| `9090` | prometheus (the metrics store) |
+| `8881` | tts-shim (host port; the container listens on `8880`) |
 | `8080` | NocoDB (optional — switch off Grist to use it) |
 | `10000` (TCP) | FreePBX Webmin (optional) |
 | `3478` (TCP/UDP) | Coturn TURN listener |
@@ -146,7 +154,7 @@ Internet ──► Router
               ├─ 3478/tcp+udp ──────► Coturn (TURN)
               └─ 49152-49251/udp ───► Coturn (relay)
               └─ 443/tcp (HTTPS) ────► NPM ──► *-sso gateway ──► the app
-                                       │      (n8n 14010, grist 14011, signoz 14012,
+                                       │      (n8n 14010, grist 14011, grafana 14012,
                                        │       workflow 14013, pbx 14014, technitium 14015)
                                        └──► dograh-ui:3010 → api:8000 (your own NPM)
 ```

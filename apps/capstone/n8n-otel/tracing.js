@@ -2,14 +2,15 @@
 //
 // Loaded via NODE_OPTIONS=--require ... in n8n.Dockerfile. Instruments the
 // Node http/express stack so the grading workflow's outbound HTTP call to the
-// local LLM is exported as a span (with duration + status) to the SigNoz OTLP
-// collector, alongside the dograh pipeline spans.
+// local LLM is exported as a span (with duration + status) to the stack's OTLP
+// collector, alongside the dograh pipeline spans. The collector converts it to
+// a RED metric and drops the span — there is no trace store.
 const { NodeSDK } = require('@opentelemetry/sdk-node');
 const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 
 const endpoint =
-  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://signoz-otel-collector:4318/v1/traces';
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://otel-collector:4318/v1/traces';
 
 const sdk = new NodeSDK({
   serviceName: process.env.OTEL_SERVICE_NAME || 'n8n',

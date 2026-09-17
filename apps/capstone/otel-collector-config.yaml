@@ -1,7 +1,23 @@
-# SigNoz otel-collector config (clickhouse 25.4 topology).
-# The collector ingests OTLP and writes DIRECTLY to ClickHouse (no hop through
-# the query-service anymore). Traces go to signoz_traces, metrics to
-# signoz_metrics. The schema is created by signoz-schema-migrator.
+# ── OTel Collector: metrics-only ─────────────────────────────────────────────
+# dograh's pipecat pipeline exports OTLP **traces** named `llm-*`, `tts`, `stt`,
+# `turn-N`, `conversation` under `service.name=dograh-pipeline` (see
+# api/services/pipecat/tracing_config.py). This collector turns each span into
+# R.E.D. metrics — `traces.span.metrics.calls` and
+# `traces.span.metrics.duration`, dimensioned by `span.name` — and then DROPS
+# the span. Nothing is written to a trace or log store, which is what removed
+# the ClickHouse + Keeper + metastore + SigNoz cluster from this stack.
+#
+# The dropped spans cost real resources: measured before this change, that
+# cluster held ~400 KiB of telemetry while pinning ~125% of a core and 1.18 GiB
+# RSS (its 2 GiB cap). Here the same numbers arrive as metrics in Prometheus,
+# which is where the dashboards read them from anyway.
+#
+# Prometheus format is served on :8889 (scraped by the `prometheus` service).
+# The one thing span attributes could give that span metrics cannot is a
+# histogram *value* taken from an attribute — `metrics.ttfb`. That single panel
+# is replaced by the `tts` span-duration histogram plus the TTS shim's own
+# `tts_shim_ttfa_seconds` histogram, which measures the same quantity locally
+# and per engine. See docs/operations.md → Observability.
 receivers:
   otlp:
     protocols:
@@ -11,32 +27,91 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  # Spans are only a carrier for the metrics here, so batch them for the
+  # connector rather than for an export hop.
   batch:
     send_batch_size: 1000
     timeout: 5s
 
+  # Keep the metric labels low-cardinality and meaningful: label by the call's
+  # organization (bounded per-tenant) and drop the per-collector UUID, which
+  # only exists for multi-writer setups and would otherwise appear on every
+  # series.
+  transform/dimensions:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["dograh.org_id"], "unknown") where attributes["dograh.org_id"] == nil
+
+connectors:
+  # Span → metrics. The default explicit buckets are tuned for HTTP; these are
+  # tuned for the pipeline's real ranges (ms-scale TTFB up to 30 s calls), so
+  # the percentiles the dashboards compute stay accurate at the top end.
+  # Two things about this connector that the config cannot state, both measured
+  # against 0.161.0 rather than assumed:
+  #
+  #  * There is no `unit` key in this release (it exists only on newer contrib
+  #    builds), so durations land in the connector's millisecond default and the
+  #    series are `traces_span_metrics_duration_milliseconds_*`. Upgrading the
+  #    collector is a deliberate act precisely because the unit is scheduled to
+  #    flip to seconds, which would silently rename every series a dashboard
+  #    here queries.
+  #  * `explicit.buckets` is scaled to *nanoseconds* of the emitted unit: a
+  #    bucket written as 5 renders as `le="5e-06"`, so a 250 ms span falls only
+  #    into `+Inf`. The values below are therefore milliseconds × 1e6; verify
+  #    with the `le` values on `<...>_duration_milliseconds_bucket` if you ever
+  #    change them.
+  #
+  # The span set runs from sub-10 ms TTS time-to-first-audio up to a 300 s
+  # `conversation` span, so the top of this ladder has to reach past the
+  # connector's 15 s default or the call-length percentiles are wrong.
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5000000, 10000000, 25000000, 50000000, 75000000, 100000000, 150000000, 200000000, 300000000, 500000000, 750000000, 1000000000, 1500000000, 2000000000, 3000000000, 5000000000, 10000000000, 20000000000, 30000000000, 60000000000, 120000000000, 300000000000]
+    dimensions:
+      - name: dograh.org_id
+    # Single collector instance: the UUID dimension only adds a label.
+    exclude_dimensions: ["collector.instance.id"]
+    metrics_flush_interval: 15s
+
+extensions:
+  # Container healthcheck target (see the compose healthcheck for this service).
+  health_check:
+    endpoint: 0.0.0.0:13133
+
 exporters:
-  clickhousetraces:
-    datasource: tcp://signoz-clickhouse:9000/signoz_traces
-    retry_on_failure:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    enable_open_metrics: true
+    # Turns resource attributes into metric labels, which is how `service.name`
+    # lands as `service_name` on the emitted series.
+    resource_to_telemetry_conversion:
       enabled: true
-      initial_interval: 5s
-      max_interval: 30s
-      max_elapsed_time: 300s
-    sending_queue:
-      enabled: true
-      queue_size: 100
-      num_consumers: 5
-  signozclickhousemetrics:
-    dsn: tcp://signoz-clickhouse:9000/signoz_metrics
 
 service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      # The collector's own health, on :8888.
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
   pipelines:
+    # Traces arrive, become metrics in the connector, and stop here: there is no
+    # downstream trace exporter, so no span is ever persisted.
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [clickhousetraces]
+      processors: [transform/dimensions, batch]
+      exporters: [spanmetrics]
+    # The connector's output, plus anything the apps emit as OTLP metrics
+    # (dograh sets OTEL_METRICS_EXPORTER=otlp), in Prometheus format.
     metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [signozclickhousemetrics]
+      receivers: [otlp, spanmetrics]
+      exporters: [prometheus]

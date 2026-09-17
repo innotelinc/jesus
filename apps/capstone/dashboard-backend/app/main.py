@@ -88,7 +88,7 @@ NPM_SUBDOMAINS: dict[str, str] = {
     "omniroute": "omniroute",
     "n8n": "n8n",
     "grist": "grist",
-    "signoz": "signoz",
+    "grafana": "grafana",
     "workflow-studio": "workflow",
     "dashboard": hosts.DASHBOARD_SUBDOMAIN,
     "ws": "voice",
@@ -177,15 +177,25 @@ SERVICE_META: dict[str, dict[str, Any]] = {
         "description": "Structured interview records, candidate loops, and call metadata store for grading workflows.",
         "tags": ["data", "interviews"], "deps": [],
     },
-    "signoz": {
-        "name": "SigNoz Observability", "owner": "SRE",
-        "description": "OpenTelemetry traces, metrics, and logs backend providing service-level dashboards and alerting.",
-        "tags": ["observability", "traces", "logs"], "deps": ["signoz-clickhouse"],
+    "otel-collector": {
+        "name": "OTel Collector", "owner": "SRE",
+        "description": "Receives the pipeline's OTLP spans, converts each one into a RED metric, and drops the span — no trace store.",
+        "tags": ["observability", "otel"], "deps": ["prometheus"],
     },
-    "signoz-clickhouse": {
-        "name": "ClickHouse", "owner": "SRE",
-        "description": "OLAP storage for telemetry streams, latency percentiles, and long-term metric retention.",
-        "tags": ["storage", "analytics"], "deps": [],
+    "prometheus": {
+        "name": "Prometheus", "owner": "SRE",
+        "description": "The metrics store: span metrics, the shim's own latency/cache counters, and retention capped by time and size.",
+        "tags": ["observability", "metrics"], "deps": [],
+    },
+    "grafana": {
+        "name": "Grafana", "owner": "SRE",
+        "description": "Interview Pipeline Latency and host-overview dashboards, provisioned from this repo and read-only in the UI.",
+        "tags": ["observability", "dashboards"], "deps": ["prometheus"],
+    },
+    "tts-shim": {
+        "name": "TTS Shim", "owner": "Voice",
+        "description": "One OpenAI-compatible TTS door in front of the engines: audio cache, engine A/B, and its own TTFB/synthesis metrics.",
+        "tags": ["speech", "tts", "cache"], "deps": ["kokoro"],
     },
     "speaches": {
         "name": "Speaches STT/TTS", "owner": "Voice",
@@ -211,21 +221,6 @@ SERVICE_META: dict[str, dict[str, Any]] = {
         "name": "SearXNG Search", "owner": "Automation",
         "description": "Self-hosted metasearch used by the n8n AI assistant.",
         "tags": ["search", "automation"], "deps": [],
-    },
-    "signoz-otel-collector": {
-        "name": "SigNoz OTel Collector", "owner": "SRE",
-        "description": "OpenTelemetry collector receiving traces from dograh and n8n.",
-        "tags": ["observability", "otel"], "deps": ["signoz-clickhouse"],
-    },
-    "signoz-metastore-postgres": {
-        "name": "SigNoz Postgres", "owner": "SRE",
-        "description": "Postgres metastore for SigNoz UI/API state.",
-        "tags": ["database", "observability"], "deps": [],
-    },
-    "signoz-clickhouse-keeper": {
-        "name": "ClickHouse Keeper", "owner": "SRE",
-        "description": "Coordination service for the SigNoz ClickHouse cluster.",
-        "tags": ["storage", "observability"], "deps": [],
     },
     "postgres": {
         "name": "Postgres", "owner": "Platform",
@@ -260,7 +255,9 @@ SERVICE_META: dict[str, dict[str, Any]] = {
 LATENCY_PROBES: dict[str, tuple[str, float]] = {
     "dograh-ui": ("http://dograh-ui:3010/", 0.6),
     "grist": ("http://grist:8484/", 0.6),
-    "signoz": ("http://signoz:8080/api/v1/health", 0.6),
+    "grafana": ("http://grafana:3000/api/health", 0.6),
+    "prometheus": ("http://prometheus:9090/-/healthy", 0.6),
+    "tts-shim": ("http://tts-shim:8880/health", 0.6),
     "n8n": ("http://n8n:5678/healthz", 0.6),
     "omniroute": ("http://omniroute:20128/", 0.6),
     "kokoro-fastapi": ("http://kokoro-fastapi:8880/health", 0.6),
@@ -278,17 +275,17 @@ LINK_PORTS: dict[str, dict[str, str]] = {
     "omniroute": {"port": "20128", "name": "OmniRoute"},
     "n8n": {"port": "5678", "name": "n8n"},
     "grist": {"port": "8484", "name": "Grist"},
-    "signoz": {"port": "3301", "name": "SigNoz UI + Dashboards"},
+    "grafana": {"port": "3301", "name": "Grafana Dashboards"},
     "workflow-studio": {"port": "8090", "name": "Workflow Studio"},
     "dashboard": {"port": "8096", "name": "Capstone Control Center"},
 }
 
 # One-shot bootstrap/helper containers (restart: no) that aren't services.
-ONE_SHOT = {"sandbox-certs", "n8n-import", "signoz-schema-migrator"}
+ONE_SHOT = {"sandbox-certs", "n8n-import"}
 
 # List of compose service labels we consider "apps" (used for active-session
 # stand-in and to exclude infra-only noise from some tallies).
-APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "signoz", "speaches", "kokoro-fastapi", "freepbx", "workflow-studio", "coturn"}
+APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "grafana", "speaches", "kokoro-fastapi", "freepbx", "workflow-studio", "coturn"}
 
 # Static documentation / repository / support links (real URLs; unaffected by
 # Docker state).
@@ -797,12 +794,12 @@ def build_links() -> list[dict[str, Any]]:
         })
     for sl in STATIC_LINKS:
         links.append({**sl, "lastVerified": now})
-    # SigNoz monitoring dashboards (under the signoz subdomain when proxied)
+    # Grafana monitoring dashboards (under the grafana subdomain when proxied)
     links.append({
-        "id": "ln-signoz-dash",
-        "name": "SigNoz Dashboards",
-        "description": "Service-level and pipeline-latency dashboards",
-        "url": f"{npm_url('signoz') or f'http://{HOST or "localhost"}:3301'}/dashboards",
+        "id": "ln-grafana-dash",
+        "name": "Grafana Dashboards",
+        "description": "Pipeline-latency and host dashboards, provisioned from this repo",
+        "url": npm_url("grafana") or f'http://{HOST or "localhost"}:3301',
         "category": "monitoring",
         "status": "verified",
         "lastVerified": now,
@@ -825,7 +822,7 @@ def build_links() -> list[dict[str, Any]]:
 OWNER_BY_KEY = {
     "ARI": "DevOps", "OMNI": "Platform", "POSTGRES": "Platform", "GRIST": "Data",
     "REDIS": "Platform", "N8N": "Automation", "SANDBOX": "Automation",
-    "SIGNOZ": "SRE", "TURN": "Voice", "FREEPBX": "PBX Ops", "JWT": "SRE",
+    "GRAFANA": "SRE", "PROMETHEUS": "SRE", "TURN": "Voice", "FREEPBX": "PBX Ops", "JWT": "SRE",
     "COOKIE": "Platform", "SESSION": "Platform", "COTURN": "Voice",
     "MINIO": "Platform", "VOIPMS": "PBX Ops", "SEARXNG": "Automation",
 }

@@ -68,14 +68,14 @@ Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
   voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
   admin/dashboard.<domain>  Capstone Control Center            :8096
   pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :14014 (SSO gateway)
-  n8n/grist/omniroute/signoz/workflow.<domain>               :14010/14011/20128/14012/14013
+  n8n/grist/omniroute/grafana/workflow.<domain>              :14010/14011/20128/14012/14013
       (the SSO gateways' host ports; OmniRoute has no gateway and stays internal)
   portal/nocodb.<domain>   optional profile services          :3000/8080
 
 SSO: there is no forward-auth gate any more — no host carries an nginx
   auth_request, and this script never writes one. Surfaces that speak OIDC
   (the Control Center, the voice app) use it directly; surfaces that do not
-  (FreePBX, n8n, Grist, SigNoz, Workflow Studio, OmniRoute) are fronted by an
+  (FreePBX, n8n, Grist, Grafana, Workflow Studio, OmniRoute) are fronted by an
   oauth2-proxy SSO gateway instead. Both are Authentik OIDC, and both close
   the app's own login page. See the npm repo's docs/stack.md.
 
@@ -107,7 +107,7 @@ DEFAULT_API_URL = "http://127.0.0.1:81"
 #   sub       subdomain under NPM_BASE_DOMAIN (None → the apex domain)
 #   scheme    upstream scheme NPM forwards with (http/https)
 #   port      upstream host port
-#   websocket enable allow_websocket_upgrade (n8n/SigNoz UIs + voice WSS)
+#   websocket enable allow_websocket_upgrade (n8n/Grafana UIs + voice WSS)
 #   name      human label for PASS/FAIL output
 #   optional  only synced when explicitly included (compose profile services)
 #
@@ -138,7 +138,7 @@ HOSTS: list[dict[str, Any]] = [
     # app authenticates that callback itself (same as dashboard./admin.).
     {"key": "dograh",    "sub": "dograh",    "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (legacy OIDC redirect alias)"},
     # SSO-gated rows: the port is the app's oauth2-proxy gateway (`<key>-sso` in
-    # docker-compose.yml), not the app's own — FreePBX, n8n, Grist, SigNoz and the
+    # docker-compose.yml), not the app's own — FreePBX, n8n, Grist, Grafana and the
     # Workflow Studio have no OIDC of their own and the gateway is what performs
     # the Authentik code flow in front of them.
     {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 14014, "websocket": False, "name": "FreePBX (+ AvantFAX at /fax) — via SSO gateway"},
@@ -147,7 +147,9 @@ HOSTS: list[dict[str, Any]] = [
     # OmniRoute holds the LLM API key — docs/networking.md: keep it internal.
     # No DNS record exists for it; sync only when explicitly included.
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
-    {"key": "signoz",    "sub": "signoz",    "scheme": "http",  "port": 14012, "websocket": True,  "name": "SigNoz — via SSO gateway"},
+    # Grafana holds the port the SigNoz UI had (14012, and 3301 behind the
+    # gateway), so the name changed but nothing about the forward did.
+    {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "name": "Grafana — via SSO gateway"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "name": "Workflow Studio — via SSO gateway"},
     # subscribe.<domain> → the shared Innotel subscribe portal (one nginx on
     # :3040 that picks the page by Host header). Public by design — pricing and

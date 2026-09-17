@@ -28,7 +28,7 @@ https://auth.capstone.innotel.us):
 
 This mirrors what scripts/npm-proxy-hosts.py expects when it injects the
 auth_request nginx snippet into each NPM proxy host (Cerulean SSO for FreePBX/
-AvantFAX, dograh, n8n, Grist, SigNoz, OmniRoute and the Workflow Studio).
+AvantFAX, dograh, n8n, Grist, Grafana, OmniRoute and the Workflow Studio).
 
 Two ways to run:
 

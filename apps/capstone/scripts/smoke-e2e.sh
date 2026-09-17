@@ -172,11 +172,10 @@ fi
 # WAIT FOR HEALTH
 # ═══════════════════════════════════════════════════════════════════════════
 section "Wait for health (max ~6 min)"
-# NOTE: signoz-otel-collector / dograh-api / signoz have NO healthcheck, so
-# they report "running" (never "healthy"). "healthy" OR "running" both count.
+# NOTE: otel-collector / dograh-api have NO healthcheck, so they report
+# "running" (never "healthy"). "healthy" OR "running" both count.
 MAIN_SERVICES="postgres redis minio dograh-api kokoro speaches omniroute n8n grist \
-               signoz-metastore-postgres signoz-clickhouse-keeper signoz-clickhouse \
-               signoz-otel-collector signoz"
+               otel-collector prometheus grafana tts-shim"
 declare -A HEALTHY=()
 # One snapshot per poll — `docker compose ps` per service is far too slow.
 # Prefers RUNNING containers: a stale container from an earlier daemon hiccup

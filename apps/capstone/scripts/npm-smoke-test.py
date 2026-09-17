@@ -5,7 +5,7 @@ Checks, per https://<sub>.<NPM_BASE_DOMAIN>/ (STRICT TLS — no cert skipping):
 
   • DNS resolves
   • TLS handshake + certificate validity (system trust store)
-  • UI hosts (app, pbx, n8n, grist, signoz, workflow) return 302 → the
+  • UI hosts (app, pbx, n8n, grist, grafana, workflow) return 302 → the
     Cerulean Authentik outpost sign-in (forward-auth gate active)
   • open hosts (api, dashboard/admin, auth, voice, apex) respond WITHOUT
     being gated (200/302-to-auth-flow/404/307 are all fine — they serve

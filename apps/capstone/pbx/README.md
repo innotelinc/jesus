@@ -296,8 +296,10 @@ curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://$PJSIP_MEDIA_ADDRESS:8088/ari/aste
 Place a test call to `8000` (IT), `8001` (DevOps), or `8002` (SQL). Watch
 dograh logs for the StasisStart, the "Created inbound workflow run N" line
 (run ids increment globally; the bound workflow per extension is IT/DevOps/
-SQL), and the media WebSocket connecting; then check SigNoz for the
-`dograh-interview-agent` trace of the call.
+SQL), and the media WebSocket connecting; then check Grafana's **Interview
+Pipeline Latency** dashboard (`:3301`) for the call's STT → LLM → TTS stages — the
+spans behind them are metrics, not stored traces, so the dashboard is the trace
+view.
 
 ## NAT / router setup (external callers dialing in)
 

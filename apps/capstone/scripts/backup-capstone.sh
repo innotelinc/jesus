@@ -6,17 +6,16 @@ set -euo pipefail
 #
 # Captures everything needed to stand the data layer back up on a NEW server
 # (the intended use: moving Capstone off this host). Deliberately NOT included:
-# telemetry (SigNoz ClickHouse), model caches, and image layers — those are
-# rebuilt, not restored.
+# the observability store (Prometheus's TSDB, which is rebuilt from the next
+# calls rather than restored), model caches, and image layers.
 #
 # What lands in the backup:
 #
 #   config/   compose files, .env, n8n workflow JSON, the dograh workflow
 #             definitions and scripts/ (the wiring + bootstrap helpers)
-#   db/       pg_dumpall of the stack Postgres (pgvector), a dump of the
-#             SigNoz metastore (dashboards/alerts), tar of the Grist and n8n
-#             volumes (Grist docs + n8n database.sqlite), and the n8n workflow
-#             JSON export
+#   db/       pg_dumpall of the stack Postgres (pgvector), tar of the Grist and
+#             n8n volumes (Grist docs + n8n database.sqlite), and the n8n
+#             workflow JSON export
 #   repo.bundle  `git bundle` of this checkout — every tracked file at HEAD
 #   MANIFEST.txt / SHA256SUMS
 #
@@ -45,9 +44,6 @@ TARBALL="$HOME/capstone-backup-$STAMP.tar.gz"
 
 PG_CONTAINER="${PG_CONTAINER:-capstone-postgres-1}"
 PG_USER="${PG_USER:-postgres}"
-SIGNOZ_PG_CONTAINER="${SIGNOZ_PG_CONTAINER:-signoz-metastore-postgres}"
-SIGNOZ_PG_USER="${SIGNOZ_PG_USER:-signoz}"
-SIGNOZ_PG_DB="${SIGNOZ_PG_DB:-signoz}"
 
 VOLUME_PREFIX="${VOLUME_PREFIX:-capstone_}"
 DOCKER_VOLUME_ROOT="${DOCKER_VOLUME_ROOT:-/var/lib/docker/volumes}"
@@ -101,15 +97,6 @@ if docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
   log "db/postgres-all.sql.gz ($(size "$BACKUP_DIR/db/postgres-all.sql.gz"))"
 else
   log "SKIP $PG_CONTAINER not running — no Postgres dump"
-fi
-
-step "Postgres (SigNoz metastore)"
-if docker ps --format '{{.Names}}' | grep -qx "$SIGNOZ_PG_CONTAINER"; then
-  docker exec "$SIGNOZ_PG_CONTAINER" pg_dump -U "$SIGNOZ_PG_USER" "$SIGNOZ_PG_DB" \
-    | gzip -9 > "$BACKUP_DIR/db/signoz-metastore.sql.gz"
-  log "db/signoz-metastore.sql.gz ($(size "$BACKUP_DIR/db/signoz-metastore.sql.gz"))"
-else
-  log "SKIP $SIGNOZ_PG_CONTAINER not running"
 fi
 
 # ── 3. Docker volumes (Grist docs, n8n database) ──────────────────────────
@@ -174,7 +161,7 @@ GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
   echo "  5. docker compose up -d   (dograh-api, dashboard-api, n8n, grist, ...)"
   echo "  6. re-run scripts/grist_bootstrap.py and scripts/dograh_wire.py"
   echo
-  echo "NOT included: SigNoz ClickHouse telemetry, model caches, image layers."
+  echo "NOT included: the Prometheus metrics store, model caches, image layers."
 } > "$BACKUP_DIR/MANIFEST.txt"
 log "MANIFEST.txt"
 
