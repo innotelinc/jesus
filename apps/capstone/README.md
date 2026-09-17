@@ -31,7 +31,7 @@ APIs, no audio leaving the box.
 | Cloud voice APIs leak audio + cost per minute | Local speech (STT+TTS) + local LLM over Asterisk/FreePBX; no audio leaves the box |
 | Identity sprawl across phone apps | Cerulean Authentik SSO; disable a user and their phone-agent access dies |
 | Telephony vendor lock-in | Skips OpenAI/Vapi/Cartesia/Make — runs on your own FreePBX + local LLM |
-| Agent observability is a black box | OpenTelemetry spans every step; traces live in the stack |
+| Agent observability is a black box | OpenTelemetry spans every step; the collector turns them into RED metrics, so pipeline latency is charted without running a trace store |
 
 > **About Capstone** — a completely self-hosted, open-source Voice AI Agent Platform: it
 > handles incoming calls, screens callers, conducts natural conversations, and automates
@@ -42,6 +42,13 @@ APIs, no audio leaving the box.
 **Non-negotiables:** 100% open-source · runs locally in Docker · no paid SaaS (no OpenAI,
 Cartesia, Vapi, Make.com) · Cerulean Authentik for authentication and user management ·
 OpenTelemetry observability throughout.
+
+**Current storage status:** Capstone still runs MinIO for the `voice-audio` S3
+contract used by recordings, transcript playback, backups, and Zeus integration.
+ONYX is the planned platform storage owner, but it is not a drop-in replacement
+until its S3-compatible endpoint, bucket policy, signed/public URL behavior, and
+restore path are verified. Do not remove MinIO from a live deployment yet; migrate
+behind the existing `MINIO_*` contract in a dedicated release.
 
 ---
 
@@ -56,7 +63,7 @@ OpenTelemetry observability throughout.
 | 🔐 **Cerulean SSO** | Shared identity through Cerulean's Authentik at `auth.capstone.innotel.us` — one login for every surface, and the Control Center is gated behind it | 
 | 📊 **Control Center** | Live ops dashboard: services, health, ports, alerts, secrets inventory, users, host monitoring, and an in-browser softphone | 
 | 🌐 **Canonical subdomains** | `app`/`api`/`auth`/`voice`/`admin`/`pbx` proxy hosts provisioned automatically through Nginx Proxy Manager, with **wildcard Let's Encrypt** by default | 
-| 📡 **Observability** | OpenTelemetry → SigNoz: pipeline latency (STT → LLM → TTS) per call, importable dashboards | 
+| 📡 **Observability** | OpenTelemetry → Prometheus → Grafana: pipeline latency (STT → LLM → TTS) per call, provisioned dashboards | 
 | 💾 **Offline + live USB** | Deployment payload, Docker image bundle, and a BIOS+UEFI live/install ISO — install with no internet | 
 
 ## 🚀 Quick start
@@ -112,10 +119,10 @@ sudo systemctl enable --now capstone.service
 | Identity | Cerulean Authentik — `auth.cerulean.innotel.us` | SSO, authentication, user management (shared via Cerulean; no local Authentik instance) |
 | Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
-| LLM Router | OmniRoute — `:20128` | OpenAI-compatible gateway to local/free models |
+| LLM Router | OmniRoute — `:20128`, reached on `:20129` | OpenAI-compatible gateway to local/free models; `20128` is loopback/docker0 only, the `:20129` proxy in front of it is the LAN door for `/v1` |
 | Workflow | n8n (Community Edition) | Session webhooks on hang-up → grading |
 | Dashboard | Grist (NocoDB opt-in) | Names, numbers, transcripts, scores |
-| Observability | OpenTelemetry → SigNoz (ClickHouse) | Pipeline latency tracking |
+| Observability | OpenTelemetry → Prometheus + Grafana — `:3301` | Pipeline latency tracking; the collector converts spans to metrics and stores no traces |
 | Control Center | `dashboard` (React/nginx) + `dashboard-api` (FastAPI) | Live ops UI |
 
 ### Addressing: LAN IPs only, never docker addresses
@@ -188,6 +195,48 @@ The one deliberate exception is `scripts/install-fail2ban.sh`'s bridge ranges:
 those are *firewall exemptions*, not service addresses, and dropping them lets
 another stack's bridge AMI probe earn a 48h ban.
 
+### Observability wiring
+
+The stack observes itself with three containers and **no trace store** — the
+pipeline's spans become metrics at the door and are then dropped:
+
+```
+dograh (OTLP spans) ─┐
+n8n    (OTLP spans) ─┼─▶ otel-collector ──spanmetrics──▶ prometheus ──▶ grafana
+                     │      :4317 / :4318        :8889        :9090      :3301
+tts-shim ────────────┴─ scraped directly, :8880/metrics ────────────────────┘
+```
+
+- **`otel-collector`** receives OTLP on `4317` (gRPC) and `4318` (HTTP), both
+  loopback-only, and both named in `.env` for the host-mode dograh. Its
+  `spanmetrics` connector turns each span into a RED histogram
+  (`traces.span.metrics.calls` / `...duration`, dimensioned by `span.name`) and
+  the span is then discarded: the traces pipeline's only exporter is the
+  connector, so no span is ever persisted. That is what removed the ClickHouse +
+  Keeper + metastore + SigNoz cluster, which was measured holding ~400 KiB of
+  telemetry while pinning ~125% of a core and 1.18 GiB RSS.
+- **`prometheus`** scrapes those metrics from `otel-collector:8889`, the
+  collector's own health from `:8888`, and the TTS shim from `tts-shim:8880`.
+  Both retention knobs are set (`PROMETHEUS_RETENTION`,
+  `PROMETHEUS_RETENTION_SIZE`) so a busy week cannot fill the disk.
+- **`grafana`** listens on `3301` — deliberately the port SigNoz held, so proxy
+  hosts, the dashboard catalog and firewall rules kept pointing at the same
+  number — and provisions its datasource and the `Interview Pipeline Latency`
+  dashboard from this repo (`grafana/dashboards/pipeline-latency.json`).
+  Provisioned dashboards are read-only in the UI: the JSON is the source of
+  truth. The public door is `grafana.<domain>` → `grafana-sso` (`14012`).
+- **`tts-shim`** measures what spans used to: TTFB per engine and per cache
+  outcome, synthesis time and cache hit rate (`tts_shim_*`). The old dashboard
+  read TTS latency out of a span *attribute* (`metrics.ttfb`), which stops
+  existing once spans are not stored, so it is measured at the process that
+  knows it. See [tts-shim/README.md](tts-shim/README.md).
+
+Span attribute names are the fork's (`SIGNOZ_OTLP_ENDPOINT` still names this
+collector — see `dograh/`), and `OTEL_LOGS_EXPORTER` is `none` because no log
+pipeline exists here. Config in full: `otel-collector-config.yaml`,
+`prometheus/prometheus.yml`, `grafana/provisioning/`. Live checks and the
+per-panel metric map: [docs/operations.md](docs/operations.md#observability).
+
 ## 📚 Documentation
 
 | Document | Covers |
@@ -221,10 +270,12 @@ full live-USB, persistent-USB, password-reset, and bundle-building walkthroughs.
 ## 🗺️ Repo layout
 
 ```
-docker-compose.yml              # ALL services (dograh, PBX, TTS/STT, n8n, SigNoz, Authentik)
+docker-compose.yml              # ALL services (dograh, PBX, TTS/STT, n8n, Prometheus + Grafana)
 dashboard/                      # Control Center SPA (React + Vite, nginx, :8096)
 dashboard-backend/              # Control Center aggregator API (FastAPI, :8095)
 pbx/                            # ARI configs + entrypoint wrapper + PBX runbook
+tts-shim/                       # OpenAI-compatible TTS door (engine A/B + audio cache, :8881)
+grafana/ + prometheus/          # provisioned dashboards + scrape config
 dograh/                         # interview workflow JSON + SDK import script
 scripts/                        # setup, wiring, smoke, ISO/bundle builders
 docs/                           # operations, networking, legacy dependencies
