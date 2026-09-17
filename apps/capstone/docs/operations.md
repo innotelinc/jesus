@@ -100,8 +100,12 @@ Under the hood `dashboard-api` proxies to dograh: `GET /workflows`,
 (`/api/v1/workflow/create/definition`), `PUT /workflows/{id}`
 (`/api/v1/workflow/{id}` then `/publish`) and `PUT /workflows/{id}/status`. The AI mode
 reaches the OmniRoute gateway through `OMNIROUTE_URL` (defaults to
-`http://host.docker.internal:20128`), the same gateway the Workflow Studio uses; set
-`OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
+`http://host.docker.internal:20129`, the identity-aware proxy in front of the gateway —
+`20128` itself is published on loopback and docker0 only), the same gateway the
+Workflow Studio uses; set `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
+On a host other than the one running the proxy, pin that host's LAN address in `.env`
+(`OMNIROUTE_URL=http://192.168.1.46:20129`) — `host.docker.internal` resolves to the
+local docker0, where nothing listens.
 
 ## PBX / Asterisk side
 
@@ -300,7 +304,7 @@ and handles renewal):
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
 | `n8n.<domain>` | `http://<host>:14010` | n8n workflows — via the `n8n-sso` gateway; webhooks (`/webhook/*`) are exempt, the editor is not |
 | `grist.<domain>` | `http://<host>:14011` | Grist documents — via the `grist-sso` gateway; nothing is exempt, its API runs in single-identity mode |
-| `signoz.<domain>` | `http://<host>:14012` | SigNoz UI + dashboards — via the `signoz-sso` gateway |
+| `grafana.<domain>` | `http://<host>:14012` | Grafana dashboards (provisioned from this repo) — via the `grafana-sso` gateway; it holds the port the SigNoz UI had |
 | `workflow.<domain>` | `http://<host>:14013` | Workflow Studio — via the `workflow-sso` gateway |
 | `dns.internal.innotel.us` | `http://<host>:14015` | Technitium console — via the `technitium-sso` gateway (the container is Cerulean's; its own `:5380` answers only on loopback + the docker0 gateway) |
 
@@ -369,7 +373,7 @@ API is separate and UDP STUN/TURN still needs direct NAT forwarding regardless.
 ### Cerulean Authentik forward auth on every proxy host
 
 By default the script injects an nginx `auth_request` snippet into every web-UI proxy host
-(the apex + `app` dograh UI, FreePBX/AvantFAX, n8n, Grist, SigNoz, Workflow Studio), so
+(the apex + `app` dograh UI, FreePBX/AvantFAX, n8n, Grist, Grafana, Workflow Studio), so
 **all logins flow through Cerulean SSO** before each service's own login page is reachable.
 One domain-level proxy provider (`Cerulean NPM Forward Auth`) covers every `*.<domain>`
 host; provision it idempotently with `scripts/authentik_bootstrap.py` (API mode via
@@ -480,6 +484,82 @@ return 400 — which catches the cross-domain `authentik_host` misconfiguration 
 python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN / NPM_AUTHENTIK_URL)
 python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
 ```
+
+## Observability
+
+Three containers and no trace store. The collector ingests OTLP, converts each
+span into a metric and drops the span; Prometheus stores the metrics; Grafana
+charts them from dashboards that live in this repo.
+
+| Container | Loopback port(s) | Role |
+|---|---|---|
+| `otel-collector` | `4317` gRPC, `4318` HTTP, `8888` own metrics, `8889` span metrics | OTLP ingest for dograh and n8n; `spanmetrics` connector |
+| `prometheus` | `9090` | the metrics store; scrapes `otel-collector:8889`, `otel-collector:8888`, `tts-shim:8880`, itself |
+| `grafana` | `3301` | charts `grafana/dashboards/*.json`; public door `grafana.<domain>` → `grafana-sso` (`14012`) |
+| `tts-shim` | `8881` | serves its own `tts_shim_*` metrics on `/metrics` |
+
+Port `3301` is deliberately the port the SigNoz UI held: the NPM proxy host, the
+Control Center's catalog and any firewall rule keep pointing at the same number,
+and only the upstream behind it changed. Nothing is stored per span, so a
+single-call investigation reads **metrics, not traces** — the panel names below
+are the trace-shaped view of the same numbers.
+
+### What each metric is, and which panel shows it
+
+`grafana/dashboards/pipeline-latency.json` (dashboard *Interview Pipeline
+Latency*, provisioned and therefore read-only — edit the JSON and re-deploy):
+
+| Panel | Metric | Notes |
+|---|---|---|
+| Interview pipeline latency by stage | `traces_span_metrics_duration_milliseconds_bucket{span_name=~"$stage"}` | the collector's span→metric output; `stage` is a dashboard variable listing every `span_name` seen (`llm-*`, `tts`, `stt`, `turn-N`, `conversation`) |
+| STT stage latency | same series, `span_name="stt"` | p50/p95 |
+| LLM stage latency by node | same series, `span_name=~"llm-.*"` | one line per pipeline node |
+| TTS time to first audio (shim) | `tts_shim_ttfa_seconds_bucket{engine,cache}` | measured in the shim, per engine and per cache hit/miss |
+| TTS cache hit rate | `tts_shim_cache_lookups_total{result="hit"}` | the fixed interview script is what makes this high |
+| Synthesis time and spend (shim) | `tts_shim_synthesis_seconds_bucket`, `tts_shim_requests_total` | engine wall time, excluding cache hits |
+| Ingest health (collector) | `otelcol_receiver_accepted_spans_total`, `otelcol_receiver_refused_spans_total`, `otelcol_connector_spans_total` | refused > 0 means spans are being dropped before they become metrics |
+
+The old dashboard's TTS panel read a span **attribute** (`metrics.ttfb`), which
+no longer exists once spans are not stored; that number is now the shim's own
+`tts_shim_ttfa_seconds` histogram. Two collector details are worth knowing before
+changing anything there:
+
+- **Durations are milliseconds**, because `spanmetrics` in the pinned
+  `otel/opentelemetry-collector-contrib:0.161.0` has no `unit` key — hence
+  `..._duration_milliseconds_bucket` in every panel. Newer contrib builds are
+  scheduled to flip the unit to seconds, which would silently rename every
+  series, so the version pin is deliberate.
+- **`explicit.buckets` is scaled to nanoseconds of the emitted unit** (a bucket
+  written as `5` renders as `le="5e-06"`, swallowing a 250 ms span into `+Inf`),
+  so the ladder in `otel-collector-config.yaml` is written as milliseconds × 1e6.
+
+`OTEL_LOGS_EXPORTER` is `none` in `.env`: with a metrics-only collector, exporting
+logs only produced per-batch drop warnings. `SIGNOZ_OTLP_ENDPOINT` is still the
+name dograh's fork reads for its trace exporter — it points at this collector,
+not at SigNoz.
+
+### Checking it by hand
+
+```bash
+# every scrape target UP? (over an SSH tunnel: ssh -L 9090:127.0.0.1:9090 root@<host>)
+curl -s http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up' | grep -o '"health":"[^"]*"'
+
+# do spans become metrics at all? (0 is normal until the first call)
+curl -s http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=sum(traces_span_metrics_calls_total)'
+
+# is anything being refused before conversion?
+curl -s http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=sum(rate(otelcol_receiver_refused_spans_total[5m]))'
+
+# the shim's own view
+curl -s http://127.0.0.1:8881/health
+curl -s http://127.0.0.1:8881/metrics | grep '^tts_shim_ttfa_seconds_count'
+```
+
+`scripts/smoke-test.sh` runs the same checks as part of the stack smoke test, and
+if a call's audio is cut mid-sentence the dashboard is the first place to look —
+see [Troubleshooting](#interview-voice-cuts-off-early--sounds-truncated).
 
 ## Blocking invalid SIP registrations (fail2ban)
 
@@ -623,8 +703,8 @@ agent — `allow_interrupt` is on by design). Check and fix in this order:
 
    Regenerate, then re-place the test call (`scripts/place_call.py`). If the interviewer's
    answers are long, use 10–12s.
-2. **Confirm which side cuts** — run the call and watch the SigNoz pipeline latency
-   dashboard (`signoz.<domain>`, port `3301`): a TTS latency spike that ends abruptly right
+2. **Confirm which side cuts** — run the call and watch the Grafana **Interview Pipeline
+   Latency** dashboard (`grafana.<domain>`, or `:3301` locally): a TTS latency spike that ends abruptly right
    before the cut means the next candidate line won the interrupt race.
 3. **Upstream knobs** (dograh platform): the user-turn stop timeout
    (`user_turn_stop_timeout`, default 5s of silence) and the per-node `allow_interrupt` flag
@@ -672,7 +752,7 @@ the workflow itself:
 
 Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh UI
 (`:3010`)**, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist,
-SigNoz, OTel ingest, ARI, the Dograh dialplan, the media WebSocket wiring, and — when
+the observability containers (Grafana, Prometheus, OTel ingest), ARI, the Dograh dialplan, the media WebSocket wiring, and — when
 `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent
 workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions
 8000/8001/8002 bound to their agents. The ARI checks dial the host LAN IP
@@ -870,3 +950,12 @@ instrumented n8n image.
   publishes them to GHCR under the repo's own namespace
   (`ghcr.io/<owner>/<repo>/capstone-*:<tag>` + `:latest`), and attaches the source bundle +
   deployment payload to the GitHub Release for that tag.
+
+
+### Nightly disk cleanup
+
+`scripts/docker-cleanup.sh` (mirrored from ips, canonical there) runs nightly at
+04:17 via `/etc/cron.d/docker-cleanup`: build cache (2 GB kept), dangling and
+unreferenced images, containers exited for more than a day, and container logs
+over 50 MB (trimmed to 10 MB). Volumes are never touched. Run it manually with
+`DRY_RUN=1 scripts/docker-cleanup.sh` to preview.
