@@ -208,6 +208,15 @@ function urlBase64ToUint8Array(base64Url: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+// A browser that doesn't expose the key it subscribed with counts as a
+// mismatch: we can't prove the subscription belongs to this relay.
+function sameKey(existing: ArrayBuffer | null | undefined, expected: Uint8Array): boolean {
+  if (!existing) return false;
+  const bytes = new Uint8Array(existing);
+  if (bytes.length !== expected.length) return false;
+  return bytes.every((byte, i) => byte === expected[i]);
+}
+
 function readPushKey(
   sub: PushSubscription,
   name: 'p256dh' | 'auth',
@@ -408,18 +417,25 @@ export async function enableWebPush(
   // Reuse an existing browser PushSubscription when possible - resubscribing
   // with the same VAPID key produces the same endpoint, but the call still
   // costs a network round-trip the user can feel.
+  //
+  // Only reuse it if it was made with THIS relay's key. A subscription is
+  // bound to the VAPID key it was created with, so one left over from another
+  // relay (or from before this relay rotated its keys) is rejected by the push
+  // service on every send - Mozilla answers 401 "VAPID public key mismatch" -
+  // while isWebPushEnabled keeps reporting push as on.
+  const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
   let pushSubscription = await registration.pushManager.getSubscription();
-  if (pushSubscription) {
-    const keyMatches = pushSubscription.options?.applicationServerKey;
-    if (!keyMatches) {
-      await pushSubscription.unsubscribe();
-      pushSubscription = null;
-    }
+  if (
+    pushSubscription
+    && !sameKey(pushSubscription.options?.applicationServerKey, applicationServerKey)
+  ) {
+    await pushSubscription.unsubscribe();
+    pushSubscription = null;
   }
   if (!pushSubscription) {
     pushSubscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      applicationServerKey,
     });
   }
 
