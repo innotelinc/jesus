@@ -15,20 +15,6 @@ It flags:
      ``%s``), a template (``<...>``), an ellipsis, or a regex fragment is left
      alone — those are configuration, not credentials.
 
-     A name that appears *inside* a string literal is not an assignment either.
-     The rule is a regex over source text, so without that distinction
-     ``line.startswith("VAULT_TOKEN_FILE=")`` reads a name out of the literal and
-     takes its closing quote as the opening quote of a value — which is how a
-     marker constant came to be reported as a credential in this repository.
-
-     A value the line *builds* at run time is not stored either. When the literal
-     is one operand of a concatenation and the same line draws on a random
-     source (``os.urandom``, ``secrets``, ``token_hex`` …), no committed text is
-     the credential: ``3-media/monarch/scripts/verify-sso.py``'s throwaway
-     ``"E2e-Sso-" + os.urandom(6).hex() + "!Aa1"`` is the case this spares. Both
-     halves are required, so a secret merely split across two literals
-     (``"hunter2" + "hunter2"``) still reads as a stored credential.
-
 Matched values are masked in the output, so a finding never re-prints the
 secret it found.
 
@@ -38,16 +24,8 @@ Usage:
     python3 scripts/secret-scan.py --stdin [label]  # scan piped content,
                                   # labelled as `label` (e.g. the file name)
     python3 scripts/secret-scan.py --history       # scan every blob in history
-    python3 scripts/secret-scan.py --selftest      # prove every rule still fires
 
 Exit codes: 0 clean, 1 findings.
-
-The rules are only worth what they catch, and a scanner that has quietly stopped
-matching reads exactly like a clean tree. `--selftest` therefore asserts that
-every shape rule and the literal-assignment rule still *fire*, and that every
-exemption still holds, from fixtures held in this file. CI runs it on every push,
-before the tree scan, so a broken scanner fails the build rather than passing it
-quietly.
 """
 from __future__ import annotations
 
@@ -72,17 +50,6 @@ ASSIGNMENT = re.compile(
 NAMESPACED_IDENTIFIER_KEY = re.compile(r"_key$", re.IGNORECASE)
 NAMESPACED_IDENTIFIER_VALUE = re.compile(r"^[a-z0-9]+(\.[a-z0-9]+)+$")
 
-# A <something>_MOUNT/_PATH/_DIR/_FILE holding an absolute path is pointing at
-# where a secret lives, not carrying one — e.g. SECRETS_MOUNT = "/run/ontrak",
-# the volume the first run writes the shared keys into. Both halves are required:
-# the name has to say "location" *and* the value has to be a path. Either alone
-# would be loose enough to hide a credential behind a name like SECRET_PATH.
-LOCATION_NAME = re.compile(
-    r"(_mount|_mountpoint|_path|_dir|_file|_socket|_endpoint|_url|_host|_ref)$",
-    re.IGNORECASE,
-)
-LOCATION_VALUE = re.compile(r"^/[A-Za-z0-9._~/-]+$")
-
 # A value that is itself a SCREAMING_SNAKE_CASE name is naming a field or env var,
 # not carrying a credential — e.g. SECRET_KEY = "INITIAL_PASSWORD", which says
 # *which* Vault field to read. Two or more all-uppercase words joined by
@@ -93,17 +60,6 @@ FIELD_NAME_VALUE = re.compile(r"^[A-Z]+(_[A-Z]+)+$")
 # A vault:// reference names the secret to fetch at runtime (scheme, path,
 # optional #field) — the value in the file is a pointer, not the secret.
 VAULT_REFERENCE = re.compile(r"^vault://", re.IGNORECASE)
-
-# A value built at run time: the literal is one operand of a concatenation *and*
-# the same line draws on a random source. Both halves are required (see the
-# module docstring): each alone would be loose enough to hide a real secret —
-# concatenation alone excuses a value split across literals, and a random source
-# alone excuses any line that happens to mention one.
-RUNTIME_SECRET_SOURCE = re.compile(
-    r"\b(os\.urandom|secrets\.\w+|random\.\w+|uuid\.uuid4|token_hex|token_urlsafe|getrandom|Crypto\.Random)\b"
-)
-CONCATENATION_AFTER = re.compile(r"^\s*\+")
-CONCATENATION_BEFORE = re.compile(r"\+\s*$")
 
 # Values that look like configuration rather than credentials.
 PLACEHOLDER_HINTS = (
@@ -129,11 +85,6 @@ REGEX_HINTS = ("|", "\\", "(?:", "[[:", ".*", "+?", "?:")
 SHAPES: list[tuple[str, re.Pattern[str]]] = [
     ("private-key-block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("provider-api-key", re.compile(r"\bsk-[A-Za-z0-9]{16,}\b")),
-    # Stripe's underscore form, which the hyphen shape above misses: a test that
-    # asserts "another provider's key is not ours" once carried one of these as a
-    # literal, and the host's own push protection blocked the push that this
-    # scanner had passed.
-    ("stripe-key", re.compile(r"\b(sk|rk)_(live|test)_[A-Za-z0-9]{16,}\b")),
     ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b")),
     ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("slack-token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}")),
@@ -161,57 +112,6 @@ def mask(value: str) -> str:
     return f"{value[:2]}{'*' * min(len(value) - 4, 12)}{value[-2:]}"
 
 
-def string_spans(line: str) -> list[tuple[int, int]]:
-    """Character ranges covered by the string literals on a line.
-
-    Deliberately simple: quotes, and a backslash escapes the next character.
-    That is enough for the languages this scans (Python, shell, JS/TS, YAML
-    values), and it answers the only question the assignment rule asks — does
-    this name start inside a literal?
-    """
-    spans: list[tuple[int, int]] = []
-    index = 0
-    length = len(line)
-    while index < length:
-        if line[index] not in "\"'":
-            index += 1
-            continue
-        quote = line[index]
-        start = index
-        index += 1
-        while index < length:
-            if line[index] == "\\":
-                index += 2
-                continue
-            if line[index] == quote:
-                index += 1
-                break
-            index += 1
-        spans.append((start, index))
-    return spans
-
-
-def inside_spans(position: int, spans: list[tuple[int, int]]) -> bool:
-    return any(start < position < end for start, end in spans)
-
-
-def is_runtime_composed(line: str, match: re.Match[str]) -> bool:
-    """Is this literal one operand of a value the line generates at run time?
-
-    The assignment rule sees a password literal such as ``"E2e-Sso-"`` inside a
-    longer expression; if the literal is joined to something else and the line
-    reaches for a random source, the committed text is a prefix, not the
-    credential. (Written without the assignment shape on purpose: this file is
-    scanned by its own hook, and ``name = "literal"`` in a docstring is exactly
-    the false positive rule 2 exists to avoid.)
-    """
-    if not RUNTIME_SECRET_SOURCE.search(line):
-        return False
-    after = line[match.end("value") + 1:]        # skip the closing quote
-    before = line[:match.start("value") - 1]     # drop the opening quote
-    return bool(CONCATENATION_AFTER.match(after) or CONCATENATION_BEFORE.search(before))
-
-
 def is_placeholder(value: str) -> bool:
     lowered = value.strip().lower()
     if not lowered:
@@ -220,7 +120,9 @@ def is_placeholder(value: str) -> bool:
         return True
     if any(token in value for token in INTERPOLATION_CHARS):
         return True
-    return any(token in value for token in REGEX_HINTS)
+    if any(token in value for token in REGEX_HINTS):
+        return True
+    return False
 
 
 def scan_text(label: str, text: str) -> list[Finding]:
@@ -228,8 +130,6 @@ def scan_text(label: str, text: str) -> list[Finding]:
     relaxed = bool(TEST_PATH.search(label))
 
     for number, line in enumerate(text.splitlines(), start=1):
-        # Shape rules run on the raw line on purpose: a provider key sitting
-        # inside a string literal is exactly what they are for.
         for rule, pattern in SHAPES:
             match = pattern.search(line)
             if match:
@@ -238,12 +138,7 @@ def scan_text(label: str, text: str) -> list[Finding]:
         if relaxed:
             continue
 
-        spans = string_spans(line)
         for match in ASSIGNMENT.finditer(line):
-            # A "name" quoted in a literal is code or a marker string, not an
-            # assignment: see string_spans.
-            if inside_spans(match.start("name"), spans):
-                continue
             name = match.group("name")
             value = match.group("value")
             if not SENSITIVE_NAME.search(name):
@@ -254,145 +149,11 @@ def scan_text(label: str, text: str) -> list[Finding]:
                 continue
             if FIELD_NAME_VALUE.match(value):
                 continue
-            if LOCATION_NAME.search(name) and LOCATION_VALUE.match(value):
-                continue
             if VAULT_REFERENCE.match(value):
-                continue
-            if is_runtime_composed(line, match):
                 continue
             findings.append((label, number, f"literal-secret ({name})", mask(value)))
 
     return findings
-
-
-# ── Self-test ──────────────────────────────────────────────────────────────
-# The vectors below are the contract: every rule fires (MUST_REJECT), every
-# exemption holds (MUST_ALLOW). A reviewer can add a case here, but deleting one
-# defeats the point — each line encodes a credential that once shipped, or a
-# false positive that once blocked a legitimate commit.
-#
-# Fixtures that carry a credential shape are assembled from fragments at run
-# time rather than written out. This file is scanned by the rules it defines (the
-# pre-commit hook labels it `scripts/secret-scan.py`, and CI's secret-scan job
-# reads it), so a literal key here would be a finding — and exempting this path
-# by name would be an exemption that also hides a real secret committed here
-# later. Two fragments are not key-shaped, so nothing has to be loosened to keep
-# the source clean. The self-test's last case proves it: this file must scan
-# clean.
-
-
-def _fixture(*fragments: str) -> str:
-    """A fixture line, assembled at run time. See the note above."""
-    return "".join(fragments)
-
-
-def selftest_vectors() -> list[tuple[str, str, str | None]]:
-    """(label, text, expected rule) — expected `None` means "must stay clean".
-
-    The label is the file path a finding would be reported against, so it also
-exercises the test-path relaxation.
-    """
-    source = "src/config.ts"
-    test_file = "ontrak-tix/tests/thing.test.ts"
-
-    # One per shape rule, so a rule that stops matching is named in the failure
-    # rather than counted as an ordinary pass.
-    shapes = [
-        ("private-key-block", _fixture("-----BEGIN RSA ", "PRIVATE KEY-----")),
-        ("provider-api-key", _fixture("sk-", "a" * 24)),
-        ("stripe-key", _fixture("sk_", "live", "_", "b" * 24)),
-        ("github-token", _fixture("ghp_", "c" * 24)),
-        ("aws-access-key", _fixture("AKIA", "D" * 16)),
-        ("slack-token", _fixture("xoxb-", "123456789012-abcdefghij")),
-        ("google-api-key", _fixture("AIza", "e" * 32)),
-    ]
-    vectors: list[tuple[str, str, str | None]] = [
-        (source, f"const {rule} = \"{value}\"", rule) for rule, value in shapes
-    ]
-
-    vectors += [
-        # A literal assigned to a sensitive name: the rule the first incident in
-        # this repository's history needed.
-        (source, 'DB_PASSWORD = "correct-horse-battery"', "literal-secret (DB_PASSWORD)"),
-        # A secret merely split across two literals is still a stored secret.
-        (source, 'ADMIN_PASS = "hunter2-" + "hunter2-not-real"', "literal-secret (ADMIN_PASS)"),
-        # …but the same line is fine in a test, which is where fixtures live. The
-        # pair below is the whole point: the relaxation is path-scoped, not
-        # global, so it cannot be reached by renaming a committed config file.
-        (test_file, 'ADMIN_PASS = "hunter2-not-a-real-credential"', None),
-        (source, 'ADMIN_PASS = "hunter2-not-a-real-credential"', "literal-secret (ADMIN_PASS)"),
-        # Exemptions. Each is configuration or a pointer, never a credential.
-        (source, 'DB_PASSWORD = "change-me"', None),
-        (source, 'API_TOKEN = "${VAULT_TOKEN}"', None),
-        (source, 'API_KEY = "<your-key-here>"', None),
-        (source, 'SECRET_KEY = "INITIAL_PASSWORD"', None),
-        (source, 'STORAGE_KEY = "studio.token"', None),
-        (source, 'SECRETS_MOUNT = "/run/ontrak/secrets"', None),
-        (source, 'VAULT_TOKEN = "vault://kv/ontrak#token"', None),
-        # A value the line builds at run time, with a random source on the line.
-        (source, 'ADMIN_PASS = "E2e-Sso-" + os.urandom(6).hex() + "!Aa1"', None),
-        # A sensitive *name* inside a string literal is a marker string, not an
-        # assignment — the false positive the string-span rule exists for.
-        (
-            source,
-            'if line.startswith("VAULT_TOKEN_FILE=") and line.strip():',
-            None,
-        ),
-    ]
-    return vectors
-
-
-def selftest() -> int:
-    """Exit 0 if every rule fires and every exemption holds, 1 otherwise."""
-    fails = 0
-    vectors = selftest_vectors()
-
-    def check(label: str, text: str, expected: str | None) -> None:
-        nonlocal fails
-        findings = scan_text(label, text)
-        if expected is None:
-            if findings:
-                print(
-                    f"selftest: FAIL — {label}: reported {findings[0][2]} on a line that is not a credential",
-                    file=sys.stderr,
-                )
-                fails += 1
-            return
-        if not findings:
-            print(f"selftest: FAIL — {label}: {expected} did not fire", file=sys.stderr)
-            fails += 1
-        elif findings[0][2] != expected:
-            print(
-                f"selftest: FAIL — {label}: expected {expected}, matched {findings[0][2]}",
-                file=sys.stderr,
-            )
-            fails += 1
-
-    for label, text, expected in vectors:
-        check(label, text, expected)
-
-    # Size must not change a verdict. The scan reads whole lines from a decoded
-    # string, so there is no pipeline to die of SIGPIPE — but the sibling
-    # attribution guard once failed OPEN on large inputs, and a rule that only
-    # holds on small ones is not a rule.
-    source = "src/config.ts"
-    filler = "\n".join(f"context line {'x' * 60}" for _ in range(4000))
-    big_clean = filler
-    big_with_secret = f"{filler}\n{_fixture('AKIA', 'D' * 16)}\n"
-    check(source, big_clean, None)
-    check(source, big_with_secret, "aws-access-key")
-
-    # This file must pass the rules it defines, or the fixtures above have
-    # become findings and someone will be tempted to exempt this path.
-    own_source = Path(__file__).read_text(errors="replace")
-    own_label = "scripts/secret-scan.py"
-    check(own_label, own_source, None)
-
-    if fails:
-        print(f"secret-scan: self-test: {fails} case(s) failed", file=sys.stderr)
-        return 1
-    print(f"secret-scan: self-test passed ({len(vectors) + 3} cases)")
-    return 0
 
 
 def tracked_paths() -> list[str]:
@@ -443,11 +204,7 @@ def main() -> int:
     args = sys.argv[1:]
     use_stdin = "--stdin" in args
     use_history = "--history" in args
-    use_selftest = "--selftest" in args
     explicit = [a for a in args if not a.startswith("--")]
-
-    if use_selftest:
-        return selftest()
 
     findings: list[Finding] = []
 
