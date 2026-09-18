@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   LITE_API_STRING_ALLOWLIST,
+  LITE_PENDING_PATH_KEY,
+  LOCALE_STORAGE_KEY,
   buildCaddyExample,
   buildHeaders,
   buildLiteConfig,
   buildLitePolicy,
   buildManifest,
   buildNginxExample,
+  buildNotFoundShim,
   buildReadme,
   buildRedirects,
   buildRootRedirect,
@@ -22,6 +25,7 @@ import {
 import { collectTestPaths, planRemovals, runPrepare } from '../../scripts/lite/prepare.mjs';
 import { runPostbuild } from '../../scripts/lite/postbuild.mjs';
 import { verifyExport } from '../../scripts/lite/verify.mjs';
+import { LITE_PENDING_PATH_KEY as APP_LITE_PENDING_PATH_KEY } from '../lite';
 
 /** The scripts take `process.env`-shaped input; tests pass plain objects. */
 function env(values: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -95,6 +99,9 @@ describe('lite build helpers', () => {
     expect(html).toContain('var fallback = "en"');
     expect(html).toContain('var base = "/webmail"');
     expect(html).toContain('href="/webmail/en/"');
+    // The language picked in Settings (zustand persist key of stores/locale-store.ts) wins.
+    expect(html).toContain(`localStorage.getItem("${LOCALE_STORAGE_KEY}")`);
+    expect(LOCALE_STORAGE_KEY).toBe('locale-storage');
     // An unknown default falls back to the first built locale.
     expect(buildRootRedirect({ locales: ['de'], defaultLocale: 'fr' })).toContain('var fallback = "de"');
   });
@@ -108,10 +115,33 @@ describe('lite build helpers', () => {
     expect(buildHeaders({ basePath: '/w', connectSrc: '*' })).toMatch(/^\/w\/\*/);
   });
 
+  it('writes a 404 shim that parks deep links for known locale/surface pairs only', () => {
+    const html = buildNotFoundShim({ basePath: '/webmail', locales: ['de', 'en'] });
+    expect(html).toContain('var base = "/webmail"');
+    expect(html).toContain('var locales = ["de","en"]');
+    expect(html).toContain('var surfaces = ["mail","calendar","contacts","files","settings"]');
+    expect(html).toContain(`sessionStorage.setItem("${LITE_PENDING_PATH_KEY}"`);
+    // Only allowlisted segments are ever assembled into the redirect target.
+    expect(html).toContain('var target = base + "/" + parts[0] + "/" + parts[1] + "/"');
+    expect(html).toContain('location.replace(target)');
+    expect(html).toContain('href="/webmail/"');
+    // The key the shim writes is the one the app reads.
+    expect(LITE_PENDING_PATH_KEY).toBe(APP_LITE_PENDING_PATH_KEY);
+  });
+
   it('renders host snippets and the README for the built variant', () => {
     expect(buildNginxExample({ basePath: '' })).toContain('(?<surface>mail|calendar|contacts|files|settings)');
-    expect(buildNginxExample({ basePath: '/w' })).toContain('alias /var/www/bulwark-lite/');
+    // Root-relative everywhere: a sub-path mount means the files live in <root><basePath>
+    // (alias does not work inside a regex location and produced a redirect cycle).
+    const nginxSub = buildNginxExample({ basePath: '/w' });
+    expect(nginxSub).not.toContain('alias ');
+    expect(nginxSub).toContain('Unzip the archive into /var/www/bulwark-lite/w');
+    expect(nginxSub).toContain('try_files $uri $uri/ $uri/index.html /w/$locale/$surface/index.html');
+    expect(nginxSub).toContain('error_page 404 /w/404.html');
+    expect(nginxSub).toContain('default_type application/manifest+json');
     expect(buildCaddyExample({ basePath: '' })).toContain('try_files {path} {path}/ {path}/index.html /{re.surface.1}/{re.surface.2}/index.html');
+    expect(buildCaddyExample({ basePath: '/w' })).toContain('rewrite @notfound /w/404.html');
+    expect(buildReadme({ version: '1.10.0', commit: 'abc1234', basePath: '/w', locales: ['en'] })).toContain('unzip into `<web root>/w`');
     const readme = buildReadme({ version: '1.10.0', commit: 'abc1234', basePath: '/w', locales: ['en'], jmapServerUrl: 'https://m.example', demoMode: true });
     expect(readme).toContain('# Bulwark Lite 1.10.0 (abc1234)');
     expect(readme).toContain('Demo mode is ON');
@@ -203,10 +233,17 @@ describe('prepare / postbuild / verify against a fake checkout', () => {
         expect(existsSync(join(out, file)), file).toBe(true);
       }
       expect(collectApiStrings(join(out, '_next', 'static'))).toEqual(['/api/config', '/api/plugins']);
+      // Next's default not-found page was replaced by the park-and-replay shim.
+      expect(readFileSync(join(out, '404.html'), 'utf8')).toContain(LITE_PENDING_PATH_KEY);
 
       const verdict = verifyExport({ root });
       expect(verdict.problems).toEqual([]);
       expect(verdict.locales).toEqual(['de', 'en']);
+
+      // An export whose 404.html is still Next's default fails verification.
+      writeFileSync(join(out, '404.html'), '<html>404: This page could not be found.</html>');
+      expect(verifyExport({ root }).problems.join('\n')).toContain('404.html is not the Lite shim');
+      writeFileSync(join(out, '404.html'), buildNotFoundShim({ basePath: '/w', locales: ['de', 'en'] }));
 
       // A new, undocumented endpoint in a chunk is a verification failure.
       writeFileSync(join(out, '_next', 'static', 'chunks', 'new.js'), 'apiFetch("/api/brand-new")');

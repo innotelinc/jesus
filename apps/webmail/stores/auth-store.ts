@@ -848,10 +848,12 @@ export const useAuthStore = create<AuthState>()(
           let oauthAccessToken: string | null = null;
           let oauthExpiresIn = 0;
 
-          // Lite has no session cookie to remember a password in, so "remember
-          // me" also goes through the token flow and only a refresh token is
-          // kept (lib/auth/lite-tokens.ts).
-          const useTokenLogin = !!totp || (IS_LITE && !!rememberMe);
+          // Lite has no session cookie to remember a password in, so every
+          // password login goes through Stalwart's token flow and only a
+          // refresh token is kept: localStorage with "remember me", the tab's
+          // sessionStorage without it (lib/auth/lite-tokens.ts). Servers
+          // without the endpoint fall back to Basic auth below.
+          const useTokenLogin = !!totp || IS_LITE;
           if (useTokenLogin) {
             // Stalwart 0.16+ dropped the `password$totp` basic-auth convention;
             // the MFA code must be exchanged for tokens via the structured login
@@ -904,8 +906,9 @@ export const useAuthStore = create<AuthState>()(
               client.enableTotpReauth(password, () => useTotpReauthStore.getState().requestTotp());
               debug.log('auth', 'TOTP re-auth enabled (legacy basic-auth path)');
             } else {
-              // Lite "remember me" on a server without token login: plain Basic
-              // auth; the session is then kept with the tab only.
+              // Lite on a server without token login (or one that blocks the
+              // browser's /api/auth call): plain Basic auth; the session is
+              // then kept with the tab only, see persistBasicSession.
               client = new JMAPClient(serverUrl, username, password);
               await client.connect();
             }
@@ -934,7 +937,10 @@ export const useAuthStore = create<AuthState>()(
           // write and stalwart-context write are best-effort persistence; the
           // outer login still succeeds even if they log a warning. Errors are
           // caught locally so Promise.all doesn't reject on either.
-          const sessionWrite: Promise<unknown> = (rememberMe && !upgradedToOAuth)
+          // In Lite a Basic session is always kept for the tab (sessionStorage),
+          // so a reload does not sign the user out; the regular build only
+          // writes the cookie when the user asked to be remembered.
+          const sessionWrite: Promise<unknown> = ((rememberMe || IS_LITE) && !upgradedToOAuth)
             ? persistBasicSession(cookieSlot, serverUrl, username, password)
             : Promise.resolve();
 
@@ -1936,7 +1942,9 @@ export const useAuthStore = create<AuthState>()(
             // Basic auth without rememberMe leaves nothing to restore - the
             // user logged in without persisting credentials. Evict silently
             // so the login screen is shown without flagging a fake error.
-            if (account.authMode === 'basic' && !account.rememberMe) {
+            // (Lite keeps a tab-scoped Basic session either way; a missing one
+            // surfaces as a 401 from fetchSlotSession below and evicts too.)
+            if (account.authMode === 'basic' && !account.rememberMe && !IS_LITE) {
               evictAccount(account.id);
               accountStore.removeAccount(account.id);
               return;
