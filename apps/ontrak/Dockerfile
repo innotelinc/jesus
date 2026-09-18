@@ -1,113 +1,90 @@
 # syntax=docker/dockerfile:1
+# ============================================================================
+# OnTrak — control plane and student portal.
+#
+#   docker build -t ontrak .
+#   docker run --rm -p 8080:8080 --env-file .env ontrak
+#
+# What this image is: the Python control plane that talks to Incus, grades the
+# machines, serves the portal and signs the Guacamole console links. The guests
+# themselves (Windows, Server, Office, Linux) are Incus virtual machines on the
+# host — they are not containers and cannot be, so they are deliberately not in
+# here. See docs/docker.md for the whole picture.
+#
+# Two stages: the builder resolves the Python dependencies into a venv, the
+# runtime stage copies that venv and the source tree and nothing else. The
+# source ships as-is because the portal loads its templates and static files
+# relative to the package directory (ontrak/portal/templates), which is also why
+# the entrypoint runs from /app rather than from site-packages.
+# ============================================================================
 
-# ═══════════════════════════════════════════════════════════════════════════
-# OnTrak IT Support Training — container image.
-#
-# Three stages, so the running image carries only what serving needs:
-#
-#   deps     installs the locked dependency tree once, cached on the lockfile
-#   builder  generates the Prisma client and runs Next's production build,
-#            which emits the self-contained server at `.next/standalone`
-#            (see `output` in next.config.ts). This stage keeps the full
-#            dependency tree, so it is also what the one-shot `migrate` and
-#            `seed` compose services run in.
-#   runner   the image that is actually served: the standalone server, the
-#            static assets and the traced Prisma client, as a non-root user.
-#
-# OnTrak Tix builds the same way from its own Dockerfile. The two are separate
-# images on purpose — the products deploy independently.
-#
-# Build (usually via `docker compose up`, which supplies the args):
-#   docker build --target runner -t ontrak-training .
-# ═══════════════════════════════════════════════════════════════════════════
+# ── builder: dependencies only ──────────────────────────────────────────────
+FROM ubuntu:24.04 AS builder
 
-FROM node:20-alpine AS base
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Next writes anonymous telemetry unless told not to; a build should be quiet.
-ENV NEXT_TELEMETRY_DISABLED=1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+
+# A venv keeps the dependencies in one directory that the runtime stage can copy
+# whole, instead of trying to diff /usr/lib/python3/dist-packages.
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+WORKDIR /build
+# Only the packaging metadata first: editing ontrak/ then re-running the build
+# reuses the layer that installed the dependencies.
+COPY pyproject.toml README.md ./
+COPY ontrak ./ontrak
+RUN python3 -m pip install --upgrade pip \
+ && python3 -m pip install .
+
+# ── runtime ─────────────────────────────────────────────────────────────────
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:${PATH}" \
+    PYTHONPATH=/app \
+    ONTRAK_PORTAL__HOST=0.0.0.0 \
+    ONTRAK_PORTAL__PORT=8080
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 \
+      ca-certificates \
+      curl \
+      # drives the Incus CLI: the hypervisor stays on the host, this talks to it
+      incus-client \
+      # the ssh driver provisions and grades Linux guests
+      openssh-client \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
 WORKDIR /app
+# Scenarios, the workload catalog, the lesson library and the config all live in
+# the tree, so the tree is the image. media/ and state/ are volumes.
+COPY . /app
 
-# Prisma's query engine links against OpenSSL, which Alpine does not ship by
-# default. Without this the client fails at import with a missing-libssl error
-# rather than a useful message.
-#
-# `setpriv` is the util-linux one, deliberately shadowing BusyBox's applet of the
-# same name: the entrypoint drops from root to `VAULT_DROP_UID` with
-# `setpriv --reuid= --regid= --init-groups`, and BusyBox's setpriv has no uid/gid
-# options at all (capabilities only), so it exits 1 with
-# `unrecognized option: reuid=1001` and every container fails to start. The
-# package is named `setpriv`, not `util-linux-misc`.
-RUN apk add --no-cache openssl setpriv
+# Volumes are created here so a run without them (plain `docker run`) still
+# works: the image is usable with no mounts at all, in demo mode.
+RUN mkdir -p /app/state /app/media \
+ && chmod +x /app/docker/entrypoint.sh \
+ && python3 -c "import ontrak, ontrak.portal.app; print('ontrak import ok')"
 
-# ── Dependencies ────────────────────────────────────────────────────────────
-# Copied alone so the layer only rebuilds when the lockfile actually changes.
-FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm ci
+# The portal listens on 8080; the console gateway (Guacamole) is a separate
+# service and never shares this port.
+EXPOSE 8080
 
-# ── Build ───────────────────────────────────────────────────────────────────
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# /healthz is public on purpose: it reports scenario and catalog counts and is
+# what the Compose healthcheck and any load balancer polls.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${ONTRAK_PORTAL__PORT}/healthz" >/dev/null || exit 1
 
-# Ask Next for the self-contained server the runner stage serves (see `output`
-# in next.config.ts). Set in this stage rather than `base` so it cannot leak
-# into the runtime image.
-ENV NEXT_STANDALONE=1
-
-# `next build` inlines NEXT_PUBLIC_* at build time — they are compiled into the
-# client bundle, not read at run time, so they must be present *here* or the
-# image ships the fallbacks in the source. Compose passes them as build args.
-ARG NEXT_PUBLIC_APP_NAME="OnTrak IT Support Training"
-ARG NEXT_PUBLIC_ALLOW_SELF_REGISTRATION="true"
-ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME
-ENV NEXT_PUBLIC_ALLOW_SELF_REGISTRATION=$NEXT_PUBLIC_ALLOW_SELF_REGISTRATION
-
-# `prisma generate` reads the datasource block, so the variable must exist even
-# though nothing connects: the build never opens a connection to this address.
-# The real URL arrives at run time, from the environment. Kept as an ARG so a
-# deployment mirroring an air-gapped registry can point it somewhere harmless.
-ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
-ENV DATABASE_URL=$DATABASE_URL
-
-# Runs the project's own build script (`prisma generate && next build`).
-RUN npm run build
-
-# ── Runtime ─────────────────────────────────────────────────────────────────
-FROM base AS runner
-
-ENV NODE_ENV=production
-# The standalone server reads HOSTNAME/PORT. 0.0.0.0 rather than localhost so
-# the port is reachable from outside the container's own loopback.
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
-
-# Run as a non-root user. Next's standalone server has no need for root, and an
-# uploaded package should never be able to overwrite the application.
-RUN addgroup --system --gid 1001 nodejs \
- && adduser --system --uid 1001 nextjs
-
-# The standalone output inlines the server and its traced dependencies, but not
-# these two, which Next deliberately keeps outside it.
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# Cerulean Vault (SecretOps): the resolver and the entrypoint that runs it before
-# the server boots. The entrypoint runs as root (the image drops to `nextjs`
-# after resolving) because this stack's Vault token is only readable by root.
-COPY scripts/vault-env.mjs ./scripts/vault-env.mjs
-COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x ./docker-entrypoint.sh
-
-# Uploaded software packages and image bundles. Compose mounts a named volume
-# over `storage/` so a rebuild never discards what a deployment has uploaded;
-# creating it here, owned by the app user, is what makes that volume writable.
-RUN mkdir -p storage/packages storage/uploads \
- && chown -R nextjs:nodejs storage
-
-# The entrypoint runs as root so it can read the root-only Vault token, resolves
-# `vault://` values, then drops to `nextjs` (uid 1001) before serving.
-ENV VAULT_DROP_UID=1001
-EXPOSE 3000
-ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["serve"]

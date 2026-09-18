@@ -1,120 +1,151 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# OnTrak IT Support Training — the app and its database.
+# ============================================================================
+# OnTrak — IT Support Training Platform powered by Innotel OnTrak
 #
-#   docker compose up -d          build the image, migrate, serve on :3000
-#   docker compose --profile demo run --rm seed    load the demo data
+#   make secrets        # writes .env with freshly generated portal/console keys
+#   make up             # portal + console gateway (+ local Incus when present)
+#   make logs           # follow
+#   make down
 #
-# `app` waits for `migrate` to finish, so a container never serves against a
-# schema it has not been given. Postgres and uploaded packages each live on a
-# named volume, so neither a rebuild nor a `down` discards them.
+# Two containers run the *control plane*:
 #
-# This file is the training app's stack only. OnTrak Tix has its own
-# (`ontrak-tix/docker-compose.yml`) because the two products are independently
-# deployable — each keeps a separate database, and running both stacks means
-# starting both files. Only the *published* database port would collide, so
-# each one takes an override: ONTRAK_DB_PORT here, ONTRAK_TIX_DB_PORT in Tix.
-# ═══════════════════════════════════════════════════════════════════════════
-
-name: ontrak-training
+#   portal      the FastAPI student portal: scenarios, tickets, grading, admin
+#   guacamole   the HTML5 console (RDP/SSH into the training machines)
+#  +guacd       Guacamole's connection daemon, which does the actual protocol work
+#
+# What is deliberately **not** here: the training machines themselves. Those are
+# Incus virtual machines on the host — Windows 95 through 11, Server, Office and
+# the Linux distributions (see docs/catalog.md) — because a machine that has to
+# boot a real Windows kernel, hold a driver fault and survive a malware
+# scenario is a VM, not a container. The portal reaches the host's Incus daemon
+# over its unix socket, which is why the stack runs from this directory, next to
+# the checkout: `docker compose up -d`.
+#
+# For the socket-free variant (a remote Incus cluster over HTTPS, demo mode, or
+# a laptop) use `make up-remote`; `make up` adds the local socket override
+# automatically when the host has one. See docs/docker.md.
+# ============================================================================
+name: ontrak
 
 services:
-  db:
-    image: postgres:16-alpine
-    # No `container_name`: that fixes the name for every project, which stops
-    # the production overlay running under its own `-p` alongside this one
-    # (compose names containers `<project>-<service>-<n>` by default).
+  # ── the student portal ────────────────────────────────────────────────────
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${ONTRAK_IMAGE:-ontrak:local}
+    container_name: ontrak-portal
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ontrak
-      POSTGRES_PASSWORD: ontrak
-      POSTGRES_DB: ontrak
+    init: true
     ports:
-      - "${ONTRAK_DB_PORT:-5432}:5432"
-    volumes:
-      - ontrak-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ontrak -d ontrak"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # Applies the tracked migrations, then exits. Runs in the builder stage, which
-  # is the one that carries the Prisma CLI and the `prisma/migrations/` tree.
-  migrate:
-    build:
-      context: .
-      target: builder
-    command: npx prisma migrate deploy
-    restart: "no"
-    depends_on:
-      db:
-        condition: service_healthy
+      # Loopback by default: the portfolio posture is a TLS proxy (NPM Edge)
+      # in front, never a portal exposed straight to the network. Set
+      # ONTRAK_BIND_ADDR=0.0.0.0 in .env for a lab where students hit it directly.
+      - "${ONTRAK_BIND_ADDR:-127.0.0.1}:${ONTRAK_PORTAL__PORT:-8080}:8080"
     environment:
-      # Inside the network the database is the `db` service. Never 127.0.0.1:
-      # in a container that address is the container itself.
-      DATABASE_URL: postgresql://ontrak:ontrak@db:5432/ontrak?schema=public
+      # ── identity and secrets ──
+      ONTRAK_PORTAL__TITLE: ${ONTRAK_PORTAL__TITLE:-OnTrak}
+      ONTRAK_PORTAL__BRAND_NOTE: ${ONTRAK_PORTAL__BRAND_NOTE:-IT support training range — powered by Innotel OnTrak}
+      # Signs the portal's session cookies: without it nobody can log in.
+      ONTRAK_PORTAL__SECRET: ${ONTRAK_PORTAL__SECRET:?run 'make secrets' to generate .env, then 'make up' again}
+      # Seeded as the instructor account on boot, and the admin panel's login.
+      ONTRAK_PORTAL__ADMIN_USER: ${ONTRAK_PORTAL__ADMIN_USER:-instructor}
+      ONTRAK_PORTAL__ADMIN_PASSWORD: ${ONTRAK_PORTAL__ADMIN_PASSWORD:-}
+      # Must equal JSON_SECRET_KEY below: the portal signs console links with it
+      # and Guacamole verifies them. One value, two services.
+      ONTRAK_GUAC__SECRET_KEY: ${ONTRAK_GUAC__SECRET_KEY:?run 'make secrets' to generate .env, then 'make up' again}
+      ONTRAK_GUAC__BASE_URL: ${ONTRAK_GUAC__BASE_URL:-http://localhost:8081/guacamole/}
+      ONTRAK_GUAC__RECORDING: ${ONTRAK_GUAC__RECORDING:-false}
+      ONTRAK_GUAC__RECORDING_PATH: /recordings
 
-  app:
-    build:
-      context: .
-      target: runner
-      args:
-        # Compiled into the client bundle at build time, not read at run time —
-        # see the `next build` note in the Dockerfile.
-        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-OnTrak IT Support Training}
-        NEXT_PUBLIC_ALLOW_SELF_REGISTRATION: ${NEXT_PUBLIC_ALLOW_SELF_REGISTRATION:-true}
+      # ── hypervisor ──
+      ONTRAK_INCUS__REMOTE: ${ONTRAK_INCUS__REMOTE:-local}
+      ONTRAK_INCUS__PROJECT: ${ONTRAK_INCUS__PROJECT:-ontrak}
+      ONTRAK_INCUS__STORAGE_POOL: ${ONTRAK_INCUS__STORAGE_POOL:-default}
+      ONTRAK_INCUS__NETWORK: ${ONTRAK_INCUS__NETWORK:-ontrak0}
+      ONTRAK_INCUS__PROFILE: ${ONTRAK_INCUS__PROFILE:-ontrak-student}
+      ONTRAK_INCUS__IMAGE_ALIAS: ${ONTRAK_INCUS__IMAGE_ALIAS:-ontrak-win-base}
+
+      # ── guest automation ──
+      # winrm (Windows guests), ssh (Linux guests), incus-exec, or null for a
+      # dry run. The driver is chosen per scenario platform when unset.
+      ONTRAK_GUEST__DRIVER: ${ONTRAK_GUEST__DRIVER:-}
+      ONTRAK_GUEST__USER: ${ONTRAK_GUEST__USER:-student}
+      ONTRAK_GUEST__PASSWORD: ${ONTRAK_GUEST__PASSWORD:-}
+      ONTRAK_GUEST__STATIC_HOST: ${ONTRAK_GUEST__STATIC_HOST:-}
+
+      # ── sessions, results and pools ──
+      ONTRAK_SESSION__TTL_MINUTES: ${ONTRAK_SESSION__TTL_MINUTES:-90}
+      ONTRAK_SESSION__IDLE_RECYCLE_MINUTES: ${ONTRAK_SESSION__IDLE_RECYCLE_MINUTES:-20}
+      ONTRAK_SESSION__MAX_PER_STUDENT: ${ONTRAK_SESSION__MAX_PER_STUDENT:-1}
+      ONTRAK_SESSION__PERSIST_PROGRESS: ${ONTRAK_SESSION__PERSIST_PROGRESS:-false}
+      ONTRAK_POOL__ENABLED: ${ONTRAK_POOL__ENABLED:-true}
+      ONTRAK_POOL__DEFAULT_TARGET: ${ONTRAK_POOL__DEFAULT_TARGET:-0}
+      ONTRAK_POOL__MAX_TOTAL: ${ONTRAK_POOL__MAX_TOTAL:-60}
+      ONTRAK_SELECTION__STRATEGY: ${ONTRAK_SELECTION__STRATEGY:-balanced}
+
+      # ── demo mode (no hypervisor, no Windows, no secrets) ──
+      ONTRAK_DEMO__ENABLED: ${ONTRAK_DEMO__ENABLED:-false}
+    volumes:
+      # Durable portal state: accounts, sessions, submitted results, tickets,
+      # audit log. This is the only thing in the stack that matters after a
+      # class — the machines are disposable by design.
+      - ontrak-state:/app/state
+      # Installation media (`ontrak media fetch`): large, so never in the image.
+      - ontrak-media:/app/media
+      - ./deploy/guacamole/recordings:/recordings
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks: [ontrak]
+
+  # ── Guacamole: the browser console ────────────────────────────────────────
+  guacd:
+    image: guacamole/guacd:1.6.0
+    container_name: ontrak-guacd
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-    ports:
-      - "3000:3000"
-    # "Healthy" here means the server is up and serving, not that the database is
-    # reachable: a database blip should not mark a running app unhealthy and send
-    # an operator after the wrong container. The sign-in page renders without
-    # touching the database, so it is a clean probe for exactly that.
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3000/login').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    # AUTH_SECRET and the rest of the app's configuration. `.env` is gitignored;
-    # `make setup` (or `npm run setup`) creates it from `.env.example`.
-    env_file:
-      - .env
-    environment:
-      # Overrides the host-oriented DATABASE_URL in `.env`, which points at
-      # 127.0.0.1 and would name the app container itself from in here.
-      DATABASE_URL: postgresql://ontrak:ontrak@db:5432/ontrak?schema=public
-      STORAGE_DIR: ./storage/packages
-      NODE_ENV: production
+    init: true
     volumes:
-      - ontrak-storage:/app/storage
+      - ./deploy/guacamole/recordings:/recordings
+    networks: [ontrak]
 
-  # Development/demo data: scenarios, courses and the seeded accounts. Opt-in,
-  # because a production deployment wants an empty database, not a demo one.
-  seed:
-    build:
-      context: .
-      target: builder
-    profiles: ["demo"]
-    command: npm run setup
-    restart: "no"
+  guacamole:
+    image: guacamole/guacamole:1.6.0
+    container_name: ontrak-guacamole
+    restart: unless-stopped
+    init: true
     depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
+      - guacd
+    ports:
+      - "${ONTRAK_BIND_ADDR:-127.0.0.1}:${ONTRAK_GUAC__PUBLIC_PORT:-8081}:8080"
     environment:
-      DATABASE_URL: postgresql://ontrak:ontrak@db:5432/ontrak?schema=public
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: "4822"
+      # guacamole-auth-json: the portal hands the browser a signed, encrypted,
+      # single-use payload scoped to one machine. There is no Guacamole user
+      # database and no login page a student ever sees.
+      JSON_ENABLED: "true"
+      JSON_SECRET_KEY: ${ONTRAK_GUAC__SECRET_KEY:?run 'make secrets' to generate .env, then 'make up' again}
+      LOG_LEVEL: ${ONTRAK_GUAC__LOG_LEVEL:-info}
+    healthcheck:
+      # The image is a Tomcat deployment; probe whichever HTTP client it has.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/guacamole/ >/dev/null 2>&1 || wget -q --spider http://127.0.0.1:8080/guacamole/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    networks: [ontrak]
 
 volumes:
-  ontrak-pgdata:
-  ontrak-storage:
+  ontrak-state:
+    name: ontrak-state
+  ontrak-media:
+    name: ontrak-media
+
+networks:
+  # A private bridge. The portal still needs egress (it dials the training
+  # machines the host's Incus bridge hands it); the gateway needs none.
+  ontrak:
+    name: ontrak
