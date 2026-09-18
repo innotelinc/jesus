@@ -1,47 +1,47 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# Build context for the training app image.
+# Docker build context exclusions.
 #
-# Two rules: never copy in what the image installs or generates itself, and
-# never let local state or a secret reach a layer. Nothing excluded here is
-# needed by `npm run build`.
-# ═══════════════════════════════════════════════════════════════════════════
+# The image needs the repository (scenarios, catalog, lessons, config, ontrak/)
+# and nothing else: no local state, no downloaded installation media, no venv,
+# no repo metadata. Keeping media/ and state/ out also keeps .iso files out of
+# the build context, which is the difference between a 300 MB context and a
+# 12 GB one.
 
-# Dependencies and build output — reinstalled and regenerated inside the image
-**/node_modules
-**/.next
-**/out
-**/dist
-**/build
-**/*.tsbuildinfo
-
-# The sibling products are separate images with their own Dockerfiles and their
-# own build contexts. They are excluded here so the training app's context does not
-# drag four other applications' node_modules and ripgrep-able secrets through the
-# daemon on every build — and so a file that should only live in a sibling cannot
-# be COPY'd into this image by a stray instruction.
-ontrak-tix
-ontrak-sentinel
-ontrak-sync
-ontrak-portal
-web
-
-# Repository tooling, not application code
+# repository metadata and CI
 .git
-.githooks
-.github
 .gitignore
+.github
+.githooks
 .freebuff
 
-# Secrets. Compose injects these at run time; a layer would freeze them forever.
+# local state: never shipped, always a volume
+state/
+*.sqlite3
+config/local.yaml
 .env
-.env*.local
-*.pem
 
-# Local data and test artifacts
-storage/packages
-storage/uploads
-test-results
-playwright-report
-coverage
-npm-debug.log*
-yarn-error.log*
+# downloaded / operator-supplied installation media
+media/
+images/
+build-*/
+*.iso
+*.esd
+*.wim
+*.vhd
+*.vhdx
+*.qcow2
+*.tar.gz
+
+# python environments and caches
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# tests are run on the host (and in CI on the host); the image has no test runner
+tests/
+
+# gateway recordings: large, and they show a student's screen
+deploy/guacamole/recordings/
