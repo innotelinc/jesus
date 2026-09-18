@@ -996,7 +996,10 @@ services:
     networks: [interview-net]
 
   grafana:
-    image: ${GRAFANA_IMAGE:-grafana/grafana:13.2.2}
+    # 13.x has a provisioning regression that crash-loops on datasource
+    # provisioning ("Datasource provisioning error: data source not found",
+    # grafana/grafana#110740). Pinned until that is fixed.
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.6.0}
     container_name: grafana
     restart: unless-stopped
     # Memory posture: UI + dashboard rendering only; the store is Prometheus.
