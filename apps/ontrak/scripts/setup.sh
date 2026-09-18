@@ -1,80 +1,64 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════════════════════
-# OnTrak — one-shot bootstrap: guard hooks, .env files, dependencies.
+# OnTrak — one-shot bootstrap.
 #
-# Deliberately small and idempotent: running it twice is safe, and it never
-# overwrites an existing .env (that file holds a deployment's own values and a
-# bootstrap has no business rewriting a secret it did not generate).
+# Installs the attribution-guard hooks, creates the virtualenv, installs the Python
+# dependencies and seeds .env from .env.example. Safe to re-run: it never overwrites
+# an existing .env, and re-running only re-installs what is missing.
 #
-# It installs the attribution/secret guard by pointing git at .githooks, which
-# is what makes the local hooks real — a copied .githooks directory that git has
-# not been told about guards nothing.
-# ═══════════════════════════════════════════════════════════════════════════
+# OnTrak has no root-level compose stack: the student range runs on the host through
+# Incus (see infra/bootstrap-host.sh) and the browser console runs through the
+# operator's Guacamole deployment (see deploy/guacamole/).
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+APP="$(basename "$(pwd)")"
+VENV=".venv"
 
-# Ensure the Genie workspace host directory is ready before any container mounts
-# it. This is the host-side half of the EACCES fix for mkdir /workspace/accounts:
-# the Incus host maps a device here and it can come up owned by nobody:nogroup
-# (UID 65534), which is outside the user-namespace range and therefore unwritable.
-# See scripts/ensure-genie-workspace.sh and the entrypoint safety net.
-bash "$ROOT/scripts/ensure-genie-workspace.sh" || true
+echo "==> ${APP} bootstrap"
 
-# Install the systemd units that keep the workspace fix permanent: the init
-# service runs before Docker starts (catches device re-mounts on reboot), and
-# the daily timer is a backstop for any case the boot-time check misses.
-SYSTEMD_DIR="${SYSTEMD_DIR:-/etc/systemd/system}"
-if command -v systemctl >/dev/null 2>&1 && [ -d "$SYSTEMD_DIR" ]; then
-  for unit in genie-workspace-init.service genie-workspace-check.service genie-workspace-check.timer; do
-    src="$ROOT/scripts/systemd/$unit"
-    if [ -f "$src" ]; then
-      cp "$src" "$SYSTEMD_DIR/" 2>/dev/null || true
-      systemctl daemon-reload 2>/dev/null || true
-      systemctl enable "$unit" 2>/dev/null && echo "  enabled $unit"
-    fi
-  done
+# ── attribution guard hooks ───────────────────────────────────────────────────
+if [ -d .githooks ]; then
+  git config core.hooksPath .githooks
+  echo "==> attribution guard hooks installed (.githooks)"
 fi
 
-echo "==> OnTrak bootstrap"
-
-echo "--> guard hooks"
-git config core.hooksPath .githooks
-chmod +x .githooks/* 2>/dev/null || true
-echo "    core.hooksPath = $(git config core.hooksPath)"
-
-echo "--> environment files"
-for dir in . ontrak-tix; do
-  if [ -f "$dir/.env.example" ]; then
-    if [ -f "$dir/.env" ]; then
-      echo "    $dir/.env exists — left alone"
-    else
-      cp "$dir/.env.example" "$dir/.env"
-      echo "    created $dir/.env from the template"
-    fi
+# ── .env ─────────────────────────────────────────────────────────────────────
+if [ ! -f .env ]; then
+  if [ -f .env.example ]; then
+    cp .env.example .env
+    echo "==> .env created from .env.example — fill in the real values"
   fi
-done
-
-echo "--> dependencies"
-# Install build/runtime tools needed by the project and its Makefile.
-# `make` is used by the bootstrap targets; `curl` and `jq` are required by
-# the platform stack library for LAN detection and health checks.
-if command -v apt-get >/dev/null 2>&1; then
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq 2>/dev/null && \
-    apt-get install -y -qq make curl jq ca-certificates 2>/dev/null || true
+else
+  echo "==> .env already present, left untouched"
 fi
-npm install
 
-cat <<'DONE'
+# ── python environment ────────────────────────────────────────────────────────
+PYTHON="${PYTHON:-python3}"
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+  echo "!! ${PYTHON} not found — install Python 3.11 or newer" >&2
+  exit 1
+fi
 
-Next:
-  make db && make setup && make dev        # the training app
-  make tix-setup tix-db tix-schema tix-dev # the service desk
+if [ ! -d "$VENV" ]; then
+  echo "==> creating ${VENV}"
+  "$PYTHON" -m venv "$VENV"
+fi
 
-Before deploying anything, replace every placeholder secret in the .env files
-(AUTH_SECRET, TIX_AUTH_SECRET, the webhook/cron/assurance secrets). A production
-deployment resolves them from Cerulean Vault — see .env.example.
+echo "==> installing dependencies"
+"${VENV}/bin/pip" install --quiet --upgrade pip
+"${VENV}/bin/pip" install --quiet -r requirements.txt
+"${VENV}/bin/pip" install --quiet -e .
 
-DONE
+# ── optional: PowerShell, for validating guest scripts locally ────────────────
+if command -v pwsh >/dev/null 2>&1; then
+  echo "==> pwsh found: guest scripts can be syntax-checked locally"
+else
+  echo "==> pwsh not found (optional): scenario scripts are only parsed at template build"
+fi
+
+echo
+echo "==> done. Next:"
+echo "    make demo        # full student flow, no hypervisor needed"
+echo "    make serve       # student portal (needs the secrets in .env)"
+echo "    make check       # host readiness, including Incus and KVM"
+echo
+echo "    Building real Windows templates needs a host: infra/bootstrap-host.sh"

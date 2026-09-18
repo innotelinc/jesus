@@ -1,57 +1,35 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# ci.yml — the checks that must be green on main.
+# ci.yml — static checks on push and pull requests.
 #
-# Twelve concerns, in the order they fail cheapest:
-#   structure    — the conformant file set, the compose files and every landing page
-#   secrets      — the scanner passes its own self-test, then the tracked tree
-#   training     — the IT support training app: typecheck, unit tests, build
-#   tix          — OnTrak Tix: typecheck, unit tests, build
-#   sentinel     — OnTrak Sentinel: migrations applied, then typecheck and unit tests
-#   roundtrip    — the Sentinel image boots and signs somebody in over the wire
-#   sync         — OnTrak Sync: the API's unittest suite, then the dashboard typecheck
-#   sync-browser — the Sync rollouts console in Chromium, over a faked Network, and the
-#                  dev server's hot-reload socket
-#   genie        — the agent console: typecheck, build, unit and HTTP tests
-#   portal       — the family's front door: typecheck, copy check, unit tests, build
-#   family       — the whole family stack boots together and the wiring between the
-#                  products holds
-#   images       — every container image actually builds, one matrix entry per product
-#
-# Both apps talk to PostgreSQL (through Prisma) and are exercised against a
-# real database here, because a suite that only passes against fakes proves
-# nothing about the SQL it actually issues. The training app ships migrations
-# and applies them; Tix is schema-first (no migrations directory) and pushes.
-# Attribution is enforced separately, in attribution-guard.yml.
+# The repo is maintained at zero findings: structure and landing stay conformant,
+# the Python control plane is linted and tested, every scenario and catalog manifest
+# is validated, the guest PowerShell parses, and the compose stack renders.
+# The attribution guard lives in its own workflow.
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: CI
 
-# `family` is where the family is assembled, so a push there runs CI too: the branch
-# that reaches a deploy is the branch whose images have to be proven to build.
 on:
   push:
-    branches: [main, master, family]
+    branches: [main]
   pull_request:
-  workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   structure:
     name: Repository structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Conformant structure
         run: |
           set -euo pipefail
-          for f in README.md LICENSE .env.example .gitignore web/landing/index.html docs/stack.md; do
+          for f in README.md LICENSE .env.example .gitignore \
+                   web/landing/index.html docs/stack.md docs/catalog.md docs/roadmap.md \
+                   .github/workflows/attribution-guard.yml .githooks/guard-lib; do
             if [ ! -f "$f" ]; then
               echo "::error::missing required file: $f"
               exit 1
@@ -62,787 +40,149 @@ jobs:
       - name: .gitignore covers .env
         run: |
           set -euo pipefail
-          grep -q '^\.env' .gitignore || { echo "::error::.gitignore does not list .env"; exit 1; }
-          echo "gitignore: ok"
+          grep -q '^\.env' .gitignore || { echo "::error:: .gitignore does not list .env"; exit 1; }
 
-      # Four compose files and three `.env.example`s, checked as a set: a family
-      # stack that no longer parses is a broken "one command" that only a person
-      # trying it would find.
-      - name: Every compose file parses
+      - name: No licensed media committed
         run: |
           set -euo pipefail
-          cp -n .env.example .env
-          cp -n ontrak-tix/.env.example ontrak-tix/.env
-          docker compose config --quiet && echo "compose: training ok"
-          ( cd ontrak-tix && docker compose config --quiet ) && echo "compose: tix ok"
-          ( cd ontrak-sentinel && docker compose config --quiet ) && echo "compose: sentinel ok"
-          docker compose -f docker-compose.all.yml config --quiet && echo "compose: family ok"
-
-      # Every landing in the tree, not only the front door. `pages.yml` publishes
-      # each product's landing at its own path under the family site, so a product
-      # landing that lost its favicon or picked up attribution text ships broken
-      # exactly as visibly as the root one would.
-      - name: Landing page sanity
-        run: |
-          set -euo pipefail
-          for f in web/landing/index.html */web/landing/index.html; do
-            [ -f "$f" ] || continue
-            grep -qi '<title>' "$f" || { echo "::error::$f has no <title>"; exit 1; }
-            grep -qi 'og:title' "$f" || { echo "::error::$f has no og:title"; exit 1; }
-            grep -qi 'data:image/svg+xml' "$f" || { echo "::error::$f favicon is not a self-contained SVG"; exit 1; }
-            grep -Eiq 'generated with|generated by|co-authored-by' "$f" && { echo "::error::$f carries attribution text"; exit 1; }
-            echo "landing: $f ok"
-          done
-
-      # Every product vendors the shared theme byte-for-byte, so the first sign the
-      # family is drifting apart is somebody fixing one copy. A diff is the check that
-      # cannot be argued with; `--update` is how a real theme change is rolled out.
-      - name: Unity theme copies are byte-identical
-        run: python3 theme/tests/test_theme_copies.py
-
-      # The lab's reporting client ships here because OnTrak-dev must stay unchanged,
-      # so its suite runs here too rather than waiting for a lab host to report a
-      # payload the server refuses. Offline by design: no network, no database, and
-      # the same command its README gives an operator.
-      - name: Lab client unit tests
-        run: |
-          set -euo pipefail
-          cd integrations/lab-completion-client
-          python3 -m unittest discover -s tests
-
-  secrets:
-    name: Secret scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      # First, because this is the step that catches the failure nobody sees: a
-      # scanner whose patterns have stopped matching reports a clean tree.
-      - name: The scanner must still fire
-        run: python3 scripts/secret-scan.py --selftest
-
-      - name: Scan the tracked tree
-        run: python3 scripts/secret-scan.py
-
-  training:
-    name: Training app
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ontrak
-          POSTGRES_PASSWORD: ontrak
-          POSTGRES_DB: ontrak
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U ontrak"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/ontrak?schema=public
-      AUTH_SECRET: ci-only-not-a-production-secret-value
-      # The shipped placeholder, so the seeded demo accounts the a11y-free
-      # suites sign in as exist without CI holding a real credential.
-      SEED_PASSWORD: change-me-ontrak
-      STORAGE_DIR: ./storage/packages
-      NEXT_PUBLIC_APP_NAME: OnTrak IT Support Training
-    defaults:
-      run:
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Generate the Prisma client and apply migrations
-        run: |
-          npx prisma generate
-          npx prisma migrate deploy
-
-      # Applied migrations are compared against the models, so a hand-edited SQL
-      # file cannot quietly describe a different schema than the one Prisma thinks
-      # it is talking to — the failure mode that only shows up in production.
-      - name: No drift between the migrations and the models
-        run: |
-          npx prisma migrate diff \
-            --from-url "$DATABASE_URL" \
-            --to-schema-datamodel prisma/schema.prisma \
-            --exit-code
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      # `npm test` skips this (it boots a server), and this is the one place it is
-      # actually run: the lab-completion boundary driven through the app's own route
-      # against the migrations applied above, so the route's database path, its
-      # idempotency and the results feed's mode filter are covered on every change
-      # — with no hypervisor and no lab. The boundary is what CI can test, and does;
-      # where the lab is hosted is an operator's deployment (docs/consolidation-audit.md
-      # §9/Q8), and the clauses that keep that true are held by tests/ci-coverage.test.ts.
-      - name: Lab-completion live test
-        run: ONTRAK_LAB_LIVE=1 npx tsx --tsconfig tests/tsconfig.json --test tests/lab-live.test.ts
-
-      # The step above drives the route with a body this repository wrote, and the
-      # client's unit tests stub the transport out. This is the only check that runs
-      # the client's *real* request against the route, which is the pair a lab host
-      # depends on. `python3` is already used by the structure job.
-      - name: Lab-client live test
-        run: ONTRAK_LAB_CLIENT_LIVE=1 npx tsx --tsconfig tests/tsconfig.json --test tests/lab-client-live.test.ts
-
-      - name: Build
-        run: npm run build
-
-  tix:
-    name: OnTrak Tix
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ontrak
-          POSTGRES_PASSWORD: ontrak
-          POSTGRES_DB: ontrak_tix
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U ontrak"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/ontrak_tix
-      TIX_AUTH_SECRET: ci-only-not-a-production-secret-value
-      ONTRAK_TIX_WEBHOOK_SECRET: ci-only-not-a-production-secret-value
-      ONTRAK_TIX_RMM_SECRET: ci-only-not-a-production-secret-value
-      ONTRAK_TIX_CRON_SECRET: ci-only-not-a-production-secret-value
-      ONTRAK_TIX_ASSURANCE_SECRET: ci-only-not-a-production-secret-value
-      ONTRAK_TIX_BLOB_DIR: .ontrak-tix-blobs
-      ONTRAK_TIX_EVIDENCE_DIR: .ontrak-tix-evidence
-    defaults:
-      run:
-        working-directory: ontrak-tix
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ontrak-tix/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Generate the Prisma client and sync the schema
-        run: |
-          npx prisma generate
-          npx prisma db push
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-  # OnTrak Sentinel, whose S0 exit criterion is that tenant isolation is covered
-  # by CI tests. Every migration is applied here, because a migration that does
-  # not apply is not a migration: the OIDC tables arrive in the second, SAML
-  # service providers and token revocation in the third, TOTP enrollment state in
-  # the fourth, WebAuthn credentials and challenges in the fifth, provisioning
-  # (SCIM tokens, groups and `Identity.externalId`) in the sixth, and the live
-  # Postgres test runs against the result. The migrations are also diffed against
-  # the models, so a hand-edited SQL file cannot quietly drift from the schema it
-  # is supposed to create.
-  sentinel:
-    name: OnTrak Sentinel
-    runs-on: ubuntu-latest
-    # A test that leaks a handle does not fail, it hangs, and a hung job holds the
-    # runner until GitHub's six-hour ceiling. The suite itself closes its sockets now;
-    # this is the guard that turns a future regression into a five-minute failure.
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: ontrak
-          POSTGRES_PASSWORD: ontrak
-          POSTGRES_DB: sentinel
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U ontrak"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/sentinel?schema=public
-    defaults:
-      run:
-        working-directory: ontrak-sentinel
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ontrak-sentinel/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Generate the Prisma client and apply every migration
-        run: |
-          npx prisma generate
-          npx prisma migrate deploy
-
-      - name: No drift between the migrations and the models
-        run: |
-          npx prisma migrate diff \
-            --from-migrations prisma/migrations \
-            --to-schema-datamodel prisma/schema.prisma \
-            --shadow-database-url "$DATABASE_URL" \
-            --exit-code
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-  # The unit suite tests the rules and the live store test tests the SQL, and
-  # neither of them answers the question a deployment actually has: does the thing
-  # in the image sign somebody in, over the wire, with the key it is holding right
-  # now? So this boots the stack a deployment would use — the compose file itself,
-  # which is the artefact under test — and drives a full authorization-code flow
-  # through it, verifying the ID token against the JWKS the container serves.
-  #
-  # It is deliberately here rather than folded into the `sentinel` job: that one
-  # runs the source against a Postgres service, this one runs the image. A broken
-  # Dockerfile, a missing `openssl`, a volume that never gets created — all three
-  # pass the first and fail this one.
-  sentinel-roundtrip:
-    name: Sentinel round trip
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ontrak-sentinel/package-lock.json
-
-      - name: Install
-        working-directory: ontrak-sentinel
-        run: npm ci
-
-      # The issuer is set here rather than in a `.env`, which is gitignored: this
-      # is the address the provider will advertise, so it has to be one the smoke
-      # check can also reach.
-      - name: Boot the stack
-        working-directory: ontrak-sentinel
-        env:
-          SENTINEL_ISSUER: http://127.0.0.1:8787
-        run: |
-          set -euo pipefail
-          docker compose up -d --build
-          # Polled rather than `--wait`: the stack has two one-shot services by
-          # design (`migrate` and `signing-key`), and waiting on them to be
-          # "running" would be waiting for something that is supposed to finish.
-          for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration >/dev/null 2>&1; then
-              echo "provider is up"
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration >/dev/null || {
-            echo "::error::the provider never answered discovery"
-            exit 1
-          }
-          docker compose logs app > /tmp/sentinel.log
-          cat /tmp/sentinel.log
-
-      - name: Full authorization-code round trip
-        working-directory: ontrak-sentinel
-        run: |
-          set -euo pipefail
-          session=$(grep -o 'demo session: [0-9a-f-]*' /tmp/sentinel.log | head -1 | cut -d' ' -f3)
-          client=$(grep -o 'demo client: [0-9a-f-]*' /tmp/sentinel.log | head -1 | cut -d' ' -f3)
-          test -n "$session" || { echo "::error::no bootstrap session in the boot log"; exit 1; }
-          test -n "$client" || { echo "::error::no demo client in the boot log"; exit 1; }
-          SENTINEL_SMOKE_BASE=http://127.0.0.1:8787 \
-          SENTINEL_SMOKE_CLIENT="$client" \
-          SENTINEL_SMOKE_SESSION="$session" \
-            npx tsx scripts/smoke.ts
-
-      # The image warns on an ephemeral key rather than failing, because that is
-      # right for a scratch run. In a stack it means the key volume did not work,
-      # and the provider would silently stop verifying its own tokens on the next
-      # restart — so here it is a failure.
-      - name: The signing key came from the volume, not from a generator
-        run: |
-          set -euo pipefail
-          if grep -q 'ephemeral key' /tmp/sentinel.log; then
-            echo "::error::the provider generated an ephemeral key: the signing-key service did not do its job"
+          # Media is never redistributed with the repo: the catalog describes it and
+          # the operator supplies it. A committed ISO means somebody broke that rule.
+          if git ls-files | grep -Eiq '\.(iso|img|vhd|vhdx|esd|wim)$'; then
+            echo "::error::an installation image is committed; media must stay out of the repo"
+            git ls-files | grep -Eic '\.(iso|img|vhd|vhdx|esd|wim)$'
             exit 1
           fi
-          echo "signing key: supplied"
+          echo "media: not committed (correct)"
 
-      - name: The stack's logs
-        if: failure()
-        working-directory: ontrak-sentinel
-        run: docker compose logs --no-color
-
-      - name: Tear down
-        if: always()
-        working-directory: ontrak-sentinel
-        run: docker compose down -v
-
-  # OnTrak Sync is the one product whose service is not a Node app, so its suite is
-  # not run by any of the jobs above: it is `unittest`, run with the interpreter, and
-  # the image build only proves it compiles. Without this job the parsers that decide
-  # what an operator is told to install on every host in the Network would be the only
-  # ones in the family with nothing checking them on a push.
-  sync:
-    name: OnTrak Sync
+  landing:
+    name: Landing page sanity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      # 3.12 because that is what the API's image is built on. The suite itself is the
-      # standard library plus one library (`cryptography`, for verifying an SSO ID
-      # token), so there is nothing else to install and no test tooling at all.
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - name: Install the API's dependencies
-        run: pip install -r ontrak-sync/backend/requirements.txt
-
-      # `run-all.py` discovers `test_*.py`, so a new module is covered by being
-      # written. It runs in the same shape the deployed image runs it in.
-      - name: API tests
-        run: python3 ontrak-sync/backend/tests/run-all.py
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ontrak-sync/web/package-lock.json
-
-      # 22 because that is what the dashboard's image is built on; a typecheck on a
-      # different major would pass here and fail in the image.
-      - name: Install the dashboard's dependencies
-        run: npm ci
-        working-directory: ontrak-sync/web
-
-      - name: Dashboard typecheck
-        run: npm run typecheck
-        working-directory: ontrak-sync/web
-
-  # The Sync dashboard's own half, and the reason it is a job of its own: the `sync`
-  # job above runs the API's unittest suite and the dashboard's typecheck, and neither
-  # of them renders a page. This boots the **real** application — FastAPI routes, Pydantic
-  # bodies, session cookies, capabilities, the remit store, the rails, the roll and the
-  # undo — over a Network that is faked (`ontrak-sync/backend/tests/serve_fake.py`,
-  # which reuses the fake the roll's own unit tests are held to), starts the dashboard
-  # against it with the same-origin `/api/*` proxy the family stack ships, and drives the
-  # rollouts console in Chromium: the empty remit, the images the scans found, the claim,
-  # the pass, the roll's `old → new`, the undo that holds the container, the clear and
-  # the release.
-  #
-  # The harness runs the posture this repository deploys (`ONTRAK_ROLLOUT_ADOPT=unattended`),
-  # so the half of that feature which is easiest to get wrong is covered too: a released
-  # container has to stay out *across a pass* — otherwise the release is a control that
-  # undoes itself — and a claim has to be the way back in. `ONTRAK_SYNC_ADOPT=off` runs the
-  # same file against the shipped claim-by-hand posture.
-  #
-  # The dev server is a dev server on purpose. Next refuses HMR handshakes whose `Origin`
-  # is not in `allowedDevOrigins`, and a WebSocket handshake always carries one — so the
-  # socket the dashboard needs to develop against is also the one thing here that no
-  # typecheck, no unit test and no production build can notice. The suite asserts it
-  # connects, and it fails when the list is missing.
-  sync-browser:
-    name: OnTrak Sync dashboard (browser)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      # The harness starts the real application, so it needs what the application needs.
-      - name: Install the API's dependencies
-        run: pip install -r ontrak-sync/backend/requirements.txt
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          # Two lockfiles: the Playwright suite and its config live at the root, and the
-          # dashboard it drives is its own package with its own dependency tree.
-          cache-dependency-path: |
-            package-lock.json
-            ontrak-sync/web/package-lock.json
-
-      - name: Install the suite and the dashboard
+      - name: Landing sanity
         run: |
           set -euo pipefail
-          npm ci
-          npm ci --prefix ontrak-sync/web
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      # One command, because the config boots both halves — the faked API and the
-      # dashboard — and waits for each to answer before the first test runs.
-      - name: Drive the rollouts console
-        run: npm run test:e2e:sync
-
-      - name: The dashboard's dev log
-        if: failure()
-        run: |
-          for f in test-results/*/error-context.md; do
-            [ -f "$f" ] || continue
-            echo "::group::$f"
-            cat "$f"
-            echo "::endgroup::"
-          done
-
-  # OnTrak Genie is where the family's toolchain work is watched, and its suite is
-  # the only thing standing between a turn and a real workspace: the jail that
-  # refuses an escape, the folder picker's fence, the approval gate and the OIDC
-  # verifier are all covered there. It builds before it tests, because `npm test`
-  # runs the compiled suite (`node --test dist/test/*.test.js`) — the same files
-  # the image executes, so a green run here is a green run against the shipped
-  # shape rather than against the source.
-  #
-  # The browser checks (`npm run ui:smoke`, part of `npm run check`) are
-  # deliberately not run here: they drive a real Chrome over the console, and they
-  # are the workstation gate before a push rather than a per-push cost.
-  genie:
-    name: OnTrak Genie
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ontrak-genie
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          # 22 because that is what Genie's image is built on; a suite green on a
-          # different major would still be one that never ran in the container.
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ontrak-genie/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Unit and HTTP tests
-        run: npm test
-
-      # `scripts/verify-sso.py` is Genie's sign-in posture check, and its suite is
-      # offline by design: it tests what the check *decides* — config precedence, the
-      # redirect URI that has to be this name's callback, a redirect handed back rather
-      # than followed, an unset admin token as SKIP (exit 2) rather than failure — which
-      # is where a green run would otherwise mean nothing. Nothing ran it: `npm test` is
-      # the TypeScript suite (`node --test dist/test/*.test.js`), so these 12 tests only
-      # ever ran on the machine of whoever wrote them. The same failure the portal's own
-      # job was added for, one artifact class over (tests/ci-coverage.test.ts).
-      - name: Sign-in check script tests
-        run: |
-          set -euo pipefail
-          cd scripts
-          python3 -m unittest discover -s tests -q
-
-  # The family's front door, run like the products behind it. It had no job: its
-  # typecheck, its unit tests and its copy check only ever ran on the machine of
-  # whoever was editing it, and its TypeScript was compiled only as a side effect of
-  # the image build — which builds the *serving* stage, and cannot say whether the
-  # rules hold. The copy check is the one that catches what nothing else can: the
-  # sign-in gate and the chrome may not carry the family's taglines, and no build
-  # fails and no type breaks when they do, so it is prose that stays wrong on the one
-  # screen every user sees first.
-  portal:
-    name: OnTrak Portal
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ontrak-portal
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          # 22 because that is what the portal's image is built on; a suite green on
-          # a different major would still be one that never ran in the container.
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ontrak-portal/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: The gate and the chrome carry no family copy
-        run: npm run copy:check
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-  # The family stack — every product in one project — is the artefact behind
-  # `make all-up`, so it is the thing to boot. The unit suites prove each product's
-  # rules; this proves the *wiring between them*: a database per product on its own
-  # port, one network, each app told its own public address, and a provider that
-  # registers a client for each of the others because their callbacks were set.
-  family:
-    name: Family stack
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Boot every product together
-        run: |
-          set -euo pipefail
-          cp -n .env.example .env
-          cp -n ontrak-tix/.env.example ontrak-tix/.env
-          # Placeholders: this job checks wiring, not secrets. The prod overlays are
-          # the ones that refuse to start without real values, and they are not used
-          # here.
-          #
-          # `ONTRAK_API_TOKEN` is one of these placeholders because it is the value
-          # Sync's API refuses to start without — "this service can install packages
-          # across the Network, so it will not start without one" — and until this
-          # job waited for the whole stack, that refusal was a crash loop nothing
-          # looked at: the API restarted every few seconds behind a dashboard that
-          # answered, and the job stayed green.
-          AUTH_SECRET=ci-only-not-a-production-secret-value \
-          TIX_AUTH_SECRET=ci-only-not-a-production-secret-value \
-          ONTRAK_API_TOKEN=ci-only-not-a-production-secret-value \
-            docker compose -f docker-compose.all.yml up -d --build
-
-          # Every product the family stack serves, at the address this job reaches it
-          # and the path it answers without a credential. Six products, seven
-          # services — Sync's dashboard and its API are separate processes and both
-          # have to be up — and all seven are waited for. The loop used to ask three
-          # of them, and the steps below only ever asked the same three, so a product
-          # that never came up left this job green.
-          #
-          # Each product answers `/health` with its own name. Sync's API is the one
-          # exception and keeps its liveness on `/api/health`, because everything it
-          # serves is under `/api`: `/health` there is a 404, which is exactly what a
-          # status light reports as an outage.
-          probes="training http://127.0.0.1:3000/health
-          tix http://127.0.0.1:3001/health
-          sentinel http://127.0.0.1:8787/health
-          portal http://127.0.0.1:3300/health
-          genie http://127.0.0.1:3400/health
-          sync-api http://127.0.0.1:8420/api/health
-          sync-web http://127.0.0.1:8421/health"
-
-          missing=""
-          for _ in $(seq 1 120); do
-            missing=""
-            while read -r name url; do
-              [ -n "$name" ] || continue
-              curl -fsS "$url" >/dev/null 2>&1 || missing="$missing $name"
-            done <<< "$probes"
-            if [ -z "$missing" ]; then break; fi
-            sleep 4
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::still not answering after eight minutes:$missing"
-            docker compose -f docker-compose.all.yml ps -a
-            # A product that never answered has usually already said why: a crash
-            # loop prints its own traceback, and the loop above can only report its
-            # absence. `$missing` holds compose service names, so this asks for
-            # exactly the containers under suspicion.
-            for service in $missing; do
-              echo "::group::logs: $service"
-              docker compose -f docker-compose.all.yml logs --no-color --tail 40 "$service" || true
-              echo "::endgroup::"
-            done
+          f=web/landing/index.html
+          grep -qi '<title>' "$f" || { echo "::error::landing has no <title>"; exit 1; }
+          grep -qi 'og:title' "$f" || { echo "::error::landing has no og:title"; exit 1; }
+          grep -qi 'og:description' "$f" || { echo "::error::landing has no og:description"; exit 1; }
+          grep -qi 'data:image/svg+xml' "$f" || { echo "::error::landing favicon is not inline SVG"; exit 1; }
+          if grep -Eiq 'https?://(fonts\.googleapis|cdn\.|unpkg|jsdelivr)' "$f"; then
+            echo "::error::landing makes third-party network requests"
             exit 1
           fi
-          echo "every product is up"
+          echo "landing: ok"
 
-      - name: The training app answers
-        run: curl -fsS -o /dev/null http://127.0.0.1:3000/login
-
-      - name: The desk answers
-        run: curl -fsS -o /dev/null http://127.0.0.1:3001/sign-in
-
-      - name: The portal answers
-        run: curl -fsS http://127.0.0.1:3300/health | grep -q '"service":"ontrak-portal"'
-
-      - name: The code console answers
-        run: curl -fsS http://127.0.0.1:3400/health | grep -q '"service":"ontrak-genie"'
-
-      - name: The provider answers discovery
-        run: curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration | grep -q authorization_endpoint
-
-      - name: The sync dashboard answers
-        run: curl -fsS http://127.0.0.1:8421/health | grep -q '"service":"ontrak-sync"'
-
-      - name: The sync API answers, without a credential
-        run: curl -fsS http://127.0.0.1:8420/api/health | grep -q '"status":"ok"'
-
-      # The dashboard draws a light per product by asking
-      # `<ONTRAK_<KEY>_INTERNAL_URL><health>` from *inside* the portal container, and
-      # this asks the same question the same way, with the same rule for what counts
-      # as an answer — 2xx, 3xx, 401 and 403 all mean "it is there". A product that
-      # answers this job but not the portal is a red light beside a healthy service,
-      # and a light nobody believes is worse than no light at all.
-      #
-      # Sync is why this is worth doing: the family stack pointed its probe at the API
-      # (`sync-api:8420`, whose liveness is `/api/health`) while the portal asked for
-      # `/health`, so the one product the stack runs as two services was reported as
-      # down on the page whose whole job is to say which products are up.
-      - name: The portal can reach every product it draws a light for
-        run: |
-          set -euo pipefail
-          # `</dev/null` on both exec calls is load-bearing: `docker exec -T` reads
-          # standard input, so without it the first product eats the rest of the
-          # list and the loop ends after one light — a check that reports "Training
-          # answers" and nothing else, which is the shape of check this whole step
-          # exists to replace.
-          while read -r name key path; do
-            [ -n "$name" ] || continue
-            base=$(docker compose -f docker-compose.all.yml exec -T portal-app \
-              printenv "ONTRAK_${key}_INTERNAL_URL" </dev/null)
-            if [ -z "$base" ]; then
-              echo "::error::the portal has no ONTRAK_${key}_INTERNAL_URL, so its ${name} light can never read up"
-              exit 1
-            fi
-            if docker compose -f docker-compose.all.yml exec -T portal-app \
-              node -e 'fetch(process.argv[1], { redirect: "manual" }).then(r => process.exit(r.ok || r.status === 401 || r.status === 403 || (r.status >= 300 && r.status < 400) ? 0 : 1)).catch(() => process.exit(1))' \
-              "${base}${path}" </dev/null; then
-              echo "${name}: ${base}${path} answers"
-            else
-              echo "::error::the portal cannot reach ${name} at ${base}${path}"
-              exit 1
-            fi
-          done <<'PROBES'
-          Training ITS /health
-          Tix TIX /health
-          Sentinel SENTINEL /health
-          Sync SYNC /health
-          Genie GENIE /health
-          PROBES
-
-      # A registered client is the half of single sign-on that can silently not
-      # happen: the callbacks are only registered when the family stack supplies
-      # them, and without the client id the products cannot sign anybody in.
-      - name: The provider registered a client for each product
-        run: |
-          set -euo pipefail
-          docker compose -f docker-compose.all.yml logs sentinel-app > /tmp/family.log
-          grep -q 'OnTrak Tix client:' /tmp/family.log || { echo "::error::no Tix client was registered"; exit 1; }
-          grep -q 'training client:' /tmp/family.log || { echo "::error::no training client was registered"; exit 1; }
-          echo "clients: registered"
-
-      # The desk's outbound provisioning must name the provider over the *network*:
-      # inside its container, `localhost` is the desk itself, so a value copied from
-      # a host-oriented `.env` would be the one wire that silently points nowhere.
-      - name: The desk is pointed at the provider over the network
-        run: |
-          set -euo pipefail
-          wired=$(docker compose -f docker-compose.all.yml exec -T tix-app printenv ONTRAK_TIX_SCIM_BASE_URL)
-          test "$wired" = "http://sentinel-app:8787" || { echo "::error::the desk is pointed at $wired"; exit 1; }
-          echo "scim target: $wired"
-
-      - name: The family stack's logs
-        if: failure()
-        run: docker compose -f docker-compose.all.yml logs --no-color
-
-      - name: Tear down
-        if: always()
-        run: docker compose -f docker-compose.all.yml down -v
-
-  # The container image is what a deployment actually runs, so it is built on
-  # every push rather than discovered broken at release time. This builds the
-  # serving stage of each product and pushes nothing: publishing an image is a
-  # deployment's decision, not CI's.
-  #
-  # Every product the family stack runs has an entry, and that is the point: a
-  # build error in any one of them — an import path that resolves in the repo but
-  # not inside the image's build context, say — is caught here, per product, with
-  # the failing name on the check rather than surfacing as a deploy that half
-  # worked.
-  images:
-    name: Image (${{ matrix.app }})
+  python:
+    name: Python control plane
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # `target` is per-entry because the products do not agree on the name of
-          # their serving stage: the three Next apps end at `runner`, Portal, Sync and
-          # Genie at `runtime`. Naming it is what makes this a build of the stage that
-          # ships rather than of whichever stage happens to be last in the file.
-          - app: training
-            context: .
-            target: runner
-          - app: tix
-            context: ontrak-tix
-            target: runner
-          - app: sentinel
-            context: ontrak-sentinel
-            target: runner
-          - app: portal
-            context: ontrak-portal
-            target: runtime
-          - app: sync
-            context: ontrak-sync/web
-            target: runtime
-          - app: genie
-            context: ontrak-genie
-            target: runtime
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Cached, because an uncached build reinstalls every dependency and re-runs
-      # `next build` for both apps on every push. `mode=max` keeps the builder
-      # stage's layers as well, and those are where the time actually goes.
-      - name: Build the ${{ matrix.app }} image
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-python@v5
         with:
-          context: ${{ matrix.context }}
-          target: ${{ matrix.target }}
-          push: false
-          load: true
-          tags: ontrak-${{ matrix.app }}:ci
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Lint
+        run: ruff check ontrak tests
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Catalogue and manifest validation
+        run: |
+          python -m ontrak scenario validate
+          python -m ontrak catalog validate
+          python -m ontrak generate list >/dev/null
+
+      - name: Generated scenarios must validate
+        run: |
+          set -euo pipefail
+          # Generation is a supported path, so a primitive that cannot produce a
+          # gradeable scenario is a CI failure, not a surprise in a classroom.
+          python -m ontrak generate matrix --prefix gen 2>&1 | tee /tmp/generate.log
+          if grep -q 'FAIL' /tmp/generate.log; then
+            echo "::error::a generated scenario failed validation"
+            exit 1
+          fi
+          python -m ontrak scenario validate
+
+      - name: CLI smoke test
+        run: |
+          python -m ontrak doctor --help >/dev/null
+          python -m ontrak catalog plan ubuntu-24.04
+          python -m ontrak media status >/dev/null
+          python -m ontrak schedule show >/dev/null
+
+  guest-scripts:
+    name: Guest PowerShell parses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every scenario script
+        shell: pwsh
+        run: |
+          $failed = @()
+          $files = Get-ChildItem -Path scenarios -Recurse -Filter *.ps1
+          Write-Host "checking $($files.Count) PowerShell file(s)"
+          foreach ($file in $files) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed += $file.FullName
+              foreach ($e in $errors) { Write-Host "::error file=$($file.FullName)::$($e.Message)" }
+            }
+          }
+          if ($failed.Count -gt 0) { throw "$($failed.Count) guest script(s) do not parse" }
+          Write-Host "guest scripts: ok"
+
+      - name: Parse the infrastructure scripts
+        shell: pwsh
+        run: |
+          $failed = @()
+          foreach ($file in Get-ChildItem -Path infra -Recurse -Filter *.ps1) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $failed += $file.FullName
+              foreach ($e in $errors) { Write-Host "::error file=$($file.FullName)::$($e.Message)" }
+            }
+          }
+          if ($failed.Count -gt 0) { throw "$($failed.Count) infra script(s) do not parse" }
+          Write-Host "infra scripts: ok"
+
+  shell-and-compose:
+    name: Shell and compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          set -euo pipefail
+          for f in $(git ls-files '*.sh'); do
+            bash -n "$f" || { echo "::error::$f does not parse"; exit 1; }
+          done
+          echo "shell: ok"
+
+      - name: Compose config renders
+        run: |
+          set -euo pipefail
+          cd deploy/guacamole
+          cp .env.example .env
+          docker compose config --quiet
+          rm -f .env
+          echo "compose: ok"

@@ -1,14 +1,3 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# conform.yml — audit this repo against the Innotel Platform Stack standard.
-#
-# The standard (README shape, landing outline, attribution guard, docs/stack.md,
-# .env.example posture, license posture, Pages reachability) is defined once in
-# innotelinc/innotel-platform-stack and enforced by its conform-project.sh. This
-# workflow checks that repo out beside us and runs the audit against this one, so
-# a repo that drifts from the shared layers fails here instead of being noticed
-# later. Fixes belong in this repo, never in the audit script.
-# ═══════════════════════════════════════════════════════════════════════════
-
 name: Conformity
 
 on:
@@ -33,8 +22,6 @@ jobs:
           path: .stack
 
       - name: Run the conformity audit
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
           bash .stack/scripts/conform-project.sh . | tee /tmp/conform.out

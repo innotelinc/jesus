@@ -1,75 +1,39 @@
-node_modules/
-.next/
-out/
-build/
-dist/
-
-# env
-.env
-.env*.local
-
-# production env for the compose overlays — a real deployment's secrets never
-# belong in git. The `.example` templates beside them are tracked on purpose.
-.env.production
-.env.production.local
-
-# Deployment-local compose overlays. Each carries this host's own settings — a
-# timezone, a port, the images a particular checkout builds — and each says so in its
-# own header: local to the deployment, not in the repository. They were untracked until
-# a directory-wide `git add ontrak-tix` swept one of them into a commit, so the pattern
-# is named here rather than left to whether the next person stages a path or a folder.
-# `docker compose` reads them straight off the disk; nothing has to be tracked for them
-# to work.
-docker-compose.override.yml
-**/docker-compose.override.yml
-docker-compose.deployment.yml
-
-# prisma
-prisma/migrations/dev.db*
-
-# uploaded software packages (kept on disk, not in git)
-storage/uploads/*
-!storage/uploads/.gitkeep
-storage/packages/*
-!storage/packages/.gitkeep
-
-# python
-# `scripts/secret-scan.py` is imported by its own self-test (and by anything that
-# imports it), which leaves bytecode behind. The scan reads untracked files on
-# purpose, so a stray `.pyc` in the tree is content it would otherwise report on.
+.venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# misc
-.DS_Store
-*.pem
-npm-debug.log*
-yarn-error.log*
-.vercel
-*.tsbuildinfo
-next-env.d.ts
-coverage/
+# build/packaging artifacts
+*.egg-info/
+build/
 
-# playwright browser-a11y sweep
-playwright-report/
-test-results/
+# local state / secrets
+state/
+*.sqlite3
+config/local.yaml
+.env
 
-# tix attachment blob storage (local/single-node)
-.ontrak-tix-blobs/
+# editor and agent scratch space
+.freebuff/
+images/
+output/
 
-# tix evidence artifacts stored under object lock (local/single-node); the
-# lock itself lives in the database, the bytes do not belong in git
-.ontrak-tix-evidence/
+# installation media never belongs in the repository: the catalog describes it,
+# `ontrak media fetch` downloads the free copies, and the operator supplies the
+# licensed ones. CI fails the build if an image is ever committed.
+media/
+*.iso
+*.vhd
+*.vhdx
+*.qcow2
+*.esd
+*.wim
 
-# Pre-Vault `.env` backups (written during the resolver bring-up) carry the
-# plaintext values that were moved into Cerulean Vault. Local migration
-# artifacts, never source.
-.env.pre-vault.*
+# build artefacts of the guest image pipeline
+build-*/
+*.tar.gz
 
-# Generic `.env` backups (timestamped `.env.bak-*`) are the same class of
-# local-only migration artifact.
-.env.bak-*
-
-# The platform Cerulean Vault token directory and other runtime state under
-# it. Root-anchored so a product that tracks its own data/ is unaffected.
-/data/
+# guacamole session recordings (large, and they show a student's screen)
+deploy/guacamole/recordings/
