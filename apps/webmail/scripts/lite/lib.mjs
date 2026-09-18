@@ -54,6 +54,16 @@ export const LITE_SURFACES = ["mail", "calendar", "contacts", "files", "settings
 export const RTL_LOCALES = ["ar", "fa", "he"];
 
 /**
+ * sessionStorage key the 404 shim parks a deep link under. Mirrors
+ * LITE_PENDING_PATH_KEY in lib/lite.ts (a TS module this script cannot
+ * import); lib/__tests__/lite-scripts.test.ts pins the two together.
+ */
+export const LITE_PENDING_PATH_KEY = "bulwark-lite:pending-path";
+
+/** zustand persist key of stores/locale-store.ts (the user's language choice). */
+export const LOCALE_STORAGE_KEY = "locale-storage";
+
+/**
  * `/api/` strings that legitimately survive in the Lite client chunks. Each
  * one is either gated at call time (`IS_LITE`, a policy flag, a config flag
  * the Lite config pins off) or tolerates a 404 by design. Anything else is a
@@ -197,7 +207,11 @@ export function buildRootRedirect({ basePath = "", locales, defaultLocale = "en"
     return null;
   }
   var chosen = null;
-  try { chosen = pick(localStorage.getItem("NEXT_LOCALE")); } catch (e) {}
+  // The language picked in Settings (stores/locale-store.ts) wins over the browser's list.
+  try {
+    var stored = JSON.parse(localStorage.getItem(${JSON.stringify(LOCALE_STORAGE_KEY)}) || "null");
+    chosen = pick(stored && stored.state && stored.state.locale);
+  } catch (e) {}
   var langs = navigator.languages || [navigator.language];
   for (var j = 0; !chosen && j < langs.length; j++) chosen = pick(langs[j]);
   location.replace(base + "/" + (chosen || fallback) + "/" + location.search + location.hash);
@@ -205,6 +219,66 @@ export function buildRootRedirect({ basePath = "", locales, defaultLocale = "en"
 </script>
 </head>
 <body><noscript>This app needs JavaScript. <a href="${basePath}/${fallback}/">Continue</a></noscript></body>
+</html>
+`;
+}
+
+/**
+ * 404.html for hosts without rewrite rules (GitHub Pages, S3 website hosting).
+ *
+ * `next build` exports Next's default not-found page as 404.html: the
+ * `[...rest]` catch-all that renders app/(main)/not-found.tsx in the server
+ * build is deleted for the export, and a route group's not-found.tsx only
+ * serves `notFound()` calls inside that group. So the park-and-replay logic
+ * lives in this dependency-free shim instead: a deep link below a known
+ * surface is parked in sessionStorage and the surface shell is loaded, which
+ * hands the link over (hooks/use-lite-link-segments.ts). Only `<locale>` and
+ * `<surface>` from the allowlists ever reach `location.replace`, so a crafted
+ * URL cannot turn this into an open redirect.
+ */
+export function buildNotFoundShim({ basePath = "", locales, surfaces = LITE_SURFACES }) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>404</title>
+<script>
+(function () {
+  var base = ${JSON.stringify(basePath)};
+  var locales = ${JSON.stringify(locales)};
+  var surfaces = ${JSON.stringify(surfaces)};
+  var path = location.pathname;
+  if (base) {
+    if (path !== base && path.indexOf(base + "/") !== 0) return;
+    path = path.slice(base.length) || "/";
+  }
+  var parts = path.split("/").filter(Boolean);
+  if (parts.length < 2 || locales.indexOf(parts[0]) === -1 || surfaces.indexOf(parts[1]) === -1) return;
+  var target = base + "/" + parts[0] + "/" + parts[1] + "/";
+  // The shell itself is missing (host misconfigured): show the 404 instead of looping.
+  if (location.pathname === target) return;
+  try { sessionStorage.setItem(${JSON.stringify(LITE_PENDING_PATH_KEY)}, location.pathname + location.search); } catch (e) {}
+  location.replace(target);
+})();
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #fff; color: #111; }
+  @media (prefers-color-scheme: dark) { body { background: #0a0a0a; color: #ededed; } }
+  main { text-align: center; padding: 1rem; }
+  h1 { font-size: 2.25rem; margin: 0 0 .5rem; }
+  p { margin: 0 0 1.5rem; opacity: .7; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>404</h1>
+  <p>This page could not be found.</p>
+  <a href="${basePath}/">Go home</a>
+</main>
+</body>
 </html>
 `;
 }
@@ -252,24 +326,46 @@ ${basePath || ""}/_next/static/*
 `;
 }
 
+/**
+ * Where the unzipped folder has to live for the nginx/Caddy examples: every
+ * rule below is root-relative, so a sub-path mount means the files sit in a
+ * folder named after the mount path inside the web root (no `alias` needed,
+ * which does not work inside a regex `location`).
+ */
+export function exampleDocRoot(basePath = "") {
+  return { root: "/var/www/bulwark-lite", files: `/var/www/bulwark-lite${basePath}` };
+}
+
 export function buildNginxExample({ basePath = "", surfaces = LITE_SURFACES }) {
   const location = basePath ? `${basePath}/` : "/";
+  const { root, files } = exampleDocRoot(basePath);
   const surfaceAlternation = surfaces.join("|");
-  return `# Bulwark Lite - nginx example. Serve the unzipped folder at ${location}
-# and rewrite deep links to the owning surface's shell.
+  return `# Bulwark Lite - nginx example. Unzip the archive into ${files}
+# so that ${basePath}/index.html is served at ${location}; deep links below a surface
+# are rewritten to that surface's shell.
 server {
     listen 80;
     server_name webmail.example.com;
-    root /var/www/bulwark-lite;
+    root ${root};
 
     add_header X-Content-Type-Options nosniff always;
     add_header X-Frame-Options DENY always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     # See _headers for a Content-Security-Policy that matches your JMAP server.
 
+    # Hashed assets never change. (add_header inside a location replaces the
+    # inherited set, so the security headers are repeated here.)
     location ${basePath}/_next/static/ {
-        ${basePath ? `alias /var/www/bulwark-lite/_next/static/;\n        ` : ""}expires 1y;
-        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+    }
+
+    # Older mime.types files do not know the PWA manifest extension.
+    location = ${basePath}/manifest.webmanifest {
+        types { }
+        default_type application/manifest+json;
     }
 
     # /<locale>/<surface>/anything -> /<locale>/<surface>/index.html
@@ -278,7 +374,7 @@ server {
     }
 
     location ${location} {
-        ${basePath ? `alias /var/www/bulwark-lite/;\n        ` : ""}try_files $uri $uri/ $uri/index.html =404;
+        try_files $uri $uri/ $uri/index.html =404;
         error_page 404 ${basePath}/404.html;
     }
 }
@@ -286,10 +382,12 @@ server {
 }
 
 export function buildCaddyExample({ basePath = "", surfaces = LITE_SURFACES }) {
+  const { root, files } = exampleDocRoot(basePath);
   const surfaceAlternation = surfaces.join("|");
-  return `# Bulwark Lite - Caddy example.
+  return `# Bulwark Lite - Caddy example. Unzip the archive into ${files}
+# so that ${basePath}/index.html is served at ${basePath || ""}/.
 webmail.example.com {
-    root * /var/www/bulwark-lite
+    root * ${root}
     encode gzip
 
     header {
@@ -298,16 +396,27 @@ webmail.example.com {
         Referrer-Policy strict-origin-when-cross-origin
     }
 
+    @manifest path ${basePath}/manifest.webmanifest
+    header @manifest Content-Type application/manifest+json
+
+    # /<locale>/<surface>/anything -> /<locale>/<surface>/index.html
     @surface path_regexp surface ^${basePath}/([a-zA-Z-]+)/(${surfaceAlternation})(/.*)?$
     handle @surface {
         try_files {path} {path}/ {path}/index.html ${basePath}/{re.surface.1}/{re.surface.2}/index.html
     }
 
     handle {
-        try_files {path} {path}/ {path}/index.html ${basePath}/404.html
+        try_files {path} {path}/ {path}/index.html
     }
 
     file_server
+
+    # Anything else is a real 404, answered by the shim that replays parked deep links.
+    handle_errors {
+        @notfound expression {http.error.status_code} == 404
+        rewrite @notfound ${basePath}/404.html
+        file_server
+    }
 }
 `;
 }
@@ -351,7 +460,7 @@ Deep links such as \`${basePath}/en/mail/thread/abc\` are served by the shell at
 - Netlify / Cloudflare Pages: the shipped \`_redirects\` and \`_headers\` files do this.
 - nginx: see \`nginx.conf.example\`.
 - Caddy: see \`Caddyfile.example\`.
-- GitHub Pages and other hosts without rewrites: \`404.html\` replays the link
+${basePath ? `  Both examples serve root-relative paths, so unzip into \`<web root>${basePath}\`\n  (e.g. \`${exampleDocRoot(basePath).files}\`), not into the web root itself.\n` : ""}- GitHub Pages and other hosts without rewrites: \`404.html\` replays the link
   in the browser. It works, with one extra page load.
 
 \`_headers\` also carries the recommended security headers. Adjust
@@ -367,7 +476,8 @@ Not available in Lite (they need the Node.js server): the admin console and
 setup wizard, plugins and sidebar apps, settings sync across devices, OAuth /
 SSO login, the account security tab (app passwords, 2FA setup), ICS URL
 subscriptions and CalDAV discovery, sender favicons, office (WOPI) editing,
-web push notifications, the update banner, device pairing.
+web push notifications, the update banner, device pairing, and the
+"Default apps" page (registering Lite as the mailto:/webcal: handler).
 
 ## Security notes
 
@@ -380,7 +490,10 @@ web push notifications, the update banner, device pairing.
   control and keep the Content-Security-Policy from \`_headers\`.
 - Servers without Stalwart's token login (\`/api/auth\`) fall back to Basic
   auth. "Remember me" is then hidden; the credentials stay in sessionStorage
-  for the lifetime of the tab so a reload does not sign you out.
+  for the lifetime of the tab so a reload does not sign you out. The same
+  fallback applies when a reverse proxy in front of Stalwart answers
+  \`/api/auth\` without CORS headers: the login still works, but "remember me"
+  then only lasts for the tab, so add the CORS rule from step 3 there too.
 - Because the export contains inline scripts, \`script-src\` must allow
   \`'unsafe-inline'\`. Email HTML is still rendered sanitised in a sandboxed
   frame, exactly as in the full build.

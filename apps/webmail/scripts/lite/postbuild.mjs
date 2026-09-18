@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  buildCaddyExample, buildHeaders, buildLiteConfig, buildLitePolicy, buildManifest, buildNginxExample, buildReadme, buildRedirects, buildRootRedirect, discoverBuiltLocales, isMainModule, normalizeBasePath, resolveRepoRoot,
+  buildCaddyExample, buildHeaders, buildLiteConfig, buildLitePolicy, buildManifest, buildNginxExample, buildNotFoundShim, buildReadme, buildRedirects, buildRootRedirect, discoverBuiltLocales, isMainModule, normalizeBasePath, resolveRepoRoot,
 } from "./lib.mjs";
 
 const repoRoot = resolveRepoRoot(import.meta.url);
@@ -35,6 +35,9 @@ export function runPostbuild({ root = repoRoot, env = process.env, log = console
     "policy.json": JSON.stringify(buildLitePolicy(), null, 2) + "\n",
     "manifest.webmanifest": JSON.stringify(buildManifest({ appName: config.appName, basePath }), null, 2) + "\n",
     "index.html": buildRootRedirect({ basePath, locales, defaultLocale }),
+    // Replaces Next's default not-found page: only this shim replays deep links
+    // on hosts without rewrite rules (see buildNotFoundShim).
+    "404.html": buildNotFoundShim({ basePath, locales }),
     "_redirects": buildRedirects({ basePath, locales }),
     "_headers": buildHeaders({ basePath, connectSrc }),
     "nginx.conf.example": buildNginxExample({ basePath }),

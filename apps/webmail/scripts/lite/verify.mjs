@@ -2,10 +2,10 @@
 // Guards for a finished Lite export: the files a deployer relies on exist,
 // and the client chunks reference no server endpoint outside the documented
 // allowlist (lib.mjs). Exit 1 with a readable list otherwise.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  collectApiStrings, discoverBuiltLocales, isMainModule, resolveRepoRoot, unexpectedApiStrings,
+  LITE_PENDING_PATH_KEY, collectApiStrings, discoverBuiltLocales, isMainModule, resolveRepoRoot, unexpectedApiStrings,
 } from "./lib.mjs";
 
 const repoRoot = resolveRepoRoot(import.meta.url);
@@ -29,6 +29,13 @@ export function verifyExport({ root = repoRoot } = {}) {
   }
   for (const file of ["_next/static", "branding"]) {
     if (!existsSync(join(outDir, file))) problems.push(`missing out/${file}`);
+  }
+
+  // Next writes its own default not-found page as 404.html; postbuild must
+  // have replaced it with the shim that parks and replays deep links.
+  const notFound = join(outDir, "404.html");
+  if (existsSync(notFound) && !readFileSync(notFound, "utf8").includes(LITE_PENDING_PATH_KEY)) {
+    problems.push("out/404.html is not the Lite shim (deep links on hosts without rewrites would dead-end); run postbuild");
   }
 
   const apiStrings = collectApiStrings(join(outDir, "_next", "static"));
