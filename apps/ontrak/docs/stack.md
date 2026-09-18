@@ -1,139 +1,92 @@
 # OnTrak in the Innotel Platform Stack
 
-**Role: TrainingOps** — the self-hosted platform where an IT support operation is
-*taught*, *run* and *evidenced*: graded simulations for the people, an MSP-grade
-service desk for the work, and a shared identity and evidence layer for both.
+**Role: TrainingOps** — OnTrak provides disposable, deliberately broken practice machines
+and the grading that goes with them. It is the environment where support skills are
+rehearsed and assessed; it is not where anything runs in production.
 
-Canonical definition of the stack lives in
-[innotelinc/innotel-platform-stack](https://github.com/innotelinc/innotel-platform-stack).
-This document only states OnTrak's place in it.
+Canonical definition of the ecosystem:
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Boundaries
 
-**Owns**
+### Owns
 
-- **Training** — scenarios, simulated Linux/Windows/Office machines, attempt
-  lifecycle, objective evaluation, completion records and certificates.
-- **The service desk** — tickets, queues, SLAs, canned responses and templates,
-  time tracking and rate cards, invoice-ready billing exports.
-- **Multi-client MSP operation** — clients, contacts, per-client promises,
-  per-client rate cards and reporting, cross-client scoping and act-as
-  guardrails.
-- **Incident response and assurance** — incident duties and playbooks, war-room
-  comms, objection-locked evidence with a retention clock, tenant-authored
-  notification wording kept as sent, and the signed assurance packet.
-- **Its own audit chain** — append-only, hash-chained records of every
-  privileged action, verifiable without trusting the application that wrote it.
-- **The Network's update state** — which host and container is behind on which
-  package, and what was applied when (OnTrak Sync).
-- **The family's front door** — routing a signed-in person to the product their
-  role belongs in (OnTrak Portal). The portal owns the *routing decision* and
-  nothing else: no accounts, no data, no second authorisation system.
-- **Identity and network defence** — OnTrak Sentinel, built in this repository: the
-  family's own IdP (OIDC/SAML/SCIM, MFA, sessions, access reviews) *and* its
-  IDS/IPS (Guard — the syslog, NetFlow/IPFIX and OTLP listeners, the normalizer,
-  the detection rules, triage and policy-gated enforcement), sharing one
-  hash-chained evidence log. A deployment can sign in against it instead of
-  Cerulean, and it federates to Cerulean where that is the directory.
-- **CodeOps** — a coding agent you can watch (OnTrak Genie): a browser console and
-  a terminal CLI over one server, working inside a workspace it cannot leave, with
-  every write and every risky command stopping at an approval gate before it lands.
+- The **workload catalog**: manifests for every supported guest platform (Windows 95 →
+  present, Windows Server NT 4.0 → 2025, Office 97 → 2024/Microsoft 365 Apps, every Linux
+  distribution the image server publishes), including device profiles for platforms that
+  predate VirtIO and Secure Boot.
+- **Training media management**: which media is freely redistributable (fetched) and which
+  is operator-supplied under their own licence (never downloaded).
+- The **scenario format and its grading contract**: `scenario.yaml` objectives,
+  `setup.ps1` fault injection, `check.ps1` live-state grading, progressive hints, the
+  score/pass-mark model, and the validation that keeps a scenario from silently scoring zero.
+- **Fault primitives and scenario generation** from reviewed, reversible faults.
+- The **session lifecycle**: template build → clean snapshot → warm pool → clone → hand over
+  → grade → submit → destroy, plus per-session time limits and reset policy.
+- The **student portal** and the **operator CLI/instructor view** for the range itself.
 
-**Consumes**
+### Consumes
 
-- **Identity (Cerulean, running Authentik)** — OIDC sign-in for staff, students,
-  technicians, analysts and sysadmins, with a local credential fallback so each
-  app deploys standalone. In this Network the directory is already Cerulean's
-  Authentik; **OnTrak Sync owns the local account table**, which is what the
-  portal's password sign-in delegates to and what a LAN with no route to the
-  provider signs in against.
-- **Secrets (Cerulean Vault)** — runtime secret resolution
-  (`vault://<mount>/<path>#<key>`).
-- **Trust (Cerulean)** — DNS records, the stack wildcard certificate and the NPM
-  proxy host for each app. OnTrak never speaks to the NPM API itself.
-- **Storage (ONYX)** — where deployments choose object storage for attachments
-  and evidence bytes instead of local disk.
+- **Cerulean — identity**: the portal is a student/instructor login surface and is expected
+  to sit behind Authentik SSO in a deployment. Local accounts exist so a range can run
+  air-gapped for a class day.
+- **Cerulean — trust (DNS + TLS)**: the portal host and the browser-console host, including
+  the wildcard certificate. Public hostnames are provisioned through Cerulean, never by
+  hand, and no stack script calls the NPM API directly.
+- **Cerulean Vault — secrets**: guest password and portal/Guacamole keys in production.
+  `.env` is local-only and gitignored.
+- **ONYX — storage**: where built guest images, template snapshots and backups life. The
+  lab host's own Incus storage pool is the working tier; ONYX is the durable tier.
+- **Magnate — billing (optional)**: if a range is ever sold as a paid course, entitlements
+  come from Magnate. Nothing in OnTrak bills today.
+- **NPM Edge — edge**: the portal and console are served through the edge, consuming the
+  DNS records and certificates issued by Cerulean.
 
-**Does not own**
+### Does not own
 
-- Identity, secrets, DNS, TLS or edge routing — those are platform services and
-  are consumed, never re-implemented.
-- Billing infrastructure — Magnate owns subscriptions and entitlements. OnTrak's
-  time and rate cards are *operational* billing (what a desk bills a client for
-  hours worked), and deliberately stop there: no payment processing, no
-  subscription lifecycle, no entitlements.
-- Telephony (Zeus) and e-signature (Signara) — integrated when a deployment has
-  them, not replaced.
+- Identity, secrets, DNS, TLS, storage replication, billing, telephony or edge routing.
+  OnTrak calls the platform services for these or runs air-gapped without them.
+- The hypervisor. Incus is consumed as infrastructure (`infra/bootstrap-host.sh` prepares
+  the host); OnTrak does not wrap it.
+- The browser-console gateway's upstream software: Guacamole and guacd are deployed from
+  their own images (`deploy/guacamole/`), not forked or vendored.
+- Course content, assessment policy or student records of record. OnTrak stores results for
+  the range; the institution's grading system is the system of record.
 
 ## Service map
 
 | Component | Technology | Job |
-|---|---|---|
-| `ontrak-tix` | Next.js 15, React 19, TypeScript, Prisma, PostgreSQL | The service desk: tickets, SLAs, clients, time, billing, incidents, assurance |
-| OnTrak IT Support Training | Next.js 15, React 19, TypeScript, Prisma, PostgreSQL, xterm.js | Graded Linux/Windows/Office simulations, attempts, certificates |
-| OnTrak Lab (being ported into this repository) | Python, FastAPI, Guacamole, its own SQLite today; TypeScript in this tree as the port lands | The hands-on half: starts a real machine for a `lab`-tagged task and grades it. Runs from its own repository and host, which the family edge can front under a single name ([consolidation-audit.md](consolidation-audit.md) §9/Q4) and which is single-tenant — one lab host per deployment, its VMs sharing one bridge and one warm pool (§9/Q5) — maps its two roles onto the vocabulary below at sign-in ([lab-identity.md](lab-identity.md)), and reports a finished session to `POST /api/v1/lab/completions` ([lab-completion.md](lab-completion.md)). **Being ported into this repository** — one language, one application — with stage 1 (its pure core, in `src/lib/lab/`) landed and green: [lab-port.md](lab-port.md) |
-| `ontrak-portal` | Next.js 15, React 19, TypeScript, no database | The family's front door: one sign-in, then the products a role belongs in. Routes by role and authorises nothing — every product re-checks the caller itself |
-| `ontrak-sync` | Python 3.12 + FastAPI + SQLite (API), Next.js 16 dashboard | Network package/container update monitoring and approved updating; the family's local account table and its capability model |
-| `ontrak-genie` | Node/TypeScript, no database; browser console and terminal CLI over one server | The family's coding agent: state a task and watch it read, edit and run commands in a workspace it cannot leave, with every write and risky command stopping at an approval gate |
-| `ontrak-sentinel` | Node/TypeScript, Prisma, PostgreSQL; framework-free, server-rendered console | The family's own IdP **and** IDS/IPS: OIDC/SAML/SCIM, MFA, sessions and access reviews, and Guard's detection and policy-gated enforcement, on one hash-chained evidence log. The family stack runs it as `sentinel-app`; `npm run serve` runs it alone |
-| Audit chain | Append-only rows, hash-chained per tenant | Tamper-evident history shared by every app |
-| Evidence store | Filesystem or object storage behind an object-lock port | Incident artifacts under a retention window nobody can shorten |
-
-Shared engineering layers, identical across the web apps: pure logic in
-`src/lib/**/*-rules.ts` with unit tests, a store port with a Prisma adapter and
-an in-memory adapter for tests, server-side trust boundaries, and an audit event
-for every privileged write. OnTrak Sync follows the same shape in Python — pure
-parsers and cron arithmetic (`scanners.py`, `policy.py`) behind a `unittest` suite,
-and one module (`applier.py`) that is the only code allowed to change a machine.
-
-One vocabulary of roles and capabilities crosses all five products this repository
-builds: `ADMIN`, `SYSADMIN`, `ANALYST`, `TECHNICIAN`, `INSTRUCTOR`, `STUDENT`. It
-exists so a claim from the directory means the same thing to every product, and so
-nothing has to be translated at a boundary — a translation table is where
-`instructor` silently becomes `student` after a migration. OnTrak Lab maps its own
-two roles onto that vocabulary at sign-in rather than widening it.
+| --- | --- | --- |
+| Control plane | Python 3.11+ (`ontrak/`) | Catalog, scenarios, sessions, scoring, CLI, portal |
+| Hypervisor | Incus on Ubuntu + KVM | Guest VMs (Windows, Linux desktop) and system containers (Linux server) |
+| Storage | ZFS or btrfs pool | Copy-on-write clones make reset and handout cheap |
+| Warm pool | `ontrak pool` / `ontrak schedule` | Pre-booted, unclaimed clones per scenario |
+| Console gateway | Apache Guacamole + guacd | HTML5 RDP into student machines with signed, encrypted single-session links |
+| Guest automation | WinRM (`winrm-ps51`), Incus agent, or SSH | Drives scenario setup/check scripts and credential rotation |
+| Catalog | YAML manifests in `catalog/` | Describes platforms, media, device profiles and provisioning plans |
+| Portal | FastAPI + Jinja templates | Student login, tickets, console, time limits, Complete & End, results |
+| Datastore | SQLite (WAL) | Users, sessions, submitted results, events |
 
 ## In the ecosystem
 
-- **Identity** — staff sign in through Authentik; the portal routes them to the
-  product their role belongs in, and every product re-checks the role on the
-  server for each privileged action rather than trusting a session claim. The
-  portal holds no accounts: its password form delegates to OnTrak Sync, which
-  owns the family's local account table.
-- **Secrets & trust** — the apps read a `.env` that either carries a Vault
-  reference the deployment resolves or the resolved value where no resolver
-  exists. Public hosts and certificates come from Cerulean.
-- **Revenue** — where a deployment sells seats, Magnate owns the subscription;
-  OnTrak only ever asks whether an entitlement exists.
-- **Source of truth** — feature work and platform scope live in this repo's
-  [ROADMAP.md](../ROADMAP.md) and [ontrak-tix/ROADMAP.md](../ontrak-tix/ROADMAP.md);
-  the ecosystem definition lives in the stack repo, never here.
+- **Identity** — Authentik (inside Cerulean) fronts the portal; OnTrak keeps a local
+  fallback so a class can run without a network dependency.
+- **Secrets** — Cerulean Vault (KV v2) is the production posture; references take the
+  `vault://<mount>/<path>#<key>` form. `.env` carries resolved values only for local use.
+- **Trust** — the portal host and console host are issued through Cerulean (DNS + wildcard
+  certificate). The Guacamole JSON-auth key is a repository-independent secret that must
+  match across `ONTRAK_GUAC__SECRET_KEY` and the gateway's `JSON_SECRET_KEY`.
+- **Storage** — built images and snapshots live on the lab host's Incus pool for speed;
+  the durable copy and backups belong to ONYX.
+- **Revenue** — no billing integration today. If ranges are sold per seat, entitlements come
+  from Magnate.
+- **Edge** — the portal and console are published through NPM Edge using Cerulean-issued
+  certificates.
 
-## Where OnTrak integrates with other platforms
+## Related platform boundaries
 
-| Platform | Direction | What crosses |
-|---|---|---|
-| Cerulean (Authentik) | consumes | OIDC issuer, client ID/secret, redirect URIs |
-| Cerulean Vault | consumes | Runtime secrets |
-| Cerulean DNS/TLS | consumes | Host records and the wildcard certificate |
-| Magnate | consumes (optional) | Seat entitlement check |
-| ONYX | consumes (optional) | Object storage for attachments and evidence |
-| Zeus / Signara | consumes (optional) | Telephony for a desk's voice channel; signature on an agreement packet |
-
-Nothing in the list is a hard dependency: OnTrak is designed to boot and be
-useful with none of them configured, and to gain each one without a rewrite.
-
-## Licences
-
-This repository's own code is MIT ([LICENSE](../LICENSE)). Third-party material that
-ships beside it keeps its own licence, which applies to its output rather than to this
-repository's code, and no upstream source is vendored or re-licensed here.
-
-The machines OnTrak Lab runs are the operator's licences, not this repository's. The
-lab fetches Microsoft **evaluation** media, which expires (90 days for desktop, 180 for
-Server), and never redistributes retail Windows or Office media: retail media is
-supplied by the operator from their own licences, and volume licensing stays with
-whoever runs the host. The lab's own repository is the source for that rule
-([OnTrak-dev](https://github.com/innotelinc/OnTrak-dev), `docs/catalog.md`); this
-paragraph exists so that a reader of the family's architecture meets it as a
-responsibility rather than as a surprise after a class has been booked onto it.
+- **ONYX (StorageOps)** — the tier that holds golden images and snapshot backups long-term;
+  OnTrak consumes it and never re-implements replication or backup policy.
+- **Cerulean (TrustOps / IdentityOps)** — OnTrak does not run its own CA, DNS server or IdP.
+- **Distro / Atlas (CodeOps / GitOps)** — unrelated: nothing from this repository is deployed
+  by them, and no artifact here is a runtime service for another platform.
