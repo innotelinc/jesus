@@ -10,7 +10,8 @@ export const plainPort = Number(process.env.LITE_SMOKE_PLAIN_PORT || port + 1);
 
 export default defineConfig({
   testDir: ".",
-  testMatch: /.*\.spec\.ts$/,
+  // lite-stalwart.spec.ts needs the Stalwart build (playwright.stalwart.config.ts).
+  testMatch: /lite-demo\.spec\.ts$/,
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",

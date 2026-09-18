@@ -126,7 +126,8 @@ describe('auth-store in the static Lite build', () => {
     expect(state.authMode).toBe('oauth');
     expect(state.accessToken).toBe('AT-1');
     expect(state.client?.getAuthHeader()).toBe('Bearer AT-1');
-    expect(readLiteRefreshToken(0)).toEqual({ serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1' });
+    // The client the token was issued to rides along, so refreshes present the same one.
+    expect(readLiteRefreshToken(0)).toEqual({ serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1', clientId: 'bulwark-webmail' });
     expect(localStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
     // No password anywhere in web storage.
     const dump = JSON.stringify({ ...localStorage, ...sessionStorage });
