@@ -19,12 +19,13 @@ import { notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
-import { IS_LITE } from '@/lib/lite';
+import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
 import {
   LiteLoginError,
   clearAllLiteSessions,
   clearLiteRefreshToken,
   clearLiteSlot,
+  getLiteClientId,
   liteRefreshTokens,
   liteTokenLogin,
   readLiteBasicSession,
@@ -284,7 +285,7 @@ async function exchangePasswordForTokens(params: {
     // "Remember me" keeps the refresh token across browser restarts
     // (localStorage); otherwise it lives with the tab (sessionStorage).
     if (tokens.refreshToken) {
-      saveLiteRefreshToken(slot, { serverUrl, username, refreshToken: tokens.refreshToken }, rememberMe);
+      saveLiteRefreshToken(slot, { serverUrl, username, refreshToken: tokens.refreshToken, clientId: getLiteClientId() }, rememberMe);
     } else {
       clearLiteRefreshToken(slot);
     }
@@ -864,9 +865,13 @@ export const useAuthStore = create<AuthState>()(
               // The callback URL the OAuth client already registers; the route
               // needs an identical redirect URI for the login + token-exchange
               // steps (and registered when require_client_registration is on).
-              const redirectUri = typeof window !== 'undefined'
-                ? `${window.location.origin}${getPathPrefix()}/${getLocaleFromPath()}/auth/callback`
-                : '';
+              // Lite on Stalwart uses the mount root instead: one locale-free
+              // URI per Application for the admin to register.
+              const redirectUri = typeof window === 'undefined'
+                ? ''
+                : IS_LITE_STALWART
+                  ? `${window.location.origin}${getPathPrefix()}/`
+                  : `${window.location.origin}${getPathPrefix()}/${getLocaleFromPath()}/auth/callback`;
               const tokenRes = await exchangePasswordForTokens({
                 serverUrl, username, password, totp, slot: cookieSlot, redirectUri, rememberMe: !!rememberMe,
               });
