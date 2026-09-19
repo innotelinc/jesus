@@ -1,20 +1,15 @@
-<div align="center">
+<p>
+  <a href="https://bulwarkmail.org"><img src="https://raw.githubusercontent.com/bulwarkmail/.github/main/profile/banner.png" alt="Bulwark: webmail for Stalwart Mail Server. Mail, calendar, contacts and files in one browser client." width="100%" /></a>
+</p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/branding/Bulwark_Logo_with_Lettering_White_and_Color.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="public/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg" />
-  <img src="public/branding/Bulwark_Logo_with_Lettering_Dark_Color.svg" alt="Bulwark Webmail" width="280" />
-</picture>
+<p align="center">
+  <a href="https://github.com/bulwarkmail/webmail/releases/latest"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/release-dark.svg" /><img src="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/release.svg" alt="latest release" height="24" /></picture></a>&nbsp;
+  <a href="https://github.com/bulwarkmail/webmail/pkgs/container/webmail"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/docker-dark.svg" /><img src="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/docker.svg" alt="docker: ghcr.io/bulwarkmail/webmail" height="24" /></picture></a>&nbsp;
+  <a href="LICENSE"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/license-dark.svg" /><img src="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/license.svg" alt="license: AGPL v3" height="24" /></picture></a>&nbsp;
+  <a href="https://discord.gg/tYCujymGrT"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/discord-dark.svg" /><img src="https://raw.githubusercontent.com/bulwarkmail/.github/main/badges/discord.svg" alt="Discord members online" height="24" /></picture></a>
+</p>
 
-# Bulwark Webmail
-
-A self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/), built with Next.js and the JMAP protocol.
-
-[![License: AGPL v3](https://img.shields.io/badge/license-AGPL%20v3-blue.svg?logo=gnu&logoColor=white)](LICENSE)
-[![Discord](https://img.shields.io/discord/1482128142939455674?color=7289da&label=discord&logo=discord&logoColor=white)](https://discord.gg/tYCujymGrT)
-[![Version](https://img.shields.io/badge/version-1.10.0-green.svg?logo=git&logoColor=white)](CHANGELOG.md)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io%2Fbulwarkmail%2Fwebmail-blue?logo=docker&logoColor=white)](https://ghcr.io/bulwarkmail/webmail)
-</div>
+Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/), built with Next.js and the JMAP protocol.
 
 ## Screenshots
 
