@@ -332,6 +332,23 @@ or `SKIP_TARBALL=1` to leave just the directory.
   container is resolved by compose label (as `scripts/smoke-e2e.sh` does), so it
   works on the shared box where the PBX is `zeus-freepbx`, not `pbx-freepbx`.
 
+### The gateway's data volume, mounted where the image reads it
+
+- **Fixed: the gateway's provider connections lived in the container, not the volume.**
+  OmniRoute's image sets `DATA_DIR=/app/data`; this file mounted
+  `omniroute_data` at `/data`, so the gateway read its own writable layer. It
+  answered every request, which is why nothing looked broken — but each
+  `--force-recreate` silently discarded the provider credentials and left
+  `auto/coding` pinning a provider with none, the `503 No credentials for
+  opencode` that made multi-turn app builds impossible. The connections were
+  preserved out of the running container and the volume is now mounted at
+  `/app/data`, where the image actually reads it. `scripts/omniroute-vault-backup.py`
+  (Olympus) no longer guesses that path either: it asks the container for
+  `DATA_DIR`, resolves it through the container's mounts, and refuses with that
+  explanation when the data dir is not mounted at all — because in that state
+  there is nothing durable to back up, and the stale volume beside it would have
+  been reported as a healthy backup.
+
 ## v3.19 — Grading you can choose, calls that can run long
 
 Release `v3.19` hands the operator control of grading: which workflows are
