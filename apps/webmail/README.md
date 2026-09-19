@@ -446,7 +446,7 @@ In the composer: `Ctrl/Cmd`+`Enter` sends, `Ctrl/Cmd`+`Shift`+`Enter` opens sche
 | **Protocol**  | Custom JMAP client (RFC 8620)                     |
 | **Editor**    | [Tiptap](https://tiptap.dev/)                     |
 | **i18n**      | [next-intl](https://next-intl-docs.vercel.app/)   |
-| **Icons**     | [Lucide React](https://lucide.dev/)               |
+| **Icons**     | [Tabler Icons](https://tabler.io/icons)             |
 | **Testing**   | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) |
 
 ## Why Stalwart?
