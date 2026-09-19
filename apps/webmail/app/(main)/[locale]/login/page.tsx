@@ -14,7 +14,7 @@ import { useConfig } from "@/hooks/use-config";
 import { useMenuNavigation } from "@/hooks/use-menu-navigation";
 import { apiFetch, getPathPrefix, toRouterPath, withBasePath } from "@/lib/browser-navigation";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy } from "lucide-react";
+import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy } from "@/components/icons";
 import { type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { useUpdateStore, selectBanner } from "@/stores/update-store";

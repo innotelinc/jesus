@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield } from 'lucide-react';
+import { Shield } from '@/components/icons';
 import { useConfig } from '@/hooks/use-config';
 import { useThemeStore } from '@/stores/theme-store';
 import { apiFetch, withBasePath } from '@/lib/browser-navigation';

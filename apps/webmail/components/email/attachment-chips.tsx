@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, FileSpreadsheet, FileImage, FileArchive, File as FileIcon } from "lucide-react";
+import { FileText, FileSpreadsheet, FileImage, FileArchive, File as FileIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import type { Attachment } from "@/lib/jmap/types";
 

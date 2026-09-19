@@ -13,7 +13,7 @@ import {
 import { useAuthStore } from "@/stores/auth-store";
 import { useEmailStore } from "@/stores/email-store";
 import { SettingsSection, SettingItem, ToggleSwitch, Select } from "./settings-section";
-import { Plus, Pencil, Trash2, GripVertical, Check, X, Loader2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical, Check, X, Loader2, Search } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { KEYWORD_PREFIX } from "@/lib/thread-utils";
 import { findUnrecognizedKeywords, type UnrecognizedKeyword } from "@/lib/keyword-discovery";

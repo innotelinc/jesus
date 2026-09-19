@@ -5,7 +5,7 @@ import { ThreadListItem } from "./thread-list-item";
 import type { Attachment } from "@/lib/jmap/types";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
-import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "lucide-react";
+import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";

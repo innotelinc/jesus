@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 import { AttachmentChips } from "./attachment-chips";
 import type { Attachment } from "@/lib/jmap/types";
 import { SelectableAvatar } from "@/components/email/selectable-avatar";
-import { Paperclip, Star, Pin, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward, CalendarClock, Folder, Archive, Trash2, MailOpen, ShieldAlert } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Paperclip, Star, Pin, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward, CalendarClock, Folder, Archive, Trash2, MailOpen, ShieldAlert } from "@/components/icons";
+import type { AppIcon } from "@/components/icons";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useEmailStore } from "@/stores/email-store";
@@ -49,7 +49,7 @@ function UnreadDot({ density, compactAvatar }: { density: string; compactAvatar:
   );
 }
 
-function StatusIcon({ icon: Icon, label, className }: { icon: LucideIcon; label: string; className: string }) {
+function StatusIcon({ icon: Icon, label, className }: { icon: AppIcon; label: string; className: string }) {
   return (
     <>
       <Icon className={className} />
@@ -147,7 +147,7 @@ interface SingleEmailItemProps {
 
 // Visual + behaviour metadata for each mobile swipe action. Keyed by the
 // SwipeAction values that map to a row callback ('none' is handled inline).
-const SWIPE_ACTION_META: Record<Exclude<SwipeAction, 'none'>, { icon: LucideIcon; bg: string }> = {
+const SWIPE_ACTION_META: Record<Exclude<SwipeAction, 'none'>, { icon: AppIcon; bg: string }> = {
   archive: { icon: Archive, bg: 'bg-emerald-600' },
   delete: { icon: Trash2, bg: 'bg-red-600' },
   markRead: { icon: MailOpen, bg: 'bg-sky-600' },

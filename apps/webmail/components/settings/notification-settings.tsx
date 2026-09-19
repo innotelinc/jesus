@@ -7,7 +7,7 @@ import { SettingsSection, SettingItem, ToggleSwitch, Select } from './settings-s
 import { playNotificationSound, NOTIFICATION_SOUNDS } from '@/lib/notification-sound';
 import type { NotificationSoundChoice } from '@/lib/notification-sound';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Volume2, XCircle } from 'lucide-react';
+import { Loader2, RefreshCw, Volume2, XCircle } from '@/components/icons';
 import { usePolicyStore } from '@/stores/policy-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

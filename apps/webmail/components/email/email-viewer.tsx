@@ -82,7 +82,7 @@ import {
   Link as LinkIcon,
   Maximize2,
   Minimize2,
-} from "lucide-react";
+} from "@/components/icons";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import type { Attachment as PostalMimeAttachment } from 'postal-mime';
