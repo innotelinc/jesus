@@ -6,6 +6,7 @@ node_modules
 !.env.example
 !.env.dev.example
 scripts/
+!scripts/lite/
 TODO.md
 *.md
 !README.md
