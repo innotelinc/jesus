@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.11.0-beta.1 (2026-09-19) - Pre-release
+
+Test release for **Bulwark Lite**, the static build of the webmail. Not recommended for production; the `latest` Docker tag stays on 1.10.0.
+
+### Added
+
+- **Bulwark Lite static export**: `npm run build:lite` produces a server-less build that talks to the JMAP server directly from the browser. The release ships `bulwark-lite-<version>.zip` for any static web host.
+- **Bulwark Lite for Stalwart Applications**: `bulwark-lite-stalwart.zip` is a Stalwart `Application` bundle that picks up its mount prefix at runtime.
+- **"Flat fields" theme**.
+
+### Changed
+
+- Icon set migrated from Lucide to Tabler Icons.
+
+### Fixed
+
+- Hardened Bulwark Lite login, deep-link replay and settings gating.
+
 ## 1.10.0 (2026-09-17)
 
 Thank you for your donations:
