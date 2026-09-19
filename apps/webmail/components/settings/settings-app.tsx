@@ -35,8 +35,8 @@ import {
   SwatchBook,
   Download,
   X,
-  type LucideIcon,
-} from 'lucide-react';
+  type AppIcon,
+} from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AppearanceSettings } from '@/components/settings/appearance-settings';
@@ -116,11 +116,11 @@ type SettingsTabId = Tab | PluginTabId;
 interface TabDef {
   id: SettingsTabId;
   label: string;
-  icon: LucideIcon;
+  icon: AppIcon;
   group: TabGroup;
 }
 
-const tabIcons: Record<Tab, LucideIcon> = {
+const tabIcons: Record<Tab, AppIcon> = {
   account: User,
   language: Languages,
   notifications: Bell,

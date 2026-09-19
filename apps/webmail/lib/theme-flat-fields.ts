@@ -384,6 +384,13 @@ body[data-theme-skin="builtin-flat-fields"] [data-tour="email-list"] span.bg-pri
   font-weight: 600;
 }
 
+/* ── Icons follow the website's rule: 1.5 stroke, square caps, mitred joins. ── */
+body[data-theme-skin="builtin-flat-fields"] svg.tabler-icon {
+  stroke-width: 1.5;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+}
+
 /* ── Focus: one ring, 2px solid, 2px off the element. ── */
 body[data-theme-skin="builtin-flat-fields"] :focus-visible {
   outline: 2px solid var(--color-ring);

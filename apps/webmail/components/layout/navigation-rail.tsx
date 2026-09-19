@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield, LogOut, Check, Search } from "lucide-react";
+import { Mail, Calendar, BookUser, HardDrive, Settings, Keyboard, Plus, Shield, LogOut, Check, Search } from "@/components/icons";
 import { AccountSwitcher } from "./account-switcher";
-import { icons as lucideIcons, type LucideIcon } from "lucide-react";
+import { iconForName } from "@/components/icons";
 import { useConfig } from "@/hooks/use-config";
 import { useThemeStore } from "@/stores/theme-store";
 import { usePathname, Link, useRouter } from "@/i18n/navigation";
@@ -398,7 +398,7 @@ export function NavigationRail({
 
         {/* Custom sidebar apps (per-app mobile visibility) */}
         {visibleSidebarApps.filter((app) => app.showOnMobile).map((app) => {
-          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
+          const AppIcon = iconForName(app.icon);
           const isActive = activeAppId === app.id;
           return (
             <button
@@ -579,7 +579,7 @@ export function NavigationRail({
           />
         )}
         {visibleSidebarApps.map((app) => {
-          const AppIcon = lucideIcons[app.icon as keyof typeof lucideIcons] as LucideIcon | undefined;
+          const AppIcon = iconForName(app.icon);
           const isActive = activeAppId === app.id;
           return (
             <button
