@@ -296,6 +296,42 @@ or `SKIP_TARBALL=1` to leave just the directory.
   it (the Next build peaks around 6.6 GiB — more than this host has free with
   the stack up, so the build is a stop-services-then-build operation here).
 
+### A Stasis app that un-parks itself
+
+- **Fixed: calls to a dograh extension hung up instantly after a PBX outage.**
+  Asterisk routes each dograh extension into `Stasis(<DOGRAH_STASIS_APP_NAME>)`, so
+  when no ARI client is registered under that name the call never starts — the
+  caller hears nothing and the Control Center reports *"Calls to 8008 will drop …
+  registered: none"*. The cause is not the dialplan: dograh parks a telephony
+  configuration whose ARI connection fails for long enough (`inactive`) and, in
+  upstream's words, *"parking is one-way"* — nothing ever retries it. A PBX down
+  (or restarting) for longer than dograh's transient-failure window therefore
+  leaves the range silently unable to take calls. The banner's own advice —
+  re-run `scripts/dograh_wire.py` — is now the actual repair: that script clears
+  the parked flag as part of its config step, which it previously did not, so the
+  documented remedy used to work only for a config that was already active.
+
+- **Fixed: a `#` in `DOGRAH_ARI_PASSWORD` silently killed ARI.** dograh
+  interpolates the credential into its ARI WebSocket URL
+  (`…?api_key=<user>:<password>&app=<app>`), so a `#` ends the query string as a
+  URI fragment and the client rejects the whole URL
+  (`InvalidURI: … fragment identifier is meaningless`). The Stasis app then never
+  registers — the same `registered: none` banner as a parked config, from an
+  unrelated cause, with nothing on the PBX to explain it. `scripts/dograh_wire.py`
+  now refuses to run on a password containing `#` or whitespace, so it fails
+  loudly instead of PUT-ing a credential that cannot connect.
+
+- **New: `scripts/dograh-ari-recover.sh`, on a 10-minute timer.**
+  `systemd/capstone-dograh-ari.{service,timer}` (installed by
+  `scripts/install-capstone.sh`, alongside the FreePBX web-UI healthcheck) probes
+  `asterisk -rx "ari show apps"` and, when the app is missing and ARI is
+  reachable, re-runs the wire script and waits for registration. A missing app
+  with **ARI unreachable** is deliberately *not* repaired — dograh cannot register
+  against a PBX that isn't answering, and reactivating on a loop would churn for
+  the whole outage — it logs and exits 1 so the journal shows it. The PBX
+  container is resolved by compose label (as `scripts/smoke-e2e.sh` does), so it
+  works on the shared box where the PBX is `zeus-freepbx`, not `pbx-freepbx`.
+
 ## v3.19 — Grading you can choose, calls that can run long
 
 Release `v3.19` hands the operator control of grading: which workflows are

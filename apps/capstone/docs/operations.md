@@ -247,6 +247,76 @@ It probes `:80` inside the container, and when the UI is down it clears any stal
 and restarts Apache (as `asterisk`, preserving the Apply Config fix). Idempotent — a healthy
 UI is a no-op that exits 0.
 
+### dograh Stasis app healthcheck + auto-recovery
+
+Asterisk routes every dograh extension into `Stasis(<DOGRAH_STASIS_APP_NAME>)`. When no ARI
+client is registered under that name the `Stasis()` call never starts a call, so Asterisk
+hangs up immediately and the caller hears nothing. The Control Center reports it as
+*"Calls to 8008 will drop … registered: none"*.
+
+The usual cause is **not** a misconfiguration but dograh's own parking policy. A telephony
+configuration whose ARI connection keeps failing is marked `inactive` and, in upstream's
+words, *"parking is one-way: the customer fixes their side and reactivates the configuration
+explicitly"* — nothing retries it. So a PBX that is down (or restarting) for longer than
+dograh's transient-failure window leaves the range silently unable to take calls until
+somebody intervenes by hand. The honest reading of the Control Center banner's advice
+("re-run `scripts/dograh_wire.py`") is that the fix used to *be* the repair: it now
+reactivates a parked config, so the documented remedy actually works.
+
+`scripts/dograh-ari-recover.sh` runs the check unattended, every 10 minutes via the
+`capstone-dograh-ari.timer` systemd timer:
+
+```bash
+./scripts/dograh-ari-recover.sh check     # is the Stasis app registered? (exit 1 if not)
+./scripts/dograh-ari-recover.sh recover   # ...and repair it: re-run dograh_wire.py
+```
+
+The split matters: a missing app with **ARI unreachable** is *not* repaired. dograh cannot
+register against a PBX that isn't answering, and this runs on a timer, so reactivating on a
+loop would only churn for the whole outage — it logs and exits 1 for the journal to show.
+A missing app with **ARI reachable** (the parked-config case) re-runs
+`scripts/dograh_wire.py`, which clears the parked flag, then waits for registration and
+reports whether calls can be taken again. It resolves the PBX container by compose label
+the way `scripts/smoke-e2e.sh` does, so it works on a shared voice host where the PBX is
+`zeus-freepbx` rather than `pbx-freepbx`.
+
+If you would rather fix it by hand, the two commands are:
+
+```bash
+python3 scripts/dograh_wire.py --env-file .env   # un-park + re-assert the app name
+docker exec pbx-freepbx asterisk -rx "ari show apps"   # expect: dograh_<hex>
+```
+
+#### A second way the same banner appears: a `#` in `DOGRAH_ARI_PASSWORD`
+
+dograh builds its ARI WebSocket URL by string interpolation —
+`ws://host:8088/ari/events?api_key=<user>:<password>&app=<app>` — so a `#` in the
+password truncates the query string as a URI fragment and the client rejects the URL
+outright:
+
+```
+DOGRAH_FAILURE [code=ari-unknown] InvalidURI: ws://…/ari/events?api_key=… isn't a
+valid URI: fragment identifier is meaningless
+```
+
+The visible symptom is identical (`registered: none`, calls hang up), but the repair is
+different: **the credential must be changed on both sides.** `scripts/dograh_wire.py` now
+refuses to run on a password containing `#` or whitespace, so it fails loudly instead of
+PUT-ing a credential that cannot connect. To fix it, take the password Asterisk actually
+enforces and make `.env` agree with it (the live PBX is the authority — it is what
+Asterisk authenticates):
+
+```bash
+# the [dograh] ARI user's password, read from the PBX itself
+PW=$(docker exec pbx-freepbx bash -c \
+  'awk -F" = " "/^password/ {print \$2; exit}" /etc/asterisk/ari_additional_custom.conf')
+sed -i "s|^DOGRAH_ARI_PASSWORD=.*|DOGRAH_ARI_PASSWORD=${PW}|" .env
+python3 scripts/dograh_wire.py --env-file .env    # reconciles dograh with it
+```
+
+`openssl rand -base64 24` (what `scripts/setup.sh` generates) never emits `#`, so this
+only bites a hand-edited or re-generated password.
+
 ## TURN / WebRTC configuration
 
 Setup persists these values in `.env` and preserves explicit non-placeholder values on

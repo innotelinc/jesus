@@ -12,7 +12,11 @@ What it does:
                    if a workflow with the same name doesn't exist yet
   3. config      — create-or-update the Asterisk ARI telephony configuration,
                    which is what makes the PBX show up in the dograh UI under
-                   "Telephony Configurations"
+                   "Telephony Configurations". A configuration dograh parked
+                   itself (``inactive``, e.g. after the PBX was down long
+                   enough) is reactivated here — parking is one-way upstream,
+                   so nothing else ever clears it and calls routed into the
+                   Stasis app keep hanging up.
   4. extensions  — register extensions 8000/8001/8002 as phone numbers on that
                    config, each bound to its interview workflow for inbound
                    calls
@@ -67,6 +71,58 @@ TRACKS: list[tuple[str, str, str]] = [
     ("8006", "survey-workflow.json", "Phone Survey"),
     ("8007", "gotv-polling-workflow.json", "Get Out The Vote Poll"),
 ]
+
+
+def ari_password_problem(password: str) -> str:
+    """Why this ARI password cannot work, or ``""`` when it is usable.
+
+    dograh builds the ARI WebSocket URL by string interpolation —
+    ``ws://host:8088/ari/events?api_key=<user>:<password>&app=<app>`` — and a
+    ``#`` in the password ends the query string as a URI fragment. The client
+    then rejects the whole URL (``InvalidURI: fragment identifier is
+    meaningless``), so the ARI connection never comes up and the Stasis app is
+    never registered: every call the dialplan routes into it hangs up, with
+    nothing on the PBX side to explain it.
+
+    ``openssl rand -base64 24`` (what ``scripts/setup.sh`` generates) never
+    emits ``#``, so this only bites a hand-edited or re-generated password —
+    which is exactly when nobody is looking for it. Refusing to write one is
+    cheaper than diagnosing it from "registered: none".
+    """
+    if not password:
+        return ""
+    if "#" in password:
+        return (
+            "contains '#', which ends the ARI query string as a URI fragment — "
+            "dograh cannot connect with it (InvalidURI: fragment identifier is "
+            "meaningless). Use one without '#', e.g. `openssl rand -hex 24`"
+        )
+    if any(ch.isspace() for ch in password):
+        return (
+            "contains whitespace, which cannot survive the ARI URL and the "
+            "`password = ...` line in ari.conf"
+        )
+    return ""
+
+
+def parked_reason(config: dict) -> str:
+    """Why dograh parked this ARI config, or ``""`` when it is still active.
+
+    A parked (``inactive``) config is never retried on its own: the ARI manager
+    drops the connection and drops the row from its refresh, so the Stasis app
+    stays unregistered on the PBX and every call the dialplan routes into it
+    hangs up immediately (dashboard: "Calls to 8008 will drop"). Re-running
+    this script is the documented remedy, so the remedy has to be the thing
+    that clears the flag — otherwise it only "works" on a config that was
+    still active, which is the case that never needed it.
+
+    ``inactive_reason`` carries dograh's own words for the cause
+    (``ari-timeout: ...``), which is what tells an operator whether the PBX
+    side has actually been fixed before retrying.
+    """
+    if not config.get("inactive"):
+        return ""
+    return str(config.get("inactive_reason") or "reason not reported")
 
 
 class ApiError(RuntimeError):
@@ -358,6 +414,14 @@ def main() -> int:
         return 1
     app_name = cfg(args, "DOGRAH_ARI_APP_NAME", "dograh")
     ws_client = cfg(args, "DOGRAH_WS_CLIENT_NAME", "dograh")
+    # Checked before anything is written: this script PUTs the password into the
+    # telephony config, so shipping a broken one would take a working range
+    # down. It also refuses to *diagnose* a live outage as a mystery.
+    if ari_password:
+        password_problem = ari_password_problem(ari_password)
+        if password_problem:
+            print(f"FAIL DOGRAH_ARI_PASSWORD {password_problem}")
+            return 1
     config_name = cfg(args, "DOGRAH_CONFIG_NAME", "Asterisk ARI (dograh)")
 
     api = Dograh(endpoint)
@@ -492,6 +556,29 @@ def main() -> int:
             print(f"  PROBLEM: {p}")
         return 1
     config_id = config.get("id")
+
+    # ── 3a. un-park a config dograh disabled itself ──────────────────────────
+    # Parking is deliberately one-way upstream (a permanently broken PBX must
+    # not be retried forever), so nothing else will ever clear it. This is the
+    # step that makes re-running the wire script a real repair rather than a
+    # verification that reports the outage back at you.
+    parked = parked_reason(config)
+    if parked:
+        if args.check:
+            problems.append(
+                f"ARI telephony config '{config_name}' is parked (inactive): {parked}"
+            )
+            print(f"FAIL ARI telephony config is parked (inactive): {parked}")
+        else:
+            print(f"WARN ARI telephony config was parked by dograh: {parked}")
+            api.request(
+                "POST",
+                f"/api/v1/organizations/telephony-configs/{config_id}/reactivate",
+            )
+            print(
+                "PASS ARI telephony config reactivated — dograh reconnects on its "
+                "next poll (the PBX must have ARI reachable for it to stay up)"
+            )
 
     # ── 3b. Stasis app name: dograh generates it (dograh_<hex>) and the PBX
     # dialplan must route calls into THAT name, not the ARI username. Fetch it
