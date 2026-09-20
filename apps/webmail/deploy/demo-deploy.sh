@@ -26,7 +26,8 @@ IMAGE=ghcr.io/bulwarkmail/webmail
 NAME=bulwark-demo
 PORT=3002
 DATA=/opt/bulwark-demo-data
-# The image this deploy replaced, kept tagged so it survives image pruning.
+# The image this deploy replaced. Containers always run an image id; this tag
+# exists only so pruning cannot collect the image we may need to go back to.
 PREVIOUS=bulwark-demo:previous
 STATE=/opt/bulwark-demo-deploy
 
@@ -98,7 +99,7 @@ case "$cmd" in
     else
       log "health check failed"
       if [[ -n "$old" ]]; then
-        run_container "$PREVIOUS"
+        run_container "$old"
         healthy && log "back on $(version_of "$old")" || log "rollback is not answering either"
       fi
       exit 4
@@ -112,7 +113,7 @@ case "$cmd" in
     prev=$(image_id "$PREVIOUS")
     [[ -n "$prev" ]] || { log "no earlier image to roll back to"; exit 5; }
     cur=$(running_image_id)
-    run_container "$PREVIOUS"
+    run_container "$prev"
     # Point $PREVIOUS at what we just left, so a second rollback comes back.
     [[ -n "$cur" ]] && docker_ tag "$cur" "$PREVIOUS"
     healthy && log "rolled back to $(version_of "$prev")" || { log "rolled back, but the health check failed"; exit 4; }
