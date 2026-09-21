@@ -1737,6 +1737,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         return;
       }
 
+      // Delayed sends get the undo toast instead; a filing error already warned.
+      if (!result.filingError) toast.success(t('notifications.email_sent'));
+
       // Refresh the current mailbox to update the UI
       if (!isScheduledView) {
         await refreshCurrentMailbox(client);
@@ -3194,6 +3197,8 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       await refreshScheduledMetadata(client);
       return;
     }
+
+    toast.success(t('notifications.email_sent'));
 
     // Refresh emails to show the sent reply
     await refreshCurrentMailbox(client);
