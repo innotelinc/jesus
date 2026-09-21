@@ -103,6 +103,45 @@ npm run lite:serve                       # http://localhost:4173/
 
 Lite keeps everything that runs in the browser (multi-account, password and TOTP login, "remember me" via Stalwart refresh tokens, themes, deep links, demo mode). Server-backed features are off: the admin console and setup wizard, plugins and sidebar apps, settings sync, OAuth/SSO, the account security tab, ICS URL subscriptions and CalDAV discovery, sender favicons, office editing, web push, the update banner, the "Default apps" protocol-handler registration. Password logins go through Stalwart's token endpoints in the browser (`/api/auth` + `/auth/token`, so those need CORS as well); without "remember me" the refresh token lives in sessionStorage and the session ends with the tab. `scripts/lite/verify.mjs` fails the build if a client chunk references a server endpoint that is not documented in `scripts/lite/lib.mjs`, and `npm run test:lite-smoke` drives a demo export with Playwright.
 
+#### Lite as a container
+
+`ghcr.io/bulwarkmail/webmail-lite` is the same export behind an unprivileged nginx (no Node.js at runtime, runs as uid 101, listens on 8080, IPv4 and IPv6). Releases are tagged like the main image (`latest`, `1.11.0`, `1.11`, `1`); `ghcr.io/bulwarkmail/webmail-lite-beta:latest` follows `main`. Configure it by mounting your own `config.json` (and, if you need it, `policy.json`) over the baked one:
+
+```yaml
+services:
+  webmail-lite:
+    image: ghcr.io/bulwarkmail/webmail-lite:latest
+    ports:
+      - "8080:8080"
+    environment:
+      # connect-src of the Content-Security-Policy. Defaults to "*" because the
+      # image cannot know your mail server; pin it once config.json does.
+      - LITE_CSP_CONNECT_SRC=https://mail.example.com
+    volumes:
+      - ./config.json:/usr/share/nginx/html/config.json:ro
+    # Optional hardening: nginx only writes to these two.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /etc/nginx/conf.d:uid=101,gid=101
+    restart: unless-stopped
+```
+
+```json
+{
+  "appName": "Example Mail",
+  "jmapServerUrl": "https://mail.example.com",
+  "allowCustomJmapEndpoint": false,
+  "rememberMeEnabled": true
+}
+```
+
+The nginx config is generated from the same routing rules as `nginx.conf.example` (deep links below a surface fall back to that surface's shell, everything else is a real 404) and adds what a static host's `_headers` would: the Content-Security-Policy and the other security headers, immutable caching for `/_next/static/`, revalidation for the shells and `config.json`, gzip. Terminate TLS in the reverse proxy in front of it. The image serves from `/`, so give it a host of its own rather than a sub-path, and remember that the browser talks to the mail server directly: CORS as described above. To bake different defaults or a locale subset, build it yourself - the build args are the `LITE_*` inputs above:
+
+```bash
+docker build -f Dockerfile.lite --build-arg LITE_LOCALES=en,de -t bulwark-lite .
+```
+
 #### Install on Stalwart
 
 Stalwart 0.16 can host the webmail itself as an `Application`: it downloads a zip, serves it under a path of its own HTTP listener, and the webmail talks to the same origin's JMAP, `/api/auth` and `/auth/token`, so there is no server URL to enter and no CORS to set up. Every release ships `bulwark-lite-stalwart.zip` for this (built with `npm run build:lite -- --target=stalwart`). An administrator creates the Application and then asks Stalwart to fetch it. Creating it alone mounts nothing:
