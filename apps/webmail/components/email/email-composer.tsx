@@ -1515,14 +1515,22 @@ export function EmailComposer({
           const newFileId = typeof transformed === 'string' ? transformed : fileId;
 
           const newFile = await fileStorage.getFile(newFileId) || file;
-          await fileStorage.deleteFile(newFileId);
 
           // Passing the signal also makes cancel abort the transfer itself,
           // instead of only being checked once the upload has finished.
-          const { blobId } = await (composerClientRef.current ?? client).uploadBlob(newFile, {
-            onProgress: reportProgress,
-            signal: controller?.signal,
-          });
+          // The staged copy is deleted only after the upload: in Firefox the
+          // File read back from IndexedDB is backed by the stored record, and
+          // deleting it first races the send - XHR then declares the full
+          // Content-Length but sends 0 bytes, and nginx answers 400.
+          let blobId: string;
+          try {
+            ({ blobId } = await (composerClientRef.current ?? client).uploadBlob(newFile, {
+              onProgress: reportProgress,
+              signal: controller?.signal,
+            }));
+          } finally {
+            await fileStorage.deleteFile(newFileId).catch(() => {});
+          }
 
           if (controller?.signal.aborted) continue;
           setAttachments(prev =>
