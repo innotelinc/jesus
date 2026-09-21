@@ -19,8 +19,21 @@ import { type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { useUpdateStore, selectBanner } from "@/stores/update-store";
 import type { PublicJmapServerEntry } from "@/lib/admin/jmap-servers";
-import { IS_LITE } from "@/lib/lite";
-import { probeLiteTokenLogin } from "@/lib/auth/lite-tokens";
+import { IS_LITE, getLiteInjectedClientId } from "@/lib/lite";
+import { getLiteClientId, probeLiteTokenLogin } from "@/lib/auth/lite-tokens";
+import {
+  LITE_OAUTH_AVAILABLE,
+  getLiteOAuthRedirectUri,
+  liteDiscoverOAuth,
+  saveLiteOAuthFlow,
+  type LiteOAuthDiscovery,
+} from "@/lib/auth/lite-oauth";
+
+/** The domain of a complete address (`user@example.com`), or '' while it is still being typed. */
+function completeAddressDomain(username: string): string {
+  const match = /^[^@\s]+@([^@\s]+\.[^@\s.]+)$/.exec(username.trim());
+  return match ? match[1].toLowerCase() : "";
+}
 
 function findServerByDomain(servers: PublicJmapServerEntry[], email: string | undefined): PublicJmapServerEntry | undefined {
   if (!email || !email.includes("@")) return undefined;
@@ -227,6 +240,33 @@ function LoginPageContent() {
     };
   }, [probeTarget]);
   const showRememberMe = rememberMeEnabled && (!IS_LITE || liteTokenLoginSupported !== false);
+
+  // Lite on Stalwart: which provider signs the typed account in
+  // (lib/auth/lite-oauth.ts). A domain Stalwart delegates to an external
+  // OpenID provider has no password to check, so the form turns into the SSO
+  // button for it. The answer depends on the domain, so it is kept while the
+  // local part is edited, and only asked for once the address is complete
+  // (the endpoint is rate limited).
+  const [liteOAuthByDomain, setLiteOAuthByDomain] = useState<{ domain: string; discovery: LiteOAuthDiscovery | null } | null>(null);
+  const [liteOAuthFailed, setLiteOAuthFailed] = useState(false);
+  const liteDomain = LITE_OAUTH_AVAILABLE ? completeAddressDomain(formData.username) : "";
+  const liteAccount = liteDomain ? formData.username.trim() : "";
+  useEffect(() => {
+    if (!liteAccount || !probeTarget) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      liteDiscoverOAuth(probeTarget, liteAccount, controller.signal).then((discovery) => {
+        if (!controller.signal.aborted) setLiteOAuthByDomain({ domain: completeAddressDomain(liteAccount), discovery });
+      });
+    }, 600);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [probeTarget, liteAccount]);
+  const liteSsoRequired = liteDomain !== "" && liteOAuthByDomain?.domain === liteDomain && liteOAuthByDomain.discovery?.external === true;
+  // The admin gave the Application an OAuth client: offer SSO next to the form.
+  const liteSsoOffered = LITE_OAUTH_AVAILABLE && !liteSsoRequired && getLiteInjectedClientId() !== "";
 
   useEffect(() => {
     if (serverUrl) {
@@ -595,7 +635,66 @@ function LoginPageContent() {
     }
   };
 
+  // Lite on Stalwart: the redirect flow without a server (lib/auth/lite-oauth.ts).
+  // Discovery needs the account, which decides the provider.
+  const startLiteOAuth = async (liteServerUrl: string) => {
+    const account = formData.username.trim();
+    if (!account) {
+      inputRef.current?.focus();
+      inputRef.current?.reportValidity();
+      return;
+    }
+    setOauthLoading(true);
+    setLiteOAuthFailed(false);
+    const discovery = await liteDiscoverOAuth(liteServerUrl, account);
+    if (!discovery) {
+      setLiteOAuthFailed(true);
+      setOauthLoading(false);
+      return;
+    }
+
+    const verifier = generateCodeVerifier();
+    const challenge = await generateCodeChallenge(verifier);
+    const state = generateState();
+    const redirectUri = getLiteOAuthRedirectUri();
+    const clientId = getLiteClientId();
+
+    sessionStorage.setItem("oauth_code_verifier", verifier);
+    sessionStorage.setItem("oauth_state", state);
+    sessionStorage.setItem("oauth_server_url", liteServerUrl);
+    sessionStorage.removeItem("oauth_server_id");
+    if (isAddAccountMode) {
+      sessionStorage.setItem("oauth_add_account_mode", "true");
+    }
+    sessionStorage.setItem("oauth_cookie_slot", useAccountStore.getState().getNextCookieSlot().toString());
+    saveLiteOAuthFlow({
+      tokenEndpoint: discovery.metadata.token_endpoint,
+      clientId,
+      redirectUri,
+      persistent: rememberMeEnabled && rememberMe,
+    });
+
+    const authUrl = new URL(discovery.metadata.authorization_endpoint);
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    if (discovery.scope) authUrl.searchParams.set("scope", discovery.scope);
+    authUrl.searchParams.set("state", state);
+    authUrl.searchParams.set("code_challenge", challenge);
+    authUrl.searchParams.set("code_challenge_method", "S256");
+    authUrl.searchParams.set("login_hint", account);
+    if (isAddAccountMode) {
+      authUrl.searchParams.set("prompt", "select_account");
+    }
+
+    window.location.href = authUrl.toString();
+  };
+
   const handleOAuthLogin = async () => {
+    if (LITE_OAUTH_AVAILABLE) {
+      await startLiteOAuth(probeTarget);
+      return;
+    }
     if (!oauthMetadata || !effectiveOauthClientId) return;
     // In mobile-handoff mode the client-side PKCE flow doesn't help us:
     // tokens would land in sessionStorage on the webmail origin and the
@@ -663,6 +762,17 @@ function LoginPageContent() {
     // when the admin hasn't configured a server list.
     const effectiveServerUrl = selectedServer?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : serverUrl);
+    // Lite on Stalwart: an account whose domain signs in at an external
+    // provider has no password Stalwart could check. Asked again here (cached)
+    // because Enter can beat the debounced lookup; a name without a domain is
+    // always Stalwart's own.
+    if (LITE_OAUTH_AVAILABLE && formData.username.includes("@")) {
+      const discovery = await liteDiscoverOAuth(effectiveServerUrl, formData.username);
+      if (discovery?.external) {
+        await startLiteOAuth(effectiveServerUrl);
+        return;
+      }
+    }
     // Capture before login() so the isAuthenticated effect can build the
     // deep-link fragment with values the user actually typed (formData may
     // be cleared by the auth store on success).
@@ -1185,8 +1295,10 @@ function LoginPageContent() {
                     </div>
                   </div>
 
-                  {/* Password field */}
-                  <div className="space-y-1.5">
+                  {/* Password field. Hidden for an account that signs in at an
+                      external provider (Lite on Stalwart): the submit button is
+                      the SSO button then. */}
+                  <div className={cn("space-y-1.5", liteSsoRequired && "hidden")}>
                     <label htmlFor="password" className="block text-sm font-medium text-foreground">
                       {t("password_label")}
                     </label>
@@ -1198,7 +1310,7 @@ function LoginPageContent() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         className="h-11 px-3.5 pe-11 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
                         placeholder={t("password_placeholder")}
-                        required
+                        required={!liteSsoRequired}
                         autoComplete="current-password"
                       />
                       <button
@@ -1221,7 +1333,7 @@ function LoginPageContent() {
                       LOGIN_SHOW_TOTP (loginShowTotp) for deployments whose mail
                       server has no per-account TOTP (auth delegated to an
                       external directory); server-required TOTP still shows. */}
-                  {!showTotpField ? (
+                  {liteSsoRequired ? null : !showTotpField ? (
                     loginShowTotp ? (
                     <button
                       type="button"
@@ -1287,9 +1399,9 @@ function LoginPageContent() {
                 <Button
                   type="submit"
                   className="w-full h-11 font-medium text-[15px] bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20"
-                  disabled={isLoading}
+                  disabled={isLoading || (liteSsoRequired && oauthLoading)}
                 >
-                  {isLoading ? (
+                  {isLoading || (liteSsoRequired && oauthLoading) ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       {t("signing_in")}
@@ -1297,12 +1409,12 @@ function LoginPageContent() {
                   ) : (
                     <div className="flex items-center gap-2">
                       <LogIn className="w-4 h-4" />
-                      {t("sign_in")}
+                      {liteSsoRequired ? t("sign_in_sso") : t("sign_in")}
                     </div>
                   )}
                 </Button>
 
-                {oauthMetadata && (
+                {(oauthMetadata || liteSsoOffered) && (
                   <>
                     <div className="relative my-2">
                       <div className="absolute inset-0 flex items-center">
@@ -1330,7 +1442,7 @@ function LoginPageContent() {
                   </>
                 )}
 
-                {oauthEnabled && oauthDiscoveryDone && !oauthMetadata && (
+                {((oauthEnabled && oauthDiscoveryDone && !oauthMetadata) || liteOAuthFailed) && (
                   <div className="mt-2 p-3 rounded-xl border border-warning/20 bg-warning/5 flex items-start gap-3">
                     <div className="w-10 h-10 rounded-full bg-warning/15 text-warning flex items-center justify-center flex-shrink-0 shadow-sm">
                       <AlertCircle className="w-5 h-5" />

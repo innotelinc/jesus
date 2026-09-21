@@ -83,7 +83,10 @@ export const LITE_API_STRING_ALLOWLIST = [
   "/api/admin/themes",
   // stores/settings-store.ts - settingsSyncEnabled is pinned off.
   "/api/settings",
-  // OAuth / SSO / pairing - oauthEnabled and stalwartFeaturesEnabled are pinned off.
+  // Stalwart's own account discovery (lib/auth/lite-oauth.ts), not a route of this app.
+  "/api/discover",
+  // OAuth / SSO / pairing - Lite discovers and redeems codes in the browser
+  // (lib/auth/lite-oauth.ts); stalwartFeaturesEnabled is pinned off.
   "/api/auth/token",
   "/api/auth/oauth/metadata",
   "/api/auth/sso/start",
@@ -815,6 +818,12 @@ export function resolveStalwartBoot(pathname, mount, locales, shells, preferredL
   var parts = rest.split("/").filter(function (p) { return p.length > 0; });
   var locale = locales.indexOf(parts[0]) !== -1 ? parts[0] : null;
   if (!locale) {
+    // The OAuth redirect URI (lib/auth/lite-oauth.ts) names no locale, so one
+    // registration covers every language: boot the callback in the preferred
+    // one. The entry keeps the query string, which holds the code.
+    if (parts.length === 2 && parts[0] === "oauth" && parts[1] === "callback" && shells.indexOf("auth/callback") !== -1) {
+      return { locale: preferredLocale, shell: preferredLocale + "/auth/callback/index.html", canonical: mount + "/" + preferredLocale + "/auth/callback/" };
+    }
     return { locale: preferredLocale, shell: preferredLocale + "/index.html", canonical: mount + "/" + preferredLocale + "/" };
   }
   var best = null;
@@ -1361,6 +1370,34 @@ into index.html) or \`bulwark-webmail\` when that field is empty. If your
 server requires registered OAuth clients, register that client id with the
 redirect URI \`https://<your stalwart host>/<prefix>/\` (for example
 \`https://mail.example.com/webmail/\`), once per prefix you mount.
+
+### Single sign-on (OpenID Connect)
+
+An account whose directory is an external OpenID provider has no password
+Stalwart could check, so the form above cannot sign it in. The app asks
+Stalwart who signs an address in (\`/api/discover/<address>\`, the lookup
+Stalwart's own web admin uses): for such an account the password field gives
+way to **Sign in with SSO**, which sends the user to the provider
+(authorization code with PKCE) and redeems the code in the browser. Accounts
+Stalwart authenticates itself keep the password form.
+
+At the provider, register a **public** client (no secret, PKCE \`S256\`) with:
+
+- the client id you put into the Application's \`oauthClientId\` (or
+  \`bulwark-webmail\` if you leave that empty);
+- the redirect URI \`https://<your stalwart host>/<prefix>/oauth/callback\`
+  (for example \`https://mail.example.com/webmail/oauth/callback\`). It names
+  no language, so one URI per prefix covers every locale;
+- CORS on its token endpoint for \`https://<your stalwart host>\`, because the
+  browser redeems and renews tokens there directly. Stalwart's web admin needs
+  the same, so a provider already set up for it only needs the extra client.
+
+Setting \`oauthClientId\` also shows **Sign in with SSO** next to the password
+form for accounts Stalwart authenticates itself; that route goes through
+Stalwart's own login page and needs the \`.../oauth/callback\` URI registered
+as well if your server requires registered clients. Per-domain directories
+are a Stalwart Enterprise feature; the community edition has one directory
+for every account.
 
 ## Branding and settings
 

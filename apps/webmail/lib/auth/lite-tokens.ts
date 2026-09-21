@@ -14,6 +14,9 @@ import { IS_LITE_STALWART, getLiteInjectedClientId } from '@/lib/lite';
  *   POST <server>/auth/token (grant_type=authorization_code)
  *     -> access token (memory) + refresh token
  *
+ * (or, for an account an external OpenID provider signs in, through that
+ * provider's redirect flow: lib/auth/lite-oauth.ts)
+ *
  * and renew with `grant_type=refresh_token`. The refresh token is the only
  * thing that persists: localStorage when the user ticked "remember me",
  * sessionStorage (this tab only) otherwise. Servers without /api/auth (older
@@ -68,6 +71,12 @@ interface StoredRefreshToken {
   refreshToken: string;
   /** Client the token was issued to; refreshes must present the same one. */
   clientId?: string;
+  /**
+   * Where the token is renewed when that is not `<serverUrl>/auth/token`: an
+   * OAuth sign-in through the external provider Stalwart delegates a domain
+   * to (lib/auth/lite-oauth.ts) is refreshed at that provider.
+   */
+  tokenEndpoint?: string;
 }
 
 interface StoredBasicSession {
@@ -145,6 +154,16 @@ export function readLiteRefreshToken(slot: number): StoredRefreshToken | null {
 /** Where the slot's refresh token currently lives, so a rotation stays put. */
 function refreshTokenIsPersistent(slot: number): boolean {
   return readJson<StoredRefreshToken>(storage('local'), `${REFRESH_KEY_PREFIX}${slot}`) !== null;
+}
+
+/**
+ * Records whose refresh token the slot holds. An OAuth sign-in stores the
+ * token before it knows the account: only the JMAP session names it.
+ */
+export function nameLiteRefreshToken(slot: number, username: string): void {
+  const stored = readLiteRefreshToken(slot);
+  if (!stored || stored.username === username) return;
+  saveLiteRefreshToken(slot, { ...stored, username }, refreshTokenIsPersistent(slot));
 }
 
 export function clearLiteRefreshToken(slot: number): void {
@@ -282,6 +301,42 @@ export async function liteTokenLogin(params: {
 }
 
 /**
+ * Second half of the OAuth redirect flow (lib/auth/lite-oauth.ts): trades the
+ * authorization code for tokens at the endpoint discovery named, which is
+ * Stalwart's own `/auth/token` or the external provider's. Mirrors the POST
+ * branch of app/api/auth/token/route.ts, minus the server hop; a public
+ * client, so PKCE stands in for the secret.
+ */
+export async function liteExchangeAuthorizationCode(params: {
+  tokenEndpoint: string;
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  clientId: string;
+}): Promise<LiteTokens> {
+  const response = await fetch(params.tokenEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: params.code,
+      client_id: params.clientId,
+      redirect_uri: params.redirectUri,
+      code_verifier: params.codeVerifier,
+    }).toString(),
+  });
+  const tokens = (await response.json().catch(() => ({}))) as TokenResponse;
+  if (!response.ok || !tokens.access_token) {
+    throw new LiteLoginError('token_exchange_failed', response.status, tokens.error);
+  }
+  return {
+    accessToken: tokens.access_token,
+    expiresIn: tokens.expires_in || 3600,
+    refreshToken: tokens.refresh_token ?? null,
+  };
+}
+
+/**
  * Renews the slot's access token. A rejected refresh token clears the slot and
  * throws `refresh_rejected`; a network failure or 5xx propagates untouched so
  * callers treat it as an outage, not a sign-out.
@@ -291,7 +346,7 @@ export async function liteRefreshTokens(slot: number, clientIdOverride?: string)
   if (!stored) throw new LiteLoginError('refresh_rejected', 401, 'no refresh token');
   const clientId = clientIdOverride || stored.clientId || getLiteClientId();
 
-  const response = await fetch(`${stored.serverUrl}/auth/token`, {
+  const response = await fetch(stored.tokenEndpoint || `${stored.serverUrl}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
