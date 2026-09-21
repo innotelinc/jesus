@@ -26,12 +26,15 @@ import {
   clearLiteRefreshToken,
   clearLiteSlot,
   getLiteClientId,
+  liteExchangeAuthorizationCode,
   liteRefreshTokens,
   liteTokenLogin,
+  nameLiteRefreshToken,
   readLiteBasicSession,
   saveLiteBasicSession,
   saveLiteRefreshToken,
 } from '@/lib/auth/lite-tokens';
+import { clearLiteOAuthFlow, readLiteOAuthFlow } from '@/lib/auth/lite-oauth';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -290,6 +293,63 @@ async function exchangePasswordForTokens(params: {
       clearLiteRefreshToken(slot);
     }
     return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn, has_refresh_token: !!tokens.refreshToken });
+  } catch (err) {
+    if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
+    throw err;
+  }
+}
+
+/** POST /api/auth/token?slot=N - redeem an OAuth authorization code for `slot`. */
+async function exchangeOAuthCode(params: {
+  serverUrl: string;
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  slot: number;
+  serverId?: string;
+}): Promise<Response> {
+  const { serverUrl, code, codeVerifier, redirectUri, slot, serverId } = params;
+  if (!IS_LITE) {
+    return apiFetch(`/api/auth/token?slot=${slot}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: redirectUri,
+        slot,
+        ...(serverId ? { server_id: serverId } : {}),
+      }),
+    });
+  }
+  // The login page parked where and as whom to redeem the code
+  // (lib/auth/lite-oauth.ts); without it this is not a flow we started. A
+  // code is good for one attempt, so the flow goes either way.
+  const flow = readLiteOAuthFlow();
+  clearLiteOAuthFlow();
+  if (!flow) return jsonResponse({ error: 'missing_flow' }, 400);
+  try {
+    const tokens = await liteExchangeAuthorizationCode({
+      tokenEndpoint: flow.tokenEndpoint,
+      code,
+      codeVerifier,
+      redirectUri: flow.redirectUri,
+      clientId: flow.clientId,
+    });
+    // The username is filled in once the session names the account
+    // (nameLiteRefreshToken in loginWithOAuth).
+    if (tokens.refreshToken) {
+      saveLiteRefreshToken(slot, {
+        serverUrl,
+        username: '',
+        refreshToken: tokens.refreshToken,
+        clientId: flow.clientId,
+        tokenEndpoint: flow.tokenEndpoint,
+      }, flow.persistent);
+    } else {
+      clearLiteRefreshToken(slot);
+    }
+    return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn });
   } catch (err) {
     if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
     throw err;
@@ -1120,6 +1180,10 @@ export const useAuthStore = create<AuthState>()(
       loginWithOAuth: async (serverUrl, code, codeVerifier, redirectUri, serverId) => {
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
 
+        // Lite: the slot whose refresh token this attempt wrote, until the
+        // session has named its account.
+        let unnamedLiteSlot: number | null = null;
+
         try {
           // Determine slot for this account (use slot from sessionStorage if re-adding).
           // Note: `parseInt(getItem(...) || '0')` collapses "no value set" and
@@ -1137,21 +1201,12 @@ export const useAuthStore = create<AuthState>()(
             ? pendingSlot
             : accountStore.getNextCookieSlot();
 
-          const tokenRes = await apiFetch(`/api/auth/token?slot=${slot}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              code_verifier: codeVerifier,
-              redirect_uri: redirectUri,
-              slot,
-              ...(serverId ? { server_id: serverId } : {}),
-            }),
-          });
+          const tokenRes = await exchangeOAuthCode({ serverUrl, code, codeVerifier, redirectUri, slot, serverId });
 
           if (!tokenRes.ok) {
             throw new Error('token_exchange_failed');
           }
+          if (IS_LITE) unnamedLiteSlot = slot;
 
           const { access_token, expires_in } = await tokenRes.json();
 
@@ -1165,6 +1220,10 @@ export const useAuthStore = create<AuthState>()(
           // preferred_username claim rather than the real email address.
           // Prefer the email from the primary identity when available.
           const username = primaryIdentity?.email || jmapUsername;
+          if (IS_LITE) {
+            nameLiteRefreshToken(slot, username);
+            unnamedLiteSlot = null;
+          }
           initializeFeatureStores(client);
 
           // Register in account store
@@ -1249,6 +1308,9 @@ export const useAuthStore = create<AuthState>()(
           return true;
         } catch (error) {
           debug.error('OAuth login error:', error);
+          // The code was redeemed but the session never came up: nothing owns
+          // the refresh token the exchange stored.
+          if (unnamedLiteSlot !== null) clearLiteRefreshToken(unnamedLiteSlot);
           const errorMsg = error instanceof Error ? error.message : 'generic';
           notifyParent('sso:auth-failure', { error: errorMsg });
           set({

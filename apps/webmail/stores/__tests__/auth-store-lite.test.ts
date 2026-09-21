@@ -14,6 +14,7 @@ import * as browserNavigation from '@/lib/browser-navigation';
 import { useAuthStore } from '../auth-store';
 import { useAccountStore } from '../account-store';
 import { readLiteRefreshToken, readLiteBasicSession, saveLiteRefreshToken, saveLiteBasicSession } from '@/lib/auth/lite-tokens';
+import { readLiteOAuthFlow, saveLiteOAuthFlow } from '@/lib/auth/lite-oauth';
 
 type FetchInput = Parameters<typeof fetch>[0];
 type FetchInit = Parameters<typeof fetch>[1];
@@ -307,5 +308,91 @@ describe('auth-store in the static Lite build', () => {
     // logout() runs asynchronously after the 401.
     await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false));
     expect(readLiteRefreshToken(0)).toBeNull();
+  });
+
+  describe('OAuth sign-in (Lite on Stalwart)', () => {
+    const PROVIDER_TOKEN = 'https://id.example.org/token';
+    const REDIRECT = 'https://mail.example.com/webmail/oauth/callback';
+
+    beforeEach(() => {
+      // A bearer client learns its account from the session, which the mocked connect() never loads.
+      vi.spyOn(JMAPClient.prototype, 'getUsername').mockReturnValue('alice@example.com');
+    });
+
+    /** Serves the external provider's token endpoint; anything on our origin throws. */
+    function providerFetch(answer: () => Response = () => jsonResponse({ access_token: 'AT-sso', expires_in: 600, refresh_token: 'RT-sso' })) {
+      const calls: { url: string; params: Record<string, string> }[] = [];
+      vi.stubGlobal('fetch', vi.fn(async (input: FetchInput, init?: FetchInit) => {
+        const url = String(input);
+        if (url === '/config.json') return jsonResponse({ jmapServerUrl: SERVER });
+        if (url === '/policy.json') return jsonResponse({});
+        if (url.startsWith('/')) throw new Error(`Lite must not call its own origin: ${url}`);
+        if (url !== PROVIDER_TOKEN) throw new Error(`unexpected fetch ${url}`);
+        calls.push({ url, params: Object.fromEntries(new URLSearchParams(String(init?.body))) });
+        return answer();
+      }));
+      return calls;
+    }
+
+    it('redeems the code at the provider the login page discovered and remembers where to renew', async () => {
+      const calls = providerFetch();
+      saveLiteOAuthFlow({ tokenEndpoint: PROVIDER_TOKEN, clientId: 'app-client', redirectUri: REDIRECT, persistent: true });
+      sessionStorage.setItem('oauth_cookie_slot', '0');
+
+      const ok = await useAuthStore.getState().loginWithOAuth(SERVER, 'CODE', 'VERIFIER', REDIRECT);
+
+      expect(ok).toBe(true);
+      expect(calls).toEqual([{
+        url: PROVIDER_TOKEN,
+        params: { grant_type: 'authorization_code', code: 'CODE', client_id: 'app-client', redirect_uri: REDIRECT, code_verifier: 'VERIFIER' },
+      }]);
+      const state = useAuthStore.getState();
+      expect(state.authMode).toBe('oauth');
+      expect(state.client?.getAuthHeader()).toBe('Bearer AT-sso');
+      // Named after the session, renewed at the provider, kept across restarts.
+      expect(readLiteRefreshToken(0)).toEqual({
+        serverUrl: SERVER, username: 'alice@example.com', refreshToken: 'RT-sso', clientId: 'app-client', tokenEndpoint: PROVIDER_TOKEN,
+      });
+      expect(localStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
+      // A code is good for one attempt.
+      expect(readLiteOAuthFlow()).toBeNull();
+
+      calls.length = 0;
+      await useAuthStore.getState().refreshAccessToken();
+      expect(calls.map((c) => [c.url, c.params.grant_type, c.params.client_id])).toEqual([[PROVIDER_TOKEN, 'refresh_token', 'app-client']]);
+    });
+
+    it('keeps the token with the tab when "remember me" was not ticked', async () => {
+      providerFetch();
+      saveLiteOAuthFlow({ tokenEndpoint: PROVIDER_TOKEN, clientId: 'app-client', redirectUri: REDIRECT, persistent: false });
+
+      expect(await useAuthStore.getState().loginWithOAuth(SERVER, 'CODE', 'VERIFIER', REDIRECT)).toBe(true);
+
+      expect(localStorage.getItem('bulwark-lite:refresh:0')).toBeNull();
+      expect(sessionStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
+    });
+
+    it('refuses a callback it did not start', async () => {
+      const calls = providerFetch();
+
+      expect(await useAuthStore.getState().loginWithOAuth(SERVER, 'CODE', 'VERIFIER', REDIRECT)).toBe(false);
+
+      expect(calls).toEqual([]);
+      expect(useAuthStore.getState().error).toBe('token_exchange_failed');
+      expect(liteStorageKeys()).toEqual([]);
+    });
+
+    it('leaves no token behind when the provider rejects the code or the session never comes up', async () => {
+      providerFetch(() => jsonResponse({ error: 'invalid_grant' }, 400));
+      saveLiteOAuthFlow({ tokenEndpoint: PROVIDER_TOKEN, clientId: 'app-client', redirectUri: REDIRECT, persistent: true });
+      expect(await useAuthStore.getState().loginWithOAuth(SERVER, 'CODE', 'VERIFIER', REDIRECT)).toBe(false);
+      expect(liteStorageKeys()).toEqual([]);
+
+      providerFetch();
+      connectSpy.mockRejectedValueOnce(new Error('Failed to get session: 401'));
+      saveLiteOAuthFlow({ tokenEndpoint: PROVIDER_TOKEN, clientId: 'app-client', redirectUri: REDIRECT, persistent: true });
+      expect(await useAuthStore.getState().loginWithOAuth(SERVER, 'CODE', 'VERIFIER', REDIRECT)).toBe(false);
+      expect(liteStorageKeys()).toEqual([]);
+    });
   });
 });

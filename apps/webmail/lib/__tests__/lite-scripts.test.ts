@@ -425,6 +425,16 @@ describe('Stalwart target: entry document logic (runs in the browser)', () => {
     expect(resolveStalwartBoot('/webmail/en/auth', '/webmail', locales, shells, 'de')?.canonical).toBe('/webmail/en/');
   });
 
+  it('boots the callback for the locale-free OAuth redirect URI', () => {
+    expect(resolveStalwartBoot('/webmail/oauth/callback', '/webmail', locales, shells, 'de')).toEqual({ locale: 'de', shell: 'de/auth/callback/index.html', canonical: '/webmail/de/auth/callback/' });
+    expect(resolveStalwartBoot('/webmail/oauth/callback/', '/webmail', locales, shells, 'en')?.shell).toBe('en/auth/callback/index.html');
+    expect(resolveStalwartBoot('/oauth/callback', '', locales, shells, 'en')?.canonical).toBe('/en/auth/callback/');
+    // Nothing else below `oauth`, and not in a bundle without the callback shell.
+    expect(resolveStalwartBoot('/webmail/oauth', '/webmail', locales, shells, 'en')?.shell).toBe('en/index.html');
+    expect(resolveStalwartBoot('/webmail/oauth/callback/x', '/webmail', locales, shells, 'en')?.shell).toBe('en/index.html');
+    expect(resolveStalwartBoot('/webmail/oauth/callback', '/webmail', locales, shells.filter((s: string) => s !== 'auth/callback'), 'en')?.shell).toBe('en/index.html');
+  });
+
   it('works at the site root and refuses paths outside the mount', () => {
     expect(resolveStalwartBoot('/en/mail', '', locales, shells, 'de')?.shell).toBe('en/mail/index.html');
     expect(resolveStalwartBoot('/', '', locales, shells, 'de')?.canonical).toBe('/de/');
