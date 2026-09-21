@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.11.0-beta.2 (2026-09-21) - Pre-release
+
+Second test release for **Bulwark Lite**. Not recommended for production; the `latest` Docker tag stays on 1.10.0.
+
+### Added
+
+- Toasts for mail actions that had no feedback, plus an "email sent" toast after immediate sends.
+- Deep links resolve to the local instance.
+
+### Fixed
+
+- A staged attachment is kept until its upload finishes.
+- Toasts show again.
+
 ## 1.11.0-beta.1 (2026-09-19) - Pre-release
 
 Test release for **Bulwark Lite**, the static build of the webmail. Not recommended for production; the `latest` Docker tag stays on 1.10.0.
