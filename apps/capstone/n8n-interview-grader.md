@@ -463,6 +463,24 @@ Gotchas surfaced and fixed in the verified workflow:
    node fail on an undefined URL. The `Has transcript URL?` guard node now
    short-circuits those payloads (0 items → clean run) before the fetch.
 
+### When Grist has no rows (a grade that never happened)
+
+This failure is quiet by construction: dograh only records that n8n *accepted*
+its POST, so `webhook_deliveries` reads `succeeded / 200` while the run itself
+died at *Fetch transcript* and `Interviews` stayed empty. The fetch is the only
+step that depends on the outside world, and it breaks two ways:
+
+* **the URL's host no longer runs this stack** — `transcript_url` is rendered
+  from `PUBLIC_BASE_URL` at hang-up, so a payload recorded before a move keeps
+  the old address (`http://<old-lan-ip>:8000/…`) forever; and
+* **the edge's `/voice-audio` route points somewhere that is no longer MinIO** —
+  see `docs/networking.md` → the media prefix. Fix this first, or every replay
+  below fails the same way.
+
+`scripts/regrade-interviews.py` lists both (`--dry-run`) and then replays the
+recorded payload for each run that has no row yet, so interviews missed while
+the route was broken can be graded without re-running the calls.
+
 > Verified end-to-end on 2026-08-20 against the real stack (n8n 2.x, Grist,
 > OmniRoute on `20128`, and local Ollama): webhook → transcript fetch →
 > keyed `model: auto` grading → parse → Grist row landed successfully

@@ -12,6 +12,10 @@ Checks, per https://<sub>.<NPM_BASE_DOMAIN>/ (STRICT TLS — no cert skipping):
     machine traffic, the OIDC redirect target, the IdP, or WS signaling)
   • the embedded outpost is reachable through each gated vhost
     (/outpost.goauthentik.io/ping → 204)
+  • the media prefix (/voice-audio) on the hosts that proxy it reaches MinIO
+    (an S3 XML body, not the edge's error page) — transcripts and recordings
+    are unsigned URLs on the app hosts, so a stale upstream there only ever
+    shows up as a failed transcript fetch at grading time
 
 Exit 0 only when every host passes; exit 1 otherwise (CI-friendly).
 
@@ -75,6 +79,21 @@ def fetch(url: str, timeout: int) -> tuple[int, str | None]:
             return resp.status, resp.headers.get("Location")
     except urllib.error.HTTPError as e:
         return e.code, e.headers.get("Location")
+
+
+def fetch_body(url: str, timeout: int) -> tuple[int, str]:
+    """Strict-TLS GET that does not follow redirects: (status, body preview).
+
+    The body is what tells a service's own answer from a proxy's failure page —
+    NPM rewrites the Server header on what it proxies, so that one says
+    `openresty` either way.
+    """
+    req = urllib.request.Request(url, headers={"User-Agent": "capstone-npm-smoke/1.0"})
+    try:
+        with OPENER.open(req, timeout=timeout) as resp:
+            return resp.status, resp.read(600).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, (e.read(600) or b"").decode("utf-8", "replace")
 
 
 def is_sso_redirect(location: str | None, signin_base: str) -> bool:
@@ -196,6 +215,26 @@ def main() -> int:
         print(f"{domain:45} {verdict} ({note})")
         if verdict == "FAIL":
             failed.append(domain)
+
+    # 2. The media prefix, through the same vhosts that serve the app. Any
+    # answer MinIO itself produces is fine (a bucket listing, or an S3 error
+    # document for a name it does not have), so the test is "did an S3 XML body
+    # come back" rather than any particular status. What must not come back is
+    # the edge's own HTML error page, which is all a forward_host that no longer
+    # runs MinIO can produce.
+    for h in [x for x in hosts if x["key"] in mod.MEDIA_HOST_KEYS]:
+        sub = h["sub"]
+        domain = base_domain if sub is None else f"{sub}.{base_domain}"
+        label = f"{domain}{mod.MEDIA_PATH}/"
+        try:
+            status, body = fetch_body(f"https://{label}", args.timeout)
+            ok = "<ListBucketResult" in body or "<Error>" in body
+            note = f"{status} {'MinIO' if ok else 'edge, not MinIO'}"
+        except (urllib.error.URLError, OSError, ssl.SSLError) as e:
+            ok, note = False, f"connect: {getattr(e, 'reason', e)}"
+        print(f"{label:45} {'PASS' if ok else 'FAIL'} ({note})")
+        if not ok:
+            failed.append(label)
 
     print()
     if failed:

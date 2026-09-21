@@ -176,6 +176,11 @@ HOSTS: list[dict[str, Any]] = [
 MEDIA_PATH = "/voice-audio"
 MEDIA_PORT = 9200
 MEDIA_LOCATION_ADVANCED = "limit_except GET HEAD OPTIONS { deny all; }"
+# Which app origins also serve the media prefix. Shared with
+# npm-smoke-test.py, which probes this route through the edge — the failure it
+# guards against (the edge forwarding the prefix to a host that no longer runs
+# MinIO) is a 502 at transcript-download time, long after the sync looked fine.
+MEDIA_HOST_KEYS = {"apex", "app", "dograh"}
 
 
 def media_location(upstream: str) -> dict[str, Any]:
@@ -527,7 +532,7 @@ def main() -> int:
     # and the others are the same UI under a different name, so a recording URL
     # resolves whichever one the operator opened.
     for h in hosts:
-        if h["key"] in {"apex", "app", "dograh"}:
+        if h["key"] in MEDIA_HOST_KEYS:
             h.setdefault("locations", [media_location(upstream)])
     if args.ws_scheme is not None or args.ws_port is not None:
         for h in hosts:
@@ -625,7 +630,16 @@ def main() -> int:
             cert_id = ensure_cert(api, [domain], le_email, dns_provider, dns_credentials,
                                   args.check, certs_by_domain, failed)
             if cert_id is None:
-                continue
+                if not args.check:
+                    continue
+                # --check only. A host that had no certificate used to be
+                # skipped outright, so EVERY other field on it went unchecked —
+                # which is how a /voice-audio upstream left pointing at the
+                # host the stack used to run on stayed invisible while the
+                # grader's transcript fetches 502'd. Keep the host's own
+                # certificate id so the missing cert isn't reported twice, and
+                # let the diff below report whatever else has drifted.
+                cert_id = (existing or {}).get("certificate_id") if existing else None
 
         want = desired(domain, h, upstream, cert_id, ssl)
         if existing is None:

@@ -48,6 +48,19 @@ Notes:
   `http://127.0.0.1:5678` (same host), so it works internally today. Only
   proxy n8n if you want remote editor access or webhooks from outside the
   LAN.
+- **The media prefix (`/voice-audio`)** — recordings and transcripts live in
+  MinIO and the API hands out unsigned `MINIO_PUBLIC_ENDPOINT/<bucket>/<key>`
+  URLs, i.e. `https://<app host>/voice-audio/...`. The same vhost that serves
+  the UI proxies that one prefix, so `scripts/npm-proxy-hosts.py` attaches a
+  `location /voice-audio` forwarding to **this stack's** LAN address on `9200`
+  (`NPM_UPSTREAM_HOST`, else `PJSIP_MEDIA_ADDRESS`) — a host address, never
+  `localhost`, because the edge is a different machine. That address is an
+  input, not a constant: run the sync from this host, or set
+  `NPM_UPSTREAM_HOST`, because a sync from anywhere else pins the edge to
+  *that* machine. Drift there is quiet — the sync looks clean and the only
+  symptom is every transcript download 502ing at grading time, hours later.
+  `npm-proxy-hosts.py --check` reports it, and `npm-smoke-test.py` probes the
+  prefix through each app host.
 - **OmniRoute (`20128`)** holds the LLM API key and is bound to `127.0.0.1` and
   this host's docker0 (`172.17.0.1`) — **not** the LAN. It stopped being reachable
   by address when its host split from the stack, because the dashboard's own login
