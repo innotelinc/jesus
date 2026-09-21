@@ -140,17 +140,21 @@ HOSTS: list[dict[str, Any]] = [
     # SSO-gated rows: the port is the app's oauth2-proxy gateway (`<key>-sso` in
     # docker-compose.yml), not the app's own — FreePBX, n8n, Grist, Grafana and the
     # Workflow Studio have no OIDC of their own and the gateway is what performs
-    # the Authentik code flow in front of them.
-    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 14014, "websocket": False, "name": "FreePBX (+ AvantFAX at /fax) — via SSO gateway"},
-    {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 14010, "websocket": True,  "name": "n8n — via SSO gateway"},
-    {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 14011, "websocket": False, "name": "Grist — via SSO gateway"},
+    # the Authentik code flow in front of them. `gated` is the machine-readable
+    # form of that "via SSO gateway" in the name: npm-smoke-test.py reads it to
+    # decide whether an unauthenticated request must bounce into the IdP, so a
+    # host that is gated but not flagged here is reported healthy while serving
+    # its app to anyone. Absent = not gated.
+    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 14014, "websocket": False, "gated": True, "name": "FreePBX (+ AvantFAX at /fax) — via SSO gateway"},
+    {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 14010, "websocket": True,  "gated": True, "name": "n8n — via SSO gateway"},
+    {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 14011, "websocket": False, "gated": True, "name": "Grist — via SSO gateway"},
     # OmniRoute holds the LLM API key — docs/networking.md: keep it internal.
     # No DNS record exists for it; sync only when explicitly included.
     {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
     # Grafana holds the port the SigNoz UI had (14012, and 3301 behind the
     # gateway), so the name changed but nothing about the forward did.
-    {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "name": "Grafana — via SSO gateway"},
-    {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "name": "Workflow Studio — via SSO gateway"},
+    {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "gated": True, "name": "Grafana — via SSO gateway"},
+    {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "gated": True, "name": "Workflow Studio — via SSO gateway"},
     # subscribe.<domain> → the shared Innotel subscribe portal (one nginx on
     # :3040 that picks the page by Host header). Public by design — pricing and
     # checkout are public; no Authentik gate on the subscribe pages.
@@ -510,8 +514,19 @@ def main() -> int:
     base_domain = (args.base_domain or cfg(args, "NPM_BASE_DOMAIN", "")).strip().lstrip(".")
     # Stack convention (central stack-lib.sh): explicit wins, else the LAN IP,
     # else the PBX media address from .env.
-    upstream = (args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
-                or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", ""))
+    explicit_upstream = args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
+    upstream = explicit_upstream or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+    if upstream and not explicit_upstream:
+        # Say it out loud. That fallback is THIS process's LAN address, which is
+        # only the right forward target when the stack runs here — run the sync
+        # from an edge or an admin box and every proxy host, the media prefix
+        # included, is pinned to that machine. Nothing reports it afterwards:
+        # the hosts keep answering, and only the transcript downloads 502, long
+        # after anyone is looking at the sync output.
+        print(f"WARN forwarding to this machine's LAN address {upstream} — no "
+              f"NPM_UPSTREAM_HOST / --upstream-host given. Only correct when the "
+              f"stack runs on this host; set NPM_UPSTREAM_HOST to the host that "
+              f"runs it to make the choice explicit.", file=sys.stderr)
     le_email = args.letsencrypt_email or cfg(args, "NPM_LETSENCRYPT_EMAIL", "") or cfg(args, "GRIST_ADMIN_EMAIL", "")
     include_raw = (args.include_optional or cfg(args, "NPM_INCLUDE_OPTIONAL", "")).lower()
 

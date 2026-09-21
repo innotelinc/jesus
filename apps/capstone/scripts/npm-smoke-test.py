@@ -5,13 +5,19 @@ Checks, per https://<sub>.<NPM_BASE_DOMAIN>/ (STRICT TLS — no cert skipping):
 
   • DNS resolves
   • TLS handshake + certificate validity (system trust store)
-  • UI hosts (app, pbx, n8n, grist, grafana, workflow) return 302 → the
-    Cerulean Authentik outpost sign-in (forward-auth gate active)
-  • open hosts (api, dashboard/admin, auth, voice, apex) respond WITHOUT
-    being gated (200/302-to-auth-flow/404/307 are all fine — they serve
-    machine traffic, the OIDC redirect target, the IdP, or WS signaling)
-  • the embedded outpost is reachable through each gated vhost
-    (/outpost.goauthentik.io/ping → 204)
+  • gated hosts (the ones flagged `gated` in npm-proxy-hosts.py — FreePBX, n8n,
+    Grist, Grafana, Workflow Studio) bounce an unauthenticated request into the
+    IdP, by either handshake this stack uses:
+      – the Authentik outpost (302 → /outpost.goauthentik.io/start, which must
+        also answer /ping with 204 and then reach an /application/o/authorize/
+        that renders), or
+      – an oauth2-proxy gateway (302 → the IdP's /application/o/authorize/
+        carrying THIS host's /oauth2/callback as redirect_uri, which must
+        render rather than reject the callback)
+  • open hosts (everything else: api, dashboard/admin, auth, voice, apex, the
+    app and the media prefix) respond WITHOUT being gated (200/302-to-auth-flow/
+    404/307 are all fine — they serve machine traffic, the OIDC redirect target,
+    the IdP, or WS signaling)
   • the media prefix (/voice-audio) on the hosts that proxy it reaches MinIO
     (an S3 XML body, not the edge's error page) — transcripts and recordings
     are unsigned URLs on the app hosts, so a stale upstream there only ever
@@ -35,7 +41,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -81,8 +87,8 @@ def fetch(url: str, timeout: int) -> tuple[int, str | None]:
         return e.code, e.headers.get("Location")
 
 
-def fetch_body(url: str, timeout: int) -> tuple[int, str]:
-    """Strict-TLS GET that does not follow redirects: (status, body preview).
+def fetch_body(url: str, timeout: int) -> tuple[int, str, str | None]:
+    """Strict-TLS GET that does not follow redirects: (status, body, Location).
 
     The body is what tells a service's own answer from a proxy's failure page —
     NPM rewrites the Server header on what it proxies, so that one says
@@ -91,9 +97,11 @@ def fetch_body(url: str, timeout: int) -> tuple[int, str]:
     req = urllib.request.Request(url, headers={"User-Agent": "capstone-npm-smoke/1.0"})
     try:
         with OPENER.open(req, timeout=timeout) as resp:
-            return resp.status, resp.read(600).decode("utf-8", "replace")
+            return (resp.status, resp.read(600).decode("utf-8", "replace"),
+                    resp.headers.get("Location"))
     except urllib.error.HTTPError as e:
-        return e.code, (e.read(600) or b"").decode("utf-8", "replace")
+        return (e.code, (e.read(600) or b"").decode("utf-8", "replace"),
+                e.headers.get("Location"))
 
 
 def is_sso_redirect(location: str | None, signin_base: str) -> bool:
@@ -104,6 +112,51 @@ def is_sso_redirect(location: str | None, signin_base: str) -> bool:
     return "outpost.goauthentik.io/start" in location and (
         not auth_host or loc_host == auth_host
     )
+
+
+# Five hosts are gated by an oauth2-proxy gateway instead of an outpost (see the
+# `gated` rows in npm-proxy-hosts.py). Those answer an unauthenticated request
+# with a 302 straight into the IdP's authorization endpoint that carries THIS
+# host's own /oauth2/callback as redirect_uri — which is what makes "the gate is
+# on" provable without a session: the redirect hands the browser to an OIDC
+# authorize URL whose callback is this very host.
+AUTHORIZE_PATH = "/application/o/authorize/"
+
+
+def is_oauth2_proxy_redirect(location: str | None, host: str) -> bool:
+    """A 302 into the IdP for THIS host (the oauth2-proxy handshake)."""
+    if not location:
+        return False
+    parsed = urlparse(location)
+    if AUTHORIZE_PATH not in parsed.path:
+        return False
+    query = parse_qs(parsed.query)
+    if not (query.get("client_id") or [""])[0]:
+        return False
+    return urlparse((query.get("redirect_uri") or [""])[0]).netloc == host
+
+
+def check_oauth2_proxy_chain(authorize_url: str, timeout: int) -> tuple[str, str]:
+    """The authorize call the gateway handed out must render, not reject us.
+
+    Same #5922-shaped failure the outpost walk asserts: a redirect_uri the
+    provider does not own comes back as HTTP 400 "Redirect URI Error" before any
+    login — which still *looks* like a working gate from outside.
+    """
+    idp = urlparse(authorize_url).netloc
+    try:
+        status, body, location = fetch_body(authorize_url, timeout)
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError, ssl.SSLError) as e:
+        return "FAIL", f"authorize {idp}: {getattr(e, 'code', e)}"
+    if status == 400 and "redirect" in body.lower():
+        return "FAIL", "authorize rejected the redirect_uri (400)"
+    # Either answer is a working gate: the login page itself (200), or the
+    # provider moving the browser on into its flow (3xx) — which is what this
+    # IdP does. Anything else (4xx/5xx) is the gate failing, not gating.
+    if 200 <= status < 400:
+        target = urlparse(location or "").path or "login"
+        return "PASS", f"oauth2-proxy → {idp} authorize ok ({status} → {target})"
+    return "FAIL", f"authorize returned {status}"
 
 
 def check_sso_chain(start_url: str, signin_base: str, timeout: int) -> str | None:
@@ -168,6 +221,8 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
             if chain_error:
                 return "FAIL", chain_error
             return "PASS", "SSO redirect + outpost ping 204 + authorize ok"
+        if is_oauth2_proxy_redirect(location, domain):
+            return check_oauth2_proxy_chain(location, timeout)
         if status < 500:
             return "FAIL", f"NOT gated — served {status} without SSO"
         return "FAIL", f"upstream error {status}"
@@ -210,7 +265,7 @@ def main() -> int:
     for h in hosts:
         sub = h["sub"]
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
-        gated = h.get("forward_auth") is not False
+        gated = bool(h.get("gated"))
         verdict, note = check_host(domain, gated, signin_base, args.timeout)
         print(f"{domain:45} {verdict} ({note})")
         if verdict == "FAIL":
@@ -227,7 +282,7 @@ def main() -> int:
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
         label = f"{domain}{mod.MEDIA_PATH}/"
         try:
-            status, body = fetch_body(f"https://{label}", args.timeout)
+            status, body, _ = fetch_body(f"https://{label}", args.timeout)
             ok = "<ListBucketResult" in body or "<Error>" in body
             note = f"{status} {'MinIO' if ok else 'edge, not MinIO'}"
         except (urllib.error.URLError, OSError, ssl.SSLError) as e:

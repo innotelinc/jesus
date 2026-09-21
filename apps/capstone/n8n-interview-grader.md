@@ -481,6 +481,32 @@ step that depends on the outside world, and it breaks two ways:
 recorded payload for each run that has no row yet, so interviews missed while
 the route was broken can be graded without re-running the calls.
 
+### Proving it end to end, on a real call
+
+A replay proves the n8n half. Only a real call proves the half that broke
+quietly — that dograh renders a `transcript_url`, writes the transcript, and
+POSTs it — and both halves are scripted, so this needs no phone:
+
+```sh
+python3 scripts/gen_loops.py --pbx <pbx-container>        # candidate audio, once
+python3 scripts/place_call.py 8001 candidate-devops 150   # 8000 IT · 8001 DevOps · 8002 SQL
+```
+
+Then read the four things in order. A Grist row is the last of them, and each
+earlier one is where it stops when something is wrong:
+
+| Check | What says it worked |
+|---|---|
+| `workflow_runs` | a new row, `mode = ari`, then `is_completed = true` |
+| `webhook_deliveries` | dograh's own POST: `succeeded`, `last_status_code 200` |
+| n8n executions | status `success` (an error here is the transcript fetch) |
+| Grist `Interviews` | a row for that `run_id`, with the transcript stored |
+
+Assert on the row arriving, not on the score: the loop answers from a fixed
+script, so it never actually answers the agent's scenarios and every dimension
+grades "not demonstrated". A floor score on a real transcript is the harness
+working, not the grader failing.
+
 > Verified end-to-end on 2026-08-20 against the real stack (n8n 2.x, Grist,
 > OmniRoute on `20128`, and local Ollama): webhook → transcript fetch →
 > keyed `model: auto` grading → parse → Grist row landed successfully
