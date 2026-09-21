@@ -85,7 +85,6 @@ export default [
       "public/**/*.js",
       "*.config.js",
       "*.config.mjs",
-      "e2e/**",
       "local-data/**/*.mjs",
       "benchmark/**",
       "examples/**",
