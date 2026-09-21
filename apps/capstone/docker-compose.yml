@@ -540,6 +540,30 @@ services:
   # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
   # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
   omniroute:
+    # THE GATEWAY RUNS ON ITS OWN HOST — NOT ON EVERY HOST THAT RUNS THIS FILE.
+    #
+    # Everything that makes it *this* gateway — its provider connections, its
+    # settings, the dashboard password hash, and the `server.env` key that
+    # decrypts them — lives in one volume, and that volume sits beside the
+    # gateway, not beside the stack talking to it. A stack on another host does
+    # NOT start a second gateway; it pins the address of the identity-aware
+    # door in front of the real one (`OMNIROUTE_URL`, see .env.example). The
+    # gateway's host starts this service deliberately:
+    #
+    #     docker compose --profile gateway up -d omniroute
+    #
+    # MEASURED, and why this is a profile rather than only a comment. A second
+    # gateway started from this file on the app host answered requests exactly
+    # the way a working one does while holding *zero* connections:
+    # `provider_connections`=0, every key rejected `401 invalid_api_key`, and
+    # its data dir in the container's writable layer (volume mounted at `/data`
+    # while the image reads `DATA_DIR=/app/data`). It looked healthy, it
+    # published the same ports, and nothing downstream could tell it apart from
+    # the real gateway except by the answers it never routed. That is the
+    # `/data`-vs-`/app/data` failure one layer up; the cure is the same one —
+    # make the wrong configuration impossible to start, rather than detectable
+    # afterwards.
+    profiles: ["gateway"]
     image: ${OMNIROUTE_IMAGE:-diegosouzapw/omniroute:latest}
     container_name: omniroute
     restart: unless-stopped

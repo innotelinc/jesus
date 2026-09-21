@@ -132,6 +132,27 @@ ari_base() {
   [[ -n "$host" ]] && printf 'http://%s:8088' "$host"
 }
 
+# The LLM gateway's own host. The gateway is the one service a stack does not
+# have to run locally: its volume (provider connections, settings, the key that
+# decrypts them) lives beside it on its own host, and every other host reaches
+# it through the identity-aware door that host publishes — `OMNIROUTE_URL`, the
+# same value the stack's own consumers dial. So the address is asked for, never
+# assumed: a local container or an answering 20128 wins on the gateway's host,
+# otherwise the configured door is used. Empty means neither could name one.
+gateway_base() {
+  local c
+  if [[ -n "$(docker ps -q --filter 'label=com.docker.compose.service=omniroute' 2>/dev/null | head -1)" ]]; then
+    printf 'http://127.0.0.1:20128'; return
+  fi
+  # 200 or 401 both prove something is listening on the gateway's own port.
+  c=$(http_code http://127.0.0.1:20128/v1/models)
+  if [[ "$c" == "200" || "$c" == "401" ]]; then printf 'http://127.0.0.1:20128'; return; fi
+  if [[ -n "${OMNIROUTE_URL:-}" ]]; then
+    printf '%s' "${OMNIROUTE_URL%/}"
+    return
+  fi
+}
+
 # Container health: healthy if the compose healthcheck says so; falls back to
 # "running" for images without a healthcheck. Looks up by compose service
 # first (project-scoped), then by the compose service label so containers
@@ -166,7 +187,7 @@ host_port_check() { # service → echoes "port" if a host process answers
       [[ "$c" == "200" ]] && echo "127.0.0.1:9000" ;;
     omniroute)
       local c; c=$(http_code http://127.0.0.1:20128/v1/models)
-      [[ "$c" == "200" ]] && echo "127.0.0.1:20128" ;;
+      if [[ "$c" == "200" || "$c" == "401" ]]; then echo "127.0.0.1:20128"; fi ;;
     dograh-api)
       local c; c=$(http_code http://127.0.0.1:8000/api/v1/health)
       [[ -n "$c" && "$c" != "000" ]] && echo "127.0.0.1:8000" ;;
@@ -179,6 +200,24 @@ check_container() { # compose_file service
   case "$state" in
     healthy|running) pass "container $2 is $state" ;;
     missing)
+      # The gateway is the one service a stack need not run locally: it lives on
+      # its own host, behind the `gateway` compose profile. A reachable door is
+      # the real check, and an *unreachable* one is worth a hard fail — because
+      # the failure this guards against is a second gateway answering locally
+      # while the real one is never consulted.
+      if [[ "$2" == "omniroute" ]]; then
+        local gw c
+        gw=$(gateway_base)
+        if [[ -n "$gw" && "$gw" != "http://127.0.0.1:20128" ]]; then
+          c=$(http_code "$gw/v1/models")
+          if [[ "$c" == "200" || "$c" == "401" ]]; then
+            pass "omniroute runs on its own host — $gw answered (HTTP $c)"
+          else
+            fail "omniroute is configured on another host ($gw) but did not answer (HTTP ${c:-none})"
+          fi
+          return
+        fi
+      fi
       hp=$(host_port_check "$2")
       if [[ -n "$hp" ]]; then
         pass "$2 not containerized — host process serving $hp"
@@ -264,6 +303,13 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   check_http "Speaches STT /health"     200 "http://127.0.0.1:8001/health"
   check_http "Dograh API /health"       200 "http://127.0.0.1:8000/api/v1/health"
   check_http "Dograh UI :3010"          200 "http://127.0.0.1:3010/" -L
+  # The gateway may run here or on its own host; `gateway_base` names whichever
+  # it is, so these checks are about the gateway this stack *uses* rather than
+  # about a container this host happens to have.
+  GATEWAY=$(gateway_base)
+  if [[ -z "$GATEWAY" ]]; then
+    fail "LLM gateway: no local container/port and no OMNIROUTE_URL — the gateway (and so every AI call) has no address"
+  fi
   llm_model_args=()
   if [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
     llm_model_args+=(-H "Authorization: Bearer ${OMNIROUTE_API_KEY}")
@@ -273,15 +319,20 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   # OMNIROUTE_API_KEY set — the chat-completions round-trip below is the real
   # probe. Anything else non-200 is a stack failure.
   llm_models_code=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
-    "${llm_model_args[@]}" http://127.0.0.1:20128/v1/models 2>/dev/null || echo 000)
+    "${llm_model_args[@]}" "${GATEWAY:-http://127.0.0.1:20128}/v1/models" 2>/dev/null || echo 000)
   if [[ "$llm_models_code" == "200" ]]; then
-    pass "LLM gateway /v1/models → HTTP 200"
+    pass "LLM gateway $GATEWAY/v1/models → HTTP 200"
   elif [[ "$llm_models_code" == "401" ]]; then
-    warn "LLM gateway /v1/models → HTTP 401 — model listing is session-gated by design; /v1/chat/completions is the real probe"
+    warn "LLM gateway $GATEWAY/v1/models → HTTP 401 — model listing is session-gated by design; /v1/chat/completions is the real probe"
   else
-    fail "LLM gateway /v1/models → expected HTTP 200, got '$llm_models_code'"
+    fail "LLM gateway $GATEWAY/v1/models → expected HTTP 200, got '$llm_models_code'"
   fi
-  check_http "LLM gateway dashboard"    200 "http://127.0.0.1:20128/" -L
+  # The dashboard on the gateway's own port is loopback-only, and on its own
+  # host the door in front of it needs Authentik; only ask for the local
+  # dashboard when the gateway is the local one.
+  if [[ "$GATEWAY" == "http://127.0.0.1:20128" ]]; then
+    check_http "LLM gateway dashboard"    200 "$GATEWAY/" -L
+  fi
   check_http "n8n /healthz"             200 "http://127.0.0.1:5678/healthz"
   check_http "n8n grader webhook"        200 "http://127.0.0.1:5678/webhook/interview-graded" -X POST -H "Content-Type: application/json" -d '{}'
   check_http "Grist :8484"              200 "http://127.0.0.1:8484/" -L

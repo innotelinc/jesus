@@ -107,6 +107,17 @@ On a host other than the one running the proxy, pin that host's LAN address in `
 (`OMNIROUTE_URL=http://192.168.1.46:20129`) — `host.docker.internal` resolves to the
 local docker0, where nothing listens.
 
+The proxy's host is the only host that runs the `omniroute` service: it is behind the
+`gateway` compose profile, so `docker compose up -d` elsewhere leaves it alone and the
+gateway's own host starts it with `docker compose --profile gateway up -d omniroute`.
+Both sides are load-bearing. Running a second gateway on an app host used to be a silent
+failure — it answers requests the way a working one does while holding no connections
+(`provider_connections`=0, every key `401 invalid_api_key`) and, if its volume is
+mounted anywhere other than the image's `DATA_DIR`, keeps that state in the container's
+writable layer where the next recreate discards it. `scripts/smoke-test.sh` now checks
+the gateway this stack actually uses (the door, when it is not local) rather than the
+container this host happens to have.
+
 ## PBX / Asterisk side
 
 FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports

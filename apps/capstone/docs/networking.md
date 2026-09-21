@@ -72,6 +72,15 @@ Notes:
   `host.docker.internal:20129`; a stack on another host pins the LAN address of
   the proxy's host in `.env`. See `docs/operations.md` → Addressing, and
   `5-dev/olympus/docs/gateway-sso.md`.
+
+  Only the gateway's host runs the `omniroute` service itself. It sits behind the
+  `gateway` compose profile — `docker compose --profile gateway up -d omniroute`
+  there, plain `docker compose up -d` everywhere else — so an app host cannot
+  quietly start a second gateway beside the real one. That mistake is invisible
+  from the outside: a second gateway answers requests the way a working one does
+  while holding no connections at all (`provider_connections`=0, every key
+  `401 invalid_api_key`), which is how a predecessor of this stack lost its
+  provider credentials to a `docker compose up -d` on the wrong host.
 - **dograh API (`8000`)** runs in host network mode on its original uvicorn
   port — the PBX reaches it back via `host.docker.internal:8000` media
   WebSocket and the n8n container calls it via the LAN IP. The **dograh UI

@@ -249,6 +249,23 @@ SERVICE_META: dict[str, dict[str, Any]] = {
     },
 }
 
+def _gateway_probe() -> tuple[str, float]:
+    """Where to measure the gateway from *here*.
+
+    The gateway's volume lives on its own host, and every other host reaches it
+    through the identity-aware door that host publishes — `OMNIROUTE_URL`, the
+    same knob `grading` and `workflows` dial. Only on the gateway's own host is
+    there an `omniroute` container to probe by name, so asking for the container
+    unconditionally reports the gateway down on every other host while the AI
+    features beside it route through the door without a problem. When the
+    deployment names a door, the door is what gets measured.
+    """
+    url = (os.environ.get("OMNIROUTE_URL") or "").strip()
+    if url:
+        return (url.rstrip("/") + "/", 0.6)
+    return ("http://omniroute:20128/", 0.6)
+
+
 # HTTP endpoints used to measure real per-service latency from inside the
 # bridge. Key = compose service label. Any container not listed uses a stable
 # deterministic fallback instead of probing.
@@ -259,7 +276,7 @@ LATENCY_PROBES: dict[str, tuple[str, float]] = {
     "prometheus": ("http://prometheus:9090/-/healthy", 0.6),
     "tts-shim": ("http://tts-shim:8880/health", 0.6),
     "n8n": ("http://n8n:5678/healthz", 0.6),
-    "omniroute": ("http://omniroute:20128/", 0.6),
+    "omniroute": _gateway_probe(),
     "kokoro-fastapi": ("http://kokoro-fastapi:8880/health", 0.6),
     "speaches": ("http://speaches:8000/health", 0.6),
     "workflow-studio": ("http://workflow-studio:8090/", 0.6),
