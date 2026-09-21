@@ -18,6 +18,7 @@ import {
   buildLiteConfig,
   buildLitePolicy,
   buildManifest,
+  buildNginxContainerTemplate,
   buildNginxExample,
   buildNotFoundShim,
   buildReadme,
@@ -57,6 +58,7 @@ import {
 import { collectTestPaths, planRemovals, runPrepare } from '../../scripts/lite/prepare.mjs';
 import { runPostbuild } from '../../scripts/lite/postbuild.mjs';
 import { verifyExport } from '../../scripts/lite/verify.mjs';
+import { stageContainer } from '../../scripts/lite/container.mjs';
 import { LITE_PENDING_PATH_KEY as APP_LITE_PENDING_PATH_KEY } from '../lite';
 
 /** The scripts take `process.env`-shaped input; tests pass plain objects. */
@@ -181,6 +183,25 @@ describe('lite build helpers', () => {
     expect(readme).toContain('currently `https://m.example`');
   });
 
+  it('renders the container nginx template with every header in every header-bearing location', () => {
+    const conf = buildNginxContainerTemplate();
+    expect(conf).toContain('listen 8080;');
+    // Filled in by the image: the IPv6 listen line and the CSP's connect-src.
+    expect(conf).toContain('\n    ${LITE_LISTEN_IPV6}\n');
+    expect(conf).toContain("connect-src 'self' ${LITE_CSP_CONNECT_SRC}; frame-src");
+    // Every other $ belongs to nginx; the image limits envsubst to LITE_*.
+    expect([...conf.matchAll(/\$\{(\w+)\}/g)].map((m) => m[1]).filter((name) => !name.startsWith('LITE_'))).toEqual([]);
+    expect(conf).toContain('try_files $uri $uri/ $uri/index.html /$locale/$surface/index.html;');
+    expect(conf).toContain('(?<surface>mail|calendar|contacts|files|settings)');
+    expect(conf).toContain('error_page 404 /404.html;');
+    expect(conf).toContain('absolute_redirect off;');
+    // add_header in a location drops the inherited set: server, /_next/static/ and /connector.json each carry it.
+    expect(conf.match(/add_header Content-Security-Policy /g)).toHaveLength(3);
+    expect(conf.match(/add_header X-Content-Type-Options nosniff always;/g)).toHaveLength(3);
+    // The CSP is one double-quoted nginx string.
+    expect(conf).not.toMatch(/Content-Security-Policy "[^"\n]*"[^;\n]*"/);
+  });
+
   it('flags server endpoints outside the documented allowlist', () => {
     expect(unexpectedApiStrings(['/api/config', '/api/plugins/x', '/api/push/register/web'])).toEqual([]);
     expect(unexpectedApiStrings(['/api/brand-new-thing', '/api/config'])).toEqual(['/api/brand-new-thing']);
@@ -280,6 +301,39 @@ describe('prepare / postbuild / verify against a fake checkout', () => {
       // A new, undocumented endpoint in a chunk is a verification failure.
       writeFileSync(join(out, '_next', 'static', 'chunks', 'new.js'), 'apiFetch("/api/brand-new")');
       expect(verifyExport({ root }).problems.join('\n')).toContain('/api/brand-new');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stages the container image content from a root-mounted static export only', () => {
+    const root = makeRepo();
+    try {
+      const out = join(root, 'out');
+      for (const surface of ['mail', 'calendar', 'contacts', 'files', 'settings', 'login']) {
+        mkdirSync(join(out, 'en', surface), { recursive: true });
+        writeFileSync(join(out, 'en', surface, 'index.html'), '<html></html>');
+      }
+      expect(() => stageContainer({ root, log: () => {} })).toThrow(/run `npm run build:lite` first/);
+
+      runPostbuild({ root, env: env({ NEXT_PUBLIC_BASE_PATH: '/w' }), log: () => {} });
+      expect(() => stageContainer({ root, log: () => {} })).toThrow(/serves from \/, out\/ was built with NEXT_PUBLIC_BASE_PATH=\/w/);
+
+      runPostbuild({ root, env: env({}), log: () => {} });
+      const dest = join(root, 'image');
+      // A stale file from an earlier staging must not survive.
+      mkdirSync(join(dest, 'html'), { recursive: true });
+      writeFileSync(join(dest, 'html', 'stale.txt'), '');
+      stageContainer({ root, dest, log: () => {} });
+      expect(readFileSync(join(dest, 'default.conf.template'), 'utf8')).toBe(buildNginxContainerTemplate());
+      for (const file of ['config.json', 'policy.json', 'connector.json', '404.html', 'lite-build.json', 'en/mail/index.html']) {
+        expect(existsSync(join(dest, 'html', ...file.split('/'))), file).toBe(true);
+      }
+      for (const file of ['_redirects', '_headers', 'nginx.conf.example', 'Caddyfile.example', 'LITE-README.md', 'stale.txt']) {
+        expect(existsSync(join(dest, 'html', file)), file).toBe(false);
+      }
+      // out/ itself is left alone: the zip is packed from it.
+      expect(existsSync(join(out, '_headers'))).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
