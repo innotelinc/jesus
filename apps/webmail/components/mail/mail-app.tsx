@@ -33,6 +33,7 @@ import { connectedAccountsGrew } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore, buildUnifiedAccountClients, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId } from "@/stores/email-store";
 import { toast } from "@/stores/toast-store";
+import { runBatchEmailAction } from "@/lib/email-action-toast";
 import { MailboxShareDialog } from "@/components/layout/mailbox-share-dialog";
 import { ShareNotificationToaster } from "@/components/layout/share-notification-toaster";
 import { CalendarEventNotificationToaster } from "@/components/layout/calendar-event-notification-toaster";
@@ -51,7 +52,7 @@ import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { useBrowserNavigation, type NavSnapshot } from "@/hooks/use-browser-navigation";
 import { debug } from "@/lib/debug";
 import { playNotificationSound } from "@/lib/notification-sound";
-import { cn } from "@/lib/utils";
+import { cn, getMailboxPath } from "@/lib/utils";
 import { localizeMailboxName } from "@/lib/mailbox-label";
 import { KEYWORD_PREFIX, KEYWORD_PREFIX_LEGACY, groupEmailsByThread } from "@/lib/thread-utils";
 import { resolveThreadRoute } from "@/lib/thread-routing";
@@ -704,15 +705,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     onArchive: async () => {
       if (isScheduledView) return;
       if (selectedEmailIds.size > 0 && client) {
-        try {
-          await batchArchive(client);
-        } catch (error) {
-          console.error("Failed to batch archive:", error);
-          if (error instanceof ArchiveMailboxNotFoundError) {
-            const { toast } = await import('sonner');
-            toast.error(t('email_viewer.archive_mailbox_not_found'));
-          }
-        }
+        const count = selectedEmailIds.size;
+        await runBatchEmailAction(() => batchArchive(client), {
+          success: t('notifications.emails_archived', { count }),
+          error: t('notifications.error_archiving'),
+          describeError: (error) => error instanceof ArchiveMailboxNotFoundError
+            ? t('email_viewer.archive_mailbox_not_found')
+            : undefined,
+        });
       } else if (selectedEmail) {
         handleArchive();
       }
@@ -738,11 +738,11 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
           variant: "destructive",
         });
         if (!confirmed) return;
-        try {
-          await batchDelete(client, permanent);
-        } catch (error) {
-          console.error("Failed to batch delete:", error);
-        }
+        const count = selectedEmailIds.size;
+        await runBatchEmailAction(() => batchDelete(client, permanent), {
+          success: t('notifications.emails_deleted', { count }),
+          error: t('notifications.error_deleting'),
+        });
       } else if (selectedEmail) {
         handleDelete();
       }
@@ -778,11 +778,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         try {
           if (isInJunk) {
             await batchUndoSpam(client, ids);
+            toast.success(t('email_viewer.spam.toast_not_spam_batch', { count: ids.length }));
           } else {
             await batchMarkAsSpam(client, ids);
+            toast.success(t('email_viewer.spam.toast_batch', { count: ids.length }));
           }
         } catch (error) {
           console.error("Failed to batch toggle spam:", error);
+          toast.error(t(isInJunk ? 'email_viewer.spam.error_not_spam' : 'email_viewer.spam.error'));
         }
       } else if (selectedEmail) {
         if (isInJunk) {
@@ -1713,8 +1716,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         // removing the old draft) was rejected - warn instead of staying
         // silent, so a stale draft row is not mistaken for a failed send
         // and re-sent (#592).
-        const toastInstance = (await import('sonner')).toast;
-        toastInstance.warning(t('email_composer.send_filing_warning'));
+        toast.warning(t('email_composer.send_filing_warning'));
       }
       // Mark the original email with $answered or $forwarded keyword. Route the
       // write to the email's own account so the flag lands on shared/group-mailbox
@@ -2178,8 +2180,10 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
 
       try {
         await deleteEmail(client, emailToDelete.id, true);
+        toast.success(t('notifications.email_deleted'));
       } catch (error) {
         console.error("Failed to permanently delete email:", error);
+        toast.error(t('notifications.error_deleting'), error instanceof Error ? error.message : undefined);
       }
     } else {
       // Not in trash: always move to trash (in the email's own account). Scope
@@ -2199,13 +2203,12 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       if (trashMailbox) {
         try {
           await moveToMailbox(client, emailToDelete.id, trashMailbox.id);
+          toast.success(t('notifications.email_deleted'));
         } catch (error) {
           console.error("Failed to move email to trash:", error);
-          const { toast } = await import('sonner');
           toast.error(error instanceof Error ? error.message : 'Failed to move email to trash');
         }
       } else {
-        const { toast } = await import('sonner');
         toast.error('Trash mailbox not found - cannot move email to trash');
       }
     }
@@ -2243,7 +2246,6 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     // the selected shared folder's owner, otherwise the user's own archive. (#889)
     const archiveMailbox = findArchiveMailbox(currentMailboxes, selectedMailbox, archiveAccountId);
     if (!archiveMailbox) {
-      const { toast } = await import('sonner');
       toast.error(t('email_viewer.archive_mailbox_not_found'));
       return;
     }
@@ -2288,11 +2290,30 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         setConversationEmails([]);
       }
 
+      toast.success(t('notifications.email_archived'));
       void refreshMailboxes();
     } catch (error) {
       console.error("Failed to archive email:", error);
-      const { toast } = await import('sonner');
-      toast.error(error instanceof Error ? error.message : 'Failed to archive email');
+      toast.error(t('notifications.error_archiving'), error instanceof Error ? error.message : undefined);
+    }
+  };
+
+  const handleMoveToMailbox = async (emailId: string, mailboxId: string) => {
+    if (!client) return;
+    const destinationList = [mailboxes, ...Object.values(accountMailboxes)]
+      .find(list => list.some(m => m.id === mailboxId));
+    const destination = destinationList?.find(m => m.id === mailboxId);
+    try {
+      await moveToMailboxCrossAware(client, emailId, mailboxId);
+      toast.success(
+        t('notifications.email_moved'),
+        destination && destinationList
+          ? t('notifications.moved_to_mailbox', { mailbox: getMailboxPath(destination, destinationList) })
+          : undefined,
+      );
+    } catch (error) {
+      console.error("Failed to move email:", error);
+      toast.error(t('notifications.move_failed'), t('notifications.move_error'));
     }
   };
 
@@ -2303,6 +2324,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       await toggleStar(client, selectedEmail.id);
     } catch (error) {
       console.error("Failed to toggle star:", error);
+      toast.error(t('notifications.error_updating'));
     }
   };
 
@@ -2314,17 +2336,16 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     try {
       await markAsSpam(client, emailId);
 
-      const toastInstance = (await import('sonner')).toast;
-      toastInstance.success(t('email_viewer.spam.toast_success'), {
+      toast.success(t('email_viewer.spam.toast_success'), {
         action: {
           label: t('email_viewer.spam.toast_undo'),
           onClick: async () => {
             try {
               await undoSpam(client, emailId);
-              toastInstance.success(t('notifications.email_moved'));
+              toast.success(t('notifications.email_moved'));
             } catch (_error) {
               console.error("Failed to undo spam:", _error);
-              toastInstance.error(t('email_viewer.spam.error'));
+              toast.error(t('email_viewer.spam.error'));
             }
           },
         },
@@ -2332,8 +2353,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       });
     } catch (_error) {
       console.error("Failed to mark as spam:", _error);
-      const toastInstance = (await import('sonner')).toast;
-      toastInstance.error(t('email_viewer.spam.error'));
+      toast.error(t('email_viewer.spam.error'));
     }
   };
 
@@ -2343,12 +2363,10 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     try {
       await undoSpam(client, emailToRestore.id);
 
-      const toastInstance = (await import('sonner')).toast;
-      toastInstance.success(t('email_viewer.spam.toast_not_spam_success'));
+      toast.success(t('email_viewer.spam.toast_not_spam_success'));
     } catch (_error) {
       console.error("Failed to restore email:", _error);
-      const toastInstance = (await import('sonner')).toast;
-      toastInstance.error(t('email_viewer.spam.error_not_spam'));
+      toast.error(t('email_viewer.spam.error_not_spam'));
     }
   };
 
@@ -2379,6 +2397,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       }
     } catch (error) {
       console.error("Failed to toggle pin:", error);
+      toast.error(t('notifications.error_updating'));
     }
   };
 
@@ -4066,11 +4085,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                 onSetTag={(emailId, color) => {
                   handleSetTag(emailId, color);
                 }}
-                onMoveToMailbox={async (emailId, mailboxId) => {
-                  if (client) {
-                    await moveToMailboxCrossAware(client, emailId, mailboxId);
-                  }
-                }}
+                onMoveToMailbox={handleMoveToMailbox}
                 onMarkAsSpam={async (email) => {
                   await handleMarkAsSpam(email);
                 }}
@@ -4345,9 +4360,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                     mailboxes={mailboxes}
                     selectedMailbox={selectedMailbox}
                     onMoveToMailbox={async (mailboxId) => {
-                      if (client && selectedEmail) {
-                        await moveToMailboxCrossAware(client, selectedEmail.id, mailboxId);
-                      }
+                      if (selectedEmail) await handleMoveToMailbox(selectedEmail.id, mailboxId);
                     }}
                     className={isMobile ? "flex-1" : undefined}
                   />
