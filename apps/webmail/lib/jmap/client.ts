@@ -507,6 +507,11 @@ export function isConcurrentRequestRefusal(status: number, body: string): boolea
 /** Base back-off per attempt when the server refuses a request for being one too many in parallel. */
 const CONCURRENT_REQUEST_RETRY_DELAYS_MS = [200, 400, 800];
 
+/** Ids asked for per FileNode/query page; Stalwart clamps it to queryMaxResults (5000 by default). */
+const FILE_NODE_QUERY_PAGE = 5000;
+/** Safety bound on how many FileNode ids one listing pages through. */
+const FILE_NODE_MAX_IDS = 200_000;
+
 function computeHasMore(position: number, emailCount: number, total: number, limit: number): boolean {
   if (total > 0) return (position + emailCount) < total;
   return emailCount === limit;
@@ -7144,8 +7149,8 @@ export class JMAPClient implements IJMAPClient {
   }
 
   async listFileNodes(parentId: string | null): Promise<FileNode[]> {
-    // FileNode/query omits folder nodes in Stalwart (see listAllFileNodes), so
-    // we enumerate the whole account and filter children client-side.
+    // FileNode/query omits folder nodes on older Stalwart (see listAllFileNodes),
+    // so we enumerate the whole account and filter children client-side.
     const all = await this.listAllFileNodes();
     return all.filter(n => (n.parentId ?? null) === parentId);
   }
@@ -7154,17 +7159,34 @@ export class JMAPClient implements IJMAPClient {
    * Fetch every FileNode in the account, files AND folders, to build the folder
    * hierarchy client-side from parentId links.
    *
-   * IMPORTANT: this uses `FileNode/get` with `ids: null` (return-all), NOT
-   * `FileNode/query`. Stalwart's FileNode/query only returns leaf files - it
-   * omits container (folder) nodes entirely - so a query-based listing made
-   * every folder invisible (the whole account looked like a single root file).
+   * IMPORTANT: this starts from `FileNode/get` with `ids: null` (return-all),
+   * NOT `FileNode/query`. Before Stalwart 0.16.6, FileNode/query only returns
+   * leaf files - it omits container (folder) nodes entirely - so a query-based
+   * listing made every folder invisible (the whole account looked like a
+   * single root file).
    */
   async listAllFileNodes(): Promise<FileNode[]> {
-    const accountId = this.getFilesAccountId();
+    const nodes = await this.fetchAllFileNodes(this.getFilesAccountId());
+    return nodes.map(withDecodedName);
+  }
+
+  /**
+   * Every raw FileNode of one account, past the server's /get ceiling.
+   *
+   * `FileNode/get { ids: null }` stops at maxObjectsInGet (500 by default) and
+   * Stalwart gives no sign that the list was cut, so larger accounts silently
+   * lost files (#1069). A full first page therefore counts as truncated: the
+   * remaining ids come from paging FileNode/query and are fetched in /get-sized
+   * batches. Stalwart before 0.16.6 leaves folders out of FileNode/query, so
+   * parents that are still unknown afterwards are fetched by id.
+   */
+  private async fetchAllFileNodes(accountId: string): Promise<FileNode[]> {
+    const using = this.fileUsing();
+    const properties = JMAPClient.FILE_NODE_PROPERTIES;
 
     const response = await this.request(
-      [["FileNode/get", { accountId, ids: null, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"]],
-      this.fileUsing(),
+      [["FileNode/get", { accountId, ids: null, properties }, "fng0"]],
+      using,
     );
 
     const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get" || (r[0] === "error" && r[2] === "fng0"));
@@ -7172,7 +7194,68 @@ export class JMAPClient implements IJMAPClient {
       console.error('[Files] FileNode/get error:', getResult?.[1]);
       throw new Error(getResult?.[1]?.description || "FileNode list failed");
     }
-    return ((getResult[1].list || []) as FileNode[]).map(withDecodedName);
+    const firstPage = (getResult[1].list || []) as FileNode[];
+    const maxObjects = this.getMaxObjectsInGet();
+    if (firstPage.length < maxObjects) return firstPage;
+
+    const known = new Map(firstPage.map(node => [node.id, node]));
+    // Several /get calls share one request, so a large account costs a few
+    // round trips rather than one per batch - the tree is re-read on every
+    // navigation.
+    const fetchByIds = async (ids: string[]) => {
+      const calls = batched(ids, maxObjects).map((batch, i): JMAPMethodCall =>
+        ["FileNode/get", { accountId, ids: batch, properties }, `fng${i + 1}`]);
+      for (const group of batched(calls, this.getMaxCallsInRequest())) {
+        const batchResponse = await this.request(group, using);
+        for (const result of batchResponse.methodResponses || []) {
+          if (result[0] !== "FileNode/get") {
+            throw new Error(result[1]?.description || "FileNode/get failed");
+          }
+          for (const node of (result[1].list || []) as FileNode[]) known.set(node.id, node);
+        }
+      }
+    };
+
+    try {
+      const missing = new Set<string>();
+      for (let position = 0; position < FILE_NODE_MAX_IDS;) {
+        const queryResponse = await this.request(
+          [["FileNode/query", { accountId, filter: {}, position, limit: FILE_NODE_QUERY_PAGE, calculateTotal: true }, "fnq0"]],
+          using,
+        );
+        const queryResult = queryResponse.methodResponses?.[0];
+        if (!queryResult || queryResult[0] !== "FileNode/query") {
+          throw new Error(queryResult?.[1]?.description || "FileNode/query failed");
+        }
+        // The server may clamp `limit`, so only an empty page or a reached
+        // total ends the listing - never a page shorter than the one asked for.
+        const pageIds = (queryResult[1].ids || []) as string[];
+        if (pageIds.length === 0) break;
+        for (const id of pageIds) {
+          if (!known.has(id)) missing.add(id);
+        }
+        position += pageIds.length;
+        const total = queryResult[1].total;
+        if (typeof total === "number" && position >= total) break;
+      }
+      await fetchByIds([...missing]);
+
+      const asked = new Set<string>();
+      for (;;) {
+        const parents = new Set<string>();
+        for (const node of known.values()) {
+          if (node.parentId && !known.has(node.parentId) && !asked.has(node.parentId)) parents.add(node.parentId);
+        }
+        if (parents.size === 0) break;
+        for (const id of parents) asked.add(id);
+        await fetchByIds([...parents]);
+      }
+    } catch (error) {
+      // A partial tree beats none: keep what was read, as before #1069.
+      console.warn(`[Files] Listing for account ${accountId} is incomplete past ${maxObjects} nodes:`, error);
+    }
+
+    return [...known.values()];
   }
 
   /**
@@ -7191,13 +7274,7 @@ export class JMAPClient implements IJMAPClient {
       const isPrimary = accountId === primaryId;
       const account = this.accounts[accountId];
       try {
-        const response = await this.request(
-          [["FileNode/get", { accountId, ids: null, properties: JMAPClient.FILE_NODE_PROPERTIES }, "fng0"]],
-          this.fileUsing(),
-        );
-        const getResult = response.methodResponses?.find(r => r[0] === "FileNode/get");
-        if (!getResult || getResult[0] === "error") continue;
-        const nodes = (getResult[1].list || []) as FileNode[];
+        const nodes = await this.fetchAllFileNodes(accountId);
         for (const node of nodes) {
           all.push({
             ...withDecodedName(node),
