@@ -40,6 +40,37 @@ an Agents page that stopped paying one PBX round trip per agent, per row.
   with the command that reads each one's truth, because all three render as the
   same browser message.
 
+### A recreated identity no longer locks its owner out of sign-in
+
+- **Fixed: an email clash during OIDC provisioning turned the whole sign-in
+  into "Sign-in could not be completed".** The callback inserts a local user
+  keyed on the provider subject and then writes the address onto it, but the
+  address carries a unique index (`ix_users_email_lower`) and that write was a
+  bare `UPDATE` — so any row already holding the address made the statement
+  raise, and the callback converts *any* exception during provisioning into a
+  generic `?error=failed` redirect. Reaching it needs no operator mistake: an
+  account deleted and recreated at the provider gets a **new** subject (the
+  subject is `sha256("{user_id}-{install_id}")`, so a rebuilt Authentik
+  instance changes *every* subject), and a password account later moved to SSO
+  carries no subject at all. The API now separates the two cases
+  (`UserClient.claim_user_email`): an address held by a **different subject** is
+  refused — the sign-in proceeds without changing the address, and the log
+  names both the address and the subject — because re-pointing that row would
+  hand the account to whoever controls the address at the provider. An address
+  held by a row with **no subject** is adopted: the subject is written onto it
+  and the empty row just created is removed, so the account keeps its id and
+  everything hanging off it. Travels as
+  `dograh/patches/0004-adopt-an-existing-email-instead-of-failing-sign-in.patch`.
+- **New: `scripts/ci/sso-smoke.py`.** "Sign-in could not be completed" is the
+  browser's message for every failure in the chain, so the chain is now walked
+  the way a browser walks it — login entry → Authentik flow → callback →
+  token → authenticated request — against a temporary, clearly-named identity
+  deleted in a `finally` block. Run it twice: the second pass presents the same
+  address under a new subject, which is the collision case above. On this box,
+  pass 1 `307 → … → /api/v1/auth/me 200`; pass 2 the same, with
+  `WARNING auth.py | … already belongs to another account — signing in without
+  changing the address` where the old code raised `UniqueViolationError`.
+
 ### Asterisk's own control frames stop logging as parse failures
 
 - **Fixed: every call logged `Failed to parse JSON message from Asterisk`.**

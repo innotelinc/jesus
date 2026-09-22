@@ -569,6 +569,40 @@ docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
     JOIN authentik_core_group g ON g.group_uuid=gu.group_id WHERE g.name='cerulean-platform';"
 ```
 
+**4. Provisioning can fail *after* admission succeeds.** The callback inserts a local row
+keyed on the provider subject and then writes the address onto it. The address carries a
+unique index, so an address already held by another row used to abort the sign-in with a
+`UniqueViolationError` that reached the browser as the same generic message. Two facts
+matter here: the subject is `sha256("{user_id}-{install_id}")` (`User.uid` in
+`authentik/core/models.py`), so **rebuilding Authentik — or recreating one account —
+changes the subject**, and a stored subject that no longer matches is the expected result
+of a provider rebuild rather than corruption. Since
+`dograh/patches/0004-adopt-an-existing-email-instead-of-failing-sign-in.patch`, only the
+*address* is refused in that case and the person is signed in under the new subject.
+
+```bash
+# which of the two outcomes the callback chose (neither is a failure)
+docker logs --since 10m dograh-api 2>&1 | grep -iE "UniqueViolation|already belongs|adopted"
+
+# the authoritative subject for an address — compare this, never the uuid
+# (uid is what the provider puts in `sub`; the uuid is a different value)
+docker exec <authentik-worker> /manage.py shell <<'PY'
+from authentik.core.models import User
+for u in User.objects.filter(email="someone@example.com"):
+    print(u.id, u.uid)
+PY
+```
+
+No admin API token is needed for the check above, and if one is wanted for the smoke test
+below, mint it the same way (`Token.objects.create(user=User.objects.get(username="akadmin"),
+intent=TokenIntents.INTENT_API, description="…")` — `Token.key` is the raw value). The
+end-to-end check needs no knowledge of `sub` at all:
+
+```bash
+AK_TOKEN=<authentik api token> SMOKE_PW=<random> python3 scripts/ci/sso-smoke.py
+# RESULT: a real sign-in completes — authorize -> callback -> token -> authenticated request.
+```
+
 ### Authentik groups per stack (and per-stack access)
 
 `scripts/authentik_bootstrap.py` creates one Authentik **Group** per product
