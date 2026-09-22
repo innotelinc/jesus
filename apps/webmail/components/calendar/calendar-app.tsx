@@ -63,6 +63,7 @@ import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } fro
 import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { SchedulingDeniedError } from "@/lib/jmap/scheduling-error";
 import { CreateCalendarModal } from "@/components/calendar/create-calendar-modal";
 import { getUserParticipantId, collectUserCalendarAddresses } from "@/lib/calendar-participants";
 import { generateBirthdayEvents, createBirthdayCalendar, BIRTHDAY_CALENDAR_ID } from "@/lib/birthday-calendar";
@@ -842,45 +843,59 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
     jumpTo(eventDate);
   }, [jumpTo]);
 
-  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => {
+  const handleSaveEvent = useCallback(async (data: Partial<CalendarEvent>, requestedScheduling?: boolean) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
-    try {
-      if (editEvent) {
-        if (isRecurringEvent(editEvent)) {
-          setPendingScopeAction({
-            type: "edit",
-            event: editEvent,
-            updates: data,
-            sendScheduling: sendSchedulingMessages,
-          });
-          setShowEventModal(false);
-          setEditEvent(null);
-          return;
-        }
-        await updateEvent(client, editEvent.id, data, sendSchedulingMessages);
-        if (data.start) {
-          focusCalendarOnEvent({ start: data.start });
-        }
-        toast.success(t("notifications.event_updated"));
-      } else {
-        const created = await createEvent(client, data, sendSchedulingMessages);
-        if (!created) {
-          toast.error(t("notifications.event_error"));
-          return;
-        }
-        focusCalendarOnEvent(created);
-        if (sendSchedulingMessages) {
-          toast.success(t("notifications.invitation_sent"));
+    const save = async (sendSchedulingMessages: boolean | undefined): Promise<void> => {
+      try {
+        if (editEvent) {
+          if (isRecurringEvent(editEvent)) {
+            setPendingScopeAction({
+              type: "edit",
+              event: editEvent,
+              updates: data,
+              sendScheduling: sendSchedulingMessages,
+            });
+            setShowEventModal(false);
+            setEditEvent(null);
+            return;
+          }
+          await updateEvent(client, editEvent.id, data, sendSchedulingMessages);
+          if (data.start) {
+            focusCalendarOnEvent({ start: data.start });
+          }
+          toast.success(t("notifications.event_updated"));
         } else {
-          toast.success(t("notifications.event_created"));
+          const created = await createEvent(client, data, sendSchedulingMessages);
+          if (!created) {
+            toast.error(t("notifications.event_error"));
+            return;
+          }
+          focusCalendarOnEvent(created);
+          if (sendSchedulingMessages) {
+            toast.success(t("notifications.invitation_sent"));
+          } else {
+            toast.success(t("notifications.event_created"));
+          }
         }
+        setShowEventModal(false);
+        setEditEvent(null);
+      } catch (error) {
+        // The server refuses to send the invitations (Stalwart 0.16.21+ fails
+        // the whole save then). Offer to keep the event without them.
+        if (error instanceof SchedulingDeniedError && sendSchedulingMessages) {
+          const ok = await confirmAction({
+            title: t("notifications.invitations_denied_title"),
+            message: t("notifications.invitations_denied", { reason: error.reason }),
+            confirmText: t("notifications.save_without_invitations"),
+          });
+          if (ok) await save(false);
+          return;
+        }
+        toast.error(t("notifications.event_error"));
       }
-      setShowEventModal(false);
-      setEditEvent(null);
-    } catch {
-      toast.error(t("notifications.event_error"));
-    }
-  }, [client, editEvent, createEvent, updateEvent, focusCalendarOnEvent, t]);
+    };
+    await save(requestedScheduling);
+  }, [client, editEvent, createEvent, updateEvent, focusCalendarOnEvent, confirmAction, t]);
 
   const handleDuplicateEvent = useCallback(async (data: Partial<CalendarEvent>) => {
     if (!client) { toast.error(t("notifications.event_error")); return; }
