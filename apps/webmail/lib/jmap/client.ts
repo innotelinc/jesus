@@ -517,6 +517,45 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
   return emailCount === limit;
 }
 
+interface JMAPMethodError {
+  type?: string;
+  description?: string;
+}
+
+/**
+ * The method errors of a send request. JMAP names a failed call `"error"`
+ * (RFC 8620 §3.6.2), not `"<Method>/error"`. An error after a created
+ * EmailSubmission comes from its implicit onSuccessUpdateEmail /
+ * onSuccessDestroyEmail call: the message has already left, so it is a filing
+ * problem, not a failed send (reporting it as one invites a duplicate resend).
+ */
+export function sendMethodErrors(
+  methodResponses: JMAPResponse['methodResponses'] | undefined,
+): { failure?: JMAPMethodError; filing?: JMAPMethodError } {
+  let submitted = false;
+  let failure: JMAPMethodError | undefined;
+  let filing: JMAPMethodError | undefined;
+  for (const [name, result] of methodResponses ?? []) {
+    if (name === 'EmailSubmission/set' && Object.keys(result?.created ?? {}).length > 0) {
+      submitted = true;
+    } else if (name === 'error') {
+      if (submitted) filing ??= result;
+      else failure ??= result;
+    }
+  }
+  return { failure, filing };
+}
+
+/** Throw on a method error of the query that a search request starts with. */
+function assertQuerySucceeded(response: JMAPResponse, what: string): void {
+  const [name, result] = response.methodResponses?.[0] ?? [];
+  if (name === 'error') {
+    const error = new Error(`${what} failed: ${result?.description || result?.type || 'unknown error'}`);
+    (error as Error & { jmapType?: string }).jmapType = result?.type;
+    throw error;
+  }
+}
+
 function hasSubmissionMethod(methodCalls: JMAPMethodCall[]): boolean {
   return methodCalls.some(([method]) => method.startsWith('Identity/') || method.startsWith('EmailSubmission/'));
 }
@@ -2889,6 +2928,7 @@ export class JMAPClient implements IJMAPClient {
         }, "1"],
         this.searchSnippetCall(targetAccountId, filter),
       ]);
+      assertQuerySucceeded(response, 'Search');
 
       const queryResponse = response.methodResponses?.[0]?.[1];
       const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
@@ -2908,8 +2948,9 @@ export class JMAPClient implements IJMAPClient {
 
       return { emails, hasMore, total };
     } catch (error) {
+      // Rethrow: an empty result would read as "No results found".
       console.error('Search failed:', error);
-      return { emails: [], hasMore: false, total: 0 };
+      throw error;
     }
   }
 
@@ -2970,6 +3011,7 @@ export class JMAPClient implements IJMAPClient {
         }, "1"],
         this.searchSnippetCall(targetAccountId, hasFilter ? filter : undefined),
       ]);
+      assertQuerySucceeded(response, 'Search');
 
       const queryResponse = response.methodResponses?.[0]?.[1];
       const emails = (response.methodResponses?.[1]?.[1]?.list || []) as Email[];
@@ -3616,13 +3658,18 @@ export class JMAPClient implements IJMAPClient {
     let serverSendAt: string | undefined;
     let filingError: string | undefined;
 
+    const { failure, filing } = sendMethodErrors(response.methodResponses);
+    if (failure) {
+      console.error('[sendEmail] JMAP method error:', failure);
+      throw new Error(failure.description || `Failed to send email: ${failure.type}`);
+    }
+    if (filing) {
+      console.error('[sendEmail] post-send method error:', filing);
+      filingError = filing.description || filing.type || 'post-send filing failed';
+    }
+
     if (response.methodResponses) {
       for (const [methodName, result] of response.methodResponses) {
-        if (methodName.endsWith('/error')) {
-          console.error('[sendEmail] JMAP method error:', methodName, result);
-          throw new Error(result.description || `Failed to send email: ${result.type}`);
-        }
-
         if (result.notCreated) {
           // Include method name + full error object so it's clear whether the
           // failure came from Email/set (draft create) or EmailSubmission/set
@@ -3890,12 +3937,14 @@ export class JMAPClient implements IJMAPClient {
 
     debug.log('calendar', '[iMIP] JMAP response:', JSON.stringify(response.methodResponses, null, 2));
 
+    const { failure: replyError } = sendMethodErrors(response.methodResponses);
+    if (replyError) {
+      debug.error('[iMIP] method error:', replyError);
+      throw new Error(replyError.description || `iMIP reply failed: ${replyError.type}`);
+    }
+
     if (response.methodResponses) {
-      for (const [methodName, result] of response.methodResponses) {
-        if (methodName.endsWith('/error')) {
-          debug.error('[iMIP] method error:', methodName, result);
-          throw new Error(result.description || `iMIP reply failed: ${result.type}`);
-        }
+      for (const [, result] of response.methodResponses) {
         if (result.notCreated) {
           const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
           debug.error('[iMIP] create error:', JSON.stringify(result.notCreated, null, 2));
@@ -4070,11 +4119,13 @@ export class JMAPClient implements IJMAPClient {
 
     const response = await this.request(methodCalls);
 
+    const { failure: invitationError } = sendMethodErrors(response.methodResponses);
+    if (invitationError) {
+      throw new Error(invitationError.description || `iMIP invitation failed: ${invitationError.type}`);
+    }
+
     if (response.methodResponses) {
-      for (const [methodName, result] of response.methodResponses) {
-        if (methodName.endsWith('/error')) {
-          throw new Error(result.description || `iMIP invitation failed: ${result.type}`);
-        }
+      for (const [, result] of response.methodResponses) {
         if (result.notCreated) {
           const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP invitation');
@@ -4224,11 +4275,13 @@ export class JMAPClient implements IJMAPClient {
 
     const response = await this.request(methodCalls);
 
+    const { failure: cancellationError } = sendMethodErrors(response.methodResponses);
+    if (cancellationError) {
+      throw new Error(cancellationError.description || `iMIP cancellation failed: ${cancellationError.type}`);
+    }
+
     if (response.methodResponses) {
-      for (const [methodName, result] of response.methodResponses) {
-        if (methodName.endsWith('/error')) {
-          throw new Error(result.description || `iMIP cancellation failed: ${result.type}`);
-        }
+      for (const [, result] of response.methodResponses) {
         if (result.notCreated) {
           const firstError = Object.values(result.notCreated)[0] as { description?: string; type?: string };
           throw new Error(firstError?.description || firstError?.type || 'Failed to send iMIP cancellation');
@@ -5011,7 +5064,7 @@ export class JMAPClient implements IJMAPClient {
       return { isValid: true };
     }
 
-    if (response.methodResponses?.[0]?.[0]?.endsWith('/error')) {
+    if (response.methodResponses?.[0]?.[0] === 'error') {
       const error = response.methodResponses[0][1];
       return { isValid: false, errors: [error.description || "Validation failed"] };
     }
@@ -8399,10 +8452,11 @@ export class JMAPClient implements IJMAPClient {
     let serverSendAt: string | undefined;
 
     // Check for errors
+    const { failure } = sendMethodErrors(response.methodResponses);
+    if (failure) {
+      throw new Error(failure.description || `Failed: ${failure.type}`);
+    }
     for (const [methodName, result] of response.methodResponses ?? []) {
-      if (methodName.endsWith('/error')) {
-        throw new Error((result as { description?: string }).description || `Failed: ${(result as { type?: string }).type}`);
-      }
       const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
       if (r.notCreated) {
         const firstErr = Object.values(r.notCreated)[0];
@@ -8486,10 +8540,11 @@ export class JMAPClient implements IJMAPClient {
     let emailSubmissionId: string | undefined;
     let serverSendAt: string | undefined;
 
+    const { failure } = sendMethodErrors(response.methodResponses);
+    if (failure) {
+      throw new Error(failure.description || `Failed: ${failure.type}`);
+    }
     for (const [methodName, result] of response.methodResponses ?? []) {
-      if (methodName.endsWith('/error')) {
-        throw new Error((result as { description?: string }).description || `Failed: ${(result as { type?: string }).type}`);
-      }
       const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
       if (r.notCreated) {
         const firstErr = Object.values(r.notCreated)[0];
