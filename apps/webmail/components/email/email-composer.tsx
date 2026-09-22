@@ -46,7 +46,7 @@ import { appendPlainTextSignature, getPlainTextSignature, plainTextBodyHasSignat
 import { findComposeIdentityId, findDraftIdentityId, findReplyIdentityId, resolveReplyFrom } from "@/lib/reply-identity";
 import { buildReplyRecipients, isSelfSent } from "@/lib/reply-recipients";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";
-import { RequestTimeoutError } from "@/lib/jmap/client";
+import { RequestTimeoutError, ScheduleTooLateError } from "@/lib/jmap/client";
 import {
   rewriteCidImagesForEditor,
   replaceInlineImagePlaceholders,
@@ -2387,7 +2387,9 @@ export function EmailComposer({
       toast.error(
         err instanceof RequestTimeoutError
           ? t('send_timeout')
-          : err instanceof Error ? err.message : t('send_failed')
+          : err instanceof ScheduleTooLateError
+            ? t('schedule_send_too_late')
+            : err instanceof Error ? err.message : t('send_failed')
       );
     } finally {
       isSendingRef.current = false;

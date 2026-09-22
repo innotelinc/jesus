@@ -107,6 +107,28 @@ export class RequestTimeoutError extends Error {
   }
 }
 
+/** A scheduled send later than the server's hold limit. */
+export class ScheduleTooLateError extends Error {
+  constructor(readonly maxSeconds?: number) {
+    super('Scheduled send time is later than the server allows');
+    this.name = 'ScheduleTooLateError';
+  }
+}
+
+/**
+ * Stalwart advertises `maxDelayedSend` as a fixed 30 days, while its MTA
+ * rejects any hold beyond the `futureRelease` limit, 7 days by default,
+ * with "501 5.5.4 Requested hold time exceeds maximum of N seconds".
+ */
+const STALWART_ADVERTISED_MAX_DELAYED_SEND = 30 * 24 * 60 * 60;
+const STALWART_DEFAULT_MAX_HOLD = 7 * 24 * 60 * 60;
+
+/** The hold limit named in a rejected submission, if that was the reason. */
+export function parseHoldLimit(description: string | undefined): number | null {
+  const m = description?.match(/hold time exceeds maximum of (\d+) seconds/i);
+  return m ? Number(m[1]) : null;
+}
+
 // JMAP protocol types - these are intentionally flexible due to server variations
 interface JMAPSession {
   // The authenticated login (JMAP spec Session.username) — server-confirmed,
@@ -762,6 +784,8 @@ export class JMAPClient implements IJMAPClient {
   // (keep-alive ping, SSE error handlers) cannot revive timers or
   // reconnect after an intentional sign-out (#588).
   private intentionallyDisconnected = false;
+  /** Hold limit learned from a rejected scheduled send (seconds). */
+  private learnedMaxDelayedSend: number | null = null;
   // Consecutive keep-alive failures; failed pings skip upcoming ticks
   // (30s -> 1m -> 2m -> ~5m) instead of hammering a down server (#588).
   private pingFailureCount = 0;
@@ -3686,6 +3710,7 @@ export class JMAPClient implements IJMAPClient {
             `[sendEmail] ${methodName} notCreated:`,
             JSON.stringify(errors, null, 2),
           );
+          this.throwIfHoldTooLong(firstError);
           const propsHint = firstError?.properties?.length
             ? ` (properties: ${firstError.properties.join(', ')})`
             : '';
@@ -4588,7 +4613,26 @@ export class JMAPClient implements IJMAPClient {
 
   getMaxDelayedSend(accountId?: string): number {
     const maxDelayedSend = this.getSubmissionCapability(accountId)?.maxDelayedSend;
-    return typeof maxDelayedSend === 'number' ? maxDelayedSend : 0;
+    if (typeof maxDelayedSend !== 'number' || maxDelayedSend <= 0) return 0;
+    if (this.learnedMaxDelayedSend !== null) return Math.min(maxDelayedSend, this.learnedMaxDelayedSend);
+    if (
+      maxDelayedSend === STALWART_ADVERTISED_MAX_DELAYED_SEND &&
+      this.hasAccountCapability('urn:stalwart:jmap', accountId)
+    ) {
+      return STALWART_DEFAULT_MAX_HOLD;
+    }
+    return maxDelayedSend;
+  }
+
+  /**
+   * Turn a "hold time exceeds maximum" rejection into ScheduleTooLateError
+   * and remember the limit, so the picker offers only times that work.
+   */
+  private throwIfHoldTooLong(error: { description?: string } | undefined): void {
+    const limit = parseHoldLimit(error?.description);
+    if (limit === null) return;
+    this.learnedMaxDelayedSend = limit;
+    throw new ScheduleTooLateError(limit);
   }
 
   hasDelayedSend(accountId?: string): boolean {
@@ -4615,7 +4659,7 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('Scheduled send is not supported for this account');
     }
     if (time > now + maxDelayedSend * 1000) {
-      throw new Error('Scheduled send time is later than the server allows');
+      throw new ScheduleTooLateError(maxDelayedSend);
     }
     return Math.ceil((time - now) / 1000);
   }
@@ -8460,6 +8504,7 @@ export class JMAPClient implements IJMAPClient {
       const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
       if (r.notCreated) {
         const firstErr = Object.values(r.notCreated)[0];
+        this.throwIfHoldTooLong(firstErr);
         throw new Error(firstErr?.description || firstErr?.type || 'Failed to send raw email');
       }
       if (methodName === 'Email/import') {
@@ -8548,6 +8593,7 @@ export class JMAPClient implements IJMAPClient {
       const r = result as { notCreated?: Record<string, { description?: string; type?: string }> };
       if (r.notCreated) {
         const firstErr = Object.values(r.notCreated)[0];
+        this.throwIfHoldTooLong(firstErr);
         throw new Error(firstErr?.description || firstErr?.type || 'Failed to submit raw email');
       }
       if (methodName === 'EmailSubmission/set') {
