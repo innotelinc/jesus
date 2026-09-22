@@ -657,6 +657,8 @@
     "upload_progress": "Завантаження {uploaded} / {total}",
     "upload_cancel": "Скасувати завантаження",
     "upload_failed": "Не вдалося завантажити {filename}",
+    "attachment_too_large": "«{name}» більший, ніж дозволяє сервер ({max} на файл)",
+    "attachments_total_too_large": "Вкладення перевищать ліміт сервера {max} на лист",
     "drop_files": "Перетягніть файли, щоб прикріпити",
     "show_less": "Показувати менше",
     "send_failed": "Не вдалося надіслати електронний лист",

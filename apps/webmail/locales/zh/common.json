@@ -657,6 +657,8 @@
     "upload_progress": "正在上传 {uploaded} / {total}",
     "upload_cancel": "取消上传",
     "upload_failed": "无法上传 {filename}",
+    "attachment_too_large": "“{name}”超过了服务器允许的大小（每个文件 {max}）",
+    "attachments_total_too_large": "附件将超过服务器每封邮件 {max} 的上限",
     "drop_files": "拖放要附加的文件",
     "show_less": "收起",
     "send_failed": "发送邮件失败",

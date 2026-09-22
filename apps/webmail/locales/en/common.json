@@ -660,6 +660,8 @@
     "upload_progress": "Uploading {uploaded} / {total}",
     "upload_cancel": "Cancel upload",
     "upload_failed": "Failed to upload {filename}",
+    "attachment_too_large": "\"{name}\" is larger than the server allows ({max} per file)",
+    "attachments_total_too_large": "The attachments would exceed the server's limit of {max} per message",
     "drop_files": "Drop files to attach",
     "show_less": "Show less",
     "send_failed": "Failed to send email",

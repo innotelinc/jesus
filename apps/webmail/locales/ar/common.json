@@ -660,6 +660,8 @@
     "upload_progress": "جارٍ الرفع {uploaded} / {total}",
     "upload_cancel": "إلغاء الرفع",
     "upload_failed": "فشل رفع {filename}",
+    "attachment_too_large": "\"{name}\" أكبر مما يسمح به الخادم ({max} لكل ملف)",
+    "attachments_total_too_large": "ستتجاوز المرفقات حد الخادم البالغ {max} لكل رسالة",
     "drop_files": "أفلت الملفات لإرفاقها",
     "show_less": "إظهار أقل",
     "send_failed": "فشل إرسال الرسالة",

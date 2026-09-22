@@ -660,6 +660,8 @@
     "upload_progress": "{uploaded} / {total}",
     "upload_cancel": "Байршуулалтыг цуцлах",
     "upload_failed": "{filename}",
+    "attachment_too_large": "\"{name}\" сервер зөвшөөрөхөөс том байна (нэг файлд {max})",
+    "attachments_total_too_large": "Хавсралтууд серверийн нэг захидалд ногдох {max} хязгаараас хэтэрнэ",
     "drop_files": "Файлуудыг хавсаргах",
     "show_less": "Бага харуулах",
     "send_failed": "Имэйл илгээж чадсангүй",

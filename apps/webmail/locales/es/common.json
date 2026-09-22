@@ -657,6 +657,8 @@
     "upload_progress": "Subiendo {uploaded} / {total}",
     "upload_cancel": "Cancelar subida",
     "upload_failed": "Error al subir {filename}",
+    "attachment_too_large": "\"{name}\" supera el tamaño que permite el servidor ({max} por archivo)",
+    "attachments_total_too_large": "Los adjuntos superarían el límite del servidor de {max} por mensaje",
     "send_failed": "Error al enviar el correo",
     "smime_sign_on": "Firma S/MIME activada",
     "smime_sign_off": "Firma S/MIME desactivada",

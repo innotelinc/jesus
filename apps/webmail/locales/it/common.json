@@ -657,6 +657,8 @@
     "upload_progress": "Caricamento {uploaded} / {total}",
     "upload_cancel": "Annulla caricamento",
     "upload_failed": "Caricamento di {filename} non riuscito",
+    "attachment_too_large": "\"{name}\" supera la dimensione consentita dal server ({max} per file)",
+    "attachments_total_too_large": "Gli allegati supererebbero il limite del server di {max} per messaggio",
     "send_failed": "Invio dell'e-mail non riuscito",
     "smime_sign_on": "Firma S/MIME attivata",
     "smime_sign_off": "Firma S/MIME disattivata",

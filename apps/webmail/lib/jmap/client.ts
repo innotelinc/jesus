@@ -4659,6 +4659,11 @@ export class JMAPClient implements IJMAPClient {
     return !!caps && capability in caps;
   }
 
+  getMaxSizeAttachmentsPerEmail(): number {
+    const mail = this.getAccountCapability("urn:ietf:params:jmap:mail") as { maxSizeAttachmentsPerEmail?: number } | undefined;
+    return mail?.maxSizeAttachmentsPerEmail || 0;
+  }
+
   getMaxSizeUpload(): number {
     const coreCapability = this.capabilities["urn:ietf:params:jmap:core"] as { maxSizeUpload?: number } | undefined;
     return coreCapability?.maxSizeUpload || 0;

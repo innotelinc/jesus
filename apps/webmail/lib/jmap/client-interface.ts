@@ -62,6 +62,8 @@ export interface IJMAPClient {
   /** FileNode naming rules the server publishes (Stalwart 0.16.6+), if any. */
   getFileNameRules?(accountId?: string): FileNameRules | null;
   getMaxSizeUpload(): number;
+  /** RFC 8621 maxSizeAttachmentsPerEmail of the mail account (0 = unknown). */
+  getMaxSizeAttachmentsPerEmail?(): number;
   getMaxCallsInRequest(): number;
   getMaxObjectsInGet(): number;
   getMaxObjectsInSet(): number;

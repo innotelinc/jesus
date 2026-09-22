@@ -659,6 +659,8 @@
     "upload_progress": "Uploader {uploaded} / {total}",
     "upload_cancel": "Annuller upload",
     "upload_failed": "Kunne ikke uploade {filename}",
+    "attachment_too_large": "\"{name}\" er større, end serveren tillader ({max} pr. fil)",
+    "attachments_total_too_large": "Vedhæftningerne ville overskride serverens grænse på {max} pr. besked",
     "drop_files": "Træk filer hertil for at vedhæfte",
     "show_less": "Vis mindre",
     "send_failed": "Kunne ikke sende e-mail",

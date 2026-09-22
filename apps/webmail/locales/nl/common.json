@@ -657,6 +657,8 @@
     "upload_progress": "Uploaden {uploaded} / {total}",
     "upload_cancel": "Upload annuleren",
     "upload_failed": "Uploaden van {filename} mislukt",
+    "attachment_too_large": "\"{name}\" is groter dan de server toestaat ({max} per bestand)",
+    "attachments_total_too_large": "De bijlagen zouden de serverlimiet van {max} per bericht overschrijden",
     "send_failed": "E-mail verzenden mislukt",
     "smime_sign_on": "S/MIME-ondertekening ingeschakeld",
     "smime_sign_off": "S/MIME-ondertekening uitgeschakeld",

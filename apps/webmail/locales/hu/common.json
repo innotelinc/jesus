@@ -660,6 +660,8 @@
     "upload_progress": "Feltöltés {uploaded} / {total}",
     "upload_cancel": "Feltöltés megszakítása",
     "upload_failed": "Nem sikerült feltölteni: {filename}",
+    "attachment_too_large": "A(z) „{name}” nagyobb, mint amit a kiszolgáló enged (fájlonként {max})",
+    "attachments_total_too_large": "A mellékletek túllépnék a kiszolgáló üzenetenkénti {max} korlátját",
     "drop_files": "Fájlok ejtése a csatoláshoz",
     "show_less": "Kevesebb mutatása",
     "send_failed": "Nem sikerült elküldeni az e-mailt",
