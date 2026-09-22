@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw } from "@/components/icons";
+import "./globals.css";
 
 /**
  * Global error boundary for the root layout.
