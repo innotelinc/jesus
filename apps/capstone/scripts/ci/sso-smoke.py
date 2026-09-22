@@ -67,19 +67,43 @@ def app_client(cfg):
     return v.Client(cfg, base=APP)
 
 
-def local_rows_created():
+def subject_of(api, username):
+    """`oidc_<uid>` for a just-created identity, or "" if the provider hides it.
+
+    Best effort: a provider that will not answer must not fail the run, it just
+    means the cleanup falls back to the address.
+    """
+    try:
+        found = api.call("GET", "/core/users/?username=" + urllib.parse.quote(username))
+    except Exception:  # noqa: BLE001 - a cleanup aid, never a result
+        return ""
+    results = found.get("results") if isinstance(found, dict) else (found or [])
+    if not results:
+        return ""
+    uid = results[0].get("uid")
+    return f"oidc_{uid}" if uid else ""
+
+
+def local_rows_created(subjects):
     """The local rows this run created, so the smoke test does not litter.
+
+    Matching on the SUBJECT, not the address: the second pass deliberately
+    collides on the address, and the callback then leaves its row with **no
+    email at all** (that is the fix — refuse the address, keep the sign-in), so
+    an address-based cleanup silently leaves exactly the row this test created.
 
     Best effort by design: in CI there is no Docker socket and nothing to clean
     up locally, which is fine — the run has still proved what it set out to.
     """
     if not _docker_available():
-        print(f"[cleanup] no docker here — leaving the dograh row for {USERNAME}@innotel.us")
+        print(f"[cleanup] no docker here — leaving the local rows for {USERNAME}")
         return
+    by_subject = ", ".join("'" + s.replace("'", "''") + "'" for s in subjects) or "''"
+    where = (f"provider_id IN ({by_subject}) "
+             "OR email LIKE 'sso-smoke-%@innotel.us'")
     sql = (
-        "DELETE FROM organization_users WHERE user_id IN "
-        "(SELECT id FROM users WHERE email LIKE 'sso-smoke-%@innotel.us');"
-        "DELETE FROM users WHERE email LIKE 'sso-smoke-%@innotel.us';"
+        f"DELETE FROM organization_users WHERE user_id IN (SELECT id FROM users WHERE {where});"
+        f"DELETE FROM users WHERE {where};"
     )
     try:
         subprocess.run(
@@ -211,6 +235,7 @@ def main():
 
     api = None
     created = False
+    subjects = []
     try:
         # verify-sso.py's Config reads the token, the required group and the LAN
         # address the same way every other verifier does; only the app entry
@@ -235,6 +260,10 @@ def main():
             pk = api.make_user(USERNAME, "SSO smoke (temporary)", groups=[group])
             created = True
             print(f"    {USERNAME}@innotel.us (pk={pk})")
+            # The subject is derived from the user id, so it is only knowable by
+            # asking the provider — and this is the run's only handle on the
+            # addressless row the second pass leaves behind.
+            subjects.append(subject_of(api, USERNAME))
             client = app_client(cfg)
             use_token(drive_login(cfg, client))
             print(f"    RESULT pass {attempt}: signed in")
@@ -262,7 +291,7 @@ def main():
                 print(f"[cleanup] WARNING: could not delete {USERNAME}: {err}",
                       file=sys.stderr)
             try:
-                local_rows_created()
+                local_rows_created([s for s in subjects if s])
             except Exception as err:  # noqa: BLE001 - cleanup never masks the result
                 print(f"[cleanup] WARNING: local rows not removed: {err}", file=sys.stderr)
 
