@@ -3283,6 +3283,8 @@
     "rename": "Zmień nazwę",
     "rename_title": "Zmień nazwę",
     "new_name": "Nowa nazwa",
+    "name_forbidden_chars": "Serwer nie zezwala na te znaki w nazwach: {chars}",
+    "name_reserved": "Ta nazwa jest zarezerwowana na serwerze.",
     "delete": "Usuń",
     "delete_confirm_title": "Usuń zasób",
     "delete_confirm_message": "Czy na pewno chcesz usunąć \"{name}\"? Tej operacji nie można cofnąć.",

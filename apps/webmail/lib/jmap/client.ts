@@ -15,6 +15,7 @@ import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectio
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
 import { contactFromWire, contactToWire } from "./contact-wire";
+import { acceptedFileName, fileNameRulesFrom, type FileNameRules } from "@/lib/file-name-rules";
 import { getEffectiveTimeZone, toLocalDateTime } from "@/lib/timezone";
 import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
 
@@ -4632,6 +4633,12 @@ export class JMAPClient implements IJMAPClient {
     return capability in this.capabilities;
   }
 
+  /** The value of an account capability (primary account by default). */
+  getAccountCapability(capability: string, accountId?: string): unknown {
+    const id = accountId || this.accountId;
+    return this.session?.accounts?.[id]?.accountCapabilities?.[capability];
+  }
+
   /** Check whether a capability is present on the primary account. */
   hasAccountCapability(capability: string, accountId?: string): boolean {
     const id = accountId || this.accountId;
@@ -7492,12 +7499,7 @@ export class JMAPClient implements IJMAPClient {
       : this.resolveFileNodeId(fileNodeId);
     const accountId = node.accountId;
     const rawId = node.id as string;
-    // `forbiddenNameChars` arrived with the draft (Stalwart 0.16.6) that split
-    // mayWrite into the finer rights; older servers reject those names.
-    const fileCapability = this.session?.accounts?.[accountId]?.accountCapabilities?.["urn:ietf:params:jmap:filenode"] as
-      Record<string, unknown> | undefined;
-    const legacyRights = !!fileCapability && !("forbiddenNameChars" in fileCapability);
-    const wireRights = rights && legacyRights ? toLegacyRights(rights) : rights;
+    const wireRights = rights && this.isLegacyFileNodeServer(accountId) ? toLegacyRights(rights) : rights;
     const response = await this.request([
       ["FileNode/set", {
         accountId,
@@ -7534,6 +7536,25 @@ export class JMAPClient implements IJMAPClient {
     return { accountId: primary, id };
   }
 
+  private fileNodeCapability(accountId: string): Record<string, unknown> | undefined {
+    return this.getAccountCapability("urn:ietf:params:jmap:filenode", accountId) as Record<string, unknown> | undefined;
+  }
+
+  /**
+   * Stalwart before 0.16.6 implements an older File Storage draft (old
+   * rights names, 30-character MIME types, no naming rules). The draft update
+   * added `forbiddenNameChars` to the capability, which tells them apart.
+   */
+  private isLegacyFileNodeServer(accountId: string): boolean {
+    const cap = this.fileNodeCapability(accountId);
+    return !!cap && !("forbiddenNameChars" in cap);
+  }
+
+  /** Naming rules for new FileNodes in `accountId`, if the server publishes any. */
+  getFileNameRules(accountId?: string): FileNameRules | null {
+    return fileNameRulesFrom(this.fileNodeCapability(accountId || this.getFilesAccountId()));
+  }
+
   /** Namespace a node created in `accountId` the way the listings do. */
   private namespaceFileNode(node: FileNode, accountId: string): FileNode {
     if (accountId === this.getFilesAccountId()) return node;
@@ -7566,7 +7587,9 @@ export class JMAPClient implements IJMAPClient {
     props: Record<string, unknown>,
     what: string,
   ): Promise<FileNode> {
-    const baseName = String(props.name ?? '');
+    // Names from the local file system (uploads) may hold characters the
+    // server refuses; store an accepted variant instead of failing the batch.
+    const baseName = acceptedFileName(String(props.name ?? ''), this.getFileNameRules(accountId));
     for (let attempt = 1; ; attempt++) {
       const name = attempt === 1 ? baseName : numberedFileName(baseName, attempt);
       const response = await this.request(
@@ -7610,8 +7633,10 @@ export class JMAPClient implements IJMAPClient {
   async createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode> {
     const parent = this.resolveFileNodeId(parentId);
 
-    //fall back for long MIME types
-    const safeType = type.length > 30 ? 'application/octet-stream' : type;
+    // Servers before 0.16.6 refuse MIME types over 30 characters (most OOXML
+    // types); later ones take up to 255.
+    const maxTypeLength = this.isLegacyFileNodeServer(parent.accountId) ? 30 : 255;
+    const safeType = type.length > maxTypeLength ? 'application/octet-stream' : type;
     const fileProps: Record<string, unknown> = { name, type: safeType, blobId, size };
     if (parent.id !== null) {
       fileProps.parentId = parent.id;

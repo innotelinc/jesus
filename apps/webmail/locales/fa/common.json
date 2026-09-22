@@ -3325,6 +3325,8 @@
     "rename": "تغییر نام",
     "rename_title": "تغییر نام",
     "new_name": "نام جدید",
+    "name_forbidden_chars": "سرور این نویسه‌ها را در نام‌ها مجاز نمی‌داند: {chars}",
+    "name_reserved": "این نام در سرور رزرو شده است.",
     "delete": "حذف",
     "delete_confirm_title": "حذف منبع",
     "delete_confirm_message": "آیا از حذف \"{name}\" اطمینان دارید؟ این عملیات قابل بازگشت نیست.",

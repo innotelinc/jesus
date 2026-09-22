@@ -3206,6 +3206,8 @@
     "rename": "שנה שם",
     "rename_title": "שנה שם",
     "new_name": "שם חדש",
+    "name_forbidden_chars": "השרת אינו מתיר את התווים האלה בשמות: {chars}",
+    "name_reserved": "השם הזה שמור בשרת.",
     "delete": "לִמְחוֹק",
     "delete_confirm_title": "מחק משאב",
     "delete_confirm_message": "האם אתה בטוח שברצונך למחוק את \"{name}\"? לא ניתן לבטל זאת.",

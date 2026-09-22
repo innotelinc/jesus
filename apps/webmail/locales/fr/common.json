@@ -3283,6 +3283,8 @@
     "rename": "Renommer",
     "rename_title": "Renommer",
     "new_name": "Nouveau nom",
+    "name_forbidden_chars": "Le serveur n'autorise pas ces caractères dans les noms : {chars}",
+    "name_reserved": "Ce nom est réservé sur le serveur.",
     "delete": "Supprimer",
     "delete_confirm_title": "Supprimer la ressource",
     "delete_confirm_message": "Êtes-vous sûr de vouloir supprimer \"{name}\" ? Cette action est irréversible.",
