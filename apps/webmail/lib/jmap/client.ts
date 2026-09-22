@@ -2,7 +2,6 @@ import { generateUUID } from '@/lib/utils';
 import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
-import { toWildcardQuery } from "./search-utils";
 import { attachSearchSnippets, filterHasSnippetTerms, snippetFilterFor, type SearchSnippetResult } from "@/lib/search-snippet";
 import { batched, itemsPerRequest } from "./request-limits";
 import { keywordPointer } from "./patch-pointer";
@@ -2976,10 +2975,9 @@ export class JMAPClient implements IJMAPClient {
       const targetAccountId = accountId || this.accountId;
 
       // Use the JMAP "text" filter which searches across from, to, cc, bcc,
-      // subject, and body. Stalwart's FTS engine supports wildcard prefix
-      // matching (e.g. "pri*" matches "prime", "primary", "private", etc.)
-      const wildcardQuery = toWildcardQuery(query);
-      const textFilter: Record<string, unknown> = { text: wildcardQuery };
+      // subject, and body. It matches whole words (stemmed on Stalwart);
+      // there is no prefix syntax, a trailing "*" is simply dropped.
+      const textFilter: Record<string, unknown> = { text: query.trim() };
 
       let filter: Record<string, unknown>;
       if (mailboxId) {

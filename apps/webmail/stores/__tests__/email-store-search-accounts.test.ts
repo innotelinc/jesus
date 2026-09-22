@@ -137,7 +137,7 @@ describe('"All folders" search across the own and group accounts (#1082)', () =>
     for (const [filter] of calls) {
       expect(filter).toEqual({
         operator: 'AND',
-        conditions: [{ text: 'acesso*' }, { from: 'sender@example.com' }],
+        conditions: [{ text: 'acesso' }, { from: 'sender@example.com' }],
       });
     }
     expect(useEmailStore.getState().emails.map(e => e.id)).toEqual(['grp-1', 'grp-2']);
