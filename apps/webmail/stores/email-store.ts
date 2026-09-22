@@ -1436,6 +1436,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   selectAccountMailbox: (accountId, mailboxId) => set({
     viewingAccountId: accountId,
     selectedMailbox: mailboxId,
+    // The search panel's folder scope names a folder of the account we are
+    // leaving. It resolves against `resolveActionMailboxes()`, which now
+    // returns the NEW account's list, so the id no longer matches: the search
+    // would query that foreign folder id against the wrong account and come
+    // back empty, while the dropdown (which renders no matching option) reads
+    // "All folders". Reset it so the scope matches what is shown. (#1082)
+    searchMailboxId: "",
     isLoadingMore: false,
     selectedEmail: null,
     selectedEmailIds: new Set(),
