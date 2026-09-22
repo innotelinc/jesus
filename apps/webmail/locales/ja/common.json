@@ -657,6 +657,8 @@
     "upload_progress": "アップロード中 {uploaded} / {total}",
     "upload_cancel": "アップロードをキャンセル",
     "upload_failed": "{filename} のアップロードに失敗しました",
+    "attachment_too_large": "「{name}」はサーバーの上限を超えています（1 ファイルあたり {max}）",
+    "attachments_total_too_large": "添付ファイルがサーバーの上限（1 通あたり {max}）を超えます",
     "send_failed": "メールの送信に失敗しました",
     "smime_sign_on": "S/MIME 署名を有効化しました",
     "smime_sign_off": "S/MIME 署名を無効化しました",

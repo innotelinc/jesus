@@ -660,6 +660,8 @@
     "upload_progress": "Pujant {uploaded} / {total}",
     "upload_cancel": "Cancel·la la pujada",
     "upload_failed": "No s'ha pogut pujar {filename}",
+    "attachment_too_large": "«{name}» supera la mida que permet el servidor ({max} per fitxer)",
+    "attachments_total_too_large": "Els adjunts superarien el límit del servidor de {max} per missatge",
     "drop_files": "Deixeu anar els fitxers per adjuntar-los",
     "show_less": "Mostra'n menys",
     "send_failed": "No s'ha pogut enviar el correu",

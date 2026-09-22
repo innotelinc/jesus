@@ -660,6 +660,8 @@
     "upload_progress": "Laster opp {uploaded} / {total}",
     "upload_cancel": "Avbryt opplasting",
     "upload_failed": "Kunne ikke laste opp {filename}",
+    "attachment_too_large": "«{name}» er større enn serveren tillater ({max} per fil)",
+    "attachments_total_too_large": "Vedleggene ville overskride serverens grense på {max} per melding",
     "drop_files": "Slipp filer for å legge ved",
     "show_less": "Vis færre",
     "send_failed": "Kunne ikke sende e-post",

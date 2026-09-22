@@ -657,6 +657,8 @@
     "upload_progress": "Hochladen {uploaded} / {total}",
     "upload_cancel": "Hochladen abbrechen",
     "upload_failed": "Hochladen von {filename} fehlgeschlagen",
+    "attachment_too_large": "\"{name}\" ist größer, als der Server erlaubt ({max} pro Datei)",
+    "attachments_total_too_large": "Die Anhänge würden das Limit des Servers von {max} pro Nachricht überschreiten",
     "send_failed": "E-Mail konnte nicht gesendet werden",
     "smime_sign_on": "S/MIME-Signatur aktiviert",
     "smime_sign_off": "S/MIME-Signatur deaktiviert",

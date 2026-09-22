@@ -603,6 +603,8 @@
     "upload_progress": "מעלה את{uploaded}/{total}",
     "upload_cancel": "בטל העלאה",
     "upload_failed": "העלאת{filename}נכשלה",
+    "attachment_too_large": "\"{name}\" גדול ממה שהשרת מאפשר ({max} לקובץ)",
+    "attachments_total_too_large": "הקבצים המצורפים יחרגו ממגבלת השרת של {max} להודעה",
     "drop_files": "שחרר קבצים לצירוף",
     "show_less": "הצג פחות",
     "send_failed": "שליחת האימייל נכשלה",

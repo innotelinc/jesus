@@ -657,6 +657,8 @@
     "upload_progress": "{uploaded} / {total} 업로드 중",
     "upload_cancel": "업로드 취소",
     "upload_failed": "{filename} 파일 업로드에 실패했어요",
+    "attachment_too_large": "\"{name}\"이(가) 서버 허용 크기보다 커요(파일당 {max})",
+    "attachments_total_too_large": "첨부 파일이 서버의 메시지당 한도({max})를 넘어요",
     "drop_files": "첨부할 파일을 여기에 놓아주세요",
     "show_less": "간략히 보기",
     "send_failed": "메일 전송에 실패했어요",

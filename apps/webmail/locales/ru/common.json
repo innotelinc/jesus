@@ -657,6 +657,8 @@
     "upload_progress": "Загрузка {uploaded} / {total}",
     "upload_cancel": "Отменить загрузку",
     "upload_failed": "Не удалось загрузить {filename}",
+    "attachment_too_large": "«{name}» больше, чем разрешает сервер ({max} на файл)",
+    "attachments_total_too_large": "Вложения превысят лимит сервера в {max} на письмо",
     "drop_files": "Перетащите файлы для прикрепления",
     "show_less": "Свернуть",
     "send_failed": "Не удалось отправить письмо",

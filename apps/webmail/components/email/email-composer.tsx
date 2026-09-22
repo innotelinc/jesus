@@ -1444,6 +1444,31 @@ export function EmailComposer({
     if (allowedFiles.length === 0) return;
     files = allowedFiles;
 
+    // Refuse what the server would refuse after the upload (maxSizeUpload per
+    // blob, maxSizeAttachmentsPerEmail per message) instead of failing late.
+    const uploadClient = composerClientRef.current ?? client;
+    const maxUpload = uploadClient.getMaxSizeUpload?.() ?? 0;
+    const oversized = maxUpload > 0 ? files.find(f => f.size > maxUpload) : undefined;
+    if (oversized) {
+      toast.error(t('attachment_too_large', { name: oversized.name, max: formatFileSize(maxUpload) }));
+      files = files.filter(f => f.size <= maxUpload);
+    }
+    const maxTotal = uploadClient.getMaxSizeAttachmentsPerEmail?.() ?? 0;
+    if (maxTotal > 0) {
+      let total = attachmentsRef.current.reduce((sum, att) => sum + (att.size || 0), 0);
+      const fitting: File[] = [];
+      for (const f of files) {
+        if (total + f.size > maxTotal) continue;
+        total += f.size;
+        fitting.push(f);
+      }
+      if (fitting.length < files.length) {
+        toast.error(t('attachments_total_too_large', { max: formatFileSize(maxTotal) }));
+      }
+      files = fitting;
+    }
+    if (files.length === 0) return;
+
     const newAttachments: ComposerAttachment[] = files.map(file => {
       const controller = new AbortController();
       return {

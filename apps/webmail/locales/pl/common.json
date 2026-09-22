@@ -657,6 +657,8 @@
     "upload_progress": "Przesyłanie {uploaded} / {total}",
     "upload_cancel": "Anuluj przesyłanie",
     "upload_failed": "Nie udało się przesłać {filename}",
+    "attachment_too_large": "„{name}” jest większy, niż pozwala serwer ({max} na plik)",
+    "attachments_total_too_large": "Załączniki przekroczyłyby limit serwera {max} na wiadomość",
     "drop_files": "Upuść pliki, aby załączyć",
     "show_less": "Pokaż mniej",
     "send_failed": "Nie udało się wysłać wiadomości",

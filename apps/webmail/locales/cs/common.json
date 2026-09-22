@@ -657,6 +657,8 @@
     "upload_progress": "Nahrávání {uploaded} / {total}",
     "upload_cancel": "Zrušit nahrávání",
     "upload_failed": "Soubor {filename} se nepodařilo nahrát",
+    "attachment_too_large": "„{name}“ je větší, než server povoluje ({max} na soubor)",
+    "attachments_total_too_large": "Přílohy by překročily limit serveru {max} na zprávu",
     "drop_files": "Přetáhněte soubory sem a připojte je",
     "show_less": "Zobrazit méně",
     "send_failed": "Odeslání zprávy selhalo",

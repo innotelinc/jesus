@@ -660,6 +660,8 @@
     "upload_progress": "در حال بارگذاری {uploaded} / {total}",
     "upload_cancel": "لغو بارگذاری",
     "upload_failed": "بارگذاری {filename} ناموفق بود",
+    "attachment_too_large": "«{name}» بزرگ‌تر از حدی است که سرور اجازه می‌دهد ({max} برای هر فایل)",
+    "attachments_total_too_large": "پیوست‌ها از سقف {max} سرور برای هر پیام بیشتر می‌شوند",
     "drop_files": "فایل‌ها را اینجا رها کنید",
     "show_less": "نمایش کمتر",
     "send_failed": "ارسال ایمیل ناموفق بود",

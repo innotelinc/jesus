@@ -657,6 +657,8 @@
     "upload_progress": "Enviando {uploaded} / {total}",
     "upload_cancel": "Cancelar envio",
     "upload_failed": "Falha ao enviar {filename}",
+    "attachment_too_large": "\"{name}\" é maior do que o servidor permite ({max} por ficheiro)",
+    "attachments_total_too_large": "Os anexos excederiam o limite do servidor de {max} por mensagem",
     "send_failed": "Falha ao enviar o e-mail",
     "smime_sign_on": "Assinatura S/MIME ativada",
     "smime_sign_off": "Assinatura S/MIME desativada",

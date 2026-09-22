@@ -660,6 +660,8 @@
     "upload_progress": "{uploaded} / {total} yükleniyor",
     "upload_cancel": "Yüklemeyi iptal et",
     "upload_failed": "{filename} yüklenemedi",
+    "attachment_too_large": "\"{name}\" sunucunun izin verdiğinden büyük (dosya başına {max})",
+    "attachments_total_too_large": "Ekler sunucunun ileti başına {max} sınırını aşar",
     "drop_files": "Eklemek için dosyaları buraya bırakın",
     "show_less": "Daha az göster",
     "send_failed": "E-posta gönderilemedi",

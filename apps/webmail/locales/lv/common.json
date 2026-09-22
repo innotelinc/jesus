@@ -657,6 +657,8 @@
     "upload_progress": "Augšupielāde {uploaded} / {total}",
     "upload_cancel": "Atcelt augšupielādi",
     "upload_failed": "Neizdevās augšupielādēt {filename}",
+    "attachment_too_large": "“{name}” ir lielāks, nekā serveris atļauj ({max} vienam failam)",
+    "attachments_total_too_large": "Pielikumi pārsniegtu servera ierobežojumu – {max} vienai ziņai",
     "drop_files": "Velciet failus šeit, lai pievienotu",
     "show_less": "Rādīt mazāk",
     "send_failed": "Neizdevās nosūtīt vēstuli",
