@@ -17,7 +17,7 @@
   <a href="https://discord.gg/tYCujymGrT">Discord</a>
 </p>
 
-Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/), built with Next.js on the JMAP protocol. Mail, calendar, contacts and files share one login, one settings store and one admin dashboard.
+Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/). It talks to Stalwart over JMAP and puts mail, calendar, contacts and files behind one login, with one set of settings and one admin dashboard.
 
 ## Contents
 
@@ -44,39 +44,37 @@ Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https
 <td width="50%"><img src="screenshots/contacts.png" alt="Contacts" /></td>
 </tr>
 <tr>
-<td><sub><b>Calendar</b> – month, week, day, and agenda views with drag-to-reschedule, iMIP invitations, and CalDAV subscriptions.</sub></td>
-<td><sub><b>Contacts</b> – multiple address books, groups, vCard import/export, and autocomplete in the composer.</sub></td>
+<td><sub><b>Calendar:</b> month, week, day and agenda views. Drag events to reschedule them, send iMIP invitations, subscribe to CalDAV calendars.</sub></td>
+<td><sub><b>Contacts:</b> several address books, groups, vCard import and export, and address completion in the composer.</sub></td>
 </tr>
 <tr>
 <td><img src="screenshots/theme.png" alt="Themes" /></td>
 <td><img src="screenshots/plugins.png" alt="Plugins" /></td>
 </tr>
 <tr>
-<td><sub><b>Themes</b> – bundled color themes or upload your own as ZIP bundles; admins can enforce presets.</sub></td>
-<td><sub><b>Plugins</b> – extend the client with bundled or third-party plugins installed from a .zip file.</sub></td>
+<td><sub><b>Themes:</b> pick a bundled theme or upload your own as a ZIP. Admins can enforce one.</sub></td>
+<td><sub><b>Plugins:</b> add features with bundled or third-party plugins, installed from a ZIP.</sub></td>
 </tr>
 <tr>
 <td><img src="screenshots/mail-white.png" alt="Light mode" /></td>
 <td><img src="screenshots/settings.png" alt="Settings" /></td>
 </tr>
 <tr>
-<td><sub><b>Light mode</b> – full theme support, remapping HTML email colors by luminance so dark-on-dark text stays readable.</sub></td>
-<td><sub><b>Settings</b> – appearance, identities, filters, templates, security, and more.</sub></td>
+<td><sub><b>Light mode:</b> HTML email colors are remapped by luminance, so text stays readable in either theme.</sub></td>
+<td><sub><b>Settings:</b> appearance, identities, filters, templates and security.</sub></td>
 </tr>
 </table>
 
 ## Features
 
-- **[Mail](https://bulwarkmail.org/docs/features/email)** – threading, unified inbox, cross-account views, [full-text search](https://bulwarkmail.org/docs/features/email/search), Sieve filters, [S/MIME](https://bulwarkmail.org/docs/guides/smime), templates, scheduled send
-- **[Calendar](https://bulwarkmail.org/docs/features/calendar)** – month/week/day/agenda, recurring events, iMIP invitations, CalDAV subscriptions
-- **[Contacts](https://bulwarkmail.org/docs/features/contacts)** – multiple address books, groups, vCard import/export
-- **[Files](https://bulwarkmail.org/docs/features/files)** – Stalwart's JMAP FileNode storage with previews, sharing and folder upload
+- [Mail](https://bulwarkmail.org/docs/features/email): threading, unified inbox, cross-account views, [full-text search](https://bulwarkmail.org/docs/features/email/search), Sieve filters, [S/MIME](https://bulwarkmail.org/docs/guides/smime), templates, scheduled send
+- [Calendar](https://bulwarkmail.org/docs/features/calendar): month, week, day and agenda views, recurring events, iMIP invitations, CalDAV subscriptions
+- [Contacts](https://bulwarkmail.org/docs/features/contacts): several address books, groups, vCard import and export
+- [Files](https://bulwarkmail.org/docs/features/files): Stalwart's JMAP file storage, with previews, sharing and folder upload
 
-Across all four: [single sign-on](https://bulwarkmail.org/docs/getting-started/configuration/authentication) and [2FA](https://bulwarkmail.org/docs/guides/account-security), [multiple accounts](https://bulwarkmail.org/docs/guides/multi-account), 27 languages, [PWA install and web push](https://bulwarkmail.org/docs/features/pwa), [themes](https://bulwarkmail.org/docs/guides/customization), [plugins](https://bulwarkmail.org/docs/guides/plugins) and [keyboard shortcuts](https://bulwarkmail.org/docs/guides/keyboard-shortcuts).
+All four share [single sign-on](https://bulwarkmail.org/docs/getting-started/configuration/authentication) and [2FA](https://bulwarkmail.org/docs/guides/account-security), [multiple accounts](https://bulwarkmail.org/docs/guides/multi-account), 27 languages, [PWA install and web push](https://bulwarkmail.org/docs/features/pwa), [themes](https://bulwarkmail.org/docs/guides/customization), [plugins](https://bulwarkmail.org/docs/guides/plugins) and [keyboard shortcuts](https://bulwarkmail.org/docs/guides/keyboard-shortcuts). The full list is on the [All features](https://bulwarkmail.org/docs/features/overview) page.
 
-The complete list is on **[All features](https://bulwarkmail.org/docs/features/overview)**.
-
-Bulwark comes in two [editions](https://bulwarkmail.org/docs/getting-started/editions): the full edition, a Node.js server with the admin dashboard, OAuth, plugins and settings sync; and **[Bulwark Lite](https://bulwarkmail.org/docs/getting-started/lite)**, the same client as static files that any web host, or Stalwart itself, can serve.
+There are two [editions](https://bulwarkmail.org/docs/getting-started/editions). The full edition runs as a Node.js server and adds the admin dashboard, OAuth, plugins and settings sync. [Bulwark Lite](https://bulwarkmail.org/docs/getting-started/lite) is the same client as static files, served by any web host or by Stalwart itself.
 
 ## Quick start
 
@@ -84,7 +82,7 @@ Bulwark comes in two [editions](https://bulwarkmail.org/docs/getting-started/edi
 docker run -d -p 3000:3000 ghcr.io/bulwarkmail/webmail:latest
 ```
 
-Open `http://localhost:3000` and the setup wizard walks you through connecting your Stalwart server. The [installation guide](https://bulwarkmail.org/docs/getting-started/installation) covers the details, and [Stalwart setup](https://bulwarkmail.org/docs/getting-started/configuration/stalwart-setup) covers the mail server side.
+Then open `http://localhost:3000`. A setup wizard asks for your Stalwart server and an admin password. The [installation guide](https://bulwarkmail.org/docs/getting-started/installation) has the details, and [Stalwart setup](https://bulwarkmail.org/docs/getting-started/configuration/stalwart-setup) covers the mail server side.
 
 ## Other ways to install
 
@@ -97,11 +95,11 @@ Open `http://localhost:3000` and the setup wizard walks you through connecting y
 | Lite as a container | [Container image](https://bulwarkmail.org/docs/deployment/static#container-image) |
 | Lite served by Stalwart | [Install on Stalwart](https://bulwarkmail.org/docs/deployment/stalwart-app) |
 
-To move to a new version, see [Updating](https://bulwarkmail.org/docs/deployment/updating).
+[Updating](https://bulwarkmail.org/docs/deployment/updating) explains how to move to a new version.
 
 ## Configuration
 
-Most installs are configured in the setup wizard on first launch and then in the [admin dashboard](https://bulwarkmail.org/docs/guides/admin). Environment variables work too and suit immutable infrastructure better; a variable always wins over the admin-managed value.
+Most installs are set up in the wizard on first launch and changed later in the [admin dashboard](https://bulwarkmail.org/docs/guides/admin). You can also use environment variables, which fit read-only or immutable deployments better. When both are set, the environment variable wins.
 
 ```env
 JMAP_SERVER_URL=https://mail.example.com
@@ -119,16 +117,16 @@ APP_NAME=My Webmail
 
 ## Documentation
 
-Everything lives at **[bulwarkmail.org/docs](https://bulwarkmail.org/docs)**:
+All documentation is at [bulwarkmail.org/docs](https://bulwarkmail.org/docs):
 
-- **Getting started** – [Introduction](https://bulwarkmail.org/docs/getting-started/introduction), [Installation](https://bulwarkmail.org/docs/getting-started/installation), [Editions](https://bulwarkmail.org/docs/getting-started/editions), [Bulwark Lite](https://bulwarkmail.org/docs/getting-started/lite), [Demo mode](https://bulwarkmail.org/docs/getting-started/demo-mode)
-- **Deployment** – [Docker](https://bulwarkmail.org/docs/deployment/docker), [Manual install](https://bulwarkmail.org/docs/deployment/manual), [Static hosting](https://bulwarkmail.org/docs/deployment/static), [Install on Stalwart](https://bulwarkmail.org/docs/deployment/stalwart-app), [Updating](https://bulwarkmail.org/docs/deployment/updating)
-- **Guides** – [Admin dashboard](https://bulwarkmail.org/docs/guides/admin), [Account security](https://bulwarkmail.org/docs/guides/account-security), [Impersonation](https://bulwarkmail.org/docs/guides/impersonation), [Plugins](https://bulwarkmail.org/docs/guides/plugins), [Marketplace](https://bulwarkmail.org/docs/guides/marketplace), [Troubleshooting](https://bulwarkmail.org/docs/guides/troubleshooting)
-- **Extensions** – [Introduction](https://bulwarkmail.org/docs/extensions/introduction), [manifest.json](https://bulwarkmail.org/docs/extensions/manifest), [Publishing](https://bulwarkmail.org/docs/extensions/publishing)
-- **Development** – [Architecture](https://bulwarkmail.org/docs/development/architecture), [Contributing](https://bulwarkmail.org/docs/development/contributing)
-- **Legal** – [Privacy](https://bulwarkmail.org/docs/legal/privacy)
+- Getting started: [Introduction](https://bulwarkmail.org/docs/getting-started/introduction), [Installation](https://bulwarkmail.org/docs/getting-started/installation), [Editions](https://bulwarkmail.org/docs/getting-started/editions), [Bulwark Lite](https://bulwarkmail.org/docs/getting-started/lite), [Demo mode](https://bulwarkmail.org/docs/getting-started/demo-mode)
+- Deployment: [Docker](https://bulwarkmail.org/docs/deployment/docker), [Manual install](https://bulwarkmail.org/docs/deployment/manual), [Static hosting](https://bulwarkmail.org/docs/deployment/static), [Install on Stalwart](https://bulwarkmail.org/docs/deployment/stalwart-app), [Updating](https://bulwarkmail.org/docs/deployment/updating)
+- Guides: [Admin dashboard](https://bulwarkmail.org/docs/guides/admin), [Account security](https://bulwarkmail.org/docs/guides/account-security), [Impersonation](https://bulwarkmail.org/docs/guides/impersonation), [Plugins](https://bulwarkmail.org/docs/guides/plugins), [Marketplace](https://bulwarkmail.org/docs/guides/marketplace), [Troubleshooting](https://bulwarkmail.org/docs/guides/troubleshooting)
+- Extensions: [Introduction](https://bulwarkmail.org/docs/extensions/introduction), [manifest.json](https://bulwarkmail.org/docs/extensions/manifest), [Publishing](https://bulwarkmail.org/docs/extensions/publishing)
+- Development: [Architecture](https://bulwarkmail.org/docs/development/architecture), [Contributing](https://bulwarkmail.org/docs/development/contributing)
+- Legal: [Privacy](https://bulwarkmail.org/docs/legal/privacy)
 
-The pages are Markdown in the [website repository](https://github.com/bulwarkmail/website/tree/main/docs); corrections are welcome there.
+The pages are Markdown files in the [website repository](https://github.com/bulwarkmail/website/tree/main/docs). Send corrections there.
 
 ## Development
 
@@ -147,16 +145,16 @@ npx vitest run             # unit tests
 npm run test:integration   # Stalwart in Docker + Playwright
 ```
 
-The [contributing guide](https://bulwarkmail.org/docs/development/contributing) covers tests, translations, code style and pull requests; [Architecture](https://bulwarkmail.org/docs/development/architecture) explains how the code fits together.
+The [contributing guide](https://bulwarkmail.org/docs/development/contributing) covers tests, translations, code style and pull requests. [Architecture](https://bulwarkmail.org/docs/development/architecture) explains how the code is organized.
 
-Built with [Next.js 16](https://nextjs.org/) and React 19, TypeScript, [Tailwind CSS v4](https://tailwindcss.com/), [Zustand](https://zustand-demo.pmnd.rs/), [Tiptap](https://tiptap.dev/), [next-intl](https://next-intl-docs.vercel.app/), [Tabler Icons](https://tabler.io/icons), and a custom JMAP client (RFC 8620). Tests run on [Vitest](https://vitest.dev/) and [Playwright](https://playwright.dev/).
+The stack: [Next.js 16](https://nextjs.org/) and React 19, TypeScript, [Tailwind CSS v4](https://tailwindcss.com/), [Zustand](https://zustand-demo.pmnd.rs/), [Tiptap](https://tiptap.dev/), [next-intl](https://next-intl-docs.vercel.app/), [Tabler Icons](https://tabler.io/icons), and our own JMAP client (RFC 8620). Tests run on [Vitest](https://vitest.dev/) and [Playwright](https://playwright.dev/).
 
 ## Community and support
 
-- **Questions and help** – [Discord](https://discord.gg/tYCujymGrT), or [Troubleshooting](https://bulwarkmail.org/docs/guides/troubleshooting) first
-- **Bugs and feature requests** – [GitHub issues](https://github.com/bulwarkmail/webmail/issues)
-- **Security vulnerabilities** – privately to [dev@bulwarkmail.org](mailto:dev@bulwarkmail.org) or through a [security advisory](https://github.com/bulwarkmail/webmail/security/advisories/new), never in a public issue
-- **Release notes** – [CHANGELOG.md](CHANGELOG.md) and [GitHub releases](https://github.com/bulwarkmail/webmail/releases)
+- Questions: check [Troubleshooting](https://bulwarkmail.org/docs/guides/troubleshooting), then ask on [Discord](https://discord.gg/tYCujymGrT).
+- Bugs and feature requests: open a [GitHub issue](https://github.com/bulwarkmail/webmail/issues).
+- Security vulnerabilities: report them privately to [dev@bulwarkmail.org](mailto:dev@bulwarkmail.org) or through a [security advisory](https://github.com/bulwarkmail/webmail/security/advisories/new), never in a public issue.
+- Release notes: [CHANGELOG.md](CHANGELOG.md) and the [GitHub releases](https://github.com/bulwarkmail/webmail/releases).
 
 ## License
 
