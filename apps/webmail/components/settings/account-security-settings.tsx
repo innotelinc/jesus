@@ -19,8 +19,9 @@ import { sanitizeI18nHtml } from '@/lib/email-sanitization';
 
 function PasswordChangeSection() {
   const t = useTranslations('settings.security');
-  const { changePassword, isSaving } = useAccountSecurityStore();
+  const { changePassword, isSaving, otpEnabled } = useAccountSecurityStore();
   const [currentPassword, setCurrentPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
@@ -41,8 +42,9 @@ function PasswordChangeSection() {
     }
 
     try {
-      await changePassword(currentPassword, newPassword);
+      await changePassword(currentPassword, newPassword, otpEnabled ? otpCode : undefined);
       setCurrentPassword('');
+      setOtpCode('');
       setNewPassword('');
       setConfirmPassword('');
       toast.success(t('password.success'));
@@ -80,6 +82,19 @@ function PasswordChangeSection() {
             </button>
           </div>
         </div>
+        {otpEnabled && (
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">{t('totp.verification_code')}</label>
+            <Input
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value)}
+              required
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">{t('password.new')}</label>
           <div className="relative">
@@ -118,7 +133,7 @@ function PasswordChangeSection() {
         <Button
           type="submit"
           size="sm"
-          disabled={isSaving || !currentPassword || !newPassword || !confirmPassword}
+          disabled={isSaving || !currentPassword || !newPassword || !confirmPassword || (otpEnabled && !otpCode.trim())}
         >
           {isSaving ? <Loader2 className="w-4 h-4 me-2 animate-spin" /> : null}
           {t('password.submit')}
@@ -249,10 +264,12 @@ function TotpSection() {
 
   const handleDisable = async () => {
     if (!password) { setSetupError(t('totp.password_required')); return; }
+    if (!otpCode.trim()) { setSetupError(t('totp.code_required')); return; }
     try {
-      await disableTotp(password);
+      await disableTotp(password, otpCode);
       setDisableOpen(false);
       setPassword('');
+      setOtpCode('');
       setSetupError(null);
       toast.success(t('totp.disabled'));
     } catch (err) {
@@ -267,6 +284,7 @@ function TotpSection() {
     } else {
       setDisableOpen(true);
       setPassword('');
+      setOtpCode('');
     }
   };
 
@@ -333,9 +351,17 @@ function TotpSection() {
             placeholder={t('password.current')}
             autoComplete="current-password"
           />
+          <Input
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value)}
+            placeholder={t('totp.verification_code')}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+          />
           {setupError && <p className="text-xs text-destructive">{setupError}</p>}
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" onClick={handleDisable} disabled={isSaving || !password}>
+            <Button size="sm" variant="destructive" onClick={handleDisable} disabled={isSaving || !password || !otpCode.trim()}>
               {isSaving ? <Loader2 className="w-4 h-4 me-1 animate-spin" /> : null}
               {t('totp.disable')}
             </Button>
