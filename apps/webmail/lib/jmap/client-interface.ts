@@ -391,7 +391,7 @@ export interface IJMAPClient {
   createAddressBook(name: string): Promise<AddressBook>;
   updateAddressBook(addressBookId: string, updates: Partial<AddressBook>, targetAccountId?: string): Promise<void>;
   setDefaultAddressBook(addressBookId: string, targetAccountId?: string): Promise<void>;
-  deleteAddressBook(addressBookId: string, targetAccountId?: string): Promise<void>;
+  deleteAddressBook(addressBookId: string, targetAccountId?: string, options?: { removeContents?: boolean }): Promise<void>;
   getContacts(addressBookId?: string, options?: { throwOnError?: boolean }): Promise<ContactCard[]>;
   getAllContacts(): Promise<ContactCard[]>;
   getContact(contactId: string, accountId?: string): Promise<ContactCard | null>;
