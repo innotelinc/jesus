@@ -3037,7 +3037,7 @@
       "supported_formats": "Підтримує файли iCalendar (.ics).",
       "url_description": "Введіть URL-адресу зовнішнього каналу iCalendar (.ics), щоб імпортувати події.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Підтримує URL-адреси CalDAV та iCalendar (.ics).",
+      "url_hint": "Підтримує URL-адреси iCalendar (.ics).",
       "fetch": "Принести",
       "invalid_url": "Введіть дійсну URL-адресу",
       "url_fetch_failed": "Не вдалося отримати календар з URL-адреси",

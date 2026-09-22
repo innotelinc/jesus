@@ -3037,7 +3037,7 @@
       "supported_formats": "iCalendar (.ics) 파일을 지원해요",
       "url_description": "외부 iCalendar (.ics) 피드의 URL을 입력해서 일정을 가져와요.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "CalDAV 및 iCalendar (.ics) URL을 지원해요",
+      "url_hint": "iCalendar (.ics) URL을 지원해요",
       "fetch": "가져오기",
       "invalid_url": "올바른 URL을 입력해 주세요",
       "url_fetch_failed": "URL에서 캘린더를 가져오지 못했어요",

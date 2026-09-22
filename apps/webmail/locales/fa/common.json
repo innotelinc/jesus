@@ -3064,7 +3064,7 @@
       "supported_formats": "پشتیبانی از فایل‌های iCalendar (.ics)",
       "url_description": "آدرس فید خارجی iCalendar (.ics) را برای وارد کردن رویدادها وارد کنید.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "پشتیبانی از آدرس‌های CalDAV و iCalendar (.ics)",
+      "url_hint": "پشتیبانی از آدرس‌های iCalendar (.ics)",
       "fetch": "دریافت",
       "invalid_url": "لطفاً یک آدرس معتبر وارد کنید",
       "url_fetch_failed": "دریافت تقویم از آدرس ناموفق بود",

@@ -3064,7 +3064,7 @@
       "supported_formats": "iCalendar (.ics) файлуудыг дэмждэг",
       "url_description": "Арга хэмжээг импортлохын тулд гадаад iCalendar (.ics) хангамжийн URL хаягийг оруулна уу.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "CalDAV болон iCalendar (.ics) URL-г дэмждэг",
+      "url_hint": "iCalendar (.ics) URL-г дэмждэг",
       "fetch": "Авах",
       "invalid_url": "Хүчинтэй URL оруулна уу",
       "url_fetch_failed": "URL",

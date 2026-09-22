@@ -3064,7 +3064,7 @@
       "supported_formats": "支援 iCalendar (.ics) 檔案",
       "url_description": "輸入外部 iCalendar（.ics）資料來源的 URL，以匯入活動。",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "支援 CalDAV 與 iCalendar（.ics）URL",
+      "url_hint": "支援 iCalendar（.ics）URL",
       "fetch": "取得",
       "invalid_url": "請輸入有效的 URL",
       "url_fetch_failed": "無法從 URL 取得行事曆",

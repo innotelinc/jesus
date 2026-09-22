@@ -3037,7 +3037,7 @@
       "supported_formats": "支持 iCalendar (.ics) 文件",
       "url_description": "输入外部 iCalendar (.ics) 源的 URL 以导入事件。",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "支持 CalDAV 和 iCalendar (.ics) URL",
+      "url_hint": "支持 iCalendar (.ics) URL",
       "fetch": "获取",
       "invalid_url": "请输入有效的 URL",
       "url_fetch_failed": "无法从 URL 获取日历",
