@@ -15,7 +15,7 @@ import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectio
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
 import { contactFromWire, contactToWire } from "./contact-wire";
-import { getEffectiveTimeZone } from "@/lib/timezone";
+import { getEffectiveTimeZone, toLocalDateTime } from "@/lib/timezone";
 import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
 
 // Cap for the follow-up Email/get issued when a displayed body part comes
@@ -6414,11 +6414,16 @@ export class JMAPClient implements IJMAPClient {
 
       const queryArgs: Record<string, unknown> = {
         accountId,
-        filter,
-        limit: limit || 1000,
+        filter: {
+          ...filter,
+          ...(filter.after ? { after: toLocalDateTime(filter.after, timeZone) } : {}),
+          ...(filter.before ? { before: toLocalDateTime(filter.before, timeZone) } : {}),
+        },
       };
       // Interpret the LocalDateTime after/before filter values in the user's
       // time zone (Stalwart defaults to UTC, shifting range boundaries).
+      // UTC bounds are converted to that wall clock above, because Stalwart
+      // drops a `Z` or offset rather than honouring it.
       if (timeZone) {
         queryArgs.timeZone = timeZone;
       }
@@ -6427,7 +6432,7 @@ export class JMAPClient implements IJMAPClient {
       // (Stalwart >= 0.16.20; the server needs both range bounds for it).
       // Older servers keep the client-side expansion in
       // lib/recurrence-expansion.ts, which runs on whatever comes back.
-      const expandRecurrences = Boolean(filter.after && filter.before)
+      let expandRecurrences = Boolean(filter.after && filter.before)
         && await this.supportsSyntheticCalendarIds();
       if (expandRecurrences) {
         queryArgs.expandRecurrences = true;
@@ -6437,23 +6442,45 @@ export class JMAPClient implements IJMAPClient {
       }
 
       const GET_BATCH_SIZE = this.getMaxObjectsInGet();
+      // Without an explicit limit, page through the whole range: a busy
+      // calendar (or a long expanded range) holds more than one page.
+      const pageSize = limit || 1000;
+      const maxIds = limit || 20000;
 
       // First, query to get IDs
-      const queryResponse = await this.request([
-        ["CalendarEvent/query", queryArgs, "0"],
-      ], this.calendarUsing());
+      const ids: string[] = [];
+      for (let position = 0; ids.length < maxIds;) {
+        const queryResponse = await this.request([
+          ["CalendarEvent/query", { ...queryArgs, limit: pageSize, position }, "0"],
+        ], this.calendarUsing());
+        const [name, result] = queryResponse.methodResponses?.[0] ?? [];
 
-      if (queryResponse.methodResponses?.[0]?.[0] === "error") {
-        const error = queryResponse.methodResponses[0][1];
-        // Keep the JMAP error type so the catch below can tell an expected
-        // access rejection apart from a genuine failure.
-        throw Object.assign(
-          new Error(error?.description || error?.type || "CalendarEvent/query failed"),
-          { jmapErrorType: error?.type },
-        );
+        if (name === "error") {
+          // Stalwart fails the whole query once a range expands to more than
+          // maxRecurrenceExpansions occurrences. Ask for the series instead;
+          // lib/recurrence-expansion.ts expands them on the client.
+          if (expandRecurrences && result?.type === "invalidArguments" &&
+              /expanded recurrences exceeds/i.test(result?.description ?? "")) {
+            debug.log('calendar', 'Range expands past the server limit; expanding on the client instead');
+            expandRecurrences = false;
+            delete queryArgs.expandRecurrences;
+            ids.length = 0;
+            position = 0;
+            continue;
+          }
+          // Keep the JMAP error type so the catch below can tell an expected
+          // access rejection apart from a genuine failure.
+          throw Object.assign(
+            new Error(result?.description || result?.type || "CalendarEvent/query failed"),
+            { jmapErrorType: result?.type },
+          );
+        }
+
+        const page: string[] = result?.ids || [];
+        ids.push(...page);
+        if (limit || page.length < pageSize) break;
+        position += page.length;
       }
-
-      const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
       if (ids.length === 0) return [];
 
       // Batch the /get calls to stay within server max-objects limit
