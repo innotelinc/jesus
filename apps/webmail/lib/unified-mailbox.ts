@@ -512,11 +512,12 @@ export async function fetchTagEmails(
   limit: number,
   position: number,
   order: SortLevel[] = [],
+  extraFilter?: Record<string, unknown>,
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
     (account, jmapAccountId) => account.client.getEmails(
-      undefined, jmapAccountId, limit, position, keyword, true, undefined, order,
+      undefined, jmapAccountId, limit, position, keyword, true, extraFilter, order,
     ),
     compareEmails(order, { pinnedFirst: true }),
   );
