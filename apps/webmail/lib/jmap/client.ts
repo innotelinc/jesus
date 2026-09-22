@@ -33,6 +33,47 @@ function withDecodedName<T extends Pick<FileNode, 'name'>>(node: T): T {
   return name === node.name ? node : { ...node, name };
 }
 
+type LegacyFileNodeRights = { mayRead?: boolean; mayWrite?: boolean; mayShare?: boolean };
+
+/**
+ * Stalwart before 0.16.6 implements an older JMAP File Storage draft whose
+ * rights are just mayRead / mayWrite / mayShare. Spread mayWrite over the
+ * finer rights the UI checks.
+ */
+function fromLegacyRights(rights: FileNodeRights | LegacyFileNodeRights | undefined): FileNodeRights | undefined {
+  if (!rights || !('mayWrite' in rights)) return rights as FileNodeRights | undefined;
+  const write = !!rights.mayWrite;
+  return {
+    mayRead: !!rights.mayRead,
+    mayAddChildren: write,
+    mayRename: write,
+    mayDelete: write,
+    mayModifyContent: write,
+    mayShare: !!rights.mayShare,
+  };
+}
+
+function toLegacyRights(rights: FileNodeRights): LegacyFileNodeRights {
+  return {
+    mayRead: rights.mayRead,
+    mayWrite: rights.mayAddChildren || rights.mayRename || rights.mayDelete || rights.mayModifyContent,
+    mayShare: rights.mayShare,
+  };
+}
+
+/** A FileNode as the server sent it, normalized for the UI. */
+function fromWireFileNode(node: FileNode): FileNode {
+  const decoded = withDecodedName(node);
+  if (!decoded.myRights && !decoded.shareWith) return decoded;
+  return {
+    ...decoded,
+    myRights: fromLegacyRights(decoded.myRights),
+    shareWith: decoded.shareWith
+      ? Object.fromEntries(Object.entries(decoded.shareWith).map(([p, r]) => [p, fromLegacyRights(r) as FileNodeRights]))
+      : decoded.shareWith,
+  };
+}
+
 /**
  * Parse a recipient string that may be "Name <email>" or bare "email" into
  * { name?, email }. The display name is unquoted and stripped of any address
@@ -7267,7 +7308,7 @@ export class JMAPClient implements IJMAPClient {
     if (!result || result[0] === "error") {
       throw new Error(result?.[1]?.description || "FileNode/get failed");
     }
-    return ((result[1].list || []) as FileNode[]).map(withDecodedName);
+    return ((result[1].list || []) as FileNode[]).map(fromWireFileNode);
   }
 
   async queryFileNodes(filter: FileNodeFilter, sort?: { property: string; isAscending: boolean }[]): Promise<string[]> {
@@ -7306,7 +7347,7 @@ export class JMAPClient implements IJMAPClient {
    */
   async listAllFileNodes(): Promise<FileNode[]> {
     const nodes = await this.fetchAllFileNodes(this.getFilesAccountId());
-    return nodes.map(withDecodedName);
+    return nodes.map(fromWireFileNode);
   }
 
   /**
@@ -7416,7 +7457,7 @@ export class JMAPClient implements IJMAPClient {
         const nodes = await this.fetchAllFileNodes(accountId);
         for (const node of nodes) {
           all.push({
-            ...withDecodedName(node),
+            ...fromWireFileNode(node),
             id: isPrimary ? node.id : `${accountId}:${node.id}`,
             parentId: node.parentId == null
               ? null
@@ -7451,10 +7492,16 @@ export class JMAPClient implements IJMAPClient {
       : this.resolveFileNodeId(fileNodeId);
     const accountId = node.accountId;
     const rawId = node.id as string;
+    // `forbiddenNameChars` arrived with the draft (Stalwart 0.16.6) that split
+    // mayWrite into the finer rights; older servers reject those names.
+    const fileCapability = this.session?.accounts?.[accountId]?.accountCapabilities?.["urn:ietf:params:jmap:filenode"] as
+      Record<string, unknown> | undefined;
+    const legacyRights = !!fileCapability && !("forbiddenNameChars" in fileCapability);
+    const wireRights = rights && legacyRights ? toLegacyRights(rights) : rights;
     const response = await this.request([
       ["FileNode/set", {
         accountId,
-        update: { [rawId]: { [`shareWith/${principalId}`]: rights } },
+        update: { [rawId]: { [`shareWith/${principalId}`]: wireRights } },
       }, "0"],
     ], this.fileUsing());
 
