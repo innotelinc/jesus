@@ -14,6 +14,7 @@ import { findTasksOnlyCalendarIds, isTaskLikeObject, type ScannedCalendarObject 
 import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectionName } from "@/lib/webdav/calendar-collection";
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
+import { contactFromWire, contactToWire } from "./contact-wire";
 import { getEffectiveTimeZone } from "@/lib/timezone";
 import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
 
@@ -5310,10 +5311,20 @@ export class JMAPClient implements IJMAPClient {
     }
   }
 
-  async deleteAddressBook(addressBookId: string, targetAccountId?: string): Promise<void> {
+  async deleteAddressBook(
+    addressBookId: string,
+    targetAccountId?: string,
+    options?: { removeContents?: boolean },
+  ): Promise<void> {
     const accountId = targetAccountId || this.getContactsAccountId();
+    // Without onDestroyRemoveContents a book that still holds cards is
+    // refused with `addressBookHasContents` (RFC 9610 §2.3).
     const response = await this.request([
-      ["AddressBook/set", { accountId, destroy: [addressBookId] }, "0"],
+      ["AddressBook/set", {
+        accountId,
+        destroy: [addressBookId],
+        ...(options?.removeContents ? { onDestroyRemoveContents: true } : {}),
+      }, "0"],
     ], this.contactUsing());
 
     const result = response.methodResponses?.[0]?.[1];
@@ -5675,7 +5686,7 @@ export class JMAPClient implements IJMAPClient {
 
       if (response.methodResponses?.[0]?.[0] === "ContactCard/get") {
         const list = (response.methodResponses[0][1].list || []) as ContactCard[];
-        allContacts.push(...list);
+        allContacts.push(...list.map(contactFromWire));
       }
     }
 
@@ -5741,8 +5752,8 @@ export class JMAPClient implements IJMAPClient {
       ], this.contactUsing());
 
       if (response.methodResponses?.[0]?.[0] === "ContactCard/get") {
-        const list = response.methodResponses[0][1].list || [];
-        return list[0] || null;
+        const list = (response.methodResponses[0][1].list || []) as ContactCard[];
+        return list[0] ? contactFromWire(list[0]) : null;
       }
       return null;
     } catch (error) {
@@ -5762,8 +5773,7 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
-    // Strip shared-only fields before sending to JMAP
-    const { originalId: _oid, accountId: _aid, accountName: _an, isShared: _is, ...contactData } = contact as ContactCard;
+    const contactData = contactToWire(contact, 'create');
 
     const response = await this.request([
       ["ContactCard/set", {
@@ -5772,7 +5782,7 @@ export class JMAPClient implements IJMAPClient {
           "new-contact": {
             ...contactData,
             //  Stalwart stores the card without one if omitted (#644)
-            uid: contactData.uid || `urn:uuid:${generateUUID()}`,
+            uid: contact.uid || `urn:uuid:${generateUUID()}`,
             addressBookIds,
           }
         }
@@ -5800,8 +5810,7 @@ export class JMAPClient implements IJMAPClient {
   async updateContact(contactId: string, updates: Partial<ContactCard>, targetAccountId?: string): Promise<void> {
     const accountId = targetAccountId || this.getContactsAccountId();
 
-    // Strip shared-only fields before sending to JMAP
-    const { originalId: _oid, accountId: _aid, accountName: _an, isShared: _is, ...cleanUpdates } = updates as ContactCard;
+    const cleanUpdates = contactToWire(updates, 'update');
 
     const response = await this.request([
       ["ContactCard/set", {
@@ -5873,7 +5882,7 @@ export class JMAPClient implements IJMAPClient {
 
           if (response.methodResponses?.[1]?.[0] === "ContactCard/get") {
             const rawContacts = (response.methodResponses[1][1].list || []) as ContactCard[];
-            const contacts = rawContacts.map((contact) => ({
+            const contacts = rawContacts.map(contactFromWire).map((contact) => ({
               ...contact,
               id: isPrimary ? contact.id : `${accountId}:${contact.id}`,
               originalId: contact.id,

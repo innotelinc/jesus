@@ -312,6 +312,11 @@ export interface ContactCard {
     grammaticalGender?: string;
     pronouns?: Record<string, { pronouns: string; pref?: number; contexts?: Record<string, boolean> }>;
   };
+  calendars?: Record<string, { uri: string; kind?: 'calendar' | 'freeBusy'; mediaType?: string; contexts?: Record<string, boolean> }>;
+  schedulingAddresses?: Record<string, { uri: string; contexts?: Record<string, boolean>; pref?: number }>;
+  // Client-side flat views of `calendars`, `schedulingAddresses` and the
+  // `directories` entry (vCard CALURI / FBURL / CALADRURI / SOURCE). They are
+  // not RFC 9553 properties; lib/jmap/contact-wire.ts maps them.
   calendarUri?: string;
   schedulingUri?: string;
   freeBusyUri?: string;
