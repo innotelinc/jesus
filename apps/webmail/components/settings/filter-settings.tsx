@@ -173,6 +173,7 @@ export function FilterSettings() {
     isOpaque,
     rawScript,
     vacationSettings,
+    includeVacation,
     selectAccount,
     saveFilters,
     addRule,
@@ -235,7 +236,7 @@ export function FilterSettings() {
   // Vacation uses a separate per-(primary)-account mechanism (RFC 9661), so the
   // "vacation active" banner only applies when editing the personal account.
   const vacationEnabled =
-    isPrimaryAccount && (vacationStoreEnabled || vacationSettings?.isEnabled);
+    isPrimaryAccount && (vacationStoreEnabled || vacationSettings?.isEnabled || includeVacation);
 
   const [editingRule, setEditingRule] = useState<FilterRule | undefined>();
   const [showRuleModal, setShowRuleModal] = useState(false);
