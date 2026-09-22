@@ -3283,6 +3283,8 @@
     "rename": "이름 바꾸기",
     "rename_title": "이름 바꾸기",
     "new_name": "새 이름",
+    "name_forbidden_chars": "서버에서 이름에 다음 문자를 허용하지 않습니다: {chars}",
+    "name_reserved": "이 이름은 서버에서 예약되어 있습니다.",
     "delete": "삭제",
     "delete_confirm_title": "항목 삭제",
     "delete_confirm_message": "정말 \"{name}\"을(를) 삭제할까요? 이 작업은 되돌릴 수 없어요.",

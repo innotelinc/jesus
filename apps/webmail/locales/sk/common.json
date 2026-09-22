@@ -3325,6 +3325,8 @@
     "rename": "Premenovať",
     "rename_title": "Premenovať",
     "new_name": "Nový názov",
+    "name_forbidden_chars": "Server nepovoľuje v názvoch tieto znaky: {chars}",
+    "name_reserved": "Tento názov je na serveri vyhradený.",
     "delete": "Odstrániť",
     "delete_confirm_title": "Odstrániť položku",
     "delete_confirm_message": "Naozaj chcete odstrániť \"{name}\"? Túto akciu nie je možné vrátiť.",

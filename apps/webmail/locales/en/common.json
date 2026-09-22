@@ -3325,6 +3325,8 @@
     "rename": "Rename",
     "rename_title": "Rename",
     "new_name": "New name",
+    "name_forbidden_chars": "The server does not allow these characters in names: {chars}",
+    "name_reserved": "This name is reserved on the server.",
     "delete": "Delete",
     "delete_confirm_title": "Delete resource",
     "delete_confirm_message": "Are you sure you want to delete \"{name}\"? This cannot be undone.",

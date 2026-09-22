@@ -3283,6 +3283,8 @@
     "rename": "Pārdēvēt",
     "rename_title": "Pārdēvēt",
     "new_name": "Jauns nosaukums",
+    "name_forbidden_chars": "Serveris neatļauj šīs rakstzīmes nosaukumos: {chars}",
+    "name_reserved": "Šis nosaukums serverī ir rezervēts.",
     "delete": "Dzēst",
     "delete_confirm_title": "Dzēst resursu",
     "delete_confirm_message": "Vai tiešām vēlaties dzēst «{name}»? Šo darbību nevar atcelt.",

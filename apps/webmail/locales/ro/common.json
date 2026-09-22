@@ -3325,6 +3325,8 @@
     "rename": "Redenumire",
     "rename_title": "Redenumire",
     "new_name": "Nume nou",
+    "name_forbidden_chars": "Serverul nu permite aceste caractere în nume: {chars}",
+    "name_reserved": "Acest nume este rezervat pe server.",
     "delete": "Șterge",
     "delete_confirm_title": "Ștergeți resursa",
     "delete_confirm_message": "Sunteți sigur că doriți să ștergeți „{name}”? Această acțiune nu poate fi anulată.",

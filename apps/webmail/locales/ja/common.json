@@ -3283,6 +3283,8 @@
     "rename": "名前を変更",
     "rename_title": "名前を変更",
     "new_name": "新しい名前",
+    "name_forbidden_chars": "サーバーでは名前に次の文字を使用できません: {chars}",
+    "name_reserved": "この名前はサーバーで予約されています。",
     "delete": "削除",
     "delete_confirm_title": "リソースを削除",
     "delete_confirm_message": "\"{name}\"を削除してもよろしいですか？この操作は元に戻せません。",

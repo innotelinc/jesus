@@ -3283,6 +3283,8 @@
     "rename": "重命名",
     "rename_title": "重命名",
     "new_name": "新名称",
+    "name_forbidden_chars": "服务器不允许名称中包含这些字符：{chars}",
+    "name_reserved": "此名称已被服务器保留。",
     "delete": "删除",
     "delete_confirm_title": "删除资源",
     "delete_confirm_message": "您确定要删除\"{name}\"吗？此操作无法撤消。",

@@ -3325,6 +3325,8 @@
     "rename": "إعادة تسمية",
     "rename_title": "إعادة تسمية",
     "new_name": "الاسم الجديد",
+    "name_forbidden_chars": "لا يسمح الخادم بهذه الأحرف في الأسماء: {chars}",
+    "name_reserved": "هذا الاسم محجوز على الخادم.",
     "delete": "حذف",
     "delete_confirm_title": "حذف المورد",
     "delete_confirm_message": "هل أنت متأكد أنك تريد حذف \"{name}\"؟ لا يمكن التراجع عن هذا.",

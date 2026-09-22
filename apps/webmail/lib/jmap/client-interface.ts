@@ -1,5 +1,6 @@
 import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CreateCalendarOptions, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, FileNode, FileNodeRights, Principal, PushSubscription, EmailPushConfig, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
+import type { FileNameRules } from "@/lib/file-name-rules";
 import type { SortLevel } from "@/lib/message-list-order";
 
 /** What `migrateKeyword` managed to do. */
@@ -58,6 +59,8 @@ export interface IJMAPClient {
   // ── Capabilities ──────────────────────────────────────────────
   getCapabilities(): Record<string, unknown>;
   hasAccountCapability(capability: string, accountId?: string): boolean;
+  /** FileNode naming rules the server publishes (Stalwart 0.16.6+), if any. */
+  getFileNameRules?(accountId?: string): FileNameRules | null;
   getMaxSizeUpload(): number;
   getMaxCallsInRequest(): number;
   getMaxObjectsInGet(): number;

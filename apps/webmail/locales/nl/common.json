@@ -3283,6 +3283,8 @@
     "rename": "Hernoemen",
     "rename_title": "Hernoemen",
     "new_name": "Nieuwe naam",
+    "name_forbidden_chars": "De server staat deze tekens niet toe in namen: {chars}",
+    "name_reserved": "Deze naam is gereserveerd op de server.",
     "delete": "Verwijderen",
     "delete_confirm_title": "Bron verwijderen",
     "delete_confirm_message": "Weet u zeker dat u \"{name}\" wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",

@@ -3283,6 +3283,8 @@
     "rename": "Renombrar",
     "rename_title": "Renombrar",
     "new_name": "Nuevo nombre",
+    "name_forbidden_chars": "El servidor no permite estos caracteres en los nombres: {chars}",
+    "name_reserved": "Este nombre está reservado en el servidor.",
     "delete": "Eliminar",
     "delete_confirm_title": "Eliminar recurso",
     "delete_confirm_message": "¿Está seguro de que desea eliminar \"{name}\"? Esta acción no se puede deshacer.",

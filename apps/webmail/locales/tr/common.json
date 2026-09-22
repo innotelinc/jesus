@@ -3325,6 +3325,8 @@
     "rename": "Yeniden Adlandır",
     "rename_title": "Yeniden Adlandır",
     "new_name": "Yeni ad",
+    "name_forbidden_chars": "Sunucu adlarda şu karakterlere izin vermiyor: {chars}",
+    "name_reserved": "Bu ad sunucuda ayrılmış.",
     "delete": "Sil",
     "delete_confirm_title": "Kaynağı sil",
     "delete_confirm_message": "\"{name}\" silinsin mi? Bu geri alınamaz.",
