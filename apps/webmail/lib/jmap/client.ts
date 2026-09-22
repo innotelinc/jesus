@@ -2750,9 +2750,12 @@ export class JMAPClient implements IJMAPClient {
         ids.map((id) => [id, { "keywords/$seen": true }])
       );
 
-      await this.request([
+      // A refused update leaves the ids unread, and the next query would
+      // return them again forever.
+      const setResponse = await this.request([
         ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
       ]);
+      this.assertEmailSetSucceeded(setResponse, "mark the folder as read");
 
       totalMarked += ids.length;
       hasMore = ids.length === pageSize;
@@ -2804,14 +2807,18 @@ export class JMAPClient implements IJMAPClient {
         const updates = Object.fromEntries(
           targetIds.map((id) => [id, { "keywords/$seen": true }])
         );
-        await this.request([
+        const setResponse = await this.request([
           ["Email/set", { accountId: targetAccountId, update: updates }, "0"],
         ]);
+        this.assertEmailSetSucceeded(setResponse, "mark all as read");
         totalMarked += targetIds.length;
       }
 
       hasMore = ids.length === pageSize;
-      position += ids.length;
+      // Marked messages drop out of the "unread" query, so the next page
+      // starts after the ones left unread (excluded folders) only. Advancing
+      // by the whole page skipped a page of unread mail every round.
+      position += ids.length - targetIds.length;
     }
 
     return totalMarked;
@@ -2845,18 +2852,19 @@ export class JMAPClient implements IJMAPClient {
     };
     if (markAsRead) patch["keywords/$seen"] = true;
 
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: targetAccountId,
         update: { [emailId]: patch },
       }, "0"],
     ]);
+    this.assertEmailSetSucceeded(response, "mark as spam");
   }
 
   async undoSpam(emailId: string, originalMailboxId: string, accountId?: string): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: targetAccountId,
         update: {
@@ -2870,6 +2878,7 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    this.assertEmailSetSucceeded(response, "mark as not spam");
   }
 
   async createMailbox(name: string, parentId?: string, accountId?: string): Promise<Mailbox> {
