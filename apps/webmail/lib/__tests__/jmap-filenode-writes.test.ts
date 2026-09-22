@@ -89,6 +89,27 @@ describe('FileNode writes', () => {
     expect(calls.some(([m]) => m === 'Blob/copy')).toBe(false);
   });
 
+  it('shares with the mayWrite rights of servers before 0.16.6', async () => {
+    const { client, calls } = makeClient({});
+    await client.setFileNodeShare('n1', 'p1', {
+      mayRead: true, mayAddChildren: true, mayRename: false, mayDelete: false, mayModifyContent: false, mayShare: false,
+    }).catch(() => {});
+    expect(sets(calls)[0]).toMatchObject({
+      accountId: 'me',
+      update: { n1: { 'shareWith/p1': { mayRead: true, mayWrite: true, mayShare: false } } },
+    });
+  });
+
+  it('reads old mayWrite rights as the finer rights', async () => {
+    const { client } = makeClient({
+      me: [{ id: 'd1', name: 'Docs', parentId: null, blobId: null, myRights: { mayRead: true, mayWrite: true, mayShare: false } }],
+    });
+    const [node] = await client.listAllFileNodes();
+    expect(node.myRights).toEqual({
+      mayRead: true, mayAddChildren: true, mayRename: true, mayDelete: true, mayModifyContent: true, mayShare: false,
+    });
+  });
+
   it('copies file content across accounts with Blob/copy', async () => {
     const { client, calls } = makeClient({
       grp: [{ id: 'f1', name: 'shared.pdf', parentId: null, blobId: 'b1', type: 'application/pdf', size: 9 }],
