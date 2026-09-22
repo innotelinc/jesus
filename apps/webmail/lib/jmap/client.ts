@@ -569,6 +569,12 @@ export function sendMethodErrors(
   return { failure, filing };
 }
 
+/** "report.pdf" -> "report (2).pdf", the way Stalwart's onExists "rename" names copies. */
+function numberedFileName(name: string, n: number): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? `${name.slice(0, dot)} (${n})${name.slice(dot)}` : `${name} (${n})`;
+}
+
 /** Throw on a method error of the query that a search request starts with. */
 function assertQuerySucceeded(response: JMAPResponse, what: string): void {
   const [name, result] = response.methodResponses?.[0] ?? [];
@@ -7440,26 +7446,105 @@ export class JMAPClient implements IJMAPClient {
     rights: FileNodeRights | null,
     targetAccountId?: string,
   ): Promise<void> {
-    const accountId = targetAccountId || this.getFilesAccountId();
+    const node = targetAccountId
+      ? { accountId: targetAccountId, id: fileNodeId }
+      : this.resolveFileNodeId(fileNodeId);
+    const accountId = node.accountId;
+    const rawId = node.id as string;
     const response = await this.request([
       ["FileNode/set", {
         accountId,
-        update: { [fileNodeId]: { [`shareWith/${principalId}`]: rights } },
+        update: { [rawId]: { [`shareWith/${principalId}`]: rights } },
       }, "0"],
     ], this.fileUsing());
 
     const result = response.methodResponses?.[0]?.[1];
-    if (result?.notUpdated?.[fileNodeId]) {
-      const err = result.notUpdated[fileNodeId];
+    if (result?.notUpdated?.[rawId]) {
+      const err = result.notUpdated[rawId];
       throw new Error(err.description || "Failed to update file share");
     }
-    if (!result?.updated || !(fileNodeId in result.updated)) {
+    if (!result?.updated || !(rawId in result.updated)) {
       throw new Error("Server did not confirm the share update");
     }
   }
 
+  /**
+   * The account and bare id behind a FileNode id. Nodes of shared drives are
+   * listed as "<accountId>:<nodeId>" (listAllFileNodesAcrossAccounts; JMAP ids
+   * never contain ':'), and a write must go to that account with the bare id.
+   * `null` is the primary account's root.
+   */
+  private resolveFileNodeId(id: string | null): { accountId: string; id: string | null } {
+    const primary = this.getFilesAccountId();
+    if (id === null) return { accountId: primary, id: null };
+    const sep = id.indexOf(':');
+    if (sep > 0) {
+      const accountId = id.slice(0, sep);
+      if (accountId !== primary && this.getFilesCapableAccountIds().includes(accountId)) {
+        return { accountId, id: id.slice(sep + 1) };
+      }
+    }
+    return { accountId: primary, id };
+  }
+
+  /** Namespace a node created in `accountId` the way the listings do. */
+  private namespaceFileNode(node: FileNode, accountId: string): FileNode {
+    if (accountId === this.getFilesAccountId()) return node;
+    return {
+      ...node,
+      id: `${accountId}:${node.id}`,
+      parentId: node.parentId == null ? null : `${accountId}:${node.parentId}`,
+    };
+  }
+
+  /**
+   * Resolve a parent for a node that lives in `accountId`. Folders only hold
+   * nodes of their own account, so a parent in another account is refused
+   * instead of being sent (the server would read it as a local id).
+   */
+  private parentInAccount(parentId: string | null, accountId: string): string | null {
+    const parent = this.resolveFileNodeId(parentId);
+    if (parent.accountId !== accountId) {
+      throw new Error('Files cannot be moved between accounts');
+    }
+    return parent.id;
+  }
+
+  /**
+   * FileNode/set `create` of one node. `onExists: "rename"` (Stalwart 0.16.6+,
+   * ignored before) turns a name clash into "name (2)" instead of a failure.
+   */
+  private async createFileNodeIn(
+    accountId: string,
+    props: Record<string, unknown>,
+    what: string,
+  ): Promise<FileNode> {
+    const baseName = String(props.name ?? '');
+    for (let attempt = 1; ; attempt++) {
+      const name = attempt === 1 ? baseName : numberedFileName(baseName, attempt);
+      const response = await this.request(
+        [["FileNode/set", { accountId, onExists: "rename", create: { n0: { ...props, name } } }, "fns0"]],
+        this.fileUsing(),
+      );
+      const result = response.methodResponses?.[0];
+      if (!result || result[0] === "error") {
+        throw new Error(result?.[1]?.description || "FileNode/set create failed");
+      }
+      const created = result[1].created?.n0;
+      if (created) {
+        // The create response carries only server-set properties; keep the
+        // ones sent so callers can rely on name/parentId/type.
+        return withDecodedName({ ...props, name, ...created } as FileNode);
+      }
+      const err = result[1].notCreated?.n0;
+      // Servers before 0.16.6 ignore onExists and refuse the clash instead.
+      if (attempt < 20 && /already exists/i.test(err?.description ?? '')) continue;
+      throw new Error(err?.description || `Failed to create ${what}`);
+    }
+  }
+
   async createFileDirectory(name: string, parentId: string | null): Promise<FileNode> {
-    const accountId = this.getFilesAccountId();
+    const parent = this.resolveFileNodeId(parentId);
 
     // A FileNode is a folder (container) only when it has no content - i.e. no
     // blobId, type or size, so the server stores it with `file == null`. Sending
@@ -7467,71 +7552,39 @@ export class JMAPClient implements IJMAPClient {
     // 0-byte FILE that nothing can ever be parented under, which is what caused
     // "Parent ID does not exist or is not a folder" during the #379 migration.
     const dirProps: Record<string, unknown> = { name };
-    if (parentId !== null) {
-      dirProps.parentId = parentId;
+    if (parent.id !== null) {
+      dirProps.parentId = parent.id;
     }
 
-    const response = await this.request(
-      [["FileNode/set", {
-        accountId,
-        create: {
-          dir0: dirProps,
-        },
-      }, "fns0"]],
-      this.fileUsing(),
-    );
-
-    const result = response.methodResponses?.[0];
-    if (!result || result[0] === "error") {
-      throw new Error(result?.[1]?.description || "FileNode/set create failed");
-    }
-    const created = result[1].created?.dir0;
-    if (!created) {
-      const err = result[1].notCreated?.dir0;
-      throw new Error(err?.description || "Failed to create directory");
-    }
-    return created as FileNode;
+    const created = await this.createFileNodeIn(parent.accountId, dirProps, 'directory');
+    return this.namespaceFileNode(created, parent.accountId);
   }
 
   async createFileNode(name: string, blobId: string, type: string, size: number, parentId: string | null): Promise<FileNode> {
-    const accountId = this.getFilesAccountId();
+    const parent = this.resolveFileNodeId(parentId);
 
     //fall back for long MIME types
     const safeType = type.length > 30 ? 'application/octet-stream' : type;
     const fileProps: Record<string, unknown> = { name, type: safeType, blobId, size };
-    if (parentId !== null) {
-      fileProps.parentId = parentId;
+    if (parent.id !== null) {
+      fileProps.parentId = parent.id;
     }
 
-    const response = await this.request(
-      [["FileNode/set", {
-        accountId,
-        create: {
-          file0: fileProps,
-        },
-      }, "fns0"]],
-      this.fileUsing(),
-    );
-
-    const result = response.methodResponses?.[0];
-    if (!result || result[0] === "error") {
-      throw new Error(result?.[1]?.description || "FileNode/set create failed");
-    }
-    const created = result[1].created?.file0;
-    if (!created) {
-      const err = result[1].notCreated?.file0;
-      throw new Error(err?.description || "Failed to create file node");
-    }
-    return created as FileNode;
+    const created = await this.createFileNodeIn(parent.accountId, fileProps, 'file node');
+    return this.namespaceFileNode(created, parent.accountId);
   }
 
   async updateFileNode(id: string, updates: Partial<Pick<FileNode, 'name' | 'parentId'>>): Promise<void> {
-    const accountId = this.getFilesAccountId();
+    const node = this.resolveFileNodeId(id);
+    const patch: Record<string, unknown> = { ...updates };
+    if ('parentId' in updates) {
+      patch.parentId = this.parentInAccount(updates.parentId ?? null, node.accountId);
+    }
 
     const response = await this.request(
       [["FileNode/set", {
-        accountId,
-        update: { [id]: updates },
+        accountId: node.accountId,
+        update: { [node.id as string]: patch },
       }, "fns0"]],
       this.fileUsing(),
     );
@@ -7540,9 +7593,21 @@ export class JMAPClient implements IJMAPClient {
     if (!result || result[0] === "error") {
       throw new Error(result?.[1]?.description || "FileNode/set update failed");
     }
-    if (result[1].notUpdated?.[id]) {
-      throw new Error(result[1].notUpdated[id].description || "Failed to update file node");
+    if (result[1].notUpdated?.[node.id as string]) {
+      throw new Error(result[1].notUpdated[node.id as string].description || "Failed to update file node");
     }
+  }
+
+  /** Group FileNode ids by the account that owns them. */
+  private groupFileNodeIds<T>(entries: Array<[string, T]>): Map<string, Array<{ id: string; rawId: string; value: T }>> {
+    const groups = new Map<string, Array<{ id: string; rawId: string; value: T }>>();
+    for (const [id, value] of entries) {
+      const node = this.resolveFileNodeId(id);
+      const list = groups.get(node.accountId) ?? [];
+      list.push({ id, rawId: node.id as string, value });
+      groups.set(node.accountId, list);
+    }
+    return groups;
   }
 
   /**
@@ -7553,106 +7618,136 @@ export class JMAPClient implements IJMAPClient {
   async updateFileNodes(updates: Record<string, Partial<Pick<FileNode, 'name' | 'parentId'>>>): Promise<{ updated: string[]; notUpdated: Record<string, string> }> {
     const entries = Object.entries(updates);
     if (entries.length === 0) return { updated: [], notUpdated: {} };
-    const accountId = this.getFilesAccountId();
 
     const updated: string[] = [];
     const notUpdated: Record<string, string> = {};
 
-    for (const batch of batched(entries, this.getMaxObjectsInSet())) {
-      const response = await this.request(
-        [["FileNode/set", { accountId, update: Object.fromEntries(batch) }, "fns0"]],
-        this.fileUsing(),
-      );
+    for (const [accountId, nodes] of this.groupFileNodeIds(entries)) {
+      for (const batch of batched(nodes, this.getMaxObjectsInSet())) {
+        const byRawId = new Map(batch.map(n => [n.rawId, n.id]));
+        const update: Record<string, Record<string, unknown>> = {};
+        for (const n of batch) {
+          const patch: Record<string, unknown> = { ...n.value };
+          if ('parentId' in n.value) {
+            try {
+              patch.parentId = this.parentInAccount(n.value.parentId ?? null, accountId);
+            } catch (error) {
+              notUpdated[n.id] = error instanceof Error ? error.message : 'not updated';
+              continue;
+            }
+          }
+          update[n.rawId] = patch;
+        }
+        if (Object.keys(update).length === 0) continue;
 
-      const result = response.methodResponses?.[0];
-      if (!result || result[0] === "error") {
-        throw new Error(result?.[1]?.description || "FileNode/set update failed");
-      }
+        const response = await this.request(
+          [["FileNode/set", { accountId, update }, "fns0"]],
+          this.fileUsing(),
+        );
 
-      const updatedMap: Record<string, unknown> = result[1].updated || {};
-      const notUpdatedMap: Record<string, { description?: string }> = result[1].notUpdated || {};
-      for (const id of Object.keys(notUpdatedMap)) {
-        notUpdated[id] = notUpdatedMap[id]?.description || 'not updated';
+        const result = response.methodResponses?.[0];
+        if (!result || result[0] === "error") {
+          throw new Error(result?.[1]?.description || "FileNode/set update failed");
+        }
+
+        const updatedMap: Record<string, unknown> = result[1].updated || {};
+        const notUpdatedMap: Record<string, { description?: string }> = result[1].notUpdated || {};
+        for (const rawId of Object.keys(notUpdatedMap)) {
+          notUpdated[byRawId.get(rawId) ?? rawId] = notUpdatedMap[rawId]?.description || 'not updated';
+        }
+        // Servers may omit the `updated` map; treat anything not rejected as updated.
+        const done = Object.keys(updatedMap).length > 0
+          ? Object.keys(updatedMap).map(rawId => byRawId.get(rawId) ?? rawId)
+          : Object.keys(update).map(rawId => byRawId.get(rawId) as string).filter(id => !(id in notUpdated));
+        updated.push(...done);
       }
-      // Servers may omit the `updated` map; treat anything not rejected as updated.
-      updated.push(...(Object.keys(updatedMap).length > 0
-        ? Object.keys(updatedMap)
-        : batch.map(([id]) => id).filter(id => !(id in notUpdated))));
     }
 
     return { updated, notUpdated };
   }
 
   async destroyFileNodes(ids: string[]): Promise<{ destroyed: string[]; notDestroyed: string[] }> {
-    const accountId = this.getFilesAccountId();
     const destroyed: string[] = [];
 
-    for (const batch of batched(ids, this.getMaxObjectsInSet())) {
-      const response = await this.request(
-        [["FileNode/set", {
-          accountId,
-          destroy: batch,
-          onDestroyRemoveChildren: true,
-        }, "fns0"]],
-        this.fileUsing(),
-      );
+    for (const [accountId, nodes] of this.groupFileNodeIds(ids.map(id => [id, null] as [string, null]))) {
+      for (const batch of batched(nodes, this.getMaxObjectsInSet())) {
+        const byRawId = new Map(batch.map(n => [n.rawId, n.id]));
+        const response = await this.request(
+          [["FileNode/set", {
+            accountId,
+            destroy: batch.map(n => n.rawId),
+            onDestroyRemoveChildren: true,
+          }, "fns0"]],
+          this.fileUsing(),
+        );
 
-      const result = response.methodResponses?.[0];
-      if (!result || result[0] === "error") {
-        throw new Error(result?.[1]?.description || "FileNode/set destroy failed");
+        const result = response.methodResponses?.[0];
+        if (!result || result[0] === "error") {
+          throw new Error(result?.[1]?.description || "FileNode/set destroy failed");
+        }
+
+        const notDestroyedMap: Record<string, { type?: string; description?: string }> = result[1].notDestroyed || {};
+        const notDestroyedIds = Object.keys(notDestroyedMap);
+
+        if (notDestroyedIds.length > 0) {
+          const firstError = notDestroyedMap[notDestroyedIds[0]];
+          throw new Error(firstError?.description || `Failed to delete ${notDestroyedIds.length} file(s)`);
+        }
+
+        destroyed.push(...((result[1].destroyed || []) as string[]).map(rawId => byRawId.get(rawId) ?? rawId));
       }
-
-      const notDestroyedMap: Record<string, { type?: string; description?: string }> = result[1].notDestroyed || {};
-      const notDestroyedIds = Object.keys(notDestroyedMap);
-
-      if (notDestroyedIds.length > 0) {
-        const firstError = notDestroyedMap[notDestroyedIds[0]];
-        throw new Error(firstError?.description || `Failed to delete ${notDestroyedIds.length} file(s)`);
-      }
-
-      destroyed.push(...(result[1].destroyed || []));
     }
 
     return { destroyed, notDestroyed: [] };
   }
 
+  /**
+   * Copy a file, or a folder with everything in it, into `parentId` (which
+   * may be in another account). A folder node carries no content, so creating
+   * one "copy" node would only make an empty folder: the subtree is recreated
+   * level by level. Across accounts the file contents go through Blob/copy.
+   */
   async copyFileNode(id: string, newName: string, parentId: string | null): Promise<FileNode> {
-    // Copy: get original, upload blob reference, create new node
-    const nodes = await this.getFileNodes([id]);
-    if (nodes.length === 0) throw new Error('File node not found');
-    const original = nodes[0];
+    const source = this.resolveFileNodeId(id);
+    const target = this.resolveFileNodeId(parentId);
 
-    const accountId = this.getFilesAccountId();
-    const createProps: Record<string, unknown> = {
-      name: newName,
-      type: original.type,
-      blobId: original.blobId,
-      size: original.size,
+    const tree = await this.fetchAllFileNodes(source.accountId);
+    const original = tree.find(n => n.id === source.id);
+    if (!original) throw new Error('File node not found');
+    const isFolderNode = (n: FileNode) => n.blobId == null;
+
+    const copyBlob = async (blobId: string): Promise<string> => {
+      if (source.accountId === target.accountId) return blobId;
+      const response = await this.request([
+        ["Blob/copy", { fromAccountId: source.accountId, accountId: target.accountId, blobIds: [blobId] }, "bc0"],
+      ], this.fileUsing());
+      const result = response.methodResponses?.[0];
+      const copied = result?.[0] === "Blob/copy" ? result[1].copied?.[blobId] : undefined;
+      if (!copied) {
+        throw new Error(result?.[1]?.notCopied?.[blobId]?.description || result?.[1]?.description || "Failed to copy file content");
+      }
+      return copied as string;
     };
-    if (parentId !== null) {
-      createProps.parentId = parentId;
-    }
 
-    const response = await this.request(
-      [["FileNode/set", {
-        accountId,
-        create: {
-          copy0: createProps,
-        },
-      }, "fns0"]],
-      this.fileUsing(),
-    );
+    const copyInto = async (node: FileNode, name: string, parent: string | null): Promise<FileNode> => {
+      const props: Record<string, unknown> = { name };
+      if (parent !== null) props.parentId = parent;
+      if (!isFolderNode(node)) {
+        props.type = node.type;
+        props.blobId = await copyBlob(node.blobId as string);
+        props.size = node.size;
+      }
+      const created = await this.createFileNodeIn(target.accountId, props, 'copy');
+      if (isFolderNode(node)) {
+        for (const child of tree.filter(n => n.parentId === node.id)) {
+          await copyInto(child, child.name, created.id);
+        }
+      }
+      return created;
+    };
 
-    const result = response.methodResponses?.[0];
-    if (!result || result[0] === "error") {
-      throw new Error(result?.[1]?.description || "FileNode copy failed");
-    }
-    const created = result[1].created?.copy0;
-    if (!created) {
-      const err = result[1].notCreated?.copy0;
-      throw new Error(err?.description || "Failed to copy file node");
-    }
-    return created as FileNode;
+    const created = await copyInto(withDecodedName(original), newName, target.id);
+    return this.namespaceFileNode(created, target.accountId);
   }
 
   async downloadBlob(blobId: string, name?: string, type?: string, accountId?: string): Promise<void> {
