@@ -10,7 +10,7 @@ import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
 import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { useMessageListTabsStore } from "@/stores/message-list-tabs-store";
@@ -612,8 +612,10 @@ export function findArchiveMailbox(
  * the account's own (undefined). During an unscoped ("All folders") search
  * the hits come from the primary account even while a shared folder is
  * selected, so deriving the owner from that folder asks the wrong account and
- * `getEmail` returns nothing. In that case the caller's own account is used
- * (searching the shared owners too is a separate issue). (#923)
+ * `getEmail` returns nothing. In that case the caller's own account is used.
+ * (#923) Since #1082 the unscoped search stamps its hits with their source
+ * account (own or shared), so this only decides for the rare unstamped row,
+ * e.g. one a plugin added to the results.
  */
 export function resolveUnstampedEmailAccountId(opts: {
   mailboxes: Mailbox[];
@@ -1012,13 +1014,27 @@ export function buildTagViewAccountClients(passedClient: IJMAPClient): UnifiedAc
 }
 
 /**
+ * Whether a search is running under the "All folders" scope (`searchMailboxId`
+ * "") of the standard (non-unified) list. That scope spans every folder of the
+ * own account AND of the group/shared accounts this login reaches, so the
+ * search fans out like a tag view and stamps its hits with their source
+ * account (#1082). A search scoped to one folder stays single-account.
+ */
+function isUnscopedSearchActive(
+  s: Pick<EmailStore, 'isUnifiedView' | 'searchMailboxId' | 'searchQuery' | 'searchFilters'>,
+): boolean {
+  return !s.isUnifiedView && s.searchMailboxId === '' && (!!s.searchQuery || !isFilterEmpty(s.searchFilters));
+}
+
+/**
  * Whether the current list mixes messages from several accounts, so actions
  * must route by each email's source stamps rather than by the selected
- * folder: the unified / cross-account views, and a tag view (#1038).
+ * folder: the unified / cross-account views, a tag view (#1038) and an
+ * "All folders" search (#1082).
  */
 function isAggregateListView(): boolean {
   const s = useEmailStore.getState();
-  return s.isUnifiedView || !!s.selectedKeyword;
+  return s.isUnifiedView || !!s.selectedKeyword || isUnscopedSearchActive(s);
 }
 
 /**
@@ -1928,16 +1944,26 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // Paginate with the same scope the search itself ran under, not the
         // folder that happens to be open in the list.
         const { searchMailboxId } = get();
-        const mailboxes = resolveActionMailboxes();
-        const mailbox = mailboxes.find(mb => mb.id === searchMailboxId);
-        const jmapMailboxId = mailbox?.originalId || searchMailboxId;
-        const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
-
-        if (hasFilters) {
-          const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
-          result = await effectiveClient.advancedSearchEmails(filter, accountId, emailsPerPage, position);
+        if (searchMailboxId === '') {
+          // "All folders": the next page of the same own + group account
+          // fan-out the search ran (#1082).
+          const built = buildTagViewAccountClients(client);
+          result = hasFilters
+            ? await advancedSearchAcrossAccounts(built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, position)
+            : await searchAcrossAccounts(built, searchQuery, emailsPerPage, position);
+          set({ unifiedErrors: result.errors });
         } else {
-          result = await effectiveClient.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, position);
+          const mailboxes = resolveActionMailboxes();
+          const mailbox = mailboxes.find(mb => mb.id === searchMailboxId);
+          const jmapMailboxId = mailbox?.originalId || searchMailboxId;
+          const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
+
+          if (hasFilters) {
+            const filter = buildJMAPFilter(searchQuery, searchFilters, jmapMailboxId);
+            result = await effectiveClient.advancedSearchEmails(filter, accountId, emailsPerPage, position);
+          } else {
+            result = await effectiveClient.searchEmails(searchQuery, jmapMailboxId, accountId, emailsPerPage, position);
+          }
         }
       } else if (selectedKeyword) {
         // Tag view: the next page of the same cross-account fan-out the
@@ -2734,9 +2760,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         result = await searchUnifiedEmails(built, unifiedRole, query, emailsPerPage, 0);
         unifiedErrors = result.errors;
 
+      } else if (searchMailboxId === '') {
+        // "All folders" (the default): every folder of the own account AND of
+        // every group/shared account this login reaches - the same fan-out the
+        // tag views use (#1038). A single own-account query silently skipped
+        // the shared accounts' mail (#1082).
+        const built = buildTagViewAccountClients(client);
+        result = await searchAcrossAccounts(built, query, emailsPerPage, 0);
+        unifiedErrors = result.errors;
+
       } else {
-        // Scope the search to the folder picked in the search panel; "" (the
-        // default) searches across all folders.
+        // Scope the search to the folder picked in the search panel.
         const mailboxes = resolveActionMailboxes();
         const mailbox = mailboxes.find(mb => mb.id === searchMailboxId);
         // Use originalId for shared mailboxes
@@ -2837,6 +2871,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           (mailboxId) => buildJMAPFilter(searchQuery, searchFilters, mailboxId),
           emailsPerPage,
           0,
+        );
+        unifiedErrors = result.errors;
+
+      } else if (searchMailboxId === '') {
+        // "All folders": fan out over the own + group/shared accounts with a
+        // filter that carries no inMailbox clause (#1082).
+        const built = buildTagViewAccountClients(client);
+        result = await advancedSearchAcrossAccounts(
+          built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, 0,
         );
         unifiedErrors = result.errors;
 
@@ -3709,7 +3752,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // accounts (#1038), so an Email change in any of them concerns them.
       const anyEmailChanged = Object.values(change.changed).some((c) => c?.Email);
       const tagViewChanged = !!get().selectedKeyword && anyEmailChanged;
-      if (accountChanges?.Email || syncedAccountEmailState || tagViewChanged) {
+      // So does an "All folders" search (#1082).
+      const unscopedSearchChanged = isUnscopedSearchActive(get()) && anyEmailChanged;
+      if (accountChanges?.Email || syncedAccountEmailState || tagViewChanged || unscopedSearchChanged) {
         const applied = syncedAccountEmailState
           ? await get().applyEmailDelta(client, syncedAccountEmailState)
           : false;
@@ -3862,10 +3907,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           // A refresh while a search is active must re-run it under the
           // search's own folder scope, which is independent of selectedMailbox.
           const { searchMailboxId } = get();
-          const scopeMailbox = mailboxes.find(mb => mb.id === searchMailboxId);
-          const filter = buildJMAPFilter(searchQuery, searchFilters, scopeMailbox?.originalId || searchMailboxId);
-          const scopeAccountId = scopeMailbox?.isShared ? scopeMailbox.accountId : undefined;
-          result = await effectiveClient.advancedSearchEmails(filter, scopeAccountId, emailsPerPage, 0);
+          if (searchMailboxId === '') {
+            // "All folders": the same own + group account fan-out the search
+            // ran, so a change in a group account reaches the list (#1082).
+            const built = buildTagViewAccountClients(client);
+            result = await advancedSearchAcrossAccounts(
+              built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, 0,
+            );
+            unifiedErrors = result.errors;
+          } else {
+            const scopeMailbox = mailboxes.find(mb => mb.id === searchMailboxId);
+            const filter = buildJMAPFilter(searchQuery, searchFilters, scopeMailbox?.originalId || searchMailboxId);
+            const scopeAccountId = scopeMailbox?.isShared ? scopeMailbox.accountId : undefined;
+            result = await effectiveClient.advancedSearchEmails(filter, scopeAccountId, emailsPerPage, 0);
+          }
         } else {
           result = await effectiveClient.getEmails(jmapMailboxId, accountId, emailsPerPage, 0, undefined, true, undefined, getMessageListOrderFor(mailbox?.role));
           // This page is the new delta-sync baseline for the folder; the

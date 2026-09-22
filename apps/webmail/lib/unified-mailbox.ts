@@ -513,6 +513,73 @@ export async function fetchTagEmails(
   position: number,
   order: SortLevel[] = [],
 ): Promise<UnifiedFetchResult> {
+  return fanOutAccountQuery(
+    accounts,
+    (account, jmapAccountId) => account.client.getEmails(
+      undefined, jmapAccountId, limit, position, keyword, true, undefined, order,
+    ),
+    compareEmails(order, { pinnedFirst: true }),
+  );
+}
+
+/**
+ * Text search over every folder of every given account: the "All folders"
+ * scope of the standard search panel. One `searchEmails` per account with no
+ * `inMailbox` constraint, merged newest first.
+ *
+ * The unscoped search used to ask only the login's own account, so mail in
+ * the group/shared accounts the same login reaches (whose folders sit right
+ * there in the sidebar) was silently missing from every "All folders"
+ * search - an ordinary "No results found" with no hint (#1082).
+ */
+export async function searchAcrossAccounts(
+  accounts: UnifiedAccountClient[],
+  query: string,
+  limit: number,
+  position: number,
+): Promise<UnifiedFetchResult> {
+  return fanOutAccountQuery(
+    accounts,
+    (account, jmapAccountId) => account.client.searchEmails(query, undefined, jmapAccountId, limit, position),
+    newestFirst,
+  );
+}
+
+/**
+ * Like `searchAcrossAccounts`, with a JMAP advanced filter that was built
+ * WITHOUT an `inMailbox` clause (`buildJMAPFilter(query, filters, undefined)`).
+ */
+export async function advancedSearchAcrossAccounts(
+  accounts: UnifiedAccountClient[],
+  filter: Record<string, unknown>,
+  limit: number,
+  position: number,
+): Promise<UnifiedFetchResult> {
+  return fanOutAccountQuery(
+    accounts,
+    (account, jmapAccountId) => account.client.advancedSearchEmails(filter, jmapAccountId, limit, position),
+    newestFirst,
+  );
+}
+
+function newestFirst(a: Email, b: Email): number {
+  return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
+}
+
+/**
+ * Runs one folder-less request per account (own entries against the client's
+ * primary account, shared entries against the owner's JMAP accountId), stamps
+ * every returned email with its source account and merges the pages under
+ * `sort`. A failing account lands in `errors` and does not hide the others.
+ */
+async function fanOutAccountQuery(
+  accounts: UnifiedAccountClient[],
+  run: (
+    account: UnifiedAccountClient,
+    jmapAccountId: string | undefined,
+  ) => Promise<{ emails: Email[]; total: number; hasMore: boolean }>,
+  sort: (a: Email, b: Email) => number,
+): Promise<UnifiedFetchResult> {
   const errors = new Map<string, string>();
 
   type AccountResult = {
@@ -523,9 +590,7 @@ export async function fetchTagEmails(
   const promises = accounts.map(async (account): Promise<AccountResult> => {
     const jmapAccountId = account.isShared ? account.accountId : undefined;
     try {
-      const result = await account.client.getEmails(
-        undefined, jmapAccountId, limit, position, keyword, true, undefined, order,
-      );
+      const result = await run(account, jmapAccountId);
       return { account, result };
     } catch (err) {
       errors.set(account.accountId, err instanceof Error ? err.message : String(err));
@@ -558,7 +623,7 @@ export async function fetchTagEmails(
     if (result.hasMore) anyHasMore = true;
   }
 
-  mergedEmails.sort(compareEmails(order, { pinnedFirst: true }));
+  mergedEmails.sort(sort);
 
   return { emails: mergedEmails, total: totalSum, hasMore: anyHasMore, errors };
 }
