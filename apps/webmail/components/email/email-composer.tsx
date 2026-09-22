@@ -2093,7 +2093,10 @@ export function EmailComposer({
     }
 
     const ccAddresses = expandRecipients(withInput(cc, ccInput));
-    const bccAddresses = expandRecipients(withInput(bcc, bccInput));
+    // RFC 8621 Identity.bcc: addresses to Bcc on every message sent with the
+    // identity. The server does not add them; only the send carries them, so
+    // a saved draft does not pick up a copy each time it is reopened.
+    const bccAddresses = expandRecipients([...withInput(bcc, bccInput), ...(currentIdentity?.bcc ?? [])]);
 
     if (!canSend) {
       const errors: { to?: boolean; body?: boolean } = {};
