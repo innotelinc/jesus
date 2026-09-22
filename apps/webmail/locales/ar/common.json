@@ -2002,6 +2002,7 @@
       "actions": "الإجراءات",
       "add_action": "إضافة إجراء",
       "stop_processing": "إيقاف معالجة القواعد التالية",
+      "include_spam": "نقل الرسائل المصنفة كرسائل مزعجة أيضًا",
       "attachment_type_placeholder": "مثال: pdf, doc, jpg",
       "value_placeholder_multi": "القيمة (عدة قيم مفصولة بفواصل)",
       "condition_fields": {

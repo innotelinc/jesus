@@ -1995,6 +1995,7 @@
       "actions": "동작",
       "add_action": "동작 추가",
       "stop_processing": "이후 규칙 무시하기",
+      "include_spam": "스팸으로 표시된 메시지도 이동",
       "attachment_type_placeholder": "예: pdf, doc, jpg",
       "value_placeholder_multi": "값 (쉼표로 여러 개 구분)",
       "condition_fields": {

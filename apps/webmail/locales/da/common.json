@@ -1998,6 +1998,7 @@
       "actions": "Handlinger",
       "add_action": "Tilføj handling",
       "stop_processing": "Stop behandling af efterfølgende regler",
+      "include_spam": "Flyt også beskeder, der er markeret som spam",
       "attachment_type_placeholder": "f.eks. pdf, doc, jpg",
       "value_placeholder_multi": "Værdi (flere adskilt med komma)",
       "condition_fields": {

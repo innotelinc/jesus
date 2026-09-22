@@ -1995,6 +1995,7 @@
       "actions": "Azioni",
       "add_action": "Aggiungi azione",
       "stop_processing": "Interrompere l'elaborazione delle regole successive",
+      "include_spam": "Sposta anche i messaggi contrassegnati come spam",
       "attachment_type_placeholder": "es. pdf, doc, jpg",
       "value_placeholder_multi": "Valore (più valori separati da virgole)",
       "condition_fields": {

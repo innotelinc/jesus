@@ -1995,6 +1995,7 @@
       "actions": "Acties",
       "add_action": "Actie toevoegen",
       "stop_processing": "Verwerking van volgende regels stoppen",
+      "include_spam": "Ook berichten verplaatsen die als spam zijn gemarkeerd",
       "attachment_type_placeholder": "bijv. pdf, doc, jpg",
       "value_placeholder_multi": "Waarde (meerdere met komma's gescheiden)",
       "condition_fields": {

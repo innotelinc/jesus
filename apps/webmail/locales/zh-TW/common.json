@@ -2002,6 +2002,7 @@
       "actions": "動作",
       "add_action": "新增動作",
       "stop_processing": "停止處理後續規則",
+      "include_spam": "同時移動被標記為垃圾郵件的郵件",
       "attachment_type_placeholder": "例如：pdf、doc、jpg",
       "value_placeholder_multi": "值（多個用逗號分隔）",
       "condition_fields": {

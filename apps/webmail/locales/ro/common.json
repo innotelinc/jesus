@@ -2002,6 +2002,7 @@
       "actions": "Acțiuni",
       "add_action": "Adăugare acțiune",
       "stop_processing": "Opriți procesarea regulilor următoare",
+      "include_spam": "Mută și mesajele marcate ca spam",
       "attachment_type_placeholder": "de ex. pdf, doc, jpg",
       "value_placeholder_multi": "Valoare (mai multe valori separate prin virgule)",
       "condition_fields": {

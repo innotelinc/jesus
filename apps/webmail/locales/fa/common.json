@@ -2002,6 +2002,7 @@
       "actions": "عملیات‌ها",
       "add_action": "افزودن عملیات",
       "stop_processing": "توقف پردازش قوانین بعدی",
+      "include_spam": "پیام‌های علامت‌خورده به‌عنوان هرزنامه هم منتقل شوند",
       "attachment_type_placeholder": "مثال: pdf, doc, jpg",
       "value_placeholder_multi": "مقدار (چندتا با کاما جدا شوند)",
       "condition_fields": {

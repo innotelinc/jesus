@@ -2002,6 +2002,7 @@
       "actions": "Handlinger",
       "add_action": "Legg til handling",
       "stop_processing": "Ikke behandle flere regler",
+      "include_spam": "Flytt også meldinger som er merket som søppelpost",
       "attachment_type_placeholder": "f.eks. pdf, doc, jpg",
       "value_placeholder_multi": "Verdi (skill flere verdier med komma)",
       "condition_fields": {

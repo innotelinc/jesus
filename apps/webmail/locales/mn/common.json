@@ -2002,6 +2002,7 @@
       "actions": "Үйлдэл",
       "add_action": "Үйлдэл нэмэх",
       "stop_processing": "Дараагийн дүрмийг боловсруулахаа зогсоох",
+      "include_spam": "Спам гэж тэмдэглэсэн захидлыг мөн зөөх",
       "attachment_type_placeholder": "жишээ нь pdf, doc, jpg",
       "value_placeholder_multi": "Утга (олон тоог таслалаар тусгаарласан)",
       "condition_fields": {

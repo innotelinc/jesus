@@ -1998,6 +1998,7 @@
       "actions": "Műveletek",
       "add_action": "Művelet hozzáadása",
       "stop_processing": "További szabályok feldolgozásának leállítása",
+      "include_spam": "A levélszemétnek jelölt üzenetek áthelyezése is",
       "attachment_type_placeholder": "pl. pdf, doc, jpg",
       "value_placeholder_multi": "Érték (több érték vesszővel elválasztva)",
       "condition_fields": {

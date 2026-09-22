@@ -1995,6 +1995,7 @@
       "actions": "操作",
       "add_action": "添加操作",
       "stop_processing": "停止处理后续规则",
+      "include_spam": "同时移动被标记为垃圾邮件的邮件",
       "attachment_type_placeholder": "例如：pdf、doc、jpg",
       "value_placeholder_multi": "值（多个用逗号分隔）",
       "condition_fields": {
