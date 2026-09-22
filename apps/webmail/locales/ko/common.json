@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "종료일은 시작일보다 나중이어야 해요",
         "start_in_past": "시작일이 이미 지났어요",
-        "empty_body": "메시지 내용이 비어있어요. 상대방에게 빈 메일이 가게 돼요"
+        "empty_body": "메시지 내용이 비어있어요. 상대방에게 빈 메일이 가게 돼요",
+        "subject_too_long": "제목이 서버에 비해 너무 깁니다(최대 {max}바이트).",
+        "body_too_long": "메시지가 서버에 비해 너무 깁니다(서식 포함 최대 {max}바이트)."
       }
     },
     "folders": {

@@ -1777,7 +1777,9 @@
       "warnings": {
         "end_before_start": "A befejező dátumnak a kezdő dátum után kell lennie",
         "start_in_past": "A kezdő dátum a múltban van",
-        "empty_body": "Az üzenet szövege üres - a címzettek üres választ kapnak"
+        "empty_body": "Az üzenet szövege üres - a címzettek üres választ kapnak",
+        "subject_too_long": "A tárgy túl hosszú a kiszolgálónak (legfeljebb {max} bájt).",
+        "body_too_long": "Az üzenet túl hosszú a kiszolgálónak (legfeljebb {max} bájt a formázással együtt)."
       }
     },
     "folders": {

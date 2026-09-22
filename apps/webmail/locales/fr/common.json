@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "La date de fin doit être postérieure à la date de début",
         "start_in_past": "La date de début est dans le passé",
-        "empty_body": "Le corps du message est vide - les destinataires recevront une réponse vide"
+        "empty_body": "Le corps du message est vide - les destinataires recevront une réponse vide",
+        "subject_too_long": "L'objet est trop long pour le serveur ({max} octets au maximum).",
+        "body_too_long": "Le message est trop long pour le serveur ({max} octets au maximum, mise en forme comprise)."
       }
     },
     "folders": {

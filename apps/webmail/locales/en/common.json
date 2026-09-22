@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "End date must be after start date",
         "start_in_past": "Start date is in the past",
-        "empty_body": "Message body is empty - recipients will receive a blank reply"
+        "empty_body": "Message body is empty - recipients will receive a blank reply",
+        "subject_too_long": "The subject is too long for the server (at most {max} bytes).",
+        "body_too_long": "The message is too long for the server (at most {max} bytes, formatting included)."
       }
     },
     "folders": {

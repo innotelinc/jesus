@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "La data de finalització ha de ser posterior a la data d'inici",
         "start_in_past": "La data d'inici és al passat",
-        "empty_body": "El cos del missatge està buit - els destinataris rebran una resposta en blanc"
+        "empty_body": "El cos del missatge està buit - els destinataris rebran una resposta en blanc",
+        "subject_too_long": "L'assumpte és massa llarg per al servidor (com a màxim {max} bytes).",
+        "body_too_long": "El missatge és massa llarg per al servidor (com a màxim {max} bytes, amb el format inclòs)."
       }
     },
     "folders": {

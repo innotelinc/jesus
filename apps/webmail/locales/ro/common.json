@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "Data de încheiere trebuie să fie ulterioară datei de începere",
         "start_in_past": "Data de începere este în trecut",
-        "empty_body": "Corpul mesajului este gol – destinatarii vor primi un răspuns gol"
+        "empty_body": "Corpul mesajului este gol – destinatarii vor primi un răspuns gol",
+        "subject_too_long": "Subiectul este prea lung pentru server (cel mult {max} octeți).",
+        "body_too_long": "Mesajul este prea lung pentru server (cel mult {max} octeți, inclusiv formatarea)."
       }
     },
     "folders": {

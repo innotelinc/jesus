@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "结束日期必须晚于开始日期",
         "start_in_past": "开始日期已在过去",
-        "empty_body": "邮件正文为空--收件人将收到空白回复"
+        "empty_body": "邮件正文为空--收件人将收到空白回复",
+        "subject_too_long": "主题对服务器来说太长（最多 {max} 字节）。",
+        "body_too_long": "消息对服务器来说太长（含格式最多 {max} 字节）。"
       }
     },
     "folders": {

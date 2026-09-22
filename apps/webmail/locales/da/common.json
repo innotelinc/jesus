@@ -1777,7 +1777,9 @@
       "warnings": {
         "end_before_start": "Slutdato skal være efter startdato",
         "start_in_past": "Startdato er tidligere end i dag",
-        "empty_body": "Beskedteksten er tom - modtagere vil modtage et tomt svar"
+        "empty_body": "Beskedteksten er tom - modtagere vil modtage et tomt svar",
+        "subject_too_long": "Emnet er for langt til serveren (højst {max} byte).",
+        "body_too_long": "Beskeden er for lang til serveren (højst {max} byte inkl. formatering)."
       }
     },
     "folders": {

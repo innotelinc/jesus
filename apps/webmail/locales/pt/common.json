@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "A data de fim deve ser posterior à data de início",
         "start_in_past": "A data de início está no passado",
-        "empty_body": "O corpo da mensagem está vazio - os destinatários receberão uma resposta em branco"
+        "empty_body": "O corpo da mensagem está vazio - os destinatários receberão uma resposta em branco",
+        "subject_too_long": "O assunto é demasiado longo para o servidor (no máximo {max} bytes).",
+        "body_too_long": "A mensagem é demasiado longa para o servidor (no máximo {max} bytes, incluindo a formatação)."
       }
     },
     "folders": {
