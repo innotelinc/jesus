@@ -57,6 +57,7 @@ const STATIC_ASSETS = [
   '/icon-192x192.png',
   '/branding/logo.png',
   '/notification/cheerful-527.mp3',
+  '/demo/prototype-v3.png',
 ];
 
 beforeEach(() => {

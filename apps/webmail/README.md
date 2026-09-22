@@ -19,6 +19,10 @@
 
 Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https://stalw.art/). It talks to Stalwart over JMAP and puts mail, calendar, contacts and files behind one login, with one set of settings and one admin dashboard.
 
+<p align="center">
+  <a href="https://bulwarkmail.org/docs/features/overview"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/dark-laptop-phone.webp" /><img src="screenshots/light-laptop-phone.webp" alt="Bulwark inbox on a laptop, with the same message open on a phone" width="100%" /></picture></a>
+</p>
+
 ## Contents
 
 - [Screenshots](#screenshots)
@@ -33,37 +37,19 @@ Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https
 
 ## Screenshots
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="screenshots/mail-dark.png" />
-  <img src="screenshots/mail-white.png" alt="Mail view" width="100%" />
-</picture>
+<p align="center">
+  <a href="https://bulwarkmail.org/docs/features/calendar"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/dark-calendar-week.webp" /><img src="screenshots/light-calendar-week.webp" alt="Calendar week view with events from several calendars" width="49%" /></picture></a>
+  <a href="https://bulwarkmail.org/docs/features/contacts"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/dark-contact.webp" /><img src="screenshots/light-contact.webp" alt="Contact details with recent mail and upcoming events" width="49%" /></picture></a>
+  <br />
+  <sub>Calendar week view&nbsp;&nbsp;·&nbsp;&nbsp;Contact details with recent mail and upcoming events</sub>
+</p>
 
-<table>
-<tr>
-<td width="50%"><img src="screenshots/calendar.png" alt="Calendar" /></td>
-<td width="50%"><img src="screenshots/contacts.png" alt="Contacts" /></td>
-</tr>
-<tr>
-<td><sub><b>Calendar:</b> month, week, day and agenda views. Drag events to reschedule them, send iMIP invitations, subscribe to CalDAV calendars.</sub></td>
-<td><sub><b>Contacts:</b> several address books, groups, vCard import and export, and address completion in the composer.</sub></td>
-</tr>
-<tr>
-<td><img src="screenshots/theme.png" alt="Themes" /></td>
-<td><img src="screenshots/plugins.png" alt="Plugins" /></td>
-</tr>
-<tr>
-<td><sub><b>Themes:</b> pick a bundled theme or upload your own as a ZIP. Admins can enforce one.</sub></td>
-<td><sub><b>Plugins:</b> add features with bundled or third-party plugins, installed from a ZIP.</sub></td>
-</tr>
-<tr>
-<td><img src="screenshots/mail-white.png" alt="Light mode" /></td>
-<td><img src="screenshots/settings.png" alt="Settings" /></td>
-</tr>
-<tr>
-<td><sub><b>Light mode:</b> HTML email colors are remapped by luminance, so text stays readable in either theme.</sub></td>
-<td><sub><b>Settings:</b> appearance, identities, filters, templates and security.</sub></td>
-</tr>
-</table>
+<p align="center">
+  <a href="https://bulwarkmail.org/docs/features/email/composing"><picture><source media="(prefers-color-scheme: dark)" srcset="screenshots/dark-composer.webp" /><img src="screenshots/light-composer.webp" alt="Rich-text composer next to the message list" width="49%" /></picture></a>
+  <a href="https://bulwarkmail.org/docs/guides/customization"><img src="screenshots/split-inbox.webp" alt="The inbox split diagonally between the light and dark theme" width="49%" /></a>
+  <br />
+  <sub>Composer with identities and formatting&nbsp;&nbsp;·&nbsp;&nbsp;Light and dark themes</sub>
+</p>
 
 ## Features
 
@@ -99,7 +85,7 @@ Then open `http://localhost:3000`. A setup wizard asks for your Stalwart server 
 
 ## Configuration
 
-Most installs are set up in the wizard on first launch and changed later in the [admin dashboard](https://bulwarkmail.org/docs/guides/admin). You can also use environment variables, which fit read-only or immutable deployments better. When both are set, the environment variable wins.
+Most installs are set up in the wizard on first launch and changed later in the [admin dashboard](https://bulwarkmail.org/docs/guides/admin). You can also use environment variables, which fit read-only or immutable deployments better. When both set the same key, the value saved in the admin config wins, so an environment variable only fills in what the admin config leaves unset.
 
 ```env
 JMAP_SERVER_URL=https://mail.example.com
