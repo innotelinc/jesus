@@ -1,10 +1,10 @@
 # Contributing to Bulwark Webmail
 
-Thanks for helping build the webmail we all wished existed. Bug reports, feature requests, translations and patches are all welcome.
+Bug reports, feature requests, translations and patches are all welcome.
 
-The full guide lives in the documentation: **[Contributing](https://bulwarkmail.org/docs/development/contributing)**. It covers the development setup, the test suites, translations and right-to-left layouts, code style, and the pull request process.
+The full guide is in the documentation under [Contributing](https://bulwarkmail.org/docs/development/contributing). It covers the development setup, the test suites, translations and right-to-left layouts, code style, and how pull requests are reviewed.
 
-The short version:
+To get a development server running:
 
 ```bash
 git clone https://github.com/bulwarkmail/webmail.git
@@ -14,8 +14,8 @@ cp .env.dev.example .env.local   # built-in mock JMAP server, no mail server nee
 npm run dev
 ```
 
-Before opening a pull request, run `npm run typecheck && npm run lint && npx vitest run`, and use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …).
+Before you open a pull request, run `npm run typecheck && npm run lint && npx vitest run`. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` and so on).
 
-- **Questions**: ask on [Discord](https://discord.gg/tYCujymGrT).
-- **Documentation fixes**: the docs are Markdown in the [website repository](https://github.com/bulwarkmail/website/tree/main/docs).
-- **Security vulnerabilities**: report them privately to [dev@bulwarkmail.org](mailto:dev@bulwarkmail.org) or through a [security advisory](https://github.com/bulwarkmail/webmail/security/advisories/new), never in a public issue.
+- Questions: ask on [Discord](https://discord.gg/tYCujymGrT).
+- Documentation fixes: the docs are Markdown files in the [website repository](https://github.com/bulwarkmail/website/tree/main/docs).
+- Security vulnerabilities: report them privately to [dev@bulwarkmail.org](mailto:dev@bulwarkmail.org) or through a [security advisory](https://github.com/bulwarkmail/webmail/security/advisories/new), never in a public issue.
