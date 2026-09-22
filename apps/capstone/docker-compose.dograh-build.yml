@@ -32,6 +32,34 @@
 # While this override file is on the compose command, the locally built images
 # (tagged dograh-local/dograh-api:capstone / dograh-local/dograh-ui:capstone)
 # replace the pulled images.
+#
+# ── MEASURED: on the capstone host, cap the heap AND build the UI elsewhere ──
+# Capping NODE_BUILD_HEAP_MB is necessary but NOT sufficient on .30. The UI
+# build dies at the same point every time — ~117 s in, during webpack's
+# PackFileCacheStrategy pass, right after "Creating an optimized production
+# build" — with exit 137 (SIGKILL), while the container's own cgroup sits at
+# only ~6 GiB of its 16 GiB limit and ~13 GB of host memory is free. It is not
+# the cgroup and not `next build`'s heap: the kill arrives from outside the
+# container's accounting, i.e. the Incus host `.30` runs on. Freeing 10 GB
+# inside `.30` first (stop grafana/prometheus/searxng/minio/n8n*/dashboard*/
+# workflow*/kokoro/speaches/tts-shim/otel-collector) did not move the failure
+# point at all, which is what rules the container out.
+#
+# So: build the UI on a host with room (the dev host, .46, succeeded first
+# try) and ship the image. ~250 MB over the LAN:
+#
+#   docker save dograh-local/dograh-ui:capstone | gzip -1 | \
+#     ssh root@192.168.1.30 'gunzip | docker load'
+#   ssh root@192.168.1.30 'cd /usr/src/projects/complete/2-voice/capstone && \
+#     docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#       up -d --no-build --force-recreate --no-deps dograh-api dograh-ui'
+#
+# `--no-build` matters: the override sets `pull_policy: build`, so a plain
+# `up -d` may try to rebuild and hit the same wall.
+#
+# The API image builds fine on .30 (it is pip, not webpack) — but not at the
+# same time: the two built in parallel once and the UI lost. Build one at a
+# time.
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
