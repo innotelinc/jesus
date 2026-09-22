@@ -1995,6 +1995,7 @@
       "actions": "Действия",
       "add_action": "Добавить действие",
       "stop_processing": "Прекратить обработку последующих правил",
+      "include_spam": "Перемещать также письма, помеченные как спам",
       "attachment_type_placeholder": "напр. pdf, doc, jpg",
       "value_placeholder_multi": "Значение (несколько через запятую)",
       "condition_fields": {

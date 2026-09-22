@@ -107,6 +107,7 @@ export function FilterRuleModal({
     rule?.actions.length ? [...rule.actions] : [makeEmptyAction()]
   );
   const [stopProcessing, setStopProcessing] = useState(rule?.stopProcessing ?? false);
+  const [includeSpam, setIncludeSpam] = useState(rule?.includeSpam ?? false);
 
   const modalRef = useFocusTrap({ isActive: true, onEscape: onClose });
 
@@ -193,8 +194,9 @@ export function FilterRuleModal({
       conditions: validConditions,
       actions: validActions,
       stopProcessing,
+      ...(includeSpam && validActions.some((a) => ACTIONS_WITH_MAILBOX.has(a.type)) ? { includeSpam: true } : {}),
     });
-  }, [name, matchType, conditions, actions, stopProcessing, rule, onSave, t, mailboxIdFor, mailboxPathMap]);
+  }, [name, matchType, conditions, actions, stopProcessing, includeSpam, rule, onSave, t, mailboxIdFor, mailboxPathMap]);
 
   const updateCondition = (index: number, updates: Partial<FilterCondition>) => {
     setConditions((prev) =>
@@ -586,6 +588,21 @@ export function FilterRuleModal({
               {t("stop_processing")}
             </label>
           </div>
+
+          {actions.some((a) => ACTIONS_WITH_MAILBOX.has(a.type)) && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="includeSpam"
+                checked={includeSpam}
+                onChange={(e) => setIncludeSpam(e.target.checked)}
+                className="rounded border-input"
+              />
+              <label htmlFor="includeSpam" className="text-sm text-foreground">
+                {t("include_spam")}
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border">

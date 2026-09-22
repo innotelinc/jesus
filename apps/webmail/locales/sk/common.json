@@ -2002,6 +2002,7 @@
       "actions": "Akcie",
       "add_action": "Pridať akciu",
       "stop_processing": "Zastaviť spracovanie ďalších pravidiel",
+      "include_spam": "Presúvať aj správy označené ako spam",
       "attachment_type_placeholder": "napr. pdf, doc, jpg",
       "value_placeholder_multi": "Hodnota (viac oddelených čiarkami)",
       "condition_fields": {

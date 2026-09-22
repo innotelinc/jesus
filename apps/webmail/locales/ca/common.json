@@ -2002,6 +2002,7 @@
       "actions": "Accions",
       "add_action": "Afegeix una acció",
       "stop_processing": "Atura el processament de les regles següents",
+      "include_spam": "Mou també els missatges marcats com a correu brossa",
       "attachment_type_placeholder": "p. ex. pdf, doc, jpg",
       "value_placeholder_multi": "Valor (múltiples separats per comes)",
       "condition_fields": {
