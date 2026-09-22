@@ -343,6 +343,47 @@ for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
 done
 # (reused for quieter compose output)
 COMPOSE_LOG=$(mktemp)
+# ── Resolve `vault://` references before compose ever sees them ─────────────
+# Compose interpolates .env *literally*, so a service written as
+# `KEY: "${KEY:-}"` receives the reference string as its credential when a
+# value is still a `vault://…` reference. That is exactly how the dograh OIDC
+# login broke: the token exchange posted the reference as the client secret and
+# Authentik answered `invalid_client`, with nothing in the API log naming the
+# credential. Everything downstream reads $ENV_FILE, so resolving here (and
+# repointing it at the resolved copy — `--env-file` replaces .env rather than
+# augmenting it, hence a complete file) fixes every compose call in this
+# script. `scripts/compose-vault.sh` is the same step for manual invocations.
+if grep -q 'vault://' "$ENV_FILE" 2>/dev/null; then
+    if ! grep -qE '^VAULT_ADDR=.+' "$ENV_FILE" 2>/dev/null; then
+        fail ".env holds vault:// references but VAULT_ADDR is unset — services would
+       receive the reference string as a credential. Set VAULT_ADDR (and
+       VAULT_TOKEN_FILE), or replace the references with plain values."
+    fi
+    RESOLVED_ENV="$REPO/data/.env.resolved"
+    VAULT_TMP="$(mktemp "$RESOLVED_ENV.XXXXXX")"
+    VAULT_ADDR_VALUE="$(sed -n 's/^VAULT_ADDR=//p' "$ENV_FILE" | head -1)"
+    VAULT_TOKEN_FILE_VALUE="$(sed -n 's/^VAULT_TOKEN_FILE=//p' "$ENV_FILE" | head -1)"
+    case "$VAULT_TOKEN_FILE_VALUE" in
+        ''|/*) ;;
+        *) VAULT_TOKEN_FILE_VALUE="$REPO/${VAULT_TOKEN_FILE_VALUE#./}" ;;
+    esac
+    if VAULT_ADDR="$VAULT_ADDR_VALUE" \
+       VAULT_TOKEN_FILE="$VAULT_TOKEN_FILE_VALUE" \
+       python3 "$REPO/scripts/vault-env.py" --out "$VAULT_TMP" "$ENV_FILE"; then
+        if grep -q 'vault://' "$VAULT_TMP"; then
+            rm -f "$VAULT_TMP"
+            fail "vault:// references did not resolve — refusing to boot with them as credentials"
+        fi
+        chmod 600 "$VAULT_TMP"
+        mv -f "$VAULT_TMP" "$RESOLVED_ENV"
+        ENV_FILE="$RESOLVED_ENV"
+        pass "vault:// references resolved → $RESOLVED_ENV"
+    else
+        rm -f "$VAULT_TMP"
+        fail "could not resolve the vault:// references in .env (see the vault-env output above)"
+    fi
+fi
+
 # The compose defaults to the prebuilt dograh images. If they aren't
 # published yet (or present locally), fall back to building both the api and
 # the ui from the dograh source (docker-compose.dograh-build.yml).

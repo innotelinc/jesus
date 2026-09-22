@@ -504,6 +504,71 @@ and would send the operator to the voice app instead of the dashboard after logi
 redirect URI is `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback` — strict, exactly
 one entry.
 
+### Voice app login (dograh OIDC): "Sign-in could not be completed"
+
+The voice app (dograh) signs operators in through its own Authentik application —
+client id `dograh`, redirect URI `https://dograh.<NPM_BASE_DOMAIN>/api/v1/auth/oidc/callback`,
+issuer `https://auth.<domain>/application/o/dograh/`. Two independent failures produce the
+same useless browser message, and each looks like the other from the UI:
+
+**1. The credential is a `vault://` reference that nothing resolved.** `.env` may hold
+`AUTHENTIK_CLIENT_SECRET=vault://cerulean/capstone#AUTHENTIK_CLIENT_SECRET`. Compose
+interpolates `.env` literally, so `docker-compose.yml`'s
+`AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"` hands the *reference string* to
+the container as the client secret. The authorize leg still succeeds (Authentik issues a
+code), and the API logs only:
+
+```
+WARNING | auth.py:254 | OIDC sign-in failed verification: Token exchange rejected by the identity provider
+```
+
+which names neither cause. **Always start this stack through `scripts/compose-vault.sh`**
+(it resolves references with `scripts/vault-env.py` and hands compose the resolved file):
+
+```bash
+scripts/compose-vault.sh --check                    # resolve, change nothing
+scripts/compose-vault.sh up -d dograh-api dograh-ui
+```
+
+A plain `docker compose up` regresses this silently. Note `--env-file` *replaces* `.env` as
+the interpolation source, which is why the wrapper writes a complete copy rather than a
+fragment. Confirm what the container actually holds — never trust the `.env`:
+
+```bash
+docker exec dograh-api python3 -c "import os,hashlib;\
+ v=os.environ.get('AUTHENTIK_CLIENT_SECRET','');\
+ print(len(v), hashlib.sha256(v.encode()).hexdigest()[:12], v.startswith('vault://'))"
+```
+
+The correct value is Authentik's, and can be read from its own database (hash, not value):
+
+```bash
+docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
+  "SELECT length(client_secret), encode(sha256(client_secret::bytea),'hex') FROM authentik_providers_oauth2_oauth2provider WHERE client_id='dograh';"
+```
+
+**2. The UI proxy follows the redirect server-side.** `/api/v1/auth/oidc/login` must answer
+**307** with the Authentik `authorize` URL *and* `set-cookie: dograh_oidc_state=…`. If it
+answers **200** with Authentik's HTML and no cookie, the Next proxy is using fetch's default
+redirect mode and swallowing both — the state/PKCE cookie never reaches the browser, and
+the callback can only answer `expired`. That is `dograh/patches/0001-…patch`
+(`redirect: "manual"`); if the running UI predates it, rebuild the image.
+
+```bash
+curl -si localhost:3010/api/v1/auth/oidc/login | head -6      # want 307 + location + set-cookie
+```
+
+Admission is a third gate after the token exchange: `AUTHENTIK_ALLOWED_GROUPS`
+(`cerulean-platform` here) is enforced by `api/services/auth/oidc_auth.py`, and
+`AUTHENTIK_ADMIN_EMAILS` grants admin. A user outside the allowed group completes the
+handshake and is then refused, so check membership when the token exchange is provably fine:
+
+```bash
+docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
+  "SELECT u.email FROM authentik_core_user u JOIN authentik_core_user_groups gu ON gu.user_id=u.id \
+    JOIN authentik_core_group g ON g.group_uuid=gu.group_id WHERE g.name='cerulean-platform';"
+```
+
 ### Authentik groups per stack (and per-stack access)
 
 `scripts/authentik_bootstrap.py` creates one Authentik **Group** per product

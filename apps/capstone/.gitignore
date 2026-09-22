@@ -39,3 +39,4 @@ dograh/upstream/
 data/vault/token/
 data/vault/init/
 data/vault/file/
+data/.env.resolved

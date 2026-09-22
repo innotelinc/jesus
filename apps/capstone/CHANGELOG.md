@@ -10,6 +10,36 @@ that is scanned continuously, a data-layer backup for the next host move, the
 shared-box softphone signaling that a profile-off PBX container had broken, and
 an Agents page that stopped paying one PBX round trip per agent, per row.
 
+### Dograh sign-in stops failing on a credential that was never a credential
+
+- **Fixed: "Sign-in could not be completed" on the voice app.** Two faults, one
+  symptom. The `.env` holds
+  `AUTHENTIK_CLIENT_SECRET=vault://cerulean/capstone#AUTHENTIK_CLIENT_SECRET`,
+  and compose interpolates `.env` **literally** — so the container received the
+  *reference string* as its OIDC client secret. The authorize leg still
+  succeeded (Authentik issued a code) and the API logged only "Token exchange
+  rejected by the identity provider", which names neither the credential nor
+  the reason: Authentik answered `invalid_client` for the literal reference,
+  for a wrong secret, and for an empty one, identically. Separately, the running
+  UI image predated `dograh/patches/0001` (`redirect: "manual"`), so its
+  `/api/v1/auth/oidc/login` proxy followed dograh-api's 307 to Authentik
+  server-side and returned Authentik's login page as a **200 on the app's own
+  origin**, dropping `set-cookie: dograh_oidc_state=…` — the state/PKCE cookie
+  the callback needs. Both were image/config faults rather than code faults,
+  which is why the fix was a rebuild plus a resolution step.
+- **New: `scripts/compose-vault.sh`.** Compose cannot resolve `vault://`
+  references and silently passes them through as credentials, so every
+  `docker compose` invocation for this stack now goes through a wrapper that
+  resolves with `scripts/vault-env.py` and hands compose the result via
+  `--env-file` (which *replaces* `.env` as the interpolation source, hence a
+  complete copy written atomically, `0600`, gitignored). A stack whose `.env`
+  still holds references but has no `VAULT_ADDR` is **refused** rather than
+  started with literal `vault://` strings, and `--check` is the assertion for
+  CI. `docs/operations.md` records the three gates a login passes through —
+  credential, UI proxy redirect mode, and `AUTHENTIK_ALLOWED_GROUPS` admission —
+  with the command that reads each one's truth, because all three render as the
+  same browser message.
+
 ### Asterisk's own control frames stop logging as parse failures
 
 - **Fixed: every call logged `Failed to parse JSON message from Asterisk`.**
