@@ -651,10 +651,13 @@ export async function isWebPushEnabled(accountId: string): Promise<boolean> {
   return sub !== null && localStorage.getItem(subscriptionIdKey(accountId)) !== null;
 }
 
-// Accounts already re-synced during this page load. One pass per account is
-// plenty: the subscription only drifts between sessions (expiry, a client
-// update that changed what we subscribe to, a recreated Junk mailbox).
-const resyncedAccountIds = new Set<string>();
+// When each account was last re-synced during this page load. Once a day is
+// enough for the drift between sessions (a client update that changed what
+// we subscribe to, a recreated Junk mailbox), but not only once: Stalwart
+// clamps `expires` to 7 days, so a tab or installed app left open for a
+// week would otherwise let the subscription lapse and push stop silently.
+const RESYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const lastResyncAt = new Map<string, number>();
 
 export interface ResyncWebPushParams {
   client: IJMAPClient;
@@ -676,10 +679,12 @@ export async function resyncWebPush(params: ResyncWebPushParams): Promise<boolea
   } catch {
     return false;
   }
-  if (!accountId || resyncedAccountIds.has(accountId)) return false;
+  if (!accountId) return false;
+  const last = lastResyncAt.get(accountId);
+  if (last !== undefined && Date.now() - last < RESYNC_INTERVAL_MS) return false;
   try {
     if (!(await isWebPushEnabled(accountId))) return false;
-    resyncedAccountIds.add(accountId);
+    lastResyncAt.set(accountId, Date.now());
     await enableWebPush({
       client: params.client,
       relayBaseUrl: params.relayBaseUrl,
@@ -693,5 +698,5 @@ export async function resyncWebPush(params: ResyncWebPushParams): Promise<boolea
 
 // Test hook: forget which accounts were re-synced during this page load.
 export function resetWebPushResyncState(): void {
-  resyncedAccountIds.clear();
+  lastResyncAt.clear();
 }
