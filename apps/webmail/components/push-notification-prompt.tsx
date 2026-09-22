@@ -118,11 +118,19 @@ export function PushNotificationPrompt() {
   // live registration stale.
   useEffect(() => {
     if (!policyLoaded || !isAuthenticated || !client || !accountId || isDemoMode) return;
-    void resyncWebPush({
-      client,
-      relayBaseUrl,
-      accountLabel: username ?? undefined,
-    });
+    const resync = () => {
+      void resyncWebPush({
+        client,
+        relayBaseUrl,
+        accountLabel: username ?? undefined,
+      });
+    };
+    resync();
+    // A long-open tab comes back to the foreground: renew the subscription
+    // before the server's 7-day expiry (resyncWebPush runs at most daily).
+    const onVisible = () => { if (document.visibilityState === 'visible') resync(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [accountId, client, isAuthenticated, isDemoMode, policyLoaded, relayBaseUrl, username]);
 
   useEffect(() => {

@@ -234,16 +234,22 @@ describe('resyncWebPush', () => {
     expect(client.createPushSubscription).not.toHaveBeenCalled();
   });
 
-  it('runs at most once per account per page load', async () => {
+  it('runs at most once a day per account', async () => {
     localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
     localStorage.setItem(SUB_KEY, 'push-old');
     const client = makeClient([sub('push-old', THIS_DEVICE)], { emailPushCapability: true });
     installFetch({});
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
 
     expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(true);
     expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(false);
-
     expect(client.listPushSubscriptions).toHaveBeenCalledTimes(1);
+
+    // A tab left open past a day renews again, before Stalwart's 7-day expiry.
+    now.mockReturnValue(1_000_000 + 25 * 60 * 60 * 1000);
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY })).toBe(true);
+    expect(client.listPushSubscriptions).toHaveBeenCalledTimes(2);
+    now.mockRestore();
   });
 
   it('swallows failures instead of surfacing them to the app', async () => {
