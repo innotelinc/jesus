@@ -3063,7 +3063,7 @@
       "supported_formats": "iCalendar (.ics) dosyalarını destekler",
       "url_description": "Etkinlikleri içe aktarmak için harici iCalendar (.ics) akışının URL'sini girin.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "CalDAV ve iCalendar (.ics) URL'lerini destekler",
+      "url_hint": "iCalendar (.ics) URL'lerini destekler",
       "fetch": "Getir",
       "invalid_url": "Lütfen geçerli bir URL girin",
       "url_fetch_failed": "URL'den takvim getirilemedi",

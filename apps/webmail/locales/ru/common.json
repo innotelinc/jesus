@@ -3037,7 +3037,7 @@
       "supported_formats": "Поддерживает файлы iCalendar (.ics)",
       "url_description": "Введите URL внешней ленты iCalendar (.ics) для импорта событий.",
       "url_placeholder": "https://пример.рф/календарь.ics",
-      "url_hint": "Поддерживает URL CalDAV и iCalendar (.ics)",
+      "url_hint": "Поддерживает URL iCalendar (.ics)",
       "fetch": "Получить",
       "invalid_url": "Введите корректный URL",
       "url_fetch_failed": "Не удалось получить календарь по URL",

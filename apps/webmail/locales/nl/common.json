@@ -3037,7 +3037,7 @@
       "supported_formats": "iCalendar (.ics) bestanden worden ondersteund",
       "url_description": "Voer de URL in van een externe iCalendar (.ics) feed om evenementen te importeren.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Ondersteunt CalDAV en iCalendar (.ics) URLs",
+      "url_hint": "Ondersteunt iCalendar (.ics) URLs",
       "fetch": "Ophalen",
       "invalid_url": "Voer een geldige URL in",
       "url_fetch_failed": "Kan agenda niet ophalen van URL",

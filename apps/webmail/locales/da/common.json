@@ -3063,7 +3063,7 @@
       "supported_formats": "Understøtter iCalendar (.ics) filer",
       "url_description": "Indtast URL'en til et eksternt iCalendar (.ics)-feed for at importere begivenheder.",
       "url_placeholder": "https://eksempel.dk/kalender.ics",
-      "url_hint": "Understøtter CalDAV og iCalendar (.ics) URL'er",
+      "url_hint": "Understøtter iCalendar (.ics) URL'er",
       "fetch": "Hent",
       "invalid_url": "Indtast en gyldig URL",
       "url_fetch_failed": "Kunne ikke hente kalender fra URL",

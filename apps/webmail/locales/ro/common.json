@@ -3064,7 +3064,7 @@
       "supported_formats": "Suportă fișiere de tip „iCalendar” (.ics)",
       "url_description": "Introduceți adresa URL a unui flux extern iCalendar (.ics) pentru a importa evenimente.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Suportă adresele URL de tip CalDAV și iCalendar (.ics)",
+      "url_hint": "Suportă adresele URL de tip iCalendar (.ics)",
       "fetch": "Preluare",
       "invalid_url": "Vă rugăm să introduceți o adresă de e-mail validă URL",
       "url_fetch_failed": "Nu s-a putut prelua calendarul de la URL",

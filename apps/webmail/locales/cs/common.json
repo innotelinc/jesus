@@ -3037,7 +3037,7 @@
       "supported_formats": "Podporuje soubory iCalendar (.ics)",
       "url_description": "Zadejte adresu URL externího zdroje iCalendar (.ics) pro import událostí.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Podporuje adresy URL CalDAV a iCalendar (.ics)",
+      "url_hint": "Podporuje adresy URL iCalendar (.ics)",
       "fetch": "Načíst",
       "invalid_url": "Zadejte platnou adresu URL",
       "url_fetch_failed": "Načtení kalendáře z adresy URL selhalo",

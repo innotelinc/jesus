@@ -3037,7 +3037,7 @@
       "supported_formats": "iCalendar (.ics) ファイルに対応",
       "url_description": "外部のiCalendar (.ics) フィードのURLを入力してイベントをインポートします。",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "CalDAVおよびiCalendar (.ics) URLに対応",
+      "url_hint": "iCalendar (.ics) URLに対応",
       "fetch": "取得",
       "invalid_url": "有効なURLを入力してください",
       "url_fetch_failed": "URLからカレンダーを取得できませんでした",

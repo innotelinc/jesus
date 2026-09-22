@@ -3036,7 +3036,7 @@
       "supported_formats": "Atbalsta iCalendar (.ics) failus",
       "url_description": "Ievadiet ārējas iCalendar plūsmas URL.",
       "url_placeholder": "https://piemers.lv/kalendars.ics",
-      "url_hint": "Atbalsta CalDAV un iCalendar (.ics) saites",
+      "url_hint": "Atbalsta iCalendar (.ics) saites",
       "fetch": "Iegūt",
       "invalid_url": "Ievadiet derīgu URL",
       "url_fetch_failed": "Neizdevās iegūt kalendāru no saites",

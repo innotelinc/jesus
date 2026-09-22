@@ -2961,7 +2961,7 @@
       "supported_formats": "תומך בקבצי iCalendar (.ics).",
       "url_description": "הזן את כתובת האתר של עדכון iCalendar (.ics) חיצוני כדי לייבא אירועים.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "תומך בכתובות URL של CalDAV ו-iCalendar (.ics).",
+      "url_hint": "תומך בכתובות URL של iCalendar (.ics).",
       "fetch": "אחזר",
       "invalid_url": "אנא הזן כתובת אתר חוקית",
       "url_fetch_failed": "אחזור היומן מ-URL נכשל",

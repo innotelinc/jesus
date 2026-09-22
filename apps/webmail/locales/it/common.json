@@ -3037,7 +3037,7 @@
       "supported_formats": "File iCalendar (.ics) supportati",
       "url_description": "Inserisci l'URL di un feed iCalendar (.ics) esterno per importare eventi.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Supporta URL CalDAV e iCalendar (.ics)",
+      "url_hint": "Supporta URL iCalendar (.ics)",
       "fetch": "Recupera",
       "invalid_url": "Inserisci un URL valido",
       "url_fetch_failed": "Impossibile recuperare il calendario dall'URL",

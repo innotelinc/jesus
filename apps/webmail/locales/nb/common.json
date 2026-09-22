@@ -3064,7 +3064,7 @@
       "supported_formats": "Støtter iCalendar (.ics)-filer",
       "url_description": "Skriv inn URL-en til en ekstern iCalendar-strøm (.ics) for å importere hendelser.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Støtter CalDAV- og iCalendar-URL-er (.ics)",
+      "url_hint": "Støtter iCalendar-URL-er (.ics)",
       "fetch": "Hent",
       "invalid_url": "Skriv inn en gyldig URL",
       "url_fetch_failed": "Kunne ikke hente kalenderen fra nettadressen",

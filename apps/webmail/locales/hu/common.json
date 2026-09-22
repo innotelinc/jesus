@@ -3064,7 +3064,7 @@
       "supported_formats": "iCalendar (.ics) fájlok támogatottak",
       "url_description": "Add meg egy külső iCalendar (.ics) feed URL-jét az események importálásához.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "CalDAV és iCalendar (.ics) URL-ek támogatottak",
+      "url_hint": "iCalendar (.ics) URL-ek támogatottak",
       "fetch": "Lekérés",
       "invalid_url": "Kérjük, adj meg egy érvényes URL-t",
       "url_fetch_failed": "Nem sikerült lekérni a naptárt az URL-ről",

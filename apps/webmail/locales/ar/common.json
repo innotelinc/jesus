@@ -3064,7 +3064,7 @@
       "supported_formats": "يدعم ملفات iCalendar (‎.ics)",
       "url_description": "أدخل رابط تغذية iCalendar (‎.ics) خارجية لاستيراد الأحداث.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "يدعم روابط CalDAV وiCalendar (‎.ics)",
+      "url_hint": "يدعم روابط iCalendar (‎.ics)",
       "fetch": "جلب",
       "invalid_url": "يرجى إدخال رابط صالح",
       "url_fetch_failed": "فشل جلب التقويم من الرابط",

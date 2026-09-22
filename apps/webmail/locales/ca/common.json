@@ -3064,7 +3064,7 @@
       "supported_formats": "Admet fitxers iCalendar (.ics)",
       "url_description": "Introduïu l'URL d'un canal iCalendar (.ics) extern per importar-ne els esdeveniments.",
       "url_placeholder": "https://example.com/calendar.ics",
-      "url_hint": "Admet URL de CalDAV i iCalendar (.ics)",
+      "url_hint": "Admet URL d’iCalendar (.ics)",
       "fetch": "Obtén",
       "invalid_url": "Introduïu un URL vàlid",
       "url_fetch_failed": "No s'ha pogut obtenir el calendari des de l'URL",
