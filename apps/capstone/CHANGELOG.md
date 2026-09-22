@@ -10,6 +10,24 @@ that is scanned continuously, a data-layer backup for the next host move, the
 shared-box softphone signaling that a profile-off PBX container had broken, and
 an Agents page that stopped paying one PBX round trip per agent, per row.
 
+### Asterisk's own control frames stop logging as parse failures
+
+- **Fixed: every call logged `Failed to parse JSON message from Asterisk`.**
+  The message comes from `pipecat`'s Asterisk serializer, which treats *every*
+  text frame as JSON — but Asterisk's external-media websocket sends its
+  control frames as plaintext key:value pairs:
+  `MEDIA_START connection_id:… channel:… channel_id:… format:ulaw
+  optimal_frame_size:160 ptime:20`. Audio was never affected (binary frames
+  were already handled), so the cost was a WARNING on every single call plus
+  the dropped frame contents — the codec and frame sizing Asterisk had just
+  negotiated. The serializer now tries JSON first and falls back to the
+  plaintext framing (`MEDIA_START`/`MEDIA_STOP`/`MEDIA_XOFF`/`MEDIA_XON`),
+  logging at debug; text that is neither still warns, so a genuinely
+  unexpected payload is reported rather than swallowed. `pipecat` is a
+  submodule of the dograh fork, so the fix travels as
+  `dograh/patches/0003-parse-asterisk-plaintext-control-frames.patch` and is
+  applied by `scripts/apply-dograh-patches.sh` alongside the OIDC patches.
+
 ### The softphone registers on a shared box again, and the Agents page stops paying N×
 
 - **Fixed: every WSS registration 502'd on the shared PBX.**

@@ -1,0 +1,70 @@
+diff --git a/pipecat/src/pipecat/serializers/asterisk.py b/pipecat/src/pipecat/serializers/asterisk.py
+index 4f356d3f5..d3de47ce8 100644
+--- a/pipecat/src/pipecat/serializers/asterisk.py
++++ b/pipecat/src/pipecat/serializers/asterisk.py
+@@ -172,7 +172,8 @@ class AsteriskFrameSerializer(FrameSerializer):
+         """Deserializes Asterisk WebSocket data to Pipecat frames.
+ 
+         Binary messages contain raw G.711 mu-law audio bytes.
+-        Text messages contain JSON control events (if any).
++        Text messages carry control events: either JSON, or the plaintext
++        ``MEDIA_*`` frames Asterisk's external-media websocket sends.
+ 
+         Args:
+             data: The raw WebSocket data from Asterisk.
+@@ -198,12 +199,49 @@ class AsteriskFrameSerializer(FrameSerializer):
+             )
+             return audio_frame
+         else:
+-            # Text message = JSON control event
++            # Text message = control event. Asterisk frames its external-media
++            # control messages as plaintext, space-separated key:value pairs --
++            #   MEDIA_START connection_id:dograh channel:WebSocket/... \
++            #     channel_id:... format:ulaw optimal_frame_size:160 ptime:20
++            # -- so JSON-only handling warned "Failed to parse JSON message" on
++            # every single call, and dropped the frame's contents (the codec and
++            # frame sizing it had just negotiated) with it. Try JSON first, then
++            # the plaintext framing; only text that is neither of those warns.
+             try:
+                 message = json.loads(data)
+-                event = message.get("type") or message.get("event")
+-                logger.debug(f"Asterisk WebSocket event: {event} - {message}")
+-                return None
+             except json.JSONDecodeError:
+-                logger.warning(f"Failed to parse JSON message from Asterisk: {data}")
+-                return None
++                message = self._parse_plaintext_event(data)
++                if message is None:
++                    logger.warning(f"Unparseable message from Asterisk: {data}")
++                    return None
++
++            event = message.get("type") or message.get("event")
++            logger.debug(f"Asterisk WebSocket event: {event} - {message}")
++            return None
++
++    @staticmethod
++    def _parse_plaintext_event(data: str) -> dict | None:
++        """Parse an Asterisk external-media plaintext control frame.
++
++        The media websocket sends ``<EVENT> key:value ...``: ``MEDIA_START``
++        once the media is connected (carrying the negotiated ``format``,
++        ``optimal_frame_size`` and ``ptime``), ``MEDIA_XOFF``/``MEDIA_XON`` as
++        its send buffer fills and drains, and ``MEDIA_STOP`` at the end.
++
++        Returns None when the text is not one of those frames, so a genuinely
++        unexpected payload is still reported rather than swallowed.
++        """
++        parts = data.split()
++        if not parts:
++            return None
++        token = parts[0]
++        # Asterisk spells event names upper-case (MEDIA_START); anything
++        # mixed-case is not one of its frames.
++        if not all(c.isupper() or c.isdigit() or c == "_" for c in token):
++            return None
++        message: dict = {"event": token}
++        for field in parts[1:]:
++            key, _, value = field.partition(":")
++            if key:
++                message[key] = value
++        return message
