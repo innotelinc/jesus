@@ -71,6 +71,40 @@ an Agents page that stopped paying one PBX round trip per agent, per row.
   `WARNING auth.py | … already belongs to another account — signing in without
   changing the address` where the old code raised `UniqueViolationError`.
 
+### The subject a rebuild moves can be reconciled, not just survived
+
+- **New: `scripts/reconcile-oidc-subjects.py`.** `0004` above stops a changed
+  provider subject from *breaking* sign-in, but it leaves the person on a fresh
+  row — their account id, and the workflows, agents and settings hanging off it,
+  stay behind on the old one. This closes that gap deliberately, from the host,
+  where an operator can see what is about to happen. It reads the identities
+  from Authentik and the rows from the stack's own postgres, and re-points a
+  subject **only** when the two agree on the address: a row already current, a
+  local-auth `oss_*` row, or a row with no address is left alone; an address no
+  identity has (`no-match`), one that two identities share (`ambiguous`), or one
+  whose current subject another row already claims (`conflict`) is reported for
+  a human, because those are exactly the cases where guessing would hand one
+  person's account to another. Report-only by default, `--apply` writes with a
+  JSON backup of the old values, and the decision table is unit-tested in
+  `scripts/tests/` (the live half needs an IdP and a database, the decision half
+  is where an account could be mis-assigned, so that is what is pinned).
+- **The sign-in chain is now a CI job.** `scripts/ci/sso-smoke.py` walks
+  authorize → callback → token → authenticated request with a temporary
+  identity, twice: once fresh, then again with the same address under a **new**
+  subject, which is the collision `0004` exists for. It exits `2` when it cannot
+  run (no token secret, or an IdP the runner cannot reach) and CI reports that
+  as a **skip, not a pass** — a hosted runner cannot resolve
+  `auth.cerulean.innotel.us`, so a skip is the honest outcome there, and only a
+  real failure fails the build. Point a runner that can route to the stack at it
+  with an `AUTHENTIK_TOKEN` secret and it becomes a gate.
+- **The harness reuses `verify-sso.py`'s client instead of carrying its own.**
+  The Authentik client, the flow-executor choreography and the admin API were a
+  second copy of what `verify-sso.py` already owns and `verify-dograh-sso.py`
+  already reuses, which is how a fix to the flow lands in one place and not
+  three. What stays specific to this script is the dograh half: its
+  `/api/v1/auth/oidc/login` entry (which answers `307` + a state cookie rather
+  than redirecting from `/`) and the callback's `#access_token` fragment.
+
 ### Asterisk's own control frames stop logging as parse failures
 
 - **Fixed: every call logged `Failed to parse JSON message from Asterisk`.**

@@ -78,6 +78,40 @@ jobs:
       - name: Dry-run every Magnate gate state
         run: python3 scripts/test_dograh_routes_gate.py
 
+  # Sign-in is the one path where every failure — a credential that was never
+  # resolved, a proxy that follows a redirect server-side, group admission, a
+  # provisioning crash — renders as the same browser message, "Sign-in could
+  # not be completed". Reading the config therefore proves nothing; the chain
+  # has to be walked. scripts/ci/sso-smoke.py walks it with a temporary
+  # identity (deleted afterwards) and, because the provider subject is derived
+  # from the user id, a second pass puts the same address under a NEW subject —
+  # the collision that used to abort provisioning with a UniqueViolationError.
+  #
+  # It exits 2 when it CANNOT run — no token secret, or an identity provider
+  # this runner cannot reach — which is reported as a skip, not a pass: a
+  # hosted runner cannot resolve auth.cerulean.innotel.us, so a skip is the
+  # expected outcome there. Only a real failure (exit 1) fails the build. Give
+  # a runner with a route to the stack AUTHENTIK_TOKEN and this becomes a gate.
+  sso-smoke:
+    name: SSO sign-in chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Walk a real sign-in: fresh identity, then its address under a new subject"
+        env:
+          AUTHENTIK_TOKEN: ${{ secrets.AUTHENTIK_TOKEN }}
+          DOGRAH_BASE: ${{ vars.DOGRAH_BASE || 'https://dograh.capstone.innotel.us' }}
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/ci/sso-smoke.py || rc=$?
+          case "$rc" in
+            0) echo "::notice::the sign-in chain completed end to end" ;;
+            2) echo "::notice::skipped — no AUTHENTIK_TOKEN secret, or this runner cannot reach the identity provider" ;;
+            *) echo "::error::the sign-in chain is broken — see the log above"; exit "$rc" ;;
+          esac
+
   # Cerulean tenant gate: the Authentik group-NAME → tenant-slug matching that
   # decides whether a signed-in user may use the control center at all (the
   # dashboard's own "no tenant here" gate). The tenant gate itself is pure

@@ -1,226 +1,271 @@
 #!/usr/bin/env python3
-"""sso-smoke.py — drive a real dograh OIDC sign-in end to end, then clean up.
+"""sso-smoke.py — prove a NEW identity can sign in, and that an address clash
+does not stop one.
 
-Why: "Sign-in could not be completed" is the browser's message for any failure
-in the chain, so the only way to know the chain works is to walk it. This does
-exactly what a browser does — GET the app's login entry, authenticate at
-Authentik, come back to the callback with the code and the state cookie, and
-then use the session that results — using a temporary, clearly-named identity
-that is deleted in a `finally` block.
+WHY THIS EXISTS NEXT TO verify-dograh-sso.py. That script signs in an EXISTING
+admin and asserts which organization they land in. This one covers the other
+half — provisioning — because that is where the failures live that no amount of
+reading the config will find:
 
-    AK_TOKEN=<authentik api token> SMOKE_PW=<random> python3 sso-smoke.py
+  * the callback inserts a local row keyed on the provider subject, so the
+    FIRST sign-in of any identity is the only one that exercises the insert;
+  * the provider subject is derived (`sha256("{user_id}-{install_id}")`), so a
+    rebuilt Authentik — or one account deleted and recreated at the provider —
+    changes it, and the callback then has to reconcile an address that another
+    row already holds. That used to abort with a UniqueViolationError, which
+    the callback renders as the same generic "Sign-in could not be completed"
+    as every other failure in the chain (see dograh/patches/0004).
+
+Both passes end at the same assertion a browser would reach: an access token
+from the callback, accepted by an authenticated API endpoint.
+
+The Authentik client and the flow choreography are verify-sso.py's — the
+convention verify-dograh-sso.py sets — so what is left here is only what is
+dograh-specific: the app's own /api/v1/auth/oidc/login entry (it answers 307 +
+a state cookie rather than redirecting from `/`), and the callback's
+`#access_token` fragment.
+
+    AUTHENTIK_TOKEN=<api token> python3 scripts/ci/sso-smoke.py
+
+Exit codes, matching verify-sso.py: 0 = pass, 1 = a check failed, 2 = cannot
+run (no token, no group, IdP unreachable) — which is a SKIP, not a failure.
 """
 from __future__ import annotations
 
-import http.cookiejar
+import argparse
+import importlib.util
 import json
 import os
+import pathlib
+import subprocess
 import sys
+import time
+import types
 import urllib.error
 import urllib.parse
 import urllib.request
 
-AUTH = "https://auth.cerulean.innotel.us"
-APP = "https://dograh.capstone.innotel.us"
-FLOW_SLUG = "default-authentication-flow"
-USERNAME = "sso-smoke-temp"
-EMAIL = "sso-smoke@innotel.us"
-GROUP = "cerulean-platform"
+HERE = pathlib.Path(__file__).resolve().parent
+# capstone/scripts/ci -> capstone/scripts
+_spec = importlib.util.spec_from_file_location("verify_sso", HERE.parent / "verify-sso.py")
+v = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(v)
 
-TOKEN = os.environ.get("AK_TOKEN", "")
-PASSWORD = os.environ.get("SMOKE_PW", "")
-if not TOKEN or not PASSWORD:
-    sys.exit("need AK_TOKEN and SMOKE_PW")
-
-jar = http.cookiejar.CookieJar()
-
-
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Return the redirect itself instead of following it."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+APP = os.environ.get("DOGRAH_BASE", "https://dograh.capstone.innotel.us").rstrip("/")
+LOGIN_PATH = "/api/v1/auth/oidc/login"
+# Distinct per run so pass 1 provisions a genuinely new identity; pass 2 reuses
+# it so the address is already taken by the row pass 1 created.
+USERNAME = os.environ.get("SMOKE_USERNAME", f"sso-smoke-{int(time.time())}")
+DB_CONTAINER = os.environ.get("SMOKE_DB_CONTAINER", "capstone-postgres-1")
 
 
-no_follow = urllib.request.build_opener(
-    urllib.request.HTTPCookieProcessor(jar), NoRedirect
-)
-follow = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-
-
-def api(path: str, method: str = "GET", body: dict | None = None):
-    data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(
-        AUTH + path, data=data, method=method,
-        headers={"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            raw = r.read()
-            return r.status, (json.loads(raw) if raw else {})
-    except urllib.error.HTTPError as e:
-        return e.code, {"error": e.read().decode(errors="replace")[:300]}
-
-
-def fetch(url: str, opener=follow, data: bytes | None = None, headers: dict | None = None):
-    req = urllib.request.Request(url, data=data, headers=headers or {})
-    try:
-        with opener.open(req, timeout=30) as r:
-            return r.status, lower(r.headers), r.read(), r.url
-    except urllib.error.HTTPError as e:
-        return e.code, lower(e.headers), e.read(), url
-
-
-def lower(headers) -> dict:
-    """Header names arrive in whatever case the server chose (uvicorn sends
-    `location`, the UI's Next proxy sends `Location`) — compare in one case."""
-    return {k.lower(): v for k, v in headers.items()}
-
-
-def cookies_for(domain: str) -> list[str]:
-    return [f"{c.name}={c.value}" for c in jar if domain in (c.domain or "")]
-
-
-def step(n: int, text: str) -> None:
+def step(n, text):
     print(f"\n[{n}] {text}")
 
 
-user_uuid = None
-try:
-    step(1, "resolve the allowed group + Authentik API")
-    status, groups = api("/api/v3/core/groups/?search=" + urllib.parse.quote(GROUP))
-    match = [g for g in groups.get("results", []) if g["name"] == GROUP]
-    if not match:
-        sys.exit(f"group {GROUP} not found (status {status})")
-    group_uuid = match[0]["pk"]
-    print(f"    group {GROUP} = {group_uuid}")
+def app_client(cfg):
+    return v.Client(cfg, base=APP)
 
-    step(2, "create the temporary identity")
-    status, user = api("/api/v3/core/users/", "POST", {
-        "username": USERNAME, "name": "SSO smoke test (temporary)",
-        "email": EMAIL, "is_active": True, "path": "users", "type": "internal",
-    })
-    if status not in (200, 201):
-        sys.exit(f"user create failed: {status} {user}")
-    user_uuid = user["pk"]
-    print(f"    created {EMAIL} ({user_uuid})")
 
-    status, res = api(f"/api/v3/core/users/{user_uuid}/set_password/", "POST",
-                      {"password": PASSWORD})
-    print(f"    set_password -> {status}")
+def local_rows_created():
+    """The local rows this run created, so the smoke test does not litter.
 
-    status, res = api(f"/api/v3/core/groups/{group_uuid}/add_user/", "POST",
-                      {"pk": user_uuid})
-    print(f"    added to {GROUP} -> {status}")
+    Best effort by design: in CI there is no Docker socket and nothing to clean
+    up locally, which is fine — the run has still proved what it set out to.
+    """
+    if not _docker_available():
+        print(f"[cleanup] no docker here — leaving the dograh row for {USERNAME}@innotel.us")
+        return
+    sql = (
+        "DELETE FROM organization_users WHERE user_id IN "
+        "(SELECT id FROM users WHERE email LIKE 'sso-smoke-%@innotel.us');"
+        "DELETE FROM users WHERE email LIKE 'sso-smoke-%@innotel.us';"
+    )
+    try:
+        subprocess.run(
+            ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-c", sql],
+            check=True, capture_output=True, text=True,
+        )
+        print("[cleanup] removed the local rows for sso-smoke-%@innotel.us")
+    except (OSError, subprocess.CalledProcessError) as err:
+        print(f"[cleanup] WARNING: could not remove the local rows: {err}", file=sys.stderr)
 
+
+def _docker_available():
+    try:
+        return subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", DB_CONTAINER],
+            capture_output=True, text=True,
+        ).stdout.strip() == "true"
+    except OSError:
+        return False
+
+
+def drive_login(cfg, client):
+    """Walk dograh's sign-in as the browser does; return the final hop's Location.
+
+    verify-sso.py's `sso_login` cannot be used here: it starts from `app + "/"`,
+    which is right for the dashboard gateways but not for dograh, whose `/` is a
+    Next.js page and whose IdP entry is the API route below. The stage loop is
+    the same dance, so it stays recognisable next to that one.
+    """
     step(3, "app login entry (this is what the browser hits)")
-    status, headers, body, _ = fetch(f"{APP}/api/v1/auth/oidc/login", no_follow)
-    state_cookie = [c for c in cookies_for("dograh.capstone") if "state" in c]
-    location = headers.get("location", "")
-    authorize_url = location
+    status, authorize, _ = client.get(APP + LOGIN_PATH)
+    state_cookie = client.cookie("dograh_oidc_state")
     print(f"    HTTP {status}")
-    print(f"    location head: {location[:72]}...")
-    print(f"    state cookie: {state_cookie[0][:34] + '...' if state_cookie else 'MISSING'}")
-    if status not in (301, 302, 303, 307) or not state_cookie:
-        sys.exit("FAIL: the login entry did not hand the browser a redirect + state cookie")
+    print(f"    location head: {(authorize or '-')[:72]}...")
+    print(f"    state cookie: {'yes, %d chars' % len(state_cookie) if state_cookie else 'MISSING'}")
+    v.require(status in (301, 302, 303, 307, 308) and state_cookie,
+              f"the login entry must answer a redirect AND set the state cookie "
+              f"(got HTTP {status}, cookie {'set' if state_cookie else 'missing'}) — "
+              f"without both, the callback can only answer `expired`")
+    v.require("client_id=" in (authorize or ""),
+              "the authorize URL carries no client_id")
+
+    # The authorize URL is absolute and names the IdP the app is actually
+    # configured against. Pin the client to that origin: the hops that follow
+    # are IdP-relative, and the client starts out based on the APP (which is a
+    # different host), so resolving them against it asks dograh for Authentik's
+    # flow executor and gets a 404.
+    idp = urllib.parse.urlparse(authorize)
+    client.base = f"{idp.scheme}://{idp.netloc}"
 
     step(4, "follow the authorization request (no session yet)")
-    status, headers, body, url = fetch(location, no_follow)
-    location = headers.get("location", "")
-    print(f"    HTTP {status} -> {location[:80]}")
-    parsed = urllib.parse.urlsplit(location)
-    slug = FLOW_SLUG
-    if "/if/flow/" in parsed.path:
-        slug = parsed.path.rstrip("/").split("/")[-1]
-    query = parsed.query
-    print(f"    flow slug: {slug}")
+    status, location, body = client.get(authorize)
+    print(f"    HTTP {status} -> {(location or '-')[:80]}")
+    v.require(status == 302 and location,
+              f"authorize -> HTTP {status}: {body[:160]}")
+
+    executor = (client.base + "/api/v3/flows/executor/" + v.AUTH_FLOW + "/?"
+                + urllib.parse.urlencode({"query": urllib.parse.urlparse(location).query}))
 
     step(5, "authenticate against the flow executor")
-    ex = f"{AUTH}/api/v3/flows/executor/{slug}/?{query}"
-    csrf = next((c.value for c in jar if c.name == "authentik_csrf"), "")
-    hdrs = {"Content-Type": "application/json"}
-    if csrf:
-        hdrs["X-CSRFToken"] = csrf
-
-    status, headers, body, _ = fetch(ex, follow, headers=hdrs)
-    challenge = json.loads(body or b"{}")
-    print(f"    GET  -> {status} {challenge.get('component')}")
-
-    status, headers, body, _ = fetch(
-        ex, follow, data=json.dumps({"uid_field": USERNAME}).encode(), headers=hdrs)
-    challenge = json.loads(body or b"{}")
-    print(f"    uid  -> {status} {challenge.get('component')}")
-
-    status, headers, body, _ = fetch(
-        ex, follow, data=json.dumps({"password": PASSWORD}).encode(), headers=hdrs)
-    challenge = json.loads(body or b"{}")
-    print(f"    pass -> {status} {challenge.get('component')}")
-    if challenge.get("component") == "ak-stage-password":
-        print("    " + json.dumps(challenge.get("response_errors") or {})[:200])
-        sys.exit("FAIL: Authentik rejected the sign-in (check the flow/user)")
-    redirect_to = challenge.get("to") or headers.get("location", "")
-
-    step(6, "return to the app callback with the code")
-    # The flow's `to` may be relative (Authentik resolves it against its own
-    # origin, and for an authorization flow the real "next" is the authorize
-    # URL again) — which is exactly what the browser re-requests now that it
-    # holds a session. Try that first, then the flow's own target.
-    candidates = [authorize_url]
-    if redirect_to.startswith("http"):
-        candidates.insert(0, redirect_to)
-    status = headers = None
-    for target in candidates:
-        status, headers, body, url = fetch(target, no_follow)
-        location = headers.get("location", "")
-        print(f"    HTTP {status} -> {location[:96]}")
-        if "code=" in location:
+    stage = client.follow_json(executor)
+    for _ in range(8):
+        component = stage.get("component")
+        if component == "xak-flow-redirect":
             break
-    if "code=" not in location:
-        sys.exit(f"FAIL: no authorization code came back ({location[:120]})")
+        if component == "ak-stage-identification":
+            payload = {"uid_field": USERNAME}
+        elif component == "ak-stage-password":
+            payload = {"password": cfg.password}
+        elif component == "ak-stage-consent":
+            # A first-time identity can be shown consent; an empty POST is what
+            # a browser does when the stage carries no required field.
+            payload = {"consent": True}
+        else:
+            payload = {}
+        print(f"    stage {component}")
+        status, next_url, body = client.post(executor, payload)
+        if status not in (200, 302):
+            raise v.CheckFailed(f"{component} rejected (HTTP {status}): {body[:200]}")
+        stage = client.follow_json(next_url or executor)
+    v.require(stage.get("component") == "xak-flow-redirect",
+              "Authentik's flow never handed back the authorize URL")
 
-    step(7, "app callback (token exchange + id_token + admission + session)")
-    status, headers, body, url = fetch(location, no_follow)
-    location = headers.get("location", "")
-    print(f"    HTTP {status} -> {location[:80]}")
-    set_cookies = [k for k in headers if k.lower() == "set-cookie"]
-    jar_names = sorted({c.name for c in jar if "dograh.capstone" in (c.domain or "")})
-    print(f"    app cookies now: {jar_names}")
-    if "error=" in location or status >= 400:
-        sys.exit(f"FAIL: the callback refused the sign-in: {location[:160]}")
+    step(6, "come back to the callback with the code")
+    callback = client.follow_to_code(stage["to"])
+    status, location, _ = client.get(callback)
+    print(f"    HTTP {status} -> {(location or '-')[:96]}")
+    v.require("error=" not in (location or ""),
+              f"the callback refused the sign-in: {(location or '')[:160]}")
+    return location or ""
 
-    step(8, "use the issued token, the way the SPA does")
-    # The callback hands the token to the SPA in the URL *fragment* (that is
-    # what AUTHENTIK_POST_LOGIN_REDIRECT's /auth/callback page reads), so the
-    # fragment — not a cookie — is where the session actually lives. A 401 here
-    # would mean a token that Authentik-like verification accepts but this API
-    # does not, which cookie-jar probing alone would never reveal.
-    token = ""
-    if "#" in location:
-        frag = dict(urllib.parse.parse_qsl(location.split("#", 1)[1]))
-        token = frag.get("access_token", "")
-    print(f"    access_token from fragment: {'yes, %d chars' % len(token) if token else 'MISSING'}")
-    if not token:
-        sys.exit("FAIL: the callback redirect carried no access_token")
 
-    ok = False
-    for path in ("/api/v1/auth/me", "/api/v1/user", "/api/v1/workflows"):
-        s, _, b, _ = fetch(APP + path, follow,
-                           headers={"Authorization": f"Bearer {token}"})
-        print(f"    GET {path} -> {s}")
-        if s == 200 and not ok:
-            ok = True
+def use_token(location):
+    """Assert the callback's token actually works, the way the SPA uses it.
+
+    The token arrives in the URL *fragment* (that is what the app's
+    /auth/callback page reads), so a cookie-jar check alone would pass while the
+    session was unusable.
+    """
+    step(7, "use the issued token")
+    v.require("#" in location, "the callback redirect carried no fragment")
+    token = dict(urllib.parse.parse_qsl(location.split("#", 1)[1])).get("access_token", "")
+    print(f"    access_token: {'%d chars' % len(token) if token else 'MISSING'}")
+    v.require(token, "the callback redirect carried no access_token")
+
+    for path in ("/api/v1/auth/me", "/api/v1/user"):
+        req = urllib.request.Request(APP + path)
+        req.add_header("Authorization", "Bearer " + token)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                body = resp.read().decode("utf-8", "replace")
+                print(f"    GET {path} -> {resp.status}")
+                try:
+                    who = json.loads(body)
+                except ValueError:
+                    continue
+                who = who if isinstance(who, dict) else {}
+                print(f"        identity: {who.get('email') or who.get('username') or '(ok)'}")
+                return
+        except urllib.error.HTTPError as err:
+            print(f"    GET {path} -> {err.code}")
+    raise v.CheckFailed("the issued token was refused by every authenticated endpoint")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--verbose", action="store_true", help="trace every HTTP hop")
+    args = parser.parse_args()
+
+    api = None
+    created = False
+    try:
+        # verify-sso.py's Config reads the token, the required group and the LAN
+        # address the same way every other verifier does; only the app entry
+        # below is specific to this script.
+        cfg = v.Config(types.SimpleNamespace(
+            base=None, host_ip=None, verbose=args.verbose,
+        ))
+        api = v.AuthApi(cfg)
+
+        step(1, "resolve the allowed group")
+        group = api.find_group(cfg.group)
+        v.require(group, f"Authentik has no group named {cfg.group!r} — nothing could be admitted")
+        print(f"    {cfg.group} = {group}")
+
+        for attempt, where in ((1, "fresh identity (create + provision)"),
+                               (2, "same address, NEW subject (the collision)")):
+            step(2, f"pass {attempt}: {where}")
+            # make_user deletes any user of this name first, so the second pass
+            # gets the same address under a new pk — and because the subject is
+            # derived from the pk, a new subject too. That is the provider
+            # rebuild / account-recreation case, without rebuilding anything.
+            pk = api.make_user(USERNAME, "SSO smoke (temporary)", groups=[group])
+            created = True
+            print(f"    {USERNAME}@innotel.us (pk={pk})")
+            client = app_client(cfg)
+            use_token(drive_login(cfg, client))
+            print(f"    RESULT pass {attempt}: signed in")
+
+        print("\nRESULT: a new identity can sign in, and an address already held by "
+              "another subject does not stop one.")
+        return 0
+    except v.CheckFailed as err:
+        print(f"\nFAIL: {err}", file=sys.stderr)
+        return 1
+    except v.CannotRun as err:
+        print(f"\nSKIP: {err}", file=sys.stderr)
+        return 2
+    except Exception as err:  # noqa: BLE001 - a verifier must not traceback
+        print(f"\nFAIL: unexpected {type(err).__name__}: {err}", file=sys.stderr)
+        return 1
+    finally:
+        # Nothing to undo when the run never created anything — and a verifier
+        # that skipped must not touch a live database on its way out.
+        if created:
             try:
-                who = json.loads(b)
-                email = who.get("email") or who.get("user", {}).get("email")
-                print(f"        identity: {email or who.get('username') or '(list response)'}")
-            except Exception:
-                pass
-    if not ok:
-        sys.exit("FAIL: the issued token was refused by every authenticated endpoint")
+                api.delete_user(USERNAME)
+                print(f"[cleanup] deleted {USERNAME} from the identity provider")
+            except Exception as err:  # noqa: BLE001
+                print(f"[cleanup] WARNING: could not delete {USERNAME}: {err}",
+                      file=sys.stderr)
+            try:
+                local_rows_created()
+            except Exception as err:  # noqa: BLE001 - cleanup never masks the result
+                print(f"[cleanup] WARNING: local rows not removed: {err}", file=sys.stderr)
 
-    print("\nRESULT: a real sign-in completes — authorize -> callback -> token -> authenticated request.")
-finally:
-    if user_uuid:
-        print(f"\n[cleanup] deleting {EMAIL}")
-        st, _ = api(f"/api/v3/core/users/{user_uuid}/", "DELETE")
-        print(f"    DELETE -> {st}")
+
+if __name__ == "__main__":
+    sys.exit(main())
