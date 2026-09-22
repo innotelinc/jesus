@@ -741,3 +741,35 @@ if grep -qE '^VAULT_ADDR=.+' .env 2>/dev/null; then
 else
   echo ">> Cerulean Vault not configured (VAULT_ADDR unset in .env) — values read as-is"
 fi
+
+# ── OIDC subject reconcile (report only, never fatal) ───────────────────────
+# A local user row is keyed on the provider subject, and Authentik derives that
+# sub as sha256("{user_id}-{install_id}") — so rebuilding or restoring the
+# identity provider moves EVERY subject at once. Sign-in survives that now
+# (dograh/patches/0004 refuses only the address instead of aborting), but the
+# person then lands on a new row: their account id, workflows and agents stay
+# behind on the old one, and nothing about the sign-in looks wrong.
+#
+# Running the reconcile report here is the difference between an operator
+# re-pointing the subjects and every user quietly starting over. It is
+# deliberately report-only and cannot fail setup: a fresh host or an air-gapped
+# install has no reachable IdP or database yet, and that is not an error.
+# SKIP_IDENTITY_RECONCILE=1 silences it.
+if [ "${SKIP_IDENTITY_RECONCILE:-0}" = "1" ]; then
+  echo ">> Identity subject check skipped (SKIP_IDENTITY_RECONCILE=1)"
+elif [ ! -f scripts/reconcile-oidc-subjects.py ]; then
+  echo ">> Identity subject check skipped (reconcile-oidc-subjects.py not present)"
+else
+  # `if cmd; then` rather than a bare call: a non-zero exit must not trip -e.
+  if reconcile_out=$(python3 scripts/reconcile-oidc-subjects.py 2>&1); then
+    reconcile_rc=0
+  else
+    reconcile_rc=$?
+  fi
+  case "$reconcile_rc" in
+    0) pass "Identity subjects are current — nothing to re-point" ;;
+    1) warn "Identity subjects need attention (re-run scripts/reconcile-oidc-subjects.py --apply)" ;;
+    *) echo ">> Identity subject check could not run (no token / no database) — skipped" ;;
+  esac
+  [ "$reconcile_rc" = 0 ] || printf '%s\n' "$reconcile_out" | sed 's/^/   /'
+fi

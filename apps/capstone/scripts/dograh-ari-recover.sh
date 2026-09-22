@@ -132,7 +132,7 @@ if [ "$ACTION" = "check" ]; then
 fi
 
 if ! ari_reachable; then
-  log "ERROR — Asterisk ARI is not listening on 127.0.0.1:8088 inside '$CONTAINER'"
+  log "ERROR — Asterisk ARI is not listening inside '$CONTAINER' (checked its own loopback)"
   log "       dograh cannot register the Stasis app until the PBX answers; not repairing"
   exit 1
 fi

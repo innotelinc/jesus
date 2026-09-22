@@ -297,8 +297,15 @@ jobs:
         run: |
           set -euo pipefail
           bad=0
+          # A probe made INSIDE the container is not dialing from here, and is
+          # the only correct way to ask whether ARI is listening there (8088 is
+          # published on the host LAN IP; the container's own loopback is the
+          # other view of the same socket). Those lines are skipped, so the
+          # rule keeps meaning "the address a script dials from the host"
+          # instead of flagging the probe that script depends on. The line
+          # numbers stay the file's own because the filter runs after `-n`.
           while IFS= read -r f; do
-            if hits=$(grep -nE '(127\.0\.0\.1|localhost):8088' "$f"); then
+            if hits=$(grep -nE '(127\.0\.0\.1|localhost):8088' "$f" | grep -vE 'docker exec'); then
               echo "::error file=$f::script dials ARI on loopback — 8088 is published on the host LAN IP"
               echo "$hits"
               bad=1
