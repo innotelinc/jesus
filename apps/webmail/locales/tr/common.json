@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "Bitiş tarihi başlangıç tarihinden sonra olmalıdır",
         "start_in_past": "Başlangıç tarihi geçmişte",
-        "empty_body": "İleti gövdesi boş - alıcılar boş bir yanıt alacak"
+        "empty_body": "İleti gövdesi boş - alıcılar boş bir yanıt alacak",
+        "subject_too_long": "Konu sunucu için çok uzun (en fazla {max} bayt).",
+        "body_too_long": "İleti sunucu için çok uzun (biçimlendirme dahil en fazla {max} bayt)."
       }
     },
     "folders": {

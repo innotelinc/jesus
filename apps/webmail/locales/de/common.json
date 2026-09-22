@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "Das Enddatum muss nach dem Startdatum liegen",
         "start_in_past": "Das Startdatum liegt in der Vergangenheit",
-        "empty_body": "Der Nachrichtentext ist leer - Empfänger erhalten eine leere Antwort"
+        "empty_body": "Der Nachrichtentext ist leer - Empfänger erhalten eine leere Antwort",
+        "subject_too_long": "Der Betreff ist für den Server zu lang (höchstens {max} Byte).",
+        "body_too_long": "Die Nachricht ist für den Server zu lang (höchstens {max} Byte, inklusive Formatierung)."
       }
     },
     "folders": {

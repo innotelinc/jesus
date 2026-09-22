@@ -1774,7 +1774,9 @@
       "warnings": {
         "end_before_start": "Beigu datumam jābūt vēlāk par sākuma datumu",
         "start_in_past": "Sākuma datums ir pagātnē",
-        "empty_body": "Ziņojuma teksts ir tukšs - saņēmēji saņems tukšu atbildi"
+        "empty_body": "Ziņojuma teksts ir tukšs - saņēmēji saņems tukšu atbildi",
+        "subject_too_long": "Temats serverim ir pārāk garš (ne vairāk kā {max} baiti).",
+        "body_too_long": "Ziņa serverim ir pārāk gara (ne vairāk kā {max} baiti, ieskaitot formatējumu)."
       }
     },
     "folders": {

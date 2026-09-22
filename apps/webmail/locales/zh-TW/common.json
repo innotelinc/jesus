@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "結束日期必須晚於開始日期",
         "start_in_past": "開始日期已在過去",
-        "empty_body": "郵件內文為空 — 收件者將收到空白回覆"
+        "empty_body": "郵件內文為空 — 收件者將收到空白回覆",
+        "subject_too_long": "主旨對伺服器來說太長（最多 {max} 位元組）。",
+        "body_too_long": "訊息對伺服器來說太長（含格式最多 {max} 位元組）。"
       }
     },
     "folders": {

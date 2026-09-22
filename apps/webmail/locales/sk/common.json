@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "Dátum ukončenia musí byť po dátume začiatku",
         "start_in_past": "Dátum začiatku je v minulosti",
-        "empty_body": "Telo správy je prázdne – príjemcovia dostanú prázdnu odpoveď"
+        "empty_body": "Telo správy je prázdne – príjemcovia dostanú prázdnu odpoveď",
+        "subject_too_long": "Predmet je pre server príliš dlhý (najviac {max} bajtov).",
+        "body_too_long": "Správa je pre server príliš dlhá (najviac {max} bajtov vrátane formátovania)."
       }
     },
     "folders": {

@@ -1781,7 +1781,9 @@
       "warnings": {
         "end_before_start": "Sluttdatoen må være etter startdatoen",
         "start_in_past": "Startdatoen er i fortiden",
-        "empty_body": "Meldingsteksten er tom – mottakerne får et tomt svar"
+        "empty_body": "Meldingsteksten er tom – mottakerne får et tomt svar",
+        "subject_too_long": "Emnet er for langt for serveren (maks. {max} byte).",
+        "body_too_long": "Meldingen er for lang for serveren (maks. {max} byte inkludert formatering)."
       }
     },
     "folders": {
