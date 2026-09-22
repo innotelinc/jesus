@@ -1869,7 +1869,8 @@ export class JMAPClient implements IJMAPClient {
           methodCalls.push(["Email/query", {
             accountId: targetAccountId,
             filter: { hasKeyword: keyword },
-            limit: 0,
+            // limit 1, not 0: Stalwart treats 0 as "no limit" and returns every id.
+            limit: 1,
             calculateTotal: true,
           }, `total_${i}`]);
           // Unread count for this tag
@@ -1882,7 +1883,8 @@ export class JMAPClient implements IJMAPClient {
                 { notKeyword: "$seen" },
               ],
             },
-            limit: 0,
+            // limit 1, not 0: Stalwart treats 0 as "no limit" and returns every id.
+            limit: 1,
             calculateTotal: true,
           }, `unread_${i}`]);
         }
@@ -2071,7 +2073,8 @@ export class JMAPClient implements IJMAPClient {
           return ["Email/query", {
             accountId: targetAccountId,
             filter: { operator: "AND", conditions },
-            limit: 0,
+            // limit 1, not 0: Stalwart treats 0 as "no limit" and returns every id.
+            limit: 1,
             calculateTotal: true,
           }, `tab_${i}`];
         });
