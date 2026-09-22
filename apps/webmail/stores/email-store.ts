@@ -5,7 +5,7 @@ import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore, getMessageListOrderFor } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
 import type { SortLevel } from "@/lib/message-list-order";
-import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty, toWildcardQuery } from "@/lib/jmap/search-utils";
+import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
 import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
@@ -1751,7 +1751,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         const tagFilter = !isFilterEmpty(tagFilters)
           ? buildJMAPFilter(tagQuery, tagFilters, undefined)
           : tagQuery
-            ? { text: toWildcardQuery(tagQuery) }
+            ? { text: tagQuery.trim() }
             : undefined;
         const result = await fetchTagEmails(built, `$label:${selectedKeyword}`, emailsPerPage, 0, order, tagFilter);
         const enrichedEmails = await emailHooks.onEmailsFetched.transform(result.emails);
@@ -1966,7 +1966,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           built, `$label:${selectedKeyword}`, emailsPerPage, position, getMessageListOrderFor(null),
           hasFilters
             ? buildJMAPFilter(searchQuery, searchFilters, undefined)
-            : { text: toWildcardQuery(searchQuery) },
+            : { text: searchQuery.trim() },
         );
         set({ unifiedErrors: result.errors });
       } else if (searchQuery || hasFilters) {
@@ -2798,7 +2798,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         const built = buildTagViewAccountClients(client);
         result = await fetchTagEmails(
           built, `$label:${selectedKeyword}`, emailsPerPage, 0, getMessageListOrderFor(null),
-          { text: toWildcardQuery(query) },
+          { text: query.trim() },
         );
         unifiedErrors = result.errors;
 
@@ -3957,7 +3957,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             hasFilters
               ? buildJMAPFilter(searchQuery, searchFilters, undefined)
               : searchQuery
-                ? { text: toWildcardQuery(searchQuery) }
+                ? { text: searchQuery.trim() }
                 : undefined,
           );
           unifiedErrors = result.errors;
