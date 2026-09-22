@@ -8558,19 +8558,21 @@ export class JMAPClient implements IJMAPClient {
     ]);
     const keywords = srcResp.methodResponses?.[0]?.[1]?.list?.[0]?.keywords ?? {};
 
-    // onSuccessDestroyOriginal is the spec-correct way to remove the source, but
-    // Stalwart currently destroys the copy's create-id instead of the source id,
-    // so the original is left behind — a duplicate on every cross-account move.
-    // Reported upstream (support.stalw.art #1150); this self-heals once fixed.
+    // No onSuccessDestroyOriginal: Stalwart before 0.16.15 destroys the wrong
+    // id with it (support.stalw.art #1150), and from 0.16.15 it destroys the
+    // source even when the copy failed (over quota, not found), so a failed
+    // move lost the message. Destroy the source only once the copy exists.
     const response = await this.request([
       ["Email/copy", {
         fromAccountId,
         accountId: toAccountId,
         create: { c: { id: emailId, mailboxIds: { [destMailboxId]: true }, keywords } },
-        onSuccessDestroyOriginal: true,
       }, "0"],
     ]);
-    const res = response.methodResponses?.[0]?.[1];
+    const [name, res] = response.methodResponses?.[0] ?? [];
+    if (name === "error") {
+      throw new Error(res?.description || res?.type || "Failed to copy email across accounts");
+    }
     const err = res?.notCreated?.c;
     if (err) {
       throw new Error(err.description || err.type || "Failed to copy email across accounts");
@@ -8579,6 +8581,11 @@ export class JMAPClient implements IJMAPClient {
     if (!id) {
       throw new Error("Email/copy succeeded but no ID returned");
     }
+
+    const destroyResponse = await this.request([
+      ["Email/set", { accountId: fromAccountId, destroy: [emailId] }, "0"],
+    ]);
+    this.assertEmailSetSucceeded(destroyResponse, "remove the moved email from its old account");
     return id;
   }
 
