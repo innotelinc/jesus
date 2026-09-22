@@ -14,6 +14,9 @@ import { DEFAULT_CALENDAR_COMPONENTS, mkCalendarCollection, newCalendarCollectio
 import { sanitizeDisplayName, splitMailbox } from "@/lib/rfc5322-mailbox";
 import { decodeFileNodeName } from "./filenode-name";
 import { contactFromWire, contactToWire } from "./contact-wire";
+import { SchedulingDeniedError } from "./scheduling-error";
+
+export { SchedulingDeniedError };
 import { acceptedFileName, fileNameRulesFrom, type FileNameRules } from "@/lib/file-name-rules";
 import { getEffectiveTimeZone, toLocalDateTime } from "@/lib/timezone";
 import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
@@ -6719,6 +6722,9 @@ export class JMAPClient implements IJMAPClient {
         debug.warn('calendar', 'CalendarEvent/create invalid properties', error.properties);
         debug.warn('calendar', 'CalendarEvent/create sent keys', Object.keys(cleanEvent));
         debug.groupEnd();
+        if (sendSchedulingMessages && error.type === 'forbidden') {
+          throw new SchedulingDeniedError(error.description || 'forbidden');
+        }
         throw new Error(error.description || "Failed to create calendar event");
       }
 
@@ -6909,6 +6915,9 @@ export class JMAPClient implements IJMAPClient {
       if (result.notUpdated?.[eventId]) {
         const error = result.notUpdated[eventId];
         debug.error('CalendarEvent/set notUpdated', { eventId, error });
+        if (sendSchedulingMessages && error.type === 'forbidden') {
+          throw new SchedulingDeniedError(error.description || 'forbidden');
+        }
         throw new Error(error.description || "Failed to update calendar event");
       }
       debug.log('calendar', 'CalendarEvent/set update full response', { methodName, result });

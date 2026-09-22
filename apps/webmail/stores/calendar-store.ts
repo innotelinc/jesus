@@ -8,6 +8,7 @@ import { displayNow } from '@/lib/timezone';
 import { parseDuration } from '@/components/calendar/event-card';
 import { sanitizeOutgoingCalendarEventData } from '@/lib/calendar-event-normalization';
 import { expandRecurringEvents } from '@/lib/recurrence-expansion';
+import { SchedulingDeniedError } from '@/lib/jmap/scheduling-error';
 import {
   baseEventStoreId,
   buildFallbackExcludePatch,
@@ -711,6 +712,8 @@ export const useCalendarStore = create<CalendarStore>()(
         } catch (error) {
           debug.error('Failed to create event:', error);
           set({ error: 'Failed to create event' });
+          // The caller can offer to save it without the invitations.
+          if (error instanceof SchedulingDeniedError) throw error;
           return null;
         }
       },
