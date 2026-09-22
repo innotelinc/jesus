@@ -5405,26 +5405,36 @@ export class JMAPClient implements IJMAPClient {
   }
 
   /**
-   * List all principals visible to the user (RFC 9670). Stalwart returns the
-   * full directory regardless of `filter`, so we fetch the whole list and let
-   * callers filter client-side.
+   * List all principals visible to the user (RFC 9670); callers filter
+   * client-side. Paged by maxObjectsInGet: an unbounded query hands every id
+   * to the chained Principal/get, which the server refuses with
+   * `requestTooLarge` once the directory holds more than that (500).
    */
   async getPrincipals(targetAccountId?: string): Promise<Principal[]> {
     if (!this.supportsPrincipals()) return [];
     const accountId = targetAccountId || this.accountId;
+    const pageSize = this.getMaxObjectsInGet();
+    const MAX_PRINCIPALS = 20000;
     try {
-      const response = await this.request([
-        ["Principal/query", { accountId }, "0"],
-        ["Principal/get", {
-          accountId,
-          "#ids": { resultOf: "0", name: "Principal/query", path: "/ids" },
-        }, "1"],
-      ], this.principalsUsing());
+      const all: Principal[] = [];
+      for (let position = 0; position < MAX_PRINCIPALS;) {
+        const response = await this.request([
+          ["Principal/query", { accountId, position, limit: pageSize }, "0"],
+          ["Principal/get", {
+            accountId,
+            "#ids": { resultOf: "0", name: "Principal/query", path: "/ids" },
+          }, "1"],
+        ], this.principalsUsing());
 
-      const getResp = response.methodResponses?.find((r) => r[0] === "Principal/get");
-      if (!getResp) return [];
-      const list = (getResp[1].list || []) as Principal[];
-      return list.map((p) => ({ ...p, accountId }));
+        const ids: string[] = response.methodResponses?.find((r) => r[0] === "Principal/query")?.[1]?.ids ?? [];
+        const getResp = response.methodResponses?.find((r) => r[0] === "Principal/get");
+        if (!getResp) break;
+        const list = (getResp[1].list || []) as Principal[];
+        all.push(...list.map((p) => ({ ...p, accountId })));
+        if (ids.length < pageSize) break;
+        position += ids.length;
+      }
+      return all;
     } catch (error) {
       console.error("Failed to fetch principals:", error);
       return [];
