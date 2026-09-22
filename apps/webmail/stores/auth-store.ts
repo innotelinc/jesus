@@ -80,6 +80,12 @@ interface AuthState {
   checkAuth: () => Promise<void>;
   clearError: () => void;
   syncIdentities: () => void;
+  /**
+   * Keep a Basic-auth session working after the user changed the password:
+   * the client, the server-side management context and the remembered
+   * session still hold the old one, which the server now refuses.
+   */
+  updateBasicPassword: (newPassword: string) => Promise<void>;
   refreshIdentities: () => Promise<void>;
   getClientForAccount: (accountId: string) => JMAPClient | undefined;
   getAllConnectedClients: () => Map<string, JMAPClient>;
@@ -2377,6 +2383,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      updateBasicPassword: async (newPassword) => {
+        const { client, activeAccountId } = get();
+        const account = activeAccountId ? useAccountStore.getState().getAccountById(activeAccountId) : undefined;
+        if (!client || !account || account.authMode !== 'basic') return;
+        client.updateBasicAuth(newPassword);
+        await syncStalwartAuthContext(account.serverUrl, account.username, client.getAuthHeader(), account.cookieSlot);
+        if (account.rememberMe || IS_LITE) {
+          await persistBasicSession(account.cookieSlot, account.serverUrl, account.username, newPassword);
+        }
+      },
 
       syncIdentities: () => {
         const identityState = useIdentityStore.getState();

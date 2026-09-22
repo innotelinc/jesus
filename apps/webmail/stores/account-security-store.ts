@@ -579,6 +579,13 @@ export const useAccountSecurityStore = create<AccountSecurityState>()((set, get)
         ],
       ]);
       requireAccountPasswordUpdate(responses, 'Failed to change password');
+      // The session still authenticates with the old password; switch it over
+      // so the next request does not bounce the user to the login page.
+      try {
+        await useAuthStore.getState().updateBasicPassword(newPassword);
+      } catch (error) {
+        debug.warn('auth', 'Password changed, but the session could not switch to it:', error);
+      }
       set({ isSaving: false });
     } catch (error) {
       set({

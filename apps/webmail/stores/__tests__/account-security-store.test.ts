@@ -9,9 +9,12 @@ vi.mock('@/lib/stalwart/jmap-passthrough', () => ({
   },
 }));
 
+const updateBasicPassword = vi.fn(async (_password: string) => {});
+
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: {
     getState: () => ({
+      updateBasicPassword,
       client: {
         getAccountId: () => 'acc-primary',
         hasAccountCapability: (cap: string) => cap === 'urn:stalwart:jmap',
@@ -270,6 +273,7 @@ describe('account-security-store', () => {
       ]);
 
       await useAccountSecurityStore.getState().changePassword('old', 'new', ' 123456 ');
+      expect(updateBasicPassword).toHaveBeenCalledWith('new');
 
       const args = mockedJmap.mock.calls[0][0][0][1];
       expect(args.update.singleton).toEqual({ currentSecret: 'old', secret: 'new', 'otpAuth/otpCode': '123456' });
