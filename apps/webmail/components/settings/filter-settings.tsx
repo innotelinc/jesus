@@ -174,6 +174,7 @@ export function FilterSettings() {
     rawScript,
     vacationSettings,
     includeVacation,
+    sieveCapabilities,
     selectAccount,
     saveFilters,
     addRule,
@@ -699,6 +700,10 @@ export function FilterSettings() {
         <FilterRuleModal
           rule={editingRule}
           mailboxes={mailboxes}
+          maxRedirects={sieveCapabilities?.maxNumberRedirects}
+          otherForwards={rules
+            .filter((r) => r.enabled && r.id !== editingRule?.id)
+            .reduce((n, r) => n + r.actions.filter((a) => a.type === "forward").length, 0)}
           onSave={handleSaveRule}
           onClose={() => {
             setShowRuleModal(false);

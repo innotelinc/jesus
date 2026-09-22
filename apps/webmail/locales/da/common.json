@@ -2039,6 +2039,8 @@
       "copy_to_folder": "Vælg mappe",
       "forward_to": "Videresend til e-mailadresse",
       "forward_placeholder": "email@eksempel.dk",
+      "forward_keep_copy": "Behold en kopi",
+      "forward_limit": "Grænse for videresendelser pr. besked på denne server: {count}. Yderligere videresendelser springes over.",
       "reject_message": "Afvisningsbesked",
       "reject_placeholder": "Din e-mail er blevet afvist",
       "label_name": "Tag-navn",

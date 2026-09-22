@@ -2043,6 +2043,8 @@
       "copy_to_folder": "Vybrať priečinok",
       "forward_to": "Preposlať na e-mailovú adresu",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Ponechať kópiu",
+      "forward_limit": "Limit preposlaní na správu na tomto serveri: {count}. Ďalšie preposlania sa preskočia.",
       "reject_message": "Správa o odmietnutí",
       "reject_placeholder": "Váš e-mail bol odmietnutý",
       "label_name": "Názov štítku",

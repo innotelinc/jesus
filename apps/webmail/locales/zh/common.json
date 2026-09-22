@@ -2036,6 +2036,8 @@
       "copy_to_folder": "选择文件夹",
       "forward_to": "转发至邮箱地址",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "保留副本",
+      "forward_limit": "此服务器每封邮件的转发上限：{count}。多余的转发将被跳过。",
       "reject_message": "拒绝留言",
       "reject_placeholder": "您的邮件已被拒绝",
       "label_name": "标签名称",

@@ -2043,6 +2043,8 @@
       "copy_to_folder": "انتخاب پوشه",
       "forward_to": "ارسال به آدرس ایمیل",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "نگه‌داشتن یک نسخه",
+      "forward_limit": "سقف بازارسال برای هر پیام در این سرور: {count}. بازارسال‌های اضافه نادیده گرفته می‌شوند.",
       "reject_message": "پیام رد",
       "reject_placeholder": "ایمیل شما رد شد",
       "label_name": "نام برچسب",

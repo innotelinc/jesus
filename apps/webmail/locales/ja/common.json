@@ -2036,6 +2036,8 @@
       "copy_to_folder": "フォルダーを選択",
       "forward_to": "転送先メールアドレス",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "コピーを残す",
+      "forward_limit": "このサーバーでの1通あたりの転送上限: {count}。それを超える転送はスキップされます。",
       "reject_message": "拒否メッセージ",
       "reject_placeholder": "あなたのメールは拒否されました",
       "label_name": "ラベル名",

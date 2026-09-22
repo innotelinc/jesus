@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Виберіть папку",
       "forward_to": "Переслати на електронну адресу",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Зберегти копію",
+      "forward_limit": "Ліміт пересилань на один лист на цьому сервері: {count}. Зайві пересилання пропускаються.",
       "reject_message": "Повідомлення про відмову",
       "reject_placeholder": "Ваш лист було відхилено",
       "label_name": "Назва мітки",

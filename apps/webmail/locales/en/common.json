@@ -2043,6 +2043,8 @@
       "copy_to_folder": "Select folder",
       "forward_to": "Forward to email address",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Keep a copy",
+      "forward_limit": "Forward limit per message on this server: {count}. Extra forwards are skipped.",
       "reject_message": "Rejection message",
       "reject_placeholder": "Your email has been rejected",
       "label_name": "Tag name",

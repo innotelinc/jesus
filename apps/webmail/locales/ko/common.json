@@ -2036,6 +2036,8 @@
       "copy_to_folder": "폴더 선택",
       "forward_to": "전달할 이메일 주소",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "사본 보관",
+      "forward_limit": "이 서버의 메시지당 전달 한도: {count}. 초과된 전달은 건너뜁니다.",
       "reject_message": "거부 메시지",
       "reject_placeholder": "메일 수신이 거부되었습니다",
       "label_name": "태그 이름",
