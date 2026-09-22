@@ -15,6 +15,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The SSO job below talks to live hosts, so an operator needs to be able to
+  # re-run it on its own (after rotating the token, or when the provider was
+  # down during the last push) without inventing a commit to trigger it.
+  workflow_dispatch:
 
 jobs:
   shellcheck:

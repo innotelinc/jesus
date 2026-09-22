@@ -95,9 +95,6 @@ def local_rows_created(subjects):
     Best effort by design: in CI there is no Docker socket and nothing to clean
     up locally, which is fine — the run has still proved what it set out to.
     """
-    if not _docker_available():
-        print(f"[cleanup] no docker here — leaving the local rows for {USERNAME}")
-        return
     by_subject = ", ".join("'" + s.replace("'", "''") + "'" for s in subjects) or "''"
     where = (f"provider_id IN ({by_subject}) "
              "OR email LIKE 'sso-smoke-%@innotel.us'")
@@ -105,6 +102,17 @@ def local_rows_created(subjects):
         f"DELETE FROM organization_users WHERE user_id IN (SELECT id FROM users WHERE {where});"
         f"DELETE FROM users WHERE {where};"
     )
+    if not _docker_available():
+        # No local database to write to — so hand back the statement that does
+        # it, on the host that can. This is the CI path, and it matters because
+        # the collision pass leaves a row with NO email: it is findable by
+        # subject only, which is why the subjects are printed rather than a
+        # pattern an operator would have to guess.
+        print("[cleanup] no local database here — nothing to remove from this host")
+        print("[cleanup] the rows this run created can be removed on the host with:")
+        print("[cleanup]   docker exec capstone-postgres-1 psql -U postgres -c "
+              f"\"{sql}\"")
+        return
     try:
         subprocess.run(
             ["docker", "exec", DB_CONTAINER, "psql", "-U", "postgres", "-c", sql],
@@ -237,11 +245,16 @@ def main():
     created = False
     subjects = []
     try:
-        # verify-sso.py's Config reads the token, the required group and the LAN
-        # address the same way every other verifier does; only the app entry
-        # below is specific to this script.
+        # verify-sso.py's Config reads the token and the required group the same
+        # way every other verifier does. `host_ip` is pinned to a placeholder on
+        # purpose: Config otherwise requires a detected LAN address, because the
+        # other verifiers probe LAN ports — this script never does. It reaches
+        # the IdP and the app over their public names only, so demanding a LAN
+        # address would make it skip in CI for a reason that has nothing to do
+        # with the thing it tests.
         cfg = v.Config(types.SimpleNamespace(
-            base=None, host_ip=None, verbose=args.verbose,
+            base=None, host_ip=os.environ.get("LAN_IP", "127.0.0.1"),
+            verbose=args.verbose,
         ))
         api = v.AuthApi(cfg)
 
