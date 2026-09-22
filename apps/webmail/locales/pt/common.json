@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Selecionar pasta",
       "forward_to": "Encaminhar para endereço de e-mail",
       "forward_placeholder": "email@exemplo.com",
+      "forward_keep_copy": "Manter uma cópia",
+      "forward_limit": "Limite de reencaminhamentos por mensagem neste servidor: {count}. Os restantes são ignorados.",
       "reject_message": "Mensagem de rejeição",
       "reject_placeholder": "Seu e-mail foi rejeitado",
       "label_name": "Nome da etiqueta",

@@ -2043,6 +2043,8 @@
       "copy_to_folder": "Selecciona una carpeta",
       "forward_to": "Reenvia a l'adreça electrònica",
       "forward_placeholder": "correu@exemple.com",
+      "forward_keep_copy": "Conserva'n una còpia",
+      "forward_limit": "Límit de reenviaments per missatge en aquest servidor: {count}. Els reenviaments addicionals s'ometen.",
       "reject_message": "Missatge de rebuig",
       "reject_placeholder": "El vostre correu ha estat rebutjat",
       "label_name": "Nom de l'etiqueta",

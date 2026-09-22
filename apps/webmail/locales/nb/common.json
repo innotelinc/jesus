@@ -2043,6 +2043,8 @@
       "copy_to_folder": "Velg mappe",
       "forward_to": "Videresend til e-postadresse",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Behold en kopi",
+      "forward_limit": "Grense for videresendinger per melding på denne serveren: {count}. Flere videresendinger hoppes over.",
       "reject_message": "Avvisningsmelding",
       "reject_placeholder": "Meldingen din er avvist",
       "label_name": "Etikettnavn",

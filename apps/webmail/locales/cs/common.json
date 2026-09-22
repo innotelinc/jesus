@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Vyberte složku",
       "forward_to": "Přeposlat na e-mailovou adresu",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Ponechat kopii",
+      "forward_limit": "Limit přeposlání na zprávu na tomto serveru: {count}. Další přeposlání se přeskočí.",
       "reject_message": "Zpráva o odmítnutí",
       "reject_placeholder": "Váš e-mail byl odmítnut",
       "label_name": "Název štítku",

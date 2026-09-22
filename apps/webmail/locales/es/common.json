@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Seleccionar carpeta",
       "forward_to": "Reenviar a dirección de correo",
       "forward_placeholder": "correo@ejemplo.com",
+      "forward_keep_copy": "Conservar una copia",
+      "forward_limit": "Límite de reenvíos por mensaje en este servidor: {count}. Los reenvíos adicionales se omiten.",
       "reject_message": "Mensaje de rechazo",
       "reject_placeholder": "Su correo ha sido rechazado",
       "label_name": "Nombre de la etiqueta",

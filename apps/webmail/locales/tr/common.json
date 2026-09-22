@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Klasör seçin",
       "forward_to": "E-posta adresine ilet",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Bir kopyasını sakla",
+      "forward_limit": "Bu sunucuda ileti başına yönlendirme sınırı: {count}. Fazla yönlendirmeler atlanır.",
       "reject_message": "Reddetme iletisi",
       "reject_placeholder": "E-postanız reddedildi",
       "label_name": "Etiket adı",

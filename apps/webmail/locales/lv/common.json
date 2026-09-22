@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Izvēlēties mapi",
       "forward_to": "Pārsūtīt uz e-pastu",
       "forward_placeholder": "lietotajs@piemers.lv",
+      "forward_keep_copy": "Saglabāt kopiju",
+      "forward_limit": "Pārsūtīšanas ierobežojums vienai ziņai šajā serverī: {count}. Papildu pārsūtīšanas tiek izlaistas.",
       "reject_message": "Noraidīšanas ziņojums",
       "reject_placeholder": "Jūsu e-pasts tika noraidīts",
       "label_name": "Taga nosaukums",

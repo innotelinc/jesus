@@ -2043,6 +2043,8 @@
       "copy_to_folder": "選取信件匣",
       "forward_to": "轉寄至電子郵件地址",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "保留副本",
+      "forward_limit": "此伺服器每封郵件的轉寄上限：{count}。多餘的轉寄將被略過。",
       "reject_message": "拒絕留言",
       "reject_placeholder": "您的郵件已被拒絕",
       "label_name": "標籤名稱",

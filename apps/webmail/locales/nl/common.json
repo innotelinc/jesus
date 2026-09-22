@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Map selecteren",
       "forward_to": "Doorsturen naar e-mailadres",
       "forward_placeholder": "email@voorbeeld.nl",
+      "forward_keep_copy": "Kopie bewaren",
+      "forward_limit": "Maximaal aantal doorsturingen per bericht op deze server: {count}. Extra doorsturingen worden overgeslagen.",
       "reject_message": "Afwijzingsbericht",
       "reject_placeholder": "Uw e-mail is afgewezen",
       "label_name": "Labelnaam",

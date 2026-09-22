@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Ordner auswählen",
       "forward_to": "An E-Mail-Adresse weiterleiten",
       "forward_placeholder": "email@beispiel.de",
+      "forward_keep_copy": "Kopie behalten",
+      "forward_limit": "Weiterleitungen pro Nachricht auf diesem Server: höchstens {count}. Weitere werden übersprungen.",
       "reject_message": "Ablehnungsnachricht",
       "reject_placeholder": "Ihre E-Mail wurde abgelehnt",
       "label_name": "Label-Name",

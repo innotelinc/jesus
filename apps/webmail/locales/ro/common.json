@@ -2043,6 +2043,8 @@
       "copy_to_folder": "Selectează folderul",
       "forward_to": "Redirecționează către adresa de e-mail",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Păstrează o copie",
+      "forward_limit": "Limita de redirecționări per mesaj pe acest server: {count}. Redirecționările în plus sunt omise.",
       "reject_message": "Mesaj de respingere",
       "reject_placeholder": "E-mailul dvs. a fost respins",
       "label_name": "Numele etichetei",

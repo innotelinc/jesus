@@ -156,14 +156,18 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
     try {
       const {
         isOpaque, rawScript, rules, activeScriptId, vacationSettings, externalRequires, includeVacation,
-        selectedAccountId,
+        selectedAccountId, sieveCapabilities,
       } = get();
 
       let content: string;
       if (isOpaque) {
         content = rawScript;
       } else {
-        content = generateScript(rules, vacationSettings || undefined, { externalRequires, includeVacation });
+        content = generateScript(rules, vacationSettings || undefined, {
+          externalRequires,
+          includeVacation,
+          extensions: sieveCapabilities?.sieveExtensions,
+        });
       }
       content = await applyScriptTransforms(content, selectedAccountId || null);
 
@@ -316,7 +320,8 @@ export async function syncVacationWithFilters(
   accountId?: string,
 ): Promise<void> {
   const sieveAccountId = accountId || client.getSieveAccountId();
-  if (enabled && !supportsInclude(client.getSieveCapabilities(sieveAccountId))) return;
+  const capabilities = client.getSieveCapabilities(sieveAccountId);
+  if (enabled && !supportsInclude(capabilities)) return;
 
   const { vacationScript, target, parsed } = await loadManagedScript(client, sieveAccountId);
   if (!target || !parsed) return;
@@ -332,6 +337,7 @@ export async function syncVacationWithFilters(
     generateScript(parsed.rules, parsed.vacation, {
       externalRequires: parsed.externalRequires,
       includeVacation: enabled,
+      extensions: capabilities?.sieveExtensions,
     }),
     sieveAccountId,
   );

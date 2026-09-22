@@ -2036,6 +2036,8 @@
       "copy_to_folder": "Wybierz folder",
       "forward_to": "Prześlij dalej na adres e-mail",
       "forward_placeholder": "email@example.com",
+      "forward_keep_copy": "Zachowaj kopię",
+      "forward_limit": "Limit przekazań na wiadomość na tym serwerze: {count}. Dodatkowe przekazania są pomijane.",
       "reject_message": "Wiadomość odrzucenia",
       "reject_placeholder": "Twoja wiadomość e-mail została odrzucona",
       "label_name": "Nazwa etykiety",
