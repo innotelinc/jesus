@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Sobreescriu",
       "toggle_on": "Cancel·la la sobreescriptura",
-      "toggle_tooltip": "Editeu lliurement el nom i l'adreça del remitent. El correu es continua enviant a través de la vostra identitat: només canvia la capçalera «De» visible.",
+      "toggle_tooltip": "Editeu lliurement el nom i l'adreça del remitent. El correu es continua enviant a través de la vostra identitat.",
       "name_label": "Nom del remitent",
       "name_placeholder": "Nom",
       "email_label": "Adreça electrònica del remitent",
-      "email_placeholder": "alias@exemple.com"
+      "email_placeholder": "alias@exemple.com",
+      "envelope_notice": "Si el vostre servidor no accepta aquesta adreça com a remitent del sobre, s'hi fa servir {identity}, i els destinataris la poden veure a la capçalera Return-Path."
     },
     "use_template": "Plantilla",
     "save_as_template": "Desa com a plantilla",

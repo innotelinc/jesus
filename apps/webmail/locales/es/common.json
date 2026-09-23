@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Anular",
       "toggle_on": "Cancelar anulación",
-      "toggle_tooltip": "Edita libremente el nombre y la dirección del remitente. El correo aún se envía a través de tu identidad - solo cambia el encabezado De visible.",
+      "toggle_tooltip": "Edita libremente el nombre y la dirección del remitente. El correo aún se envía a través de tu identidad.",
       "name_label": "Nombre del remitente",
       "name_placeholder": "Nombre",
       "email_label": "Dirección de correo del remitente",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Si tu servidor no acepta esta dirección como remitente del sobre, se usa {identity} en su lugar, y los destinatarios pueden verla en el encabezado Return-Path."
     },
     "use_template": "Plantilla",
     "save_as_template": "Guardar como plantilla",

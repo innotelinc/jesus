@@ -642,11 +642,12 @@
     "from_override": {
       "toggle_off": "Tilsidesæt",
       "toggle_on": "Annuller tilsidesættelse",
-      "toggle_tooltip": "Redigér Fra-navn og -adresse frit. Mail sendes stadig gennem din identitet - kun den synlige Fra-header ændres.",
+      "toggle_tooltip": "Redigér Fra-navn og -adresse frit. Mail sendes stadig gennem din identitet.",
       "name_label": "Fra-navn",
       "name_placeholder": "Navn",
       "email_label": "Fra-e-mailadresse",
-      "email_placeholder": "alias@eksempel.dk"
+      "email_placeholder": "alias@eksempel.dk",
+      "envelope_notice": "Hvis din server ikke accepterer denne adresse som konvolutafsender, bruges {identity} i stedet, og modtagerne kan se den i Return-Path-headeren."
     },
     "use_template": "Skabelon",
     "save_as_template": "Gem som skabelon",

@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "上書き",
       "toggle_on": "上書きを取り消す",
-      "toggle_tooltip": "差出人名とアドレスを自由に編集できます。メールは引き続きあなたのアイデンティティ経由で送信されます - 表示される差出人ヘッダーのみが変更されます。",
+      "toggle_tooltip": "差出人名とアドレスを自由に編集できます。メールは引き続きあなたのアイデンティティ経由で送信されます。",
       "name_label": "差出人名",
       "name_placeholder": "名前",
       "email_label": "差出人メールアドレス",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "サーバーがこのアドレスをエンベロープ送信者として受け付けない場合は、代わりに {identity} が使われ、受信者は Return-Path ヘッダーでそのアドレスを確認できます。"
     },
     "use_template": "テンプレート",
     "save_as_template": "テンプレートとして保存",

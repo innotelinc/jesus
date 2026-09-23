@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Endre avsender",
       "toggle_on": "Avbryt endringen",
-      "toggle_tooltip": "Rediger Fra-navnet og -adressen fritt. E-posten sendes fortsatt gjennom identiteten din – bare den synlige Fra-overskriften endres.",
+      "toggle_tooltip": "Rediger Fra-navnet og -adressen fritt. E-posten sendes fortsatt gjennom identiteten din.",
       "name_label": "Navn i Fra-feltet",
       "name_placeholder": "Navn",
       "email_label": "E-postadresse i Fra-feltet",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Hvis serveren din ikke godtar denne adressen som konvoluttavsender, brukes {identity} i stedet, og mottakerne kan se den i Return-Path-overskriften."
     },
     "use_template": "Mal",
     "save_as_template": "Lagre som mal",

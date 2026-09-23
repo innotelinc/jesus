@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Substituir",
       "toggle_on": "Cancelar substituição",
-      "toggle_tooltip": "Edite livremente o nome e o endereço do remetente. O email ainda é enviado através da sua identidade - apenas o cabeçalho De visível muda.",
+      "toggle_tooltip": "Edite livremente o nome e o endereço do remetente. O email ainda é enviado através da sua identidade.",
       "name_label": "Nome do remetente",
       "name_placeholder": "Nome",
       "email_label": "Endereço de email do remetente",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Se o seu servidor não aceitar este endereço como remetente do envelope, {identity} é usado em seu lugar, e os destinatários podem vê-lo no cabeçalho Return-Path."
     },
     "use_template": "Modelo",
     "save_as_template": "Salvar como modelo",

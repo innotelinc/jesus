@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "تجاوز",
       "toggle_on": "إلغاء التجاوز",
-      "toggle_tooltip": "عدّل اسم وعنوان \"من\" بحرية. سيُرسل البريد عبر هويتك، لكن ترويسة \"من\" الظاهرة فقط هي التي تتغير.",
+      "toggle_tooltip": "عدّل اسم وعنوان \"من\" بحرية. سيُرسل البريد عبر هويتك.",
       "name_label": "اسم المرسل",
       "name_placeholder": "الاسم",
       "email_label": "عنوان بريد المرسل",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "إذا لم يقبل خادمك هذا العنوان كمرسل للمغلف، فسيُستخدم {identity} بدلاً منه، ويمكن للمستلمين رؤيته في ترويسة Return-Path."
     },
     "use_template": "قالب",
     "save_as_template": "حفظ كقالب",

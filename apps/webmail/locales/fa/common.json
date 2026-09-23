@@ -647,7 +647,8 @@
       "name_label": "نام فرستنده",
       "name_placeholder": "نام",
       "email_label": "آدرس ایمیل فرستنده",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "اگر سرور شما این آدرس را به‌عنوان فرستندهٔ پاکت نپذیرد، به‌جای آن {identity} استفاده می‌شود و گیرندگان می‌توانند آن را در سرآیند Return-Path ببینند."
     },
     "use_template": "قالب",
     "save_as_template": "ذخیره به عنوان قالب",

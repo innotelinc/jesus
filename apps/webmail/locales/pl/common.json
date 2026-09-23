@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Zastąp",
       "toggle_on": "Anuluj zastąpienie",
-      "toggle_tooltip": "Swobodnie edytuj nazwę i adres nadawcy. Poczta jest nadal wysyłana przez twoją tożsamość - zmienia się tylko widoczny nagłówek Od.",
+      "toggle_tooltip": "Swobodnie edytuj nazwę i adres nadawcy. Poczta jest nadal wysyłana przez twoją tożsamość.",
       "name_label": "Nazwa nadawcy",
       "name_placeholder": "Nazwa",
       "email_label": "Adres e-mail nadawcy",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Jeśli twój serwer nie akceptuje tego adresu jako nadawcy koperty, zostanie użyty {identity}, a odbiorcy zobaczą go w nagłówku Return-Path."
     },
     "use_template": "Szablon",
     "save_as_template": "Zapisz jako szablon",

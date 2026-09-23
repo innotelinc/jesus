@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Felülbírálás",
       "toggle_on": "Felülbírálás megszüntetése",
-      "toggle_tooltip": "A Feladó név és cím szabad szerkesztése. A levél továbbra is az identitásodon keresztül kerül elküldésre - csak a látható Feladó fejléc változik.",
+      "toggle_tooltip": "A Feladó név és cím szabad szerkesztése. A levél továbbra is az identitásodon keresztül kerül elküldésre.",
       "name_label": "Feladó neve",
       "name_placeholder": "Név",
       "email_label": "Feladó e-mail címe",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Ha a szervered nem fogadja el ezt a címet borítékfeladóként, helyette a(z) {identity} cím kerül oda, és a címzettek láthatják a Return-Path fejlécben."
     },
     "use_template": "Sablon",
     "save_as_template": "Mentés sablonként",

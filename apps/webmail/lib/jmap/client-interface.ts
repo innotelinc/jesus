@@ -304,6 +304,9 @@ export interface IJMAPClient {
     inReplyTo?: string[],
     references?: string[],
     delayedUntil?: string,
+    // The SMTP MAIL FROM wanted instead of the identity's address (a From
+    // override). Sent through the identity that owns it when there is one;
+    // a server that refuses it gets the identity's address instead.
     envelopeMailFrom?: string,
     // requestDsn / requireTls map to RFC 3461 / RFC 8689 envelope parameters
     // and need the matching `submissionExtensions` entry (see

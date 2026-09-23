@@ -647,7 +647,8 @@
       "name_label": "Meno odosielateľa",
       "name_placeholder": "Meno",
       "email_label": "E-mailová adresa odosielateľa",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Ak váš server túto adresu neprijme ako odosielateľa obálky, použije sa namiesto nej {identity} a príjemcovia ju uvidia v hlavičke Return-Path."
     },
     "use_template": "Šablóna",
     "save_as_template": "Uložiť ako šablónu",

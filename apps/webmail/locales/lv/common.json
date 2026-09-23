@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Pārrakstīt",
       "toggle_on": "Atcelt pārrakstīšanu",
-      "toggle_tooltip": "Brīvi rediģējiet sūtītāja vārdu un adresi. Pasts joprojām tiek sūtīts caur jūsu identitāti - mainās tikai redzamais No galvenes ieraksts.",
+      "toggle_tooltip": "Brīvi rediģējiet sūtītāja vārdu un adresi. Pasts joprojām tiek sūtīts caur jūsu identitāti.",
       "name_label": "Sūtītāja vārds",
       "name_placeholder": "Vārds",
       "email_label": "Sūtītāja e-pasta adrese",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Ja jūsu serveris nepieņem šo adresi kā aploksnes sūtītāju, tās vietā tiek izmantota {identity}, un adresāti to var redzēt galvenē Return-Path."
     },
     "use_template": "Veidne",
     "save_as_template": "Saglabāt kā veidni",

@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Überschreiben",
       "toggle_on": "Überschreibung aufheben",
-      "toggle_tooltip": "Bearbeiten Sie Absendername und -adresse frei. Die E-Mail wird weiterhin über Ihre Identität gesendet - nur die sichtbare Absenderkopfzeile ändert sich.",
+      "toggle_tooltip": "Bearbeiten Sie Absendername und -adresse frei. Die E-Mail wird weiterhin über Ihre Identität gesendet.",
       "name_label": "Absendername",
       "name_placeholder": "Name",
       "email_label": "Absender-E-Mail-Adresse",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Akzeptiert Ihr Server diese Adresse nicht als Umschlag-Absender, wird dort {identity} verwendet, und Empfänger können sie in der Kopfzeile Return-Path sehen."
     },
     "use_template": "Vorlage",
     "save_as_template": "Als Vorlage speichern",

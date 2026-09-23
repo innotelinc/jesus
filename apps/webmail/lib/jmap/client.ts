@@ -3640,8 +3640,10 @@ export class JMAPClient implements IJMAPClient {
       throw new Error('No drafts mailbox found');
     }
 
+    const requestedMailFrom = envelopeMailFrom ? parseRecipientString(envelopeMailFrom).email : undefined;
     let finalIdentityId = identityId;
     let identityReplyTo: EmailAddress[] | undefined;
+    let identityEmail: string | undefined;
     {
       const identityResponse = await this.request([
         ["Identity/get", { accountId: targetAccountId }, "0"]
@@ -3653,9 +3655,15 @@ export class JMAPClient implements IJMAPClient {
       if (identityResponse.methodResponses?.[0]?.[0] === "Identity/get") {
         const identities = (identityResponse.methodResponses[0][1].list || []) as Identity[];
         if (identities.length > 0) {
-          let matchingIdentity = identityId
-            ? identities.find((id) => id.id === identityId)
+          // A requested MAIL FROM that is itself one of the account's
+          // identities is sent through that identity, so the server accepts
+          // it as the envelope sender (#1009).
+          let matchingIdentity = requestedMailFrom
+            ? identities.find((id) => id.email.toLowerCase() === requestedMailFrom.toLowerCase())
             : undefined;
+          if (!matchingIdentity && identityId) {
+            matchingIdentity = identities.find((id) => id.id === identityId);
+          }
           if (!matchingIdentity) {
             const target = fromEmail || this.username;
             matchingIdentity = identities.find((id) => id.email === target)
@@ -3663,9 +3671,16 @@ export class JMAPClient implements IJMAPClient {
           }
           finalIdentityId = matchingIdentity?.id || identities[0].id;
           identityReplyTo = matchingIdentity?.replyTo || identities[0].replyTo;
+          identityEmail = (matchingIdentity || identities[0]).email;
         }
       }
     }
+    // The MAIL FROM the server derives from the identity when the envelope is
+    // omitted. A wildcard identity (RFC 8621 §6, "*@example.com") names no
+    // concrete address, so the header From stands in for it.
+    const identityMailFrom = identityEmail && !identityEmail.includes('*')
+      ? identityEmail
+      : parseRecipientString(fromEmail || this.username).email;
 
     // Per RFC 8621 §4.1.2.3 inReplyTo/references are arrays of bare msg-ids
     // (no angle brackets). Stalwart may return them either way, so normalize.
@@ -3733,20 +3748,20 @@ export class JMAPClient implements IJMAPClient {
       },
     };
 
-    // When an explicit envelope MAIL FROM is provided (header From ≠ envelope,
-    // e.g. sending from a domain-catch-all alias without a dedicated Identity),
-    // set the EmailSubmission envelope explicitly. JMAP §7.3: when `envelope`
-    // is omitted the server derives mailFrom from the Identity.
-    const buildSubmissionCreate = (submissionId: string): Record<string, unknown> => {
-      const create: Record<string, unknown> = { emailId: `#${emailId}`, identityId: finalIdentityId };
+    // An explicit envelope is only sent when MAIL FROM should differ from the
+    // identity's address (a From override, e.g. replying from a catch-all
+    // alias without its own Identity) or carries SMTP parameters. JMAP §7.5:
+    // when `envelope` is omitted the server derives mailFrom itself.
+    const buildSubmissionCreate = (emailRef: string, mailFrom: string): Record<string, unknown> => {
+      const create: Record<string, unknown> = { emailId: emailRef, identityId: finalIdentityId };
       const parameters = submissionEnvelopeParameters(options, holdForSeconds);
       const hasMailFromParams = Object.keys(parameters.mailFrom).length > 0;
       const hasRcptToParams = Object.keys(parameters.rcptTo).length > 0;
-      if (hasMailFromParams || hasRcptToParams || envelopeMailFrom) {
+      if (hasMailFromParams || hasRcptToParams || mailFrom.toLowerCase() !== identityMailFrom.toLowerCase()) {
         const envelopeRecipients = normalizeEnvelopeRecipients([...to, ...(cc || []), ...(bcc || [])]);
         create.envelope = {
           mailFrom: {
-            email: parseRecipientString(envelopeMailFrom || fromEmail || this.username).email,
+            email: mailFrom,
             ...(hasMailFromParams ? { parameters: parameters.mailFrom } : {}),
           },
           rcptTo: hasRcptToParams
@@ -3754,8 +3769,9 @@ export class JMAPClient implements IJMAPClient {
             : envelopeRecipients,
         };
       }
-      return { [submissionId]: create };
+      return { "1": create };
     };
+    const firstMailFrom = requestedMailFrom || identityMailFrom;
 
     // The old draft is destroyed in a separate request only after the
     // submission succeeded (see below, #849). Destroying it up front in the
@@ -3768,11 +3784,38 @@ export class JMAPClient implements IJMAPClient {
     }, "0"]);
     methodCalls.push(["EmailSubmission/set", {
       accountId: this.getSubmissionAccountId(targetAccountId),
-      create: buildSubmissionCreate("1"),
+      create: buildSubmissionCreate(`#${emailId}`, firstMailFrom),
       onSuccessUpdateEmail,
     }, "1"]);
 
-    const response = await this.request(methodCalls);
+    let response = await this.request(methodCalls);
+
+    // The server may refuse a MAIL FROM other than the identity's own address
+    // (RFC 8621 §7.5.1 forbiddenMailFrom). Stalwart always does, and reports
+    // it as forbiddenFrom. The message exists in Drafts by then, so submit it
+    // once more with the identity's address instead of failing the send; the
+    // composer warns about this before sending (#1009).
+    if (firstMailFrom.toLowerCase() !== identityMailFrom.toLowerCase()) {
+      const refusal = response.methodResponses
+        ?.find(([name]) => name === 'EmailSubmission/set')?.[1]?.notCreated?.['1'] as { type?: string } | undefined;
+      const draftCopyId = response.methodResponses
+        ?.find(([name]) => name === 'Email/set')?.[1]?.created?.[emailId]?.id as string | undefined;
+      if (draftCopyId && (refusal?.type === 'forbiddenMailFrom' || refusal?.type === 'forbiddenFrom')) {
+        debug.warn('email', `[sendEmail] server refused ${firstMailFrom} as MAIL FROM (${refusal.type}), sending with ${identityMailFrom}`);
+        const retry = await this.request([["EmailSubmission/set", {
+          accountId: this.getSubmissionAccountId(targetAccountId),
+          create: buildSubmissionCreate(draftCopyId, identityMailFrom),
+          onSuccessUpdateEmail,
+        }, "1"]]);
+        response = {
+          ...retry,
+          methodResponses: [
+            ...response.methodResponses.filter(([name]) => name === 'Email/set'),
+            ...(retry.methodResponses ?? []),
+          ],
+        };
+      }
+    }
 
     let createdEmailId: string | undefined;
     let emailSubmissionId: string | undefined;

@@ -637,11 +637,12 @@
     "from_override": {
       "toggle_off": "עקוף",
       "toggle_on": "בטל עקיפה",
-      "toggle_tooltip": "ערוך את שם ההַשגחה וכתובת בחופשיות. הדוא״ל עדיין נשלח דרך הזהות שלך - רק כותרת ההַשגחה הנראית משתנה.",
+      "toggle_tooltip": "ערוך בחופשיות את שם וכתובת השולח. הדוא״ל עדיין נשלח דרך הזהות שלך.",
       "name_label": "שם ממנו",
       "name_placeholder": "שם",
       "email_label": "כתובת דוא״ל ממנו",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "אם השרת שלך לא מקבל את הכתובת הזו כשולח המעטפה, ייעשה שימוש ב-{identity} במקומה, והנמענים יכולים לראות אותה בכותרת Return-Path."
     },
     "forgot_attachment": {
       "title": "נשכחת קובץ מצורף?",
