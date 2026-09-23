@@ -23,14 +23,33 @@ export interface ClientConfigOptions {
   fallbackClientId?: string;
 }
 
-// SSRF guard for OAuth discovery. When `oauthAllowPrivateEndpoints` is set,
-// the admin opts in to discovery resolving to RFC-1918 / loopback hosts —
-// required for split-DNS deployments where the JMAP server's public hostname
-// resolves to an internal IP locally. The guard remains in force for any
-// caller that passes a user-supplied serverUrl (see totp-token-exchange).
-export function getDiscoveryValidator(): EndpointValidator | undefined {
+function httpOrigin(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    if (u.username || u.password) return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+// SSRF guard for OAuth discovery. `discoveryUrl` comes from admin config (the
+// issuer or the JMAP server, see getRequiredConfig), and discovery has already
+// connected to it, so endpoints on that same origin are trusted the way the
+// configured JMAP server is in stalwart-context. Rejecting them broke
+// split-horizon DNS, where the issuer's public hostname resolves to an
+// in-cluster address (#1028). Every other endpoint in the document must still
+// resolve publicly, so a spoofed or compromised document cannot aim the token
+// or revocation request at another internal host. When
+// `oauthAllowPrivateEndpoints` is set, the admin opts out of the guard
+// entirely, for IdPs that advertise endpoints on other internal hosts.
+export function getDiscoveryValidator(discoveryUrl: string): EndpointValidator | undefined {
   const allowPrivate = configManager.get<boolean>('oauthAllowPrivateEndpoints', false);
-  return allowPrivate ? undefined : isPublicHttpUrl;
+  if (allowPrivate) return undefined;
+  const issuerOrigin = httpOrigin(discoveryUrl);
+  return async (endpoint: string) =>
+    (issuerOrigin !== null && httpOrigin(endpoint) === issuerOrigin) || isPublicHttpUrl(endpoint);
 }
 
 function getGlobalClientSecret(): string {
@@ -110,7 +129,7 @@ function getClientSecret(serverId?: string | null): string {
 
 export async function getTokenEndpoint(serverId?: string | null, options?: ClientConfigOptions): Promise<string> {
   const { discoveryUrl } = getRequiredConfig(serverId, options);
-  const metadata = await discoverOAuth(discoveryUrl, { validateEndpoint: getDiscoveryValidator() });
+  const metadata = await discoverOAuth(discoveryUrl, { validateEndpoint: getDiscoveryValidator(discoveryUrl) });
   if (!metadata?.token_endpoint) {
     throw new Error('OAuth token endpoint not found');
   }
@@ -119,7 +138,7 @@ export async function getTokenEndpoint(serverId?: string | null, options?: Clien
 
 export async function getMetadata(serverId?: string | null, options?: ClientConfigOptions): Promise<OAuthMetadata | null> {
   const { discoveryUrl } = getRequiredConfig(serverId, options);
-  return discoverOAuth(discoveryUrl, { validateEndpoint: getDiscoveryValidator() });
+  return discoverOAuth(discoveryUrl, { validateEndpoint: getDiscoveryValidator(discoveryUrl) });
 }
 
 export function buildOAuthParams(base: Record<string, string>, serverId?: string | null, options?: ClientConfigOptions): URLSearchParams {
