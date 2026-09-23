@@ -9,6 +9,7 @@ import {
 } from '@/lib/oauth/token-exchange';
 import { refreshTokenCookieName, refreshTokenServerCookieName } from '@/lib/oauth/tokens';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
+import { storeIdToken } from '@/lib/oauth/end-session';
 import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 
 const SSO_PENDING_COOKIE = 'sso_pending';
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
       } else {
         cookieStore.delete(serverCookieName);
       }
+      storeIdToken(cookieStore, slot, tokens.id_token, request.nextUrl.basePath);
     }
 
     // Delete pending cookie

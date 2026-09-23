@@ -14,9 +14,9 @@ import { fetchPrincipalDisplayName } from '@/lib/stalwart/principal';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
 import { setServerAuthIssue } from '@/lib/server-auth-status';
-import { generateAccountId } from '@/lib/account-utils';
+import { generateAccountId, MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 import { replaceWindowLocation, getPathPrefix, getLocaleFromPath, apiFetch } from '@/lib/browser-navigation';
-import { notifyParent } from '@/lib/iframe-bridge';
+import { isEmbedded, notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
@@ -74,7 +74,16 @@ interface AuthState {
    * refresh tokens behind an `nbf` claim reject an early renewal outright.
    */
   refreshAccessToken: (options?: { allowCached?: boolean }) => Promise<string | null>;
-  logout: () => Promise<void>;
+  /**
+   * Sign out of the active account. Switches to the next signed-in account
+   * when there is one; otherwise ends the identity provider's session too
+   * (see {@link LogoutOptions}) and leaves the app.
+   */
+  logout: (options?: LogoutOptions) => Promise<void>;
+  /**
+   * Sign out of every account. Ends at most one identity provider session:
+   * see {@link pickEndSessionSlot}.
+   */
   logoutAll: () => Promise<void>;
   removeAccount: (accountId: string) => void;
   switchAccount: (accountId: string) => Promise<void>;
@@ -90,6 +99,16 @@ interface AuthState {
   refreshIdentities: () => Promise<void>;
   getClientForAccount: (accountId: string) => JMAPClient | undefined;
   getAllConnectedClients: () => Map<string, JMAPClient>;
+}
+
+export interface LogoutOptions {
+  /**
+   * Also end the identity provider's session when the account signed in
+   * through it (#905). Default true. False when the session ended on its own
+   * (rejected or unrenewable token): the user did not ask to leave the
+   * provider, and signing in again should stay a single click.
+   */
+  endProviderSession?: boolean;
 }
 
 const ERROR_PATTERNS: Array<{ key: string; matches: string[] }> = [
@@ -221,20 +240,81 @@ export async function syncAccountDisplayName(
   useAccountStore.getState().updateAccount(accountId, updates);
 }
 
+/*
+ * Sign-out ordering (#905).
+ *
+ * A token renewal or Stalwart context sync still in flight when the user signs
+ * out would write its cookies back after sign-out cleared them, reviving the
+ * session. Such requests are tracked per slot. Sign-out marks the slot closing
+ * (no new ones start), lets the pending ones settle - aborting any that take
+ * too long, which drops their response and its cookies - and only then clears
+ * the slot's credentials. That cleanup is awaited with a timeout, so its
+ * result (the provider's logout URL) is known before the page navigates, and
+ * failures are reported instead of dropped.
+ */
+
+/** How long sign-out waits for a token renewal already in flight. */
+const SESSION_WRITE_SETTLE_TIMEOUT_MS = 3000;
+/** How long sign-out waits for the server to revoke and clear a slot's credentials. */
+const CREDENTIAL_CLEANUP_TIMEOUT_MS = 8000;
+
+interface SessionWrite {
+  slot: number;
+  settled: Promise<unknown>;
+  abort: () => void;
+}
+
+const sessionWrites = new Set<SessionWrite>();
+// Slots being signed out: nothing may write their session cookies anymore.
+const closingSlots = new Set<number>();
+
+/** Run a request that may write `slot`'s session cookies, so sign-out can wait for it. */
+function trackSessionWrite<T>(slot: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const request = run(controller.signal);
+  const entry: SessionWrite = { slot, settled: request.catch(() => {}), abort: () => controller.abort() };
+  sessionWrites.add(entry);
+  void entry.settled.then(() => sessionWrites.delete(entry));
+  return request;
+}
+
+const TIMED_OUT = Symbol('timed out');
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/** Wait for the session writes of closing `slots` to finish, aborting stragglers. */
+async function settleSessionWrites(slots: ReadonlySet<number>): Promise<void> {
+  const pending = [...sessionWrites].filter((write) => slots.has(write.slot));
+  if (pending.length === 0) return;
+  const result = await withTimeout(Promise.all(pending.map((write) => write.settled)), SESSION_WRITE_SETTLE_TIMEOUT_MS);
+  if (result === TIMED_OUT) {
+    debug.warn('auth', 'A token renewal was still running at sign-out; cancelling it');
+    for (const write of pending) write.abort();
+  }
+}
+
 async function syncStalwartAuthContext(
   serverUrl: string,
   username: string,
   authHeader: string,
   slot: number,
 ): Promise<void> {
-  // The passthrough context lives on the server; Lite has none.
-  if (IS_LITE) return;
+  // The passthrough context lives on the server; Lite has none. A slot being
+  // signed out must not get its context back.
+  if (IS_LITE || closingSlots.has(slot)) return;
   try {
-    const response = await apiFetch('/api/auth/stalwart-context', {
+    const response = await trackSessionWrite(slot, (signal) => apiFetch('/api/auth/stalwart-context', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ serverUrl, username, authHeader, slot }),
-    });
+      signal,
+    }));
 
     const data = await response.json().catch(() => ({})) as { error?: string; hint?: string; warning?: string };
     if (!response.ok) {
@@ -393,16 +473,20 @@ async function persistBasicSession(slot: number, serverUrl: string, username: st
 
 /** PUT /api/auth/token?slot=N - renew (or, unless `force`, reuse) the slot's access token. */
 async function fetchSlotAccessToken(slot: number, opts: { force?: boolean } = {}): Promise<Response> {
+  // Renewing would write the tokens of a slot being signed out back.
+  if (closingSlots.has(slot)) return jsonResponse({ error: 'signed_out' }, 401);
   if (!IS_LITE) {
-    return apiFetch(`/api/auth/token?slot=${slot}${opts.force ? '&force=true' : ''}`, { method: 'PUT' });
+    return trackSessionWrite(slot, (signal) => apiFetch(`/api/auth/token?slot=${slot}${opts.force ? '&force=true' : ''}`, { method: 'PUT', signal }));
   }
-  try {
-    const tokens = await liteRefreshTokens(slot);
-    return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn });
-  } catch (err) {
-    if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
-    throw err; // network failure - callers treat it as an outage, not a rejection
-  }
+  return trackSessionWrite(slot, async () => {
+    try {
+      const tokens = await liteRefreshTokens(slot);
+      return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn });
+    } catch (err) {
+      if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
+      throw err; // network failure - callers treat it as an outage, not a rejection
+    }
+  });
 }
 
 /** PUT /api/auth/session[?slot=N] - the slot's remembered Basic credentials. */
@@ -414,26 +498,124 @@ async function fetchSlotSession(slot?: number): Promise<Response> {
   return stored ? jsonResponse(stored) : jsonResponse({ error: 'no_session' }, 401);
 }
 
-/** DELETE the slot's remembered credentials (and refresh token when `includeToken`). Fire and forget. */
-function discardSlotCredentials(slot: number, includeToken: boolean, keepalive = false): void {
-  if (IS_LITE) {
-    clearLiteSlot(slot);
-    return;
-  }
-  const init: RequestInit = keepalive ? { method: 'DELETE', keepalive: true } : { method: 'DELETE' };
-  apiFetch(`/api/auth/session?slot=${slot}`, init).catch(() => {});
-  if (includeToken) {
-    apiFetch(`/api/auth/token?slot=${slot}`, init).catch(() => {});
+/**
+ * DELETE one of the credential endpoints. Resolves to the JSON body, or null
+ * when the server could not clear it - reported, since those credentials may
+ * then still resume the session. keepalive lets a request that outlives the
+ * cleanup timeout finish after the page has navigated away.
+ */
+async function deleteCredentials(path: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await apiFetch(path, { method: 'DELETE', keepalive: true });
+    if (!res.ok) {
+      console.warn(`[auth] Sign-out could not clear ${path}: HTTP ${res.status}`);
+      return null;
+    }
+    return await res.json().catch(() => ({}));
+  } catch (err) {
+    console.warn(`[auth] Sign-out could not reach ${path}:`, err);
+    return null;
   }
 }
 
-function discardAllCredentials(): void {
-  if (IS_LITE) {
-    clearAllLiteSessions();
-    return;
+/** The provider logout URL from a token DELETE answer, when it is one a browser may be sent to. */
+function readEndSessionUrl(body: Record<string, unknown> | null): string | null {
+  const url = body?.end_session_url;
+  if (typeof url !== 'string') return null;
+  try {
+    return new URL(url).protocol === 'https:' ? url : null;
+  } catch {
+    return null;
   }
-  apiFetch('/api/auth/session?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
-  apiFetch('/api/auth/token?all=true', { method: 'DELETE', keepalive: true }).catch(() => {});
+}
+
+/**
+ * Clear credentials for the closing `slots` once their in-flight session
+ * writes have settled, then reopen the slots. `requests` issues the DELETEs
+ * and picks the provider logout URL out of the answers.
+ */
+async function clearClosingSlots(
+  slots: ReadonlySet<number>,
+  requests: () => Promise<string | null>,
+): Promise<string | null> {
+  try {
+    await settleSessionWrites(slots);
+    const result = await withTimeout(requests(), CREDENTIAL_CLEANUP_TIMEOUT_MS);
+    if (result === TIMED_OUT) {
+      console.warn('[auth] Sign-out cleanup is taking long; finishing it in the background');
+      return null;
+    }
+    return result;
+  } finally {
+    for (const slot of slots) closingSlots.delete(slot);
+  }
+}
+
+/**
+ * Revoke and clear a slot's credentials: the remembered session and, with
+ * `includeToken`, the refresh token. With `endSession`, resolves to the URL
+ * that ends the identity provider's session, when there is one.
+ */
+function clearSlotCredentials(slot: number, includeToken: boolean, endSession = false): Promise<string | null> {
+  closingSlots.add(slot);
+  return clearClosingSlots(new Set([slot]), async () => {
+    if (IS_LITE) {
+      clearLiteSlot(slot);
+      return null;
+    }
+    const [, token] = await Promise.all([
+      deleteCredentials(`/api/auth/session?slot=${slot}`),
+      includeToken ? deleteCredentials(`/api/auth/token?slot=${slot}${endSession ? '&end_session=true' : ''}`) : null,
+    ]);
+    return readEndSessionUrl(token);
+  });
+}
+
+/**
+ * Revoke and clear every slot's credentials. With `endSessionSlot`, resolves
+ * to the URL that ends that slot's identity provider session, when there is one.
+ */
+function clearAllCredentials(endSessionSlot: number | null): Promise<string | null> {
+  const slots = new Set(Array.from({ length: MAX_ACCOUNT_SLOTS }, (_, i) => i));
+  for (const slot of slots) closingSlots.add(slot);
+  return clearClosingSlots(slots, async () => {
+    if (IS_LITE) {
+      clearAllLiteSessions();
+      return null;
+    }
+    const endSession = endSessionSlot === null ? '' : `&end_session_slot=${endSessionSlot}`;
+    const [, token] = await Promise.all([
+      deleteCredentials('/api/auth/session?all=true'),
+      deleteCredentials(`/api/auth/token?all=true${endSession}`),
+    ]);
+    return readEndSessionUrl(token);
+  });
+}
+
+/**
+ * Whether signing `account` out should also end its identity provider
+ * session: only for a sign-in through the provider's own login (OAuth code or
+ * SSO flow - a password login leaves no provider session to end), only when
+ * the page can navigate the whole window (an embedding portal owns SSO and is
+ * told through the iframe bridge instead), and not in Lite, which has no
+ * server to build the logout request.
+ */
+function shouldEndProviderSession(account: AccountEntry | null | undefined): boolean {
+  return !!account?.providerSession && !IS_LITE && !isEmbedded();
+}
+
+/**
+ * The account whose provider session "Sign out of all accounts" ends. A page
+ * can make one top-level navigation, so one provider can be visited: the
+ * active account's, when it signed in through one, else the first such account
+ * in the list. Accounts on that same provider share its browser session and
+ * are signed out of it together. Accounts on other providers are signed out of
+ * Bulwark and their tokens revoked, but those providers' sessions stay open.
+ */
+export function pickEndSessionSlot(accounts: AccountEntry[], activeAccountId: string | null): number | null {
+  const eligible = accounts.filter((account) => shouldEndProviderSession(account));
+  const target = eligible.find((account) => account.id === activeAccountId) ?? eligible[0];
+  return target ? target.cookieSlot : null;
 }
 
 function bindClientStatusHandlers(
@@ -579,12 +761,19 @@ function getLocaleLoginPath(): string {
 }
 
 /**
+ * Set once sign-out has sent the browser to the identity provider's logout.
+ * The pages' auth guards answer the signed-out state by heading for the login
+ * page, and that later navigation would cancel the one to the provider.
+ */
+let leavingForProviderLogout = false;
+
+/**
  * Remembers where the user was so login can send them back. Stores the query
  * and hash too, not just the path - a deep link's disambiguators (#733) live
  * there, and dropping them silently lands the user on the wrong thing.
  */
 export function saveRedirectAfterLogin(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || leavingForProviderLogout) return;
 
   try {
     const loginPath = getLocaleLoginPath();
@@ -599,6 +788,11 @@ export function saveRedirectAfterLogin(): void {
 }
 
 export function redirectToLogin(): void {
+  if (typeof window === 'undefined' || leavingForProviderLogout) return;
+  navigateToLogin();
+}
+
+function navigateToLogin(): void {
   if (typeof window === 'undefined') return;
 
   const loginPath = getLocaleLoginPath();
@@ -614,6 +808,43 @@ function markSessionExpired(): void {
   }
 
   saveRedirectAfterLogin();
+}
+
+const SIGNED_OUT_KEY = 'signed_out';
+
+/**
+ * True once after the user signed out on purpose. The login page then skips
+ * automatic SSO: it would sign the user straight back in whenever the
+ * provider's session outlived the sign-out (#905).
+ */
+export function consumeSignedOut(): boolean {
+  try {
+    const signedOut = sessionStorage.getItem(SIGNED_OUT_KEY) === 'true';
+    sessionStorage.removeItem(SIGNED_OUT_KEY);
+    return signedOut;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Leave the app after a full sign-out: through the identity provider's logout
+ * when there is one to end, otherwise straight to the login page.
+ */
+function finishSignOut(endSessionUrl: string | null, userInitiated: boolean): void {
+  if (userInitiated) {
+    try {
+      sessionStorage.setItem(SIGNED_OUT_KEY, 'true');
+    } catch {
+      /* noop */
+    }
+  }
+  if (endSessionUrl) {
+    leavingForProviderLogout = true;
+    replaceWindowLocation(endSessionUrl);
+    return;
+  }
+  navigateToLogin();
 }
 
 function initializeFeatureStores(client: IJMAPClient): void {
@@ -723,7 +954,8 @@ function notifySignInAgain(): void {
 // account. A sign-out during the outage - or while the request was in
 // flight - must end the retry loop instead of keeping it alive with
 // doomed requests (#588).
-function shouldRetryRefresh(accountId?: string): boolean {
+function shouldRetryRefresh(slot: number, accountId?: string): boolean {
+  if (closingSlots.has(slot)) return false;
   if (accountId) return !!useAccountStore.getState().getAccountById(accountId);
   return useAuthStore.getState().isAuthenticated;
 }
@@ -1057,6 +1289,7 @@ export const useAuthStore = create<AuthState>()(
           accountStore.updateAccount(accountId, {
             authMode: effectiveAuthMode,
             rememberMe: !!rememberMe,
+            providerSession: false,
             isConnected: true,
             hasError: false,
             errorMessage: undefined,
@@ -1273,7 +1506,7 @@ export const useAuthStore = create<AuthState>()(
           // re-adding an existing account, and recomputes via getNextCookieSlot
           // for new accounts (which may disagree if another tab claimed a slot
           // mid-flow). Either way, the cookie's slot is the source of truth.
-          accountStore.updateAccount(accountId, { cookieSlot: slot });
+          accountStore.updateAccount(accountId, { cookieSlot: slot, providerSession: true });
           accountStore.setActiveAccount(accountId);
 
           await syncStalwartAuthContext(serverUrl, username, client.getAuthHeader(), slot);
@@ -1416,7 +1649,7 @@ export const useAuthStore = create<AuthState>()(
           // The refresh-token cookie was written to `slot` by /api/auth/sso/complete.
           // Force the stored cookieSlot to match - see loginWithOAuth above for the
           // re-add and concurrent-tab cases this guards against.
-          accountStore.updateAccount(accountId, { cookieSlot: slot });
+          accountStore.updateAccount(accountId, { cookieSlot: slot, providerSession: true });
           accountStore.setActiveAccount(accountId);
 
           await syncStalwartAuthContext(ssoServerUrl, username, client.getAuthHeader(), slot);
@@ -1484,6 +1717,8 @@ export const useAuthStore = create<AuthState>()(
 
         const account = accountId ? useAccountStore.getState().getAccountById(accountId) : null;
         const slot = account?.cookieSlot ?? 0;
+        // The account is being signed out: a renewal now would only undo that.
+        if (closingSlots.has(slot)) return null;
 
         const promise = (async () => {
           try {
@@ -1502,7 +1737,7 @@ export const useAuthStore = create<AuthState>()(
                 resetRefreshBackoff(accountId ?? undefined);
                 notifyParent('sso:session-expired');
                 markSessionExpired();
-                get().logout();
+                get().logout({ endProviderSession: false });
                 return null;
               }
               // A Bulwark-side failure (500/502) that keeps repeating will not
@@ -1513,10 +1748,12 @@ export const useAuthStore = create<AuthState>()(
                 notifySignInAgain();
                 notifyParent('sso:session-expired');
                 markSessionExpired();
-                if (accountId) get().removeAccount(accountId); else get().logout();
+                // removeAccount() on the active account would sign out as if the user asked to.
+                if (accountId && accountId !== get().activeAccountId) get().removeAccount(accountId);
+                else get().logout({ endProviderSession: false });
                 return null;
               }
-              if (shouldRetryRefresh(accountId ?? undefined)) {
+              if (shouldRetryRefresh(slot, accountId ?? undefined)) {
                 const retryIn = nextRefreshRetrySeconds(accountId ?? undefined);
                 debug.error(`Token refresh unavailable (${res.status}), retrying with backoff`);
                 scheduleRefresh(retryIn, get().refreshAccessToken, accountId ?? undefined);
@@ -1525,6 +1762,9 @@ export const useAuthStore = create<AuthState>()(
             }
 
             const { access_token, expires_in } = await res.json();
+
+            // Signed out while the renewal was in flight: nothing to keep alive.
+            if (closingSlots.has(slot)) return null;
 
             get().client?.updateAccessToken(access_token);
 
@@ -1549,7 +1789,7 @@ export const useAuthStore = create<AuthState>()(
             // Network failure (offline, Wi-Fi switch, server unreachable) -
             // not a rejection. Keep the session and retry with backoff.
             debug.error('Token refresh failed, retrying with backoff:', error);
-            if (shouldRetryRefresh(accountId ?? undefined)) {
+            if (shouldRetryRefresh(slot, accountId ?? undefined)) {
               scheduleRefresh(nextRefreshRetrySeconds(accountId ?? undefined), get().refreshAccessToken, accountId ?? undefined);
             }
             return null;
@@ -1565,7 +1805,7 @@ export const useAuthStore = create<AuthState>()(
         return promise;
       },
 
-       logout: async () => {
+       logout: async (options) => {
         const state = get();
         const wasDemoMode = state.isDemoMode;
         const wasOAuth = state.authMode === 'oauth';
@@ -1573,8 +1813,9 @@ export const useAuthStore = create<AuthState>()(
         const accountStore = useAccountStore.getState();
         const account = accountId ? accountStore.getAccountById(accountId) : null;
         const slot = account?.cookieSlot ?? 0;
-
-        // Stop refresh timers immediately
+        // `options` can be a click event when the action is wired straight to onClick.
+        const userInitiated = options?.endProviderSession !== false;
+        const endProviderSession = userInitiated && !wasDemoMode && shouldEndProviderSession(account);
 
         const ok = await authHooks.onBeforeLogout.intercept({
           accountId: accountId ?? 'all',
@@ -1584,6 +1825,9 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
+        // From here on nothing may renew this slot's session; the cleanup
+        // below reopens it once the credentials are gone.
+        if (!wasDemoMode) closingSlots.add(slot);
         clearRefreshTimer(accountId ?? undefined);
 
         // Disconnect and null out the client BEFORE clearing stores so the
@@ -1606,12 +1850,12 @@ export const useAuthStore = create<AuthState>()(
           accountId: accountId ?? 'all',
         });
 
-        // Check if there are remaining accounts to switch to
-        const remainingAccounts = accountStore.accounts;
+        // Check if there are remaining accounts to switch to. Read the store
+        // afresh: `accountStore` is the state from before removeAccount().
+        const nextAccount = wasDemoMode ? undefined : useAccountStore.getState().accounts[0];
 
-        if (remainingAccounts.length > 0 && !wasDemoMode) {
+        if (nextAccount) {
           // Switch to the next account - this is the one path that stays in-app
-          const nextAccount = remainingAccounts[0];
           clearAllStores();
 
           const nextClient = clients.get(nextAccount.id);
@@ -1644,32 +1888,34 @@ export const useAuthStore = create<AuthState>()(
                 set({ identities, primaryIdentity });
               }).catch((err) => debug.error('Failed to load identities after switch:', err));
             }
-          } else {
-            // Client not in memory - clear everything and redirect.
-            // Trying to async-restore during logout caused the original bug.
-            debug.error(`Cannot restore next account ${nextAccount.id}, performing full logout`);
-            evictAccount(nextAccount.id);
-            accountStore.removeAccount(nextAccount.id);
-            performFullLogout(set);
+
+            // The provider session is left alone: visiting its logout page
+            // would take the user away from the accounts still signed in
+            // here, which may share that session. Revoking the token ends
+            // Bulwark's grant.
+            void clearSlotCredentials(slot, wasOAuth);
+            return;
           }
 
-          // Background cookie cleanup for the removed account
-          discardSlotCredentials(slot, wasOAuth, true);
-          return;
+          // Client not in memory - sign out fully instead.
+          // Trying to async-restore during logout caused the original bug.
+          debug.error(`Cannot restore next account ${nextAccount.id}, performing full logout`);
+          evictAccount(nextAccount.id);
+          accountStore.removeAccount(nextAccount.id);
         }
 
-        // No accounts remaining (or demo mode) - full logout + redirect
+        // Full logout. The credentials are cleared before the page state:
+        // once signed out, the pages' auth guards head for the login page and
+        // would cut the cleanup short. Awaiting it also means the provider's
+        // logout URL is known before navigating, and nothing is left to
+        // resume the session when the browser comes back.
+        const endSessionUrl = wasDemoMode ? null : await clearSlotCredentials(slot, wasOAuth, endProviderSession);
+
         performFullLogout(set);
 
         notifyParent('sso:logout');
 
-        // Background cookie/token cleanup - keepalive ensures completion during navigation
-        if (!wasDemoMode) {
-          discardSlotCredentials(slot, wasOAuth, true);
-        }
-
-        // Redirect to login - this is synchronous and happens AFTER all state is cleared
-        redirectToLogin();
+        finishSignOut(endSessionUrl, userInitiated);
       },
 
       // Remove a specific (typically non-active) account: tear down its client,
@@ -1677,21 +1923,22 @@ export const useAuthStore = create<AuthState>()(
       // remove the active account, defer to logout() which handles switching
       // away or redirecting.
       removeAccount: (accountId: string) => {
-        if (accountId === get().activeAccountId) { get().logout(); return; }
+        if (accountId === get().activeAccountId) { void get().logout(); return; }
         const accountStore = useAccountStore.getState();
         const account = accountStore.getAccountById(accountId);
         if (!account) return;
         const slot = account.cookieSlot ?? 0;
         const wasOAuth = account.authMode === 'oauth';
 
+        // Started first: the cleanup marks the slot closing right away, so a
+        // renewal in flight cannot bring the session back.
+        void clearSlotCredentials(slot, wasOAuth);
         clearRefreshTimer(accountId);
         const client = clients.get(accountId);
         if (client) { try { client.disconnect(); } catch { /* noop */ } }
         clients.delete(accountId);
         evictAccount(accountId);
         accountStore.removeAccount(accountId);
-
-        discardSlotCredentials(slot, wasOAuth, true);
       },
 
       logoutAll: async () => {
@@ -1703,7 +1950,16 @@ export const useAuthStore = create<AuthState>()(
           return;
         }
 
+        const accountStore = useAccountStore.getState();
+        const allAccounts = [...accountStore.accounts];
+        const endSessionSlot = get().isDemoMode ? null : pickEndSessionSlot(allAccounts, get().activeAccountId);
+
+        // Starts by marking every slot closing, so nothing renews a session
+        // while the clients are torn down.
+        const cleanup = clearAllCredentials(endSessionSlot);
+
         // Disconnect all clients
+        set({ client: null });
         for (const c of clients.values()) {
           c.disconnect();
         }
@@ -1711,11 +1967,12 @@ export const useAuthStore = create<AuthState>()(
         clearAllRefreshTimers();
         evictAll();
 
+        // Credentials are cleared before the page state - see logout().
+        const endSessionUrl = await cleanup;
+
         performFullLogout(set);
 
         // Clear all accounts from registry
-        const accountStore = useAccountStore.getState();
-        const allAccounts = [...accountStore.accounts];
         for (const account of allAccounts) {
           accountStore.removeAccount(account.id);
         }
@@ -1724,10 +1981,9 @@ export const useAuthStore = create<AuthState>()(
           accountId: 'all'
         });
 
-        // Background cookie/token cleanup
-        discardAllCredentials();
+        notifyParent('sso:logout');
 
-        redirectToLogin();
+        finishSignOut(endSessionUrl, true);
       },
 
       switchAccount: async (accountId: string) => {
@@ -1832,7 +2088,7 @@ export const useAuthStore = create<AuthState>()(
           // Cannot restore - remove the stale account and redirect to login
           evictAccount(accountId);
           accountStore.removeAccount(accountId);
-          discardSlotCredentials(targetAccount.cookieSlot, false);
+          void clearSlotCredentials(targetAccount.cookieSlot, false);
 
           // Restore the previous account if still available
           if (state.activeAccountId && state.activeAccountId !== accountId) {
@@ -1879,7 +2135,7 @@ export const useAuthStore = create<AuthState>()(
           debug.error(`switchAccount: slot ${targetAccount.cookieSlot} for ${accountId} resolved to [${connectedCandidates.join(", ")}] — forcing re-auth`);
           clients.delete(accountId);
           try { targetClient.disconnect(); } catch { /* noop */ }
-          discardSlotCredentials(targetAccount.cookieSlot, true);
+          void clearSlotCredentials(targetAccount.cookieSlot, true);
           accountStore.updateAccount(accountId, { isConnected: false, hasError: true, errorMessage: 'session_mismatch' });
           set({ isLoading: false, error: 'connection_failed', activeAccountId: state.activeAccountId });
           replaceWindowLocation(getLocaleLoginPath());
@@ -2099,7 +2355,7 @@ export const useAuthStore = create<AuthState>()(
               // again rather than seeing a stale error entry forever.
               evictAccount(account.id);
               accountStore.removeAccount(account.id);
-              discardSlotCredentials(account.cookieSlot, false);
+              void clearSlotCredentials(account.cookieSlot, false);
             }
           };
 
