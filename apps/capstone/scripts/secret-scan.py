@@ -21,6 +21,11 @@ It flags:
      takes its closing quote as the opening quote of a value — which is how a
      marker constant came to be reported as a credential in this repository.
 
+     A mode name from the Fetch API is a mode, not a credential. Minified
+     bundles carry ``credentials = "same-origin"`` verbatim, which is what
+     blocked the dashboard's rebuilt chunk; telling it apart from a real pair
+     stored under that name takes both halves — see FETCH_CREDENTIALS_MODES.
+
      A value the line *builds* at run time is not stored either. When the literal
      is one operand of a concatenation and the same line draws on a random
      source (``os.urandom``, ``secrets``, ``token_hex`` …), no committed text is
@@ -81,6 +86,18 @@ LOCATION_VALUE = re.compile(r"^/[A-Za-z0-9._~/-]+$")
 # underscores, and nothing else: real secrets are mixed-case and include digits
 # or symbols, so this cannot swallow one.
 FIELD_NAME_VALUE = re.compile(r"^[A-Z]+(_[A-Z]+)+$")
+
+# The Fetch API's RequestCredentials enum. ``credentials = "same-origin"`` is a
+# mode, not a credential, and a minified bundle carries it verbatim: the
+# dashboard's dist chunk holds ``p.credentials="omit"`` and its ``"same-origin"``
+# twin inside the fetch wrapper, which blocked every rebuild of that bundle (the
+# whole file is re-added when the chunk hash changes, so the hook rescans it).
+# The name alone cannot exempt it — a variable called `credentials` can hold a
+# real pair such as "user:hunter2" — so both halves are required: the name *is*
+# `credentials`, and the value is one of the three modes the spec defines.
+# Nothing else is a mode name.
+FETCH_CREDENTIALS_NAME = re.compile(r"^credentials$", re.IGNORECASE)
+FETCH_CREDENTIALS_MODES = frozenset({"omit", "same-origin", "include"})
 
 # A vault:// reference names the secret to fetch at runtime (scheme, path,
 # optional #field) — the value in the file is a pointer, not the secret.
@@ -240,6 +257,8 @@ def scan_text(label: str, text: str) -> list[Finding]:
             if NAMESPACED_IDENTIFIER_KEY.search(name) and NAMESPACED_IDENTIFIER_VALUE.match(value):
                 continue
             if FIELD_NAME_VALUE.match(value):
+                continue
+            if FETCH_CREDENTIALS_NAME.match(name) and value.strip().lower() in FETCH_CREDENTIALS_MODES:
                 continue
             if LOCATION_NAME.search(name) and LOCATION_VALUE.match(value):
                 continue
