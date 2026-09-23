@@ -1722,8 +1722,10 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
           onMenuClick={isNarrow ? () => setNarrowSidebarOpen(true) : undefined}
         />
 
+        {/* isolate keeps the views' sticky headers (z-50) below the toolbar's
+            import dropdown, which overlaps this area (#1049). */}
         <div
-          className="flex flex-1 overflow-hidden relative"
+          className="flex flex-1 overflow-hidden relative isolate"
           data-tour="calendar-view"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
