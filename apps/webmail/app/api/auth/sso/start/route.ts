@@ -5,7 +5,8 @@ import { encryptPayload } from '@/lib/auth/crypto';
 import { generateCodeVerifierServer, generateCodeChallengeServer, generateStateServer } from '@/lib/oauth/pkce-server';
 import { getRequiredConfig, getDiscoveryValidator } from '@/lib/oauth/token-exchange';
 import { discoverOAuth } from '@/lib/oauth/discovery';
-import { getOauthScopes } from '@/lib/oauth/tokens';
+import { getOauthScopes, refreshTokenServerCookieName } from '@/lib/oauth/tokens';
+import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
 import { configManager } from '@/lib/admin/config-manager';
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       mobile_redirect_uri: rawMobileRedirectUri,
       mobile_state: rawMobileState,
       purpose: rawPurpose,
+      slot: rawSlot,
     } = await request.json();
 
     // `reauth` drives the step-up flow for device pairing: it forces a fresh
@@ -58,7 +60,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid mobile_redirect_uri' }, { status: 400 });
     }
 
-    const serverId = typeof bodyServerId === 'string' && bodyServerId ? bodyServerId : null;
+    const cookieStore = await cookies();
+
+    // A re-auth must hit the IdP of the account being paired. The client
+    // doesn't know that account's server id, so read it from the slot's
+    // server cookie like pair/create does. Without it, deployments that only
+    // configure OAuth per server (no global client/server) fail discovery.
+    let serverId = typeof bodyServerId === 'string' && bodyServerId ? bodyServerId : null;
+    if (!serverId && isReauth) {
+      const slot =
+        typeof rawSlot === 'number' && rawSlot >= 0 && rawSlot < MAX_ACCOUNT_SLOTS ? rawSlot : 0;
+      serverId = cookieStore.get(refreshTokenServerCookieName(slot))?.value || null;
+    }
 
     // Validate redirect_uri origin matches the request origin to prevent open redirects
     const requestOrigin = request.headers.get('origin') || request.nextUrl.origin;
@@ -101,7 +114,6 @@ export async function POST(request: NextRequest) {
     };
 
     const encrypted = encryptPayload(pendingData, 'sso-pending');
-    const cookieStore = await cookies();
     const baseCookieOpts = getCookieOptions();
     cookieStore.set(SSO_PENDING_COOKIE, encrypted, {
       ...baseCookieOpts,
