@@ -12,10 +12,11 @@ import { SchedulingDeniedError } from '@/lib/jmap/scheduling-error';
 import {
   baseEventStoreId,
   buildFallbackExcludePatch,
-  buildBaseEventOverridePatch,
   buildFallbackOverridePatch,
   buildOccurrencePatch,
   buildOccurrenceRsvpPatch,
+  isBrowserExpandedOccurrence,
+  withNewOverrideDetails,
   isServerRecurrenceInstance,
   isSyntheticIdMutationUnsupported,
 } from '@/lib/recurrence-instances';
@@ -68,10 +69,12 @@ function rawIdentityOf(id: string): string {
  * 'occurrence' they are written through that id - the server turns the patch
  * into a recurrence override - unless they are the single instance of a
  * non-recurring event, where the base event is the same thing and works on
- * every server version. Scope 'series' (an RSVP, a calendar move) always
- * targets the base event. A base event that is not in the store itself but
- * has an expanded occurrence in view (`baseEventStoreId`) borrows that
- * occurrence's account routing.
+ * every server version. Occurrences the browser expanded itself resolve to
+ * their base event and, with scope 'occurrence', are written as a recurrence
+ * override on it. Scope 'series' (an RSVP, a calendar move) always targets
+ * the base event. A base event that is not in the store itself but has an
+ * expanded occurrence in view (`baseEventStoreId`) borrows that occurrence's
+ * account routing.
  */
 interface MutationTarget {
   storeEvent?: CalendarEvent;
@@ -80,6 +83,8 @@ interface MutationTarget {
   localAccountId?: string;
   /** True when `realId` is the synthetic id of one occurrence of a series. */
   isOccurrence: boolean;
+  /** True when `storeEvent` is one occurrence the browser expanded and `realId` its base event. */
+  isBrowserOccurrence?: boolean;
 }
 
 export function resolveMutationTarget(
@@ -100,6 +105,9 @@ export function resolveMutationTarget(
         return { ...context, realId: storeEvent.baseEventId, isOccurrence: false };
       }
       return { ...context, realId: rawId, isOccurrence: true };
+    }
+    if (scope === 'occurrence' && isBrowserExpandedOccurrence(storeEvent)) {
+      return { ...context, realId: rawId, isOccurrence: false, isBrowserOccurrence: true };
     }
     return { ...context, realId: rawId, isOccurrence: false };
   }
@@ -133,7 +141,9 @@ const syntheticIdRejected = new WeakSet<object>();
  * Patch one expanded occurrence through its synthetic id. A server that
  * predates synthetic-id writes rejects it; the same change is then written
  * as a recurrence override on the base event instead (the way Bulwark did it
- * before), and that client is remembered as needing the fallback.
+ * before), and that client is remembered as needing the fallback. A change
+ * that creates the override carries the occurrence's details along
+ * (`withNewOverrideDetails`).
  */
 async function updateOccurrence(
   client: IJMAPClient,
@@ -142,9 +152,9 @@ async function updateOccurrence(
   updates: Partial<CalendarEvent>,
   sendSchedulingMessages: boolean | undefined,
   targetAccountId: string | undefined,
-  options?: CalendarEventUpdateOptions,
 ): Promise<void> {
-  const patch = buildOccurrencePatch(updates);
+  const patch = withNewOverrideDetails(instance, buildOccurrencePatch(updates));
+  const options: CalendarEventUpdateOptions | undefined = patch.sequence != null ? { keepSequence: true } : undefined;
   if (!syntheticIdRejected.has(client)) {
     try {
       await client.updateCalendarEvent(syntheticId, patch, sendSchedulingMessages, targetAccountId, options);
@@ -202,15 +212,38 @@ async function rsvpOccurrence(
   const patch = buildOccurrenceRsvpPatch(occurrence, participantId, status);
   if (!patch) throw new Error('Participant not found on this occurrence');
   if (target.isOccurrence) {
-    await updateOccurrence(
-      client, occurrence, target.realId, patch, true, target.targetAccountId, { keepSequence: true },
-    );
+    await updateOccurrence(client, occurrence, target.realId, patch, true, target.targetAccountId);
     return;
   }
-  // Expanded in the browser: `realId` is the base event.
-  const overridePatch = buildBaseEventOverridePatch(occurrence, patch);
-  if (!overridePatch) throw new Error('Cannot resolve the occurrence to override');
-  await client.updateCalendarEvent(target.realId, overridePatch, true, target.targetAccountId);
+  await updateBrowserOccurrence(client, target, patch, true);
+}
+
+/**
+ * Write a change to one occurrence the browser expanded as a recurrence
+ * override on its base event (`target.realId`) - never as a change to the
+ * base event itself, which would move or edit the whole series.
+ */
+async function updateBrowserOccurrence(
+  client: IJMAPClient,
+  target: MutationTarget,
+  updates: Partial<CalendarEvent>,
+  sendSchedulingMessages: boolean | undefined,
+): Promise<void> {
+  const occurrence = target.storeEvent!;
+  const patch = buildFallbackOverridePatch(occurrence, withNewOverrideDetails(occurrence, updates));
+  if (!patch) throw new Error('Cannot resolve the occurrence to override');
+  await client.updateCalendarEvent(target.realId, patch, sendSchedulingMessages, target.targetAccountId);
+}
+
+/** Delete one occurrence the browser expanded by excluding it on its base event. */
+async function destroyBrowserOccurrence(
+  client: IJMAPClient,
+  target: MutationTarget,
+  sendSchedulingMessages: boolean | undefined,
+): Promise<void> {
+  const patch = buildFallbackExcludePatch(target.storeEvent!);
+  if (!patch) throw new Error('Cannot resolve the occurrence to exclude');
+  await client.updateCalendarEvent(target.realId, patch, sendSchedulingMessages, target.targetAccountId);
 }
 
 // Re-runs the most recent range fetch. Synthetic occurrence ids are
@@ -775,6 +808,8 @@ export const useCalendarStore = create<CalendarStore>()(
           }
           if (target.isOccurrence && storeEvent) {
             await updateOccurrence(client, storeEvent, realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
+          } else if (target.isBrowserOccurrence) {
+            await updateBrowserOccurrence(client, target, cleanUpdates, sendSchedulingMessages);
           } else {
             await client.updateCalendarEvent(realId, cleanUpdates, sendSchedulingMessages, targetAccountId);
           }
@@ -806,7 +841,7 @@ export const useCalendarStore = create<CalendarStore>()(
               return merged;
             }),
           }));
-          if (target.isOccurrence || hasExpandedOccurrencesOf(get().events, realId, target)) {
+          if (target.isOccurrence || target.isBrowserOccurrence || hasExpandedOccurrencesOf(get().events, realId, target)) {
             await refetchAfterOccurrenceMutation();
           }
           // Update emails (iTIP REQUEST/REPLY) are sent by the server via the
@@ -836,7 +871,7 @@ export const useCalendarStore = create<CalendarStore>()(
           const target = resolveMutationTarget(get().events, eventId, scope);
           const { storeEvent, realId, targetAccountId, localAccountId } = target;
           client = resolveAccountClient(client, localAccountId);
-          const occurrence = scope === 'occurrence' && storeEvent?.recurrenceId ? storeEvent : null;
+          const occurrence = target.isOccurrence || target.isBrowserOccurrence ? storeEvent ?? null : null;
           if (occurrence) {
             await rsvpOccurrence(
               client, target, occurrence, participantId,
@@ -1094,6 +1129,9 @@ export const useCalendarStore = create<CalendarStore>()(
           });
           if (target.isOccurrence && storeEvent) {
             await destroyOccurrence(client, storeEvent, realId, sendSchedulingMessages, targetAccountId);
+          } else if (target.isBrowserOccurrence) {
+            // `realId` is the base event: destroying it would delete the series.
+            await destroyBrowserOccurrence(client, target, sendSchedulingMessages);
           } else {
             await client.deleteCalendarEvent(realId, sendSchedulingMessages, targetAccountId);
           }
@@ -1102,7 +1140,7 @@ export const useCalendarStore = create<CalendarStore>()(
             events: state.events.filter(e => e.id !== id),
             selectedEventId: state.selectedEventId === id ? null : state.selectedEventId,
           }));
-          if (target.isOccurrence || hadOccurrences) {
+          if (target.isOccurrence || target.isBrowserOccurrence || hadOccurrences) {
             await refetchAfterOccurrenceMutation();
           }
         } catch (error) {

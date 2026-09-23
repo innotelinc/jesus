@@ -51,8 +51,15 @@ import { useIsFocusedProTab } from "@/hooks/use-pane-context";
 import { useProMultiAccountCalendars } from "@/hooks/use-pro-multi-account-calendars";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normalization";
-import { buildRecurrenceOverridePatch } from "@/lib/recurrence-overrides";
-import { baseEventStoreId, isServerRecurrenceInstance } from "@/lib/recurrence-instances";
+import {
+  baseEventStoreId,
+  buildFallbackExcludePatch,
+  buildFallbackOverridePatch,
+  isBrowserExpandedOccurrence,
+  isServerRecurrenceInstance,
+  overrideContextOf,
+  withNewOverrideDetails,
+} from "@/lib/recurrence-instances";
 import { getClientByLocalAccountId } from "@/stores/client-registry";
 import { getEventStartDate } from "@/lib/calendar-utils";
 import { displayNow } from "@/lib/timezone";
@@ -991,18 +998,20 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
       if (type === "edit" && updates) {
         switch (scope) {
           case "this": {
-            if (isServerRecurrenceInstance(event)) {
-              // A server-expanded occurrence is written through its own
-              // (synthetic) id; the store handles the older-server fallback.
+            if (isServerRecurrenceInstance(event) || isBrowserExpandedOccurrence(event)) {
+              // The store writes one occurrence through its own (synthetic)
+              // id, or as a recurrence override on the base event it was
+              // expanded from.
               await updateEvent(client, event.id, updates, sendScheduling);
               break;
             }
-            // Client-side expanded occurrence: patch the master event's
-            // recurrenceOverrides instead.
+            // An override outside an expanded series: override it on the master.
             const master = await findMasterEvent(event);
-            if (master && event.recurrenceId) {
-              const patchUpdates = buildRecurrenceOverridePatch(updates, event.recurrenceId);
-              await updateEvent(client, master.id, patchUpdates, sendScheduling);
+            const occurrence = master && overrideContextOf(event, master);
+            const overridePatch = occurrence
+              && buildFallbackOverridePatch(occurrence, withNewOverrideDetails(occurrence, updates));
+            if (master && overridePatch) {
+              await updateEvent(client, master.id, overridePatch, sendScheduling);
             } else {
               await updateEvent(client, event.id, updates, sendScheduling);
             }
@@ -1066,18 +1075,17 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
       } else {
         switch (scope) {
           case "this": {
-            if (isServerRecurrenceInstance(event)) {
+            if (isServerRecurrenceInstance(event) || isBrowserExpandedOccurrence(event)) {
+              // The store destroys a server occurrence, or excludes a
+              // browser-expanded one on its base event.
               await deleteEvent(client, event.id, sendScheduling);
               break;
             }
-            // Client-side expanded occurrence: exclude the instance via
-            // recurrenceOverrides on the master event.
+            // An override outside an expanded series: exclude it on the master.
             const delMaster = await findMasterEvent(event);
-            if (delMaster && event.recurrenceId) {
-              await updateEvent(
-                client, delMaster.id,
-                { [`recurrenceOverrides/${event.recurrenceId}`]: { excluded: true } } as Partial<CalendarEvent>,
-              );
+            const excludePatch = delMaster && buildFallbackExcludePatch(overrideContextOf(event, delMaster));
+            if (delMaster && excludePatch) {
+              await updateEvent(client, delMaster.id, excludePatch, sendScheduling);
             } else {
               await deleteEvent(client, event.id, sendScheduling);
             }
