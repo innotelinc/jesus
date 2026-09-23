@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Suprascrieți",
       "toggle_on": "Anulare suprascriere",
-      "toggle_tooltip": "Puteți modifica liber numele și adresa din câmpul „De la”. E-mailul este trimis în continuare sub identitatea dvs. – se modifică doar antetul vizibil „De la”.",
+      "toggle_tooltip": "Puteți modifica liber numele și adresa din câmpul „De la”. E-mailul este trimis în continuare sub identitatea dvs.",
       "name_label": "Numele expeditorului",
       "name_placeholder": "Nume",
       "email_label": "De la adresa de e-mail",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Dacă serverul dvs. nu acceptă această adresă ca expeditor al plicului, se folosește în schimb {identity}, iar destinatarii o pot vedea în antetul Return-Path."
     },
     "use_template": "Șablon",
     "save_as_template": "Salvează ca șablon",

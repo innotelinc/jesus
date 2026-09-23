@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "覆寫",
       "toggle_on": "取消覆寫",
-      "toggle_tooltip": "自由編輯寄件者名稱與電子郵件地址。郵件仍會透過您的寄件身分傳送，只有顯示的 From 標頭會變更。",
+      "toggle_tooltip": "自由編輯寄件者名稱與電子郵件地址。郵件仍會透過您的寄件身分傳送。",
       "name_label": "寄件者姓名",
       "name_placeholder": "姓名",
       "email_label": "寄件者電子郵件地址",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "如果您的伺服器不接受此地址作為信封寄件者，將改用 {identity}，收件者可以在 Return-Path 標頭中看到它。"
     },
     "use_template": "範本",
     "save_as_template": "儲存為範本",

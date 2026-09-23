@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "Přepsat",
       "toggle_on": "Zrušit přepsání",
-      "toggle_tooltip": "Volně upravujte jméno a adresu odesílatele. Pošta se stále odesílá přes vaši identitu - mění se pouze viditelné záhlaví Od.",
+      "toggle_tooltip": "Volně upravujte jméno a adresu odesílatele. Pošta se stále odesílá přes vaši identitu.",
       "name_label": "Jméno odesílatele",
       "name_placeholder": "Jméno",
       "email_label": "E-mailová adresa odesílatele",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "Pokud váš server tuto adresu jako odesílatele obálky nepřijme, použije se místo ní {identity} a příjemci ji uvidí v záhlaví Return-Path."
     },
     "use_template": "Šablona",
     "save_as_template": "Uložit jako šablonu",

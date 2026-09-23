@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Override",
       "toggle_on": "Cancel override",
-      "toggle_tooltip": "Edit the From name and address freely. Mail is still sent through your identity - only the visible From header changes.",
+      "toggle_tooltip": "Edit the From name and address freely. Mail is still sent through your identity.",
       "name_label": "From name",
       "name_placeholder": "Name",
       "email_label": "From email address",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "If your server doesn't accept this address as the envelope sender, {identity} is used there instead, and recipients can see it in the Return-Path header."
     },
     "use_template": "Template",
     "save_as_template": "Save as Template",

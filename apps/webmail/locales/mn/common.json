@@ -643,11 +643,12 @@
     "from_override": {
       "toggle_off": "Дараах",
       "toggle_on": "Дараахыг цуцлах",
-      "toggle_tooltip": "From нэр хаягийг чөлөөтэй засварлана. Таны хувийн мэдээллээр шуудан илгээгдсэн хэвээр байна - зөвхөн харагдах \"From\" гарчиг өөрчлөгдөнө.",
+      "toggle_tooltip": "From нэр хаягийг чөлөөтэй засварлана. Таны хувийн мэдээллээр шуудан илгээгдсэн хэвээр байна.",
       "name_label": "Нэрнээс",
       "name_placeholder": "Нэр",
       "email_label": "Имэйл хаягаас",
-      "email_placeholder": "user@example.com"
+      "email_placeholder": "user@example.com",
+      "envelope_notice": "Хэрэв таны сервер энэ хаягийг дугтуйн илгээгчээр хүлээн авахгүй бол оронд нь {identity} ашиглагдах бөгөөд хүлээн авагчид үүнийг Return-Path гарчигт харж болно."
     },
     "use_template": "Загвар",
     "save_as_template": "Загвар болгон хадгалах",

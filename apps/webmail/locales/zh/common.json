@@ -640,11 +640,12 @@
     "from_override": {
       "toggle_off": "覆盖",
       "toggle_on": "取消覆盖",
-      "toggle_tooltip": "自由编辑发件人姓名和地址。邮件仍通过您的身份发送 - 仅可见的发件人标题发生变化。",
+      "toggle_tooltip": "自由编辑发件人姓名和地址。邮件仍通过您的身份发送。",
       "name_label": "发件人姓名",
       "name_placeholder": "姓名",
       "email_label": "发件人电子邮件地址",
-      "email_placeholder": "alias@example.com"
+      "email_placeholder": "alias@example.com",
+      "envelope_notice": "如果您的服务器不接受此地址作为信封发件人，将改用 {identity}，收件人可以在 Return-Path 标头中看到它。"
     },
     "use_template": "模板",
     "save_as_template": "保存为模板",
