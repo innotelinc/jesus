@@ -100,7 +100,7 @@ describe('updateEvent on an expanded occurrence', () => {
 
     expect(client.updateCalendarEvent).toHaveBeenCalledTimes(1);
     expect(client.updateCalendarEvent).toHaveBeenCalledWith(
-      'maaaaab', { title: 'Renamed', start: '2026-09-08T11:00:00' }, undefined, undefined,
+      'maaaaab', { title: 'Renamed', start: '2026-09-08T11:00:00' }, undefined, undefined, undefined,
     );
     const stored = useCalendarStore.getState().events[0];
     expect(stored.title).toBe('Renamed');
@@ -115,7 +115,7 @@ describe('updateEvent on an expanded occurrence', () => {
     await useCalendarStore.getState().updateEvent(client, 'maaaaab', { title: 'Renamed' }, true);
 
     expect(client.updateCalendarEvent).toHaveBeenCalledTimes(2);
-    expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(1, 'maaaaab', { title: 'Renamed' }, true, undefined);
+    expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(1, 'maaaaab', { title: 'Renamed' }, true, undefined, undefined);
     expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(2, 'b', {
       'recurrenceOverrides/2026-09-08T10:00:00': { start: '2026-09-08T10:00:00', duration: 'PT1H', title: 'Renamed' },
     }, true, undefined);
@@ -243,5 +243,72 @@ describe('rsvpEvent on an expanded occurrence', () => {
       'b', { 'participants/p1/participationStatus': 'accepted' }, true, undefined,
     );
     expect(useCalendarStore.getState().events[0].participants?.p1.participationStatus).toBe('accepted');
+  });
+
+  it('answers one occurrence through its synthetic id with the whole participants map', async () => {
+    const client = fakeClient();
+    const occ = occurrence({ sequence: 2 });
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().rsvpEvent(client, 'maaaaab', 'p1', 'declined', undefined, 'occurrence');
+
+    expect(client.updateCalendarEvent).toHaveBeenCalledTimes(1);
+    // The occurrence has no override yet, so its details are copied into it,
+    // and the series sequence is sent along.
+    expect(client.updateCalendarEvent).toHaveBeenCalledWith('maaaaab', {
+      title: 'Daily standup',
+      sequence: 2,
+      participants: { p1: { ...occ.participants!.p1, participationStatus: 'declined' } },
+    }, true, undefined, { keepSequence: true });
+    expect(useCalendarStore.getState().events[0].participants?.p1.participationStatus).toBe('declined');
+  });
+
+  it('answers one occurrence as a recurrence override when the server rejects synthetic ids', async () => {
+    const client = fakeClient();
+    client.updateCalendarEvent.mockRejectedValueOnce(new Error(UNSUPPORTED));
+    const occ = occurrence();
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().rsvpEvent(client, 'maaaaab', 'p1', 'tentative', undefined, 'occurrence');
+
+    expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(2, 'b', {
+      'recurrenceOverrides/2026-09-08T10:00:00': {
+        start: '2026-09-08T10:00:00',
+        duration: 'PT1H',
+        title: 'Daily standup',
+        participants: { p1: { ...occ.participants!.p1, participationStatus: 'tentative' } },
+      },
+    }, true, undefined);
+  });
+
+  it('answers one occurrence expanded in the browser on its base event', async () => {
+    const client = fakeClient();
+    // Client-side expansion: `<master id>:<recurrenceId>`, no baseEventId,
+    // the master's overrides copied onto the occurrence.
+    const occ = occurrence({ id: 'b:2026-09-08T10:00:00', originalId: 'b', baseEventId: undefined, recurrenceOverrides: null });
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().rsvpEvent(client, occ.id, 'p1', 'declined', undefined, 'occurrence');
+
+    expect(client.updateCalendarEvent).toHaveBeenCalledWith('b', {
+      recurrenceOverrides: {
+        '2026-09-08T10:00:00': {
+          start: '2026-09-08T10:00:00',
+          duration: 'PT1H',
+          title: 'Daily standup',
+          participants: { p1: { ...occ.participants!.p1, participationStatus: 'declined' } },
+        },
+      },
+    }, true, undefined);
+  });
+
+  it('refuses to answer an occurrence the participant is not on', async () => {
+    const client = fakeClient();
+    useCalendarStore.setState({ events: [occurrence()] });
+
+    await expect(
+      useCalendarStore.getState().rsvpEvent(client, 'maaaaab', 'p2', 'declined', undefined, 'occurrence'),
+    ).rejects.toThrow();
+    expect(client.updateCalendarEvent).not.toHaveBeenCalled();
   });
 });

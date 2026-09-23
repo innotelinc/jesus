@@ -39,6 +39,15 @@ export interface KeywordDiscoveryResult {
  * (in-memory/browser-only) implement this interface so that stores
  * and UI code never need to know which one is active.
  */
+export interface CalendarEventUpdateOptions {
+  /**
+   * Send `sequence` instead of stripping it with the other server-managed
+   * fields. Only for a patch that creates a recurrence override and must carry
+   * the series' sequence (see buildOccurrenceRsvpPatch).
+   */
+  keepSequence?: boolean;
+}
+
 export interface IJMAPClient {
   // ── Connection lifecycle ──────────────────────────────────────
   connect(): Promise<void>;
@@ -422,6 +431,7 @@ export interface IJMAPClient {
     updates: Partial<CalendarEvent>,
     sendSchedulingMessages?: boolean,
     targetAccountId?: string,
+    options?: CalendarEventUpdateOptions,
   ): Promise<void>;
   deleteCalendarEvent(eventId: string, sendSchedulingMessages?: boolean, targetAccountId?: string): Promise<void>;
   batchDeleteCalendarEvents(eventIds: string[], targetAccountId?: string): Promise<{ destroyed: string[]; notDestroyed: Record<string, { type?: string; description?: string }> }>;

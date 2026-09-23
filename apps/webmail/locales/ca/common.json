@@ -2928,7 +2928,10 @@
       "all_events": "Tots els esdeveniments",
       "cancel": "Cancel·la",
       "save": "Desa",
-      "delete": "Suprimeix"
+      "delete": "Suprimeix",
+      "rsvp_title": "Respon a l'esdeveniment periòdic",
+      "rsvp_description": "Aquest és un esdeveniment periòdic. A quins esdeveniments s'aplica la vostra resposta?",
+      "respond": "Respon"
     },
     "alerts": {
       "title": "Recordatoris",

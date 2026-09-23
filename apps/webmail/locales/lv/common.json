@@ -2927,7 +2927,10 @@
       "all_events": "Visus pasākumus",
       "cancel": "Atcelt",
       "save": "Saglabāt",
-      "delete": "Dzēst"
+      "delete": "Dzēst",
+      "rsvp_title": "Atbildēt uz atkārtotu pasākumu",
+      "rsvp_description": "Šis ir atkārtots pasākums. Uz kurām instancēm attiecas jūsu atbilde?",
+      "respond": "Atbildēt"
     },
     "alerts": {
       "title": "Atgādinājums",

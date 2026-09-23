@@ -2928,7 +2928,10 @@
       "all_events": "جميع الأحداث",
       "cancel": "إلغاء",
       "save": "حفظ",
-      "delete": "حذف"
+      "delete": "حذف",
+      "rsvp_title": "الرد على حدث متكرر",
+      "rsvp_description": "هذا حدث متكرر. على أي الأحداث ينطبق ردك؟",
+      "respond": "رد"
     },
     "alerts": {
       "title": "التذكيرات",

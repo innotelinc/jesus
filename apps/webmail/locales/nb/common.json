@@ -2928,7 +2928,10 @@
       "all_events": "Alle hendelser",
       "cancel": "Avbryt",
       "save": "Lagre",
-      "delete": "Slett"
+      "delete": "Slett",
+      "rsvp_title": "Svar på gjentakende hendelse",
+      "rsvp_description": "Dette er en gjentakende hendelse. Hvilke hendelser gjelder svaret ditt for?",
+      "respond": "Svar"
     },
     "alerts": {
       "title": "Påminnelser",

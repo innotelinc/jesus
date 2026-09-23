@@ -2928,7 +2928,10 @@
       "all_events": "所有活動",
       "cancel": "取消",
       "save": "儲存",
-      "delete": "刪除"
+      "delete": "刪除",
+      "rsvp_title": "回覆重複活動",
+      "rsvp_description": "這是重複活動。您的回覆適用於哪些活動？",
+      "respond": "回覆"
     },
     "alerts": {
       "title": "提醒",

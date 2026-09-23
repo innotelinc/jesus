@@ -2928,7 +2928,10 @@
       "all_events": "Tutti gli eventi",
       "cancel": "Annulla",
       "save": "Salva",
-      "delete": "Elimina"
+      "delete": "Elimina",
+      "rsvp_title": "Rispondi a evento ricorrente",
+      "rsvp_description": "Questo è un evento ricorrente. A quali eventi si applica la tua risposta?",
+      "respond": "Rispondi"
     },
     "alerts": {
       "title": "Promemoria",

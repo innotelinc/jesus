@@ -2928,7 +2928,10 @@
       "all_events": "Wszystkie wydarzenia",
       "cancel": "Anuluj",
       "save": "Zapisz",
-      "delete": "Usuń"
+      "delete": "Usuń",
+      "rsvp_title": "Odpowiedz na wydarzenie cykliczne",
+      "rsvp_description": "To jest wydarzenie cykliczne. Których wydarzeń dotyczy Twoja odpowiedź?",
+      "respond": "Odpowiedz"
     },
     "alerts": {
       "title": "Przypomnienie",

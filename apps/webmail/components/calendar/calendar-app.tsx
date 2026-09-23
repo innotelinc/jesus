@@ -85,7 +85,8 @@ import { useLiteLinkSegments } from "@/hooks/use-lite-link-segments";
 
 type PendingScopeAction =
   | { type: "edit"; event: CalendarEvent; updates: Partial<CalendarEvent>; sendScheduling?: boolean }
-  | { type: "delete"; event: CalendarEvent; sendScheduling?: boolean };
+  | { type: "delete"; event: CalendarEvent; sendScheduling?: boolean }
+  | { type: "rsvp"; event: CalendarEvent; participantId: string; status: CalendarParticipant["participationStatus"] };
 
 function isRecurringEvent(event: CalendarEvent): boolean {
   return (event.recurrenceRules?.length ?? 0) > 0 || event.recurrenceId != null;
@@ -959,8 +960,29 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
     return { master, originalRules };
   }, [client, findMasterEvent, updateEvent]);
 
+  const submitRsvp = useCallback(async (
+    eventId: string,
+    participantId: string,
+    status: CalendarParticipant['participationStatus'],
+    scope: 'occurrence' | 'series' = 'series',
+  ) => {
+    if (!client) return;
+    try {
+      await rsvpEvent(client, eventId, participantId, status, undefined, scope);
+      toast.success(t("notifications.rsvp_updated"));
+    } catch {
+      toast.error(t("notifications.rsvp_error"));
+    }
+  }, [client, rsvpEvent, t]);
+
   const handleScopeSelect = useCallback(async (scope: RecurrenceEditScope) => {
     if (!client || !pendingScopeAction) { toast.error(t("notifications.event_error")); return; }
+    if (pendingScopeAction.type === "rsvp") {
+      const { event, participantId, status } = pendingScopeAction;
+      setPendingScopeAction(null);
+      await submitRsvp(event.id, participantId, status, scope === "this" ? "occurrence" : "series");
+      return;
+    }
     const { type, event, sendScheduling } = pendingScopeAction;
     const updates = type === "edit" ? pendingScopeAction.updates : undefined;
     setPendingScopeAction(null);
@@ -1093,17 +1115,19 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
     } catch {
       toast.error(t("notifications.event_error"));
     }
-  }, [client, pendingScopeAction, updateEvent, deleteEvent, createEvent, findMasterEvent, truncateRecurrenceAtEvent, refetchCurrentRange, t]);
+  }, [client, pendingScopeAction, updateEvent, deleteEvent, createEvent, findMasterEvent, truncateRecurrenceAtEvent, refetchCurrentRange, submitRsvp, t]);
 
   const handleRsvp = useCallback(async (eventId: string, participantId: string, status: CalendarParticipant['participationStatus']) => {
     if (!client) return;
-    try {
-      await rsvpEvent(client, eventId, participantId, status);
-      toast.success(t("notifications.rsvp_updated"));
-    } catch {
-      toast.error(t("notifications.rsvp_error"));
+    // An answer on one occurrence of a series asks whether it covers just
+    // that occurrence or the whole series (#1086).
+    const occurrence = events.find(e => e.id === eventId && e.recurrenceId != null);
+    if (occurrence) {
+      setPendingScopeAction({ type: "rsvp", event: occurrence, participantId, status });
+      return;
     }
-  }, [client, rsvpEvent, t]);
+    await submitRsvp(eventId, participantId, status);
+  }, [client, events, submitRsvp]);
 
   const handleDeleteFromDetail = useCallback(() => {
     if (!detailEvent) return;

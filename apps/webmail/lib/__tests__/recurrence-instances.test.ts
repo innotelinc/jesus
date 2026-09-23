@@ -3,9 +3,11 @@ import type { CalendarEvent } from '@/lib/jmap/types';
 import {
   SYNTHETIC_ID_PROBE,
   baseEventStoreId,
+  buildBaseEventOverridePatch,
   buildFallbackExcludePatch,
   buildFallbackOverridePatch,
   buildOccurrencePatch,
+  buildOccurrenceRsvpPatch,
   hydrateRecurrenceInstances,
   isServerRecurrenceInstance,
   isSyntheticIdMutationUnsupported,
@@ -263,6 +265,87 @@ describe('buildFallbackOverridePatch', () => {
 
   it('is null for something that is not an occurrence of a series', () => {
     expect(buildFallbackOverridePatch(instance({ recurrenceId: null }), { title: 'x' })).toBeNull();
+  });
+});
+
+describe('buildOccurrenceRsvpPatch', () => {
+  const participants = {
+    org: { '@type': 'Participant', email: 'org@example.com', roles: { owner: true }, participationStatus: 'accepted' },
+    me: { '@type': 'Participant', email: 'me@example.com', roles: { attendee: true }, participationStatus: 'needs-action', expectReply: true },
+  } as unknown as CalendarEvent['participants'];
+
+  it('sends every participant, changing only the answering one', () => {
+    expect(buildOccurrenceRsvpPatch({ participants }, 'me', 'declined')).toEqual({
+      participants: {
+        org: participants!.org,
+        me: { ...participants!.me, participationStatus: 'declined' },
+      },
+    });
+  });
+
+  it('names the organizer, which 0.16.19 needs to accept the override', () => {
+    const occ = { participants, organizerCalendarAddress: 'mailto:org@example.com' };
+    expect(buildOccurrenceRsvpPatch(occ, 'me', 'tentative')).toMatchObject({
+      organizerCalendarAddress: 'mailto:org@example.com',
+    });
+  });
+
+  it('keeps the series sequence, so the override replaces its occurrence', () => {
+    expect(buildOccurrenceRsvpPatch({ participants, sequence: 3 }, 'me', 'declined')).toMatchObject({ sequence: 3 });
+  });
+
+  it('copies the occurrence details only when the answer creates the override', () => {
+    const details = {
+      title: 'Weekly sync',
+      description: 'Agenda',
+      locations: { l1: { '@type': 'Location', name: 'Room B' } },
+      status: 'confirmed',
+      alerts: { a1: { '@type': 'Alert', trigger: { '@type': 'OffsetTrigger', offset: '-PT15M' } } },
+    } as unknown as Partial<CalendarEvent>;
+    const occ = instance({ ...details, participants, recurrenceOverrides: { '2026-09-10T10:00:00': { title: 'Other' } } });
+    expect(buildOccurrenceRsvpPatch(occ, 'me', 'declined')).toMatchObject(details);
+
+    // An override that already exists is the organizer's: only the answer changes.
+    const overridden = instance({ ...details, participants, recurrenceOverrides: { '2026-09-08T10:00:00': { title: 'Moved' } } });
+    const patch = buildOccurrenceRsvpPatch(overridden, 'me', 'declined')!;
+    expect(Object.keys(patch).sort()).toEqual(['participants']);
+
+    // Unknown (a server occurrence whose base event was not fetched): copy nothing.
+    const unknown = { ...instance({ ...details, participants }), recurrenceOverrides: undefined };
+    expect(Object.keys(buildOccurrenceRsvpPatch(unknown, 'me', 'declined')!)).toEqual(['participants']);
+  });
+
+  it('is null when the participant is not on the occurrence', () => {
+    expect(buildOccurrenceRsvpPatch({ participants }, 'someone-else', 'declined')).toBeNull();
+    expect(buildOccurrenceRsvpPatch({ participants: null }, 'me', 'declined')).toBeNull();
+  });
+});
+
+describe('buildBaseEventOverridePatch', () => {
+  const patch = { participants: { me: { participationStatus: 'declined' } } } as unknown as Partial<CalendarEvent>;
+
+  it('patches the override entry when the base event already has overrides', () => {
+    const occ = instance({
+      recurrenceId: '2026-09-08T10:00:00',
+      recurrenceOverrides: { '2026-09-10T10:00:00': { title: 'Other' } },
+    });
+    expect(buildBaseEventOverridePatch(occ, patch)).toEqual({
+      'recurrenceOverrides/2026-09-08T10:00:00': { start: '2026-09-08T10:00:00', duration: 'PT1H', ...patch },
+    });
+  });
+
+  it('sends the whole map for the first override, since a pointer into a missing map fails', () => {
+    for (const recurrenceOverrides of [null, {}]) {
+      expect(buildBaseEventOverridePatch(instance({ recurrenceOverrides }), patch)).toEqual({
+        recurrenceOverrides: {
+          '2026-09-08T10:00:00': { start: '2026-09-08T10:00:00', duration: 'PT1H', ...patch },
+        },
+      });
+    }
+  });
+
+  it('is null for something that is not an occurrence of a series', () => {
+    expect(buildBaseEventOverridePatch(instance({ recurrenceId: null }), patch)).toBeNull();
   });
 });
 

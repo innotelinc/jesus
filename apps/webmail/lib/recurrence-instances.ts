@@ -21,7 +21,7 @@
  *   change, so the visible range has to be refetched after mutating one.
  */
 
-import type { CalendarEvent } from '@/lib/jmap/types';
+import type { CalendarEvent, CalendarParticipant } from '@/lib/jmap/types';
 import { parseDurationSeconds } from '@/lib/calendar-event-normalization';
 import { RECURRENCE_OVERRIDE_IMMUTABLE_KEYS } from '@/lib/recurrence-overrides';
 
@@ -220,6 +220,94 @@ export function buildFallbackOverridePatch(
     ...buildOccurrencePatch(patch),
   };
   return { [`recurrenceOverrides/${key}`]: override } as Partial<CalendarEvent>;
+}
+
+/**
+ * What a new override written by an RSVP copies from its occurrence. Stalwart
+ * stores an override as a VEVENT holding only the override's own properties,
+ * so without these the occurrence loses its title, place and reminders - for
+ * other CalDAV clients as well as when Stalwart expands it. An attendee may
+ * not add most of them to an override that already exists (the organizer's),
+ * so they are only copied when the answer creates the override.
+ */
+const RSVP_OVERRIDE_COPIED_KEYS = [
+  'title',
+  'description',
+  'descriptionContentType',
+  'locations',
+  'virtualLocations',
+  'links',
+  'keywords',
+  'categories',
+  'color',
+  'locale',
+  'status',
+  'freeBusyStatus',
+  'privacy',
+  'alerts',
+] as const;
+
+/**
+ * The patch that answers one occurrence as `participantId`.
+ *
+ * - The whole participants map, with only that participant's status changed.
+ *   Stalwart rejects a `participants/<id>/participationStatus` pointer on a
+ *   single occurrence ("Multiple organizers found in iCalendar object",
+ *   0.16.23), and a pointer inside an override keeps just the patched
+ *   participant, dropping the organizer and everyone else from it.
+ * - The organizer: 0.16.19 rejects the override the same way without it.
+ * - The sequence: an override with a lower SEQUENCE than the series does not
+ *   replace its occurrence, and Stalwart then lists that occurrence twice.
+ * - For a new override, the occurrence's details (RSVP_OVERRIDE_COPIED_KEYS).
+ *   Whether one exists is only known when `recurrenceOverrides` holds the
+ *   base event's map; otherwise nothing is copied.
+ */
+export function buildOccurrenceRsvpPatch(
+  occurrence: Partial<CalendarEvent>,
+  participantId: string,
+  status: CalendarParticipant['participationStatus'],
+): Partial<CalendarEvent> | null {
+  const participant = occurrence.participants?.[participantId];
+  if (!participant) return null;
+  const patch: Record<string, unknown> = {};
+  const overrides = occurrence.recurrenceOverrides;
+  const key = occurrence.recurrenceId
+    ? resolveOverrideKey({ start: occurrence.start ?? '', recurrenceId: occurrence.recurrenceId }, overrides)
+    : null;
+  const createsOverride = overrides !== undefined && !!key && !(overrides && key in overrides);
+  if (createsOverride) {
+    for (const name of RSVP_OVERRIDE_COPIED_KEYS) {
+      if (occurrence[name] != null) patch[name] = occurrence[name];
+    }
+  }
+  if (occurrence.sequence != null) patch.sequence = occurrence.sequence;
+  if (occurrence.organizerCalendarAddress) {
+    patch.organizerCalendarAddress = occurrence.organizerCalendarAddress;
+  }
+  patch.participants = {
+    ...occurrence.participants,
+    [participantId]: { ...participant, participationStatus: status },
+  };
+  return patch as Partial<CalendarEvent>;
+}
+
+/**
+ * `patch` as the recurrence override of an occurrence the browser expanded
+ * itself, written on its base event. Like `buildFallbackOverridePatch`, but a
+ * `recurrenceOverrides/<key>` pointer fails ("Patch operation failed") while
+ * the base event has no overrides at all, so the first one is sent as the
+ * whole map. Only for occurrences whose `recurrenceOverrides` is the base
+ * event's real map (client-side expansion copies it).
+ */
+export function buildBaseEventOverridePatch(
+  instance: Pick<CalendarEvent, 'start' | 'duration' | 'recurrenceId' | 'recurrenceOverrides'>,
+  patch: Partial<CalendarEvent>,
+): Partial<CalendarEvent> | null {
+  const pointerPatch = buildFallbackOverridePatch(instance, patch);
+  if (!pointerPatch || Object.keys(instance.recurrenceOverrides ?? {}).length > 0) return pointerPatch;
+  const [[pointer, override]] = Object.entries(pointerPatch);
+  const key = pointer.slice('recurrenceOverrides/'.length);
+  return { recurrenceOverrides: { [key]: override } } as Partial<CalendarEvent>;
 }
 
 /** The fallback for destroying one occurrence: exclude it on the base event. */
