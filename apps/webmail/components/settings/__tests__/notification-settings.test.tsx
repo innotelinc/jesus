@@ -26,6 +26,7 @@ vi.mock('@/lib/web-push', () => ({
   disableWebPush: vi.fn(async () => undefined),
   listPushDevices: vi.fn(async () => []),
   revokePushDevice: vi.fn(async () => undefined),
+  serverSupportsEmailPush: vi.fn(() => true),
 }));
 
 const fakeClient = { getAccountId: () => 'acct-1' } as unknown as ReturnType<
@@ -43,6 +44,19 @@ describe('NotificationSettings - pushNotifyInboxOnly', () => {
       isSettingLocked: () => false,
       isSettingHidden: () => false,
     } as never);
+  });
+
+  it('shows the toggle when the server supports emailPush filters', async () => {
+    const { findByText } = render(<NotificationSettings />);
+    await findByText('email.inbox_only');
+  });
+
+  it('hides the toggle when the server cannot filter pushes', async () => {
+    (webPush.serverSupportsEmailPush as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const { findByText, queryByText } = render(<NotificationSettings />);
+    await findByText('email.sound');
+    expect(queryByText('email.inbox_only')).toBeNull();
+    (webPush.serverSupportsEmailPush as ReturnType<typeof vi.fn>).mockReturnValue(true);
   });
 
   it('does not re-sync push on mount', async () => {

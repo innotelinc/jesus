@@ -396,6 +396,27 @@ describe('buildEmailPushConfig inbox-only mode', () => {
     await expect(buildEmailPushConfig(client, true)).rejects.toThrow(/No Inbox mailbox/);
   });
 
+  it('mutes a shared account whose Inbox we cannot see instead of failing', async () => {
+    // Someone shared a single folder: the account shows up with no Inbox role.
+    // Leaving it out of the map would let the server push it unfiltered.
+    const client = makeClient([], { emailPushCapability: true });
+    client.getAllMailboxes = vi.fn(async () => [
+      { id: 'mb-inbox', originalId: 'mb-inbox', name: 'inbox', role: 'inbox', accountId: ACCOUNT_ID },
+      { id: `${SHARED_ACCOUNT_ID}:mb-proj`, originalId: 'mb-proj', name: 'Projects', accountId: SHARED_ACCOUNT_ID },
+    ]) as unknown as IJMAPClient['getAllMailboxes'];
+
+    const config = await buildEmailPushConfig(client, true);
+
+    expect(config[ACCOUNT_ID].filter).toEqual({
+      operator: 'AND',
+      conditions: [{ notKeyword: '$junk' }, { inMailbox: 'mb-inbox' }],
+    });
+    expect(config[SHARED_ACCOUNT_ID].filter).toEqual({
+      operator: 'AND',
+      conditions: [{ notKeyword: '$junk' }, { hasKeyword: '$junk' }],
+    });
+  });
+
   it('rethrows a mailbox-fetch failure in inbox-only mode instead of reporting no Inbox', async () => {
     const client = makeClient([], { emailPushCapability: true });
     client.getAllMailboxes = vi.fn(async () => {
