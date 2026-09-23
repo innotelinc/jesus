@@ -139,17 +139,25 @@ export function normalizeBasePath(raw) {
  * config.json contents from the LITE_* build inputs. The Stalwart target is
  * served by the mail server itself: an empty server URL means "this origin"
  * there, so the server field stays hidden unless a build asks for it.
+ *
+ * The static target leaves `allowCustomJmapEndpoint` out unless the build sets
+ * it: the app then derives it from `jmapServerUrl` at runtime. Writing the
+ * derived `true` of an empty server URL kept the server field on the login
+ * page after a deployer filled in `jmapServerUrl` and nothing else (#1087).
  */
 export function buildLiteConfig(env = {}, { target = "static" } = {}) {
   const jmapServerUrl = (env.LITE_JMAP_SERVER_URL ?? "").trim().replace(/\/+$/, "");
   const stalwart = target === "stalwart";
+  const customEndpointSet = (env.LITE_ALLOW_CUSTOM_ENDPOINT ?? "") !== "";
   return {
     _comment: stalwart
       ? "Bulwark Lite for Stalwart. Read-only inside the Application bundle: to change it, build your own zip (see LITE-README.md). An empty jmapServerUrl means the Stalwart server that serves this page."
       : "Bulwark Lite runtime configuration. Edit and re-upload; no rebuild needed. See LITE-README.md.",
     appName: (env.LITE_APP_NAME ?? "").trim() || "Bulwark Webmail",
     jmapServerUrl,
-    allowCustomJmapEndpoint: parseBool(env.LITE_ALLOW_CUSTOM_ENDPOINT, !stalwart && jmapServerUrl === ""),
+    ...(stalwart || customEndpointSet
+      ? { allowCustomJmapEndpoint: parseBool(env.LITE_ALLOW_CUSTOM_ENDPOINT, false) }
+      : {}),
     rememberMeEnabled: parseBool(env.LITE_REMEMBER_ME, true),
     demoMode: parseBool(env.LITE_DEMO_MODE, false),
     loginShowTotp: true,
@@ -574,7 +582,9 @@ ${demoMode ? "Demo mode is ON: the login page offers a built-in demo account and
 2. Edit \`config.json\`:
    - \`jmapServerUrl\`: your mail server, e.g. \`https://mail.example.com\`${jmapServerUrl ? ` (currently \`${jmapServerUrl}\`)` : ""}.
    - \`appName\`: the name shown in the tab and on the login page.
-   - \`allowCustomJmapEndpoint\`: \`true\` shows a server field on the login page.
+   - \`allowCustomJmapEndpoint\` (optional): \`true\` always shows a server field
+     on the login page, \`false\` never does. Left out, the field shows only
+     while \`jmapServerUrl\` is empty.
    - \`rememberMeEnabled\`: \`false\` hides "remember me" (sessions then end with the tab).
    Optional keys: \`demoMode\`, \`jmapServers\`, \`jmapServerAutoPickByDomain\`, the login logo/company/link keys and \`loginShow*\` toggles (same names as the Docker env vars, camelCased).
 3. Allow the browser to talk to the mail server (CORS). In Stalwart:
