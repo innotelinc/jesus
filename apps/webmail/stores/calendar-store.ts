@@ -23,6 +23,7 @@ import {
 import { parseISO } from 'date-fns';
 import { generateUUID } from '@/lib/utils';
 import { apiFetch } from '@/lib/browser-navigation';
+import { explainServerAuthError } from '@/lib/server-auth-status';
 import { BIRTHDAY_CALENDAR_ID } from '@/lib/birthday-calendar';
 import { getClientByLocalAccountId } from './client-registry';
 
@@ -1513,7 +1514,7 @@ export const useCalendarStore = create<CalendarStore>()(
 
           if (!response.ok) {
             const data = await response.json().catch(() => ({}));
-            throw new Error(data.error || 'Failed to fetch calendar');
+            throw new Error(explainServerAuthError(response.status, data.error, 'Failed to fetch calendar'));
           }
 
           const blob = await response.blob();

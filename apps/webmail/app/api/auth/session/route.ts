@@ -15,6 +15,7 @@ import { recordLogin } from '@/lib/telemetry/login-tracker';
 import { parseJmapServers, resolveTrustedJmapUrl } from '@/lib/admin/jmap-servers';
 import { MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
+import { insecureCookieHint, verificationFailureBody } from '@/lib/auth/verification-failure';
 
 function sessionCookieOptions() {
   return {
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
   // so a cross-site top-level POST would otherwise reach this handler.
   const crossOrigin = rejectCrossOriginRequest(request);
   if (crossOrigin) return crossOrigin;
+  let upstreamUrl = '';
+  let upstreamTrusted = false;
   try {
     const oauthEnabled = configManager.get<boolean>('oauthEnabled', false);
     const oauthOnly = configManager.get<boolean>('oauthOnly', false);
@@ -63,8 +66,6 @@ export async function POST(request: NextRequest) {
     const serverList = parseJmapServers(configManager.get<unknown>('jmapServers', []));
     const trustedUrl = resolveTrustedJmapUrl(serverUrl, configuredServerUrl, serverList);
 
-    let upstreamUrl: string;
-    let upstreamTrusted: boolean;
     if (trustedUrl) {
       upstreamUrl = trustedUrl;
       upstreamTrusted = true;
@@ -102,10 +103,15 @@ export async function POST(request: NextRequest) {
 
     void recordLogin(username, normalizedServerUrl);
 
-    return NextResponse.json({ ok: true });
+    const warning = insecureCookieHint(request);
+    if (warning) logger.warn(`session: ${warning}`);
+    return NextResponse.json(warning ? { ok: true, warning } : { ok: true });
   } catch (error) {
     if (error instanceof JmapAuthVerificationError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        verificationFailureBody('session', error, upstreamUrl, upstreamTrusted),
+        { status: error.status },
+      );
     }
 
     logger.error('Session store error', { error: error instanceof Error ? error.message : 'Unknown error' });

@@ -13,6 +13,7 @@ import { useAccountStore, type AccountEntry } from './account-store';
 import { fetchPrincipalDisplayName } from '@/lib/stalwart/principal';
 import { fetchConfig } from '@/hooks/use-config';
 import { debug } from '@/lib/debug';
+import { setServerAuthIssue } from '@/lib/server-auth-status';
 import { generateAccountId } from '@/lib/account-utils';
 import { replaceWindowLocation, getPathPrefix, getLocaleFromPath, apiFetch } from '@/lib/browser-navigation';
 import { notifyParent } from '@/lib/iframe-bridge';
@@ -235,8 +236,16 @@ async function syncStalwartAuthContext(
       body: JSON.stringify({ serverUrl, username, authHeader, slot }),
     });
 
+    const data = await response.json().catch(() => ({})) as { error?: string; hint?: string; warning?: string };
     if (!response.ok) {
-      debug.warn('auth', `Failed to sync Stalwart auth context: ${response.status}`);
+      // Not debug-gated: without the context every server-side helper
+      // answers 401, and this is the only place the browser learns why (#1073).
+      const reason = data.hint || data.error || `HTTP ${response.status}`;
+      setServerAuthIssue(reason);
+      console.warn(`[auth] The server could not store the sign-in context (${response.status}): ${reason}`);
+    } else {
+      setServerAuthIssue(data.warning ?? null);
+      if (data.warning) console.warn(`[auth] ${data.warning}`);
     }
   } catch (error) {
     debug.warn('auth', 'Failed to sync Stalwart auth context:', error);
