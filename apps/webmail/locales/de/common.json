@@ -2928,7 +2928,10 @@
       "all_events": "Alle Ereignisse",
       "cancel": "Abbrechen",
       "save": "Speichern",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "rsvp_title": "Auf wiederkehrendes Ereignis antworten",
+      "rsvp_description": "Dies ist ein wiederkehrendes Ereignis. Für welche Ereignisse gilt Ihre Antwort?",
+      "respond": "Antworten"
     },
     "alerts": {
       "title": "Erinnerung",

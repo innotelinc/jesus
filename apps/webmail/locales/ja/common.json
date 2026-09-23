@@ -2928,7 +2928,10 @@
       "all_events": "すべてのイベント",
       "cancel": "キャンセル",
       "save": "保存",
-      "delete": "削除"
+      "delete": "削除",
+      "rsvp_title": "繰り返しイベントに返信",
+      "rsvp_description": "これは繰り返しイベントです。どのイベントに返信しますか？",
+      "respond": "返信"
     },
     "alerts": {
       "title": "リマインダー",

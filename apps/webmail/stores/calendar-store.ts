@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { IJMAPClient } from '@/lib/jmap/client-interface';
+import type { CalendarEventUpdateOptions, IJMAPClient } from '@/lib/jmap/client-interface';
 import type { Calendar, CalendarEvent, CalendarParticipant, CalendarParticipantIdentity, CalendarRights, CreateCalendarOptions } from '@/lib/jmap/types';
 import { debug } from '@/lib/debug';
 import { normalizeAllDayDuration } from '@/lib/calendar-utils';
@@ -12,8 +12,10 @@ import { SchedulingDeniedError } from '@/lib/jmap/scheduling-error';
 import {
   baseEventStoreId,
   buildFallbackExcludePatch,
+  buildBaseEventOverridePatch,
   buildFallbackOverridePatch,
   buildOccurrencePatch,
+  buildOccurrenceRsvpPatch,
   isServerRecurrenceInstance,
   isSyntheticIdMutationUnsupported,
 } from '@/lib/recurrence-instances';
@@ -140,11 +142,12 @@ async function updateOccurrence(
   updates: Partial<CalendarEvent>,
   sendSchedulingMessages: boolean | undefined,
   targetAccountId: string | undefined,
+  options?: CalendarEventUpdateOptions,
 ): Promise<void> {
   const patch = buildOccurrencePatch(updates);
   if (!syntheticIdRejected.has(client)) {
     try {
-      await client.updateCalendarEvent(syntheticId, patch, sendSchedulingMessages, targetAccountId);
+      await client.updateCalendarEvent(syntheticId, patch, sendSchedulingMessages, targetAccountId, options);
       return;
     } catch (error) {
       if (!isSyntheticIdMutationUnsupported(error)) throw error;
@@ -182,6 +185,32 @@ async function destroyOccurrence(
     throw new Error('Cannot resolve the occurrence to exclude');
   }
   await client.updateCalendarEvent(instance.baseEventId, fallback, sendSchedulingMessages, targetAccountId);
+}
+
+/**
+ * Answer one occurrence of a series as `participantId`. The server stores it
+ * as a recurrence override and sends the organizer an iTIP REPLY carrying
+ * that occurrence's RECURRENCE-ID.
+ */
+async function rsvpOccurrence(
+  client: IJMAPClient,
+  target: MutationTarget,
+  occurrence: CalendarEvent,
+  participantId: string,
+  status: CalendarParticipant['participationStatus'],
+): Promise<void> {
+  const patch = buildOccurrenceRsvpPatch(occurrence, participantId, status);
+  if (!patch) throw new Error('Participant not found on this occurrence');
+  if (target.isOccurrence) {
+    await updateOccurrence(
+      client, occurrence, target.realId, patch, true, target.targetAccountId, { keepSequence: true },
+    );
+    return;
+  }
+  // Expanded in the browser: `realId` is the base event.
+  const overridePatch = buildBaseEventOverridePatch(occurrence, patch);
+  if (!overridePatch) throw new Error('Cannot resolve the occurrence to override');
+  await client.updateCalendarEvent(target.realId, overridePatch, true, target.targetAccountId);
 }
 
 // Re-runs the most recent range fetch. Synthetic occurrence ids are
@@ -442,7 +471,7 @@ interface CalendarStore {
   createEvent: (client: IJMAPClient, event: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<CalendarEvent | null>;
   updateEvent: (client: IJMAPClient, id: string, updates: Partial<CalendarEvent>, sendSchedulingMessages?: boolean) => Promise<void>;
   deleteEvent: (client: IJMAPClient, id: string, sendSchedulingMessages?: boolean) => Promise<void>;
-  rsvpEvent: (client: IJMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null) => Promise<void>;
+  rsvpEvent: (client: IJMAPClient, eventId: string, participantId: string, status: string, replyTo?: Record<string, string> | null, scope?: 'occurrence' | 'series') => Promise<void>;
   importEvents: (client: IJMAPClient, events: Partial<CalendarEvent>[], calendarId: string) => Promise<number>;
   updateCalendar: (client: IJMAPClient, calendarId: string, updates: Partial<Calendar>) => Promise<void>;
   setDefaultCalendar: (client: IJMAPClient, calendarId: string) => Promise<void>;
@@ -790,7 +819,7 @@ export const useCalendarStore = create<CalendarStore>()(
         }
       },
 
-      rsvpEvent: async (client, eventId, participantId, status, replyTo) => {
+      rsvpEvent: async (client, eventId, participantId, status, replyTo, scope = 'series') => {
         set({ error: null });
         // JMAP participant IDs are opaque strings - they can contain @, ., :,
         // / etc. The id is RFC 6901-escaped below before being embedded in the
@@ -800,30 +829,39 @@ export const useCalendarStore = create<CalendarStore>()(
           throw new Error('Invalid participant ID');
         }
         try {
-          // Resolve shared event IDs and client-side expanded occurrence IDs
-          // An RSVP answers for the whole series, so an expanded occurrence
-          // is resolved to its base event here.
-          const { storeEvent, realId, targetAccountId, localAccountId } =
-            resolveMutationTarget(get().events, eventId, 'series');
+          // Resolve shared event IDs and client-side expanded occurrence IDs.
+          // Scope 'series' answers for the whole series, so an expanded
+          // occurrence is resolved to its base event here; scope 'occurrence'
+          // answers for that one occurrence only.
+          const target = resolveMutationTarget(get().events, eventId, scope);
+          const { storeEvent, realId, targetAccountId, localAccountId } = target;
           client = resolveAccountClient(client, localAccountId);
-          // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
-          const escapedId = participantId.replace(/~/g, '~0').replace(/\//g, '~1');
-          const patchKey = `participants/${escapedId}/participationStatus`;
-          const patch: Record<string, unknown> = { [patchKey]: status };
-          // Stalwart routes the iTIP REPLY to the stored ORGANIZER
-          // (organizerCalendarAddress); the RFC 8984 replyTo property is retired
-          // in jscalendarbis and ignored. Repair events that are missing the
-          // organizer (e.g. imported ones), but never touch an existing one -
-          // attendees may not modify the ORGANIZER.
-          if (replyTo?.imip && storeEvent && !storeEvent.organizerCalendarAddress) {
-            patch.organizerCalendarAddress = replyTo.imip;
+          const occurrence = scope === 'occurrence' && storeEvent?.recurrenceId ? storeEvent : null;
+          if (occurrence) {
+            await rsvpOccurrence(
+              client, target, occurrence, participantId,
+              status as CalendarParticipant['participationStatus'],
+            );
+          } else {
+            // Escape per RFC 6901 (JSON Pointer): ~ → ~0, / → ~1
+            const escapedId = participantId.replace(/~/g, '~0').replace(/\//g, '~1');
+            const patchKey = `participants/${escapedId}/participationStatus`;
+            const patch: Record<string, unknown> = { [patchKey]: status };
+            // Stalwart routes the iTIP REPLY to the stored ORGANIZER
+            // (organizerCalendarAddress); the RFC 8984 replyTo property is retired
+            // in jscalendarbis and ignored. Repair events that are missing the
+            // organizer (e.g. imported ones), but never touch an existing one -
+            // attendees may not modify the ORGANIZER.
+            if (replyTo?.imip && storeEvent && !storeEvent.organizerCalendarAddress) {
+              patch.organizerCalendarAddress = replyTo.imip;
+            }
+            await client.updateCalendarEvent(
+              realId,
+              patch as unknown as Partial<CalendarEvent>,
+              true,
+              targetAccountId
+            );
           }
-          await client.updateCalendarEvent(
-            realId,
-            patch as unknown as Partial<CalendarEvent>,
-            true,
-            targetAccountId
-          );
           set((state) => ({
             events: state.events.map(e => {
               if (e.id !== eventId || !e.participants?.[participantId]) return e;
@@ -836,6 +874,12 @@ export const useCalendarStore = create<CalendarStore>()(
               };
             }),
           }));
+          // Only the answered event was updated above: after a series answer
+          // the other occurrences in view still show the old status, after an
+          // occurrence answer the synthetic ids / overrides are stale.
+          if (occurrence || storeEvent?.recurrenceId || hasExpandedOccurrencesOf(get().events, realId, target)) {
+            await refetchAfterOccurrenceMutation();
+          }
         } catch (error) {
           debug.error('Failed to RSVP:', error);
           set({ error: 'Failed to update RSVP' });

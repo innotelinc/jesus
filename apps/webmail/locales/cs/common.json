@@ -2928,7 +2928,10 @@
       "all_events": "Všechny události",
       "cancel": "Zrušit",
       "save": "Uložit",
-      "delete": "Odstranit"
+      "delete": "Odstranit",
+      "rsvp_title": "Odpovědět na opakující se událost",
+      "rsvp_description": "Toto je opakující se událost. Na které události se vaše odpověď vztahuje?",
+      "respond": "Odpovědět"
     },
     "alerts": {
       "title": "Připomenutí",

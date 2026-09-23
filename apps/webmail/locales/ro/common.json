@@ -2928,7 +2928,10 @@
       "all_events": "Toate evenimentele",
       "cancel": "Anulează",
       "save": "Salvare",
-      "delete": "Șterge"
+      "delete": "Șterge",
+      "rsvp_title": "Răspundeți la evenimentul recurent",
+      "rsvp_description": "Acesta este un eveniment recurent. Pentru ce evenimente se aplică răspunsul dvs.?",
+      "respond": "Răspundeți"
     },
     "alerts": {
       "title": "Memento-uri",

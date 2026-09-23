@@ -2928,7 +2928,10 @@
       "all_events": "Todos los eventos",
       "cancel": "Cancelar",
       "save": "Guardar",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "rsvp_title": "Responder a evento recurrente",
+      "rsvp_description": "Este es un evento recurrente. ¿A qué eventos se aplica su respuesta?",
+      "respond": "Responder"
     },
     "alerts": {
       "title": "Recordatorio",

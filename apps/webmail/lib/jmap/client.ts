@@ -1,7 +1,7 @@
 import { generateUUID } from '@/lib/utils';
 import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
-import type { IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
+import type { CalendarEventUpdateOptions, IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { attachSearchSnippets, filterHasSnippetTerms, snippetFilterFor, type SearchSnippetResult } from "@/lib/search-snippet";
 import { batched, itemsPerRequest } from "./request-limits";
 import { keywordPointer } from "./patch-pointer";
@@ -6873,12 +6873,14 @@ export class JMAPClient implements IJMAPClient {
     eventId: string,
     updates: Partial<CalendarEvent>,
     sendSchedulingMessages?: boolean,
-    targetAccountId?: string
+    targetAccountId?: string,
+    options?: CalendarEventUpdateOptions,
   ): Promise<void> {
     const accountId = targetAccountId || this.getCalendarsAccountId();
 
     // Strip client-only and server-immutable fields before sending to JMAP
     const { id: _id, uid: _uid, '@type': _typ, created: _cr, updated: _up, sequence: _sq, isOrigin: _io, isDraft: _idr, originalId: _oi, baseEventId: _be, originalCalendarIds: _oc, accountId: _ai, accountName: _an, isShared: _is, progressUpdated: _pu, ...cleanUpdates } = updates as CalendarEvent & { progressUpdated?: string | null };
+    if (options?.keepSequence && _sq != null) (cleanUpdates as Partial<CalendarEvent>).sequence = _sq;
     cleanRecurrenceRules(cleanUpdates as unknown as Record<string, unknown>);
 
     const setArgs: Record<string, unknown> = {

@@ -2928,7 +2928,10 @@
       "all_events": "Minden esemény",
       "cancel": "Mégse",
       "save": "Mentés",
-      "delete": "Törlés"
+      "delete": "Törlés",
+      "rsvp_title": "Válasz ismétlődő eseményre",
+      "rsvp_description": "Ez egy ismétlődő esemény. Mely eseményekre vonatkozzon a válaszod?",
+      "respond": "Válasz"
     },
     "alerts": {
       "title": "Emlékeztetők",

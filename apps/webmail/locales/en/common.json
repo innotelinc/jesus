@@ -2928,7 +2928,10 @@
       "all_events": "All events",
       "cancel": "Cancel",
       "save": "Save",
-      "delete": "Delete"
+      "delete": "Delete",
+      "rsvp_title": "Respond to recurring event",
+      "rsvp_description": "This is a recurring event. Which events does your response apply to?",
+      "respond": "Respond"
     },
     "alerts": {
       "title": "Reminders",
