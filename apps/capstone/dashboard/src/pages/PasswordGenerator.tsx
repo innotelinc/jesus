@@ -34,7 +34,10 @@ function generatePassword(length: number, upper: boolean, lower: boolean, number
 
   if (excludeAmbiguous) {
     const filtered = pool.filter(char => !ambiguous.includes(char));
-    filtered.length ? (pool.length = 0, pool.push(...filtered)) : null;
+    if (filtered.length) {
+      pool.length = 0;
+      pool.push(...filtered);
+    }
   }
 
   if (pool.length === 0) return 'aB3!@#';

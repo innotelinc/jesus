@@ -7,8 +7,34 @@ product landing page; this file keeps the per-release detail.
 
 Work landed after the `v3.19` tag: host-side SIP registration bans for a PBX
 that is scanned continuously, a data-layer backup for the next host move, the
-shared-box softphone signaling that a profile-off PBX container had broken, and
-an Agents page that stopped paying one PBX round trip per agent, per row.
+shared-box softphone signaling that a profile-off PBX container had broken, an
+Agents page that stopped paying one PBX round trip per agent, per row, and a
+portal link that pointed at a container this stack does not start.
+
+### The portal link points at Zeus, and the dashboard's lint is real
+
+- **Fixed: the Control Center's portal row was a dead link.** `build_links`
+  built it from `portal.<domain>` — the *bundled* portal, which runs behind a
+  compose profile, so with the profile off that host answers nothing while the
+  real portal is up. The portal is Zeus's app now, published under Zeus's own
+  names, so the row resolves `ZEUS_PORTAL_URL`, then `ZEUS_API_URL`, then the
+  portal's own default public name (`https://app.zeus.innotel.us`, measured:
+  `/dashboard/voice` answers a 307 to `/login`). `portal` is no longer in
+  `NPM_SUBDOMAINS`, because no one map can answer for an app that is not this
+  stack's.
+- **New: the voice plane has a door on the PBX side.** The `pbx-sso`
+  oauth2-proxy banner carries the link to that same screen, so a PBX-first
+  operator meets the voice plane from the sign-in page they already use. A link
+  *inside* FreePBX's admin menu would be a module, which this stack deliberately
+  does not ship. Measured against the pinned v7.8.2 image rather than assumed:
+  `--banner` is the flag that exists (`--signin-message` does not yet, and
+  setting it is silently ignored) and its value renders as unescaped HTML, so
+  the anchor is a real link. `PBX_SSO_BANNER` overrides it; `-` disables it.
+- **Fixed: `npm run lint` could only ever fail.** It was declared in
+  `package.json` with no eslint dependency and no config, so there was nothing
+  it could do but error. The flat config and its devDependencies are committed
+  now, the real findings it turned up are fixed, and CI runs it — which is what
+  makes the dashboard build's lint step mean anything.
 
 ### Dograh sign-in stops failing on a credential that was never a credential
 

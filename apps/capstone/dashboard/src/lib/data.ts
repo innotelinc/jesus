@@ -14,6 +14,7 @@ import type {
   MonitoringMetrics,
   MetricPoint,
 } from '../types';
+import { PBX_SIGNIN_LINK_ID, VOICE_PLANE_LINK_ID, pbxSigninUrl, voicePortalVoiceScreenUrl } from './config';
 
 function makeMetrics(): MonitoringMetrics {
   const now = Date.now();
@@ -531,6 +532,10 @@ export const incidents: Incident[] = [
 ];
 
 export const links: ResourceLink[] = [
+  // Same id the aggregator publishes (dashboard-backend `build_links`), so the
+  // sidebar resolves this link's URL from the live payload whenever it is up.
+  { id: VOICE_PLANE_LINK_ID, name: 'Zeus Voice Plane', description: 'Per-DID agent, Capstone binding and add-on gate, with live calls and hand-offs', url: voicePortalVoiceScreenUrl, category: 'services', status: 'verified', lastVerified: '2026-09-22T00:00:00Z' },
+  { id: PBX_SIGNIN_LINK_ID, name: 'Voice Plane via PBX Sign-in', description: "FreePBX's own door: the pbx-sso gateway renders the Voice Plane link in its sign-in banner", url: pbxSigninUrl, category: 'services', status: 'verified', lastVerified: '2026-09-22T00:00:00Z' },
   { id: 'l1', name: 'Capstone Voice App', description: 'Agent workflow dashboard and telephony configuration', url: `http://${_fh()}:3010`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l1a', name: 'Authentik', description: 'SSO and user management for the platform', url: `http://${_fh()}:9100`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },
   { id: 'l1b', name: 'Capstone Control Center', description: 'Operational dashboard for the whole stack', url: `http://${_fh()}:8096`, category: 'services', status: 'verified', lastVerified: '2026-08-31T16:42:00Z' },

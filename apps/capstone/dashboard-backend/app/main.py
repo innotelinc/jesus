@@ -79,12 +79,15 @@ NPM_BASE_DOMAIN = os.environ.get("NPM_BASE_DOMAIN", "").strip().lower().lstrip("
 # Subdomain each NPM-proxied service is exposed under NPM_BASE_DOMAIN.
 # The canonical Capstone map (v3.11): app/api/auth/voice/admin/pbx.
 # "voice" is the WebRTC signaling endpoint (not a web UI).
+#
+# No `portal` entry: the PBX customer portal is Zeus's app now, served under
+# Zeus's own names, so its URL comes from `portal_origin()` instead of this map
+# — see that function for what was measured.
 NPM_SUBDOMAINS: dict[str, str] = {
     "dograh-api": "api",
     "dograh-ui": "app",
     "authentik-server": "auth",
     "pbx-freepbx": "pbx",
-    "portal": "portal",
     "omniroute": "omniroute",
     "n8n": "n8n",
     "grist": "grist",
@@ -103,6 +106,30 @@ def npm_url(svc: str) -> str:
     if not sub or not NPM_BASE_DOMAIN:
         return ""
     return f"https://{sub}.{NPM_BASE_DOMAIN}"
+
+
+def portal_origin() -> str:
+    """Origin of the Zeus portal — one Next.js app, answered under every
+    `*.zeus.<zone>` name, so any of its names serves its routes.
+
+    Resolution order, measured through the edge rather than assumed:
+
+    1. `ZEUS_PORTAL_URL` — an explicit override.
+    2. `ZEUS_API_URL` — the origin `scripts/zeus_client.py` already dials.
+    3. `https://app.zeus.innotel.us` — the portal's own default public name
+       (the value the Zeus repo defaults `NEXT_PUBLIC_URL` to), which answers
+       `/dashboard/voice` with a 307 to `/login`.
+
+    The proxied `portal.<NPM_BASE_DOMAIN>` name this stack's map once assumed is
+    deliberately not used: Capstone's bundled portal runs behind a compose
+    profile, and with it off that host answers nothing, so the service row built
+    from it read as a dead link while the real portal was up.
+    """
+    return (
+        os.environ.get("ZEUS_PORTAL_URL", "").strip().rstrip("/")
+        or os.environ.get("ZEUS_API_URL", "").strip().rstrip("/")
+        or "https://app.zeus.innotel.us"
+    )
 
 
 def public_host() -> str:
@@ -781,6 +808,19 @@ def build_alerts() -> list[dict[str, Any]]:
     return alerts
 
 
+# The Zeus voice-plane screen: the portal page where a call's agent, Capstone
+# binding and add-on entitlement are visible, and the only place an operator can
+# watch a hand-off happen. One path, because the portal is one Next.js app.
+VOICE_PLANE_PATH = "/dashboard/voice"
+
+# The link id of the PBX-side door to that screen: the `pbx-sso` gateway's
+# sign-in page, published directly beneath the voice-plane row above. Named
+# here rather than inline because the dashboard's offline fallback (`src/lib/
+# data.ts`) has to publish the same id, and two literals is how the sidebar and
+# the Links page stop agreeing.
+PBX_SIGNIN_LINK_ID = "ln-pbx-signin"
+
+
 def build_links() -> list[dict[str, Any]]:
     now = now_iso()
     links = []
@@ -789,6 +829,10 @@ def build_links() -> list[dict[str, Any]]:
         # Prefer the public subdomain (https://<sub>.<NPM_BASE_DOMAIN>) when a
         # proxy domain is configured; otherwise fall back to host:port.
         url = npm_url(svc) or f"http://{HOST or 'localhost'}:{info['port']}"
+        # The portal is the one row the subdomain map cannot answer for — it is
+        # Zeus's app, under Zeus's names (see portal_origin).
+        if svc == "portal":
+            url = portal_origin()
         links.append({
             "id": f"ln-{svc}",
             "name": meta.get("name", info["name"]),
@@ -809,6 +853,39 @@ def build_links() -> list[dict[str, Any]]:
             "status": "verified",
             "lastVerified": now,
         })
+    # The voice plane's own screen, on the same origin as the portal service row
+    # above — one function, so the two rows cannot point at different portals.
+    links.append({
+        "id": "ln-voice-plane",
+        "name": "Zeus Voice Plane",
+        "description": "Per-DID agent, Capstone binding and add-on gate, with live calls and hand-offs.",
+        "url": f"{portal_origin()}{VOICE_PLANE_PATH}",
+        "category": "services",
+        "status": "verified",
+        "lastVerified": now,
+    })
+    # ...and the PBX-side door to the same screen, published beside it on purpose.
+    # The voice plane has exactly two ways in: the portal screen above, and the
+    # sign-in page of the PBX reverse proxy in front of FreePBX (`pbx-sso`, an
+    # oauth2-proxy gateway) whose sign-in banner carries the Voice Plane link —
+    # the module-free way in from the PBX side, because a FreePBX admin-menu
+    # entry is only expressible as a FreePBX module (Zeus repo,
+    # docs/ava-capstone-convergence.md §7).
+    #
+    # It points at the gateway rather than the portal because that is where a
+    # PBX-first operator already is — the same host as the FreePBX service row
+    # above, which is why this row is named for the *route* it opens and not as
+    # another service: what it adds is the pairing, so neither entry has to be
+    # reached through the other product's vocabulary.
+    links.append({
+        "id": PBX_SIGNIN_LINK_ID,
+        "name": "Voice Plane via PBX Sign-in",
+        "description": "FreePBX's own door: the pbx-sso gateway renders the Voice Plane link in its sign-in banner.",
+        "url": npm_url("pbx-freepbx") or f"http://{HOST or 'localhost'}:80",
+        "category": "services",
+        "status": "verified",
+        "lastVerified": now,
+    })
     for sl in STATIC_LINKS:
         links.append({**sl, "lastVerified": now})
     # Grafana monitoring dashboards (under the grafana subdomain when proxied)

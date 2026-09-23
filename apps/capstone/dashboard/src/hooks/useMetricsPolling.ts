@@ -53,7 +53,7 @@ export function useMetricsPolling({
         setPayload({ snapshot: sampleSnapshot, metrics: sampleMetrics });
         setState('stale');
       }
-    } catch (error) {
+    } catch {
       if (mountedRef.current) {
         setPayload({ snapshot: sampleSnapshot, metrics: sampleMetrics });
         setState('error');

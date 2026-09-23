@@ -255,7 +255,12 @@ the mailbox — a per-number routing decision owned by the agent config.
    the OmniRoute OpenAI-compatible endpoint (or run OmniRoute as the stack's
    shared LLM gateway and retire direct Ollama calls).
 5. **Unify the web layer**: dograh-ui, Zeus portal, dashboard behind the
-   same Authentik + Nginx Proxy Manager subdomains.
+   same Authentik + Nginx Proxy Manager subdomains. **(DONE 2026-09-22)**, and
+   the voice plane is now reachable *from the PBX side without a module*: the
+   Control Center's Links page and sidebar carry a **Voice Plane** entry, and
+   the `pbx-sso` gateway's sign-in banner links to the portal's voice screen —
+   see §8 G8 for why a FreePBX menu entry would need a module, and the Zeus
+   repo's `docs/ava-capstone-convergence.md` §7 for the surfaces as built.
 6. **Wire outcome write-back** (contract above) so agent calls show in Zeus
    call history with playback.
 7. **Deprecate the bundled Capstone PBX** as the default topology — keep the
@@ -352,6 +357,32 @@ the mailbox — a per-number routing decision owned by the agent config.
   plan(+user) only — `phone` is echoed, not resolved — so the gate is
   deployment-scoped to the agent SKU; per-DID plan mapping for a multi-tenant
   shared-PBX box is a possible later refinement.
+- **G8 — Reaching the voice plane from FreePBX (RESOLVED).** A FreePBX
+  admin-menu entry is only expressible as a module — the framework builds its
+  menu from each installed module's `module.xml` `<menuitems>`, so there is no
+  config to set instead. One now ships in the Zeus repo
+  (`pbx/freepbx-modules/voiceplane/`, menu *Reports → Zeus Voice Plane*): a
+  read-only view that puts the portal's plan beside the routes FreePBX actually
+  answers with, installed by `pbx/install-freepbx-voiceplane.py` and converged
+  on every boot. It cannot write — no `doConfigPageInit()`, no form, GET-only
+  requests — because a third writer of routing is what produced the estate's
+  worst failure (every DID unwired while both products believed the numbers were
+  routed).
+
+  Two module-free surfaces carry the link as well, so the screen is reachable on
+  a PBX where nothing has been installed: the `pbx-sso` gateway's sign-in banner
+  (oauth2-proxy's `--banner`, rendered as unescaped HTML — verified against the
+  pinned v7.8.2 image, where `--signin-message` does not exist yet and is
+  silently ignored) and the Capstone/Zeus landing tiles. All three name
+  `app.zeus.innotel.us/dashboard/voice`, measured through the edge as
+  `307 → /login`. This also closed a dead link: the `portal.<NPM_BASE_DOMAIN>`
+  row the Links map produced answered nothing (Capstone's bundled portal is
+  behind a compose profile), so that row and the new entries resolve through one
+  `portal_origin()` in `dashboard-backend` — `ZEUS_PORTAL_URL`, else
+  `ZEUS_API_URL`, else the portal's own declared name. The Control Center now
+  publishes the PBX-side door directly beneath the portal row (`ln-pbx-signin`,
+  *Voice Plane via PBX Sign-in*), so both ways in are visible together and an
+  operator never has to know which product owns which.
 
 ## 9. Related
 

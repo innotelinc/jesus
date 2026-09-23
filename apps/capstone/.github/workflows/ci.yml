@@ -153,6 +153,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `lint` was declared in package.json with no eslint dependency and no
+      # config, so it could only ever fail; the config is committed now and this
+      # is what keeps it honest.
+      - name: Lint
+        run: npm run lint
+
       - name: Type-check + production build (tsc && vite build)
         run: npm run build
 
