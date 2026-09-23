@@ -60,6 +60,7 @@ import { runPostbuild } from '../../scripts/lite/postbuild.mjs';
 import { verifyExport } from '../../scripts/lite/verify.mjs';
 import { stageContainer } from '../../scripts/lite/container.mjs';
 import { LITE_PENDING_PATH_KEY as APP_LITE_PENDING_PATH_KEY } from '../lite';
+import { applyLiteConfig } from '../lite-config';
 
 /** The scripts take `process.env`-shaped input; tests pass plain objects. */
 function env(values: Record<string, string> = {}): NodeJS.ProcessEnv {
@@ -102,18 +103,28 @@ describe('lite build helpers', () => {
   it('derives config.json from the LITE_* inputs with safe defaults', () => {
     const empty = buildLiteConfig({});
     expect(empty.jmapServerUrl).toBe('');
-    expect(empty.allowCustomJmapEndpoint).toBe(true);
+    expect(empty).not.toHaveProperty('allowCustomJmapEndpoint');
+    expect(applyLiteConfig(empty).allowCustomJmapEndpoint).toBe(true);
     expect(empty.rememberMeEnabled).toBe(true);
     expect(empty.demoMode).toBe(false);
     expect(empty.appName).toBe('Bulwark Webmail');
 
     const fixed = buildLiteConfig({ LITE_JMAP_SERVER_URL: 'https://mail.example.com/', LITE_APP_NAME: 'Acme', LITE_DEMO_MODE: 'true', LITE_REMEMBER_ME: 'false' });
     expect(fixed.jmapServerUrl).toBe('https://mail.example.com');
-    expect(fixed.allowCustomJmapEndpoint).toBe(false);
+    expect(fixed).not.toHaveProperty('allowCustomJmapEndpoint');
+    expect(applyLiteConfig(fixed).allowCustomJmapEndpoint).toBe(false);
     expect(fixed.appName).toBe('Acme');
     expect(fixed.demoMode).toBe(true);
     expect(fixed.rememberMeEnabled).toBe(false);
     expect(buildLitePolicy().features).toEqual({ pluginsEnabled: false, sidebarAppsEnabled: false });
+    expect(buildLiteConfig({ LITE_ALLOW_CUSTOM_ENDPOINT: 'true' }).allowCustomJmapEndpoint).toBe(true);
+    expect(buildLiteConfig({ LITE_ALLOW_CUSTOM_ENDPOINT: 'false' }).allowCustomJmapEndpoint).toBe(false);
+  });
+
+  it('hides the server field once a deployer fills in jmapServerUrl of the shipped config.json (#1087)', () => {
+    const shipped = buildLiteConfig({});
+    const edited = { ...shipped, jmapServerUrl: 'https://mail.example.com' };
+    expect(applyLiteConfig(edited).allowCustomJmapEndpoint).toBe(false);
   });
 
   it('prefixes manifest and redirect paths with the base path', () => {
