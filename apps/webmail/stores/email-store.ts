@@ -4,7 +4,7 @@ import type { UnifiedMailboxRole, CrossView } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore, getMessageListOrderFor } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
-import type { SortLevel } from "@/lib/message-list-order";
+import { orderKeywords, type SortLevel } from "@/lib/message-list-order";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
@@ -71,7 +71,10 @@ interface EmailStore {
   selectedEmailIds: Set<string>; // Track selected emails for batch operations
   // Emails the user just read (unread view) or unstarred (starred view) that
   // should stay visible in that self-filtering cross view until it is re-opened,
-  // instead of vanishing on the next push refresh. Cleared on navigation.
+  // instead of vanishing on the next push refresh. In a folder sorted on a
+  // keyword (#718): the open conversation's rows, kept although a read/star/tag
+  // change moved them past the loaded part of the server order. Cleared on
+  // navigation.
   retainedInViewIds: Set<string>;
   hasMoreEmails: boolean; // Track if more emails are available to load
   totalEmails: number; // Total number of emails in the current mailbox/query
@@ -477,6 +480,21 @@ let emailDeltaQueue: Promise<void> = Promise.resolve();
 type StoreGet = () => EmailStore;
 type StoreSet = (partial: Partial<EmailStore> | ((state: EmailStore) => Partial<EmailStore>)) => void;
 
+/**
+ * After a local read/star/tag change: re-query a folder list sorted on one of
+ * the changed keywords (#718). The change moves the row at once, possibly past
+ * the end of what is loaded, but nothing moves the rows from beyond it up -
+ * reading the top unread mail over and over ran out of unread mail after the
+ * first page while more waited on the server.
+ */
+function refillAfterKeywordChange(get: StoreGet, client: IJMAPClient, changed: Iterable<string>): void {
+  const s = get();
+  if (s.isUnifiedView || s.isScheduledView || s.selectedKeyword || s.searchQuery || !isFilterEmpty(s.searchFilters)) return;
+  const sortKeywords = orderKeywords(s.listOrder);
+  if (![...changed].some((keyword) => sortKeywords.includes(keyword))) return;
+  void s.refreshCurrentMailbox(client);
+}
+
 async function applyEmailDeltaNow(client: IJMAPClient, newState: string, get: StoreGet, set: StoreSet): Promise<boolean> {
   const s = get();
   const sync = s.emailListSync;
@@ -525,6 +543,18 @@ async function applyEmailDeltaNow(client: IJMAPClient, newState: string, get: St
   const removed = new Set(destroyedInList);
   const updatedEmails = updatedInList.length > 0 ? await effectiveClient.getSomeEmails(updatedInList, accountArg) : [];
   const updatedById = new Map(updatedEmails.map((e) => [e.id, e]));
+  // Another client changed the read/star/tag state a keyword order (#718)
+  // sorts on: the row may now belong past the loaded part of the list and an
+  // unloaded one in its place, which patching rows in place cannot show.
+  const sortKeywords = orderKeywords(s.listOrder);
+  if (sortKeywords.length > 0) {
+    const localById = new Map(s.emails.map((e) => [e.id, e]));
+    const moved = updatedEmails.some((fresh) => {
+      const local = localById.get(fresh.id);
+      return local && sortKeywords.some((k) => !!local.keywords?.[k] !== !!fresh.keywords?.[k]);
+    });
+    if (moved) return false;
+  }
   for (const id of updatedInList) {
     const fresh = updatedById.get(id);
     // Gone from the folder (moved/deleted) or gone entirely since the delta.
@@ -2016,16 +2046,26 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // Category tabs (plugin-registered) must filter pagination the same
         // way as the initial fetch or pages would mix categories.
         const categoryFilter = useMessageListTabsStore.getState().getCategoryFilter(mailbox?.role);
+        // Rows kept out of a keyword order (the open conversation, see
+        // refreshCurrentMailbox) are not part of the loaded head of the
+        // server order; counting them would skip as many rows.
+        const retained = get().retainedInViewIds;
+        const outOfOrder = emails.filter(e => retained.has(e.id)).length;
         result = await effectiveClient.getEmails(
           jmapMailboxId,
           accountId,
           emailsPerPage,
-          position,
+          position - outOfOrder,
           undefined,
           true,
           categoryFilter ?? undefined,
           getMessageListOrderFor(mailbox?.role),
         );
+        // A kept row this page reached is back in order.
+        const reached = new Set(result.emails.map(e => e.id));
+        if (outOfOrder > 0 && [...retained].some(id => reached.has(id))) {
+          set({ retainedInViewIds: new Set([...get().retainedInViewIds].filter(id => !reached.has(id))) });
+        }
       }
 
       // Use fresh state when merging to avoid overwriting concurrent updates
@@ -2374,6 +2414,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           })(),
         };
       });
+      refillAfterKeywordChange(get, client, ['$seen']);
     } catch (error) {
       // Remove from processing set on error
       set((state) => {
@@ -3038,6 +3079,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           emailId,
         ),
       }));
+      refillAfterKeywordChange(get, client, ['$flagged']);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to update star"
@@ -3069,8 +3111,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // silently lost on the next reload - the same class of bug as the batch
     // actions in `email-store-shared-folder-actions.test.ts`. (#281)
     const { client: actionClient, accountId } = resolveKeywordActionContext(emailId, client);
+    const previous = (get().emails.find(e => e.id === emailId) ?? get().selectedEmail)?.keywords ?? {};
     await actionClient.updateEmailKeywords(emailId, keywords, accountId);
     get().setEmailKeywordsLocal(emailId, keywords);
+    refillAfterKeywordChange(
+      get,
+      client,
+      [...Object.keys(previous), ...Object.keys(keywords)].filter(k => !!previous[k] !== !!keywords[k]),
+    );
   },
 
   setEmailKeywordsLocal: (emailId, keywords) => {
@@ -3178,6 +3226,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         selectedEmailIds: new Set(),
         isLoading: false
       });
+      refillAfterKeywordChange(get, client, ['$seen']);
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : "Failed to update emails",
@@ -3919,6 +3968,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       let mailbox;
       let unifiedErrors: Map<string, string> | undefined;
       let syncAfterRefresh: EmailListSync | null = null;
+      // How many rows the refresh re-queries from the top of the view.
+      let windowSize = emailsPerPage;
+      // Set when the whole loaded list was re-queried in a keyword order.
+      let keepOpenThread = false;
       if (!selectedKeyword && isUnifiedView && crossView) {
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
         const built = await buildUnifiedAccountClients({ includeGroup });
@@ -3980,7 +4033,19 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             result = await effectiveClient.advancedSearchEmails(filter, scopeAccountId, emailsPerPage, 0);
           }
         } else {
-          result = await effectiveClient.getEmails(jmapMailboxId, accountId, emailsPerPage, 0, undefined, true, undefined, getMessageListOrderFor(mailbox?.role));
+          const order = getMessageListOrderFor(mailbox?.role);
+          // A keyword order (#718) moves rows whose read/star/tag state
+          // changed - possibly past the end of what is loaded - and rows from
+          // beyond it up. Re-query every loaded row, not only the first page,
+          // so the list stays the head of the server order. The rows kept
+          // out of that order below are not part of the head.
+          if (orderKeywords(order).length > 0) {
+            const { emails: loaded, retainedInViewIds } = get();
+            const inOrder = loaded.filter(e => !retainedInViewIds.has(e.id)).length;
+            windowSize = Math.min(Math.max(emailsPerPage, inOrder), effectiveClient.getMaxObjectsInGet());
+            keepOpenThread = true;
+          }
+          result = await effectiveClient.getEmails(jmapMailboxId, accountId, windowSize, 0, undefined, true, undefined, order);
           // This page is the new delta-sync baseline for the folder; the
           // search / unified paths above cannot be delta-synced.
           syncAfterRefresh = result.state
@@ -3993,6 +4058,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
       const currentEmails = get().emails;
       const previousTotal = get().totalEmails;
+      const insertedCount = Math.max((result.total || 0) - previousTotal, 0);
 
       // Only notify for genuinely new incoming mail in the Inbox.
       // Without these guards the toast/sound also fires when sending,
@@ -4003,6 +4069,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // candidate is the newest non-pinned mail on the page rather than its
       // first entry (a just-arrived mail cannot be pinned yet). Deleting the
       // top message shifts in an OLDER one, which never becomes the newest.
+      // Re-querying a keyword order can also move up a newer mail that was not
+      // loaded yet (e.g. unread first, the newest read mail); that is only
+      // new mail when the folder grew.
       const newFirst = result.emails
         .filter(e => !e.keywords?.['$pinned'])
         .reduce<Email | undefined>(
@@ -4013,7 +4082,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         newFirst &&
         !selectedKeyword &&
         mailbox?.role === 'inbox' &&
-        !currentEmails.some(e => e.id === newFirst.id)
+        !currentEmails.some(e => e.id === newFirst.id) &&
+        (!keepOpenThread || insertedCount > 0)
       ) {
         get().handleNewEmailNotification(newFirst);
       }
@@ -4030,7 +4100,6 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // be reintroduced from stale local state.
       let merged: Email[] = [...refreshedEmails];
       const mergedIds = new Set(refreshedEmails.map((e: Email) => e.id));
-      const insertedCount = Math.max((result.total || 0) - previousTotal, 0);
       // Derive the cutoff from the page size, not from the refreshed list's
       // length: when the folder shrank (a deletion - e.g. the draft of a just
       // sent mail), the fresh page is shorter than the stale list and a
@@ -4038,12 +4107,37 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // state. That ghost row is how "sent mail still shows as draft"
       // reports happen (#592) - and re-sending the ghost delivers the mail
       // again.
-      const appendFromIndex = Math.max(emailsPerPage - insertedCount, 0);
+      const appendFromIndex = Math.max(windowSize - insertedCount, 0);
+      // Rows kept out of a keyword order are not part of the re-queried head
+      // and are decided on below.
+      const previouslyRetained = get().retainedInViewIds;
+      const inOrderEmails = keepOpenThread
+        ? currentEmails.filter(e => !previouslyRetained.has(e.id))
+        : currentEmails;
 
-      for (const email of currentEmails.slice(appendFromIndex)) {
+      for (const email of inOrderEmails.slice(appendFromIndex)) {
         if (!mergedIds.has(email.id)) {
           merged.push(email);
           mergedIds.add(email.id);
+        }
+      }
+
+      // Rows that left the re-queried head of a keyword order are dropped;
+      // load-more brings them back where they now belong. Not the open
+      // conversation's, though: every action on an email looks it up in this
+      // list, so "mark as unread" on the mail just read must still find it.
+      // They stay until something else is opened, and load-more does not
+      // count them.
+      let retainedInViewIds: Set<string> | undefined;
+      if (keepOpenThread) {
+        const open = get().selectedEmail;
+        const openThread = open ? threadKeyFor(open) : null;
+        retainedInViewIds = new Set();
+        for (const email of currentEmails) {
+          if (mergedIds.has(email.id) || threadKeyFor(email) !== openThread) continue;
+          merged.push(email);
+          mergedIds.add(email.id);
+          retainedInViewIds.add(email.id);
         }
       }
 
@@ -4127,6 +4221,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             totalEmails: effectiveTotal,
             threadEmailsCache: newCache,
             ...(unifiedErrors !== undefined ? { unifiedErrors } : {}),
+            ...(retainedInViewIds ? { retainedInViewIds } : {}),
           };
         });
 
@@ -4151,6 +4246,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
         // Fetch full thread counts in the background (non-blocking)
         void get().fetchThreadEmailCounts(client);
+      } else if (retainedInViewIds) {
+        set({ retainedInViewIds });
       }
     } catch (error) {
       console.error('Failed to refresh current mailbox:', error);
@@ -4326,6 +4423,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           : state.selectedEmail,
       };
     });
+    refillAfterKeywordChange(get, client, ['$seen']);
   },
 
   collapseAllThreads: () => {
