@@ -85,6 +85,8 @@ import { useProTabStore } from "@/stores/pro-tab-store";
 import { useProMultiAccountMailboxes } from "@/hooks/use-pro-multi-account-mailboxes";
 import { Input } from "@/components/ui/input";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
+import { WopiEditor } from "@/components/files/wopi-editor";
+import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 import { isFilePreviewable } from "@/lib/file-preview";
 import { appendHtmlSignature, appendPlainTextSignature } from "@/lib/signature-utils";
 import { computeReplyThreadingHeaders } from "@/lib/email-threading";
@@ -169,6 +171,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [rateLimitSecondsLeft, setRateLimitSecondsLeft] = useState<number | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{ blobId: string; name: string; type?: string; accountId?: string; clientAccountId?: string } | null>(null);
+  // Office attachments open read-only in the configured WOPI editor (#1047).
+  const [officeAttachment, setOfficeAttachment] = useState<{ blobId: string; name: string; type?: string; size?: number; accountId: string; slot: number | null } | null>(null);
+  const wopiStatus = useWopiStatus(true);
   const [pendingMailtoAccountChoice, setPendingMailtoAccountChoice] = useState<ParsedMailto | null>(null);
   const [isProtocolAccountSwitching, setIsProtocolAccountSwitching] = useState(false);
   const markAsReadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -3036,6 +3041,24 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     return { blobClient, accountId, clientAccountId };
   }, [isUnifiedView, client]);
 
+  // Opens an attachment the built-in preview cannot render but the office
+  // editor can (docx, odt, xlsx, ...). The launch route runs server-side with
+  // one login's cookie, so it needs that login's slot and an explicit
+  // accountId (the client's default one when the message is not delegated).
+  const openOfficeAttachment = useCallback((
+    blobClient: NonNullable<typeof client>,
+    attachment: { blobId: string; name: string; type?: string; size?: number },
+    accountId: string | undefined,
+    clientAccountId: string | undefined,
+  ): boolean => {
+    if (isFilePreviewable(attachment.name, attachment.type) || !canWopiOpen(wopiStatus, attachment.name)) return false;
+    const slot = clientAccountId
+      ? (useAccountStore.getState().getAccountById(clientAccountId)?.cookieSlot ?? null)
+      : null;
+    setOfficeAttachment({ ...attachment, accountId: accountId || blobClient.getAccountId(), slot });
+    return true;
+  }, [wopiStatus]);
+
   // Opening an attachment straight from a list row. Deliberately resolves
   // the blob source from that row's own email rather than the selected one:
   // in the unified inbox each row can belong to a different account, and
@@ -3050,11 +3073,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         setPreviewAttachment({ blobId: attachment.blobId, name, type: attachment.type, accountId, clientAccountId });
         return;
       }
+      if (mailAttachmentAction === 'preview' && openOfficeAttachment(
+        blobClient, { blobId: attachment.blobId, name, type: attachment.type, size: attachment.size }, accountId, clientAccountId,
+      )) return;
       await blobClient.downloadBlob(attachment.blobId, name, attachment.type, accountId);
     } catch (error) {
       console.error("Failed to open attachment from the list:", error);
     }
-  }, [resolveBlobSource]);
+  }, [resolveBlobSource, openOfficeAttachment]);
 
   // Where a list row's attachment parts are fetched from: the same routing
   // the viewer uses to open that row (source stamps first, then the account
@@ -3100,6 +3126,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         setPreviewAttachment({ blobId, name, type, accountId, clientAccountId });
         return;
       }
+      if (!forceDownload && mailAttachmentAction === 'preview' && openOfficeAttachment(
+        blobClient, { blobId, name, type }, accountId, clientAccountId,
+      )) return;
 
       await blobClient.downloadBlob(blobId, name, type, accountId);
     } catch (error) {
@@ -4450,6 +4479,15 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
             onClose={() => setPreviewAttachment(null)}
             onDownload={handlePreviewAttachmentDownload}
             getFileContent={getPreviewAttachmentContent}
+          />
+        )}
+
+        {officeAttachment && (
+          <WopiEditor
+            target={{ kind: "attachment", blobId: officeAttachment.blobId, name: officeAttachment.name, type: officeAttachment.type, size: officeAttachment.size }}
+            accountId={officeAttachment.accountId}
+            slot={officeAttachment.slot}
+            onClose={() => setOfficeAttachment(null)}
           />
         )}
 

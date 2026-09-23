@@ -27,7 +27,7 @@ import type { FileNodeRights } from "@/lib/jmap/types";
 import { ImagePreviewModal } from "@/components/files/image-preview-modal";
 import { FilePreviewModal } from "@/components/files/file-preview-modal";
 import { WopiEditor } from "@/components/files/wopi-editor";
-import { useWopiStatus, fileExtension } from "@/hooks/use-wopi-status";
+import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 import { loadFilesSettings } from "@/components/files/files-settings-dialog";
 import type { FolderLayout } from "@/components/files/files-settings-dialog";
 import { AppTopBannerSlot } from "@/components/plugins/app-top-banner-slot";
@@ -135,11 +135,7 @@ export function FilesApp({ linkSegments: routeSegments }: FilesAppProps = {}) {
   // WOPI document editing (#425): name of the file open in the editor overlay.
   const [editFile, setEditFile] = useState<string | null>(null);
   const wopiStatus = useWopiStatus(filesEnabled);
-  const isOfficeEditable = useCallback((name: string) => {
-    if (!wopiStatus?.enabled) return false;
-    const ext = fileExtension(name);
-    return wopiStatus.editExtensions.includes(ext) || wopiStatus.viewExtensions.includes(ext);
-  }, [wopiStatus]);
+  const isOfficeEditable = useCallback((name: string) => canWopiOpen(wopiStatus, name), [wopiStatus]);
   const [showDetails, setShowDetails] = useState(false);
   const [detailName, setDetailName] = useState<string | null>(null);
 
@@ -727,7 +723,7 @@ export function FilesApp({ linkSegments: routeSegments }: FilesAppProps = {}) {
         const editResource = resources.find(r => r.name === editFile);
         return editResource ? (
           <WopiEditor
-            resource={editResource}
+            target={{ kind: "file", id: editResource.id, name: editResource.name }}
             accountId={filesAccountId}
             onClose={() => {
               setEditFile(null);
