@@ -53,6 +53,7 @@ const nextConfig: NextConfig = {
   // the shipped SPA-fallback rules expect; next/image has no optimizer here.
   ...(isLite ? { trailingSlash: true, images: { unoptimized: true } } : {}),
   allowedDevOrigins: ["192.168.1.51"],
+  agentRules: false,
   basePath: basePath || undefined,
   // esbuild ships native binaries + a README the bundler can't parse; load
   // it from node_modules at runtime instead of trying to bundle it. Used by
