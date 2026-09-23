@@ -7,6 +7,9 @@
 # command-string split, node -e template literals) are documented with inline
 # shellcheck directives, so this job fails the build if a commit reintroduces
 # any warning, error, or note.
+#
+# The secret-scan job is the backstop the pre-commit hook names: the hook sees
+# only the added lines of one commit, so this scans the whole tracked tree.
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: CI
@@ -34,6 +37,23 @@ jobs:
           echo "Checking ${#scripts[@]} scripts"
           docker run --rm -v "$PWD":/mnt:ro -w /mnt \
             koalaman/shellcheck:v0.10.0 -s bash "${scripts[@]}"
+
+  # The pre-commit hook only reads the ADDED lines of what is being committed, so
+  # a credential already in the tree — one that predates the hook, or one that
+  # arrived in a file the hook had no reason to rescan — is invisible to it. This
+  # job is the other half .githooks/secret-scan.sh points at: the whole tracked
+  # tree at every push. It is the same scanner, so it flags exactly what the hook
+  # would have, with the value masked; a rule exemption (test fixtures, a
+  # NEXT_PUBLIC_ value the framework inlines, a fetch mode) applies here too, and
+  # none of them can hide a provider-key shape.
+  secret-scan:
+    name: Credential scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan every tracked file for literal secrets
+        run: python3 scripts/secret-scan.py
 
   pbx-converge:
     name: PBX converge tool

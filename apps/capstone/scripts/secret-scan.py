@@ -34,6 +34,15 @@ It flags:
      halves are required, so a secret merely split across two literals
      (``"hunter2" + "hunter2"``) still reads as a stored credential.
 
+     A value Next.js inlines into the client bundle is published, not stored:
+     the ``NEXT_PUBLIC_`` prefix is that compiler's own marker for "this ships
+     to every browser", so the only alternative to publishing it is not having
+     the feature. The dograh patch carried in this repository sets its Chatwoot
+     *website* token that way, and a widget token is public by design. The
+     prefix is the whole test — nothing is secret under a name the framework
+     advertises — and without it the whole-tree scan can never be green, which
+     is how a gate gets bypassed rather than satisfied.
+
 Matched values are masked in the output, so a finding never re-prints the
 secret it found.
 
@@ -98,6 +107,16 @@ FIELD_NAME_VALUE = re.compile(r"^[A-Z]+(_[A-Z]+)+$")
 # Nothing else is a mode name.
 FETCH_CREDENTIALS_NAME = re.compile(r"^credentials$", re.IGNORECASE)
 FETCH_CREDENTIALS_MODES = frozenset({"omit", "same-origin", "include"})
+
+# A value Next.js *requires* to be inlined into the client bundle is not a stored
+# credential: the `NEXT_PUBLIC_` prefix is the compiler's own marker that the
+# value ships to every browser, so publishing it is the point rather than the
+# mistake. dograh's carried upstream patch sets its Chatwoot *website* token this
+# way (`NEXT_PUBLIC_CHATWOOT_TOKEN`), and a widget token is public by design —
+# without the exemption the whole tracked tree can never be clean, and a gate
+# that always fails is one people learn to bypass. The prefix is the whole test:
+# nothing is secret under a name the framework advertises as client-visible.
+NEXT_PUBLIC_NAME = re.compile(r"^NEXT_PUBLIC_", re.IGNORECASE)
 
 # A vault:// reference names the secret to fetch at runtime (scheme, path,
 # optional #field) — the value in the file is a pointer, not the secret.
@@ -251,6 +270,8 @@ def scan_text(label: str, text: str) -> list[Finding]:
             name = match.group("name")
             value = match.group("value")
             if not SENSITIVE_NAME.search(name):
+                continue
+            if NEXT_PUBLIC_NAME.match(name):
                 continue
             if is_placeholder(value):
                 continue

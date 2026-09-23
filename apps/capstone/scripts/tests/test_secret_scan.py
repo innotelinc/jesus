@@ -11,6 +11,9 @@ The contract under test:
     changes, that false positive blocked every rebuild of the bundle
   * the exemption needs BOTH halves: a value under any other sensitive name, or
     a value that is not exactly a mode, is still a finding
+  * a name Next.js inlines into the client bundle (``NEXT_PUBLIC_``) is
+    published on purpose, so its value is not a finding — while the same name
+    without the prefix still is
   * provider-key shapes still fire wherever they appear
   * a finding is masked, so a report never re-prints the value
 
@@ -65,6 +68,32 @@ class FetchCredentialsTests(unittest.TestCase):
     def test_a_longer_value_that_merely_starts_with_a_mode_is_a_finding(self):
         hits = findings('credentials="same-origin-then-some"')
         self.assertEqual(len(hits), 1)
+
+
+class NextPublicTests(unittest.TestCase):
+    """The exemption for values Next.js inlines into the client bundle.
+
+    The dograh upstream patch carried in this repository sets its Chatwoot
+    website token under ``NEXT_PUBLIC_CHATWOOT_TOKEN``; a widget token ships in
+    the browser by design.
+    """
+
+    def test_next_public_name_is_not_a_credential(self):
+        self.assertEqual(
+            findings('ENV NEXT_PUBLIC_CHATWOOT_TOKEN="3fkFx2mCEjNHjM9gaNc4A82X"'),
+            [],
+        )
+
+    def test_the_same_name_without_the_prefix_is_still_a_finding(self):
+        hits = findings('CHATWOOT_TOKEN="3fkFx2mCEjNHjM9gaNc4A82X"')
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][2], "literal-secret (CHATWOOT_TOKEN)")
+
+    def test_the_exemption_does_not_disable_the_shape_rules(self):
+        # A provider key is a finding wherever it sits, including under a name
+        # Next.js would inline: the exemption covers the assignment rule only.
+        hits = findings(f'NEXT_PUBLIC_KEY="{FAKE_GITHUB_TOKEN}"')
+        self.assertEqual([h[2] for h in hits], ["github-token"])
 
 
 class LiteralAssignmentTests(unittest.TestCase):
