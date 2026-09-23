@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, consumeSignedOut } from "@/stores/auth-store";
 import { useAccountStore } from "@/stores/account-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useShallow } from "zustand/react/shallow";
@@ -438,6 +438,8 @@ function LoginPageContent() {
   // Auto-SSO: when enabled with OAUTH_ONLY, skip the login page entirely
   const ssoError = searchParams.get("sso_error");
   const autoSsoTriggered = useRef(false);
+  // Read once per mount: a ref survives the effect re-runs, the flag does not.
+  const signedOutOnPurpose = useRef<boolean | null>(null);
 
   const startServerSideSso = useCallback(async () => {
     setOauthLoading(true);
@@ -494,6 +496,10 @@ function LoginPageContent() {
   }, [params.locale, selectedServer?.id, isMobileHandoff, mobileRedirectUri, mobileState]);
 
   useEffect(() => {
+    // After signing out, show the login page rather than signing straight
+    // back in through a provider session that outlived the sign-out (#905).
+    if (signedOutOnPurpose.current === null) signedOutOnPurpose.current = consumeSignedOut();
+    if (signedOutOnPurpose.current) return;
     if (!autoSsoEnabled || !oauthOnly || !oauthDiscoveryDone || !oauthMetadata) return;
     if (ssoError || isAddAccountMode || isAuthenticated) return;
     if (autoSsoTriggered.current) return;

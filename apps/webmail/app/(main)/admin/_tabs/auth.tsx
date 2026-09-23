@@ -280,6 +280,8 @@ export function AuthTab() {
 
       <Section title="Single Sign-On">
         <Toggle label="Auto SSO" description="Automatically redirect to SSO provider on load" configKey="autoSsoEnabled" value={currentValue('autoSsoEnabled') as boolean} source={config.autoSsoEnabled?.source} onChange={handleChange} onRevert={handleRevert} />
+        <Toggle label="End provider session on sign-out" description="Signing out of an SSO account also signs out of the identity provider, when it advertises an end_session_endpoint. Turn off if the provider is shared with apps that should stay signed in." configKey="oauthEndSession" value={currentValue('oauthEndSession') as boolean} source={config.oauthEndSession?.source} onChange={handleChange} onRevert={handleRevert} />
+        <Text label="Post-logout redirect URI" description="Where the provider sends users after signing them out. Register it with the provider as a post-logout redirect URI first, or it will refuse the logout. Leave blank to stay on the provider's signed-out page." configKey="oauthPostLogoutRedirectUri" value={currentValue('oauthPostLogoutRedirectUri') as string} source={config.oauthPostLogoutRedirectUri?.source} onChange={handleChange} onRevert={handleRevert} placeholder="https://mail.example.com/en/login" />
       </Section>
 
       <Section title="Admin Dashboard">

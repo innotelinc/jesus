@@ -155,6 +155,8 @@ export interface TokenResult {
   access_token: string;
   expires_in: number;
   refresh_token?: string;
+  /** OIDC id token, kept for RP-initiated logout (`id_token_hint`). */
+  id_token?: string;
 }
 
 export async function exchangeCodeForTokens(
@@ -195,5 +197,6 @@ export async function exchangeCodeForTokens(
     access_token: tokens.access_token,
     expires_in: tokens.expires_in || 3600,
     refresh_token: tokens.refresh_token,
+    id_token: typeof tokens.id_token === 'string' ? tokens.id_token : undefined,
   };
 }
