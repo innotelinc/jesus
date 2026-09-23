@@ -20,6 +20,7 @@ import {
   isWebPushSupported,
   listPushDevices,
   revokePushDevice,
+  serverSupportsEmailPush,
 } from '@/lib/web-push';
 import type { PushDevice } from '@/lib/web-push';
 import { IS_LITE } from '@/lib/lite';
@@ -62,6 +63,9 @@ export function NotificationSettings() {
   const { dialogProps: confirmDialogProps, confirm: confirmDialog } = useConfirmDialog();
 
   const supported = typeof window !== 'undefined' && isWebPushSupported();
+  // "Inbox only" is enforced by the server's emailPush filter; without that
+  // capability (Stalwart < 0.16.16) the toggle would do nothing.
+  const inboxOnlyAvailable = supported && !!client && serverSupportsEmailPush(client);
   const [pushStatus, setPushStatus] = useState<PushStatus>(
     supported ? { kind: 'idle' } : { kind: 'unsupported' },
   );
@@ -402,7 +406,7 @@ export function NotificationSettings() {
           />
         </SettingItem>
 
-        {!isSettingHidden('pushNotifyInboxOnly') && (
+        {inboxOnlyAvailable && !isSettingHidden('pushNotifyInboxOnly') && (
         <SettingItem
           label={t('email.inbox_only')}
           description={t('email.inbox_only_desc')}

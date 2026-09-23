@@ -82,7 +82,10 @@ export function serverSupportsEmailPush(client: IJMAPClient): boolean {
  *
  * Inbox-only mode: same `$junk` keyword guard, but the mailbox condition
  * requires the message to be IN the account's Inbox rather than merely NOT
- * in Junk - mail a Sieve rule files into any other folder stays silent.
+ * in Junk - mail a Sieve rule files into any other folder stays silent. An
+ * account with no Inbox we can see (someone shared a single folder with us)
+ * gets a filter that never matches: leaving it out of the map would make the
+ * server fall back to unfiltered pushes for that account.
  */
 export async function buildEmailPushConfig(
   client: IJMAPClient,
@@ -120,12 +123,12 @@ export async function buildEmailPushConfig(
     const conditions: Record<string, unknown>[] = [{ notKeyword: '$junk' }];
     if (inboxOnly) {
       const inboxId = inboxByAccount.get(accountId);
-      if (!inboxId) {
-        throw new Error(
-          `No Inbox mailbox found for account ${accountId}; cannot build an inbox-only push filter`,
-        );
+      // The primary account always has an Inbox; missing it means its
+      // Mailbox/get failed, and muting it would be worse than failing loudly.
+      if (!inboxId && accountId === primary) {
+        throw new Error(`No Inbox mailbox found for account ${accountId}; cannot build an inbox-only push filter`);
       }
-      conditions.push({ inMailbox: inboxId });
+      conditions.push(inboxId ? { inMailbox: inboxId } : { hasKeyword: '$junk' });
     } else if (junkIds.length > 0) {
       conditions.push({ inMailboxOtherThan: [...junkIds].sort() });
     }
