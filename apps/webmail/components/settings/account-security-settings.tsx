@@ -947,11 +947,14 @@ function LinkDeviceSection() {
     } catch { /* sessionStorage unavailable */ }
     const prefix = getPathPrefix(locale);
     const redirectUri = `${window.location.origin}${prefix}/${locale}/auth/callback`;
+    // The slot lets the server re-authenticate against this account's own
+    // server entry (its IdP), read from the slot's server cookie.
+    const slot = useAccountStore.getState().getActiveAccount()?.cookieSlot ?? 0;
     const res = await apiFetch('/api/auth/sso/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ redirect_uri: redirectUri, locale, purpose: 'reauth' }),
+      body: JSON.stringify({ redirect_uri: redirectUri, locale, purpose: 'reauth', slot }),
     });
     if (!res.ok) {
       setError(t('link_device.error'));
