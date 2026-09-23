@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.11.0-beta.3 (2026-09-23) - Pre-release
+
+General test release of everything planned for 1.11.0 so far. Not recommended for production; the `latest` Docker tag stays on 1.10.0.
+
+### Added
+
+- Attendees can answer a single occurrence of a recurring event (#1086).
+- Optional inbox-only push notifications (#983, thanks [@guisea](https://github.com/guisea)).
+- OpenID Connect login in the Bulwark Lite bundle for Stalwart.
+- Bulwark Lite as a container image (#1081).
+
+### Changed
+
+- The message list loads attachment chips lazily, so large folders open faster (#1089).
+- Mail search sends search terms exactly as typed, without adding a prefix wildcard. This also applies in tag views.
+- Scheduled send is limited to 7 days, the most Stalwart accepts.
+
+### Fixed
+
+- "All folders" search includes shared accounts (#1082).
+- A search inside a tag view narrows the tag instead of replacing it.
+- Leaving an account drops a search folder scope that belongs to it (#1084, thanks [@rotterp](https://github.com/rotterp)).
+- In unified views, threads belong to the account that owns them (#1012, thanks [@lucamzanon](https://github.com/lucamzanon)).
+- A failed move between accounts no longer loses the message.
+- "Mark all as read" marks every unread message and reports spam moves the server refuses.
+- Send and search report failed JMAP calls instead of claiming success.
+- Attachments over the server's size limits are refused before upload.
+- Sending with an identity adds its Bcc addresses.
+- Tag and tab counters no longer download every matching id.
+- Mail filters keep running while the auto-reply is on, keep flags and folder targets when mail is moved, and no longer pull spam out of Junk.
+- A warning appears before you save an auto-reply that Stalwart would refuse as too long.
+- Edits to a single occurrence stay on that occurrence and keep its details.
+- Calendar ranges are queried in the right time zone and past the server limits.
+- If the server refuses an event's invitations, you are offered to save the event anyway.
+- The calendar subscription dialog no longer promises CalDAV URLs.
+- Contacts with calendar links or cleared fields save correctly.
+- Files lists every file, even when the account has more than `maxObjectsInGet` (#1069).
+- Files can copy whole folders and write to shared drives, shares files on Stalwart versions before 0.16.6, and handles file names and types Stalwart refuses.
+- You stay signed in after changing your password in settings.
+- Users who are not admins see their name and can change a TOTP password.
+- Push subscriptions are renewed before Stalwart's 7-day expiry.
+- Sharing lists principals in directories with more than 500 users.
+- The plugin sandbox follows the app's "Automatic" language (#976, thanks [@bartfaizoli76](https://github.com/bartfaizoli76)).
+- The global error page loads the app's styles.
+
 ## 1.11.0-beta.2 (2026-09-21) - Pre-release
 
 Second test release for **Bulwark Lite**. Not recommended for production; the `latest` Docker tag stays on 1.10.0.
