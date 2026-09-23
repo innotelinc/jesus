@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Attachment, Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { CalendarEventUpdateOptions, IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { attachSearchSnippets, filterHasSnippetTerms, snippetFilterFor, type SearchSnippetResult } from "@/lib/search-snippet";
@@ -271,11 +271,18 @@ const EMAIL_LIST_PROPERTIES = [
   "subject",
   "preview",
   "hasAttachment",
-  // Attachment metadata (name / type / blobId) so list rows can offer the
-  // files directly. hasAttachment alone only supports a paperclip icon.
-  "attachments",
+  // No "attachments" here: Stalwart answers it (like bodyStructure/textBody)
+  // by reading and parsing every message's full raw blob, so a 300-row page of
+  // mail with large files took seconds instead of milliseconds (#1089). List
+  // rows fetch their attachment chips lazily via getEmailAttachments.
   // Needed so list rows can serve drag-out to the file system as .eml.
+  // Served from stored metadata, so it costs nothing.
   "blobId",
+] as const;
+
+// Body-part fields an attachment chip needs (see components/email/attachment-chips.tsx).
+const LIST_ATTACHMENT_BODY_PROPERTIES = [
+  "partId", "blobId", "size", "name", "type", "charset", "cid", "disposition",
 ] as const;
 
 /**
@@ -923,6 +930,34 @@ export class JMAPClient implements IJMAPClient {
       console.error('Failed to get specific emails:', error);
       return [];
     }
+  }
+
+  /**
+   * Attachment parts of the given emails, keyed by email id, for list-row
+   * chips. Kept out of the list request on purpose: the server has to read
+   * each message's whole raw blob to answer it (#1089), so callers should
+   * ask only for the rows that are on screen and have `hasAttachment`.
+   * Ids the server does not return are absent from the map.
+   */
+  async getEmailAttachments(emailIds: string[], accountId?: string): Promise<Map<string, Attachment[]>> {
+    const targetAccountId = accountId || this.accountId;
+    const result = new Map<string, Attachment[]>();
+    for (const batchIds of batched(emailIds, this.getMaxObjectsInGet())) {
+      const response = await this.request([
+        ["Email/get", {
+          accountId: targetAccountId,
+          ids: batchIds,
+          properties: ["id", "attachments"],
+          bodyProperties: [...LIST_ATTACHMENT_BODY_PROPERTIES],
+        }, "0"],
+      ]);
+      if (response.methodResponses?.[0]?.[0] !== "Email/get") {
+        throw new Error("Email/get for list attachments failed");
+      }
+      const list = (response.methodResponses[0][1]?.list || []) as Pick<Email, "id" | "attachments">[];
+      for (const email of list) result.set(email.id, email.attachments ?? []);
+    }
+    return result;
   }
   /** Upgrade an existing basic-auth client to bearer-token auth (e.g. after TOTP token exchange). */
   upgradeToBearer(accessToken: string, onRefresh?: () => Promise<string | null>): void {

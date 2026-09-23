@@ -3,6 +3,7 @@
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import type { Attachment } from "@/lib/jmap/types";
+import type { LoadListAttachments } from "@/lib/list-attachments";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
@@ -48,6 +49,7 @@ interface EmailListProps {
   onMarkAsSpam?: (email: Email) => void;
   onUndoSpam?: (email: Email) => void;
   onOpenAttachment?: (email: Email, attachment: Attachment) => void;
+  loadAttachments?: LoadListAttachments;
   onEditDraft?: (email: Email) => void;
   isScheduledView?: boolean;
   onLoadMoreScheduled?: () => void;
@@ -78,6 +80,7 @@ export function EmailList({
   onMarkAsSpam,
   onUndoSpam,
   onOpenAttachment,
+  loadAttachments,
   onMoveToMailbox,
   onEditDraft,
   isScheduledView = false,
@@ -593,6 +596,7 @@ export function EmailList({
                       onMarkAsSpam={onMarkAsSpam ? (email) => onMarkAsSpam(email) : undefined}
                       onUndoSpam={onUndoSpam ? (email) => onUndoSpam(email) : undefined}
                       onOpenAttachment={onOpenAttachment}
+                      loadAttachments={loadAttachments}
                     />
                   </div>
                 );

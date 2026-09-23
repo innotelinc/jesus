@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo, useCallback, useId } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, useId } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -72,6 +72,7 @@ import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { SearchBox, type ContactSearchField } from "@/components/search/search-box";
 import type { ContactSuggestion } from "@/lib/search-suggestions";
 import type { Attachment } from "@/lib/jmap/types";
+import { requestListAttachments, type ListAttachmentSource, type LoadListAttachments } from "@/lib/list-attachments";
 import { useSearchHistoryStore } from "@/stores/search-history-store";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
@@ -3055,6 +3056,39 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     }
   }, [resolveBlobSource]);
 
+  // Where a list row's attachment parts are fetched from: the same routing
+  // the viewer uses to open that row (source stamps first, then the account
+  // being browsed, then a shared folder's owner). Read through a ref so the
+  // loader stays stable and rows do not re-request on every folder count
+  // change. A layout effect, because the rows ask from their own (passive)
+  // effects in the same commit.
+  const listRowSourceRef = useRef<(email: Email) => { source: ListAttachmentSource; accountId?: string } | null>(() => null);
+  useLayoutEffect(() => {
+    listRowSourceRef.current = (email) => {
+      const auth = useAuthStore.getState();
+      if (email.sourceClientAccountId) {
+        const source = auth.getClientForAccount(email.sourceClientAccountId);
+        return source ? { source, accountId: email.sourceAccountId } : null;
+      }
+      const source = (viewingAccountId ? auth.getClientForAccount(viewingAccountId) : undefined) ?? client;
+      if (!source) return null;
+      const accountId = email.sourceAccountId
+        ?? resolveUnstampedEmailAccountId({
+            mailboxes: viewMailboxes,
+            selectedMailbox,
+            searchActive: !!searchQuery || !isFilterEmpty(searchFilters),
+            searchMailboxId,
+          });
+      return { source, accountId };
+    };
+  }, [client, viewingAccountId, viewMailboxes, selectedMailbox, searchQuery, searchFilters, searchMailboxId]);
+
+  const loadListAttachments = useCallback<LoadListAttachments>((email, onLoad) => {
+    const target = listRowSourceRef.current(email);
+    if (!target) return () => {};
+    return requestListAttachments(target.source, target.accountId, email.id, onLoad);
+  }, []);
+
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string, forceDownload?: boolean) => {
     const { blobClient, accountId, clientAccountId } = resolveBlobSource(selectedEmail);
     if (!blobClient) return;
@@ -4111,6 +4145,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                   await handleUndoSpam(email);
                 }}
                 onOpenAttachment={handleOpenListAttachment}
+                loadAttachments={loadListAttachments}
                 onEditDraft={(email) => {
                   handleEditDraft(email);
                 }}

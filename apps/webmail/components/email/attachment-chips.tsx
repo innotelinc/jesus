@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { FileText, FileSpreadsheet, FileImage, FileArchive, File as FileIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import type { Attachment } from "@/lib/jmap/types";
+import type { Attachment, Email } from "@/lib/jmap/types";
+import type { LoadListAttachments } from "@/lib/list-attachments";
 
 /**
  * A message can carry a dozen inline images — signature logos, tracking
@@ -82,4 +84,37 @@ export function AttachmentChips({ attachments, onOpen, max = 2, className }: Att
       )}
     </div>
   );
+}
+
+/**
+ * Attachment parts for a list row. List requests no longer carry
+ * `attachments` (#1089), so a row with a paperclip loads its own once it is
+ * mounted; an email that already has them (thread expansion, demo data) is
+ * used as is.
+ */
+export function useListAttachments(email: Email, load?: LoadListAttachments): Attachment[] | undefined {
+  const [loaded, setLoaded] = useState<{ id: string; attachments: Attachment[] } | null>(null);
+  const needsLoad = !!load && !!email.hasAttachment && !email.attachments;
+
+  useEffect(() => {
+    if (!needsLoad || !load) return;
+    const id = email.id;
+    return load(email, (attachments) => setLoaded({ id, attachments }));
+    // The row's email object is replaced on every keyword change; only a
+    // different message needs a different answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsLoad, load, email.id]);
+
+  if (email.attachments) return email.attachments;
+  return loaded?.id === email.id ? loaded.attachments : undefined;
+}
+
+interface ListAttachmentChipsProps extends Omit<AttachmentChipsProps, "attachments"> {
+  email: Email;
+  load?: LoadListAttachments;
+}
+
+export function ListAttachmentChips({ email, load, ...chipProps }: ListAttachmentChipsProps) {
+  const attachments = useListAttachments(email, load);
+  return <AttachmentChips attachments={attachments} {...chipProps} />;
 }

@@ -4,8 +4,9 @@ import React, { useCallback } from "react";
 import { formatDate, formatDateTime, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
-import { AttachmentChips } from "./attachment-chips";
+import { ListAttachmentChips } from "./attachment-chips";
 import type { Attachment } from "@/lib/jmap/types";
+import type { LoadListAttachments } from "@/lib/list-attachments";
 import { SelectableAvatar } from "@/components/email/selectable-avatar";
 import { Paperclip, Star, Pin, Circle, ChevronRight, ChevronDown, Loader2, MessageSquare, CheckSquare, Square, Reply, Forward, CalendarClock, Folder, Archive, Trash2, MailOpen, ShieldAlert } from "@/components/icons";
 import type { AppIcon } from "@/components/icons";
@@ -125,6 +126,7 @@ interface ThreadListItemProps {
   onMarkAsSpam?: (email: Email) => void;
   onUndoSpam?: (email: Email) => void;
   onOpenAttachment?: (email: Email, attachment: Attachment) => void;
+  loadAttachments?: LoadListAttachments;
 }
 
 interface SingleEmailItemProps {
@@ -143,6 +145,7 @@ interface SingleEmailItemProps {
   onMarkAsSpam?: () => void;
   onUndoSpam?: () => void;
   onOpenAttachment?: (attachment: Attachment) => void;
+  loadAttachments?: LoadListAttachments;
 }
 
 // Visual + behaviour metadata for each mobile swipe action. Keyed by the
@@ -156,7 +159,7 @@ const SWIPE_ACTION_META: Record<Exclude<SwipeAction, 'none'>, { icon: AppIcon; b
 };
 
 const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
-  function SingleEmailItem({ email, selected, onClick, onDoubleClick, onContextMenu, showPreview, rowTint, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetTag, onMarkAsSpam, onUndoSpam, onOpenAttachment }, ref) {
+  function SingleEmailItem({ email, selected, onClick, onDoubleClick, onContextMenu, showPreview, rowTint, onToggleStar, onMarkAsRead, onDelete, onArchive, onSetTag, onMarkAsSpam, onUndoSpam, onOpenAttachment, loadAttachments }, ref) {
     const t = useTranslations('email_viewer');
     const tBatch = useTranslations('email_list.batch_actions');
     const tStatus = useTranslations('email_list');
@@ -563,8 +566,9 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                   </p>
                 )}
                 {onOpenAttachment && (
-                  <AttachmentChips
-                    attachments={email.attachments}
+                  <ListAttachmentChips
+                    email={email}
+                    load={loadAttachments}
                     onOpen={onOpenAttachment}
                     className="mt-1.5"
                   />
@@ -598,6 +602,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
 export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemProps>(
   function ThreadListItem({
     onOpenAttachment,
+    loadAttachments,
     thread,
     isExpanded,
     selectedEmailId,
@@ -709,6 +714,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
           onMarkAsSpam={onMarkAsSpam ? () => onMarkAsSpam(latestEmail) : undefined}
           onUndoSpam={onUndoSpam ? () => onUndoSpam(latestEmail) : undefined}
           onOpenAttachment={onOpenAttachment ? (a) => onOpenAttachment(latestEmail, a) : undefined}
+          loadAttachments={loadAttachments}
         />
       );
     }
@@ -1065,8 +1071,9 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                     </p>
                   )}
                   {onOpenAttachment && (
-                    <AttachmentChips
-                      attachments={latestEmail.attachments}
+                    <ListAttachmentChips
+                      email={latestEmail}
+                      load={loadAttachments}
                       onOpen={(a) => onOpenAttachment(latestEmail, a)}
                       className="mt-1.5"
                     />
