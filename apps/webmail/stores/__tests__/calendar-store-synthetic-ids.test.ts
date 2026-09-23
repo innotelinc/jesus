@@ -99,8 +99,10 @@ describe('updateEvent on an expanded occurrence', () => {
     });
 
     expect(client.updateCalendarEvent).toHaveBeenCalledTimes(1);
+    // The occurrence has no override yet: its details (here the participants) go along.
     expect(client.updateCalendarEvent).toHaveBeenCalledWith(
-      'maaaaab', { title: 'Renamed', start: '2026-09-08T11:00:00' }, undefined, undefined, undefined,
+      'maaaaab', { title: 'Renamed', start: '2026-09-08T11:00:00', participants: occurrence().participants },
+      undefined, undefined, undefined,
     );
     const stored = useCalendarStore.getState().events[0];
     expect(stored.title).toBe('Renamed');
@@ -115,9 +117,13 @@ describe('updateEvent on an expanded occurrence', () => {
     await useCalendarStore.getState().updateEvent(client, 'maaaaab', { title: 'Renamed' }, true);
 
     expect(client.updateCalendarEvent).toHaveBeenCalledTimes(2);
-    expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(1, 'maaaaab', { title: 'Renamed' }, true, undefined, undefined);
+    expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(
+      1, 'maaaaab', { title: 'Renamed', participants: occurrence().participants }, true, undefined, undefined,
+    );
     expect(client.updateCalendarEvent).toHaveBeenNthCalledWith(2, 'b', {
-      'recurrenceOverrides/2026-09-08T10:00:00': { start: '2026-09-08T10:00:00', duration: 'PT1H', title: 'Renamed' },
+      'recurrenceOverrides/2026-09-08T10:00:00': {
+        start: '2026-09-08T10:00:00', duration: 'PT1H', title: 'Renamed', participants: occurrence().participants,
+      },
     }, true, undefined);
     expect(useCalendarStore.getState().events[0].title).toBe('Renamed');
 
@@ -229,6 +235,57 @@ describe('deleteEvent on an expanded occurrence', () => {
     await useCalendarStore.getState().deleteEvent(client, 'eaaaaad');
 
     expect(client.deleteCalendarEvent).toHaveBeenCalledWith('d', undefined, undefined);
+  });
+});
+
+describe('an occurrence expanded in the browser (older servers)', () => {
+  // Client-side expansion: `<master id>:<recurrenceId>`, no baseEventId,
+  // the master's rules and overrides copied onto the occurrence.
+  const browserOccurrence = (overrides: Partial<CalendarEvent> = {}) => occurrence({
+    id: 'b:2026-09-08T10:00:00', originalId: 'b', baseEventId: undefined, recurrenceOverrides: null, ...overrides,
+  });
+
+  it('writes a drag as an override on the base event, not as a new start for the series', async () => {
+    const client = fakeClient();
+    const occ = browserOccurrence();
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().updateEvent(client, occ.id, { start: '2026-09-08T12:00:00' });
+
+    expect(client.updateCalendarEvent).toHaveBeenCalledTimes(1);
+    expect(client.updateCalendarEvent).toHaveBeenCalledWith('b', {
+      recurrenceOverrides: {
+        '2026-09-08T10:00:00': {
+          start: '2026-09-08T12:00:00',
+          duration: 'PT1H',
+          title: 'Daily standup',
+          participants: occ.participants,
+        },
+      },
+    }, undefined, undefined);
+  });
+
+  it('patches the override entry when the series already has overrides', async () => {
+    const client = fakeClient();
+    const occ = browserOccurrence({ recurrenceOverrides: { '2026-09-09T10:00:00': { title: 'Moved' } } });
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().updateEvent(client, occ.id, { description: 'Bring slides' });
+
+    expect(Object.keys(client.updateCalendarEvent.mock.calls[0][1])).toEqual(['recurrenceOverrides/2026-09-08T10:00:00']);
+  });
+
+  it('deletes one occurrence by excluding it, never the whole series', async () => {
+    const client = fakeClient();
+    const occ = browserOccurrence();
+    useCalendarStore.setState({ events: [occ] });
+
+    await useCalendarStore.getState().deleteEvent(client, occ.id, true);
+
+    expect(client.deleteCalendarEvent).not.toHaveBeenCalled();
+    expect(client.updateCalendarEvent).toHaveBeenCalledWith('b', {
+      recurrenceOverrides: { '2026-09-08T10:00:00': { excluded: true } },
+    }, true, undefined);
   });
 });
 

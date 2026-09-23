@@ -15,7 +15,7 @@
 
 import { parseISO, format, addDays, addWeeks, addMonths, addYears, differenceInCalendarDays } from 'date-fns';
 import type { CalendarEvent, CalendarRecurrenceRule, CalendarNDay } from '@/lib/jmap/types';
-import { isServerRecurrenceInstance } from '@/lib/recurrence-instances';
+import { isServerRecurrenceInstance, mergeOverrideParticipants } from '@/lib/recurrence-instances';
 
 const DAY_INDEX: Record<string, number> = { su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 };
 const INDEX_TO_DAY: string[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'];
@@ -245,6 +245,7 @@ function createOccurrence(
   return {
     ...master,
     ...(override || {}),
+    ...(override?.participants ? { participants: mergeOverrideParticipants(master.participants, override.participants) } : {}),
     id: `${master.id}:${recurrenceId}`,
     originalId: master.originalId || master.id,
     uid: master.uid,
