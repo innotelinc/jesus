@@ -5,8 +5,9 @@ import { wopiContext } from '@/lib/wopi/request';
 
 /**
  * WOPI GetFile / PutFile (#425). Content flows purely over JMAP: GetFile
- * streams the node's blob, PutFile uploads the editor's bytes as a new blob
- * and points the FileNode at it via `FileNode/set { blobId }`.
+ * streams the node's blob (or, for a mail attachment, the attachment blob
+ * itself - #1047), PutFile uploads the editor's bytes as a new blob and
+ * points the FileNode at it via `FileNode/set { blobId }`.
  */
 
 /** GET = GetFile */
@@ -15,26 +16,33 @@ export async function GET(
   { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
-    const { fileId } = await params;
-    const auth = await wopiContext(request, fileId);
+    const { fileId: documentId } = await params;
+    const auth = await wopiContext(request, documentId);
     if (!auth) {
       return NextResponse.json({ error: 'Invalid access token' }, { status: 401 });
     }
 
-    const node = await getWopiFileNode(auth.ctx, auth.payload.accountId, fileId);
-    if (!node || !node.blobId) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    const { payload } = auth;
+    let source: { blobId: string; name: string; type: string };
+    if (payload.kind === 'attachment') {
+      source = { blobId: payload.fileId, name: payload.name || 'attachment', type: payload.type || '' };
+    } else {
+      const node = await getWopiFileNode(auth.ctx, payload.accountId, payload.fileId);
+      if (!node || !node.blobId) {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      }
+      source = { blobId: node.blobId, name: node.name, type: node.type };
     }
 
     const upstream = await downloadFileBlob(
-      auth.ctx, auth.payload.accountId, node.blobId, node.name, node.type,
+      auth.ctx, payload.accountId, source.blobId, source.name, source.type,
     );
     if (!upstream.ok) {
       return NextResponse.json({ error: 'Blob download failed' }, { status: 502 });
     }
 
     const headers = new Headers();
-    headers.set('Content-Type', node.type || 'application/octet-stream');
+    headers.set('Content-Type', source.type || 'application/octet-stream');
     const contentLength = upstream.headers.get('Content-Length');
     if (contentLength) headers.set('Content-Length', contentLength);
     return new NextResponse(upstream.body, { status: 200, headers });
@@ -52,15 +60,16 @@ export async function POST(
   { params }: { params: Promise<{ fileId: string }> },
 ) {
   try {
-    const { fileId } = await params;
-    const auth = await wopiContext(request, fileId);
+    const { fileId: documentId } = await params;
+    const auth = await wopiContext(request, documentId);
     if (!auth) {
       return NextResponse.json({ error: 'Invalid access token' }, { status: 401 });
     }
-    if (!auth.payload.canWrite) {
+    if (!auth.payload.canWrite || auth.payload.kind === 'attachment') {
       return NextResponse.json({ error: 'Read-only token' }, { status: 403 });
     }
 
+    const fileId = auth.payload.fileId;
     const node = await getWopiFileNode(auth.ctx, auth.payload.accountId, fileId);
     if (!node || !node.blobId) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });

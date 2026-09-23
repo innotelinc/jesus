@@ -107,6 +107,7 @@ import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invit
 import { RecipientPopover } from "./recipient-popover";
 import { MailtoLink } from "@/components/ui/mailto-link";
 import { inertBlobType, isFilePreviewable, isMimeTypeSafeForInlinePreview, toInertBlob } from "@/lib/file-preview";
+import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
 import type { TnefAttachment } from "@/lib/tnef";
@@ -677,6 +678,16 @@ export function EmailViewer({
   const messageSpacing = useSettingsStore((state) => state.messageSpacing);
   const plainTextFont = useSettingsStore((state) => state.plainTextFont);
   const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
+  // Office documents the built-in preview can't render still open in the
+  // configured WOPI editor (#1047) - only blob-backed ones, the editor
+  // fetches the content server-side.
+  const wopiStatus = useWopiStatus(true);
+  const isAttachmentPreviewable = useCallback(
+    (attachment: EffectiveAttachment) =>
+      isFilePreviewable(attachment.name || undefined, attachment.type)
+      || (!!attachment.blobId && canWopiOpen(wopiStatus, attachment.name)),
+    [wopiStatus],
+  );
   const mailAttachmentActionRef = useRef(mailAttachmentAction);
   mailAttachmentActionRef.current = mailAttachmentAction;
   const attachmentPosition = useSettingsStore((state) => state.attachmentPosition);
@@ -4067,7 +4078,7 @@ export function EmailViewer({
                 <div className="relative flex flex-col items-end justify-start gap-1 flex-shrink-0 max-w-[50%]">
                   {effectiveAttachments.slice(0, 2).map((attachment) => {
                     const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-                    const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                    const isPreviewable = isAttachmentPreviewable(attachment);
                     const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                     const thumbUrl = imageThumbUrls[attachment.id];
                     return (
@@ -4164,7 +4175,7 @@ export function EmailViewer({
                       <div className="absolute top-full end-0 mt-1 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[220px]">
                         {effectiveAttachments.slice(2).map((attachment) => {
                           const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-                          const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                          const isPreviewable = isAttachmentPreviewable(attachment);
                           const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                           return (
                             <DraggableAttachmentChip key={attachment.id} attachment={attachment} client={blobClient} accountId={blobAccountId} enabled={dragOutActive} downloadName={resolveAttachmentName(attachment)}>
@@ -4879,7 +4890,7 @@ export function EmailViewer({
               .slice(0, visibleBelowHeaderCount ?? effectiveAttachments.length)
               .map((attachment) => {
               const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-              const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+              const isPreviewable = isAttachmentPreviewable(attachment);
               const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
               const thumbUrl = imageThumbUrls[attachment.id];
               return (
@@ -4981,7 +4992,7 @@ export function EmailViewer({
                 <div className="absolute top-full end-0 mt-1 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[260px] max-h-[60vh] overflow-y-auto">
                   {effectiveAttachments.slice(visibleBelowHeaderCount).map((attachment) => {
                     const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-                    const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                    const isPreviewable = isAttachmentPreviewable(attachment);
                     const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                     return (
                       <DraggableAttachmentChip key={attachment.id} attachment={attachment} client={blobClient} accountId={blobAccountId} enabled={dragOutActive} downloadName={resolveAttachmentName(attachment)}>
@@ -5051,7 +5062,7 @@ export function EmailViewer({
             <div className="relative flex items-center gap-1.5 flex-wrap">
               {effectiveAttachments.slice(0, 2).map((attachment) => {
                 const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-                const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                const isPreviewable = isAttachmentPreviewable(attachment);
                 const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                 const thumbUrl = imageThumbUrls[attachment.id];
                 return (
@@ -5147,7 +5158,7 @@ export function EmailViewer({
                   <div className="absolute top-full start-0 mt-1 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[220px]">
                     {effectiveAttachments.slice(2).map((attachment) => {
                       const FileIcon = getFileIcon(attachment.name || undefined, attachment.type);
-                      const isPreviewable = isFilePreviewable(attachment.name || undefined, attachment.type);
+                      const isPreviewable = isAttachmentPreviewable(attachment);
                       const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                       return (
                         <DraggableAttachmentChip key={attachment.id} attachment={attachment} client={blobClient} accountId={blobAccountId} enabled={dragOutActive} downloadName={resolveAttachmentName(attachment)}>

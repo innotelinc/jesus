@@ -4,16 +4,19 @@ import { configManager } from '@/lib/admin/config-manager';
 import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 import { fetchJmapSession } from '@/lib/stalwart/jmap-api';
 import { getWopiActions, buildWopiActionUrl } from '@/lib/wopi/discovery';
-import { getWopiFileNode } from '@/lib/wopi/files';
-import { mintWopiToken } from '@/lib/wopi/token';
+import { getWopiFileNode, probeBlob } from '@/lib/wopi/files';
+import { mintWopiToken, wopiDocumentId, type WopiTokenPayload } from '@/lib/wopi/token';
 
 /**
- * POST /api/wopi/launch  { fileId: string, accountId?: string }
+ * POST /api/wopi/launch
+ *   { fileId: string, accountId?: string }                          - a Files node
+ *   { blobId: string, name: string, type?: string, accountId?: string } - a mail attachment
  *
- * Mints a WOPI access token scoped to one file node and returns the editor
- * URL to POST it to (#425). Session-authenticated - this is the only WOPI
- * route the browser calls; everything under /api/wopi/files is called by the
- * editor server-to-server with the token minted here.
+ * Mints a WOPI access token scoped to one document and returns the editor
+ * URL to POST it to (#425). Attachments always open read-only (#1047).
+ * Session-authenticated - this is the only WOPI route the browser calls;
+ * everything under /api/wopi/files is called by the editor server-to-server
+ * with the token minted here.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,10 +25,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const body = (await request.json().catch(() => null)) as { fileId?: unknown; accountId?: unknown } | null;
-    const fileId = typeof body?.fileId === 'string' ? body.fileId : '';
-    if (!fileId) {
-      return NextResponse.json({ error: 'fileId is required' }, { status: 400 });
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    const str = (key: string): string => (typeof body?.[key] === 'string' ? (body[key] as string) : '');
+    const fileId = str('fileId');
+    const blobId = str('blobId');
+    const attachmentName = str('name').trim();
+    if (!fileId && !blobId) {
+      return NextResponse.json({ error: 'fileId or blobId is required' }, { status: 400 });
+    }
+    if (blobId && !attachmentName) {
+      return NextResponse.json({ error: 'name is required for attachments' }, { status: 400 });
     }
 
     const actions = await getWopiActions();
@@ -41,25 +50,45 @@ export async function POST(request: NextRequest) {
     const trusted = creds.trusted || new URL(serverUrl).origin === request.nextUrl.origin;
     const ctx = { serverUrl, authHeader: creds.authHeader, trusted };
 
-    let accountId = typeof body?.accountId === 'string' ? body.accountId : '';
+    let accountId = str('accountId');
     if (!accountId) {
       const session = await fetchJmapSession(serverUrl, creds.authHeader, { trusted });
+      const capability = blobId ? 'urn:ietf:params:jmap:mail' : 'urn:ietf:params:jmap:filenode';
       accountId =
-        session?.primaryAccounts?.['urn:ietf:params:jmap:filenode'] ||
+        session?.primaryAccounts?.[capability] ||
         Object.keys(session?.accounts ?? {})[0] ||
         '';
     }
     if (!accountId) {
-      return NextResponse.json({ error: 'No files account' }, { status: 404 });
+      return NextResponse.json({ error: blobId ? 'No mail account' : 'No files account' }, { status: 404 });
     }
 
-    const node = await getWopiFileNode(ctx, accountId, fileId);
-    if (!node || !node.blobId) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    let document: Pick<WopiTokenPayload, 'kind' | 'fileId' | 'name' | 'type' | 'size'>;
+    let name: string;
+    let canWrite: boolean;
+    if (blobId) {
+      const type = str('type');
+      // Confirms the blob is readable with these credentials before the
+      // editor is pointed at it, and reads its size for CheckFileInfo.
+      const probe = await probeBlob(ctx, accountId, blobId, attachmentName, type);
+      if (!probe) {
+        return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+      }
+      const clientSize = typeof body?.size === 'number' && body.size >= 0 ? body.size : 0;
+      name = attachmentName;
+      canWrite = false;
+      document = { kind: 'attachment', fileId: blobId, name, type, size: probe.size ?? clientSize };
+    } else {
+      const node = await getWopiFileNode(ctx, accountId, fileId);
+      if (!node || !node.blobId) {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      }
+      name = node.name;
+      canWrite = node.myRights ? !!node.myRights.mayModifyContent : true;
+      document = { kind: 'file', fileId };
     }
 
-    const ext = node.name.split('.').pop()?.toLowerCase() || '';
-    const canWrite = node.myRights ? !!node.myRights.mayModifyContent : true;
+    const ext = name.split('.').pop()?.toLowerCase() || '';
     const urlsrc = (canWrite && actions.edit[ext]) || actions.view[ext] || actions.edit[ext];
     if (!urlsrc) {
       return NextResponse.json({ error: 'File type not supported by the editor' }, { status: 415 });
@@ -72,17 +101,17 @@ export async function POST(request: NextRequest) {
     const hostBase =
       configManager.get<string>('wopiHostUrl', '').trim().replace(/\/+$/, '') ||
       request.nextUrl.origin;
-    const wopiSrc = `${hostBase}/api/wopi/files/${encodeURIComponent(fileId)}`;
-
-    const { token, expiresAt } = mintWopiToken({
+    const tokenPayload = {
       serverUrl,
       authHeader: creds.authHeader,
       username: creds.username,
       accountId,
-      fileId,
+      ...document,
       canWrite: editable,
       origin: request.nextUrl.origin,
-    });
+    };
+    const wopiSrc = `${hostBase}/api/wopi/files/${wopiDocumentId(tokenPayload)}`;
+    const { token, expiresAt } = mintWopiToken(tokenPayload);
 
     return NextResponse.json({
       url: buildWopiActionUrl(urlsrc, wopiSrc),

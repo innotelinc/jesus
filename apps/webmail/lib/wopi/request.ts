@@ -6,13 +6,13 @@ import { verifyWopiToken, type WopiTokenPayload } from '@/lib/wopi/token';
 /**
  * Authenticate an incoming WOPI request (called by the editor
  * server-to-server, no session cookie) from its `access_token` query
- * parameter, scoped to the fileId in the URL.
+ * parameter, scoped to the document id in the URL (see wopiDocumentId).
  */
 export async function wopiContext(
   request: NextRequest,
-  fileId: string,
+  documentId: string,
 ): Promise<{ payload: WopiTokenPayload; ctx: WopiJmapContext } | null> {
-  const payload = verifyWopiToken(request.nextUrl.searchParams.get('access_token'), fileId);
+  const payload = verifyWopiToken(request.nextUrl.searchParams.get('access_token'), documentId);
   if (!payload) return null;
   // Trust is re-derived from the current config, not persisted in the token
   // (mirrors lib/stalwart/server-fetch.ts): removing a server from the config

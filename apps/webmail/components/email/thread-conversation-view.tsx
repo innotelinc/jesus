@@ -37,6 +37,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useContactStore } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { isFilePreviewable, toInertBlob } from "@/lib/file-preview";
+import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 
 interface ThreadConversationViewProps {
   thread: ThreadGroup;
@@ -240,6 +241,7 @@ function EmailCard({
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const density = useSettingsStore((state) => state.density);
   const mailAttachmentAction = useSettingsStore((state) => state.mailAttachmentAction);
+  const wopiStatus = useWopiStatus(true);
   const hideInlineImageAttachments = useSettingsStore((state) => state.hideInlineImageAttachments);
   const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const plainTextFont = useSettingsStore((state) => state.plainTextFont);
@@ -647,7 +649,8 @@ function EmailCard({
               <div className="flex flex-wrap gap-2">
                 {visibleAttachments.map((attachment, idx) => {
                   const Icon = getFileIcon(attachment.name, attachment.type);
-                  const isPreviewable = isFilePreviewable(attachment.name, attachment.type);
+                  const isPreviewable = isFilePreviewable(attachment.name, attachment.type)
+                    || (!!attachment.blobId && canWopiOpen(wopiStatus, attachment.name));
                   const opensPreview = isPreviewable && mailAttachmentAction === 'preview';
                   return (
                     <button
