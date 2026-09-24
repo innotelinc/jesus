@@ -21,6 +21,7 @@ import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
 import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
+import { toAsciiEmail } from '@/lib/idn';
 import {
   LiteLoginError,
   clearAllLiteSessions,
@@ -1139,8 +1140,13 @@ export const useAuthStore = create<AuthState>()(
       isDemoMode: false,
       connectedAccountsRevision: 0,
 
-      login: async (serverUrl, username, password, totp, rememberMe) => {
+      login: async (serverUrl, typedUsername, password, totp, rememberMe) => {
         set({ isLoading: true, error: null, isRateLimited: false, rateLimitUntil: null });
+
+        // Sign in with the ASCII (punycode) form of an IDN domain, the form
+        // Stalwart stores and reports back in the session and identities, so
+        // `user@bücher.de` and `user@xn--bcher-kva.de` are one account (#1100).
+        const username = toAsciiEmail(typedUsername);
 
         try {
           // Resolve account/slot info up front so the TOTP exchange can target

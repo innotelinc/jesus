@@ -25,6 +25,7 @@ import type { SwipeAction } from "@/stores/settings-store";
 import { ThreadEmailItem } from "./thread-email-item";
 import { EmailHoverActions } from "./email-hover-actions";
 import { SearchSnippetText } from "./search-snippet-text";
+import { useOwnDomainAddress } from "@/hooks/use-own-domain-address";
 import { useTranslations } from "next-intl";
 
 /**
@@ -176,6 +177,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
       ?? (isUnifiedView ? (unifiedRole ?? undefined) : undefined);
     const showRecipient = currentMailboxRole === 'sent' || currentMailboxRole === 'drafts';
     const sender = showRecipient ? (email.to?.[0] ?? email.from?.[0]) : email.from?.[0];
+    const formatAddress = useOwnDomainAddress();
     const { sortTagIds, tagColor } = useKeywordFormat();
     const { variant: tagVariant, placement: tagPlacement } = useTagDisplay();
     const tintListRowsByTag = useSettingsStore((state) => state.tintListRowsByTag);
@@ -408,7 +410,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                     'w-32 shrink-0 truncate text-sm lg:w-40',
                     isUnread ? 'font-semibold text-foreground' : 'font-medium text-foreground/80'
                   )}>
-                    {sender?.name || sender?.email || 'Unknown'}
+                    {sender?.name || (sender?.email && formatAddress(sender.email)) || 'Unknown'}
                   </span>
                   <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
                     {tagIds.length > 0 && (
@@ -481,7 +483,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                         ? "font-bold text-foreground"
                         : "font-medium text-muted-foreground"
                     )}>
-                      {sender?.name || sender?.email || "Unknown"}
+                      {sender?.name || (sender?.email && formatAddress(sender.email)) || "Unknown"}
                     </span>
                     {tagPlacement === 'sender' && tagIds.length > 0 && (
                       <span className={TAG_GROUP_CLASS}>

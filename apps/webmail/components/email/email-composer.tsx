@@ -70,6 +70,7 @@ import type { Editor } from "@tiptap/react";
 import { htmlToPlainText as htmlToPlainTextShared } from "@/lib/html-to-text";
 import { fileStorage } from "@/lib/plugin-storage";
 import { usePolicyStore } from "@/stores/policy-store";
+import { toUnicodeEmail } from "@/lib/idn";
 
 /**
  * Derives the text/plain alternative from the composer's HTML body, preserving
@@ -2732,11 +2733,11 @@ export function EmailComposer({
                 >
                   {identityGroups.length > 0
                     ? identityGroups.map((group) => (
-                        <optgroup key={group.localAccountId} label={group.accountLabel}>
+                        <optgroup key={group.localAccountId} label={toUnicodeEmail(group.accountLabel)}>
                           {group.identities.map((identity) => {
-                            const displayEmail = subAddressTag
+                            const displayEmail = toUnicodeEmail(subAddressTag
                               ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
-                              : identity.email;
+                              : identity.email);
                             return (
                               <option key={identity.id} value={identity.id} dir="ltr">
                                 {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
@@ -2746,9 +2747,9 @@ export function EmailComposer({
                         </optgroup>
                       ))
                     : identities.map((identity) => {
-                        const displayEmail = subAddressTag
+                        const displayEmail = toUnicodeEmail(subAddressTag
                           ? generateSubAddress(identity.email, subAddressTag, subAddressDelimiter)
-                          : identity.email;
+                          : identity.email);
                         return (
                           <option key={identity.id} value={identity.id} dir="ltr">
                             {identity.name ? `${identity.name} <${displayEmail}>` : displayEmail}
@@ -2760,13 +2761,13 @@ export function EmailComposer({
                 <span data-testid="composer-from" className="text-sm text-foreground flex-1 truncate">
                   {subAddressTag ? (
                     <span className="font-mono">
-                      {generateSubAddress(primaryIdentity?.email || '', subAddressTag, subAddressDelimiter)}
+                      {toUnicodeEmail(generateSubAddress(primaryIdentity?.email || '', subAddressTag, subAddressDelimiter))}
                     </span>
                   ) : (
                     <bdi>
                       {primaryIdentity?.name
-                        ? `${primaryIdentity.name} <${primaryIdentity.email}>`
-                        : primaryIdentity?.email || ''}
+                        ? `${primaryIdentity.name} <${toUnicodeEmail(primaryIdentity.email)}>`
+                        : toUnicodeEmail(primaryIdentity?.email || '')}
                     </bdi>
                   )}
                 </span>

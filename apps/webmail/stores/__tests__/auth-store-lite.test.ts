@@ -164,6 +164,30 @@ describe('auth-store in the static Lite build', () => {
     expect(readLiteBasicSession(0)).toBeNull();
   });
 
+  it('signs in with an address on an IDN domain as typed, using its ASCII form (#1100)', async () => {
+    const { mock } = stalwartFetch();
+
+    const ok = await useAuthStore.getState().login(SERVER, 'alice@ノード.com', 'pw');
+
+    expect(ok).toBe(true);
+    const loginCall = mock.mock.calls.find(([input]) => String(input) === `${SERVER}/api/auth`);
+    expect(JSON.parse(String(loginCall?.[1]?.body)).accountName).toBe('alice@xn--gdkj2l.com');
+    expect(useAuthStore.getState().username).toBe('alice@xn--gdkj2l.com');
+    expect(useAuthStore.getState().client?.getAuthHeader()).toBe('Bearer AT-1');
+  });
+
+  it('sends Basic credentials as UTF-8 when the server has no token login', async () => {
+    stalwartFetch({ loginStatus: 404 });
+
+    const ok = await useAuthStore.getState().login(SERVER, 'jörg@ノード.com', 'pässwörd€');
+
+    expect(ok).toBe(true);
+    const header = useAuthStore.getState().client?.getAuthHeader() ?? '';
+    expect(header.startsWith('Basic ')).toBe(true);
+    const bytes = Uint8Array.from(atob(header.slice(6)), (c) => c.charCodeAt(0));
+    expect(new TextDecoder().decode(bytes)).toBe('jörg@xn--gdkj2l.com:pässwörd€');
+  });
+
   it('without token login and without "remember me" the Basic session is still kept for the tab', async () => {
     const { calls } = stalwartFetch({ loginStatus: 404 });
 
