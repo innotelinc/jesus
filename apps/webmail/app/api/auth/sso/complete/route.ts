@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       } else {
         cookieStore.delete(serverCookieName);
       }
-      storeIdToken(cookieStore, slot, tokens.id_token, request.nextUrl.basePath);
+      storeIdToken(cookieStore, slot, tokens.id_token, request.nextUrl.basePath, [tokens.refresh_token, pendingServerId]);
     }
 
     // Delete pending cookie
