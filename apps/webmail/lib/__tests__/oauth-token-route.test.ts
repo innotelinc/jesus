@@ -326,6 +326,34 @@ describe('oauth token route - sign-in keeps the id token (#905)', () => {
 
     expect(cookieStore.get('jmap_idt')).toBeUndefined();
   });
+
+  // Sizes of a stock Keycloak realm's tokens.
+  it('stores the id token beside tokens of a typical size', async () => {
+    exchangeCodeForTokens.mockResolvedValue({
+      access_token: 'a'.repeat(1130), expires_in: 300, refresh_token: 'r'.repeat(650), id_token: 'i'.repeat(1080),
+    });
+
+    await callRoute('POST', {}, { code: 'c', code_verifier: 'v', redirect_uri: 'https://mail.example.com/en/auth/callback' });
+
+    expect(cookieStore.get('jmap_idt')?.value).toBe('i'.repeat(1080));
+  });
+
+  it('leaves the id token out when the response would outgrow a proxy header buffer (#1096)', async () => {
+    // A Keycloak realm with roles and a groups claim: together the three
+    // cookies exceed nginx's default 4 KB proxy_buffer_size, and the
+    // sign-in failed with 502.
+    exchangeCodeForTokens.mockResolvedValue({
+      access_token: 'a'.repeat(1700), expires_in: 300, refresh_token: 'r'.repeat(650), id_token: 'i'.repeat(1300),
+    });
+    cookieStore.set('jmap_idt', 'stale');
+
+    const { status } = await callRoute('POST', {}, { code: 'c', code_verifier: 'v', redirect_uri: 'https://mail.example.com/en/auth/callback' });
+
+    expect(status).toBe(200);
+    expect(cookieStore.get('jmap_idt')).toBeUndefined();
+    expect(cookieStore.get('jmap_rt')?.value).toBe('r'.repeat(650));
+    expect(cookieStore.get('jmap_at')?.value).toMatch(/^\d+\.a+$/);
+  });
 });
 
 describe('oauth token route - refresh keeps the id token current (#905)', () => {
@@ -350,6 +378,23 @@ describe('oauth token route - refresh keeps the id token current (#905)', () => 
     await callPut({ force: 'true' });
 
     expect(cookieStore.get('jmap_idt')?.value).toBe(ID_TOKEN);
+  });
+
+  it('forgets the id token when a reissued one would outgrow a proxy header buffer (#1096)', async () => {
+    cookieStore.set('jmap_rt', 'rt');
+    cookieStore.set('jmap_idt', ID_TOKEN);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        access_token: 'a'.repeat(1700), expires_in: 300, refresh_token: 'r'.repeat(650), id_token: 'i'.repeat(1300),
+      }),
+    });
+
+    const { status } = await callPut({ force: 'true' });
+
+    expect(status).toBe(200);
+    expect(cookieStore.get('jmap_idt')).toBeUndefined();
+    expect(cookieStore.get('jmap_rt')?.value).toBe('r'.repeat(650));
   });
 
   it('does not start keeping an id token for a password sign-in', async () => {
