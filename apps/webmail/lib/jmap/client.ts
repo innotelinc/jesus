@@ -78,6 +78,18 @@ function fromWireFileNode(node: FileNode): FileNode {
 }
 
 /**
+ * RFC 7617 Basic credentials, UTF-8 encoded (what Stalwart decodes). `btoa`
+ * alone is Latin-1: it garbles `ü` and throws on anything past U+00FF, such
+ * as an unconverted IDN login or a password with `€` in it.
+ */
+function basicAuthHeader(username: string, password: string): string {
+  const bytes = new TextEncoder().encode(`${username}:${password}`);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return `Basic ${btoa(binary)}`;
+}
+
+/**
  * Parse a recipient string that may be "Name <email>" or bare "email" into
  * { name?, email }. The display name is unquoted and stripped of any address
  * it carries inline: JMAP takes the name and the address as separate fields,
@@ -873,7 +885,7 @@ export class JMAPClient implements IJMAPClient {
     this.serverUrl = serverUrl.replace(/\/$/, '');
     this.username = username;
     this.password = password;
-    this.authHeader = `Basic ${btoa(`${username}:${password}`)}`;
+    this.authHeader = basicAuthHeader(username, password);
   }
 
   static withBearer(
@@ -979,7 +991,7 @@ export class JMAPClient implements IJMAPClient {
   /** Update basic-auth credentials with a new password (e.g. password$newTotp). */
   updateBasicAuth(newPassword: string): void {
     this.password = newPassword;
-    this.authHeader = `Basic ${btoa(`${this.username}:${newPassword}`)}`;
+    this.authHeader = basicAuthHeader(this.username, newPassword);
   }
 
   getAuthHeader(): string {

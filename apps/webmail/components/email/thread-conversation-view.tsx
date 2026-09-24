@@ -38,6 +38,7 @@ import { useContactStore } from "@/stores/contact-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { isFilePreviewable, toInertBlob } from "@/lib/file-preview";
 import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
+import { useOwnDomainAddress } from "@/hooks/use-own-domain-address";
 
 interface ThreadConversationViewProps {
   thread: ThreadGroup;
@@ -246,6 +247,7 @@ function EmailCard({
   const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const plainTextFont = useSettingsStore((state) => state.plainTextFont);
   const sender = email.from?.[0];
+  const formatAddress = useOwnDomainAddress();
   const isUnread = !email.keywords?.$seen;
   const isStarred = email.keywords?.$flagged;
   const [hasBlockedContent, setHasBlockedContent] = useState(false);
@@ -551,7 +553,7 @@ function EmailCard({
               "font-medium truncate",
               isUnread ? "text-foreground" : "text-muted-foreground"
             )}>
-              {sender?.name || sender?.email || "Unknown"}
+              {sender?.name || (sender?.email && formatAddress(sender.email)) || "Unknown"}
             </span>
             {isStarred && (
               <Star className="w-4 h-4 fill-amber-400 text-amber-400 flex-shrink-0" />

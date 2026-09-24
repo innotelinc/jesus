@@ -28,6 +28,7 @@ import {
   saveLiteOAuthFlow,
   type LiteOAuthDiscovery,
 } from "@/lib/auth/lite-oauth";
+import { toAsciiDomain } from "@/lib/idn";
 
 /** The domain of a complete address (`user@example.com`), or '' while it is still being typed. */
 function completeAddressDomain(username: string): string {
@@ -35,11 +36,17 @@ function completeAddressDomain(username: string): string {
   return match ? match[1].toLowerCase() : "";
 }
 
+/** Compare domains in ASCII form, so `bücher.de` matches a configured `xn--bcher-kva.de` and back. */
+function domainKey(domain: string): string {
+  return toAsciiDomain(domain) ?? domain.trim().toLowerCase();
+}
+
 function findServerByDomain(servers: PublicJmapServerEntry[], email: string | undefined): PublicJmapServerEntry | undefined {
   if (!email || !email.includes("@")) return undefined;
-  const domain = email.split("@")[1]?.trim().toLowerCase();
+  const domain = email.split("@")[1]?.trim();
   if (!domain) return undefined;
-  return servers.find((s) => (s.domains ?? []).some((d) => d.toLowerCase() === domain));
+  const key = domainKey(domain);
+  return servers.find((s) => (s.domains ?? []).some((d) => domainKey(d) === key));
 }
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
