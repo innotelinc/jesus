@@ -283,6 +283,11 @@ services:
       ENABLE_ARI_MANAGER: "true"
       ENABLE_ARI_STASIS: "true"
       ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
+      # On the Zeus shared voice plane, a completed interview channel is
+      # redirected to [zeus-ai-return] instead of being deleted. Keep this
+      # false for standalone Capstone; set it on the shared Zeus deployment
+      # only after the Zeus dialplan and VOICE_CONTEXT_SECRET are configured.
+      ZEUS_RETURN_ENABLED: "${ZEUS_RETURN_ENABLED:-false}"
 
       # ── OpenTelemetry → the stack's collector ─────────────────────────────
       # Standard OTel SDK auto-config vars (used by any exporter that reads them)

@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { Service } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
@@ -9,8 +10,12 @@ import { exportJSON } from '../lib/export';
 
 export default function Services() {
   const { services, refresh } = useDashboardData();
+  const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const requestedStatus = params.get('status');
+  const statusFilter = ['healthy', 'warning', 'critical', 'offline'].includes(requestedStatus ?? '')
+    ? requestedStatus!
+    : 'all';
   const [envFilter, setEnvFilter] = useState<string>('all');
   const [selected, setSelected] = useState<Service | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -32,7 +37,34 @@ export default function Services() {
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
     setSelected(null);
-  }, []);
+    if (params.has('service')) {
+      const next = new URLSearchParams(params);
+      next.delete('service');
+      setParams(next, { replace: true });
+    }
+  }, [params, setParams]);
+
+  const setStatusFilter = useCallback((status: string) => {
+    const next = new URLSearchParams(params);
+    if (status === 'all') next.delete('status');
+    else next.set('status', status);
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
+  const requestedService = params.get('service');
+  const targetService = requestedService
+    ? services.find(candidate => {
+        const normalized = requestedService.toLowerCase();
+        return candidate.name.toLowerCase() === normalized
+          || candidate.id.toLowerCase() === normalized
+          || candidate.name.toLowerCase().includes(normalized);
+      })
+    : undefined;
+  const targetMissing = Boolean(requestedService && services.length > 0 && !targetService);
+
+  useEffect(() => {
+    if (targetService) openService(targetService, 'overview');
+  }, [openService, targetService]);
 
   return (
     <div className="space-y-6">
@@ -128,8 +160,14 @@ export default function Services() {
         </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <table className="w-full border-collapse">
+      {targetMissing && (
+        <div className="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
+          Service “{requestedService}” is not present in the current inventory. Clear the service link to browse all services.
+        </div>
+      )}
+
+      <div className="mt-4 overflow-x-auto rounded-2xl border bg-card shadow-sm">
+        <table className="w-full min-w-[1120px] border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Service</th>

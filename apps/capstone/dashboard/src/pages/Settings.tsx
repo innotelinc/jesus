@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useResolvedTheme } from '../components/providers';
 import Button from '../components/Button';
 import { cn } from '../lib/utils';
-import Modal from '../components/Modal';
+import { exportJSON } from '../lib/export';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import {
@@ -82,7 +82,6 @@ function SaveRow({
 
 export default function Settings() {
   const { theme, setTheme } = useResolvedTheme();
-  const [modalOpen, setModalOpen] = useState(false);
 
   const access = useSavableSettings<AccessSettings>(
     settingsStore.loadAccess,
@@ -100,6 +99,14 @@ export default function Settings() {
     settingsStore.loadProfile,
     settingsStore.saveProfile,
   );
+
+  const downloadLocalSettings = () => exportJSON({
+    exportedAt: new Date().toISOString(),
+    access: access.value,
+    notifications: notifications.value,
+    dashboard: dashboard.value,
+    profile: profile.value,
+  }, { filename: `capstone-personal-settings-${new Date().toISOString().slice(0, 10)}.json` });
 
   const toggleNotifyOn = (label: string, enabled: boolean) => {
     const set = new Set(notifications.value.notifyOn);
@@ -135,14 +142,9 @@ export default function Settings() {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="reduceMotion" className="h-4 w-4 rounded border input accent-primary" />
-            <label htmlFor="reduceMotion" className="text-sm cursor-pointer">Reduce motion</label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="highContrast" className="h-4 w-4 rounded border input accent-primary" />
-            <label htmlFor="highContrast" className="text-sm cursor-pointer">High contrast focus rings</label>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Theme is applied immediately and remembered by this browser profile.
+          </p>
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
@@ -282,11 +284,8 @@ export default function Settings() {
             />
             <label htmlFor="showEmail" className="text-sm cursor-pointer">Show email on dashboard</label>
           </div>
-          <div className="pt-2">
-            <Button variant="outline" size="sm" className="w-full justify-center" onClick={() => setModalOpen(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-              Change password
-            </Button>
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Password, MFA, and account lifecycle are managed by the Cerulean Authentik account that signed you in.
           </div>
           <SaveRow
             saved={profile.saved}
@@ -297,7 +296,8 @@ export default function Settings() {
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Access</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Local Access Preferences</h2>
+          <p className="text-xs text-muted-foreground">These are browser-profile preferences only; Authentik remains the security authority.</p>
           <div>
             <label className="text-sm font-medium">Session timeout (minutes)</label>
             <Select
@@ -341,8 +341,8 @@ export default function Settings() {
               onChange={e => access.update({ ipRanges: e.target.value })}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Comma-separated CIDR ranges. Stored with this browser's profile and applied on
-              your next visits — the API itself is gated by the Cerulean session.
+              Comma-separated CIDR ranges stored with this browser profile for operator reference.
+              They do not replace server-side network policy.
             </p>
           </div>
           <SaveRow
@@ -357,10 +357,6 @@ export default function Settings() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Data & privacy</h2>
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center justify-between">
-              <span>Dashboard analytics</span>
-              <input type="checkbox" className="h-4 w-4 rounded border input accent-primary" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
               <span>Usage metrics retention</span>
               <span className="font-mono text-xs">30 days</span>
             </div>
@@ -370,16 +366,10 @@ export default function Settings() {
             </div>
           </div>
           <div className="pt-2">
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
-                Download my data
-              </Button>
-              <Button variant="ghost" size="sm" className="text-danger hover:text-danger/80">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                Delete account
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={downloadLocalSettings}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+              Download my settings
+            </Button>
           </div>
         </div>
       </div>
@@ -401,31 +391,6 @@ export default function Settings() {
         </div>
       </div>
 
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Change password"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Current password</label>
-            <Input className="mt-1" type="password" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">New password</label>
-            <Input className="mt-1" type="password" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Confirm new password</label>
-            <Input className="mt-1" type="password" />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button variant="default" size="sm">Update password</Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

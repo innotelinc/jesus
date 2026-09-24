@@ -64,6 +64,17 @@ export default function NetworkPorts() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [envFilter, setEnvFilter] = useState('all');
   const [riskFilter, setRiskFilter] = useState('all');
+  const [copied, setCopied] = useState(false);
+
+  const copyHostPort = async (host: string, port: number) => {
+    try {
+      await navigator.clipboard.writeText(`${host}:${port}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     return ports.filter(p => {
@@ -73,11 +84,15 @@ export default function NetworkPorts() {
       const matchesRisk = riskFilter === 'all' || p.risk === riskFilter;
       return matchesSearch && matchesStatus && matchesEnv && matchesRisk;
     });
-  }, [search, statusFilter, envFilter, riskFilter]);
+  }, [ports, search, statusFilter, envFilter, riskFilter]);
 
   const statusOptions = ['all', 'open', 'filtered', 'closed', 'unknown'];
   const envOptions = ['all', 'prod', 'stage', 'test', 'dev'];
   const riskOptions = ['all', 'low', 'medium', 'high', 'critical'];
+
+  const averageUtilization = filtered.length
+    ? Math.round(filtered.reduce((sum, port) => sum + port.utilization, 0) / filtered.length)
+    : 0;
 
   const utilizationChartData = useMemo(() => {
     const chartPorts = filtered.slice(0, 6);
@@ -151,8 +166,8 @@ export default function NetworkPorts() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3 border rounded-2xl bg-card shadow-sm overflow-hidden">
-          <table className="w-full border-collapse">
+        <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm lg:col-span-3">
+          <table className="w-full min-w-[1050px] border-collapse">
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Port</th>
@@ -206,10 +221,10 @@ export default function NetworkPorts() {
             <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Avg utilization</span>
-                <span className="font-semibold">{filtered.length ? Math.round(filtered.reduce((s, p) => s + p.utilization, 0) / filtered.length) : 0}%</span>
+                <span className="font-semibold">{averageUtilization}%</span>
               </div>
               <div className="mt-3 h-10 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full w-full rounded-full bg-primary/80" style={{ width: `${Math.min(100, filtered.reduce((s, p) => s + p.utilization, 0) / filtered.length)}%` }} />
+                <div className="h-full w-full rounded-full bg-primary/80" style={{ width: `${averageUtilization}%` }} />
               </div>
               <Chart data={utilizationChartData} color="hsl(var(--primary))" height={120} formatY={v => `${v}%`} />
             </div>
@@ -218,7 +233,12 @@ export default function NetworkPorts() {
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Utilization</h2>
             <div className="mt-2 divide-y">
               {filtered.sort((a, b) => b.utilization - a.utilization).slice(0, 5).map(p => (
-                <div key={p.port} className="flex items-center justify-between py-2">
+                <button
+                  type="button"
+                  key={p.port}
+                  onClick={() => setSelected(p)}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/50"
+                >
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-medium">{p.port}</span>
                     <span className="text-xs text-muted-foreground">{p.service}</span>
@@ -229,7 +249,7 @@ export default function NetworkPorts() {
                     </div>
                     <span className="text-xs font-mono text-muted-foreground">{p.utilization}%</span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -256,9 +276,14 @@ export default function NetworkPorts() {
                 <span className="text-muted-foreground">By risk</span>
                 <div className="flex flex-wrap gap-2 text-xs">
                   {['critical', 'high', 'medium', 'low'].map(risk => (
-                    <span key={risk} className={cn('rounded-full px-2 py-0.5', risk === 'critical' || risk === 'high' ? 'bg-danger/10 text-danger' : risk === 'medium' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground')}>
+                    <button
+                      type="button"
+                      key={risk}
+                      onClick={() => setRiskFilter(risk)}
+                      className={cn('rounded-full px-2 py-0.5 transition-colors hover:opacity-80', risk === 'critical' || risk === 'high' ? 'bg-danger/10 text-danger' : risk === 'medium' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground')}
+                    >
                       {risk} {ports.filter(p => p.risk === risk).length}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -328,12 +353,12 @@ export default function NetworkPorts() {
 
             <div className="flex flex-wrap gap-2 border-t border-border pt-4">
               {selected.status === 'open' && (selected.protocol === 'tcp' || selected.protocol === 'tls' || selected.protocol === 'tcp6') && (
-                <a href={`http://${selected.host}:${selected.port}`} target="_blank" rel="noreferrer">
+                <a href={`${selected.protocol === 'tls' ? 'https' : 'http'}://${selected.host}:${selected.port}`} target="_blank" rel="noopener noreferrer">
                   <Button variant="default" size="sm">Open endpoint</Button>
                 </a>
               )}
-              <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(`${selected.host}:${selected.port}`).catch(() => {}); }}>
-                Copy host:port
+              <Button variant="outline" size="sm" onClick={() => void copyHostPort(selected.host, selected.port)}>
+                {copied ? 'Copied!' : 'Copy host:port'}
               </Button>
             </div>
           </div>

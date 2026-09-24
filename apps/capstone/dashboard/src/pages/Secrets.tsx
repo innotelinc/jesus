@@ -5,9 +5,7 @@ import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 import Drawer from '../components/Drawer';
 import { cn, formatRelativeTime } from '../lib/utils';
-import Modal from '../components/Modal';
-import Input from '../components/Input';
-import Select from '../components/Select';
+import { exportJSON } from '../lib/export';
 
 function secretTypeBadge(type: string) {
   switch (type) {
@@ -40,8 +38,6 @@ export default function Secrets() {
   const [envFilter, setEnvFilter] = useState('all');
   const [selected, setSelected] = useState<Secret | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return secrets.filter(s => {
@@ -50,17 +46,16 @@ export default function Secrets() {
       const matchesEnv = envFilter === 'all' || s.environment === envFilter;
       return matchesSearch && matchesStatus && matchesEnv;
     });
-  }, [search, statusFilter, envFilter]);
+  }, [search, secrets, statusFilter, envFilter]);
 
   const openDrawer = (secret: Secret) => {
     setSelected(secret);
     setDrawerOpen(true);
   };
 
-  const copyValue = (id: string) => {
-    setCopyFeedback(id);
-    setTimeout(() => setCopyFeedback(null), 2000);
-  };
+  const selectedAudit = selected
+    ? auditLog.filter(entry => entry.resource.includes(selected.id)).slice(0, 5)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -69,10 +64,15 @@ export default function Secrets() {
           <h1 className="text-2xl font-semibold tracking-tight">Secrets Vault</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage API keys, passwords, certificates, and tokens with rotation tracking.</p>
         </div>
-        <Button variant="default" size="sm" onClick={() => setCreateOpen(true)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 5v14M5 12h14" /></svg>
-          Create secret
+        <Button variant="outline" size="sm" onClick={() => exportJSON(secrets, { filename: `capstone-secret-metadata-${new Date().toISOString().slice(0, 10)}.json` })}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><path d="M12 15V3" /></svg>
+          Export metadata
         </Button>
+      </div>
+
+      <div className="rounded-xl border border-info/30 bg-info/5 px-4 py-3 text-sm">
+        <span className="font-medium">Metadata-only safety view.</span>{' '}
+        <span className="text-muted-foreground">Secret values are never exposed here. Rotate or change credentials through the owning deployment or secret manager, then refresh this inventory.</span>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -224,11 +224,11 @@ export default function Secrets() {
             <div className="space-y-2 border-t pt-4">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Audit History</h3>
               <div className="divide-y">
-                {auditLog.filter(a => a.resource.includes(selected.id || '')).length === 0 ? (
+                {selectedAudit.length === 0 ? (
                   <div className="py-4 text-center text-sm text-muted-foreground">No audit entries for this secret.</div>
                 ) : (
-                  auditLog.slice(0, 3).map((a, i) => (
-                    <div key={i} className="flex items-center justify-between py-2">
+                  selectedAudit.map(a => (
+                    <div key={a.id} className="flex items-center justify-between py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">{formatRelativeTime(a.timestamp)}</span>
                         <span className="text-xs text-muted-foreground">{a.actor}</span>
@@ -240,77 +240,13 @@ export default function Secrets() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button variant="secondary" size="sm" onClick={() => copyValue(selected.id)}>
-                {copyFeedback === selected.id ? 'Copied!' : 'Copy value securely'}
-              </Button>
-              <Button variant="outline" size="sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
-                Rotate
-              </Button>
-              <Button variant="outline" size="sm">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
-                View metadata
-              </Button>
-            </div>
+            <p className="border-t pt-4 text-xs text-muted-foreground">
+              Values and write operations are intentionally unavailable in the Control Center.
+            </p>
           </div>
         )}
       </Drawer>
 
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Create secret"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <Input className="mt-1" placeholder="e.g. API_KEY_NAME" />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Type</label>
-              <Select
-                value=""
-                options={[
-                  { value: 'api-key', label: 'API key' },
-                  { value: 'password', label: 'Password' },
-                  { value: 'certificate', label: 'Certificate' },
-                  { value: 'token', label: 'Token' },
-                  { value: 'credential', label: 'Credential' },
-                ]}
-                onChange={() => {}}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium">Environment</label>
-              <Select
-                value="prod"
-                options={[
-                  { value: 'prod', label: 'Production' },
-                  { value: 'stage', label: 'Stage' },
-                  { value: 'test', label: 'Test' },
-                  { value: 'dev', label: 'Dev' },
-                ]}
-                onChange={() => {}}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Owner</label>
-              <Input className="mt-1" placeholder="team@capstone.internal" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button variant="default" size="sm">Create secret</Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

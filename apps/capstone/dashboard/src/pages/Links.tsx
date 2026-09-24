@@ -3,6 +3,7 @@ import type { ResourceLink } from '../types';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import { cn, formatRelativeTime } from '../lib/utils';
+import { exportJSON } from '../lib/export';
 
 const categories: Array<{ key: ResourceLink['category']; label: string; color: string }> = [
   { key: 'services', label: 'Services', color: 'bg-primary/10 text-primary border-primary/30' },
@@ -32,7 +33,11 @@ export default function Links() {
           <p className="mt-1 text-sm text-muted-foreground">Quick access to services, documentation, repositories, and support.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="inline-flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <button
+            type="button"
+            onClick={() => exportJSON(links, { filename: `capstone-links-${new Date().toISOString().slice(0, 10)}.json` })}
+            className="inline-flex items-center gap-2 rounded-lg border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><path d="M12 15V3" /></svg>
             Export links
           </button>

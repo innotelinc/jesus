@@ -1,26 +1,47 @@
-import type { ServiceStatus, PortStatus, AlertSeverity, AlertStatus, SecretStatus, ResourceLink } from '../types';
+import type { ServiceStatus, PortStatus, AlertSeverity, AlertStatus, SecretStatus, ResourceLink, User } from '../types';
 import { cn } from '../lib/utils';
 
-type StatusKind = ServiceStatus | PortStatus | AlertSeverity | AlertStatus | SecretStatus | ResourceLink['status'];
+type StatusKind = ServiceStatus | PortStatus | AlertSeverity | AlertStatus | SecretStatus | ResourceLink['status'] | User['status'];
 
 function statusConfig(status: StatusKind): { label: string; colorClass: string; dotClass: string; dotBgClass?: string } {
   switch (status) {
     case 'healthy':
-    case 'resolved':
-    case 'verified':
-    case 'active':
-    case 'open':
       return {
         label: 'Healthy',
         colorClass: 'text-success',
         dotClass: 'bg-success',
       };
+    case 'active':
+    case 'verified':
+      return {
+        label: status === 'active' ? 'Active' : 'Verified',
+        colorClass: 'text-success',
+        dotClass: 'bg-success',
+      };
+    case 'resolved':
+    case 'closed':
+      return {
+        label: status === 'resolved' ? 'Resolved' : 'Closed',
+        colorClass: 'text-success',
+        dotClass: 'bg-success',
+      };
+    case 'open':
     case 'warning':
-    case 'acknowledged':
     case 'degraded':
+      return {
+        label: status === 'open' ? 'Open' : status === 'degraded' ? 'Degraded' : 'Warning',
+        colorClass: 'text-warning',
+        dotClass: 'bg-warning',
+      };
+    case 'acknowledged':
+      return {
+        label: 'Acknowledged',
+        colorClass: 'text-info',
+        dotClass: 'bg-info',
+      };
     case 'pending':
       return {
-        label: 'Warning',
+        label: 'Pending',
         colorClass: 'text-warning',
         dotClass: 'bg-warning',
       };
@@ -28,12 +49,13 @@ function statusConfig(status: StatusKind): { label: string; colorClass: string; 
     case 'escalated':
     case 'expired':
     case 'offline':
+    case 'disabled':
       return {
-        label: 'Critical',
+        label: status.charAt(0).toUpperCase() + status.slice(1),
         colorClass: 'text-danger',
         dotClass: 'bg-danger',
-      };    case 'info':
-    case 'closed':
+      };
+    case 'info':
     case 'filtered':
       return {
         label: 'Info',

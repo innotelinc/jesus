@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { createContext, useContext, useRef } from 'react';
 

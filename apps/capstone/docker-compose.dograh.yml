@@ -54,6 +54,8 @@ services:
       ENABLE_ARI_MANAGER: "true"
       ENABLE_ARI_STASIS: "true"
       ENABLE_CAMPAIGN_ORCHESTRATOR: "false"
+      # Shared Zeus voice plane only; standalone host mode remains opt-in.
+      ZEUS_RETURN_ENABLED: "${ZEUS_RETURN_ENABLED:-false}"
 
       # ── OpenTelemetry → the stack's collector ─────────────────────────────
       # Spans are converted to RED metrics and dropped (see

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { Alert } from '../types';
 import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
@@ -20,8 +21,11 @@ function severityColor(severity: string) {
 
 export default function Alerts() {
   const { alerts, refresh } = useDashboardData();
-  const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [params, setParams] = useSearchParams();
+  const severityParam = params.get('severity');
+  const statusParam = params.get('status');
+  const severityFilter = ['critical', 'warning', 'info'].includes(severityParam ?? '') ? severityParam! : 'all';
+  const statusFilter = ['open', 'acknowledged', 'resolved', 'escalated'].includes(statusParam ?? '') ? statusParam! : 'all';
   const [escalateModalOpen, setEscalateModalOpen] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -38,20 +42,29 @@ export default function Alerts() {
     });
   }, [alerts, severityFilter, statusFilter]);
 
+  const updateFilter = (key: 'severity' | 'status', value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === 'all') next.delete(key);
+    else next.set(key, value);
+    setParams(next, { replace: true });
+  };
+
   const flash = (msg: string) => {
     setNotice(msg);
     window.setTimeout(() => setNotice(null), 5000);
   };
 
-  const run = async (id: string, act: () => Promise<unknown>, ok: string) => {
+  const run = async (id: string, act: () => Promise<unknown>, ok: string): Promise<boolean> => {
     setBusy(id);
     setActionError(null);
     try {
       await act();
       await refresh();
       flash(ok);
+      return true;
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Action failed');
+      return false;
     } finally {
       setBusy(null);
     }
@@ -69,14 +82,15 @@ export default function Alerts() {
     setEscalateModalOpen(true);
   };
 
-  const submitEscalation = () => {
-    if (!selectedAlert) return;
+  const submitEscalation = async () => {
+    if (!selectedAlert || !reason.trim()) return;
     const alert = selectedAlert;
-    void run(
+    const succeeded = await run(
       alert.id,
       () => api.escalateAlert(alert.id, { reason: reason.trim(), assignTo: assignee }),
       `Alert escalated — ${alert.service} → ${assignee}.`,
-    ).then(() => setEscalateModalOpen(false));
+    );
+    if (succeeded) setEscalateModalOpen(false);
   };
 
   return (
@@ -91,7 +105,7 @@ export default function Alerts() {
             {['all', 'critical', 'warning', 'info'].map(s => (
               <button
                 key={s}
-                onClick={() => setSeverityFilter(s)}
+                onClick={() => updateFilter('severity', s)}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                   severityFilter === s ? (s === 'critical' ? 'bg-danger/20 text-danger' : s === 'warning' ? 'bg-warning/20 text-warning' : s === 'info' ? 'bg-info/20 text-info' : 'bg-primary text-primary-foreground') : 'text-muted-foreground hover:text-foreground',
@@ -105,7 +119,7 @@ export default function Alerts() {
             {['all', 'open', 'acknowledged', 'resolved', 'escalated'].map(s => (
               <button
                 key={s}
-                onClick={() => setStatusFilter(s)}
+                onClick={() => updateFilter('status', s)}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                   statusFilter === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
@@ -130,22 +144,22 @@ export default function Alerts() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Critical</div>
-          <div className="mt-1 text-2xl font-semibold text-danger">{filtered.filter(a => a.severity === 'critical').length}</div>
-        </div>
-        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Warning</div>
-          <div className="mt-1 text-2xl font-semibold text-warning">{filtered.filter(a => a.severity === 'warning').length}</div>
-        </div>
-        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Info</div>
-          <div className="mt-1 text-2xl font-semibold text-info">{filtered.filter(a => a.severity === 'info').length}</div>
-        </div>
-        <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide">Open</div>
-          <div className="mt-1 text-2xl font-semibold">{filtered.filter(a => a.status === 'open').length}</div>
-        </div>
+        {([
+          { label: 'Critical', value: alerts.filter(a => a.severity === 'critical').length, tone: 'text-danger', filter: { key: 'severity' as const, value: 'critical' } },
+          { label: 'Warning', value: alerts.filter(a => a.severity === 'warning').length, tone: 'text-warning', filter: { key: 'severity' as const, value: 'warning' } },
+          { label: 'Info', value: alerts.filter(a => a.severity === 'info').length, tone: 'text-info', filter: { key: 'severity' as const, value: 'info' } },
+          { label: 'Open', value: alerts.filter(a => a.status === 'open').length, tone: 'text-foreground', filter: { key: 'status' as const, value: 'open' } },
+        ]).map(card => (
+          <button
+            key={card.label}
+            type="button"
+            onClick={() => updateFilter(card.filter.key, card.filter.value)}
+            className="rounded-2xl border bg-card p-4 text-left text-sm shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
+          >
+            <div className="text-xs text-muted-foreground uppercase tracking-wide">{card.label}</div>
+            <div className={`mt-1 text-2xl font-semibold ${card.tone}`}>{card.value}</div>
+          </button>
+        ))}
       </div>
 
       <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
@@ -168,7 +182,13 @@ export default function Alerts() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div className={cn('h-2 w-2 rounded-full', severityColor(alert.severity).split(' ')[0].replace('bg-', ''))} />
-                    <span className="font-medium">{alert.service}</span>
+                    <Link
+                      to={`/services?service=${encodeURIComponent(alert.service)}`}
+                      className="font-medium hover:text-primary hover:underline"
+                      title={`Open ${alert.service} service details`}
+                    >
+                      {alert.service}
+                    </Link>
                   </div>
                 </td>
                 <td className="px-4 py-3">
@@ -194,7 +214,7 @@ export default function Alerts() {
                         {busy === alert.id ? 'Working…' : 'Acknowledge'}
                       </Button>
                     )}
-                    {alert.status === 'open' && (
+                    {(alert.status === 'open' || alert.status === 'acknowledged') && (
                       <Button
                         variant="secondary"
                         size="sm"
@@ -206,16 +226,18 @@ export default function Alerts() {
                         Resolve
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                      disabled={busy === alert.id}
-                      onClick={() => escalate(alert)}
-                    >
+                    {(alert.status === 'open' || alert.status === 'acknowledged') && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                        disabled={busy === alert.id}
+                        onClick={() => escalate(alert)}
+                      >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M18 15a3 3 0 0 0 3-3 3 3 0 0 0-3-3M15 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3" /><path d="M3 9h6m2 5l3-3 3 3" /></svg>
-                      Escalate
-                    </Button>
+                        Escalate
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -273,8 +295,8 @@ export default function Alerts() {
               <Button
                 variant="destructive"
                 size="sm"
-                disabled={selectedAlert !== null && busy === selectedAlert.id}
-                onClick={submitEscalation}
+                onClick={() => void submitEscalation()}
+                disabled={selectedAlert !== null && (busy === selectedAlert.id || !reason.trim())}
               >
                 {selectedAlert !== null && busy === selectedAlert.id ? 'Escalating…' : 'Escalate'}
               </Button>

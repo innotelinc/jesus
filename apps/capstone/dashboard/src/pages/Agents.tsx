@@ -169,13 +169,13 @@ export default function Agents() {
     }
   };
 
-  const openEdit = (agent: Agent) => {
+  const openEdit = useCallback((agent: Agent) => {
     setEditAgent(agent);
     setEditLabel(agent.label);
     setEditWorkflow(agent.workflowId != null ? String(agent.workflowId) : '');
     setEditActive(agent.active);
     setEditWorkflowData(null);
-  };
+  }, []);
 
   const reloadWorkflowOptions = async () => {
     try {
@@ -205,9 +205,7 @@ export default function Agents() {
     if (!agent) return;
     openedAgentParam.current = raw;
     openEdit(agent);
-    // openEdit is stable in effect here; it only runs once per ?agent= value.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, agents]);
+  }, [agents, openEdit, searchParams]);
 
   const handleSaveEdit = async () => {
     if (!editAgent) return;

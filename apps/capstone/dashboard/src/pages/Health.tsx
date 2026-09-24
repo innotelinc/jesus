@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { HealthMatrixEntry, StackAccessStatus } from '../types';
 import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
@@ -7,6 +8,7 @@ import Button from '../components/Button';
 import { cn } from '../lib/utils';
 import Chart from '../components/Chart';
 import type { MetricPoint } from '../types';
+import { exportJSON } from '../lib/export';
 
 function healthColor(status: string) {
   switch (status) {
@@ -35,7 +37,8 @@ const uptimePoints: MetricPoint[] = Array.from({ length: 30 }, (_, i) => ({
 
 export default function Health() {
   const { healthData, incidents } = useDashboardData();
-  const [checkFilter, setCheckFilter] = useState('all');
+  const [params, setParams] = useSearchParams();
+  const checkFilter = params.get('status') ?? 'all';
 
   const [stackAccess, setStackAccess] = useState<StackAccessStatus | null>(null);
   const [accessLoading, setAccessLoading] = useState(false);
@@ -77,7 +80,14 @@ export default function Health() {
           <p className="mt-1 text-sm text-muted-foreground">Real-time service health matrix, latency, error rates, and dependency map.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportJSON(
+              { generatedAt: new Date().toISOString(), health: healthData, incidents },
+              { filename: `capstone-health-${new Date().toISOString().slice(0, 10)}.json` },
+            )}
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><path d="M12 15V3" /></svg>
             Export
           </Button>
@@ -88,7 +98,12 @@ export default function Health() {
         {['all', 'healthy', 'warning', 'critical', 'offline'].map(f => (
           <button
             key={f}
-            onClick={() => setCheckFilter(f)}
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              if (f === 'all') next.delete('status');
+              else next.set('status', f);
+              setParams(next, { replace: true });
+            }}
             className={cn(
               'rounded-full px-3 py-1 text-xs font-medium transition-colors',
               checkFilter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -99,8 +114,8 @@ export default function Health() {
         ))}
       </div>
 
-      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
-        <table className="w-full border-collapse">
+      <div className="border rounded-2xl bg-card shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Service</th>
@@ -146,10 +161,23 @@ export default function Health() {
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">Just now</td>
                 <td className="px-4 py-3">
-                  <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border', healthRowColor(entry))} style={{ borderColor: `hsl(var(--${healthRowColor(entry).replace('text-', '')}) / 0.3)` }}>
-                    <span className={cn('h-2 w-2 rounded-full', healthRowColor(entry))} />
-                    {entry.status}
-                  </span>
+                  {entry.status === 'warning' || entry.status === 'critical' ? (
+                    <Link
+                      to={`/services?status=${entry.status}&service=${encodeURIComponent(entry.service)}`}
+                      className="inline-flex items-center rounded-full transition-opacity hover:opacity-80"
+                      title={`Open ${entry.service} service details`}
+                    >
+                      <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border', healthRowColor(entry))} style={{ borderColor: `hsl(var(--${healthRowColor(entry).replace('text-', '')}) / 0.3)` }}>
+                        <span className={cn('h-2 w-2 rounded-full', healthRowColor(entry))} />
+                        {entry.status} · open
+                      </span>
+                    </Link>
+                  ) : (
+                    <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border', healthRowColor(entry))}>
+                      <span className={cn('h-2 w-2 rounded-full', healthRowColor(entry))} />
+                      {entry.status}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -165,7 +193,7 @@ export default function Health() {
 
       {/* Stack SSO & access — which Cerulean Authentik identity can reach which
           stack, and whether a group binding actually enforces it. */}
-      <div>
+      <div id="sso-access" className="scroll-mt-20">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Stack SSO &amp; access</h2>
@@ -313,8 +341,13 @@ export default function Health() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Top Error Rates</h2>
           <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
             <div className="space-y-3">
-              {healthData.sort((a, b) => b.errorRate - a.errorRate).slice(0, 5).map((entry, i) => (
-                <div key={i} className="flex items-center justify-between gap-2">
+              {[...healthData].sort((a, b) => b.errorRate - a.errorRate).slice(0, 5).map(entry => (
+                <Link
+                  key={entry.service}
+                  to={`/services?status=${entry.status}&service=${encodeURIComponent(entry.service)}`}
+                  className="flex items-center justify-between gap-2 rounded-md p-1 transition-colors hover:bg-muted/50"
+                  title={`Open ${entry.service} service details`}
+                >
                   <div className="flex items-center gap-2 truncate">
                     <span className={cn('h-2 w-2 rounded-full shrink-0', healthRowColor(entry))} />
                     <span className="text-sm truncate">{entry.service}</span>
@@ -325,7 +358,7 @@ export default function Health() {
                       <div className={cn('h-full rounded-full', healthRowColor(entry))} style={{ width: `${Math.min(100, entry.errorRate * 50)}%` }} />
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -335,14 +368,19 @@ export default function Health() {
           <div className="mt-2 border rounded-2xl bg-card shadow-sm p-4">
             <div className="flex flex-wrap gap-2">
               {healthData.map(entry => (
-                <div key={entry.service} className={cn('rounded-lg border p-3 text-sm', entry.status === 'healthy' ? 'bg-success/8 border-success/30' : entry.status === 'warning' ? 'bg-warning/8 border-warning/30' : 'bg-danger/8 border-danger/30')}>
+                <Link
+                  key={entry.service}
+                  to={`/services?status=${entry.status}&service=${encodeURIComponent(entry.service)}`}
+                  className={cn('rounded-lg border p-3 text-sm transition-opacity hover:opacity-80', entry.status === 'healthy' ? 'bg-success/8 border-success/30' : entry.status === 'warning' ? 'bg-warning/8 border-warning/30' : 'bg-danger/8 border-danger/30')}
+                  title={`Open ${entry.service} service details`}
+                >
                   <div className="font-medium">{entry.service}</div>
                   <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
                     {entry.dependencies.length ? entry.dependencies.map(d => (
                       <span key={d} className="rounded-full bg-muted/60 px-1.5 py-0.5">{d}</span>
-                    )) : <span className="text-muted-foregroundColor">none</span>}
+                    )) : <span className="text-muted-foreground">none</span>}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -379,7 +417,20 @@ export default function Health() {
                     </span>
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={inc.severity as 'warning' | 'info' | 'critical'} size="sm" /></td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">{inc.affected.join(', ')}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap gap-1">
+                      {inc.affected.map(service => (
+                        <Link
+                          key={service}
+                          to={`/services?service=${encodeURIComponent(service)}`}
+                          className="rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-primary/10 hover:text-primary"
+                          title={`Open ${service} service details`}
+                        >
+                          {service}
+                        </Link>
+                      ))}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">{inc.resolvedAt || '—'}</td>
                 </tr>
               ))}

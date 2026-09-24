@@ -39,10 +39,11 @@ export default function ServiceDetailDrawer({ service, open, onClose, onChanged,
   const [confirmingRestart, setConfirmingRestart] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const serviceId = service?.id;
 
   // Reset transient state whenever a different service opens.
   useEffect(() => {
-    if (open && service) {
+    if (open && serviceId) {
       setTab(initialTab);
       setLogs(null);
       setLogsError(null);
@@ -52,7 +53,7 @@ export default function ServiceDetailDrawer({ service, open, onClose, onChanged,
         setConfirmingRestart(true);
       }
     }
-  }, [open, service?.id, initialTab, autoConfirmRestart]);
+  }, [open, serviceId, initialTab, autoConfirmRestart]);
 
   const loadLogs = useCallback(async () => {
     if (!service) return;

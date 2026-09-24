@@ -149,7 +149,7 @@ export default function Softphone() {
       .catch(() => { /* aggregator unavailable — fall back to defaults */ })
       .finally(() => { if (!cancelled) setConfigLoaded(true); });
     return () => { cancelled = true; };
-  }, [dashboardBaseUrl, pushLog]);
+  }, [pushLog]);
 
 
 
@@ -220,7 +220,7 @@ export default function Softphone() {
     });
     simpleUserRef.current = su;
     return su;
-  }, [server, extension, password, iceServers, pushLog]);
+  }, [server, extension, password, iceServers, pushLog, remoteParty]);
 
   const connectAndRegister = useCallback(async () => {
     try {

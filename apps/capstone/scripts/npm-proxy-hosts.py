@@ -38,6 +38,8 @@ Environment variables (real env wins, then the capstone .env, then defaults):
   NPM_BASE_DOMAIN         base domain, e.g. capstone.innotel.us  (required)
   NPM_UPSTREAM_HOST       Docker host IP NPM forwards to
                           (default: PJSIP_MEDIA_ADDRESS from .env)
+  ZEUS_UPSTREAM_HOST      Docker host IP for the shared Zeus subscribe portal
+                          (required for subscribe.<domain>; not the Capstone host)
   NPM_LETSENCRYPT_EMAIL   email for Let's Encrypt certs
                           (default: GRIST_ADMIN_EMAIL; empty → hosts without SSL)
   NPM_INCLUDE_OPTIONAL    comma list of optional hosts: nocodb,portal (or "all")
@@ -155,10 +157,13 @@ HOSTS: list[dict[str, Any]] = [
     # gateway), so the name changed but nothing about the forward did.
     {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "gated": True, "name": "Grafana — via SSO gateway"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "gated": True, "name": "Workflow Studio — via SSO gateway"},
-    # subscribe.<domain> → the shared Innotel subscribe portal (one nginx on
-    # :3040 that picks the page by Host header). Public by design — pricing and
-    # checkout are public; no Authentik gate on the subscribe pages.
-    {"key": "subscribe", "sub": "subscribe", "scheme": "http",  "port": 3040,  "websocket": False, "name": "Subscribe portal (pricing / checkout)"},
+    # subscribe.<domain> is served by the Zeus portal, not the retired shared
+    # :3040 nginx. Keep this row in the cross-stack smoke inventory, but resolve
+    # its host independently: the normal NPM_UPSTREAM_HOST is the Capstone/Dograh
+    # box and forwarding this name there produced the 502 fixed on 24 Sep 2026.
+    {"key": "subscribe", "sub": "subscribe", "scheme": "http", "port": 3001,
+     "websocket": True, "host_key": "ZEUS_UPSTREAM_HOST",
+     "name": "Zeus subscribe portal (pricing / checkout)"},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
 
@@ -478,6 +483,8 @@ def main() -> int:
     parser.add_argument("--api-token", default=None, help="persistent NPM API token (env NPM_API_TOKEN)")
     parser.add_argument("--base-domain", default=None, help="base domain, e.g. capstone.innotel.us (env NPM_BASE_DOMAIN)")
     parser.add_argument("--upstream-host", default=None, help="Docker host IP NPM forwards to (env NPM_UPSTREAM_HOST)")
+    parser.add_argument("--zeus-upstream-host", default=None,
+                        help="Docker host IP for the shared Zeus subscribe portal (env ZEUS_UPSTREAM_HOST)")
     parser.add_argument("--letsencrypt-email", default=None, help="email for Let's Encrypt certs (env NPM_LETSENCRYPT_EMAIL)")
     parser.add_argument("--wildcard", action="store_true",
                         help="issue ONE wildcard cert (*.base + base) via DNS-01 and attach it to every host (env NPM_WILDCARD_CERT)")
@@ -516,6 +523,7 @@ def main() -> int:
     # else the PBX media address from .env.
     explicit_upstream = args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
     upstream = explicit_upstream or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+    zeus_upstream = args.zeus_upstream_host or cfg(args, "ZEUS_UPSTREAM_HOST", "")
     if upstream and not explicit_upstream:
         # Say it out loud. That fallback is THIS process's LAN address, which is
         # only the right forward target when the stack runs here — run the sync
@@ -536,6 +544,9 @@ def main() -> int:
     if not upstream:
         print("FAIL NPM_UPSTREAM_HOST (or PJSIP_MEDIA_ADDRESS) is empty — set the Docker host IP in .env", file=sys.stderr)
         return 1
+    if not zeus_upstream:
+        print("FAIL ZEUS_UPSTREAM_HOST is empty — subscribe.<domain> serves the Zeus portal and must not use the Capstone upstream", file=sys.stderr)
+        return 1
 
     optional = {s.strip() for s in include_raw.split(",") if s.strip()}
     if "all" in optional:
@@ -549,6 +560,8 @@ def main() -> int:
     for h in hosts:
         if h["key"] in MEDIA_HOST_KEYS:
             h.setdefault("locations", [media_location(upstream)])
+        if h.get("host_key") == "ZEUS_UPSTREAM_HOST":
+            h["forward_host"] = zeus_upstream
     if args.ws_scheme is not None or args.ws_port is not None:
         for h in hosts:
             if h["key"] == "voice":
@@ -656,16 +669,17 @@ def main() -> int:
                 # let the diff below report whatever else has drifted.
                 cert_id = (existing or {}).get("certificate_id") if existing else None
 
-        want = desired(domain, h, upstream, cert_id, ssl)
+        host_forward = h.get("forward_host") or upstream
+        want = desired(domain, h, host_forward, cert_id, ssl)
         if existing is None:
             if args.check:
                 print(f"FAIL {label} — proxy host {domain} missing")
                 failed.append(domain)
                 continue
             try:
-                api.create_proxy_host(build_payload(domain, h, upstream, cert_id, ssl))
+                api.create_proxy_host(build_payload(domain, h, host_forward, cert_id, ssl))
                 created += 1
-                print(f"PASS {label} — created {domain} → {h['scheme']}://{upstream}:{h['port']}")
+                print(f"PASS {label} — created {domain} → {h['scheme']}://{host_forward}:{h['port']}")
             except (NpmError, urllib.error.URLError, OSError) as e:
                 print(f"FAIL {label} — could not create {domain}: {e}", file=sys.stderr)
                 failed.append(domain)

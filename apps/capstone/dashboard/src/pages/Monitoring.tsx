@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMetricsPolling } from '../hooks/useMetricsPolling';
 import { formatBytes } from '../lib/utils';
 import Chart from '../components/Chart';
@@ -12,9 +13,41 @@ const snapshotCards = [
   { label: 'Network In', value: (s: { networkIn: number }) => formatBytes(s.networkIn), color: 'bg-info', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg> },
   { label: 'Network Out', value: (s: { networkOut: number }) => formatBytes(s.networkOut), color: 'bg-info', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M2 12h4l3-9L15 3l3 9H22" /></svg> },
   { label: 'Request Rate', value: (s: { requestRate: number }) => `${s.requestRate.toLocaleString()} req/s`, color: 'bg-primary', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg> },
-  { label: 'Error Rate', value: (s: { errorRate: number }) => `${s.errorRate.toFixed(2)}%`, color: (s: { errorRate: number }) => s.errorRate > 1 ? 'bg-danger' : 'bg-warning', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
+  { label: 'Error Rate', value: (s: { errorRate: number }) => `${s.errorRate.toFixed(2)}%`, color: (s: { errorRate: number }) => s.errorRate >= 5 ? 'bg-danger' : s.errorRate >= 1 ? 'bg-warning' : 'bg-success', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg> },
   { label: 'Active Sessions', value: (s: { activeSessions: number }) => s.activeSessions.toString(), color: 'bg-accent', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> },
 ];
+
+type Snapshot = ReturnType<typeof useMetricsPolling>['snapshot'];
+
+function snapshotDestination(label: string, snapshot: Snapshot): { to: string; title: string } | null {
+  const resource = label === 'CPU'
+    ? snapshot.cpuPercent
+    : label === 'Memory'
+      ? snapshot.memoryPercent
+      : label === 'Disk'
+        ? snapshot.diskPercent
+        : null;
+  if (resource !== null && resource >= 80) {
+    const status = resource >= 90 ? 'critical' : 'warning';
+    return { to: `/services?status=${status}`, title: `View ${status} services` };
+  }
+  if (label === 'Error Rate' && snapshot.errorRate >= 1) {
+    const severity = snapshot.errorRate >= 5 ? 'critical' : 'warning';
+    return { to: `/alerts?severity=${severity}&status=open`, title: `View open ${severity} alerts` };
+  }
+  return null;
+}
+
+function snapshotPercent(label: string, snapshot: Snapshot): number {
+  if (label === 'CPU') return Math.min(100, snapshot.cpuPercent);
+  if (label === 'Memory') return Math.min(100, snapshot.memoryPercent);
+  if (label === 'Disk') return Math.min(100, snapshot.diskPercent);
+  if (label === 'Error Rate') return Math.min(100, snapshot.errorRate * 10);
+  if (label === 'Request Rate') return Math.min(100, snapshot.requestRate / 100);
+  if (label === 'Active Sessions') return Math.min(100, snapshot.activeSessions / 5);
+  if (label === 'Network In') return Math.min(100, snapshot.networkIn / 3_000_000);
+  return Math.min(100, snapshot.networkOut / 2_000_000);
+}
 
 const chartConfigs = (metrics: ReturnType<typeof useMetricsPolling>['metrics']) => [
   { key: 'cpu' as const, label: 'CPU %', color: 'hsl(var(--primary))', data: metrics.cpu, formatY: (v: number) => `${v.toFixed(0)}%` },
@@ -64,22 +97,35 @@ export default function Monitoring() {
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Current Resource Snapshot</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-          {snapshotCards.map(card => (
-            <div key={card.label} className="rounded-2xl border bg-card p-5 shadow-sm">
-              <div className="flex items-start justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.color}`}>
-                  {card.icon}
+          {snapshotCards.map(card => {
+            const destination = snapshotDestination(card.label, snapshot);
+            const color = typeof card.color === 'function' ? card.color(snapshot) : card.color;
+            const content = (
+              <>
+                <div className="flex items-start justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${color}`}>
+                    {card.icon}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-semibold">{typeof card.value === 'function' ? card.value(snapshot) : card.value}</span>
-              </div>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className={`h-full rounded-full ${card.color}`} style={{ width: card.label === 'CPU' ? `${Math.min(100, snapshot.cpuPercent)}%` : card.label === 'Memory' ? `${Math.min(100, snapshot.memoryPercent)}%` : card.label === 'Disk' ? `${Math.min(100, snapshot.diskPercent)}%` : card.label === 'Error Rate' ? `${Math.min(100, (snapshot.errorRate / 10) * 100)}%` : card.label === 'Request Rate' ? `${Math.min(100, (snapshot.requestRate / 10000) * 100)}%` : card.label === 'Active Sessions' ? `${Math.min(100, (snapshot.activeSessions / 500) * 100)}%` : card.label === 'Network In' ? `${Math.min(100, (snapshot.networkIn / 300_000_000) * 100)}%` : `${Math.min(100, (snapshot.networkOut / 200_000_000) * 100)}%` }} />
-              </div>
-            </div>
-          ))}
+                <div className="mt-3 flex items-end justify-between gap-2">
+                  <span className="text-2xl font-semibold">{typeof card.value === 'function' ? card.value(snapshot) : card.value}</span>
+                  {destination && <span className="text-[10px] font-medium text-primary">Investigate →</span>}
+                </div>
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className={`h-full rounded-full transition-[width] duration-500 ${color}`} style={{ width: `${snapshotPercent(card.label, snapshot)}%` }} />
+                </div>
+              </>
+            );
+            const className = 'block rounded-2xl border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md';
+            return destination ? (
+              <Link key={card.label} to={destination.to} title={destination.title} className={className}>
+                {content}
+              </Link>
+            ) : (
+              <div key={card.label} className={className}>{content}</div>
+            );
+          })}
         </div>
       </div>
 

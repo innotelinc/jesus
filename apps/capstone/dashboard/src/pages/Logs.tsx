@@ -20,6 +20,23 @@ function levelBadge(action: string) {
   return <span className="text-xs text-muted-foreground">{action}</span>;
 }
 
+function exportCSV(rows: object[]) {
+  const entries = rows as Record<string, unknown>[];
+  const headers = Array.from(new Set(entries.flatMap(entry => Object.keys(entry))));
+  const quote = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    headers.map(quote).join(','),
+    ...entries.map(entry => headers.map(header => quote(entry[header])).join(',')),
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'capstone-audit-log.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Logs() {
   const { auditLog } = useDashboardData();
   const [search, setSearch] = useState('');
@@ -37,7 +54,7 @@ export default function Logs() {
       const matchesActor = actorFilter === 'all' || entry.actor === actorFilter;
       return matchesSearch && matchesLevel && matchesActor;
     });
-  }, [search, levelFilter, actorFilter]);
+  }, [actorFilter, auditLog, levelFilter, search]);
 
   const uniqueActors = Array.from(new Set(auditLog.map(e => e.actor)));
 
@@ -59,16 +76,7 @@ export default function Logs() {
           <p className="mt-1 text-sm text-muted-foreground">Audit log entries for configuration changes, access, and operational actions.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => {
-            const csv = ['timestamp,actor,action,resource,details,ip', ...auditLog.map(e => `${e.timestamp},${e.actor},${e.action},${e.resource},${e.details},${e.ip}`)].join('\n');
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'capstone-audit-log.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}>
+          <Button variant="outline" size="sm" onClick={() => exportCSV(auditLog)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><path d="M12 15V3" /></svg>
             Export CSV
           </Button>
@@ -115,8 +123,8 @@ export default function Logs() {
         </div>
       </div>
 
-      <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
-        <table className="w-full border-collapse">
+      <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Time</th>
@@ -150,9 +158,6 @@ export default function Logs() {
                       {copyFeedback === entry.id ? 'Copied' : (
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
                       )}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
                     </Button>
                   </div>
                 </td>

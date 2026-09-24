@@ -207,6 +207,42 @@ A number can either ring voicemail as today (transcript + summary, with the
 summary LLM call routed to OmniRoute) or be answered by an agent instead of
 the mailbox — a per-number routing decision owned by the agent config.
 
+### 5.5 AVA → interview → AVA (shared voice plane only)
+
+This is the one supported interview hand-back, and it is deliberately **not** a
+second call:
+
+1. Zeus routes the DID through `[zeus-ai-router]`, stamps the call envelope
+   (`AI_CALL_ID`, `AI_CONTEXT_TOKEN`, `AI_ACCOUNT`, `AI_AGENT`, caller facts),
+   and sends the call to AVA.
+2. AVA's interview hand-off enters `[zeus-ai-interview]`, checks the entitlement,
+   and reaches the account's bound `[dograh-inbound]` workflow.
+3. Dograh's ARI manager reads the Zeus envelope from the live channel and copies
+   it into `initial_context.zeus_context`; the workflow can greet the caller by
+   name without asking for facts Zeus already knows.
+4. When the interview ends, ARIHangupStrategy checks
+   `ZEUS_RETURN_ENABLED`. If the call carries `AI_CONTEXT_TOKEN`, it writes
+   `ZEUS_RETURN_OUTCOME=interview_complete` and redirects the **same channel**
+   to `[zeus-ai-return]` with ARI. The ordinary delete path is used for every
+   call without that envelope, so standalone Dograh is unchanged.
+5. `[zeus-ai-return]` re-enters the original `AI_AGENT` in AVA. AVA can fetch the
+   same context, sees `return_outcome`, and continues or escalates to the
+   operator. Zeus's `voice_calls` row records `capstone → ava` as the path.
+
+**Activation is deployment-owned:** set `ZEUS_RETURN_ENABLED=true` in the
+Capstone compose environment only after the Zeus return context is converged and
+`VOICE_CONTEXT_SECRET` is shared with the agents. The default is `false`, which
+keeps standalone installs safe.
+
+**Deployed on the shared `.30` host (2026-09-24):** Dograh runs the patched API
+with the opt-in enabled and healthy; the Zeus return context is loaded; the
+portal's authenticated context route and AVA admin source are live. The
+customer-call acceptance is deliberately still open: no Zeus `voice_bindings`
+rows or pilot DID route have been activated, and the `7745057135` / `8005` /
+*Job Interview* mismatch remains. Do not describe the return as live for
+customers until one pilot call proves the same channel and call id survive
+Dograh → `[zeus-ai-return]` → AVA.
+
 ## 6. Data & identity contracts
 
 - **Identity:** Authentik is the only IdP. Zeus `user_id` and the dograh
@@ -262,7 +298,10 @@ the mailbox — a per-number routing decision owned by the agent config.
    see §8 G8 for why a FreePBX menu entry would need a module, and the Zeus
    repo's `docs/ava-capstone-convergence.md` §7 for the surfaces as built.
 6. **Wire outcome write-back** (contract above) so agent calls show in Zeus
-   call history with playback.
+   call history with playback. **Interview hand-back is now implemented in the
+   shared-plane path:** set `ZEUS_RETURN_ENABLED=true`, converge Zeus's
+   `[zeus-ai-return]`, share `VOICE_CONTEXT_SECRET`, and test one controlled
+   call end-to-end. Do not enable the switch in standalone mode.
 7. **Deprecate the bundled Capstone PBX** as the default topology — keep the
    standalone compose only for development/offline installs.
 8. **Add the Magnate entitlement** gating agent routing per number/plan

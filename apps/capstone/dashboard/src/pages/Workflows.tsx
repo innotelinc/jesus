@@ -70,7 +70,7 @@ export default function Workflows() {
     window.setTimeout(() => setNotice(null), 5000);
   };
 
-  const handleEdit = async (id: number) => {
+  const handleEdit = useCallback(async (id: number) => {
     setBusy(true);
     setError(null);
     try {
@@ -80,7 +80,7 @@ export default function Workflows() {
     } finally {
       setBusy(false);
     }
-  };
+  }, []);
 
   // Archived rows are hidden unless the toggle is on (the deep-link below still
   // opens one — the Agents page can link to a bound-but-archived workflow).
@@ -94,9 +94,7 @@ export default function Workflows() {
     if (!workflows.some(w => String(w.id) === raw)) return;
     openedWorkflowParam.current = raw;
     void handleEdit(Number(raw));
-    // handleEdit only runs once per ?workflow= value (guarded by the ref).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, workflows]);
+  }, [handleEdit, searchParams, workflows]);
 
   const handleStatus = async (workflow: AgentWorkflow, next: 'active' | 'archived') => {
     const bound = agents.filter(a => a.workflowId === workflow.id);
