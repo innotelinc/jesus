@@ -236,12 +236,16 @@ keeps standalone installs safe.
 
 **Deployed on the shared `.30` host (2026-09-24):** Dograh runs the patched API
 with the opt-in enabled and healthy; the Zeus return context is loaded; the
-portal's authenticated context route and AVA admin source are live. The
-customer-call acceptance is deliberately still open: no Zeus `voice_bindings`
-rows or pilot DID route have been activated, and the `7745057135` / `8005` /
-*Job Interview* mismatch remains. Do not describe the return as live for
-customers until one pilot call proves the same channel and call id survive
-Dograh → `[zeus-ai-return]` → AVA.
+portal's authenticated context route and AVA admin source are live. One pilot
+binding is now configured through the Zeus API (`4132643964 → 8000`, IT Help
+Desk Mock Interview), and the live PBX has all seven platform DIDs on the Zeus
+router, with only the pilot DID carrying a non-empty interview target. The
+customer-call acceptance is deliberately still open: a local-media origination
+was rejected by Asterisk before AVA answered, so no same-channel Dograh →
+`[zeus-ai-return]` → AVA transcript is claimed. The next step is one controlled
+external call to `4132643964`, followed by verification of the shared call id,
+return outcome, and both transcripts. The `7745057135` / `8005` / *Job
+Interview* mismatch remains unreconciled.
 
 ## 6. Data & identity contracts
 
