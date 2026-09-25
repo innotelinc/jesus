@@ -4,6 +4,7 @@ import { api, type Agent, type AgentWorkflow, type StasisHealth, type Workflow }
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
+import Select from '../components/Select';
 import Spinner from '../components/Spinner';
 import WorkflowForm from '../components/WorkflowForm';
 import { cn } from '../lib/utils';
@@ -540,16 +541,16 @@ export default function Agents() {
               </div>
             ) : (
               <>
-                <select
-                  className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                <Select
+                  className="mt-1"
+                  ariaLabel="Inbound workflow"
                   value={newWorkflow}
-                  onChange={e => setNewWorkflow(e.target.value)}
-                >
-                  <option value="">— no inbound workflow (outbound only) —</option>
-                  {bindableWorkflows.map(w => (
-                    <option key={w.id} value={String(w.id)}>{w.name}</option>
-                  ))}
-                </select>
+                  onChange={setNewWorkflow}
+                  options={[
+                    { value: '', label: '— no inbound workflow (outbound only) —' },
+                    ...bindableWorkflows.map(w => ({ value: String(w.id), label: w.name })),
+                  ]}
+                />
                 <p className="mt-1 text-xs text-muted-foreground">
                   Calls to this number run this workflow. Create one here — describe it, or use the
                   guided template — and it's imported into dograh automatically, or pick one that
@@ -606,18 +607,19 @@ export default function Agents() {
                 </div>
               ) : (
                 <>
-                  <select
-                    className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  <Select
+                    className="mt-1"
+                    ariaLabel="Inbound workflow"
                     value={editWorkflow}
-                    onChange={e => setEditWorkflow(e.target.value)}
-                  >
-                    <option value="">— no inbound workflow (outbound only) —</option>
-                    {editWorkflowChoices.map(w => (
-                      <option key={w.id} value={String(w.id)}>
-                        {w.name}{w.status === 'archived' ? ' (archived)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setEditWorkflow}
+                    options={[
+                      { value: '', label: '— no inbound workflow (outbound only) —' },
+                      ...editWorkflowChoices.map(w => ({
+                        value: String(w.id),
+                        label: `${w.name}${w.status === 'archived' ? ' (archived)' : ''}`,
+                      })),
+                    ]}
+                  />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Edit the workflow's persona/greeting/script right here, or re-point the number at
                     another one. The number itself is immutable in dograh — to renumber an agent,

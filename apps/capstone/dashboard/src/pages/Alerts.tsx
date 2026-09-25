@@ -6,6 +6,7 @@ import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
+import Select from '../components/Select';
 import { cn, formatRelativeTime } from '../lib/utils';
 
 function severityColor(severity: string) {
@@ -277,18 +278,15 @@ export default function Alerts() {
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-medium">Assign to</label>
-              <select
-                className="h-9 w-full rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              <Select
+                ariaLabel="Assign to"
                 value={assignee}
-                onChange={e => setAssignee(e.target.value)}
-              >
-                <option>Automation</option>
-                <option>DevOps</option>
-                <option>SRE</option>
-                <option>Platform</option>
-                <option>Voice</option>
-                <option>Data</option>
-              </select>
+                onChange={setAssignee}
+                options={['Automation', 'DevOps', 'SRE', 'Platform', 'Voice', 'Data'].map(name => ({
+                  value: name,
+                  label: name,
+                }))}
+              />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" size="sm" onClick={() => setEscalateModalOpen(false)}>Cancel</Button>

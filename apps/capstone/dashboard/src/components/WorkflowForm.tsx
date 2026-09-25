@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, type Workflow, type WorkflowMode, type WorkflowNode } from '../lib/api';
 import Button from './Button';
 import Input from './Input';
+import Select from './Select';
 import { cn } from '../lib/utils';
 
 const NODE_LABELS: Record<string, string> = {
@@ -185,16 +186,18 @@ export default function WorkflowForm({ workflow, onSaved, onCancel }: WorkflowFo
           {mode !== 'ai' && (
             <div>
               <label className="text-sm font-medium">Use case</label>
-              <select
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              <Select
+                className="mt-1"
+                ariaLabel="Use case"
                 value={useCase}
-                onChange={e => setUseCase(e.target.value)}
-              >
-                <option value="inbound">inbound</option>
-                <option value="outbound">outbound</option>
-                <option value="survey">survey</option>
-                <option value="interview">interview</option>
-              </select>
+                onChange={setUseCase}
+                options={[
+                  { value: 'inbound', label: 'inbound' },
+                  { value: 'outbound', label: 'outbound' },
+                  { value: 'survey', label: 'survey' },
+                  { value: 'interview', label: 'interview' },
+                ]}
+              />
             </div>
           )}
 
