@@ -257,6 +257,8 @@
     "view_source": "צפה במקור",
     "fullscreen": "מסך מלא",
     "exit_fullscreen": "יציאה ממסך מלא",
+    "view_in_dark_mode": "הצגה במצב כהה",
+    "view_in_light_mode": "הצגה במצב בהיר",
     "export_email": "ייצא כ-.eml",
     "forward_as_attachment": "העבר כקובץ מצורף",
     "import_email": "ייבוא .eml",

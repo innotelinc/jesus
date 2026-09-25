@@ -310,6 +310,8 @@
     "view_source": "Vis meldingskilde",
     "fullscreen": "Fullskjerm",
     "exit_fullscreen": "Avslutt fullskjerm",
+    "view_in_dark_mode": "Vis i mørk modus",
+    "view_in_light_mode": "Vis i lys modus",
     "export_email": "Eksporter som .eml",
     "forward_as_attachment": "Videresend som vedlegg",
     "import_email": "Importer .eml eller .zip",

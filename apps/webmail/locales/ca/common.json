@@ -310,6 +310,8 @@
     "view_source": "Mostra el codi font",
     "fullscreen": "Pantalla completa",
     "exit_fullscreen": "Surt de la pantalla completa",
+    "view_in_dark_mode": "Veure en mode fosc",
+    "view_in_light_mode": "Veure en mode clar",
     "export_email": "Exporta com a .eml",
     "forward_as_attachment": "Reenvia com a fitxer adjunt",
     "import_email": "Importa .eml o .zip",

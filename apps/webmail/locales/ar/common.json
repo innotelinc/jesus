@@ -310,6 +310,8 @@
     "view_source": "عرض المصدر",
     "fullscreen": "ملء الشاشة",
     "exit_fullscreen": "الخروج من ملء الشاشة",
+    "view_in_dark_mode": "عرض في الوضع الداكن",
+    "view_in_light_mode": "عرض في الوضع الفاتح",
     "export_email": "تصدير كملف ‎.eml",
     "forward_as_attachment": "إعادة التوجيه كمرفق",
     "import_email": "استيراد ملف ‎.eml أو ‎.zip",

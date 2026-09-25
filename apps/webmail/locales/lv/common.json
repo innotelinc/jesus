@@ -310,6 +310,8 @@
     "view_source": "Skatīt avota kodu",
     "fullscreen": "Pilnekrāna režīms",
     "exit_fullscreen": "Iziet no pilnekrāna režīma",
+    "view_in_dark_mode": "Skatīt tumšajā režīmā",
+    "view_in_light_mode": "Skatīt gaišajā režīmā",
     "export_email": "Eksportēt kā .eml",
     "forward_as_attachment": "Pārsūtīt kā pielikumu",
     "import_email": "Importēt .eml vai .zip",

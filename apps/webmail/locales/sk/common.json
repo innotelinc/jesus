@@ -310,6 +310,8 @@
     "view_source": "Zobraziť zdrojový kód",
     "fullscreen": "Celá obrazovka",
     "exit_fullscreen": "Ukončiť režim celej obrazovky",
+    "view_in_dark_mode": "Zobraziť v tmavom režime",
+    "view_in_light_mode": "Zobraziť v svetlom režime",
     "export_email": "Exportovať ako .eml",
     "forward_as_attachment": "Preposlať ako prílohu",
     "import_email": "Importovať .eml alebo .zip",

@@ -310,6 +310,8 @@
     "view_source": "Bron bekijken",
     "fullscreen": "Volledig scherm",
     "exit_fullscreen": "Volledig scherm sluiten",
+    "view_in_dark_mode": "Weergeven in donkere modus",
+    "view_in_light_mode": "Weergeven in lichte modus",
     "export_email": "Exporteren als .eml",
     "forward_as_attachment": "Doorsturen als bijlage",
     "import_email": ".eml of .zip importeren",
