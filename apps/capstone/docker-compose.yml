@@ -436,11 +436,16 @@ services:
     memswap_limit: 8g
     # Torch/OpenMP size their thread pools (and thread-local arenas) from the
     # core count; on an 8-core host that multiplies the load-time allocation
-    # spike past even 6 GiB. Two threads per pool keeps the boot allocation
-    # bounded — synthesis stays well under 1.5 GiB either way.
+    # spike past even 6 GiB. Two threads per pool kept the boot allocation
+    # bounded, but it also pinned synthesis to two of the host's eight cores,
+    # where one interview-sized sentence took ~5-9 s to generate ~7 s of audio
+    # (RTF ~1.25) — slower than playback, so the caller heard the audio
+    # underrun. Four threads measured 2.3x faster (3.0-3.5 s, RTF ~0.48) and
+    # still boots clean at ~1.1 GiB steady-state. The spike scales with the
+    # pool, so raise this further only against a measurement, not a core count.
     environment:
-      OMP_NUM_THREADS: "2"
-      MKL_NUM_THREADS: "2"
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
       KMP_INIT_AT_FORK: "FALSE"
       KMP_AFFINITY: "granularity=fine,compact,1,0"
     # GPU? Use ghcr.io/remsky/kokoro-fastapi-gpu:latest and add:
