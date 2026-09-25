@@ -109,10 +109,38 @@ def _sql(value: str) -> str:
     return value.replace("'", "''")
 
 
+# FreePBX's `custom_extensions`.`description` column caps at 40 characters.
+DESC_MAX = 40
+
+
+def fit_description(marker: str, purpose: str, maxlen: int = DESC_MAX) -> str:
+    """`marker (purpose)` within `maxlen`, dropping a short trailing fragment.
+
+    The plain truncation this replaces produced "(Get Out The Vote Pol)" — the
+    stinger of a longer word, which makes the FreePBX title look corrupted.
+    Backing off to the previous space when only a short fragment would remain
+    fixes that ("(Get Out The Vote)"). A longer trailing fragment is left in
+    place, because it is visibly a truncation and still tells an operator which
+    agent the row is — dropping it would lose the distinguishing word.
+    """
+    budget = maxlen - len(marker) - 3  # 2 for " (" + 1 for ")"
+    if budget <= 0:
+        return marker[:maxlen]
+    if len(purpose) <= budget:
+        return f"{marker} ({purpose})"
+    cut = purpose[:budget].rstrip()
+    space = cut.rfind(" ")
+    if space > 0 and len(cut) - space <= 6:
+        cut = cut[:space]
+    if not cut:
+        cut = purpose[:budget]
+    return _ascii(f"{marker} ({cut})", maxlen)
+
+
 def agent_description(label: str, workflow_name: str = "") -> str:
     """FreePBX description for a dograh agent row (schema caps at 40 chars)."""
     purpose = workflow_name or label or "agent"
-    return _ascii(f"{DESC_MARKER} ({purpose})", 40)
+    return fit_description(DESC_MARKER, purpose)
 
 
 # ── dograh API client ─────────────────────────────────────────────────────
@@ -436,9 +464,16 @@ def refresh_inbound_route_description_sql(did: str, description: str) -> str:
 
 
 def refresh_custom_dest_description_sql(table: str, dest_id: str, description: str) -> str:
-    """Update a custom destination's description in the kvstore row."""
+    """Update a custom destination's description in the kvstore row.
+
+    `val` is already the JSON document, so it goes to `JSON_SET` as-is. The
+    `CAST(`val` AS JSON)` this used to wrap it in is **MySQL-only**: FreePBX 17
+    runs MariaDB, which has no `JSON` cast target, and the statement died with
+    "check the manual ... near 'JSON)'" before it touched a row. MariaDB (10.2.3+)
+    does have `JSON_SET`, so dropping the cast is the whole fix.
+    """
     return (
-        f"UPDATE `{table}` SET `val`=JSON_SET(CAST(`val` AS JSON),'$.description','{_sql(description)}') "
+        f"UPDATE `{table}` SET `val`=JSON_SET(`val`,'$.description','{_sql(description)}') "
         f"WHERE `id`='dests' AND `key`='{_sql(dest_id)}'"
     )
 

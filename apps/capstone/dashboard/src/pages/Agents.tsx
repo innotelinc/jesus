@@ -257,6 +257,64 @@ export default function Agents() {
     }
   };
 
+  /**
+   * A row that is not fully wired. `partial` is the one that matters: a
+   * provisioning run that failed part-way leaves the extension row without
+   * its inbound route, and the repair is to re-run the same idempotent
+   * writers — no edit required.
+   */
+  const needsResync = (agent: Agent) =>
+    mode === 'standalone' &&
+    !!agent.pbx?.status &&
+    agent.pbx.status !== 'provisioned' &&
+    agent.pbx.status !== 'pending-sync';
+
+  const handleSync = async (agent: Agent) => {
+    setBusy(String(agent.id));
+    setError(null);
+    try {
+      const res = await api.syncAgent(agent.id);
+      showWarnings(res.warnings, `Agent ${agent.label} re-synced with FreePBX`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Re-sync failed');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    const target = agents.filter(needsResync);
+    if (target.length === 0) {
+      flash('Every agent is already fully provisioned.');
+      return;
+    }
+    setBusy('sync-all');
+    setError(null);
+    const warnings: string[] = [];
+    let repaired = 0;
+    try {
+      // Sequential on purpose: each sync ends in an `fwconsole reload`, and two
+      // reloads at once is how a PBX ends up with a half-applied config.
+      for (const agent of target) {
+        try {
+          const res = await api.syncAgent(agent.id);
+          if (res.warnings?.length) warnings.push(...res.warnings.map(w => `${agent.label}: ${w}`));
+          repaired += 1;
+        } catch (e) {
+          warnings.push(`${agent.label}: ${e instanceof Error ? e.message : 're-sync failed'}`);
+        }
+      }
+      showWarnings(
+        warnings,
+        `Re-synced ${repaired} of ${target.length} agent${target.length === 1 ? '' : 's'} with FreePBX`,
+      );
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  };
+
   // Archived workflows aren't offered for new bindings; the one already bound
   // to the agent being edited stays listed so the selector never goes blank.
   const bindableWorkflows = workflows.filter(w => w.status !== 'archived');
@@ -276,7 +334,19 @@ export default function Agents() {
           </p>
         </div>
         {configured && (
-          <Button onClick={() => { setCreateWorkflowOpen(false); setCreateOpen(true); }} disabled={!configured}>Add agent</Button>
+          <div className="flex items-center gap-2">
+            {agents.some(needsResync) && (
+              <Button
+                variant="outline"
+                onClick={() => void handleSyncAll()}
+                disabled={busy === 'sync-all'}
+                title="Re-apply the FreePBX extension, inbound route and dialplan entry for every agent that is not fully provisioned"
+              >
+                {busy === 'sync-all' ? 'Re-syncing…' : 'Re-sync partial'}
+              </Button>
+            )}
+            <Button onClick={() => { setCreateWorkflowOpen(false); setCreateOpen(true); }} disabled={!configured}>Add agent</Button>
+          </div>
         )}
       </div>
 
@@ -384,6 +454,16 @@ export default function Agents() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex justify-end gap-2">
+                        {needsResync(agent) && (
+                          <button
+                            className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
+                            disabled={busy === String(agent.id)}
+                            title="Re-apply this agent's FreePBX extension, inbound route and dialplan entry"
+                            onClick={() => void handleSync(agent)}
+                          >
+                            Re-sync
+                          </button>
+                        )}
                         <button
                           className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                           disabled={busy === String(agent.id)}

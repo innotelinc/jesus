@@ -2283,6 +2283,39 @@ def agents_update(phone_id: int, body: dict, user: dict = Depends(require_sessio
     return {"agent": agent, "mode": mode, "warnings": warnings}
 
 
+@app.post("/agents/{phone_id}/sync")
+def agents_sync(phone_id: int, user: dict = Depends(require_session)):
+    """Re-apply one agent's FreePBX rows without changing anything in dograh.
+
+    The repair path the Agents page offers when a row reads **Partial**. A
+    provisioning run that failed part-way — most recently the MariaDB-rejected
+    `CAST(... AS JSON)` taking the whole apply down with it — leaves the
+    extension row written but the inbound route (and the reload behind it)
+    never reached. Every writer involved is idempotent, so re-running the same
+    sequence converges the row without touching the agent's label, workflow or
+    active flag.
+    """
+    mode = agents.deploy_mode()
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(status_code=503,
+                            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once")
+    try:
+        rows = client.list_agents()
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    agent = next((a for a in rows if a.get("id") == int(phone_id)), None)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"no dograh agent with id {phone_id}")
+    warnings = []
+    if mode == "standalone":
+        try:
+            _provision_agent_pbx(agent, client)
+        except HTTPException as exc:
+            warnings.append(exc.detail)
+    return {"agent": agent, "mode": mode, "warnings": warnings}
+
+
 @app.delete("/agents/{phone_id}")
 def agents_delete(phone_id: int, user: dict = Depends(require_session)):
     """Delete a dograh agent and remove its FreePBX rows (standalone)."""
@@ -2518,8 +2551,23 @@ def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool) -> dict:
     status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
     if not (has_ext or has_route or has_dp):
         status = "not-provisioned"
-    return {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
-            "dialplan": has_dp}
+    payload = {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
+               "dialplan": has_dp}
+    if status == "partial":
+        # Name the missing piece. "Partial" alone is not actionable, and the
+        # common cause is a provisioning run that failed part-way (see the
+        # re-sync action), which leaves the row half-wired until it is re-run.
+        missing = [
+            name
+            for name, present in (
+                ("extension", has_ext),
+                ("inbound route", has_route),
+                ("dialplan entry", has_dp),
+            )
+            if not present
+        ]
+        payload["detail"] = f"Missing {', '.join(missing)} — re-sync to repair."
+    return payload
 
 
 def _pbx_provisioning_counts(exts: list[str]) -> dict[str, tuple[bool, bool]]:

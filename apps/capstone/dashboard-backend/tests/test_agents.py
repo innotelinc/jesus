@@ -334,6 +334,25 @@ class FreePbxBuildersTest(unittest.TestCase):
         sql = agents.upsert_custom_extension_sql("8009", "O'Brien's Agent", "")
         self.assertIn("O''Brien''s Agent", sql)
 
+    def test_custom_dest_refresh_has_no_mysql_only_json_cast(self):
+        # FreePBX 17 runs MariaDB, which has no `CAST(x AS JSON)` — the
+        # statement failed with a syntax error (near `JSON)`) before it touched
+        # a row. `val` is already the JSON document, so JSON_SET takes it
+        # directly. This pins the portability fix, not the description.
+        sql = agents.refresh_custom_dest_description_sql(
+            "kvstore_FreePBX_modules_Customappsreg",
+            "8",
+            "Dograh Voice Agent (Get Out The Vote Pol",
+        )
+        self.assertIn("JSON_SET(`val`,", sql)
+        self.assertNotIn("CAST(", sql)
+        self.assertIn("'$.description'", sql)
+        self.assertIn("WHERE `id`='dests' AND `key`='8'", sql)
+
+    def test_custom_dest_refresh_escapes_the_description(self):
+        sql = agents.refresh_custom_dest_description_sql("kvstore_Customappsreg", "8", "O'Brien")
+        self.assertIn("O''Brien", sql)
+
     def test_delete_custom_extension_targets_ext_only(self):
         sql = agents.delete_custom_extension_sql("8008")
         self.assertIn("DELETE FROM `custom_extensions` WHERE `custom_exten`='8008'", sql)

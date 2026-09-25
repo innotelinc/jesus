@@ -371,6 +371,9 @@ export const api = {
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>('/agents', body),
   updateAgent: (id: number, body: AgentUpdate) =>
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}`, body, 'PUT'),
+  /** Re-apply one agent's FreePBX rows without changing the agent (repairs Partial). */
+  syncAgent: (id: number) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}/sync`, {}),
   deleteAgent: (id: number) =>
     deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
   /** Deleted rows are hidden unless `includeDeleted` (the reports page toggle). */
