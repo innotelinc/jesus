@@ -231,6 +231,32 @@ describe('enableWebPush', () => {
     expect(calls.some((c) => c.url.endsWith('/api/push/register/web'))).toBe(true);
   });
 
+  it('subscribes anyway when the browser cannot retrieve the existing subscription', async () => {
+    // Firefox rejects the lookup with `AbortError: Error retrieving push
+    // subscription` when its local record is stale; that must not abort enable.
+    const { registration } = installPushBrowser();
+    registration.pushManager.getSubscription.mockRejectedValue(
+      new DOMException('Error retrieving push subscription', 'AbortError'),
+    );
+    installFetch({});
+
+    const result = await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+    expect(result.subscriptionId).toBe('push-new');
+  });
+
+  it('still subscribes when unsubscribing the mismatched subscription fails', async () => {
+    const { browserSub, registration } = installPushBrowser();
+    browserSub.options.applicationServerKey = new Uint8Array([9, 9, 9]).buffer;
+    browserSub.unsubscribe.mockRejectedValue(new Error('unsubscribe failed'));
+    installFetch({});
+
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+  });
+
   it('replaces a browser subscription whose key the browser does not expose', async () => {
     const { browserSub, registration } = installPushBrowser();
     browserSub.options.applicationServerKey = null;
