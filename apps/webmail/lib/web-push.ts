@@ -424,12 +424,19 @@ export async function enableWebPush(
   // service on every send - Mozilla answers 401 "VAPID public key mismatch" -
   // while isWebPushEnabled keeps reporting push as on.
   const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-  let pushSubscription = await registration.pushManager.getSubscription();
+  // A stale or broken local record makes Firefox reject the lookup itself with
+  // `AbortError: Error retrieving push subscription`, which would abort the
+  // whole enable. There is nothing to reuse in that case, so carry on to
+  // subscribe() and let its own error surface if the push service is really
+  // unreachable.
+  let pushSubscription = await registration.pushManager.getSubscription().catch(() => null);
   if (
     pushSubscription
     && !sameKey(pushSubscription.options?.applicationServerKey, applicationServerKey)
   ) {
-    await pushSubscription.unsubscribe();
+    // An unsubscribe that fails leaves the old record in place; subscribing
+    // with the right key is what matters, so don't abort the enable for it.
+    await pushSubscription.unsubscribe().catch(() => undefined);
     pushSubscription = null;
   }
   if (!pushSubscription) {
