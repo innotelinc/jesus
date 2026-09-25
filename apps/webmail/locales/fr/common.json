@@ -310,6 +310,8 @@
     "view_source": "Voir la source",
     "fullscreen": "Plein écran",
     "exit_fullscreen": "Quitter le plein écran",
+    "view_in_dark_mode": "Afficher en mode sombre",
+    "view_in_light_mode": "Afficher en mode clair",
     "export_email": "Exporter en .eml",
     "forward_as_attachment": "Transférer en pièce jointe",
     "import_email": "Importer .eml ou .zip",

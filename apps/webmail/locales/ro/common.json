@@ -310,6 +310,8 @@
     "view_source": "Vizualizați sursa",
     "fullscreen": "Ecran complet",
     "exit_fullscreen": "Ieșire din ecran complet",
+    "view_in_dark_mode": "Vizualizare în modul întunecat",
+    "view_in_light_mode": "Vizualizare în modul luminos",
     "export_email": "Exportați ca fișier .eml",
     "forward_as_attachment": "Redirecționează ca atașament",
     "import_email": "Importați fișiere .eml sau .zip",

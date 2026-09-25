@@ -310,6 +310,8 @@
     "view_source": "مشاهده منبع",
     "fullscreen": "تمام‌صفحه",
     "exit_fullscreen": "خروج از تمام‌صفحه",
+    "view_in_dark_mode": "نمایش در حالت تیره",
+    "view_in_light_mode": "نمایش در حالت روشن",
     "export_email": "خروجی .eml",
     "forward_as_attachment": "ارسال به‌عنوان پیوست",
     "import_email": "وارد کردن .eml یا .zip",

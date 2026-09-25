@@ -3325,7 +3325,7 @@ export function EmailViewer({
           data-overflow-item
           data-overflow-priority="11"
           className="hidden sm:inline-flex h-8 gap-1.5"
-          title={isDark ? 'View in light mode' : 'View in dark mode'}
+          title={isDark ? t('view_in_light_mode') : t('view_in_dark_mode')}
           disabled={!effectiveEmailContent.isHtml}
           aria-disabled={!effectiveEmailContent.isHtml}
         >
@@ -3562,7 +3562,7 @@ export function EmailViewer({
                   className={cn("w-full px-3 py-1.5 text-sm text-start hover:bg-muted text-foreground flex items-center gap-2", hiddenPriorities.has(11) ? "" : "sm:hidden")}
                 >
                   {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  {isDark ? 'View in light mode' : 'View in dark mode'}
+                  {isDark ? t('view_in_light_mode') : t('view_in_dark_mode')}
                 </button>
               )}
               <div className="h-px bg-border my-1" />
@@ -3776,7 +3776,7 @@ export function EmailViewer({
                   className="w-full px-4 py-3 min-h-[44px] text-sm text-start hover:bg-muted text-foreground flex items-center gap-3"
                 >
                   {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                  {isDark ? 'View in light mode' : 'View in dark mode'}
+                  {isDark ? t('view_in_light_mode') : t('view_in_dark_mode')}
                 </button>
               )}
               <div className="h-px bg-border my-1" />

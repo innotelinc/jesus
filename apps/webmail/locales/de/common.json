@@ -310,6 +310,8 @@
     "view_source": "Quelltext anzeigen",
     "fullscreen": "Vollbild",
     "exit_fullscreen": "Vollbild beenden",
+    "view_in_dark_mode": "Im dunklen Modus anzeigen",
+    "view_in_light_mode": "Im hellen Modus anzeigen",
     "export_email": "Als .eml exportieren",
     "forward_as_attachment": "Als Anhang weiterleiten",
     "import_email": ".eml oder .zip importieren",
