@@ -310,6 +310,8 @@
     "view_source": "Vis kilde",
     "fullscreen": "Fuld skærm",
     "exit_fullscreen": "Afslut fuld skærm",
+    "view_in_dark_mode": "Vis i mørk tilstand",
+    "view_in_light_mode": "Vis i lys tilstand",
     "export_email": "Eksportér som .eml",
     "forward_as_attachment": "Videresend som vedhæftet fil",
     "import_email": "Importér .eml eller .zip",

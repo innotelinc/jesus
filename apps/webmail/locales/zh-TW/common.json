@@ -310,6 +310,8 @@
     "view_source": "檢視原始碼",
     "fullscreen": "全螢幕",
     "exit_fullscreen": "離開全螢幕",
+    "view_in_dark_mode": "深色模式檢視",
+    "view_in_light_mode": "淺色模式檢視",
     "export_email": "匯出為 .eml",
     "forward_as_attachment": "以附件形式轉寄",
     "import_email": "匯入 .eml 或 .zip",

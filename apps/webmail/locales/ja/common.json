@@ -310,6 +310,8 @@
     "view_source": "ソースを表示",
     "fullscreen": "全画面表示",
     "exit_fullscreen": "全画面表示を終了",
+    "view_in_dark_mode": "ダークモードで表示",
+    "view_in_light_mode": "ライトモードで表示",
     "export_email": ".emlとしてエクスポート",
     "forward_as_attachment": "添付ファイルとして転送",
     "import_email": ".eml または .zip をインポート",

@@ -310,6 +310,8 @@
     "view_source": "Forrás megtekintése",
     "fullscreen": "Teljes képernyő",
     "exit_fullscreen": "Kilépés a teljes képernyőből",
+    "view_in_dark_mode": "Megjelenítés sötét módban",
+    "view_in_light_mode": "Megjelenítés világos módban",
     "export_email": "Exportálás .eml-ként",
     "forward_as_attachment": "Továbbítás mellékletként",
     "import_email": "Importálás .eml vagy .zip fájlból",
