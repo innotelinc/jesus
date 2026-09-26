@@ -5,9 +5,9 @@ import { localeFromAcceptLanguage } from "./i18n/locale-matcher";
 import { isSameOriginRequest } from "./lib/security/same-origin";
 import { getEnabledPluginFrameOrigins } from "./lib/admin/csp-frame-origins";
 import {
-  APP_FRAME_ORIGINS_COOKIE,
   inlineAppFrameOrigins,
   parseAppFrameOrigins,
+  pickAppFrameOriginsCookie,
 } from "./lib/security/app-frame-origins";
 import { configManager } from "./lib/admin/config-manager";
 import { detectSetupState } from "./lib/setup/state";
@@ -283,7 +283,10 @@ export async function proxy(request: NextRequest) {
   const policy = configManager.getPolicy();
   const sidebarAppsEnabled = policy.features?.sidebarAppsEnabled !== false;
   const appFrameOrigins = sidebarAppsEnabled
-    ? parseAppFrameOrigins(request.cookies.get(APP_FRAME_ORIGINS_COOKIE)?.value)
+    ? parseAppFrameOrigins(pickAppFrameOriginsCookie(
+        (name) => request.cookies.get(name)?.value,
+        request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https",
+      ))
     : [];
 
   // Apps the operator pins for everyone (#931) are known server-side, so their
