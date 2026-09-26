@@ -746,6 +746,24 @@ describe('JMAPClient resilience', () => {
       URL.revokeObjectURL(objectUrl);
     });
 
+    it('never hands back an object URL typed as a script-bearing document', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>', {
+        status: 200,
+        headers: { 'Content-Type': 'image/svg+xml' },
+      }));
+      const created: Blob[] = [];
+      const spy = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+        created.push(blob as Blob);
+        return 'blob:test';
+      });
+
+      await client.fetchBlobAsObjectUrl('blob-svg', 'logo.svg', 'image/svg+xml');
+
+      expect(created[0].type).toBe('application/octet-stream');
+      spy.mockRestore();
+    });
+
     it('throws when download URL is not available', async () => {
       fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, makeSession({ downloadUrl: '' })));
       const client = new JMAPClient('https://mail.example.com', 'user@test.com', 'pass123');
