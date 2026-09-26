@@ -1,5 +1,8 @@
 name: Publish Docker Image on Release
 
+# `latest` moves only for a published stable release, or for a manual run
+# dispatched on a stable release tag (to rebuild one). A dispatch on a
+# branch builds nothing that the demo deploy or Watchtower users follow.
 on:
   release:
     types: [published]
@@ -101,7 +104,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name != 'release' || !github.event.release.prerelease }}
+            type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')) }}
             type=semver,pattern=v{{version}}
             type=semver,pattern={{version}}
             type=semver,pattern=v{{major}}.{{minor}}
@@ -212,7 +215,7 @@ jobs:
           flavor: |
             suffix=-always,onlatest=true
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name != 'release' || !github.event.release.prerelease }}
+            type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')) }}
             type=semver,pattern=v{{version}}
             type=semver,pattern={{version}}
             type=semver,pattern=v{{major}}.{{minor}}
