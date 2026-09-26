@@ -1115,7 +1115,7 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   // Remove persisted state AFTER the final set() so the persist middleware
   // doesn't re-write stale values.
   try { localStorage.removeItem('auth-storage'); } catch { /* noop */ }
-  try { localStorage.removeItem('account-storage'); } catch { /* noop */ }
+  try { localStorage.removeItem('account-registry'); } catch { /* noop */ }
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -1859,6 +1859,7 @@ export const useAuthStore = create<AuthState>()(
         // Check if there are remaining accounts to switch to. Read the store
         // afresh: `accountStore` is the state from before removeAccount().
         const nextAccount = wasDemoMode ? undefined : useAccountStore.getState().accounts[0];
+        const droppedAccounts: AccountEntry[] = [];
 
         if (nextAccount) {
           // Switch to the next account - this is the one path that stays in-app
@@ -1905,9 +1906,18 @@ export const useAuthStore = create<AuthState>()(
 
           // Client not in memory - sign out fully instead.
           // Trying to async-restore during logout caused the original bug.
+          // A full logout leaves no account behind: drop every remaining one
+          // and clear its slot too. Left in place, its remembered session
+          // would sign the next visitor of this browser straight back in.
           debug.error(`Cannot restore next account ${nextAccount.id}, performing full logout`);
-          evictAccount(nextAccount.id);
-          accountStore.removeAccount(nextAccount.id);
+          for (const remaining of useAccountStore.getState().accounts) {
+            droppedAccounts.push(remaining);
+            clearRefreshTimer(remaining.id);
+            clients.get(remaining.id)?.disconnect();
+            clients.delete(remaining.id);
+            evictAccount(remaining.id);
+            accountStore.removeAccount(remaining.id);
+          }
         }
 
         // Full logout. The credentials are cleared before the page state:
@@ -1915,7 +1925,10 @@ export const useAuthStore = create<AuthState>()(
         // would cut the cleanup short. Awaiting it also means the provider's
         // logout URL is known before navigating, and nothing is left to
         // resume the session when the browser comes back.
-        const endSessionUrl = wasDemoMode ? null : await clearSlotCredentials(slot, wasOAuth, endProviderSession);
+        const [endSessionUrl] = wasDemoMode ? [null] : await Promise.all([
+          clearSlotCredentials(slot, wasOAuth, endProviderSession),
+          ...droppedAccounts.map((dropped) => clearSlotCredentials(dropped.cookieSlot ?? 0, dropped.authMode === 'oauth')),
+        ]);
 
         performFullLogout(set);
 
