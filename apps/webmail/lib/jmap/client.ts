@@ -2261,10 +2261,9 @@ export class JMAPClient implements IJMAPClient {
 
     const authResultsHeader = headersRecord['Authentication-Results'];
     if (authResultsHeader) {
-      // Multiple Authentication-Results headers (or multiple SPF identities in
-      // one header) must all be considered so the most severe result wins.
-      const value = Array.isArray(authResultsHeader) ? authResultsHeader.join('; ') : authResultsHeader;
-      email.authenticationResults = parseAuthenticationResults(value);
+      // Keep the headers apart and in message order: the topmost one is the
+      // receiving server's own, the rest may be forged by the sender.
+      email.authenticationResults = parseAuthenticationResults(authResultsHeader);
     }
 
     for (const headerName of ['X-Spam-Score', 'X-Spam-Status', 'X-Spam-Result', 'X-Rspamd-Score']) {
