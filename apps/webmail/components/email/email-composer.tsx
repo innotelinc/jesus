@@ -45,7 +45,7 @@ import type { EmailTemplate } from "@/lib/template-types";
 import { appendPlainTextSignature, getPlainTextSignature, plainTextBodyHasSignature, plainTextBodyWithoutSignature } from "@/lib/signature-utils";
 import { findComposeIdentityId, findDraftIdentityId, findReplyIdentityId, resolveReplyFrom } from "@/lib/reply-identity";
 import { buildReplyRecipients, isSelfSent } from "@/lib/reply-recipients";
-import { computeReplyThreadingHeaders } from "@/lib/email-threading";
+import { computeReplyThreadingHeaders, type ReplyThreadingHeaders } from "@/lib/email-threading";
 import { RequestTimeoutError, ScheduleTooLateError } from "@/lib/jmap/client";
 import {
   rewriteCidImagesForEditor,
@@ -142,6 +142,13 @@ export interface ComposerDraftData {
    * format it was written in (#1022).
    */
   plainTextMode?: boolean;
+  /**
+   * Threading headers of a re-opened reply draft (RFC 5322 In-Reply-To /
+   * References). A draft re-opens in "compose" mode, where nothing else
+   * rebuilds them, so they ride along or the reply drops out of its thread.
+   */
+  inReplyTo?: string[];
+  references?: string[];
 }
 
 interface EmailComposerProps {
@@ -730,6 +737,17 @@ export function EmailComposer({
   const composerClientRef = useRef(composerClient);
   composerClientRef.current = composerClient;
   const currentIdentityRawId = currentIdentityParts.rawId ?? currentIdentity?.id;
+  // RFC 5322 §3.6.4 threading for this message: computed from the original
+  // on a reply (not a forward), carried over from a re-opened reply draft.
+  // Drafts store it too, so a reply stays in its thread when re-opened or
+  // re-sent after Undo.
+  const replyThreadingHeaders = useMemo<ReplyThreadingHeaders | null>(() => {
+    if (mode === 'reply' || mode === 'replyAll') return computeReplyThreadingHeaders(replyTo);
+    if (initialData?.inReplyTo?.length) {
+      return { inReplyTo: initialData.inReplyTo, references: initialData.references ?? [] };
+    }
+    return null;
+  }, [mode, replyTo, initialData?.inReplyTo, initialData?.references]);
   // A From override is asked for as the envelope MAIL FROM too, but a server
   // may only accept the identity's own address there (Stalwart does), which
   // then shows in the Return-Path. Unless one of the account's identities owns
@@ -1894,7 +1912,9 @@ export function EmailComposer({
         savedDraft.draftId,
         savedDraft.attachments,
         savedDraft.fromName,
-        savedDraft.htmlBody
+        savedDraft.htmlBody,
+        replyThreadingHeaders?.inReplyTo,
+        replyThreadingHeaders?.references,
       );
 
       // Update the ref synchronously so a queued save sees the new id and
@@ -2285,9 +2305,7 @@ export function EmailComposer({
     };
 
     // RFC 5322 §3.6.4 threading - only continues the chain on a reply, not a forward.
-    const threadingHeaders = (mode === 'reply' || mode === 'replyAll')
-      ? computeReplyThreadingHeaders(replyTo)
-      : null;
+    const threadingHeaders = replyThreadingHeaders;
 
     // In plain text mode, send text/plain only (no HTML body)
     const signatureOpts = { separator: signatureSeparatorEnabled };
