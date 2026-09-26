@@ -935,6 +935,18 @@
       "about_data": "Info a data",
       "debug": "Ladění"
     },
+    "themes": {
+      "title": "Motivy",
+      "description": "Vyberte si z motivů nasazených vaším správcem a z vestavěných předvoleb.",
+      "locked": "Výběr motivu je uzamčen správcem.",
+      "forced": "Motiv „{name}“ je vynucen správcem a nelze jej změnit",
+      "admin_theme": "Motiv správce",
+      "activated": "Motiv aktivován",
+      "default_restored": "Výchozí motiv obnoven",
+      "default_name": "Výchozí",
+      "default_badge": "Výchozí",
+      "admin_enforced": "Vynuceno správcem"
+    },
     "tab_groups": {
       "general": "Obecné",
       "account": "Účet a identita",

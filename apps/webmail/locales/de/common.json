@@ -935,6 +935,18 @@
       "about_data": "Über & Daten",
       "debug": "Debug"
     },
+    "themes": {
+      "title": "Designs",
+      "description": "Wählen Sie aus den von Ihrem Administrator bereitgestellten Designs und den integrierten Vorlagen.",
+      "locked": "Die Designauswahl wurde von einem Administrator gesperrt.",
+      "forced": "Das Design „{name}“ wird vom Administrator vorgegeben und kann nicht geändert werden",
+      "admin_theme": "Administrator-Design",
+      "activated": "Design aktiviert",
+      "default_restored": "Standarddesign wiederhergestellt",
+      "default_name": "Standard",
+      "default_badge": "Standard",
+      "admin_enforced": "Vom Administrator erzwungen"
+    },
     "tab_groups": {
       "general": "Allgemein",
       "account": "Konto & Identität",

@@ -935,6 +935,18 @@
       "about_data": "Acerca de y datos",
       "debug": "Depuración"
     },
+    "themes": {
+      "title": "Temas",
+      "description": "Elija entre los temas implementados por su administrador y los ajustes preestablecidos integrados.",
+      "locked": "La selección de tema está bloqueada por un administrador.",
+      "forced": "El tema «{name}» lo impone el administrador y no se puede cambiar",
+      "admin_theme": "Tema del administrador",
+      "activated": "Tema activado",
+      "default_restored": "Tema predeterminado restaurado",
+      "default_name": "Predeterminado",
+      "default_badge": "Predeterminado",
+      "admin_enforced": "Impuesto por el administrador"
+    },
     "tab_groups": {
       "general": "General",
       "account": "Cuenta e identidad",

@@ -938,6 +938,18 @@
       "about_data": "Névjegy és adatok",
       "debug": "Hibakeresés"
     },
+    "themes": {
+      "title": "Témák",
+      "description": "Válassz a rendszergazda által telepített témák és a beépített előbeállítások közül.",
+      "locked": "A témaválasztást egy rendszergazda zárolta.",
+      "forced": "A(z) „{name}” témát a rendszergazda írja elő, ezért nem módosítható",
+      "admin_theme": "Rendszergazdai téma",
+      "activated": "Téma aktiválva",
+      "default_restored": "Alapértelmezett téma visszaállítva",
+      "default_name": "Alapértelmezett",
+      "default_badge": "Alapértelmezett",
+      "admin_enforced": "Rendszergazda által előírva"
+    },
     "tab_groups": {
       "general": "Általános",
       "account": "Fiók és azonosság",

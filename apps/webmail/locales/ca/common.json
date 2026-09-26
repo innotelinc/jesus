@@ -938,6 +938,18 @@
       "about_data": "Quant a i dades",
       "debug": "Depuració"
     },
+    "themes": {
+      "title": "Temes",
+      "description": "Trieu entre els temes desplegats pel vostre administrador i els predefinits integrats.",
+      "locked": "La selecció de tema està bloquejada per un administrador.",
+      "forced": "El tema «{name}» l'imposa l'administrador i no es pot canviar",
+      "admin_theme": "Tema de l'administrador",
+      "activated": "Tema activat",
+      "default_restored": "S'ha restaurat el tema predeterminat",
+      "default_name": "Predeterminat",
+      "default_badge": "Predeterminat",
+      "admin_enforced": "Imposat per l'administrador"
+    },
     "tab_groups": {
       "general": "General",
       "account": "Compte i identitat",

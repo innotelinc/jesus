@@ -935,6 +935,18 @@
       "about_data": "Sobre e dados",
       "debug": "Depuração"
     },
+    "themes": {
+      "title": "Temas",
+      "description": "Escolha entre os temas disponibilizados pelo seu administrador e as predefinições integradas.",
+      "locked": "A seleção de tema está bloqueada por um administrador.",
+      "forced": "O tema “{name}” é imposto pelo administrador e não pode ser alterado",
+      "admin_theme": "Tema do administrador",
+      "activated": "Tema ativado",
+      "default_restored": "Tema padrão restaurado",
+      "default_name": "Padrão",
+      "default_badge": "Padrão",
+      "admin_enforced": "Imposto pelo administrador"
+    },
     "tab_groups": {
       "general": "Geral",
       "account": "Conta e identidade",
@@ -2593,7 +2605,7 @@
       "nickname": "Apelido",
       "nickname_placeholder": "Apelido",
       "email": "E-mail",
-      "email_placeholder": "email@examplo.com.br",
+      "email_placeholder": "email@example.com",
       "phone": "Telefone",
       "phone_placeholder": "+55 11 1234 5678",
       "phone_type": "Tipo",

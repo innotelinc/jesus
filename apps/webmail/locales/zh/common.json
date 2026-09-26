@@ -935,6 +935,18 @@
       "about_data": "关于和数据",
       "debug": "调试"
     },
+    "themes": {
+      "title": "主题",
+      "description": "从管理员部署的主题和内置预设中选择。",
+      "locked": "主题选择已被管理员锁定。",
+      "forced": "主题“{name}”由管理员强制指定，无法更改",
+      "admin_theme": "管理员主题",
+      "activated": "主题已启用",
+      "default_restored": "已恢复默认主题",
+      "default_name": "默认",
+      "default_badge": "默认",
+      "admin_enforced": "管理员强制"
+    },
     "tab_groups": {
       "general": "通用",
       "account": "账户与身份",

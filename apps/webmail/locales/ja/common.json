@@ -935,6 +935,18 @@
       "about_data": "情報とデータ",
       "debug": "デバッグ"
     },
+    "themes": {
+      "title": "テーマ",
+      "description": "管理者が配布したテーマと組み込みのプリセットから選択",
+      "locked": "テーマの選択は管理者によってロックされています。",
+      "forced": "テーマ「{name}」は管理者によって固定されているため、変更できません",
+      "admin_theme": "管理者テーマ",
+      "activated": "テーマを適用しました",
+      "default_restored": "デフォルトのテーマに戻しました",
+      "default_name": "デフォルト",
+      "default_badge": "デフォルト",
+      "admin_enforced": "管理者により固定"
+    },
     "tab_groups": {
       "general": "一般",
       "account": "アカウントと身元",

@@ -938,6 +938,18 @@
       "about_data": "About & Data",
       "debug": "Debug"
     },
+    "themes": {
+      "title": "Themes",
+      "description": "Choose from themes deployed by your administrator and built-in presets.",
+      "locked": "Theme selection is locked by an administrator.",
+      "forced": "Theme \"{name}\" is forced by admin and cannot be changed",
+      "admin_theme": "Admin theme",
+      "activated": "Theme activated",
+      "default_restored": "Default theme restored",
+      "default_name": "Default",
+      "default_badge": "Default",
+      "admin_enforced": "Admin enforced"
+    },
     "tab_groups": {
       "general": "General",
       "account": "Account & Identity",

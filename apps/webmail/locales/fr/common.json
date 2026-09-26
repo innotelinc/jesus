@@ -935,6 +935,18 @@
       "about_data": "À propos et données",
       "debug": "Débogage"
     },
+    "themes": {
+      "title": "Thèmes",
+      "description": "Choisissez parmi les thèmes déployés par votre administrateur et les préréglages intégrés.",
+      "locked": "La sélection du thème est verrouillée par un administrateur.",
+      "forced": "Le thème « {name} » est imposé par l'administrateur et ne peut pas être modifié",
+      "admin_theme": "Thème de l'administrateur",
+      "activated": "Thème activé",
+      "default_restored": "Thème par défaut restauré",
+      "default_name": "Par défaut",
+      "default_badge": "Par défaut",
+      "admin_enforced": "Imposé par l'administrateur"
+    },
     "tab_groups": {
       "general": "Général",
       "account": "Compte & Identité",

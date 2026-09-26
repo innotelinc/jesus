@@ -935,6 +935,18 @@
       "about_data": "Over en gegevens",
       "debug": "Debuggen"
     },
+    "themes": {
+      "title": "Thema's",
+      "description": "Kies uit thema's die je beheerder heeft uitgerold en ingebouwde voorinstellingen.",
+      "locked": "Themakeuze is vergrendeld door een beheerder.",
+      "forced": "Thema “{name}” is afgedwongen door de beheerder en kan niet worden gewijzigd",
+      "admin_theme": "Beheerdersthema",
+      "activated": "Thema geactiveerd",
+      "default_restored": "Standaardthema hersteld",
+      "default_name": "Standaard",
+      "default_badge": "Standaard",
+      "admin_enforced": "Afgedwongen door beheerder"
+    },
     "tab_groups": {
       "general": "Algemeen",
       "account": "Account & identiteit",
