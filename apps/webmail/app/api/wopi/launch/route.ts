@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 import { logger } from '@/lib/logger';
 import { configManager } from '@/lib/admin/config-manager';
@@ -7,6 +8,7 @@ import { fetchJmapSession } from '@/lib/stalwart/jmap-api';
 import { getWopiActions, buildWopiActionUrl } from '@/lib/wopi/discovery';
 import { getWopiFileNode, probeBlob } from '@/lib/wopi/files';
 import { mintWopiToken, wopiDocumentId, type WopiTokenPayload } from '@/lib/wopi/token';
+import { wopiBrowserBinding } from '@/lib/wopi/revocation';
 
 /**
  * POST /api/wopi/launch
@@ -114,6 +116,9 @@ export async function POST(request: NextRequest) {
       ...document,
       canWrite: editable,
       origin: request.nextUrl.origin,
+      // Signing out of this slot in this browser revokes the token.
+      bid: wopiBrowserBinding(await cookies()),
+      slot: creds.slot,
     };
     const wopiSrc = `${hostBase}/api/wopi/files/${wopiDocumentId(tokenPayload)}`;
     const { token, expiresAt } = mintWopiToken(tokenPayload);

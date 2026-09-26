@@ -19,6 +19,7 @@ import { insecureCookieHint, verificationFailureBody } from '@/lib/auth/verifica
 import { readImpersonationConfig } from '@/lib/impersonation/master-config';
 import { revokeImpersonationCredential } from '@/lib/impersonation/app-password';
 import { IMPERSONATION_GRANT_COOKIE, openImpersonationGrant } from '@/lib/impersonation/grant-cookie';
+import { revokeWopiTokens } from '@/lib/wopi/revocation';
 
 function sessionCookieOptions() {
   return {
@@ -247,6 +248,8 @@ export async function DELETE(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const all = request.nextUrl.searchParams.get('all') === 'true';
+    // Office editors opened from here stop working with the session.
+    await revokeWopiTokens(cookieStore, all ? 'all' : getSlot(request));
 
     if (all) {
       // Delete all session cookies across every slot.
