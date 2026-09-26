@@ -9185,7 +9185,11 @@ export class JMAPClient implements IJMAPClient {
   // A full mailboxIds replacement (rather than mailboxIds/<id> pointer patches)
   // both drops the Sent copy without needing its id and stays safe for numeric
   // mailbox ids — see mailboxIdsReplacement().
-  async restoreEmailToDraft(emailId: string, draftMailboxId: string, _sentMailboxId?: string): Promise<void> {
+  //
+  // `accountId` is the account the message lives in: one sent from a shared
+  // or group identity lives in that account, and restoring it through the
+  // primary account would act on whatever primary message has the same id.
+  async restoreEmailToDraft(emailId: string, draftMailboxId: string, _sentMailboxId?: string, accountId?: string): Promise<void> {
     const update: Record<string, unknown> = {
       ...mailboxIdsReplacement(draftMailboxId),
       'keywords/$draft': true,
@@ -9193,7 +9197,7 @@ export class JMAPClient implements IJMAPClient {
     };
     const response = await this.request([
       ['Email/set', {
-        accountId: this.accountId,
+        accountId: accountId || this.accountId,
         update: { [emailId]: update },
       }, '0'],
     ]);
