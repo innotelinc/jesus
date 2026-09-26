@@ -356,7 +356,12 @@ export async function liteRefreshTokens(slot: number, clientIdOverride?: string)
     }).toString(),
   });
 
-  if (response.status >= 500) {
+  // Only a definitive refusal (400/401/403) ends the session, as in the
+  // server build. A rate limit (429), a request timeout (408) or a 5xx is an
+  // outage: the refresh token stays, so the session resumes once the server
+  // answers again.
+  const refused = response.status === 400 || response.status === 401 || response.status === 403;
+  if (!response.ok && !refused) {
     throw new LiteLoginError('token_exchange_failed', response.status);
   }
   const tokens = (await response.json().catch(() => ({}))) as TokenResponse;
