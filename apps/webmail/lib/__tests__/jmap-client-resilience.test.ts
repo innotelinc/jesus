@@ -163,6 +163,34 @@ describe('JMAPClient resilience', () => {
     });
   });
 
+  describe('writes the server refuses', () => {
+    // HTTP 200 says nothing about the objects: a refused /set used to be
+    // shown as done.
+    it('markAsRead rejects on notUpdated', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, {
+        methodResponses: [['Email/set', { notUpdated: { e1: { type: 'forbidden', description: 'read-only folder' } } }, '0']],
+      }));
+      await expect(client.markAsRead('e1', true)).rejects.toThrow('read-only folder');
+    });
+
+    it('toggleStar rejects on a method-level error', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, {
+        methodResponses: [['error', { type: 'accountReadOnly' }, '0']],
+      }));
+      await expect(client.toggleStar('e1', true)).rejects.toThrow('accountReadOnly');
+    });
+
+    it('cancelEmailSubmission rejects on a method-level error, so the send is not shown as cancelled', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, {
+        methodResponses: [['error', { type: 'invalidArguments' }, '0']],
+      }));
+      await expect(client.cancelEmailSubmission('s1', 'acc')).rejects.toThrow('invalidArguments');
+    });
+  });
+
   describe('isReplaySafeRequest', () => {
     const batch = (...methods: string[]) => ({
       method: 'POST',

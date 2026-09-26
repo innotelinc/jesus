@@ -195,6 +195,26 @@ function methodErrorMessage(response: JMAPResponse, fallback: string): string {
   return detail?.description || detail?.type || fallback;
 }
 
+/**
+ * Throw unless every /set in `response` did what it was asked: a method-level
+ * error (`["error", ...]`) or any entry in notCreated / notUpdated /
+ * notDestroyed fails it. An HTTP 200 says nothing about the objects, and
+ * without this check a refused write (no permission, a stale id) was shown
+ * as done.
+ */
+function assertSetSucceeded(response: JMAPResponse, fallback: string): void {
+  for (const [name, result] of response.methodResponses ?? []) {
+    if (name === 'error') {
+      throw new Error(result?.description || result?.type || fallback);
+    }
+    for (const key of ['notCreated', 'notUpdated', 'notDestroyed'] as const) {
+      const failures = result?.[key] as Record<string, { type?: string; description?: string }> | null | undefined;
+      const first = failures ? Object.values(failures)[0] : undefined;
+      if (first) throw new Error(first.description || first.type || fallback);
+    }
+  }
+}
+
 /** A scheduled send later than the server's hold limit. */
 export class ScheduleTooLateError extends Error {
   constructor(readonly maxSeconds?: number) {
@@ -2324,7 +2344,7 @@ export class JMAPClient implements IJMAPClient {
   async markAsRead(emailId: string, read: boolean = true, accountId?: string): Promise<void> {
     const targetAccountId = accountId || this.accountId;
 
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: targetAccountId,
         update: {
@@ -2334,6 +2354,7 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    assertSetSucceeded(response, 'Failed to update read status');
   }
 
   async batchMarkAsRead(emailIds: string[], read: boolean = true, accountId?: string): Promise<void> {
@@ -2341,14 +2362,15 @@ export class JMAPClient implements IJMAPClient {
 
     for (const batch of batched(emailIds, this.getMaxObjectsInSet())) {
       const updates = Object.fromEntries(batch.map(id => [id, { "keywords/$seen": read ? true : null }]));
-      await this.request([
+      const response = await this.request([
         ["Email/set", { accountId: accountId || this.accountId, update: updates }, "0"],
       ]);
+      assertSetSucceeded(response, 'Failed to update read status');
     }
   }
 
   async toggleStar(emailId: string, starred: boolean, accountId?: string): Promise<void> {
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: accountId || this.accountId,
         update: {
@@ -2358,10 +2380,11 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    assertSetSucceeded(response, 'Failed to update star');
   }
 
   async updateEmailKeywords(emailId: string, keywords: Record<string, boolean>, accountId?: string): Promise<void> {
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: accountId || this.accountId,
         update: {
@@ -2371,10 +2394,11 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    assertSetSucceeded(response, 'Failed to update keywords');
   }
 
   async setKeyword(emailId: string, keyword: string, accountId?: string): Promise<void> {
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: accountId || this.accountId,
         update: {
@@ -2384,10 +2408,11 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    assertSetSucceeded(response, 'Failed to add tag');
   }
 
   async removeKeyword(emailId: string, keyword: string, accountId?: string): Promise<void> {
-    await this.request([
+    const response = await this.request([
       ["Email/set", {
         accountId: accountId || this.accountId,
         update: {
@@ -2397,6 +2422,7 @@ export class JMAPClient implements IJMAPClient {
         },
       }, "0"],
     ]);
+    assertSetSucceeded(response, 'Failed to remove tag');
   }
 
   /**
@@ -2408,9 +2434,10 @@ export class JMAPClient implements IJMAPClient {
     if (emailIds.length === 0 || Object.keys(patch).length === 0) return;
     for (const batch of batched(emailIds, this.getMaxObjectsInSet())) {
       const update = Object.fromEntries(batch.map(id => [id, { ...patch }]));
-      await this.request([
+      const response = await this.request([
         ["Email/set", { accountId: accountId || this.accountId, update }, "0"],
       ]);
+      assertSetSucceeded(response, 'Failed to update keywords');
     }
   }
 
@@ -2796,10 +2823,13 @@ export class JMAPClient implements IJMAPClient {
       const destroyed = setResult?.destroyed?.length || 0;
       totalDestroyed += destroyed;
 
-      // Nothing left, or the server refused everything in this batch (missing
-      // permission, immutable mail) — stop instead of looping forever on the
-      // same ids.
-      if (found.length === 0 || destroyed === 0) break;
+      if (found.length === 0) break;
+      // The server refused everything in this batch (missing permission,
+      // immutable mail): say so, instead of reporting the folder as emptied.
+      if (destroyed === 0) {
+        assertSetSucceeded(response, 'Failed to empty folder');
+        throw new Error('Failed to empty folder');
+      }
       // A short page means we just handled the tail of the mailbox.
       if (found.length < batchSize) break;
     }
@@ -9141,11 +9171,9 @@ export class JMAPClient implements IJMAPClient {
         update: { [submissionId]: { undoStatus: 'canceled' } },
       }, '0'],
     ]);
-    const result = response.methodResponses?.[0]?.[1];
-    const error = result?.notUpdated?.[submissionId];
-    if (error) {
-      throw new Error(error.description || error.type || 'Failed to cancel scheduled send');
-    }
+    // A method-level error (the server rejected the whole call) means the
+    // message still goes out; it must not read as a successful cancel.
+    assertSetSucceeded(response, 'Failed to cancel scheduled send');
   }
 
   async rescheduleEmailSubmission(submissionId: string, emailId: string, identityId: string, delayedUntil: string, accountId?: string): Promise<SendEmailResult> {
