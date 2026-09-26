@@ -18,6 +18,7 @@ import { generateAccountId, MAX_ACCOUNT_SLOTS } from '@/lib/account-utils';
 import { replaceWindowLocation, getPathPrefix, getLocaleFromPath, apiFetch } from '@/lib/browser-navigation';
 import { isEmbedded, notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
+import { clearAllPluginStorage, clearPluginStorageForAccount } from '@/lib/plugin-sandbox/storage-scope';
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
 import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
@@ -1169,6 +1170,7 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   // Calendar subscriptions outlive account switches, but their feed URLs are
   // often secret: nobody is signed in any more, so none may stay behind.
   useCalendarStore.getState().clearICalSubscriptions();
+  clearAllPluginStorage();
 
   // Remove persisted state AFTER the final set() so the persist middleware
   // doesn't re-write stale values.
@@ -1906,6 +1908,7 @@ export const useAuthStore = create<AuthState>()(
           clients.delete(accountId);
           evictAccount(accountId);
           accountStore.removeAccount(accountId);
+          if (!wasDemoMode) clearPluginStorageForAccount(accountId);
         }
 
         await useSettingsStore.getState().flushSync();
@@ -2024,6 +2027,7 @@ export const useAuthStore = create<AuthState>()(
         clients.delete(accountId);
         evictAccount(accountId);
         accountStore.removeAccount(accountId);
+        clearPluginStorageForAccount(accountId);
       },
 
       logoutAll: async () => {

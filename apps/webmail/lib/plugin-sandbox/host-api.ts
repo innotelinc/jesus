@@ -7,6 +7,7 @@ import { pluginHasPermission } from './permissions';
 import { toast as appToast } from '@/stores/toast-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAccountStore } from '@/stores/account-store';
+import { claimLegacyPluginStorage, pluginStoragePrefix } from './storage-scope';
 import { useIdentityStore } from '@/stores/identity-store';
 import { useEmailStore } from '@/stores/email-store';
 import { useFilterStore } from '@/stores/filter-store';
@@ -192,25 +193,31 @@ function originMatchesAllowlist(url: URL, allowlist: string[]): boolean {
 
 // ─── Per-plugin storage namespace ─────────────────────────────
 
-const STORAGE_PREFIX = (pluginId: string) => `plugin:${pluginId}:`;
+/** The signed-in account's namespace; see storage-scope.ts. */
+function storagePrefix(pluginId: string): string {
+  const accountId = useAccountStore.getState().activeAccountId;
+  if (!accountId) return pluginStoragePrefix(pluginId, 'signed-out');
+  claimLegacyPluginStorage(pluginId, accountId);
+  return pluginStoragePrefix(pluginId, accountId);
+}
 
 function storageGet(pluginId: string, key: string): unknown {
   if (typeof window === 'undefined') return null;
-  const raw = window.localStorage.getItem(STORAGE_PREFIX(pluginId) + key);
+  const raw = window.localStorage.getItem(storagePrefix(pluginId) + key);
   if (raw === null) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
 function storageSet(pluginId: string, key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_PREFIX(pluginId) + key, JSON.stringify(value));
+  window.localStorage.setItem(storagePrefix(pluginId) + key, JSON.stringify(value));
 }
 function storageRemove(pluginId: string, key: string): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(STORAGE_PREFIX(pluginId) + key);
+  window.localStorage.removeItem(storagePrefix(pluginId) + key);
 }
 function storageKeys(pluginId: string): string[] {
   if (typeof window === 'undefined') return [];
-  const prefix = STORAGE_PREFIX(pluginId);
+  const prefix = storagePrefix(pluginId);
   const out: string[] = [];
   for (let i = 0; i < window.localStorage.length; i++) {
     const k = window.localStorage.key(i);
