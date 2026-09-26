@@ -207,7 +207,17 @@ export async function proxy(request: NextRequest) {
   }
 
   if (PROXY_SKIP_PATTERN.test(pathname) || isStaticAssetPath(pathname)) {
-    return NextResponse.next();
+    // No page CSP here, but what comes back can still be a document: the
+    // not-found shell for a missing /foo.html or an unknown /api route. It
+    // must not be framed or sniffed into another type. API routes set their
+    // own CSP where they need one, so only non-API paths get frame-ancestors.
+    const skipped = NextResponse.next();
+    skipped.headers.set("X-Content-Type-Options", "nosniff");
+    skipped.headers.set("X-Frame-Options", "DENY");
+    if (!pathname.startsWith("/api/")) {
+      skipped.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+    }
+    return skipped;
   }
 
   const nonce = crypto.randomUUID();
