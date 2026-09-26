@@ -3,7 +3,7 @@
 // structured-cloneable data back to the iframe.
 
 import type { InstalledPlugin, Permission } from '../plugin-types';
-import { IMPLICIT_PERMISSIONS } from '../plugin-types';
+import { pluginHasPermission } from './permissions';
 import { toast as appToast } from '@/stores/toast-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAccountStore } from '@/stores/account-store';
@@ -164,16 +164,6 @@ const PERM_PER_METHOD: Record<string, Permission | null> = {
   'sieve.validateScript': 'filters:write',
   'sieve.regenerate': 'filters:write',
 };
-
-function hasPermission(plugin: InstalledPlugin, perm: Permission): boolean {
-  if ((IMPLICIT_PERMISSIONS as readonly string[]).includes(perm)) return true;
-  if (!plugin.permissions.includes(perm)) return false;
-  // Defense-in-depth: even if the manifest declares a permission, the host
-  // refuses the API call unless an admin has marked the plugin as managed,
-  // or the user has explicitly granted it via the consent dialog.
-  if (plugin.managed) return true;
-  return (plugin.grantedPermissions ?? []).includes(perm);
-}
 
 // ─── Cross-origin allow-list (mirrors lib/plugin-api.ts) ──────
 
@@ -1371,7 +1361,7 @@ export async function dispatchApiCall(
   // Permission gate
   const requiredPerm = PERM_PER_METHOD[method];
   if (requiredPerm !== undefined && requiredPerm !== null) {
-    if (!hasPermission(plugin, requiredPerm)) {
+    if (!pluginHasPermission(plugin, requiredPerm)) {
       throw new Error(`Plugin "${plugin.id}" lacks permission "${requiredPerm}"`);
     }
   } else if (!(method in PERM_PER_METHOD)) {
