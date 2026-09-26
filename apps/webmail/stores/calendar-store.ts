@@ -448,6 +448,39 @@ function getStoreEventDebugSnapshot(event: Partial<CalendarEvent> | null | undef
   };
 }
 
+/** Identifies the login a subscription belongs to: server plus login name. */
+export function subscriptionOwner(client: Pick<IJMAPClient, 'getServerUrl' | 'getUsername'>): string {
+  return `${client.getServerUrl().replace(/\/+$/, '').toLowerCase()}|${client.getUsername().toLowerCase()}`;
+}
+
+type CalendarStoreSet = (partial: Partial<CalendarStore> | ((state: CalendarStore) => Partial<CalendarStore>)) => void;
+
+/**
+ * Whether `client` may act on `sub`: refresh it (a destructive diff of the
+ * calendar's events), rename or delete its calendar. A subscription owned
+ * by this login may. One with another owner may not. One without an owner
+ * (created before owners were recorded) is adopted only when its calendar
+ * id and name both exist in this account - a bare id match would name an
+ * unrelated calendar in another account or on another server.
+ */
+async function claimSubscription(client: IJMAPClient, sub: ICalSubscription, set: CalendarStoreSet): Promise<boolean> {
+  const owner = subscriptionOwner(client);
+  if (sub.owner) return sub.owner === owner;
+  if (sub.accountId && sub.accountId !== client.getAccountId()) return false;
+  let calendars: Calendar[];
+  try {
+    calendars = await client.getCalendars();
+  } catch {
+    return false;
+  }
+  const found = calendars.some((c) => (c.originalId ?? c.id) === sub.calendarId && c.name === sub.name);
+  if (!found) return false;
+  set((state) => ({
+    icalSubscriptions: state.icalSubscriptions.map((s) => (s.id === sub.id ? { ...s, owner } : s)),
+  }));
+  return true;
+}
+
 export interface ICalSubscription {
   id: string;
   url: string;
@@ -457,6 +490,14 @@ export interface ICalSubscription {
   // legacy entries with no accountId are shown only in whichever account
   // the user has active (treated as floating). New subs always set it.
   accountId?: string;
+  /**
+   * The login that owns the subscription (subscriptionOwner()). A JMAP
+   * account id alone is not unique - two servers hand out the same small
+   * ids - so a subscription is only refreshed or removed through the login
+   * it was created with. Missing on subscriptions created before this was
+   * recorded; those are adopted once their calendar is found in the account.
+   */
+  owner?: string;
   name: string;
   color: string;
   refreshInterval: number; // minutes
@@ -525,6 +566,10 @@ interface CalendarStore {
   updateICalSubscription: (client: IJMAPClient, subscriptionId: string, updates: { url?: string; name?: string; color?: string; refreshInterval?: number }) => Promise<void>;
   removeICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
   refreshICalSubscription: (client: IJMAPClient, subscriptionId: string) => Promise<void>;
+  /** Drop every subscription of a signed-out login (its feed URLs are secrets). */
+  forgetICalSubscriptions: (owner: string) => void;
+  /** Drop all subscriptions, e.g. once nobody is signed in any more. */
+  clearICalSubscriptions: () => void;
   refreshAllSubscriptions: (client: IJMAPClient) => Promise<void>;
   isSubscriptionCalendar: (calendarId: string) => boolean;
 }
@@ -1395,6 +1440,7 @@ export const useCalendarStore = create<CalendarStore>()(
             url: normalizedUrl,
             calendarId: calendar.id,
             accountId: client.getAccountId(),
+            owner: subscriptionOwner(client),
             name,
             color,
             refreshInterval,
@@ -1437,6 +1483,10 @@ export const useCalendarStore = create<CalendarStore>()(
       updateICalSubscription: async (client, subscriptionId, updates) => {
         const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
         if (!sub) return;
+        if (!(await claimSubscription(client, sub, set))) {
+          debug.warn('calendar', 'Not updating a subscription of another account', { sub: sub.name });
+          return;
+        }
 
         // Normalize webcal(s):// in the new URL so refreshes don't break.
         const normalizedUpdates: typeof updates = updates.url
@@ -1475,11 +1525,15 @@ export const useCalendarStore = create<CalendarStore>()(
         const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
         if (!sub) return;
 
-        try {
-          await client.deleteCalendar(sub.calendarId);
-        } catch (error) {
-          debug.error('Failed to delete subscription calendar:', error);
-          // Continue removing subscription record even if calendar delete fails
+        // Only destroy the calendar in the account the subscription belongs
+        // to: through another login its id names an unrelated calendar.
+        if (await claimSubscription(client, sub, set)) {
+          try {
+            await client.deleteCalendar(sub.calendarId);
+          } catch (error) {
+            debug.error('Failed to delete subscription calendar:', error);
+            // Continue removing subscription record even if calendar delete fails
+          }
         }
 
         set((state) => ({
@@ -1497,10 +1551,10 @@ export const useCalendarStore = create<CalendarStore>()(
         const sub = get().icalSubscriptions.find(s => s.id === subscriptionId);
         if (!sub) return;
 
-        // Skip if the subscription is scoped to a different JMAP account
-        // than the one this client is talking to - otherwise we'd create
-        // events in the wrong account / against a missing calendar.
-        if (sub.accountId && sub.accountId !== client.getAccountId()) {
+        // Skip unless the subscription belongs to this login - otherwise the
+        // diff below would delete the events of whatever calendar in this
+        // account happens to have the same id.
+        if (!(await claimSubscription(client, sub, set))) {
           debug.warn('calendar', 'Skipping subscription refresh: account mismatch', { sub: sub.name });
           return;
         }
@@ -1606,13 +1660,13 @@ export const useCalendarStore = create<CalendarStore>()(
       refreshAllSubscriptions: async (client) => {
         const { icalSubscriptions } = get();
         const currentAccountId = client.getAccountId();
+        const owner = subscriptionOwner(client);
         const now = Date.now();
 
         for (const sub of icalSubscriptions) {
-          // Only refresh subs for the current account (or legacy untagged
-          // subs, which are treated as belonging to whichever account the
-          // user has active).
-          if (sub.accountId && sub.accountId !== currentAccountId) continue;
+          // Only refresh subs of this login. Older ones without an owner
+          // are checked (and adopted) by refreshICalSubscription.
+          if (sub.owner ? sub.owner !== owner : (sub.accountId && sub.accountId !== currentAccountId)) continue;
 
           const lastRefreshed = sub.lastRefreshed ? new Date(sub.lastRefreshed).getTime() : 0;
           const intervalMs = sub.refreshInterval * 60 * 1000;
@@ -1625,6 +1679,14 @@ export const useCalendarStore = create<CalendarStore>()(
             }
           }
         }
+      },
+
+      forgetICalSubscriptions: (owner) => {
+        set((state) => ({ icalSubscriptions: state.icalSubscriptions.filter(s => s.owner !== owner) }));
+      },
+
+      clearICalSubscriptions: () => {
+        set({ icalSubscriptions: [] });
       },
 
       clearState: () => {
