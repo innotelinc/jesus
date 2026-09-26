@@ -261,6 +261,9 @@ interface JMAPEmailHeader {
 
 type JMAPMethodCall = [string, Record<string, unknown>, string];
 
+/** One entry of a JMAP `methodResponses` array. */
+type JMAPMethodResponse = [string, JMAPResponseResult, string];
+
 const SUBMISSION_USING = [
   'urn:ietf:params:jmap:core',
   'urn:ietf:params:jmap:mail',
@@ -8366,27 +8369,41 @@ export class JMAPClient implements IJMAPClient {
     return stateKey ? { accountId: this.accountId, stateKey } : null;
   }
 
+  /**
+   * Run the state-poll calls and collect their responses. The poll holds two
+   * calls per account plus calendars and filters, so enough accounts (seven,
+   * on Stalwart's default of 16) push it past `maxCallsInRequest`, and the
+   * server refuses the whole request: change detection then stopped without
+   * a sound. The calls go out in batches the server accepts, one after the
+   * other to keep the socket budget (#702). A batch that fails is skipped.
+   */
+  private async fetchPolledStateResponses(): Promise<JMAPMethodResponse[]> {
+    const { using, methodCalls } = this.buildStatePollingRequest();
+    const responses: JMAPMethodResponse[] = [];
+    for (const group of batched(methodCalls, this.getMaxCallsInRequest())) {
+      const response = await this.firstTouchGate.run(group, () =>
+        this.authenticatedFetch(this.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ using, methodCalls: group }),
+        }),
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      if (Array.isArray(data?.methodResponses)) responses.push(...data.methodResponses);
+    }
+    return responses;
+  }
+
   private async fetchCurrentStates(): Promise<void> {
     if (this.isRateLimited()) {
       return;
     }
     try {
-      const { using, methodCalls } = this.buildStatePollingRequest();
-      const response = await this.firstTouchGate.run(methodCalls, () =>
-        this.authenticatedFetch(this.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ using, methodCalls }),
-        }),
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        for (const [method, result, callId] of data.methodResponses) {
-          const resolved = this.resolvePolledState(method, callId);
-          if (resolved && result?.state) {
-            this.pollingStates[`${resolved.accountId}:${resolved.stateKey}`] = result.state;
-          }
+      for (const [method, result, callId] of await this.fetchPolledStateResponses()) {
+        const resolved = this.resolvePolledState(method, callId);
+        if (resolved && result?.state) {
+          this.pollingStates[`${resolved.accountId}:${resolved.stateKey}`] = result.state as string;
         }
       }
     } catch {
@@ -8406,36 +8423,25 @@ export class JMAPClient implements IJMAPClient {
     }
     this.stateCheckInFlight = true;
     try {
-      const { using, methodCalls } = this.buildStatePollingRequest();
-      const response = await this.firstTouchGate.run(methodCalls, () =>
-        this.authenticatedFetch(this.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ using, methodCalls }),
-        }),
-      );
+      // Build a per-account changed map so a background change in a shared
+      // (secondary) account is reported under its own accountId — which
+      // handleStateChange treats as "some mailbox changed" and refetches the
+      // full (own + delegated) mailbox list from.
+      const changedByAccount: Record<string, Record<string, string>> = {};
 
-      if (response.ok) {
-        const data = await response.json();
-        // Build a per-account changed map so a background change in a shared
-        // (secondary) account is reported under its own accountId — which
-        // handleStateChange treats as "some mailbox changed" and refetches the
-        // full (own + delegated) mailbox list from.
-        const changedByAccount: Record<string, Record<string, string>> = {};
-
-        for (const [method, result, callId] of data.methodResponses) {
-          const resolved = this.resolvePolledState(method, callId);
-          if (!resolved || !result?.state) continue;
-          const key = `${resolved.accountId}:${resolved.stateKey}`;
-          if (this.pollingStates[key] && this.pollingStates[key] !== result.state) {
-            (changedByAccount[resolved.accountId] ??= {})[resolved.stateKey] = result.state;
-          }
-          this.pollingStates[key] = result.state;
+      for (const [method, result, callId] of await this.fetchPolledStateResponses()) {
+        const resolved = this.resolvePolledState(method, callId);
+        const state = result?.state as string | undefined;
+        if (!resolved || !state) continue;
+        const key = `${resolved.accountId}:${resolved.stateKey}`;
+        if (this.pollingStates[key] && this.pollingStates[key] !== state) {
+          (changedByAccount[resolved.accountId] ??= {})[resolved.stateKey] = state;
         }
+        this.pollingStates[key] = state;
+      }
 
-        if (Object.keys(changedByAccount).length > 0 && this.stateChangeCallback) {
-          this.stateChangeCallback({ '@type': 'StateChange', changed: changedByAccount });
-        }
+      if (Object.keys(changedByAccount).length > 0 && this.stateChangeCallback) {
+        this.stateChangeCallback({ '@type': 'StateChange', changed: changedByAccount });
       }
     } catch {
       // Silently fail - polling will retry
