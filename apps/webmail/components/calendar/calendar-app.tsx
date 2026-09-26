@@ -1494,6 +1494,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               tasks={calendarTasks}
               onToggleTaskComplete={handleToggleTaskComplete}
               onSelectTask={openEditTaskModal}
+              currentUserEmails={currentUserEmails}
             />
           );
         case "week":
@@ -1517,6 +1518,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               tasks={calendarTasks}
               onToggleTaskComplete={handleToggleTaskComplete}
               onSelectTask={openEditTaskModal}
+              currentUserEmails={currentUserEmails}
             />
           );
         case "day":
@@ -1538,6 +1540,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               tasks={calendarTasks}
               onToggleTaskComplete={handleToggleTaskComplete}
               onSelectTask={openEditTaskModal}
+              currentUserEmails={currentUserEmails}
             />
           );
         case "agenda":
@@ -1551,6 +1554,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               onHoverLeave={handleHoverLeave}
               onContextMenuEvent={handleContextMenuEvent}
               timeFormat={timeFormat}
+              currentUserEmails={currentUserEmails}
             />
           );
         case "tasks":

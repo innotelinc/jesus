@@ -37,6 +37,8 @@ interface CalendarWeekViewProps extends ScrollWindowViewProps {
   tasks?: CalendarTask[];
   onToggleTaskComplete?: (task: CalendarTask) => void;
   onSelectTask?: (task: CalendarTask) => void;
+  /** The user's calendar addresses, to mark events they declined (#1110). */
+  currentUserEmails?: string[];
 }
 
 const HOUR_HEIGHT = 60;
@@ -70,6 +72,7 @@ export function CalendarWeekView({
   tasks,
   onToggleTaskComplete,
   onSelectTask,
+  currentUserEmails,
 }: CalendarWeekViewProps) {
   const t = useTranslations("calendar");
   // Grid days / event dates are display dates (local fields = wall-clock in
@@ -361,6 +364,7 @@ export function CalendarWeekView({
                       onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
                       onMouseLeave={onHoverLeave}
                       onContextMenu={onContextMenuEvent}
+                      currentUserEmails={currentUserEmails}
                     />
                   </div>
                 );
@@ -513,6 +517,7 @@ export function CalendarWeekView({
                           onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                           onMouseLeave={onHoverLeave}
                           onContextMenu={onContextMenuEvent}
+                          currentUserEmails={currentUserEmails}
                           draggable
                         />
                         <div
