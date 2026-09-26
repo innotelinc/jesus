@@ -2914,7 +2914,7 @@
       "enable_tasks": "אפשר משימות",
       "enable_tasks_desc": "הצג תצוגת משימות בלוח השנה לניהול מטלות",
       "show_tasks_on_calendar": "הצג משימות בלוח השנה",
-      "show_tasks_on_calendar_desc": "הצג שבבי משימות בתצוגות יומן היום והשבוע",
+      "show_tasks_on_calendar_desc": "הצג משימות בתצוגות החודש, השבוע והיום של היומן",
       "hover_preview": "תצוגה מקדימה של ריחוף לאירוע",
       "hover_preview_desc": "הצג חלון קופץ לפרטי בעת ריחוף מעל אירועי לוח שנה",
       "hover_preview_instant": "מיידי",

@@ -2990,7 +2990,7 @@
       "enable_tasks": "Görevleri etkinleştir",
       "enable_tasks_desc": "Yapılacaklar listesini yönetmek için takvimde görev görünümü göster",
       "show_tasks_on_calendar": "Görevleri takvimde göster",
-      "show_tasks_on_calendar_desc": "Gün ve hafta takvim görünümlerinde görev parçacıklarını görüntüle",
+      "show_tasks_on_calendar_desc": "Görevleri ay, hafta ve gün takvim görünümlerinde görüntüle",
       "hover_preview": "Etkinlik üzerine gelme önizlemesi",
       "hover_preview_desc": "Takvim etkinliklerinin üzerine gelindiğinde ayrıntı açılır penceresi göster",
       "hover_preview_instant": "Anında",

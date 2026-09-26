@@ -2990,7 +2990,7 @@
       "enable_tasks": "Aktiver oppgaver",
       "enable_tasks_desc": "Vis en oppgavevisning i kalenderen for å administrere gjøremål",
       "show_tasks_on_calendar": "Vis oppgaver i kalenderen",
-      "show_tasks_on_calendar_desc": "Vis oppgavemarkører i dags- og ukesvisningen",
+      "show_tasks_on_calendar_desc": "Vis oppgaver i måneds-, uke- og dagsvisningen",
       "hover_preview": "Forhåndsvis hendelser når du peker",
       "hover_preview_desc": "Vis et detaljvindu når du holder markøren over kalenderhendelser",
       "hover_preview_instant": "Øyeblikkelig",

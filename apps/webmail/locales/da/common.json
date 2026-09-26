@@ -2990,7 +2990,7 @@
       "enable_tasks": "Aktivér opgaver",
       "enable_tasks_desc": "Vis en opgavevisning i kalenderen til styring af gøremål",
       "show_tasks_on_calendar": "Vis opgaver på kalender",
-      "show_tasks_on_calendar_desc": "Vis opgave-chips i dags- og ugekalendervisningerne",
+      "show_tasks_on_calendar_desc": "Vis opgaver i måneds-, uge- og dagsvisningen",
       "hover_preview": "Hover-forhåndsvisning",
       "hover_preview_desc": "Vis en detalje-popover når du holder musen over kalenderbegivenheder",
       "hover_preview_instant": "Øjeblikkeligt",

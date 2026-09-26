@@ -2990,7 +2990,7 @@
       "enable_tasks": "Activa les tasques",
       "enable_tasks_desc": "Mostra una vista de tasques al calendari per gestionar pendents",
       "show_tasks_on_calendar": "Mostra les tasques al calendari",
-      "show_tasks_on_calendar_desc": "Mostra etiquetes de tasca a les vistes de dia i setmana del calendari",
+      "show_tasks_on_calendar_desc": "Mostra les tasques a les vistes de mes, setmana i dia del calendari",
       "hover_preview": "Previsualització en passar el cursor",
       "hover_preview_desc": "Mostra una finestra emergent de detalls en passar el cursor per sobre dels esdeveniments",
       "hover_preview_instant": "Instantània",

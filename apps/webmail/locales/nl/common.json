@@ -2990,7 +2990,7 @@
       "enable_tasks": "Taken inschakelen",
       "enable_tasks_desc": "Een takenweergave in de agenda tonen om to-do's te beheren",
       "show_tasks_on_calendar": "Taken in agenda tonen",
-      "show_tasks_on_calendar_desc": "Taaklabels tonen in dag- en weekweergave van de agenda",
+      "show_tasks_on_calendar_desc": "Taken tonen in de maand-, week- en dagweergave van de agenda",
       "hover_preview": "Voorvertoning bij hover",
       "hover_preview_desc": "Toon een detailpopover bij het hoveren over agenda-evenementen",
       "hover_preview_instant": "Direct",

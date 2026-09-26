@@ -2990,7 +2990,7 @@
       "enable_tasks": "Aufgaben aktivieren",
       "enable_tasks_desc": "Eine Aufgabenansicht im Kalender zum Verwalten von To-dos anzeigen",
       "show_tasks_on_calendar": "Aufgaben im Kalender anzeigen",
-      "show_tasks_on_calendar_desc": "Aufgabenmarkierungen in der Tages- und Wochenansicht anzeigen",
+      "show_tasks_on_calendar_desc": "Aufgaben in der Monats-, Wochen- und Tagesansicht anzeigen",
       "hover_preview": "Ereignis-Hover-Vorschau",
       "hover_preview_desc": "Ein Detail-Popover anzeigen, wenn über Kalender-Ereignisse gehovert wird",
       "hover_preview_instant": "Sofort",

@@ -47,10 +47,11 @@ import { SidebarAppsModal } from "@/components/layout/sidebar-apps-modal";
 import { InlineAppView } from "@/components/layout/inline-app-view";
 import { useSidebarApps } from "@/hooks/use-sidebar-apps";
 import { useIsEmbedded } from "@/hooks/use-is-embedded";
-import { useIsFocusedProTab } from "@/hooks/use-pane-context";
+import { useIsFocusedProTab, useIsPaneScoped } from "@/hooks/use-pane-context";
 import { useProMultiAccountCalendars } from "@/hooks/use-pro-multi-account-calendars";
 import { ResizeHandle } from "@/components/layout/resize-handle";
 import { sanitizeOutgoingCalendarEventData } from "@/lib/calendar-event-normalization";
+import { filterTasksByCalendars } from "@/lib/calendar-tasks";
 import {
   baseEventStoreId,
   buildFallbackExcludePatch,
@@ -66,7 +67,7 @@ import { displayNow } from "@/lib/timezone";
 import { useTaskStore } from "@/stores/task-store";
 import { useContactStore } from "@/stores/contact-store";
 import { cn } from "@/lib/utils";
-import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights } from "@/lib/jmap/types";
+import type { Calendar, CalendarEvent, CalendarParticipant, CalendarRights, CalendarTask } from "@/lib/jmap/types";
 import { ShareCollectionDialog } from "@/components/settings/share-collection-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
@@ -138,6 +139,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
   const removeSharedCalendarColor = useSettingsStore((s) => s.removeSharedCalendarColor);
   const taskStore = useTaskStore();
   const fetchTasksFn = useTaskStore(state => state.fetchTasks);
+  const toggleTaskCompleteFn = useTaskStore(state => state.toggleTaskComplete);
   const { identities } = useIdentityStore();
   const contacts = useContactStore((s) => s.contacts);
   const normalizedViewMode = isCalendarViewMode(viewMode) ? viewMode : "month";
@@ -576,24 +578,45 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
     setDefaultModalEndDate(endDate);
     setDefaultModalAllDay(allDay ?? false);
     setSelectedDate(d);
+    setShowTaskModal(false);
+    setEditTask(null);
     setShowEventModal(true);
   }, [selectedDate, setSelectedDate]);
 
   const openEditModal = useCallback((event: CalendarEvent) => {
     setEditEvent(event);
     setDefaultModalDate(undefined);
+    setShowTaskModal(false);
+    setEditTask(null);
     setShowEventModal(true);
   }, []);
 
-  const openCreateTaskModal = useCallback(() => {
-    setEditTask(null);
-    setShowTaskModal(true);
+  // The event and task panels share the space beside the grid; now that
+  // tasks open from the month, week and day views (#1107), opening one
+  // closes the other.
+  const closeEventPanelForTask = useCallback(() => {
+    setShowEventModal(false);
+    setEditEvent(null);
+    setPendingPreview(null);
+    setDefaultCalendarIdForCreate(undefined);
+    setDefaultModalAllDay(false);
   }, []);
 
-  const openEditTaskModal = useCallback((task: import("@/lib/jmap/types").CalendarTask) => {
+  const openCreateTaskModal = useCallback(() => {
+    closeEventPanelForTask();
+    setEditTask(null);
+    setShowTaskModal(true);
+  }, [closeEventPanelForTask]);
+
+  const openEditTaskModal = useCallback((task: CalendarTask) => {
+    closeEventPanelForTask();
     setEditTask(task);
     setShowTaskModal(true);
-  }, []);
+  }, [closeEventPanelForTask]);
+
+  const handleToggleTaskComplete = useCallback((task: CalendarTask) => {
+    if (client) toggleTaskCompleteFn(client, task);
+  }, [client, toggleTaskCompleteFn]);
 
   const handleSaveTask = useCallback(async (data: Partial<import("@/lib/jmap/types").CalendarTask>) => {
     if (!client) return;
@@ -746,6 +769,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
   // that renders while Pro takes over a route stays silent.
   const proInterfaceActive = useProInterfaceActive();
   const isFocusedProTab = useIsFocusedProTab();
+  const isPaneScoped = useIsPaneScoped();
   const eventLinkId = showEventModal && editEvent ? editEvent.id : null;
   const calendarLinkPath = appPath(buildCalendarPath({
     view: normalizedViewMode,
@@ -1353,6 +1377,13 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
     return filtered;
   }, [events, selectedCalendarIds, showBirthdayCalendar, birthdayEvents]);
 
+  // Tasks on the month, week and day grids follow the calendar filter like
+  // the events do (#1107).
+  const calendarTasks = useMemo(() => {
+    if (!enableCalendarTasks || !showTasksOnCalendar) return undefined;
+    return filterTasksByCalendars(taskStore.tasks, selectedCalendarIds);
+  }, [enableCalendarTasks, showTasksOnCalendar, taskStore.tasks, selectedCalendarIds]);
+
   useEffect(() => {
     const hiddenEvents = events.filter((event) => {
       if (!event.start || !event.calendarIds) {
@@ -1460,6 +1491,9 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               firstDayOfWeek={firstDayOfWeek}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
+              tasks={calendarTasks}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onSelectTask={openEditTaskModal}
             />
           );
         case "week":
@@ -1480,8 +1514,9 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
-              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
-              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+              tasks={calendarTasks}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onSelectTask={openEditTaskModal}
             />
           );
         case "day":
@@ -1500,8 +1535,9 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               timeFormat={timeFormat}
               isMobile={isMobile}
               pendingPreview={pendingPreview}
-              tasks={enableCalendarTasks && showTasksOnCalendar ? taskStore.tasks : undefined}
-              onToggleTaskComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+              tasks={calendarTasks}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onSelectTask={openEditTaskModal}
             />
           );
         case "agenda":
@@ -1534,7 +1570,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
                 filter={taskStore.filter}
                 showCompleted={taskStore.showCompleted}
                 onSelectTask={openEditTaskModal}
-                onToggleComplete={(task) => { if (client) taskStore.toggleTaskComplete(client, task); }}
+                onToggleComplete={handleToggleTaskComplete}
                 selectedTaskId={taskStore.selectedTaskId}
                 onQuickCreate={(title) => {
                   if (client) {
@@ -1851,10 +1887,7 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
               d.setHours(0, 0, 0, 0);
               openCreateModal(d, undefined, true);
             }}
-            onNewTask={enableCalendarTasks ? () => {
-              setEditTask(null);
-              setShowTaskModal(true);
-            } : undefined}
+            onNewTask={enableCalendarTasks ? openCreateTaskModal : undefined}
             onGoToToday={goToToday}
           />
         );
@@ -1898,6 +1931,26 @@ export function CalendarApp({ linkSegments: routeSegments }: CalendarAppProps = 
           isSubscriptionCalendar={isSubscriptionCalendar}
           isMobile={true}
         />
+      )}
+
+      {/* Mobile task editor: full screen, like the event editor. */}
+      {showTaskModal && isMobile && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={editTask ? t("tasks.edit") : t("tasks.create")}
+          className={isPaneScoped ? "absolute inset-0 z-40 flex flex-col bg-background" : "fixed inset-0 z-50 flex flex-col bg-background"}
+        >
+          <TaskModal
+            key={editTask?.id ?? 'new-task'}
+            task={editTask}
+            calendars={displayCalendars}
+            onSave={handleSaveTask}
+            onDelete={handleDeleteTask}
+            onClose={() => { setShowTaskModal(false); setEditTask(null); }}
+            isMobile={true}
+          />
+        </div>
       )}
 
       {showImportModal && client && (
