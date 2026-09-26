@@ -306,9 +306,9 @@ export function EmailComposer({
   const signatureSeparatorEnabled = useSettingsStore((state) => state.signatureSeparatorEnabled);
   const requestReadReceiptDefault = useSettingsStore((state) => state.requestReadReceiptDefault);
   const activeIdentities = useIdentityStore((s) => s.identities);
-  // Pro shell: surface identities from every connected account, grouped
-  // for the From dropdown's <optgroup>s. Outside Pro this collapses to
-  // the active account's identities only.
+  // More than one connected account: surface identities from every one,
+  // grouped for the From dropdown's <optgroup>s. With a single account this
+  // collapses to the active account's identities only.
   const multiAccountIdentities = useProMultiAccountIdentities();
   const identities = multiAccountIdentities.enabled
     ? multiAccountIdentities.allIdentities
@@ -318,17 +318,26 @@ export function EmailComposer({
     : [];
   const primaryIdentity = activeIdentities[0] ?? null;
   const activeAccountId = useAuthStore((s) => s.activeAccountId);
-  // Automatic selection stays on the active account: `composerClient` follows
-  // the chosen identity, and a reply/forward still carries the original
-  // message's blobIds, which only its own account's server can resolve. The
-  // From dropdown keeps offering every account's identities to pick by hand.
-  const sameAccountIdentities = useMemo(
+  // Automatic selection stays on the account that holds the original message:
+  // `composerClient` follows the chosen identity, and a reply/forward still
+  // carries the original message's blobIds, which only that account's server
+  // can resolve. That is the active account unless `replyTo.accountId` names
+  // another connected login - a message opened from the Unified Inbox or from
+  // a non-active account's folders (#1104). Anything else there (a shared
+  // folder's owner id) stays on the active account. The From dropdown keeps
+  // offering every account's identities to pick by hand.
+  const replyAccountId = replyTo?.accountId;
+  const sourceAccountId = multiAccountIdentities.enabled && replyAccountId
+    && useAccountStore.getState().getAccountById(replyAccountId)?.isConnected
+    ? replyAccountId
+    : activeAccountId;
+  const sourceAccountIdentities = useMemo(
     () => (multiAccountIdentities.enabled
       ? identities.filter(
-          (identity) => stripCrossAccountIdentityPrefix(identity.id).localAccountId === activeAccountId,
+          (identity) => stripCrossAccountIdentityPrefix(identity.id).localAccountId === sourceAccountId,
         )
       : identities),
-    [multiAccountIdentities.enabled, identities, activeAccountId],
+    [multiAccountIdentities.enabled, identities, sourceAccountId],
   );
 
   const { isFeatureEnabled } = usePolicyStore();
@@ -816,12 +825,20 @@ export function EmailComposer({
     // neighbouring inline-image effect groups all three modes together.
     if (mode !== 'reply' && mode !== 'replyAll' && mode !== 'forward') return;
 
+    // The original lives on another connected account whose identities have
+    // not loaded yet: wait for them instead of settling on one of the active
+    // account's, which the selectedIdentityId guard above would then keep.
+    const fromOtherAccount = Boolean(sourceAccountId) && sourceAccountId !== activeAccountId;
+    if (fromOtherAccount && sourceAccountIdentities.length === 0) return;
+
     // Replying to our own message in a thread (#703): keep sending as the
     // identity that sent it. Resolving from the recipients here would pick the
     // *other* party's address - and on a catch-all domain it would even set a
-    // From override to their address.
+    // From override to their address. An identity on the message's own account
+    // wins when two accounts share the address.
     if (isSelfSent({ from: replyTo?.from }, identities.map(i => i.email).filter(Boolean))) {
-      const senderIdentityId = findDraftIdentityId(identities, replyTo?.from?.[0]);
+      const senderIdentityId = findDraftIdentityId(sourceAccountIdentities, replyTo?.from?.[0])
+        ?? findDraftIdentityId(identities, replyTo?.from?.[0]);
       if (senderIdentityId) {
         setSelectedIdentityId(senderIdentityId);
         return;
@@ -836,7 +853,7 @@ export function EmailComposer({
 
     // Own-identity match: unconditional, since it only ever selects one of the
     // user's own configured addresses.
-    const ownIdentityId = findReplyIdentityId(sameAccountIdentities, recipients);
+    const ownIdentityId = findReplyIdentityId(sourceAccountIdentities, recipients);
     if (ownIdentityId) {
       setSelectedIdentityId(ownIdentityId);
       return;
@@ -849,7 +866,7 @@ export function EmailComposer({
     // lets a user keep the setting on but limit it to configured identities,
     // for domains where the other addresses are distribution lists (#1000).
     if (autoSelectReplyIdentity && mode !== 'forward') {
-      const resolved = resolveReplyFrom(identities, recipients, replyIdentityMatch);
+      const resolved = resolveReplyFrom(sourceAccountIdentities, recipients, replyIdentityMatch);
       if (resolved) {
         setSelectedIdentityId(resolved.identityId);
         if (resolved.overrideEmail && !fromOverrideEnabled) {
@@ -861,18 +878,16 @@ export function EmailComposer({
       }
     }
 
-    // Fallback: match identity by the account's email when replying from unified view
-    if (replyTo?.accountId) {
-      const account = useAccountStore.getState().getAccountById(replyTo.accountId);
-      if (account?.email) {
-        const accountEmail = account.email.trim().toLowerCase();
-        const accountIdentity = identities.find(
-          (identity) => identity.email.trim().toLowerCase() === accountEmail
-        );
-        if (accountIdentity) {
-          setSelectedIdentityId(accountIdentity.id);
-        }
-      }
+    // Nothing on the message's account matched, but it is not the active one:
+    // still send from it - the identity on its login address, else its first -
+    // rather than from the active account's default (#1104). On the active
+    // account the default already applies, and it is the user's choice (#507).
+    if (fromOtherAccount && sourceAccountId) {
+      const loginEmail = useAccountStore.getState().getAccountById(sourceAccountId)?.email?.trim().toLowerCase();
+      const accountIdentity = sourceAccountIdentities.find(
+        (identity) => identity.email.trim().toLowerCase() === loginEmail
+      ) ?? sourceAccountIdentities[0];
+      setSelectedIdentityId(accountIdentity.id);
     }
   }, [
     autoSelectReplyIdentity,
@@ -880,10 +895,11 @@ export function EmailComposer({
     composeFromAccountEmail,
     fromOverrideEnabled,
     identities,
-    sameAccountIdentities,
+    sourceAccountIdentities,
+    sourceAccountId,
+    activeAccountId,
     initialData?.selectedIdentityId,
     mode,
-    replyTo?.accountId,
     replyTo?.bcc,
     replyTo?.cc,
     replyTo?.from,
