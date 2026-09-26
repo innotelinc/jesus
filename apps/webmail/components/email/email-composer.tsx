@@ -470,6 +470,11 @@ export function EmailComposer({
       separator: signatureSeparatorEnabled,
     });
 
+    // Whether the quoted original may show its remote images in the editor:
+    // the viewer's rule, minus the per-message "load" click it doesn't know.
+    const { externalContentPolicy, isSenderTrusted } = useSettingsStore.getState();
+    const quoteRemoteAllowed = externalContentPolicy === 'allow' || (!!from?.email && isSenderTrusted(from.email));
+
     // Plugin override (resolved at composer open via onBuildQuoteHeader).
     if (replyTo.quoteHeaderHtml !== undefined && (mode === 'reply' || mode === 'replyAll' || mode === 'forward')) {
       if (replyTo.htmlBody) {
@@ -477,7 +482,8 @@ export function EmailComposer({
         // nested tables / MJML survive 1:1 (sanitize strips scripts/styles
         // first; cid rewrite runs after so its data-cid markers survive).
         const island = buildQuotedHtmlBlock(
-          rewriteCidImagesForEditor(sanitizeEmailHtml(replyTo.htmlBody))
+          rewriteCidImagesForEditor(sanitizeEmailHtml(replyTo.htmlBody)),
+          { remoteAllowed: quoteRemoteAllowed },
         );
         return `${prefix}${signatureBlock}<br>${replyTo.quoteHeaderHtml}${island}`;
       }
@@ -503,7 +509,8 @@ export function EmailComposer({
       // scripts/styles/head; cid rewrite afterwards so data-cid markers
       // aren't dropped by the sanitizer's ALLOW_DATA_ATTR:false.
       const island = buildQuotedHtmlBlock(
-        rewriteCidImagesForEditor(sanitizeEmailHtml(replyTo.htmlBody))
+        rewriteCidImagesForEditor(sanitizeEmailHtml(replyTo.htmlBody)),
+        { remoteAllowed: quoteRemoteAllowed },
       );
       return `${prefix}${signatureBlock}<br><div>${quoteHeader}</div>${island}`;
     }
