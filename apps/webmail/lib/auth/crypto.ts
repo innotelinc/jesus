@@ -77,7 +77,9 @@ export type PayloadPurpose =
   /** Fresh-IdP-login proof required before a device pairing code is issued. */
   | 'pair-reauth'
   /** WOPI access token, scoped to one file node and a six-hour expiry. */
-  | 'wopi-token';
+  | 'wopi-token'
+  /** The app password an impersonation handoff minted, kept for revocation. */
+  | 'impersonation-grant';
 
 /**
  * Whether a blob minted before purposes were bound may be re-admitted for
@@ -95,6 +97,7 @@ const LEGACY_PAYLOAD_MARKERS: Record<PayloadPurpose, (payload: Record<string, un
   'sso-pending': (p) => p.t === undefined && (p.purpose === undefined || p.purpose === 'reauth'),
   'pair-reauth': (p) => p.purpose === 'pair',
   'wopi-token': (p) => p.t === 'wopi',
+  'impersonation-grant': () => false,
 };
 
 export function encryptPayload(payload: Record<string, unknown>, purpose: PayloadPurpose): string {
