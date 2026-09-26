@@ -121,6 +121,11 @@ interface EmailStore {
   externalSearchResults: ExternalSearchResult[];
 
   // Unified mailbox state
+  // Bumped by any action that changes which mailbox/keyword/unified view is
+  // active. fetchUnifiedEmails/fetchCrossView capture it before their async
+  // fetch and check it on return, so a late-resolving fetch from a view the
+  // user already navigated away from can't stomp the newer view's state (#delete-folder-blend).
+  viewToken: number;
   isUnifiedView: boolean;
   unifiedRole: UnifiedMailboxRole | null;
   // Cross-account view ('unread' | 'starred' | 'all') when active; null for the
@@ -1432,6 +1437,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   externalSearchResults: [],
 
   // Unified mailbox state
+  viewToken: 0,
   isUnifiedView: false,
   unifiedRole: null,
   crossView: null,
@@ -1516,7 +1522,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       emailHooks.onEmailOpen.emitSync(email);
     }
   },
-  selectKeyword: (keyword) => set({
+  selectKeyword: (keyword) => set(state => ({
     selectedKeyword: keyword,
     isLoadingMore: false,
     selectedEmail: null,
@@ -1524,7 +1530,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     expandedThreadIds: new Set(),
     threadEmailsCache: new Map(),
     threadEmailCounts: new Map(),
-  }),
+    viewToken: state.viewToken + 1,
+    isUnifiedView: false,
+    unifiedRole: null,
+    crossView: null,
+  })),
   fetchTagCounts: (client) => coalesceRefresh(client, 'tagCounts', async () => {
     try {
       const keywords = useSettingsStore.getState().emailKeywords;
@@ -1553,7 +1563,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       console.error('Failed to fetch tag counts:', error);
     }
   }),
-  selectMailbox: (mailboxId) => set({
+  selectMailbox: (mailboxId) => set(state => ({
     selectedMailbox: mailboxId,
     isLoadingMore: false,
     selectedEmail: null,
@@ -1563,7 +1573,11 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     threadEmailsCache: new Map(),
     threadEmailCounts: new Map(),
     isLoadingThread: null,
-  }),
+    viewToken: state.viewToken + 1,
+    isUnifiedView: false,
+    unifiedRole: null,
+    crossView: null,
+  })),
   setLoading: (loading) => set({ isLoading: loading }),
   setLoadingEmail: (loading) => set({ isLoadingEmail: loading }),
   setError: (error) => set({ error }),
@@ -4777,6 +4791,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // Unified mailbox operations
   fetchUnifiedEmails: async (accounts, role) => {
+    const token = get().viewToken + 1;
     set({
       isLoading: true,
       error: null,
@@ -4785,11 +4800,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       crossView: null,
       selectedKeyword: null,
       retainedInViewIds: new Set(),
+      viewToken: token,
     });
     try {
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const order = getMessageListOrderFor(role);
       const result = await fetchUnifiedEmails(accounts, role, emailsPerPage, 0, order);
+      // The user may have navigated to a different mailbox/keyword/unified view
+      // while this was in flight — don't let a stale response overwrite it.
+      if (get().viewToken !== token) return;
       set({
         emails: result.emails,
         hasMoreEmails: result.hasMore,
@@ -4799,6 +4818,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         unifiedErrors: result.errors,
       });
     } catch (error) {
+      if (get().viewToken !== token) return;
       console.error('Failed to fetch unified emails:', error);
       set({
         error: error instanceof Error ? error.message : "Failed to fetch unified emails",
@@ -4855,6 +4875,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   fetchCrossView: async (accounts, view) => {
+    const token = get().viewToken + 1;
     set({
       isLoading: true,
       error: null,
@@ -4863,10 +4884,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       crossView: view,
       selectedKeyword: null,
       retainedInViewIds: new Set(),
+      viewToken: token,
     });
     try {
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
       const result = await fetchCrossViewEmails(accounts, view, emailsPerPage, 0);
+      // The user may have navigated to a different mailbox/keyword/unified view
+      // while this was in flight — don't let a stale response overwrite it.
+      if (get().viewToken !== token) return;
       set({
         emails: result.emails,
         hasMoreEmails: result.hasMore,
@@ -4875,6 +4900,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         unifiedErrors: result.errors,
       });
     } catch (error) {
+      if (get().viewToken !== token) return;
       console.error('Failed to fetch cross-account view:', error);
       set({
         error: error instanceof Error ? error.message : "Failed to fetch cross-account view",
@@ -4898,13 +4924,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   exitUnifiedView: () => {
-    set({
+    set(state => ({
       isUnifiedView: false,
       unifiedRole: null,
       crossView: null,
       unifiedErrors: new Map(),
       retainedInViewIds: new Set(),
-    });
+      viewToken: state.viewToken + 1,
+    }));
   },
 
   setScheduledView: (isScheduledView, accountScope = null) => set(state => {
