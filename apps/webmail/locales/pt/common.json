@@ -142,8 +142,8 @@
     "unified_all_unread": "Tudo não lido",
     "unified_all_starred": "Tudo com estrela",
     "unified_all_mail": "Todo o correio",
-    "remove_account": "Remove account",
-    "remove_account_confirm": "Remove {account} from this device? You can add it back later."
+    "remove_account": "Remover conta",
+    "remove_account_confirm": "Remover {account} desse dispositivo? Você pode adicioná-la de volta depois."
   },
   "protocol_handlers": {
     "title": "Aplicativos padrão",
@@ -296,7 +296,7 @@
     "forward": "Encaminhar",
     "delete": "Excluir",
     "archive": "Arquivar",
-    "archive_mailbox_not_found": "Archive mailbox not found - cannot archive email",
+    "archive_mailbox_not_found": "Caixa de arquivos não encontrada - não é possível arquivar e-mail",
     "star": "Adicionar Estrela",
     "unstar": "Remover Estrela",
     "mark_unread": "Marcar como não lido",
@@ -608,8 +608,8 @@
     "send": "Enviar",
     "cancel": "Cancelar",
     "attach": "Anexar",
-    "attach_photos": "Photos & Videos",
-    "attach_files": "Files",
+    "attach_photos": "Fotos & Vídeos",
+    "attach_files": "Arquivos",
     "discard": "Descartar",
     "discard_draft_title": "Descartar rascunho?",
     "discard_draft_confirm": "Você tem alterações não salvas. Deseja descartar este rascunho?",
@@ -620,8 +620,8 @@
     "cc_placeholder": "Destinatários CC",
     "bcc_placeholder": "Destinatários CCO",
     "subject_placeholder": "Assunto",
-    "cc_label": "CC:",
-    "bcc_label": "CCO:",
+    "cc_label": "Cc:",
+    "bcc_label": "Cco:",
     "subject_label": "Assunto:",
     "file_size_kb": "KB",
     "prefix": {
@@ -927,6 +927,7 @@
       "sidebar_apps": "Apps da barra lateral",
       "notifications": "Notificações",
       "layout": "Layout",
+      "themes": "Temas",
       "reading": "Leitura",
       "composing": "Composição",
       "downloads": "Downloads",
@@ -1050,8 +1051,8 @@
         "label": "Caixa de correio unificada",
         "description": "Mostrar pastas combinadas (Entrada, Enviados, etc.) de todas as contas conectadas",
         "cross_account": {
-          "label": "Across all accounts",
-          "description": "Merge the unified mailbox across every connected account instead of staying within the active account."
+          "label": "Todas as contas",
+          "description": "Unifique a caixa de correio em todas as contas conectadas, em vez de permanecer apenas na conta ativa."
         },
         "include_group": {
           "label": "Incluir caixas de grupo",
@@ -1059,26 +1060,26 @@
         }
       },
       "all_mail": {
-        "folders_label": "Folders in All Mail",
-        "folders_description": "Choose which folders are merged into the All Mail view.",
-        "account_hint": "Applies to {account}.",
-        "no_folders": "No folders available."
+        "folders_label": "Pastas em Todos os E-mails",
+        "folders_description": "Escolha quais pastas serão mescladas na visualização de Todos os E-mails.",
+        "account_hint": "Aplica-se a {account}.",
+        "no_folders": "Nenhuma pasta disponível."
       },
       "colorful_sidebar_icons": {
         "label": "Ícones coloridos na barra lateral",
         "description": "Colorir ícones de pastas e etiquetas por tipo (Caixa de entrada azul, Spam vermelho, Enviados verde, etc.). Desative para uma barra lateral monocromática."
       },
       "tint_list_rows": {
-        "label": "Tint List Rows by Tag Color",
-        "description": "Shade each message row with its first tag color. Disable to keep rows plain; tag dots and chips still show the color."
+        "label": "Colorir as linhas da lista de acordo com a cor da etiqueta",
+        "description": "Aplicar sombreado a cada linha de mensagem com a cor da primeira etiqueta. Desative essa opção para manter as linhas sem sombreado; os pontos e os ícones das etiquetas continuarão exibindo a cor."
       },
       "show_folder_total_count": {
         "label": "Mostrar contagem total de mensagens",
         "description": "Mostra a contagem total de mensagens ao lado de pastas e etiquetas, além da contagem de não lidas. Desative para mostrar apenas as não lidas."
       },
       "favicon_unread_badge": {
-        "label": "Unread Count on Tab Icon",
-        "description": "Show the inbox unread count as a badge on the browser tab icon, so new mail is visible when the tab is not focused. Disable to keep the icon unbadged."
+        "label": "Contagem de não lidos no Ícone da Aba",
+        "description": "Mostra a contagem de e-mails não lidos na aba do navegador, para que novos e-mails sejam visíveis mesmo quando a aba não estiver em foco. Desative para manter o ícone sem marca."
       },
       "pro_interface": {
         "label": "Interface Pro (experimental)",
@@ -1166,8 +1167,8 @@
         "enabled_desc": "Mostrar notificações quando novos e-mails chegarem",
         "sound": "Som de notificação",
         "sound_desc": "Reproduzir um som quando novos e-mails chegarem",
-        "inbox_only": "Inbox only",
-        "inbox_only_desc": "Only notify for mail that lands in the Inbox; skip mail a filter files into another folder"
+        "inbox_only": "Apenas Caixa de Entrada",
+        "inbox_only_desc": "Notificar apenas pelos e-mails que chegarem à Caixa de Entrada; pular e-mails que forem filtrados para outra pasta"
       },
       "calendar": {
         "title": "Notificações de calendário",
@@ -1196,7 +1197,7 @@
         "status_busy": "Processando…",
         "status_inactive": "Não ativado neste dispositivo",
         "status_unsupported": "Este navegador não oferece suporte a Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "O Web Push não está disponível no Bulwark Lite; ele requer o servidor do Bulwark.",
         "title": "Notificações em segundo plano",
         "devices_title": "Dispositivos registrados",
         "devices_desc": "Todos os dispositivos registrados para receber notificações em segundo plano desta conta. Revogar um deles interrompe o recebimento imediatamente.",
@@ -1236,12 +1237,12 @@
         "preview_older": "Mais antigo:"
       },
       "date_locale": {
-        "label": "Date format region",
-        "description": "How numeric dates are ordered (day, month, year)",
-        "auto": "Automatic (match language)",
-        "iso": "ISO 8601 (YYYY-MM-DD)",
-        "dmy": "Day/Month/Year",
-        "mdy": "Month/Day/Year"
+        "label": "Formato de data da região",
+        "description": "Como as datas numéricas são ordenadas (dia, mês, ano)",
+        "auto": "Automático (corresponder ao idioma)",
+        "iso": "ISO 8601 (AAAA-MM-DD)",
+        "dmy": "Dia/Mês/Ano",
+        "mdy": "Mês/Dia/Ano"
       },
       "time_format": {
         "label": "Formato de Hora",
@@ -1256,10 +1257,10 @@
         "monday": "Segunda-feira"
       },
       "time_zone": {
-        "label": "Time zone",
-        "description": "Show email and calendar times in this time zone instead of the one reported by your browser",
-        "auto": "Automatic ({zone})",
-        "preview_now": "Now:"
+        "label": "Fuso horário",
+        "description": "Mostrar os horários dos e-mails e da agenda neste fuso horário, em vez daquele informado pelo seu navegador",
+        "auto": "Automático ({zone})",
+        "preview_now": "Agora:"
       }
     },
     "email_behavior": {
@@ -1459,7 +1460,7 @@
         "keywords_label": "Palavras-chave de ativação",
         "keywords_description": "Palavras ou frases que ativam o lembrete quando encontradas na sua mensagem",
         "add_placeholder": "Adicionar palavra-chave...",
-        "add": "Add",
+        "add": "Adicionar",
         "remove": "Remover"
       },
       "empty_subject_warning": {
@@ -1800,8 +1801,8 @@
       "role_trash": "Lixeira",
       "role_junk": "Spam / Lixo eletrônico",
       "role_archive": "Arquivo",
-      "role_scheduled": "Scheduled",
-      "role_snoozed": "Snoozed",
+      "role_scheduled": "Programado",
+      "role_snoozed": "Adiado",
       "role_none": "Nenhum",
       "create_folder": "Criar pasta",
       "create_subfolder": "Criar subpasta",
@@ -1874,9 +1875,9 @@
         "button": "Ver Atalhos"
       },
       "refresh_cache": {
-        "label": "Refresh cached data",
-        "description": "Reload contacts, calendars, and folders from the server. Keeps your accounts and sessions — fixes a stale or wrong view without signing out.",
-        "button": "Refresh"
+        "label": "Atualizar dados armazenados em cache",
+        "description": "Atualize os contatos, calendários e pastas do servidor. Mantém suas contas e sessões — corrige uma visualização desatualizada ou incorreta sem precisar sair da conta.",
+        "button": "Recarregar"
       },
       "reset_settings": {
         "label": "Redefinir Configurações",
@@ -2546,31 +2547,31 @@
       "cert_imported": "Certificado importado",
       "cert_import_failed": "Falha ao importar o certificado",
       "section_contact": "Detalhes do contato",
-      "section_work": "Work",
-      "section_personal": "Personal",
-      "email_default_label": "Email",
-      "phone_default_label": "Phone",
-      "address_default_label": "Address",
+      "section_work": "Trabalho",
+      "section_personal": "Pessoal",
+      "email_default_label": "E-mail",
+      "phone_default_label": "Telefone",
+      "address_default_label": "Endereço",
       "online_service_default_label": "Online",
-      "organization_label": "Organization",
-      "title_label": "Title",
-      "role_label": "Role",
-      "language_label": "Language",
-      "related_default_label": "Related",
+      "organization_label": "Organização",
+      "title_label": "Título",
+      "role_label": "Função",
+      "language_label": "Idioma",
+      "related_default_label": "Relacionado",
       "more_actions": "Mais ações",
       "age_years": "{count, plural, one {1 ano} other {# anos}}",
       "years_since": "{count, plural, one {há 1 ano} other {há # anos}}"
     },
     "activity": {
-      "recent_emails": "Recent Emails",
-      "upcoming_events": "Upcoming Events",
-      "no_emails": "No recent emails",
-      "no_events": "No upcoming events",
-      "no_subject": "(No subject)",
-      "no_title": "(No title)",
-      "load_failed": "Failed to load",
-      "unknown_sender": "Unknown sender",
-      "all_day": "All day"
+      "recent_emails": "E-mails recentes",
+      "upcoming_events": "Eventos futuros",
+      "no_emails": "Nenhum e-mail recente",
+      "no_events": "Nenhum evento futuro",
+      "no_subject": "(Sem assunto)",
+      "no_title": "(Sem título)",
+      "load_failed": "Falha ao carregar",
+      "unknown_sender": "Remetente desconhecido",
+      "all_day": "Dia todo"
     },
     "form": {
       "create_title": "Novo contato",
@@ -2592,7 +2593,7 @@
       "nickname": "Apelido",
       "nickname_placeholder": "Apelido",
       "email": "E-mail",
-      "email_placeholder": "email@example.com",
+      "email_placeholder": "email@examplo.com.br",
       "phone": "Telefone",
       "phone_placeholder": "+55 11 1234 5678",
       "phone_type": "Tipo",
@@ -2691,11 +2692,11 @@
       "search_members": "Pesquisar contatos para adicionar...",
       "no_members": "Nenhum membro neste grupo",
       "member_count": "{count, plural, =0 {Nenhum membro} one {1 membro} other {# membros}}",
-      "send_email": "Send email to group",
-      "send_email_to": "To",
+      "send_email": "Enviar e-mail para o grupo",
+      "send_email_to": "Para",
       "send_email_cc": "Cc",
-      "send_email_bcc": "Bcc",
-      "no_member_emails": "This group has no members with an email address."
+      "send_email_bcc": "Cco",
+      "no_member_emails": "Este grupo não tem membros com endereço de e-mail."
     },
     "import": {
       "title": "Importar contatos",
@@ -3351,10 +3352,10 @@
     "duplicate": "Duplicar",
     "duplicate_success": "Duplicado com sucesso",
     "duplicate_error": "Falha ao duplicar",
-    "share": "Share",
-    "shared": "Shared",
-    "shared_with_me": "Shared with me",
-    "shared_by": "Shared by {name}",
+    "share": "Compartilhar",
+    "shared": "Compartilhado",
+    "shared_with_me": "Compartilhado comigo",
+    "shared_by": "Compartilhado por {name}",
     "create_file_success": "Arquivo criado",
     "create_file_error": "Falha ao criar arquivo",
     "favorites": "Favoritos",
