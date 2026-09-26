@@ -106,7 +106,7 @@ import { useMenuNavigation } from "@/hooks/use-menu-navigation";
 import { findCalendarAttachment, isCalendarMimeType } from "@/lib/calendar-invitation";
 import { RecipientPopover } from "./recipient-popover";
 import { MailtoLink } from "@/components/ui/mailto-link";
-import { inertBlobType, isFilePreviewable, isMimeTypeSafeForInlinePreview, toInertBlob } from "@/lib/file-preview";
+import { imageBlobUrl, inertBlobType, isFilePreviewable, isMimeTypeSafeForInlinePreview, toInertBlob } from "@/lib/file-preview";
 import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
@@ -604,13 +604,13 @@ function DraggableAttachmentChip({ attachment, client, accountId, enabled, downl
       if (attachment.tnefData) {
         const bytes = attachment.tnefData;
         const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-        return URL.createObjectURL(new Blob([buffer], { type: attachment.type || 'application/octet-stream' }));
+        return URL.createObjectURL(new Blob([buffer], { type: inertBlobType(attachment.type) }));
       }
       if (attachment.decryptedAttachment) {
         const bytes = getAttachmentContentBytes(attachment.decryptedAttachment);
         if (!bytes || bytes.byteLength === 0) return null;
         const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-        return URL.createObjectURL(new Blob([buffer], { type: attachment.type || 'application/octet-stream' }));
+        return URL.createObjectURL(new Blob([buffer], { type: inertBlobType(attachment.type) }));
       }
       return null;
     },
@@ -2130,8 +2130,10 @@ export function EmailViewer({
     </button>
   ) : null;
 
-  // Pre-fetch object URLs for image attachments so their actual contents can be
+  // Pre-fetch URLs for image attachments so their actual contents can be
   // rendered as thumbnails inside the chip. Skips images larger than 10 MB.
+  // The thumbnail can be opened on its own (context menu, drag to the tab
+  // strip), so imageBlobUrl keeps a sender's SVG out of the webmail origin.
   useEffect(() => {
     let cancelled = false;
     const createdUrls: string[] = [];
@@ -2156,18 +2158,18 @@ export function EmailViewer({
         let url: string | undefined;
         try {
           if (att.blobId && blobClient) {
-            url = await blobClient.fetchBlobAsObjectUrl(att.blobId, att.name || 'thumb', att.type, blobAccountId);
+            url = await imageBlobUrl(await blobClient.fetchBlob(att.blobId, att.name || 'thumb', att.type, blobAccountId), att.type);
           } else if (att.decryptedAttachment) {
             const bytes = getAttachmentContentBytes(att.decryptedAttachment);
             if (!bytes || bytes.byteLength === 0) return;
             const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-            url = URL.createObjectURL(new Blob([buffer], { type: att.type || 'application/octet-stream' }));
+            url = await imageBlobUrl(new Blob([buffer]), att.type);
           } else if (att.tnefData) {
             const buffer = att.tnefData.buffer.slice(
               att.tnefData.byteOffset,
               att.tnefData.byteOffset + att.tnefData.byteLength,
             ) as ArrayBuffer;
-            url = URL.createObjectURL(new Blob([buffer], { type: att.type || 'application/octet-stream' }));
+            url = await imageBlobUrl(new Blob([buffer]), att.type);
           }
         } catch {
           return;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 import type { FileNode, FileNodeRights } from '@/lib/jmap/types';
+import { imageBlobUrl } from '@/lib/file-preview';
 
 export interface FileResource {
   id: string;
@@ -803,7 +804,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const resource = resources.find(r => r.name === name);
     if (!resource?.blobId) throw new Error('No blob');
 
-    return client.fetchBlobAsObjectUrl(resource.blobId, resource.name, resource.contentType);
+    return imageBlobUrl(await client.fetchBlob(resource.blobId, resource.name, resource.contentType), resource.contentType);
   },
 
   getFileContent: async (name: string) => {

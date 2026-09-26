@@ -20,6 +20,7 @@ export { SchedulingDeniedError };
 import { acceptedFileName, fileNameRulesFrom, type FileNameRules } from "@/lib/file-name-rules";
 import { getEffectiveTimeZone, toLocalDateTime } from "@/lib/timezone";
 import { buildEmailSort, compareEmails, hasKeywordLevels, type KeywordSortPolarity, type SortLevel } from "@/lib/message-list-order";
+import { toInertBlob } from "@/lib/file-preview";
 
 // Cap for the follow-up Email/get issued when a displayed body part comes
 // back truncated at the normal 256000-byte limit (see refetchTruncatedBodyValues
@@ -4722,9 +4723,15 @@ export class JMAPClient implements IJMAPClient {
     return response.blob();
   }
 
+  /**
+   * Object URL for a blob. It shares the webmail origin and the type comes
+   * from whoever sent the blob, so it is re-typed to something no browser
+   * runs as a document (toInertBlob); image/svg+xml and text/html come back
+   * as application/octet-stream.
+   */
   async fetchBlobAsObjectUrl(blobId: string, name?: string, type?: string, accountId?: string): Promise<string> {
     const blob = await this.fetchBlob(blobId, name, type, accountId);
-    return URL.createObjectURL(blob);
+    return URL.createObjectURL(toInertBlob(blob));
   }
 
   getCapabilities(): Record<string, unknown> {

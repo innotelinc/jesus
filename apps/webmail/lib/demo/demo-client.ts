@@ -5,6 +5,7 @@ import { getDemoData, type DemoData } from './demo-data';
 import { generateDemoId } from './demo-utils';
 import { compareEmails, type SortLevel } from '@/lib/message-list-order';
 import { withBasePath } from '@/lib/browser-navigation';
+import { toInertBlob } from '@/lib/file-preview';
 
 // Fixture blobs with real bytes behind them, served from public/demo/. The
 // photos are CC0 / public domain from Wikimedia Commons: "Wedding couple
@@ -731,7 +732,7 @@ export class DemoJMAPClient implements IJMAPClient {
 
   async fetchBlobAsObjectUrl(blobId: string): Promise<string> {
     const blob = await this.fetchBlob(blobId);
-    return URL.createObjectURL(blob);
+    return URL.createObjectURL(toInertBlob(blob));
   }
 
   async fetchBlobArrayBuffer(blobId: string): Promise<ArrayBuffer> {
