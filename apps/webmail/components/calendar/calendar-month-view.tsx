@@ -8,6 +8,7 @@ import { EventCard } from "./event-card";
 import { CalendarTaskChip } from "./task-chip";
 import { buildWeekSegments, getEventDayBounds, getPrimaryCalendarId } from "@/lib/calendar-utils";
 import { groupTasksByDueDay } from "@/lib/calendar-tasks";
+import { isDeclinedByUser } from "@/lib/calendar-participants";
 import type { CalendarEvent, Calendar, CalendarTask } from "@/lib/jmap/types";
 import { useAuthStore } from "@/stores/auth-store";
 import { useCalendarStore } from "@/stores/calendar-store";
@@ -35,6 +36,8 @@ interface CalendarMonthViewProps extends ScrollWindowViewProps {
   tasks?: CalendarTask[];
   onToggleTaskComplete?: (task: CalendarTask) => void;
   onSelectTask?: (task: CalendarTask) => void;
+  /** The user's calendar addresses, to mark events they declined (#1110). */
+  currentUserEmails?: string[];
 }
 
 /** Fraction of the viewport height at which the "current month" is sampled. */
@@ -64,6 +67,7 @@ export function CalendarMonthView({
   tasks,
   onToggleTaskComplete,
   onSelectTask,
+  currentUserEmails,
 }: CalendarMonthViewProps) {
   const t = useTranslations("calendar");
   const showTimeInMonthView = useSettingsStore((state) => state.showTimeInMonthView);
@@ -344,10 +348,11 @@ export function CalendarMonthView({
                         const calId = getPrimaryCalendarId(ev);
                         const cal = calId ? calendarMap.get(calId) : undefined;
                         const evColor = ev.color || cal?.color || "#3b82f6";
+                        const inactive = ev.status === "cancelled" || isDeclinedByUser(ev, currentUserEmails);
                         return (
                           <span
                             key={ev.id}
-                            className="w-1.5 h-1.5 rounded-full"
+                            className={cn("w-1.5 h-1.5 rounded-full", inactive && "opacity-40")}
                             style={{ backgroundColor: evColor }}
                           />
                         );
@@ -436,6 +441,7 @@ export function CalendarMonthView({
                         onMouseEnter={(rect) => onHoverEvent?.(segment.event, rect)}
                         onMouseLeave={onHoverLeave}
                         onContextMenu={onContextMenuEvent}
+                        currentUserEmails={currentUserEmails}
                         draggable
                         className={isMobile ? "text-[10px] px-1" : undefined}
                       />

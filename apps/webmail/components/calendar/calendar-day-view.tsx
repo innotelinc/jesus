@@ -33,6 +33,8 @@ interface CalendarDayViewProps extends ScrollWindowViewProps {
   tasks?: CalendarTask[];
   onToggleTaskComplete?: (task: CalendarTask) => void;
   onSelectTask?: (task: CalendarTask) => void;
+  /** The user's calendar addresses, to mark events they declined (#1110). */
+  currentUserEmails?: string[];
 }
 
 const HOUR_HEIGHT = 64;
@@ -63,6 +65,7 @@ export function CalendarDayView({
   tasks,
   onToggleTaskComplete,
   onSelectTask,
+  currentUserEmails,
 }: CalendarDayViewProps) {
   const t = useTranslations("calendar");
   // Grid days / event dates are display dates (local fields = wall-clock in
@@ -328,6 +331,7 @@ export function CalendarDayView({
                                   onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                                   onMouseLeave={onHoverLeave}
                                   onContextMenu={onContextMenuEvent}
+                                  currentUserEmails={currentUserEmails}
                                 />
                               );
                             })}
@@ -456,6 +460,7 @@ export function CalendarDayView({
                             onMouseEnter={(rect) => onHoverEvent?.(ev, rect)}
                             onMouseLeave={onHoverLeave}
                             onContextMenu={onContextMenuEvent}
+                            currentUserEmails={currentUserEmails}
                             draggable
                           />
                           <div

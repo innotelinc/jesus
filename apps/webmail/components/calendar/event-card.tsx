@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { CalendarEvent, Calendar } from "@/lib/jmap/types";
 import { format } from "date-fns";
 import { Users } from "@/components/icons";
-import { getParticipantCount } from "@/lib/calendar-participants";
+import { getParticipantCount, isDeclinedByUser } from "@/lib/calendar-participants";
 import { getEventEndDate, getEventStartDate } from "@/lib/calendar-utils";
 import { useSettingsStore } from "@/stores/settings-store";
 
@@ -24,6 +24,8 @@ interface EventCardProps {
   continuesAfter?: boolean;
   className?: string;
   style?: CSSProperties;
+  /** The user's calendar addresses, to tell whether they declined the event. */
+  currentUserEmails?: string[];
 }
 
 function sanitizeColor(color: string | null | undefined, fallback = "#3b82f6"): string {
@@ -71,7 +73,7 @@ function createEventDragPreview(title: string, timeRange: string, color: string)
   return el;
 }
 
-export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, onContextMenu, isSelected, draggable: isDraggable, continuesAfter = false, className, style }: EventCardProps) {
+export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onMouseLeave, onContextMenu, isSelected, draggable: isDraggable, continuesAfter = false, className, style, currentUserEmails }: EventCardProps) {
   const t = useTranslations("calendar");
   const [isBeingDragged, setIsBeingDragged] = useState(false);
   const color = getEventColor(event, calendar);
@@ -89,9 +91,13 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
   };
   const timeString = `${safeFormat(startDate, timeFmt)} – ${safeFormat(endTime, timeFmt)}`;
   // iTIP CANCEL marks the attendee's copy with status "cancelled" instead of
-  // deleting it (#572) - render it struck through and dimmed.
+  // deleting it (#572), and a declined invitation stays on the calendar too
+  // (#1110) - render both struck through and dimmed.
   const isCancelled = event.status === "cancelled";
-  const ariaLabel = `${event.title || t("events.no_title")}, ${timeString}${calendarName ? `, ${calendarName}` : ""}${isCancelled ? `, ${t("detail.cancelled")}` : ""}`;
+  const isDeclined = !isCancelled && isDeclinedByUser(event, currentUserEmails);
+  const isInactive = isCancelled || isDeclined;
+  const statusLabel = isCancelled ? t("detail.cancelled") : isDeclined ? t("participants.declined") : null;
+  const ariaLabel = `${event.title || t("events.no_title")}, ${timeString}${calendarName ? `, ${calendarName}` : ""}${statusLabel ? `, ${statusLabel}` : ""}`;
 
   const handleDragStart = useCallback((e: DragEvent) => {
     e.stopPropagation();
@@ -139,7 +145,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           "hover:opacity-80 transition-opacity",
           isSelected && "ring-2 ring-primary",
           isBeingDragged && "opacity-50",
-          isCancelled && !isBeingDragged && "opacity-60",
+          isInactive && !isBeingDragged && "opacity-60",
           className
         )}
         style={{ backgroundColor: `${color}20`, color, ...style }}
@@ -148,7 +154,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           className="w-1.5 h-1.5 rounded-full flex-shrink-0"
           style={{ backgroundColor: color }}
         />
-        <span className={cn("truncate", isCancelled && "line-through")}>{event.title || t("events.no_title")}</span>
+        <span className={cn("truncate", isInactive && "line-through")}>{event.title || t("events.no_title")}</span>
       </button>
     );
   }
@@ -169,7 +175,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           continuesAfter && "pe-2",
           isSelected && "ring-2 ring-primary",
           isBeingDragged && "opacity-50",
-          isCancelled && !isBeingDragged && "opacity-60",
+          isInactive && !isBeingDragged && "opacity-60",
           className
         )}
         style={{ backgroundColor: `${color}24`, borderLeft: `3px solid ${color}`, color, ...style }}
@@ -178,7 +184,7 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
           {showTimeInMonthView && !event.showWithoutTime && (
             <span className="flex-shrink-0 opacity-80">{format(startDate, timeFmt)}</span>
           )}
-          <span className={cn("truncate font-medium", isCancelled && "line-through")}>{event.title || t("events.no_title")}</span>
+          <span className={cn("truncate font-medium", isInactive && "line-through")}>{event.title || t("events.no_title")}</span>
         </div>
       </button>
     );
@@ -198,12 +204,12 @@ export function EventCard({ event, calendar, variant, onClick, onMouseEnter, onM
         "hover:opacity-90 transition-opacity cursor-pointer",
         isSelected && "ring-2 ring-primary",
         isBeingDragged && "opacity-50",
-        isCancelled && !isBeingDragged && "opacity-60",
+        isInactive && !isBeingDragged && "opacity-60",
         className
       )}
       style={{ backgroundColor: `${color}30`, borderLeft: `3px solid ${color}`, color, ...style }}
     >
-      <div className={cn("font-medium truncate", isCancelled && "line-through")}>{event.title || t("events.no_title")}</div>
+      <div className={cn("font-medium truncate", isInactive && "line-through")}>{event.title || t("events.no_title")}</div>
       {!event.showWithoutTime && (
         <div className="opacity-80 text-[10px]">
           {timeString}
