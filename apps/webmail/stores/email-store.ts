@@ -10,7 +10,7 @@ import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
 import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { currentStoreEpoch } from "@/lib/store-epoch";
 import { useAccountStore } from "@/stores/account-store";
@@ -1953,7 +1953,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       try {
         const emailsPerPage = useSettingsStore.getState().emailsPerPage;
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
-        const position = emails.length;
+        const position = positionsByAccount(emails);
         const built = await buildUnifiedAccountClients({ includeGroup });
         const hasFilters = !isFilterEmpty(get().searchFilters);
         const result = hasFilters
@@ -1992,7 +1992,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       try {
         const emailsPerPage = useSettingsStore.getState().emailsPerPage;
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
-        const position = emails.length;
+        const position = positionsByAccount(emails);
         const built = await buildUnifiedAccountClients({ includeGroup });
         const { searchFilters } = get();
         const hasFilters = !isFilterEmpty(searchFilters);
@@ -2056,7 +2056,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // appends unrelated all-folders hits to a tag list.
         const built = buildTagViewAccountClients(client);
         result = await fetchTagEmails(
-          built, `$label:${selectedKeyword}`, emailsPerPage, position, getMessageListOrderFor(null),
+          built, `$label:${selectedKeyword}`, emailsPerPage, positionsByAccount(emails), getMessageListOrderFor(null),
           hasFilters
             ? buildJMAPFilter(searchQuery, searchFilters, undefined)
             : { text: searchQuery.trim() },
@@ -2071,8 +2071,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           // fan-out the search ran (#1082).
           const built = buildTagViewAccountClients(client);
           result = hasFilters
-            ? await advancedSearchAcrossAccounts(built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, position)
-            : await searchAcrossAccounts(built, searchQuery, emailsPerPage, position);
+            ? await advancedSearchAcrossAccounts(built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, positionsByAccount(emails))
+            : await searchAcrossAccounts(built, searchQuery, emailsPerPage, positionsByAccount(emails));
           set({ unifiedErrors: result.errors });
         } else {
           const mailboxes = resolveActionMailboxes();
@@ -2093,7 +2093,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // so pagination spans the own and group accounts alike (#1038).
         const built = buildTagViewAccountClients(client);
         result = await fetchTagEmails(
-          built, `$label:${selectedKeyword}`, emailsPerPage, position, getMessageListOrderFor(null),
+          built, `$label:${selectedKeyword}`, emailsPerPage, positionsByAccount(emails), getMessageListOrderFor(null),
         );
         set({ unifiedErrors: result.errors });
       } else {
@@ -4891,7 +4891,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     set({ isLoadingMore: true, error: null });
     try {
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
-      const position = emails.length;
+      const position = positionsByAccount(emails);
       const result = await fetchUnifiedEmails(accounts, unifiedRole, emailsPerPage, position, getMessageListOrderFor(unifiedRole));
 
       const currentEmails = get().emails;

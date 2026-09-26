@@ -83,6 +83,28 @@ export function findMailboxByRole(
 }
 
 /**
+ * Where each account's next page starts. The merged list interleaves the
+ * accounts, so its length is no single account's position: passing it made
+ * every account skip the rows between its own count and the merged length.
+ * A map gives each account the number of its rows already shown (see
+ * positionsByAccount); a plain number still means the same for all.
+ */
+export type FanOutPosition = number | Readonly<Record<string, number>>;
+
+function positionFor(position: FanOutPosition, account: UnifiedAccountClient): number {
+  return typeof position === 'number' ? position : (position[account.accountId] ?? 0);
+}
+
+/** Per-account positions for the next page of a merged list. */
+export function positionsByAccount(emails: readonly Email[]): Record<string, number> {
+  const positions: Record<string, number> = {};
+  for (const email of emails) {
+    if (email.accountId) positions[email.accountId] = (positions[email.accountId] ?? 0) + 1;
+  }
+  return positions;
+}
+
+/**
  * Fetches emails from all accounts for a given unified role, merges and sorts
  * them by receivedAt descending. Per-account failures are collected in the
  * errors map while successful results are still returned.
@@ -91,7 +113,7 @@ export async function fetchUnifiedEmails(
   accounts: UnifiedAccountClient[],
   role: UnifiedMailboxRole,
   limit: number,
-  position: number,
+  position: FanOutPosition,
   order: SortLevel[] = [],
 ): Promise<UnifiedFetchResult> {
   const errors = new Map<string, string>();
@@ -113,8 +135,8 @@ export async function fetchUnifiedEmails(
         // The configured list order (#718) rides along only when set, so the
         // default call shape stays the four-argument one.
         const result = order.length > 0
-          ? await account.client.getEmails(jmapMailboxId, jmapAccountId, limit, position, undefined, undefined, undefined, order)
-          : await account.client.getEmails(jmapMailboxId, jmapAccountId, limit, position);
+          ? await account.client.getEmails(jmapMailboxId, jmapAccountId, limit, positionFor(position, account), undefined, undefined, undefined, order)
+          : await account.client.getEmails(jmapMailboxId, jmapAccountId, limit, positionFor(position, account));
         return { account, result };
       } catch (err) {
         errors.set(
@@ -179,11 +201,11 @@ export async function searchUnifiedEmails(
   role: UnifiedMailboxRole,
   query: string,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
     const { jmapMailboxId, jmapAccountId } = resolveJmapTarget(account, mailbox);
-    return account.client.searchEmails(query, jmapMailboxId, jmapAccountId, limit, position);
+    return account.client.searchEmails(query, jmapMailboxId, jmapAccountId, limit, positionFor(position, account));
   });
 }
 
@@ -198,11 +220,11 @@ export async function advancedSearchUnifiedEmails(
   role: UnifiedMailboxRole,
   filterFor: (mailboxId: string) => Record<string, unknown>,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutUnifiedQuery(accounts, role, async (account, mailbox) => {
     const { jmapMailboxId, jmapAccountId } = resolveJmapTarget(account, mailbox);
-    return account.client.advancedSearchEmails(filterFor(jmapMailboxId), jmapAccountId, limit, position);
+    return account.client.advancedSearchEmails(filterFor(jmapMailboxId), jmapAccountId, limit, positionFor(position, account));
   });
 }
 
@@ -442,10 +464,10 @@ export async function fetchCrossViewEmails(
   accounts: UnifiedAccountClient[],
   view: CrossView,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutCrossQuery(accounts, (account, jmapAccountId, ids) =>
-    account.client.advancedSearchEmails(buildCrossFilter(view, ids), jmapAccountId, limit, position));
+    account.client.advancedSearchEmails(buildCrossFilter(view, ids), jmapAccountId, limit, positionFor(position, account)));
 }
 
 /**
@@ -457,14 +479,14 @@ export async function searchCrossViewEmails(
   view: CrossView,
   query: string,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutCrossQuery(accounts, (account, jmapAccountId, ids) =>
     account.client.advancedSearchEmails(
       { operator: 'AND', conditions: [buildCrossFilter(view, ids), { text: query }] },
       jmapAccountId,
       limit,
-      position,
+      positionFor(position, account),
     ));
 }
 
@@ -479,7 +501,7 @@ export async function advancedSearchCrossViewEmails(
   view: CrossView,
   extraFilter: Record<string, unknown>,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   const hasExtra = Object.keys(extraFilter).length > 0;
   return fanOutCrossQuery(accounts, (account, jmapAccountId, ids) => {
@@ -487,7 +509,7 @@ export async function advancedSearchCrossViewEmails(
     const filter = hasExtra
       ? { operator: 'AND', conditions: [membership, extraFilter] }
       : membership;
-    return account.client.advancedSearchEmails(filter, jmapAccountId, limit, position);
+    return account.client.advancedSearchEmails(filter, jmapAccountId, limit, positionFor(position, account));
   });
 }
 
@@ -510,14 +532,14 @@ export async function fetchTagEmails(
   accounts: UnifiedAccountClient[],
   keyword: string,
   limit: number,
-  position: number,
+  position: FanOutPosition,
   order: SortLevel[] = [],
   extraFilter?: Record<string, unknown>,
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
     (account, jmapAccountId) => account.client.getEmails(
-      undefined, jmapAccountId, limit, position, keyword, true, extraFilter, order,
+      undefined, jmapAccountId, limit, positionFor(position, account), keyword, true, extraFilter, order,
     ),
     compareEmails(order, { pinnedFirst: true }),
   );
@@ -537,11 +559,11 @@ export async function searchAcrossAccounts(
   accounts: UnifiedAccountClient[],
   query: string,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
-    (account, jmapAccountId) => account.client.searchEmails(query, undefined, jmapAccountId, limit, position),
+    (account, jmapAccountId) => account.client.searchEmails(query, undefined, jmapAccountId, limit, positionFor(position, account)),
     newestFirst,
   );
 }
@@ -554,11 +576,11 @@ export async function advancedSearchAcrossAccounts(
   accounts: UnifiedAccountClient[],
   filter: Record<string, unknown>,
   limit: number,
-  position: number,
+  position: FanOutPosition,
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
-    (account, jmapAccountId) => account.client.advancedSearchEmails(filter, jmapAccountId, limit, position),
+    (account, jmapAccountId) => account.client.advancedSearchEmails(filter, jmapAccountId, limit, positionFor(position, account)),
     newestFirst,
   );
 }
