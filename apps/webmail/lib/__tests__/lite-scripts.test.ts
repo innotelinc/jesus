@@ -625,7 +625,10 @@ describe('Stalwart target: the entry document', () => {
 
   it('documents the install, reserved prefixes, updates and the redirect URI', () => {
     const readme = buildStalwartReadme({ version: '1.10.0', commit: 'abc1234', locales: ['en'], buildId: 'b' });
-    expect(readme).toContain(`releases/latest/download/${STALWART_ZIP_NAME}`);
+    // A tagged release by default: Stalwart verifies nothing it downloads.
+    expect(readme).toContain(`resourceUrl='https://github.com/bulwarkmail/webmail/releases/download/v`);
+    expect(readme).not.toContain(`resourceUrl='https://github.com/bulwarkmail/webmail/releases/latest`);
+    expect(readme).toContain(`sha256sum -c ${STALWART_ZIP_NAME}.sha256`);
     expect(readme).toContain('stalwart-cli create Application');
     // The CLI wants JSON (verified against stalwart-cli 1.0.12), and nothing is mounted before UpdateApps.
     expect(readme).toContain(`--field 'urlPrefix={"/webmail":true}'`);

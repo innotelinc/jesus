@@ -776,7 +776,10 @@ export function parseLiteTarget(argv = [], env = {}) {
   return target;
 }
 
-/** Release asset name; `releases/latest/download/<this>` is the stable resourceUrl. */
+/**
+ * Release asset name. It carries no version, so `releases/latest/download/<this>`
+ * exists too, but the README points `resourceUrl` at a tagged release.
+ */
 export const STALWART_ZIP_NAME = "bulwark-lite-stalwart.zip";
 
 /** The mount prefix the docs and the one-line install use. */
@@ -1359,7 +1362,8 @@ export function collectZipEntries(dir) {
 
 /** LITE-README.md for the Stalwart bundle. */
 export function buildStalwartReadme({ version, commit, locales, buildId, demoMode = false }) {
-  const url = `https://github.com/bulwarkmail/webmail/releases/latest/download/${STALWART_ZIP_NAME}`;
+  const url = `https://github.com/bulwarkmail/webmail/releases/download/v${version}/${STALWART_ZIP_NAME}`;
+  const latestUrl = `https://github.com/bulwarkmail/webmail/releases/latest/download/${STALWART_ZIP_NAME}`;
   return `# Bulwark Lite ${version} (${commit}) for Stalwart
 
 Bulwark Webmail as a Stalwart \`Application\`: Stalwart downloads this zip,
@@ -1425,20 +1429,24 @@ admin's own \`admin\` and \`account\`.
 
 ## Updates
 
-Stalwart keeps the downloaded zip for \`autoUpdateFrequency\` (default 90
-days) and downloads \`resourceUrl\` again at the first restart or
-\`UpdateApps\` after that, so the \`latest/download\` URL above follows new
-releases on that schedule. \`UpdateApps\` always downloads again: run it to
-update right away. A failed download keeps the previous bundle online.
+The resource URL above names one release, so what Stalwart serves only
+changes when you change it: to update, point \`resourceUrl\` at the new
+release's tag and run \`UpdateApps\` (it always downloads again; a failed
+download keeps the previous bundle online). Every release also carries
+\`${STALWART_ZIP_NAME}.sha256\`; check a download with
+\`sha256sum -c ${STALWART_ZIP_NAME}.sha256\` before you switch.
+
+The bundle runs as script on your Stalwart origin, next to the web admin.
+Stalwart checks no hash or signature when it downloads, so a floating URL
+such as \`${latestUrl}\` would run whatever the newest release holds, at the
+next restart or \`UpdateApps\` after \`autoUpdateFrequency\` (default 90
+days). Use it only if you accept that in exchange for automatic updates.
 
 Open tabs move to the new build on their next navigation (one full page
 load); a freshly opened tab gets it immediately. Nothing stays stuck on old
 files although Stalwart sends a year-long cache header for every file but
 index.html: every file the app fetches without a content hash carries the
 build id.
-
-To pin a version, point \`resourceUrl\` at a tagged release instead:
-\`https://github.com/bulwarkmail/webmail/releases/download/v${version}/${STALWART_ZIP_NAME}\`.
 
 ## Sign-in
 
