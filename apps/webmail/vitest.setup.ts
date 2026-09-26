@@ -18,6 +18,32 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   }) as unknown as MediaQueryList;
 }
 
+// jsdom 28 (resolved by the ^27 caret in package.json) no longer provides a
+// localStorage implementation; the zustand persist middleware writes through
+// it on every setState and several stores read from it directly. Provide a
+// minimal in-memory Storage so store-backed components render under test.
+if (typeof window !== 'undefined' && typeof window.localStorage === 'undefined') {
+  const backing = new Map<string, string>();
+  const localStorage: Storage = {
+    get length() {
+      return backing.size;
+    },
+    clear: () => backing.clear(),
+    getItem: (key: string) => backing.get(key) ?? null,
+    key: (index: number) => [...backing.keys()][index] ?? null,
+    removeItem: (key: string) => {
+      backing.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      backing.set(key, String(value));
+    },
+  };
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorage,
+    configurable: true,
+  });
+}
+
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
   useLocale: () => 'en',
