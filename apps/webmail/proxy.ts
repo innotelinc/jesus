@@ -252,8 +252,14 @@ export async function proxy(request: NextRequest) {
 
   const connectSrc = isDev ? `'self' http: https: ws: wss:` : `'self' https:`;
 
+  // The admin dashboard and the setup wizard are never framed. The embedding
+  // allowance is for the mail UI a portal wraps; a framed admin page is a
+  // clickjacking target with nothing to gain from being embedded.
+  const isAdminOrSetupPath = /^\/(?:admin|setup)(?:\/|$)/.test(pathname);
   const frameAncestors = isSandboxPath
     ? `'self'`
+    : isAdminOrSetupPath
+    ? "'none'"
     : process.env.ALLOWED_FRAME_ANCESTORS?.trim() || "'none'";
 
   // Plugins may declare iframe origins they need (e.g. for embedded video).
