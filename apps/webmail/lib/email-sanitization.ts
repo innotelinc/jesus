@@ -411,14 +411,18 @@ export function restrictDataUriResourcesOnNode(node: Element): void {
  * though they don't literally start with "https://" (the `imgNewlineSrc`
  * tracking bypass). Protocol-relative `//host` is external too. data:, blob:,
  * and cid: are inline/local and never count as external.
+ *
+ * The parser also reads `\` as `/` in http(s) URLs and needs no slashes
+ * after the scheme, so `/\host`, `https:\\host` and `https:host` all load
+ * from another host.
  */
 export function isExternalResourceUrl(value: string | null | undefined): boolean {
   if (!value) return false;
   // Mirror the URL parser: drop every ASCII C0-control and space char it
   // ignores (leading/trailing trim plus tab/newline/CR removed anywhere).
   // eslint-disable-next-line no-control-regex
-  const normalized = value.replace(/[\u0000-\u0020]+/g, '');
-  return /^(?:https?:\/\/|\/\/)/i.test(normalized);
+  const normalized = value.replace(/[\u0000-\u0020]+/g, '').replace(/\\/g, '/');
+  return /^(?:https?:|\/\/)/i.test(normalized);
 }
 
 
@@ -485,23 +489,57 @@ export function decodeCssEscapes(value: string): string {
   });
 }
 
-const CSS_URL_PATTERN = /url\(\s*(['"]?)([^)]*?)\1\s*\)/gi;
+// A url() token also ends at the end of the declaration list: a style
+// attribute's last `url(https://t` needs no closing parenthesis.
+const CSS_URL_PATTERN = /url\(\s*(['"]?)([^)]*?)\1\s*(?:\)|$)/gi;
+// image-set() takes plain strings as well as url()s.
+const CSS_IMAGE_SET_PATTERN = /(?:-webkit-)?image-set\(([^()]*(?:\([^()]*\)[^()]*)*)\)/gi;
+const CSS_STRING_PATTERN = /(['"])(.*?)\1/g;
 
-/** True if any `url(...)` in a CSS string resolves to an external resource. */
-export function styleHasExternalUrl(style: string): boolean {
+function imageSetHasExternalUrl(args: string): boolean {
   let found = false;
-  style.replace(CSS_URL_PATTERN, (full, _q, inner) => {
-    if (isExternalResourceUrl(decodeCssEscapes(inner))) found = true;
+  args.replace(CSS_STRING_PATTERN, (full, _q, inner: string) => {
+    if (isExternalResourceUrl(inner)) found = true;
+    return full;
+  });
+  return found || styleHasExternalCssUrl(args);
+}
+
+function styleHasExternalCssUrl(css: string): boolean {
+  let found = false;
+  css.replace(CSS_URL_PATTERN, (full, _q, inner: string) => {
+    if (isExternalResourceUrl(inner)) found = true;
     return full;
   });
   return found;
 }
 
-/** Replace every external `url(...)` in a CSS string with an empty `url()`. */
+/**
+ * True if any `url(...)` or `image-set(...)` in a CSS string resolves to an
+ * external resource. Escapes are decoded first: `\75 rl(` is `url(`.
+ */
+export function styleHasExternalUrl(style: string): boolean {
+  const decoded = decodeCssEscapes(style);
+  if (styleHasExternalCssUrl(decoded)) return true;
+  let found = false;
+  decoded.replace(CSS_IMAGE_SET_PATTERN, (full, args: string) => {
+    if (imageSetHasExternalUrl(args)) found = true;
+    return full;
+  });
+  return found;
+}
+
+/**
+ * Replace every external `url(...)` in a CSS string with an empty `url()`
+ * and drop an `image-set(...)` that names one. Returns the input unchanged
+ * when nothing external is present; otherwise the escape-decoded CSS, since
+ * an escaped `url` keyword can only be found and removed once decoded.
+ */
 export function stripExternalCssUrls(style: string): string {
-  return style.replace(CSS_URL_PATTERN, (full, _q, inner) =>
-    isExternalResourceUrl(decodeCssEscapes(inner)) ? 'url()' : full
-  );
+  if (!styleHasExternalUrl(style)) return style;
+  return decodeCssEscapes(style)
+    .replace(CSS_IMAGE_SET_PATTERN, (full, args: string) => (imageSetHasExternalUrl(args) ? 'none' : full))
+    .replace(CSS_URL_PATTERN, (full, _q, inner: string) => (isExternalResourceUrl(inner) ? 'url()' : full));
 }
 
 /**
@@ -520,13 +558,20 @@ export function stripExternalCssUrls(style: string): string {
 export function stripExternalStyleSheetCss(css: string): string {
   if (!css) return css;
   const decoded = decodeCssEscapes(css);
-  if (!/url\(|@import/i.test(decoded)) return css;
+  if (!/url\(|@import|image-set\(/i.test(decoded)) return css;
   let changed = false;
   // External url(...) anywhere in the sheet (also covers `@import url(...)`).
   let result = decoded.replace(CSS_URL_PATTERN, (full, _q, inner: string) => {
     if (isExternalResourceUrl(inner)) {
       changed = true;
       return 'url()';
+    }
+    return full;
+  });
+  result = result.replace(CSS_IMAGE_SET_PATTERN, (full, args: string) => {
+    if (imageSetHasExternalUrl(args)) {
+      changed = true;
+      return 'none';
     }
     return full;
   });

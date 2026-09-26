@@ -2744,8 +2744,15 @@ export function EmailViewer({
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    // The popup is an about:blank document of the app, so it carries the
+    // app's CSP (img-src https:), not the message iframe's strict one. Add
+    // the iframe's policy while remote content is blocked; it narrows the
+    // inherited one.
     printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${escapeHtml(subjectText)}</title>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${emailIframeCsp(effectiveEmailContent.externalBlocked)}">
+<meta name="referrer" content="no-referrer">
+<title>${escapeHtml(subjectText)}</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; color: #000; }
   .header { border-bottom: 1px solid #ccc; padding-bottom: 16px; margin-bottom: 16px; }
