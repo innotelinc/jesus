@@ -281,6 +281,43 @@ function isApiPostPathAllowed(path: string, allowlist: readonly string[]): boole
   return false;
 }
 
+/**
+ * Same-origin routes no plugin may POST to, whatever its `apiPostPaths`
+ * lists: they act with the user's full credentials (the JMAP passthrough,
+ * WebDAV, CalDAV), change sign-in, admin or plugin state, or belong to the
+ * setup wizard. A plugin talks to its own sidecar routes instead.
+ */
+const PLUGIN_POST_DENIED_PATHS = [
+  '/api/account',
+  '/api/admin',
+  '/api/auth',
+  '/api/caldav',
+  '/api/dev-jmap',
+  '/api/plugin-approval-status',
+  '/api/plugins',
+  '/api/push',
+  '/api/settings',
+  '/api/setup',
+  '/api/system',
+  '/api/webdav',
+  '/api/wopi',
+];
+
+/**
+ * Checked on the path the router will see: decoded once and with repeated
+ * slashes collapsed, so `/api/%61dmin/...` cannot pass for something else.
+ */
+function isPluginPostDenied(pathname: string): boolean {
+  let routePath: string;
+  try {
+    routePath = decodeURIComponent(pathname);
+  } catch {
+    return true;
+  }
+  routePath = routePath.replace(/\/{2,}/g, '/');
+  return PLUGIN_POST_DENIED_PATHS.some((denied) => routePath === denied || routePath.startsWith(`${denied}/`));
+}
+
 interface PluginHttpPostOptions {
   headers?: Record<string, string>;
   /**
@@ -337,6 +374,9 @@ async function doHttpPost(
   }
   if (!isApiPostPathAllowed(url.pathname, allow)) {
     throw new Error(`Path ${url.pathname} not in plugin apiPostPaths allowlist`);
+  }
+  if (isPluginPostDenied(url.pathname)) {
+    throw new Error(`Path ${url.pathname} is not available to plugins`);
   }
   const { client } = useAuthStore.getState();
   const headers: Record<string, string> = {};
