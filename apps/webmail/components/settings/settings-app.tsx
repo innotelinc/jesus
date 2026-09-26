@@ -542,7 +542,7 @@ export function SettingsApp({ linkSegments: routeSegments }: SettingsAppProps = 
     // Appearance
     { id: 'appearance', label: t('tabs.appearance'), icon: tabIcons.appearance, group: 'appearance' },
     { id: 'layout', label: t('tabs.layout'), icon: tabIcons.layout, group: 'appearance' },
-    ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: 'Themes', icon: tabIcons.themes, group: 'appearance' as TabGroup }] : []),
+    ...(isFeatureEnabled('themesEnabled') ? [{ id: 'themes' as Tab, label: t('tabs.themes'), icon: tabIcons.themes, group: 'appearance' as TabGroup }] : []),
 
     // Mail
     { id: 'reading', label: t('tabs.reading'), icon: tabIcons.reading, group: 'mail' },
