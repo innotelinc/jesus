@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 // #1047: mail attachments open read-only in the WOPI editor. The launch route
@@ -13,6 +16,14 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} },
 }));
 vi.mock('@/lib/stalwart/credentials', () => ({ getStalwartCredentials: vi.fn() }));
+const jar = new Map<string, string>();
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => (jar.has(name) ? { name, value: jar.get(name)! } : undefined),
+    set: (name: string, value: string) => void jar.set(name, value),
+    delete: (name: string) => void jar.delete(name),
+  }),
+}));
 vi.mock('@/lib/admin/config-manager', () => ({
   configManager: { get: (_key: string, fallback: unknown) => fallback, ensureLoaded: async () => {} },
 }));
@@ -37,6 +48,11 @@ import { getStalwartCredentials } from '@/lib/stalwart/credentials';
 import { getWopiActions } from '@/lib/wopi/discovery';
 import { fetchJmapServer } from '@/lib/stalwart/server-fetch';
 import { fetchJmapSession, postJmap } from '@/lib/stalwart/jmap-api';
+import { cookies } from 'next/headers';
+import { revokeWopiTokens } from '@/lib/wopi/revocation';
+
+// Revocations are kept in the state directory.
+process.env.ADMIN_STATE_DIR = mkdtempSync(path.join(tmpdir(), 'bw-wopi-'));
 
 const ORIGIN = 'https://webmail.example.com';
 const OFFICE = 'https://office.example.com/browser/abc/cool.html?';
@@ -192,5 +208,55 @@ describe('WOPI calls for an attachment token', () => {
       const res = await checkFileInfo(request(`/api/wopi/files/${id}?${token}`), params(id));
       expect(res.status).toBe(401);
     }
+  });
+});
+
+// The token carries the user's credentials to the editor server; it used to
+// keep working for six hours after the user signed out.
+describe('WOPI tokens after signing out', () => {
+  beforeEach(() => jar.clear());
+
+  async function open() {
+    const { data } = await launchAttachment({ blobId: 'Gblob1', name: 'Quote.docx', type: DOCX });
+    const { documentId, token } = editorCall(data);
+    return () => checkFileInfo(request(`/api/wopi/files/${documentId}?${token}`), params(documentId));
+  }
+
+  it('refuses a token once its slot signed out in that browser', async () => {
+    const call = await open();
+    expect((await call()).status).toBe(200);
+    await new Promise((r) => setTimeout(r, 2));
+
+    await revokeWopiTokens(await cookies(), 0);
+    expect((await call()).status).toBe(401);
+  });
+
+  it('keeps tokens of other slots, and tokens minted after signing in again', async () => {
+    const call = await open();
+    await revokeWopiTokens(await cookies(), 1);
+    expect((await call()).status).toBe(200);
+
+    await new Promise((r) => setTimeout(r, 2));
+    await revokeWopiTokens(await cookies(), 0);
+    await new Promise((r) => setTimeout(r, 2));
+    const again = await open();
+    expect((await again()).status).toBe(200);
+  });
+
+  it('a full sign-out refuses every slot and forgets the browser id', async () => {
+    const call = await open();
+    await new Promise((r) => setTimeout(r, 2));
+    await revokeWopiTokens(await cookies(), 'all');
+    expect((await call()).status).toBe(401);
+    expect(jar.has('bulwark_wopi')).toBe(false);
+  });
+
+  it('signing out on another browser leaves this one alone', async () => {
+    const call = await open();
+    const mine = jar.get('bulwark_wopi')!;
+    jar.set('bulwark_wopi', 'another-browser');
+    await revokeWopiTokens(await cookies(), 'all');
+    jar.set('bulwark_wopi', mine);
+    expect((await call()).status).toBe(200);
   });
 });

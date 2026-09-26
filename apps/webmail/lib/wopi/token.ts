@@ -35,6 +35,12 @@ export interface WopiTokenPayload {
   canWrite: boolean;
   /** Browser origin that embeds the editor iframe (WOPI PostMessageOrigin). */
   origin: string;
+  /**
+   * The browser and account slot that minted the token, so signing out
+   * there revokes it (see lib/wopi/revocation.ts). Absent on older tokens.
+   */
+  bid?: string;
+  slot?: number;
   /** Expiry, ms since epoch. */
   exp: number;
 }
@@ -96,6 +102,8 @@ export function verifyWopiToken(token: string | null, documentId: string): WopiT
     typeof p.exp !== 'number'
   ) return null;
   if (p.kind !== undefined && p.kind !== 'file' && p.kind !== 'attachment') return null;
+  if (p.bid !== undefined && typeof p.bid !== 'string') return null;
+  if (p.slot !== undefined && typeof p.slot !== 'number') return null;
   if (wopiDocumentId(p) !== documentId) return null;
   if (Date.now() > p.exp) return null;
   return p;
