@@ -898,6 +898,34 @@ let refreshPromise: Promise<string | null> | null = null;
 
 // Multi-account state: per-account JMAP clients and refresh timers
 const clients = new Map<string, JMAPClient>();
+
+/**
+ * Account switches can overlap (click B, then C before B lands). Each switch
+ * takes a generation and gives up at its next await once a newer one has
+ * started, so only the last click is applied.
+ */
+let switchGeneration = 0;
+/**
+ * True while a switch has cleared the stores and not yet filled them with
+ * the target account. A switch starting then must not snapshot the empty
+ * stores over the outgoing account's cached state.
+ */
+let storesClearedForSwitch = false;
+
+/**
+ * Snapshot the account whose data is on screen right now and clear the
+ * stores. Reads the active account when it runs, not when the switch began:
+ * an overlapping switch may have changed it in between, and a snapshot under
+ * the wrong key would later restore one account's identities (and so its
+ * From address) into another.
+ */
+function snapshotAndClearForSwitch(activeAccountId: string | null): void {
+  if (!storesClearedForSwitch && activeAccountId) {
+    snapshotAccount(activeAccountId);
+  }
+  clearAllStores();
+  storesClearedForSwitch = true;
+}
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const refreshPromises = new Map<string, Promise<string | null>>();
 
@@ -2027,6 +2055,8 @@ export const useAuthStore = create<AuthState>()(
       switchAccount: async (accountId: string) => {
         const state = get();
         if (state.activeAccountId === accountId) return;
+        const generation = ++switchGeneration;
+        const superseded = () => generation !== switchGeneration;
 
         const accountStore = useAccountStore.getState();
         const targetAccount = accountStore.getAccountById(accountId);
@@ -2050,10 +2080,7 @@ export const useAuthStore = create<AuthState>()(
 
           // Snapshot current account, then clear - there's nothing to keep on
           // screen during the network round-trip.
-          if (state.activeAccountId) {
-            snapshotAccount(state.activeAccountId);
-          }
-          clearAllStores();
+          snapshotAndClearForSwitch(get().activeAccountId);
           await useSettingsStore.getState().flushSync();
           useSettingsStore.getState().disableSync();
 
@@ -2095,6 +2122,10 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
+        // A newer switch owns the screen now. A client restored here stays in
+        // the pool for when the account is picked again.
+        if (superseded()) return;
+
         if (!targetClient) {
           if (targetRestoreRateLimited) {
             if (state.activeAccountId && state.activeAccountId !== accountId) {
@@ -2102,6 +2133,7 @@ export const useAuthStore = create<AuthState>()(
               const prevAccount = accountStore.getAccountById(state.activeAccountId);
               if (prevClient && prevAccount) {
                 restoreAccount(state.activeAccountId);
+                storesClearedForSwitch = false;
                 accountStore.setActiveAccount(state.activeAccountId);
                 set({
                   isLoading: false,
@@ -2134,6 +2166,7 @@ export const useAuthStore = create<AuthState>()(
             const prevAccount = accountStore.getAccountById(state.activeAccountId);
             if (prevClient && prevAccount) {
               restoreAccount(state.activeAccountId);
+              storesClearedForSwitch = false;
               accountStore.setActiveAccount(state.activeAccountId);
               set({
                 isLoading: false,
@@ -2168,6 +2201,7 @@ export const useAuthStore = create<AuthState>()(
         // this slot and force a clean re-auth instead of surfacing someone
         // else's mail.
         const connectedCandidates = await connectedAccountCandidates(targetClient, targetAccount.serverUrl);
+        if (superseded()) return;
         const verdict = classifySessionMatch(connectedCandidates, accountId, targetAccount.serverIdentifiers);
         if (verdict === 'reject') {
           debug.error(`switchAccount: slot ${targetAccount.cookieSlot} for ${accountId} resolved to [${connectedCandidates.join(", ")}] — forcing re-auth`);
@@ -2190,16 +2224,15 @@ export const useAuthStore = create<AuthState>()(
         // the restore and client swap below - so the UI never blanks between the
         // two accounts. The network path already snapshotted and cleared above.
         if (wasConnected) {
-          if (state.activeAccountId) {
-            snapshotAccount(state.activeAccountId);
-          }
-          clearAllStores();
+          snapshotAndClearForSwitch(get().activeAccountId);
           await useSettingsStore.getState().flushSync();
           useSettingsStore.getState().disableSync();
+          if (superseded()) return;
         }
 
         // Restore cached state or fetch fresh
         const restored = restoreAccount(accountId);
+        storesClearedForSwitch = false;
         accountStore.setActiveAccount(accountId);
         accountStore.updateAccount(accountId, { isConnected: true, hasError: false, errorMessage: undefined });
 
@@ -2227,6 +2260,9 @@ export const useAuthStore = create<AuthState>()(
           // Fetch fresh data
           try {
             const { identities, primaryIdentity } = loadIdentities(await targetClient.getIdentities(), targetAccount.username);
+            // Switched on again while these loaded: they belong to this
+            // account, not the one now active.
+            if (superseded()) return;
             set({ identities, primaryIdentity });
             initializeFeatureStores(targetClient);
           } catch (err) {
