@@ -1366,16 +1366,20 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   const applyMailDeepLink = async (link: MailDeepLink) => {
     // A permalink can name the account it belongs to. Ids are only meaningful
     // within their account, so switch first - but only to a login that is
-    // actually connected; we can't authenticate on someone's behalf.
-    if (link.accountId && link.accountId !== useAuthStore.getState().activeAccountId) {
+    // actually connected; we can't authenticate on someone's behalf. A push
+    // notification names the login by its cookie slot.
+    const linkAccountId = link.accountId ?? (link.slot !== undefined
+      ? useAccountStore.getState().accounts.find((a) => a.cookieSlot === link.slot)?.id ?? `slot:${link.slot}`
+      : undefined);
+    if (linkAccountId && linkAccountId !== useAuthStore.getState().activeAccountId) {
       const target = useAccountStore.getState().accounts.find(
-        (a) => a.id === link.accountId && a.isConnected,
+        (a) => a.id === linkAccountId && a.isConnected,
       );
       if (!target) {
         toast.error(t('deep_link.account_unavailable'));
         return;
       }
-      await switchAccount(link.accountId);
+      await switchAccount(linkAccountId);
     }
 
     const activeClient = useAuthStore.getState().client;

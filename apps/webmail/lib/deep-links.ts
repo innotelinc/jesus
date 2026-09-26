@@ -131,10 +131,14 @@ const VIRTUAL_ALIAS_BY_ID: Record<string, string> = Object.fromEntries(
 /** Mailbox roles that get a readable alias instead of their opaque JMAP id. */
 const ALIASED_ROLES = new Set(['inbox', 'sent', 'drafts', 'trash', 'archive', 'junk']);
 
+/**
+ * `accountId` is the local account (AccountEntry.id). `slot` names the
+ * login by its cookie slot instead - what a push notification knows.
+ */
 export type MailDeepLink =
-  | { kind: 'folder'; ref: string; accountId?: string }
-  | { kind: 'message'; id: string; accountId?: string; fullscreen?: boolean }
-  | { kind: 'thread'; id: string; accountId?: string };
+  | { kind: 'folder'; ref: string; accountId?: string; slot?: number }
+  | { kind: 'message'; id: string; accountId?: string; slot?: number; fullscreen?: boolean }
+  | { kind: 'thread'; id: string; accountId?: string; slot?: number };
 
 export interface MailLinkState {
   mailboxId: string | null;
@@ -210,6 +214,9 @@ export function parseMailPath(
   search?: URLSearchParams,
 ): MailDeepLink | null {
   const accountId = search?.get('account') ?? undefined;
+  const rawSlot = search?.get('slot');
+  const slotNumber = rawSlot != null && rawSlot !== '' ? Number(rawSlot) : NaN;
+  const slot = Number.isInteger(slotNumber) && slotNumber >= 0 ? slotNumber : undefined;
   // `?view=fullscreen` asks for the message alone, no sidebar or list - what
   // a mail dragged out into a new browser tab opens as. The Pro shell always
   // opens message links as fullscreen email tabs and ignores the flag.
@@ -219,14 +226,14 @@ export function parseMailPath(
   if (kind && value) {
     const id = decodeSegment(value);
     if (id) {
-      if (kind === 'message') return { kind: 'message', id, accountId, fullscreen };
-      if (kind === 'thread') return { kind: 'thread', id, accountId };
-      if (kind === 'folder') return { kind: 'folder', ref: id, accountId };
+      if (kind === 'message') return { kind: 'message', id, accountId, slot, fullscreen };
+      if (kind === 'thread') return { kind: 'thread', id, accountId, slot };
+      if (kind === 'folder') return { kind: 'folder', ref: id, accountId, slot };
     }
   }
 
   const legacyEmail = search?.get('email');
-  if (legacyEmail) return { kind: 'message', id: legacyEmail, accountId };
+  if (legacyEmail) return { kind: 'message', id: legacyEmail, accountId, slot };
 
   return null;
 }
