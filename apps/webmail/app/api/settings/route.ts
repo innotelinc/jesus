@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger';
 import { decryptSession } from '@/lib/auth/crypto';
@@ -121,6 +122,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // CSRF gate (GHSA-9mvj-98f5-9q6g): this handler acts with the caller's
+  // session cookie, which SameSite=Lax still sends from a same-site page.
+  const crossOrigin = rejectCrossOriginRequest(request);
+  if (crossOrigin) return crossOrigin;
   if (!isEnabled()) {
     return NextResponse.json({ error: 'Settings sync is disabled' }, { status: 404 });
   }
@@ -178,6 +183,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // CSRF gate (GHSA-9mvj-98f5-9q6g): this handler acts with the caller's
+  // session cookie, which SameSite=Lax still sends from a same-site page.
+  const crossOrigin = rejectCrossOriginRequest(request);
+  if (crossOrigin) return crossOrigin;
   if (!isEnabled()) {
     return NextResponse.json({ error: 'Settings sync is disabled' }, { status: 404 });
   }

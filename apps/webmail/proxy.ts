@@ -115,6 +115,29 @@ function forwardRequestHeaders(
   return response;
 }
 
+/**
+ * The path Next routes on. `nextUrl.pathname` keeps percent-escapes, but the
+ * route matcher decodes them, so `/api/%61uth/session` reaches the
+ * `/api/auth/session` handler. Security decisions must use the decoded form
+ * or an escaped spelling walks around them.
+ */
+export function routePathOf(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+/**
+ * Paths under /api/ that must accept requests without a same-origin browser
+ * context: the office editor's WOPI host calls the file endpoints
+ * server-to-server with a token of its own, not the session cookie.
+ */
+function isOriginGateExempt(routePath: string): boolean {
+  return routePath.startsWith("/api/wopi/files/");
+}
+
 function isSetupPath(pathname: string): boolean {
   return (
     pathname === "/setup" ||
@@ -128,7 +151,10 @@ export async function proxy(request: NextRequest) {
   // boot triggers the config load; subsequent calls are in-memory.
   await configManager.ensureLoaded();
   const setupState = detectSetupState();
-  const pathname = request.nextUrl.pathname;
+  // Raw form for what is echoed back (x-pathname); decoded form for every
+  // decision about the request.
+  const rawPathname = request.nextUrl.pathname;
+  const pathname = routePathOf(rawPathname);
 
   if (setupState === "bootstrap") {
     // Wizard active. Redirect HTML pages to /setup; let asset/internal
@@ -170,10 +196,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Outer CSRF gate for the unauthenticated auth routes (GHSA-qvr9-m8cq-7wvg).
-  // Each handler checks this itself as well; this layer covers any route
-  // added under /api/auth/ later. GET/HEAD/OPTIONS pass through untouched.
-  if (pathname.startsWith("/api/auth/") && !isSameOriginRequest(request)) {
+  // Outer CSRF gate for every API route (GHSA-qvr9-m8cq-7wvg,
+  // GHSA-9mvj-98f5-9q6g). The identity cookies are SameSite=Lax, which a
+  // same-site sibling origin still receives, so any route that acts with
+  // them needs an origin check. The state-changing handlers check this
+  // themselves as well; this layer covers any route added later.
+  // GET/HEAD/OPTIONS pass through untouched.
+  if (pathname.startsWith("/api/") && !isOriginGateExempt(pathname) && !isSameOriginRequest(request)) {
     return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
   }
 
@@ -330,7 +359,7 @@ export async function proxy(request: NextRequest) {
   // so getLocale() can't resolve the active locale there and falls back to the
   // default - emitting <html lang="en"> on e.g. /de pages, which makes browsers
   // offer to "translate this page". The layout reads x-pathname to recover it.
-  forwardRequestHeaders(response, request, { "x-nonce": nonce, "x-pathname": pathname });
+  forwardRequestHeaders(response, request, { "x-nonce": nonce, "x-pathname": rawPathname });
 
   response.headers.set("X-Content-Type-Options", "nosniff");
 
