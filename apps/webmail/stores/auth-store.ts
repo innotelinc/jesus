@@ -22,6 +22,7 @@ import { clearAllPluginStorage, clearPluginStorageForAccount } from '@/lib/plugi
 import { broadcastSignOut, onSignedOutElsewhere, purgeSignedOutData } from '@/lib/sign-out-cleanup';
 import { useSearchHistoryStore } from './search-history-store';
 import { useCalendarNotificationStore } from './calendar-notification-store';
+import { usePolicyStore } from './policy-store';
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
 import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
@@ -2814,6 +2815,12 @@ export const useAuthStore = create<AuthState>()(
 // Expose getClientForAccount to the calendar/contact stores via a small
 // shared registry - see [[stores/client-registry]] for rationale.
 setClientLookup((accountId) => useAuthStore.getState().getClientForAccount(accountId));
+
+// Before signing in, the server only hands out the public part of the admin
+// policy; fetch the rest once a session exists.
+useAuthStore.subscribe((state, prev) => {
+  if (state.isAuthenticated && !prev.isAuthenticated) void usePolicyStore.getState().refreshIfPartial();
+});
 
 // Another tab signed everyone out: this one's cookies and account list are
 // gone too, so leave for the login page instead of showing stale mail.
