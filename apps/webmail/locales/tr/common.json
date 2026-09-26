@@ -935,6 +935,18 @@
       "about_data": "Hakkında ve Veriler",
       "debug": "Hata Ayıklama"
     },
+    "themes": {
+      "title": "Temalar",
+      "description": "Yöneticinizin dağıttığı temalar ve yerleşik hazır ayarlar arasından seçim yapın.",
+      "locked": "Tema seçimi bir yönetici tarafından kilitlendi.",
+      "forced": "“{name}” teması yönetici tarafından zorunlu kılınmıştır ve değiştirilemez",
+      "admin_theme": "Yönetici teması",
+      "activated": "Tema etkinleştirildi",
+      "default_restored": "Varsayılan tema geri yüklendi",
+      "default_name": "Varsayılan",
+      "default_badge": "Varsayılan",
+      "admin_enforced": "Yönetici tarafından zorunlu"
+    },
     "tab_groups": {
       "general": "Genel",
       "account": "Hesap ve Kimlik",

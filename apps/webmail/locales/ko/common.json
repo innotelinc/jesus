@@ -935,6 +935,18 @@
       "about_data": "정보 및 데이터",
       "debug": "디버그"
     },
+    "themes": {
+      "title": "테마",
+      "description": "관리자가 배포한 테마와 기본 제공 프리셋 중에서 선택해 주세요.",
+      "locked": "관리자가 테마 선택을 잠갔습니다.",
+      "forced": "테마 “{name}”은(는) 관리자가 지정했으므로 변경할 수 없습니다",
+      "admin_theme": "관리자 테마",
+      "activated": "테마가 적용되었습니다",
+      "default_restored": "기본 테마로 복원되었습니다",
+      "default_name": "기본",
+      "default_badge": "기본",
+      "admin_enforced": "관리자가 지정함"
+    },
     "tab_groups": {
       "general": "일반",
       "account": "계정 및 인증",

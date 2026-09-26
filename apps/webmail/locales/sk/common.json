@@ -938,6 +938,18 @@
       "about_data": "Info a dáta",
       "debug": "Ladenie"
     },
+    "themes": {
+      "title": "Motívy",
+      "description": "Vyberte si z motívov nasadených vaším správcom a zo vstavaných predvolieb.",
+      "locked": "Výber motívu je uzamknutý správcom.",
+      "forced": "Motív „{name}“ je vynútený správcom a nemožno ho zmeniť",
+      "admin_theme": "Motív správcu",
+      "activated": "Motív aktivovaný",
+      "default_restored": "Predvolený motív bol obnovený",
+      "default_name": "Predvolený",
+      "default_badge": "Predvolený",
+      "admin_enforced": "Vynútené správcom"
+    },
     "tab_groups": {
       "general": "Všeobecné",
       "account": "Účet a identita",

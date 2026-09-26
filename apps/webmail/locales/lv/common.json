@@ -935,6 +935,18 @@
       "about_data": "Par un dati",
       "debug": "Atkļūdošana"
     },
+    "themes": {
+      "title": "Tēmas",
+      "description": "Izvēlieties kādu no administratora izvietotajām tēmām vai iebūvētajiem priekšiestatījumiem.",
+      "locked": "Tēmas izvēli ir bloķējis administrators.",
+      "forced": "Tēmu “{name}” ir noteicis administrators, un to nevar mainīt",
+      "admin_theme": "Administratora tēma",
+      "activated": "Tēma aktivizēta",
+      "default_restored": "Noklusējuma tēma atjaunota",
+      "default_name": "Noklusējuma",
+      "default_badge": "Noklusējuma",
+      "admin_enforced": "Noteicis administrators"
+    },
     "tab_groups": {
       "general": "Vispārīgi",
       "account": "Konts un identitāte",

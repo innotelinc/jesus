@@ -935,6 +935,18 @@
       "about_data": "Informazioni e dati",
       "debug": "Debug"
     },
+    "themes": {
+      "title": "Temi",
+      "description": "Scegli tra i temi distribuiti dal tuo amministratore e i preset integrati.",
+      "locked": "La selezione del tema è bloccata da un amministratore.",
+      "forced": "Il tema “{name}” è imposto dall'amministratore e non può essere modificato",
+      "admin_theme": "Tema dell'amministratore",
+      "activated": "Tema attivato",
+      "default_restored": "Tema predefinito ripristinato",
+      "default_name": "Predefinito",
+      "default_badge": "Predefinito",
+      "admin_enforced": "Imposto dall'amministratore"
+    },
     "tab_groups": {
       "general": "Generale",
       "account": "Account e identità",

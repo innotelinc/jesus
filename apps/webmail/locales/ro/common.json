@@ -938,6 +938,18 @@
       "about_data": "Despre & Date",
       "debug": "Depanare"
     },
+    "themes": {
+      "title": "Teme",
+      "description": "Alegeți dintre temele implementate de administratorul dvs. și presetările integrate.",
+      "locked": "Selectarea temei este blocată de un administrator.",
+      "forced": "Tema „{name}” este impusă de administrator și nu poate fi schimbată",
+      "admin_theme": "Temă de administrator",
+      "activated": "Temă activată",
+      "default_restored": "Tema implicită a fost restabilită",
+      "default_name": "Implicită",
+      "default_badge": "Implicită",
+      "admin_enforced": "Impusă de administrator"
+    },
     "tab_groups": {
       "general": "Generalități",
       "account": "Cont și identitate",

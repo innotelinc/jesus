@@ -935,6 +935,18 @@
       "about_data": "O programie i dane",
       "debug": "Debugowanie"
     },
+    "themes": {
+      "title": "Motywy",
+      "description": "Wybierz jeden z motywów udostępnionych przez administratora lub jeden z wbudowanych.",
+      "locked": "Wybór motywu został zablokowany przez administratora.",
+      "forced": "Motyw „{name}” jest wymuszony przez administratora i nie można go zmienić",
+      "admin_theme": "Motyw administratora",
+      "activated": "Motyw aktywowany",
+      "default_restored": "Przywrócono domyślny motyw",
+      "default_name": "Domyślny",
+      "default_badge": "Domyślny",
+      "admin_enforced": "Wymuszony przez administratora"
+    },
     "tab_groups": {
       "general": "Ogólne",
       "account": "Konto i tożsamość",

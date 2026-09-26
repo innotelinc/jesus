@@ -938,6 +938,18 @@
       "about_data": "Om & data",
       "debug": "Debug"
     },
+    "themes": {
+      "title": "Temaer",
+      "description": "Vælg mellem temaer, som din administrator har udrullet, og indbyggede forudindstillinger.",
+      "locked": "Temavalget er låst af en administrator.",
+      "forced": "Temaet »{name}« er gennemtvunget af administratoren og kan ikke ændres",
+      "admin_theme": "Administratortema",
+      "activated": "Tema aktiveret",
+      "default_restored": "Standardtema gendannet",
+      "default_name": "Standard",
+      "default_badge": "Standard",
+      "admin_enforced": "Gennemtvunget af administrator"
+    },
     "tab_groups": {
       "general": "Generelt",
       "account": "Konto & identitet",

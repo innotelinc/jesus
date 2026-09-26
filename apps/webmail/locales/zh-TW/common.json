@@ -930,13 +930,25 @@
       "sidebar_apps": "側邊欄應用程式",
       "notifications": "通知",
       "layout": "版面配置",
-      "themes": "主题",
+      "themes": "主題",
       "reading": "閱讀",
       "composing": "撰寫",
       "downloads": "下載",
       "content_senders": "內容與寄件者",
       "about_data": "關於與資料",
       "debug": "除錯"
+    },
+    "themes": {
+      "title": "主題",
+      "description": "從管理員部署的主題和內建預設集中選擇。",
+      "locked": "主題選擇已被管理員鎖定。",
+      "forced": "主題「{name}」由管理員強制指定，無法變更",
+      "admin_theme": "管理員主題",
+      "activated": "主題已啟用",
+      "default_restored": "已還原預設主題",
+      "default_name": "預設",
+      "default_badge": "預設",
+      "admin_enforced": "管理員強制"
     },
     "tab_groups": {
       "general": "一般",
