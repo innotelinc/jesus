@@ -7,10 +7,10 @@ name: Build Static Lite
 #
 # Two targets are built side by side:
 #   - static:   bulwark-lite-<version>.zip for any static web host;
-#   - stalwart: bulwark-lite-stalwart.zip, a Stalwart `Application` bundle. Its
-#               release asset name carries no version, so
-#               releases/latest/download/bulwark-lite-stalwart.zip is a stable
-#               resourceUrl that follows new releases.
+#   - stalwart: bulwark-lite-stalwart.zip, a Stalwart `Application` bundle.
+#               Its LITE-README points `resourceUrl` at the tagged release.
+#
+# Each zip is published with a `.sha256` next to it.
 #
 # scripts/lite/prepare.mjs deletes the server-only trees in place; that is
 # safe here because the Actions checkout is disposable (CI=true is the guard).
@@ -121,12 +121,16 @@ jobs:
           path: zips
           merge-multiple: true
 
+      - name: Checksum zips
+        working-directory: zips
+        run: for zip in *.zip; do sha256sum "$zip" > "$zip.sha256"; done
+
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG_NAME" zips/*.zip --clobber
+        run: gh release upload "$TAG_NAME" zips/*.zip zips/*.zip.sha256 --clobber
 
   smoke:
     # Boots the demo export on a plain static server and drives it with
