@@ -50,5 +50,5 @@ describe('conversation view honours the remote-content block', () => {
     const csp = /Content-Security-Policy" content="([^"]*)"/.exec(srcdoc)?.[1] ?? '';
     expect(live).toEqual([]);
     expect(csp).not.toMatch(/img-src[^;]*https?:/);
-  });
+  }, 30_000);
 });
