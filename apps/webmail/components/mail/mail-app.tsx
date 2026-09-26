@@ -1959,6 +1959,10 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       subAddressTag: '',
       mode: 'compose',
       draftId: draft.id,
+      // A reply draft re-opens in compose mode; its threading headers must
+      // come along or the reply leaves its thread.
+      inReplyTo: draft.inReplyTo ?? undefined,
+      references: draft.references ?? undefined,
       // Existing server-side attachments must ride along, or the composer
       // starts empty and the next save/send silently rebuilds the draft
       // without them (#849).

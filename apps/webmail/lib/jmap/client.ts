@@ -3576,7 +3576,9 @@ export class JMAPClient implements IJMAPClient {
     draftId?: string,
     attachments?: Array<{ blobId: string; name: string; type: string; size: number; disposition?: 'attachment' | 'inline'; cid?: string }>,
     fromName?: string,
-    htmlBody?: string
+    htmlBody?: string,
+    inReplyTo?: string[],
+    references?: string[],
   ): Promise<string> {
     const mailboxes = await this.getMailboxes();
     const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
@@ -3598,9 +3600,15 @@ export class JMAPClient implements IJMAPClient {
       textBody: { partId: string; type?: string }[];
       htmlBody?: { partId: string; type: string }[];
       attachments?: { blobId: string; type: string; name: string; disposition: string; cid?: string }[];
+      inReplyTo?: string[];
+      references?: string[];
     }
 
     const sanitizedFromName = sanitizeIdentityDisplayName(fromName);
+    // A reply draft keeps its thread: re-opened or re-sent after Undo, it has
+    // nothing else to rebuild In-Reply-To / References from.
+    const draftInReplyTo = inReplyTo?.map(stripMessageIdBrackets).filter(Boolean);
+    const draftReferences = references?.map(stripMessageIdBrackets).filter(Boolean);
     const emailData: EmailDraft = {
       from: [{ ...(sanitizedFromName ? { name: sanitizedFromName } : {}), email: fromEmail || this.username }],
       // "Name <addr>" must be split into the two JMAP fields: storing the whole
@@ -3619,6 +3627,8 @@ export class JMAPClient implements IJMAPClient {
         ? [{ partId: "text", type: "text/plain" }]
         : [{ partId: "1" }],
       ...(htmlBody ? { htmlBody: [{ partId: "html", type: "text/html" }] } : {}),
+      ...(draftInReplyTo?.length ? { inReplyTo: draftInReplyTo } : {}),
+      ...(draftReferences?.length ? { references: draftReferences } : {}),
     };
 
     if (attachments?.length) {
