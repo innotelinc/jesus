@@ -457,7 +457,9 @@ export function isOpenableLinkHref(href: string | null | undefined): boolean {
  * spawn a blank tab. (The plaintext path relies on ADD_URI_SAFE_ATTR instead.)
  */
 export function applyNewTabToAnchor(node: Element): void {
-  if (node.tagName !== 'A') return;
+  // <area> in an image map is a link too; left alone it kept whatever
+  // target/rel the sender wrote (rel=opener: reverse tabnabbing).
+  if (node.tagName !== 'A' && node.tagName !== 'AREA') return;
   if (isHttpLinkHref(node.getAttribute('href'))) {
     node.setAttribute('target', '_blank');
     node.setAttribute('rel', 'noopener noreferrer');

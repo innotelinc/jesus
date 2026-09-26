@@ -365,7 +365,7 @@ function EmailCard({
             blockedExternalContent = true;
           }
 
-          if (node.tagName === 'A') {
+          if (node.tagName === 'A' || node.tagName === 'AREA') {
             node.setAttribute('target', '_blank');
             node.setAttribute('rel', 'noopener noreferrer');
           }
@@ -507,7 +507,7 @@ function EmailCard({
       resize();
       const ro = new ResizeObserver(resize);
       ro.observe(doc.body);
-      doc.querySelectorAll('a').forEach((a) => {
+      doc.querySelectorAll('a, area').forEach((a) => {
         a.setAttribute('target', '_blank');
         a.setAttribute('rel', 'noopener noreferrer');
       });
