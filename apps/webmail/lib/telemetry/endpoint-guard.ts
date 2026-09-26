@@ -1,6 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { isPrivateAddress } from '@/lib/security/ip-ranges';
+import { fetchPublicUrl } from '@/lib/security/url-guard';
 
 export { isPrivateAddress, parseV6Groups } from '@/lib/security/ip-ranges';
 
@@ -76,7 +77,31 @@ export async function resolveEndpointAllowed(raw: string): Promise<EndpointCheck
     // Don't block on transient DNS failures - fetch will fail loudly anyway,
     // and we don't want to lock admins out of their config when the resolver
     // is flaky. The literal-IP check above already covers the direct-attack
-    // case.
+    // case, and fetchTelemetryTarget re-checks at connect time, failing
+    // closed.
     return { ok: true };
   }
+}
+
+export interface TelemetryFetchInit {
+  method: 'GET' | 'POST';
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Fetch a telemetry target (the collector, the JMAP server's version
+ * probe). resolveEndpointAllowed runs its own DNS lookup, so on its own it
+ * is check-then-fetch: the socket resolves again and a rebinding answer, or
+ * a lookup that failed at check time, lands wherever it points. Unless the
+ * dev bypass is on, the address is checked inside the socket's own lookup
+ * instead, and a lookup failure fails the request. Redirects are never
+ * followed.
+ */
+export async function fetchTelemetryTarget(url: string, init: TelemetryFetchInit): Promise<Response> {
+  if (bypassEnabled()) {
+    return fetch(url, { ...init, redirect: 'manual' });
+  }
+  return (await fetchPublicUrl(url, init)) as unknown as Response;
 }
