@@ -96,13 +96,31 @@ describe('security headers on dotted app paths (GHSA-xvjh-v9c6-qcvc)', () => {
     const response = await load(path);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-security-policy')).toBeNull();
+    // No page CSP (frame-ancestors alone restricts nothing a script or
+    // image does) and no locale routing.
+    expect(response.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
     expect(response.headers.get('x-middleware-request-x-nonce')).toBeNull();
   });
 
   it.each(['/api/auth/session', '/_next/static/chunks/main.js', '/_next/image'])('still skips %s', async (path) => {
     const response = await load(path);
 
+    expect(response.headers.get('content-security-policy') ?? '').not.toContain('script-src');
+  });
+
+  it.each(['/missing.html', '/branding/nothing-here', '/_next/static/x.js'])(
+    'keeps %s from being framed or sniffed',
+    async (path) => {
+      const response = await load(path);
+      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(response.headers.get('x-frame-options')).toBe('DENY');
+      expect(response.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+    },
+  );
+
+  it('leaves the CSP of API routes to the route', async () => {
+    const response = await load('/api/unknown');
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
     expect(response.headers.get('content-security-policy')).toBeNull();
   });
 });
