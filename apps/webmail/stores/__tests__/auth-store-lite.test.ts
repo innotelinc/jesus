@@ -128,11 +128,13 @@ describe('auth-store in the static Lite build', () => {
     vi.spyOn(browserNavigation, 'replaceWindowLocation').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Signing out revokes refresh tokens. Finish that here against a fetch
+    // that answers nothing: left running, it reaches the real network and
+    // then posts a revocation into a later test's fetch mock.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+    await useAuthStore.getState().logoutAll();
     vi.unstubAllGlobals();
-    for (const [id] of useAuthStore.getState().getAllConnectedClients()) {
-      useAuthStore.getState().removeAccount(id);
-    }
   });
 
   it('"remember me" logs in through Stalwart token login and keeps only a refresh token in localStorage', async () => {
