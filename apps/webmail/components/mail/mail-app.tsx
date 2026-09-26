@@ -72,7 +72,7 @@ import { isFilterEmpty, activeFilterCount } from "@/lib/jmap/search-utils";
 import { SearchBox, type ContactSearchField } from "@/components/search/search-box";
 import type { ContactSuggestion } from "@/lib/search-suggestions";
 import type { Attachment } from "@/lib/jmap/types";
-import { requestListAttachments, type ListAttachmentSource, type LoadListAttachments } from "@/lib/list-attachments";
+import { peekListAttachments, requestListAttachments, type ListAttachmentSource, type LoadListAttachments } from "@/lib/list-attachments";
 import { useSearchHistoryStore } from "@/stores/search-history-store";
 import { WelcomeBanner } from "@/components/ui/welcome-banner";
 import { NavigationRail } from "@/components/layout/navigation-rail";
@@ -3127,10 +3127,17 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     };
   }, [client, viewingAccountId, viewMailboxes, selectedMailbox, searchQuery, searchFilters, searchMailboxId]);
 
-  const loadListAttachments = useCallback<LoadListAttachments>((email, onLoad) => {
-    const target = listRowSourceRef.current(email);
-    if (!target) return () => {};
-    return requestListAttachments(target.source, target.accountId, email.id, onLoad);
+  const loadListAttachments = useMemo<LoadListAttachments>(() => {
+    const load: LoadListAttachments = (email, onLoad) => {
+      const target = listRowSourceRef.current(email);
+      if (!target) return () => {};
+      return requestListAttachments(target.source, target.accountId, email.id, onLoad);
+    };
+    load.peek = (email) => {
+      const target = listRowSourceRef.current(email);
+      return target ? peekListAttachments(target.source, target.accountId, email.id) : undefined;
+    };
+    return load;
   }, []);
 
   const handleDownloadAttachment = async (blobId: string, name: string, type?: string, forceDownload?: boolean) => {

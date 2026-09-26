@@ -4,6 +4,7 @@ import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { ThreadListItem } from "./thread-list-item";
 import type { Attachment } from "@/lib/jmap/types";
 import type { LoadListAttachments } from "@/lib/list-attachments";
+import { listRowShowsChips } from "./attachment-chips";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
@@ -198,20 +199,39 @@ export function EmailList({
   // Match the list items: focus layout collapses to multi-line on mobile, so virtualizer estimates must match.
   const isFocusedMailLayout = mailLayout === 'focus' && !isMobile;
 
-  const estimateSize = useCallback(() => {
+  const estimateSize = useCallback((index: number) => {
     if (isFocusedMailLayout) {
       return { 'extra-compact': 28, compact: 40, regular: 56, comfortable: 64 }[density];
     }
-    const base = { 'extra-compact': 32, compact: 60, regular: 84, comfortable: 104 }[density];
-    return (showPreview && density !== 'extra-compact') ? base + 36 : base;
-  }, [density, isFocusedMailLayout, showPreview]);
+    // Rows the list has not measured yet are placed by this guess, and each
+    // one it gets wrong shifts the list when it is measured on the way back
+    // up after a jump down (scrollbar drag, End). So guess per row.
+    const latest = threadGroups[index]?.latestEmail;
+    let size = { 'extra-compact': 32, compact: 60, regular: 84, comfortable: 104 }[density];
+    if (showPreview && density !== 'extra-compact') {
+      // A mail without a preview draws a one-line "No preview available",
+      // a line (23px) shorter than a real one.
+      const emptyPreview = !!latest && !latest.preview?.trim() && !latest.searchSnippet?.preview;
+      size += emptyPreview ? 36 - 23 : 36;
+    }
+    // The attachment chip row: a 22px chip plus 6px margin.
+    if (latest && onOpenAttachment && listRowShowsChips(latest, loadAttachments)) size += 28;
+    return size;
+  }, [density, isFocusedMailLayout, showPreview, threadGroups, onOpenAttachment, loadAttachments]);
+
+  // Stable per list, so the virtualizer does not rebuild every row's
+  // measurement on each scroll render.
+  const getItemKey = useCallback(
+    (index: number) => threadGroups[index]?.threadKey ?? String(index),
+    [threadGroups],
+  );
 
   const virtualizer = useVirtualizer({
     count: threadGroups.length,
     getScrollElement: () => parentRef.current,
     estimateSize,
     overscan: 5,
-    getItemKey: (index) => threadGroups[index]?.threadKey ?? String(index),
+    getItemKey,
   });
 
   const LoadingSkeleton = () => (
