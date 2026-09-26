@@ -6,7 +6,7 @@ import { useIdentityStore } from './identity-store';
 import { setClientLookup } from './client-registry';
 import { useContactStore } from './contact-store';
 import { useVacationStore } from './vacation-store';
-import { useCalendarStore } from './calendar-store';
+import { subscriptionOwner, useCalendarStore } from './calendar-store';
 import { useFilterStore } from './filter-store';
 import { useSettingsStore } from './settings-store';
 import { useAccountStore, type AccountEntry } from './account-store';
@@ -1087,6 +1087,18 @@ function clearAllRefreshTimers(): void {
  * Synchronously clears all auth and feature store state.
  * Called during full logout (no remaining accounts).
  */
+/**
+ * Drop the calendar subscriptions of a login being signed out: they persist
+ * across account switches, and their feed URLs are often secret.
+ */
+function forgetCalendarSubscriptions(client: IJMAPClient): void {
+  try {
+    useCalendarStore.getState().forgetICalSubscriptions(subscriptionOwner(client));
+  } catch {
+    // A client that cannot name its server and login owns no subscription.
+  }
+}
+
 function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   useSettingsStore.getState().disableSync();
 
@@ -1111,6 +1123,9 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   });
 
   clearAllStores();
+  // Calendar subscriptions outlive account switches, but their feed URLs are
+  // often secret: nobody is signed in any more, so none may stay behind.
+  useCalendarStore.getState().clearICalSubscriptions();
 
   // Remove persisted state AFTER the final set() so the persist middleware
   // doesn't re-write stale values.
@@ -1841,6 +1856,7 @@ export const useAuthStore = create<AuthState>()(
         const oldClient = state.client;
         set({ client: null });
         oldClient?.disconnect();
+        if (oldClient && !wasDemoMode) forgetCalendarSubscriptions(oldClient);
 
         // Remove client from multi-account map
         if (accountId) {
@@ -1954,7 +1970,10 @@ export const useAuthStore = create<AuthState>()(
         void clearSlotCredentials(slot, wasOAuth);
         clearRefreshTimer(accountId);
         const client = clients.get(accountId);
-        if (client) { try { client.disconnect(); } catch { /* noop */ } }
+        if (client) {
+          forgetCalendarSubscriptions(client);
+          try { client.disconnect(); } catch { /* noop */ }
+        }
         clients.delete(accountId);
         evictAccount(accountId);
         accountStore.removeAccount(accountId);
