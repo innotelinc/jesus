@@ -188,6 +188,13 @@ export function isReplaySafeRequest(init?: Parameters<typeof fetch>[1]): boolean
   }
 }
 
+/** The first method error in a JMAP response, for an Error message. */
+function methodErrorMessage(response: JMAPResponse, fallback: string): string {
+  const failed = response.methodResponses?.find(([name]) => name === 'error');
+  const detail = failed?.[1] as { type?: string; description?: string } | undefined;
+  return detail?.description || detail?.type || fallback;
+}
+
 /** A scheduled send later than the server's hold limit. */
 export class ScheduleTooLateError extends Error {
   constructor(readonly maxSeconds?: number) {
@@ -932,43 +939,41 @@ export class JMAPClient implements IJMAPClient {
     this.authHeader = `Bearer ${token}`;
   }
 
+  // Throws when the server does not answer: an empty result would read as
+  // "these messages are gone", and callers would drop them from the list.
   async getSomeEmails(emailsId: string[], accountId?: string): Promise<Email[]> {
-    try {
-      const targetAccountId = accountId || this.accountId;
-      if (!emailsId || emailsId.length === 0) {
-        return [];
-      }
-
-      const emails: Email[] = [];
-
-      for (const batchIds of batched(emailsId, this.getMaxObjectsInGet())) {
-        const response = await this.request([
-          ["Email/get", {
-            accountId: targetAccountId,
-            ids: batchIds,
-            properties: [...EMAIL_LIST_PROPERTIES],
-          }, "0"],
-        ]);
-
-        const getResponse = response.methodResponses?.[0]?.[1];
-        if (response.methodResponses?.[0]?.[0] === "Email/get" && getResponse) {
-          emails.push(...((getResponse.list || []) as Email[]));
-        }
-      }
-
-      emails.sort((a: Email, b: Email) =>
-        new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-      );
-
-      if (accountId && accountId !== this.accountId) {
-        namespaceMailboxIds(emails, accountId);
-      }
-
-      return emails;
-    } catch (error) {
-      console.error('Failed to get specific emails:', error);
+    const targetAccountId = accountId || this.accountId;
+    if (!emailsId || emailsId.length === 0) {
       return [];
     }
+
+    const emails: Email[] = [];
+
+    for (const batchIds of batched(emailsId, this.getMaxObjectsInGet())) {
+      const response = await this.request([
+        ["Email/get", {
+          accountId: targetAccountId,
+          ids: batchIds,
+          properties: [...EMAIL_LIST_PROPERTIES],
+        }, "0"],
+      ]);
+
+      const getResponse = response.methodResponses?.[0]?.[1];
+      if (response.methodResponses?.[0]?.[0] !== "Email/get" || !getResponse) {
+        throw new Error(methodErrorMessage(response, 'Failed to get emails'));
+      }
+      emails.push(...((getResponse.list || []) as Email[]));
+    }
+
+    emails.sort((a: Email, b: Email) =>
+      new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+    );
+
+    if (accountId && accountId !== this.accountId) {
+      namespaceMailboxIds(emails, accountId);
+    }
+
+    return emails;
   }
 
   /**
@@ -1834,88 +1839,86 @@ export class JMAPClient implements IJMAPClient {
     return { sort: buildEmailSort(order, { pinnedFirst, polarity }), keywordSortSupported: true };
   }
 
+  // Throws when the page cannot be read. Answering with an empty page made a
+  // failed refresh empty the list, and callers could not tell it from an
+  // empty folder.
   async getEmails(mailboxId?: string, accountId?: string, limit: number = 50, position: number = 0, hasKeyword?: string, pinnedFirst?: boolean, extraFilter?: Record<string, unknown>, order: SortLevel[] = []): Promise<{ emails: Email[], hasMore: boolean, total: number, state?: string }> {
-    try {
-      const targetAccountId = accountId || this.accountId;
-      const simple: { inMailbox?: string; hasKeyword?: string } = {};
-      if (mailboxId) {
-        simple.inMailbox = mailboxId;
-      }
-      if (hasKeyword) {
-        simple.hasKeyword = hasKeyword;
-      }
-      // `extraFilter` is an arbitrary FilterCondition/FilterOperator ANDed
-      // into the view - the message-list category tabs' search contract.
-      const filter: Record<string, unknown> = extraFilter
-        ? {
-            operator: "AND",
-            conditions: [
-              ...(Object.keys(simple).length > 0 ? [simple] : []),
-              extraFilter,
-            ],
-          }
-        : simple;
-      // Pinned-first and the configured list order (#718) use the hasKeyword
-      // sort comparator (RFC 8621 §4.4.2); every page of a view must use the
-      // same sort or pagination tears, so the sort is built from settings the
-      // same way on the first page, load-more and the push refresh.
-      const built = await this.buildListSort(targetAccountId, pinnedFirst === true, order);
-      const query = (sort: ReturnType<typeof buildEmailSort>) => this.request([
-        ["Email/query", {
-          accountId: targetAccountId,
-          filter,
-          sort,
-          limit,
-          position,
-          calculateTotal: true,
-        }, "0"],
-        ["Email/get", {
-          accountId: targetAccountId,
-          "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
-          properties: [...EMAIL_LIST_PROPERTIES],
-        }, "1"],
-      ]);
-
-      let response = await query(built.sort);
-      // A server that advertises nothing but refuses hasKeyword fails the whole
-      // query. Remember that and retry once without the keyword comparators
-      // rather than showing an empty folder.
-      if (
-        built.keywordSortSupported &&
-        response.methodResponses?.[0]?.[0] === "error" &&
-        (response.methodResponses[0][1] as { type?: string })?.type === "unsupportedSort"
-      ) {
-        this.keywordSortUnsupported.add(targetAccountId);
-        response = await query(buildEmailSort(order, { pinnedFirst, keywordSortSupported: false }));
-      }
-
-      const queryResponse = response.methodResponses?.[0]?.[1];
-      const getResponse = response.methodResponses?.[1]?.[1];
-
-      if (response.methodResponses?.[1]?.[0] === "Email/get" && getResponse) {
-        const emails = (getResponse.list || []) as Email[];
-        // Sort client-side as safety net - some servers may not honour
-        // the query sort for large mailboxes without additional filters.
-        // Must mirror the query sort, or it would undo the configured order.
-        emails.sort(compareEmails(order, { pinnedFirst }));
-        const total = queryResponse?.total || 0;
-        const hasMore = computeHasMore(position, emails.length, total, limit);
-
-        if (accountId && accountId !== this.accountId) {
-          namespaceMailboxIds(emails, accountId);
-        }
-
-        // The Email collection state this page was read at; the store keeps
-        // it so a later push can be applied with Email/changes.
-        const state = typeof getResponse.state === 'string' ? getResponse.state : undefined;
-        return { emails, hasMore, total, state };
-      }
-
-      return { emails: [], hasMore: false, total: 0 };
-    } catch (error) {
-      console.error('Failed to get emails:', error);
-      return { emails: [], hasMore: false, total: 0 };
+    const targetAccountId = accountId || this.accountId;
+    const simple: { inMailbox?: string; hasKeyword?: string } = {};
+    if (mailboxId) {
+      simple.inMailbox = mailboxId;
     }
+    if (hasKeyword) {
+      simple.hasKeyword = hasKeyword;
+    }
+    // `extraFilter` is an arbitrary FilterCondition/FilterOperator ANDed
+    // into the view - the message-list category tabs' search contract.
+    const filter: Record<string, unknown> = extraFilter
+      ? {
+          operator: "AND",
+          conditions: [
+            ...(Object.keys(simple).length > 0 ? [simple] : []),
+            extraFilter,
+          ],
+        }
+      : simple;
+    // Pinned-first and the configured list order (#718) use the hasKeyword
+    // sort comparator (RFC 8621 §4.4.2); every page of a view must use the
+    // same sort or pagination tears, so the sort is built from settings the
+    // same way on the first page, load-more and the push refresh.
+    const built = await this.buildListSort(targetAccountId, pinnedFirst === true, order);
+    const query = (sort: ReturnType<typeof buildEmailSort>) => this.request([
+      ["Email/query", {
+        accountId: targetAccountId,
+        filter,
+        sort,
+        limit,
+        position,
+        calculateTotal: true,
+      }, "0"],
+      ["Email/get", {
+        accountId: targetAccountId,
+        "#ids": { resultOf: "0", name: "Email/query", path: "/ids" },
+        properties: [...EMAIL_LIST_PROPERTIES],
+      }, "1"],
+    ]);
+
+    let response = await query(built.sort);
+    // A server that advertises nothing but refuses hasKeyword fails the whole
+    // query. Remember that and retry once without the keyword comparators
+    // rather than showing an empty folder.
+    if (
+      built.keywordSortSupported &&
+      response.methodResponses?.[0]?.[0] === "error" &&
+      (response.methodResponses[0][1] as { type?: string })?.type === "unsupportedSort"
+    ) {
+      this.keywordSortUnsupported.add(targetAccountId);
+      response = await query(buildEmailSort(order, { pinnedFirst, keywordSortSupported: false }));
+    }
+
+    const queryResponse = response.methodResponses?.[0]?.[1];
+    const getResponse = response.methodResponses?.[1]?.[1];
+
+    if (response.methodResponses?.[1]?.[0] === "Email/get" && getResponse) {
+      const emails = (getResponse.list || []) as Email[];
+      // Sort client-side as safety net - some servers may not honour
+      // the query sort for large mailboxes without additional filters.
+      // Must mirror the query sort, or it would undo the configured order.
+      emails.sort(compareEmails(order, { pinnedFirst }));
+      const total = queryResponse?.total || 0;
+      const hasMore = computeHasMore(position, emails.length, total, limit);
+
+      if (accountId && accountId !== this.accountId) {
+        namespaceMailboxIds(emails, accountId);
+      }
+
+      // The Email collection state this page was read at; the store keeps
+      // it so a later push can be applied with Email/changes.
+      const state = typeof getResponse.state === 'string' ? getResponse.state : undefined;
+      return { emails, hasMore, total, state };
+    }
+
+    throw new Error(methodErrorMessage(response, 'Failed to get emails'));
   }
 
   async getEmailsInMailbox(mailboxId: string): Promise<Email[]> {
