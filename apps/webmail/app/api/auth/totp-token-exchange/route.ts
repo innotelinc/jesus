@@ -100,7 +100,7 @@ async function attemptLogin(
     });
 
     if (!loginResponse.ok) {
-      const detail = (await loginResponse.text()).substring(0, 500);
+      const detail = await upstreamDetail(loginResponse, upstreamTrusted);
       logger.warn('TOTP login: /api/auth rejected request', { status: loginResponse.status });
       // A 404 means the server predates the structured login endpoint; let the
       // caller fall back to the legacy basic-auth path.
@@ -155,7 +155,7 @@ async function attemptLogin(
     });
 
     if (!tokenResponse.ok) {
-      const detail = (await tokenResponse.text()).substring(0, 500);
+      const detail = await upstreamDetail(tokenResponse, upstreamTrusted);
       logger.warn('TOTP login: token exchange failed', { status: tokenResponse.status, detail });
       return NextResponse.json({ error: 'token_exchange_failed', detail }, { status: 502 });
     }
@@ -181,6 +181,17 @@ async function attemptLogin(
     slot,
     serverId,
   );
+}
+
+/**
+ * The start of an upstream error body, for the login screen. Only from a
+ * server the admin configured: a user-chosen server URL makes this route a
+ * way to read what any public address answers, and together with a gap in
+ * the address guard, internal ones too.
+ */
+async function upstreamDetail(response: Response, trusted: boolean): Promise<string | undefined> {
+  if (!trusted) return undefined;
+  return (await response.text()).substring(0, 500);
 }
 
 export async function POST(request: NextRequest) {
