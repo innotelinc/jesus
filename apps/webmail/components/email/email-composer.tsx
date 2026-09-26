@@ -305,7 +305,19 @@ export function EmailComposer({
   const signaturePosition = useSettingsStore((state) => state.signaturePosition);
   const signatureSeparatorEnabled = useSettingsStore((state) => state.signatureSeparatorEnabled);
   const requestReadReceiptDefault = useSettingsStore((state) => state.requestReadReceiptDefault);
-  const activeIdentities = useIdentityStore((s) => s.identities);
+  // A draft belongs to the account the composer was opened in. Switching
+  // accounts with the composer open must not move it: its saves would land in
+  // the other account, and replacing the previous save would delete that
+  // account's message with the same id. So the identities (and, below, the
+  // client) stop following the active account once it changes.
+  const activeAccountIdNow = useAuthStore((s) => s.activeAccountId);
+  const composerAccountIdRef = useRef(activeAccountIdNow);
+  if (composerAccountIdRef.current === null) composerAccountIdRef.current = activeAccountIdNow;
+  const onComposerAccount = activeAccountIdNow === composerAccountIdRef.current;
+  const liveIdentities = useIdentityStore((s) => s.identities);
+  const composerIdentitiesRef = useRef(liveIdentities);
+  if (onComposerAccount) composerIdentitiesRef.current = liveIdentities;
+  const activeIdentities = composerIdentitiesRef.current;
   // More than one connected account: surface identities from every one,
   // grouped for the From dropdown's <optgroup>s. With a single account this
   // collapses to the active account's identities only.
@@ -317,7 +329,8 @@ export function EmailComposer({
     ? multiAccountIdentities.groups
     : [];
   const primaryIdentity = activeIdentities[0] ?? null;
-  const activeAccountId = useAuthStore((s) => s.activeAccountId);
+  // The account this composer belongs to (see composerAccountIdRef above).
+  const activeAccountId = composerAccountIdRef.current;
   // Automatic selection stays on the account that holds the original message:
   // `composerClient` follows the chosen identity, and a reply/forward still
   // carries the original message's blobIds, which only that account's server
@@ -691,7 +704,10 @@ export function EmailComposer({
     restoreFocus: true,
   });
 
-  const { client } = useAuthStore();
+  const { client: activeClient } = useAuthStore();
+  const composerOwnClientRef = useRef(activeClient);
+  if (onComposerAccount && activeClient) composerOwnClientRef.current = activeClient;
+  const client = composerOwnClientRef.current;
   const currentIdentity = selectedIdentityId
     ? identities.find((identity) => identity.id === selectedIdentityId) || primaryIdentity
     : primaryIdentity;
