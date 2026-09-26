@@ -2503,13 +2503,13 @@ export function EmailViewer({
 
         // Second pass over the rendered iframe DOM (the hook above only sees
         // DOMPurify's output); http(s) → new tab, other schemes left in place.
-        doc.querySelectorAll('a').forEach(applyNewTabToAnchor);
+        doc.querySelectorAll('a, area').forEach(applyNewTabToAnchor);
 
         // Plugin intercept: let plugins cancel or rewrite external links inside
         // the email body before navigation happens. Bound on the iframe doc so
         // it survives DOM mutations from dark-mode pass below.
         const onLinkClick = async (ev: Event) => {
-          const targetEl = (ev.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+          const targetEl = (ev.target as Element | null)?.closest?.('a[href], area[href]') as HTMLAnchorElement | HTMLAreaElement | null;
           if (!targetEl) return;
           const href = targetEl.getAttribute('href') || '';
           if (!href || href.startsWith('#') || href.startsWith('mailto:')) return;
