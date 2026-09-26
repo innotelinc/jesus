@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { JMAPClient, RequestTimeoutError } from '../jmap/client';
+import { JMAPClient, RequestTimeoutError, isReplaySafeRequest } from '../jmap/client';
 
 /**
  * A connection that accepts the request and then goes silent: the promise never
@@ -130,6 +130,39 @@ describe('JMAPClient resilience', () => {
 
       await expect(client.ping()).rejects.toThrow('Failed to fetch');
       expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not replay a request that changes something', async () => {
+      // The connection may have failed after the server acted on the batch:
+      // replaying an Email/set or an EmailSubmission/set does it twice.
+      const client = await createConnectedClient();
+      fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await expect(client.deleteEmail('email-1')).rejects.toThrow('Failed to fetch');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('isReplaySafeRequest', () => {
+    const batch = (...methods: string[]) => ({
+      method: 'POST',
+      body: JSON.stringify({ using: [], methodCalls: methods.map((m, i) => [m, {}, String(i)]) }),
+    });
+
+    it('allows GETs, uploads and read-only batches', () => {
+      expect(isReplaySafeRequest(undefined)).toBe(true);
+      expect(isReplaySafeRequest({ method: 'GET' })).toBe(true);
+      expect(isReplaySafeRequest({ method: 'POST', body: new Blob(['x']) })).toBe(true);
+      expect(isReplaySafeRequest(batch('Email/query', 'Email/get', 'Mailbox/changes', 'Core/echo'))).toBe(true);
+    });
+
+    it('refuses anything that writes, and bodies it cannot read', () => {
+      expect(isReplaySafeRequest(batch('Email/get', 'Email/set'))).toBe(false);
+      expect(isReplaySafeRequest(batch('Email/set', 'EmailSubmission/set'))).toBe(false);
+      expect(isReplaySafeRequest(batch('Email/copy'))).toBe(false);
+      expect(isReplaySafeRequest(batch('Email/import'))).toBe(false);
+      expect(isReplaySafeRequest({ method: 'POST', body: 'not json' })).toBe(false);
+      expect(isReplaySafeRequest({ method: 'POST', body: JSON.stringify({ methodCalls: [] }) })).toBe(false);
     });
   });
 
