@@ -29,15 +29,15 @@ import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
 import { toAsciiEmail } from '@/lib/idn';
 import {
   LiteLoginError,
-  clearAllLiteSessions,
   clearLiteRefreshToken,
-  clearLiteSlot,
   getLiteClientId,
   liteExchangeAuthorizationCode,
   liteRefreshTokens,
   liteTokenLogin,
   nameLiteRefreshToken,
   readLiteBasicSession,
+  revokeAllLiteSessions,
+  revokeLiteSlot,
   saveLiteBasicSession,
   saveLiteRefreshToken,
 } from '@/lib/auth/lite-tokens';
@@ -446,6 +446,7 @@ async function exchangeOAuthCode(params: {
         refreshToken: tokens.refreshToken,
         clientId: flow.clientId,
         tokenEndpoint: flow.tokenEndpoint,
+        revocationEndpoint: flow.revocationEndpoint,
       }, flow.persistent);
     } else {
       clearLiteRefreshToken(slot);
@@ -566,7 +567,7 @@ function clearSlotCredentials(slot: number, includeToken: boolean, endSession = 
   closingSlots.add(slot);
   return clearClosingSlots(new Set([slot]), async () => {
     if (IS_LITE) {
-      clearLiteSlot(slot);
+      await revokeLiteSlot(slot);
       return null;
     }
     const [, token] = await Promise.all([
@@ -586,7 +587,7 @@ function clearAllCredentials(endSessionSlot: number | null): Promise<string | nu
   for (const slot of slots) closingSlots.add(slot);
   return clearClosingSlots(slots, async () => {
     if (IS_LITE) {
-      clearAllLiteSessions();
+      await revokeAllLiteSessions();
       return null;
     }
     const endSession = endSessionSlot === null ? '' : `&end_session_slot=${endSessionSlot}`;
@@ -1228,6 +1229,10 @@ export const useAuthStore = create<AuthState>()(
 
           let client: JMAPClient;
           let upgradedToOAuth = false;
+          // Lite keeps a Basic password for the tab only when the server has
+          // no token login to use instead; a token login that failed for
+          // another reason must not leave the password in web storage.
+          let tokenLoginUnavailable = false;
           let oauthAccessToken: string | null = null;
           let oauthExpiresIn = 0;
 
@@ -1263,6 +1268,7 @@ export const useAuthStore = create<AuthState>()(
                 oauthExpiresIn = expires_in;
                 debug.log('auth', 'TOTP login exchanged for token-based auth (has_refresh_token=' + has_refresh_token + ')');
               } else {
+                if (tokenRes.status === 404) tokenLoginUnavailable = true;
                 const errorBody = await tokenRes.json().catch(() => ({ error: 'unknown' }));
                 // A correct password with a missing/invalid MFA token surfaces as
                 // a TOTP prompt rather than a generic failure.
@@ -1273,6 +1279,8 @@ export const useAuthStore = create<AuthState>()(
               }
             } catch (err) {
               if (err instanceof Error && err.message === 'TOTP_REQUIRED') throw err;
+              // Unreachable (a server without /api/auth rarely answers CORS).
+              tokenLoginUnavailable = true;
               debug.warn('auth', 'TOTP login exchange error, trying legacy basic auth:', err);
             }
 
@@ -1324,10 +1332,11 @@ export const useAuthStore = create<AuthState>()(
           // write and stalwart-context write are best-effort persistence; the
           // outer login still succeeds even if they log a warning. Errors are
           // caught locally so Promise.all doesn't reject on either.
-          // In Lite a Basic session is always kept for the tab (sessionStorage),
-          // so a reload does not sign the user out; the regular build only
-          // writes the cookie when the user asked to be remembered.
-          const sessionWrite: Promise<unknown> = ((rememberMe || IS_LITE) && !upgradedToOAuth)
+          // In Lite a Basic session is kept for the tab (sessionStorage) on a
+          // server without token login, so a reload does not sign the user
+          // out; the regular build only writes the cookie when the user asked
+          // to be remembered.
+          const sessionWrite: Promise<unknown> = ((IS_LITE ? tokenLoginUnavailable : rememberMe) && !upgradedToOAuth)
             ? persistBasicSession(cookieSlot, serverUrl, username, password)
             : Promise.resolve();
 

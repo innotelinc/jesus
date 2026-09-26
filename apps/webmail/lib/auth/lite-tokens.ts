@@ -77,6 +77,8 @@ interface StoredRefreshToken {
    * to (lib/auth/lite-oauth.ts) is refreshed at that provider.
    */
   tokenEndpoint?: string;
+  /** RFC 7009 endpoint that revokes the token on sign-out, when discovery named one. */
+  revocationEndpoint?: string;
 }
 
 interface StoredBasicSession {
@@ -192,6 +194,84 @@ export function clearLiteBasicSession(slot: number): void {
 export function clearLiteSlot(slot: number): void {
   clearLiteRefreshToken(slot);
   clearLiteBasicSession(slot);
+}
+
+// ---------------------------------------------------------------------------
+// Revocation
+// ---------------------------------------------------------------------------
+
+// Sign-out waits for this, so an unresponsive endpoint must not hold it up.
+const REVOCATION_TIMEOUT_MS = 3000;
+
+/** The revocation endpoint a Stalwart server advertises, if any. */
+async function discoverRevocationEndpoint(serverUrl: string): Promise<string | null> {
+  for (const path of ['/.well-known/oauth-authorization-server', '/.well-known/openid-configuration']) {
+    try {
+      const response = await fetch(`${serverUrl}${path}`, { signal: AbortSignal.timeout(REVOCATION_TIMEOUT_MS) });
+      if (!response.ok) continue;
+      const endpoint = ((await response.json()) as { revocation_endpoint?: unknown }).revocation_endpoint;
+      return typeof endpoint === 'string' && /^https?:\/\//.test(endpoint) ? endpoint : null;
+    } catch {
+      // Try the next document.
+    }
+  }
+  return null;
+}
+
+async function revokeRefreshToken(entry: StoredRefreshToken): Promise<void> {
+  // A token from an external provider is only revoked where its own
+  // discovery said; Stalwart's own tokens can be looked up.
+  const endpoint = entry.revocationEndpoint
+    ?? (entry.tokenEndpoint ? null : await discoverRevocationEndpoint(trimUrl(entry.serverUrl)));
+  if (!endpoint) return;
+  try {
+    await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        token: entry.refreshToken,
+        token_type_hint: 'refresh_token',
+        client_id: entry.clientId || getLiteClientId(),
+      }).toString(),
+      signal: AbortSignal.timeout(REVOCATION_TIMEOUT_MS),
+      // Finishes even when sign-out navigates away first.
+      keepalive: true,
+      redirect: 'error',
+    });
+  } catch {
+    // Best effort: the token is gone from this browser either way.
+  }
+}
+
+/**
+ * Sign a slot out: forget its credentials at once, then revoke its refresh
+ * token so a copy taken from this browser's storage stops working too.
+ */
+export async function revokeLiteSlot(slot: number): Promise<void> {
+  const entry = readLiteRefreshToken(slot);
+  clearLiteSlot(slot);
+  if (entry) await revokeRefreshToken(entry);
+}
+
+/** {@link revokeLiteSlot} for every slot. */
+export async function revokeAllLiteSessions(): Promise<void> {
+  const entries: StoredRefreshToken[] = [];
+  for (const kind of ['local', 'session'] as const) {
+    const store = storage(kind);
+    if (!store) continue;
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i);
+        if (!key?.startsWith(REFRESH_KEY_PREFIX)) continue;
+        const entry = readJson<StoredRefreshToken>(store, key);
+        if (entry && typeof entry.refreshToken === 'string' && entry.refreshToken) entries.push(entry);
+      }
+    } catch {
+      continue;
+    }
+  }
+  clearAllLiteSessions();
+  await Promise.all(entries.map(revokeRefreshToken));
 }
 
 export function clearAllLiteSessions(): void {

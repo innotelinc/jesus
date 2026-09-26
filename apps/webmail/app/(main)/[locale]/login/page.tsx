@@ -685,6 +685,7 @@ function LoginPageContent() {
       clientId,
       redirectUri,
       persistent: rememberMeEnabled && rememberMe,
+      revocationEndpoint: discovery.metadata.revocation_endpoint,
     });
 
     const authUrl = new URL(discovery.metadata.authorization_endpoint);
