@@ -5456,20 +5456,37 @@ const EMAIL_SNAPSHOT_KEY = 'email-snapshot';
 // v2: unified / cross-account lists are no longer snapshotted (their rows carry
 // per-account source stamps that a fresh boot ignores, so a colliding JMAP id
 // opened the wrong account's mail - #847). Older snapshots are discarded.
-const EMAIL_SNAPSHOT_VERSION = 2;
+// v3: the snapshot names its account and is only restored for that account.
+const EMAIL_SNAPSHOT_VERSION = 3;
 const EMAIL_SNAPSHOT_MAX_EMAILS = 50;
+
+/** The signed-in session persisted by auth-store, read without importing it. */
+function persistedAuthState(): { isAuthenticated?: unknown; activeAccountId?: unknown } | null {
+  try {
+    const raw = window.localStorage.getItem('auth-storage');
+    return raw ? JSON.parse(raw)?.state ?? null : null;
+  } catch {
+    return null;
+  }
+}
 
 if (typeof window !== 'undefined') {
   // Restore at module load, before the first render reads the store - and only
   // when the last session ended authenticated, so a logged-out visitor never
-  // sees cached mail.
+  // sees cached mail, and for the account the snapshot was taken from.
   try {
-    const authRaw = window.localStorage.getItem('auth-storage');
-    const authed = authRaw ? JSON.parse(authRaw)?.state?.isAuthenticated === true : false;
+    const auth = persistedAuthState();
+    const authed = auth?.isAuthenticated === true;
     const raw = authed ? window.localStorage.getItem(EMAIL_SNAPSHOT_KEY) : null;
     if (raw) {
       const snap = JSON.parse(raw);
-      if (snap?.v === EMAIL_SNAPSHOT_VERSION && Array.isArray(snap.mailboxes) && snap.mailboxes.length > 0) {
+      if (
+        snap?.v === EMAIL_SNAPSHOT_VERSION &&
+        typeof snap.account === 'string' &&
+        snap.account === auth?.activeAccountId &&
+        Array.isArray(snap.mailboxes) &&
+        snap.mailboxes.length > 0
+      ) {
         useEmailStore.setState({
           mailboxes: snap.mailboxes,
           selectedMailbox: typeof snap.selectedMailbox === 'string' ? snap.selectedMailbox : '',
@@ -5514,9 +5531,12 @@ if (typeof window !== 'undefined') {
       // accounts whose email ids collide; restored without its view flags it
       // would be read as the active account's mail. (#847)
       if (s.searchQuery || s.selectedKeyword || s.isScheduledView || s.viewingAccountId || s.isUnifiedView) return;
+      const account = persistedAuthState()?.activeAccountId;
+      if (typeof account !== 'string' || !account) return;
       try {
         window.localStorage.setItem(EMAIL_SNAPSHOT_KEY, JSON.stringify({
           v: EMAIL_SNAPSHOT_VERSION,
+          account,
           mailboxes: s.mailboxes,
           selectedMailbox: s.selectedMailbox,
           emails: s.emails.slice(0, EMAIL_SNAPSHOT_MAX_EMAILS),

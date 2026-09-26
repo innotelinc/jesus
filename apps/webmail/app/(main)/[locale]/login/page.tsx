@@ -808,7 +808,9 @@ function LoginPageContent() {
     );
 
     if (success) {
-      saveUsername(formData.username);
+      // Suggested again on this browser only when the user did not decline
+      // being remembered: on a shared computer the next person sees the list.
+      if (!rememberMeEnabled || rememberMe) saveUsername(formData.username);
       if (isMobileHandoff) {
         // The isAuthenticated effect handles the redirect; nothing else to
         // do here. Don't push to / - that would race the deep link.

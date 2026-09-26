@@ -19,6 +19,9 @@ import { replaceWindowLocation, getPathPrefix, getLocaleFromPath, apiFetch } fro
 import { isEmbedded, notifyParent } from '@/lib/iframe-bridge';
 import { snapshotAccount, restoreAccount, clearAllStores, evictAccount, evictAll } from '@/lib/account-state-manager';
 import { clearAllPluginStorage, clearPluginStorageForAccount } from '@/lib/plugin-sandbox/storage-scope';
+import { broadcastSignOut, onSignedOutElsewhere, purgeSignedOutData } from '@/lib/sign-out-cleanup';
+import { useSearchHistoryStore } from './search-history-store';
+import { useCalendarNotificationStore } from './calendar-notification-store';
 import type { Identity } from '@/lib/jmap/types';
 import { authHooks } from '@/lib/plugin-hooks';
 import { IS_LITE, IS_LITE_STALWART } from '@/lib/lite';
@@ -1170,12 +1173,17 @@ function performFullLogout(set: (state: Partial<AuthState>) => void): void {
   // Calendar subscriptions outlive account switches, but their feed URLs are
   // often secret: nobody is signed in any more, so none may stay behind.
   useCalendarStore.getState().clearICalSubscriptions();
+  useSearchHistoryStore.getState().clearRecentSearches();
+  useCalendarNotificationStore.getState().clearAll();
   clearAllPluginStorage();
 
   // Remove persisted state AFTER the final set() so the persist middleware
   // doesn't re-write stale values.
   try { localStorage.removeItem('auth-storage'); } catch { /* noop */ }
   try { localStorage.removeItem('account-registry'); } catch { /* noop */ }
+  purgeSignedOutData();
+  // Other tabs still hold the accounts' mail in memory.
+  broadcastSignOut();
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -2806,3 +2814,11 @@ export const useAuthStore = create<AuthState>()(
 // Expose getClientForAccount to the calendar/contact stores via a small
 // shared registry - see [[stores/client-registry]] for rationale.
 setClientLookup((accountId) => useAuthStore.getState().getClientForAccount(accountId));
+
+// Another tab signed everyone out: this one's cookies and account list are
+// gone too, so leave for the login page instead of showing stale mail.
+if (typeof window !== 'undefined') {
+  onSignedOutElsewhere(() => {
+    if (useAuthStore.getState().isAuthenticated) navigateToLogin();
+  });
+}
