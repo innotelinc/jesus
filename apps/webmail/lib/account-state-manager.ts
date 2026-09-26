@@ -12,6 +12,7 @@ import { DEFAULT_SEARCH_FILTERS } from '@/lib/jmap/search-utils';
 import { useIdentityStore } from '@/stores/identity-store';
 import { useVacationStore } from '@/stores/vacation-store';
 import { useFileStore } from '@/stores/file-store';
+import { bumpStoreEpoch } from '@/lib/store-epoch';
 
 // Minimal snapshot shapes - we only capture what we need
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,6 +106,9 @@ export function restoreAccount(accountId: string): boolean {
 
 /** Clear all stores (used before restoring a different account) */
 export function clearAllStores(): void {
+  // In-flight fetches of the outgoing account must not land in the stores
+  // the next account is about to fill.
+  bumpStoreEpoch();
   useEmailStore.setState({
     emails: [],
     mailboxes: [],
