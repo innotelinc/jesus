@@ -163,6 +163,9 @@ export interface SettingsPolicy {
   defaultSidebarApps?: AdminSidebarApp[];
 }
 
+/** Set to `public` on a policy answered with the pre-login subset. */
+export const POLICY_SCOPE_HEADER = 'X-Bulwark-Policy-Scope';
+
 export const DEFAULT_POLICY: SettingsPolicy = {
   restrictions: {},
   features: { ...DEFAULT_FEATURE_GATES },
