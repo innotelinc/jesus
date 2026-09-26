@@ -12,6 +12,7 @@ import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
+import { currentStoreEpoch } from "@/lib/store-epoch";
 import { useAccountStore } from "@/stores/account-store";
 import { useMessageListTabsStore } from "@/stores/message-list-tabs-store";
 
@@ -699,9 +700,11 @@ function resolveActionMailboxes(): Mailbox[] {
 function captureEmailListView(): () => boolean {
   const view = useEmailStore.getState();
   const activeAccountId = useAuthStore.getState().activeAccountId;
+  const epoch = currentStoreEpoch();
   return () => {
     const current = useEmailStore.getState();
-    return current.selectedMailbox === view.selectedMailbox
+    return currentStoreEpoch() === epoch
+      && current.selectedMailbox === view.selectedMailbox
       && current.selectedKeyword === view.selectedKeyword
       && current.viewingAccountId === view.viewingAccountId
       && current.isUnifiedView === view.isUnifiedView
@@ -1662,6 +1665,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
 
   // JMAP operations
   fetchMailboxes: (client) => coalesceRefresh(client, 'mailboxes', async () => {
+    // An account switch while this is in flight empties the stores for the
+    // next account; this account's folders must not land in them.
+    const epoch = currentStoreEpoch();
+    const stale = () => currentStoreEpoch() !== epoch;
     // Only toggle the email list's isLoading on the initial load. Background
     // refreshes (after a move/archive that may have created new folders) must
     // not flash the list's loading state, which hides the results-count bar
@@ -1674,6 +1681,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       const fetched = client.getAllMailboxesWithState
         ? await client.getAllMailboxesWithState()
         : { mailboxes: await client.getAllMailboxes(), states: {} };
+      if (stale()) return;
       const mailboxes = fetched.mailboxes;
 
       // Guard against a transient fetch returning an empty list (e.g. a server
@@ -1688,6 +1696,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // fetch. This is also emitted for Mailbox-only state changes (for example
       // an empty provider label), where no Email fetch follows.
       await emailHooks.onMailboxesRefresh.emit(mailboxes);
+      if (stale()) return;
 
       // Auto-select inbox if no mailbox is selected or the current selection
       // doesn't exist in the fetched list (e.g. after an account switch)
@@ -1715,6 +1724,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         set({ mailboxes, ...loadingPatch });
       }
     } catch (error) {
+      if (stale()) return;
       // The existing folder list is deliberately left untouched: a failed
       // background refresh must never blank the sidebar (#780).
       set({

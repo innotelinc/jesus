@@ -43,6 +43,14 @@ interface FilterStore {
   clearState: () => void;
 }
 
+/**
+ * Bumped by every fetch, account selection and reset. A fetch that is no
+ * longer the latest when its answer arrives drops it: an account switch
+ * during the fetch would otherwise leave one account's rules and script id
+ * in place for the next account, and the next save would upload them there.
+ */
+let fetchGeneration = 0;
+
 export const useFilterStore = create<FilterStore>()((set, get) => ({
   rules: [],
   isLoading: false,
@@ -62,6 +70,8 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
   setSupported: (supported) => set({ isSupported: supported }),
 
   fetchFilters: async (client, accountId) => {
+    const generation = ++fetchGeneration;
+    const stale = () => generation !== fetchGeneration;
     set({ isLoading: true, error: null });
     try {
       const accounts = client.getSieveAccounts();
@@ -73,6 +83,7 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
       set({ sieveCapabilities: capabilities });
 
       const allScripts = await client.getSieveScripts(resolvedId);
+      if (stale()) return;
       debug.log('filters', 'Sieve scripts fetched:', allScripts.length);
 
       // Skip the server-managed 'vacation' script (RFC 9661 §4) - it can only
@@ -101,6 +112,7 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
       set({ activeScriptId: activeScript.id });
 
       const content = await client.getSieveScriptContent(activeScript.blobId, resolvedId);
+      if (stale()) return;
       set({ rawScript: content });
 
       const result = parseScript(content);
@@ -127,6 +139,7 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
         });
       }
     } catch (error) {
+      if (stale()) return;
       debug.error('Failed to fetch filters:', error);
       set({
         isLoading: false,
@@ -252,22 +265,25 @@ export const useFilterStore = create<FilterStore>()((set, get) => ({
 
   resetToVisualBuilder: () => set({ isOpaque: false, rawScript: '', rules: [], externalRequires: [] }),
 
-  clearState: () => set({
-    rules: [],
-    isLoading: false,
-    isSaving: false,
-    error: null,
-    isSupported: false,
-    sieveCapabilities: null,
-    activeScriptId: null,
-    isOpaque: false,
-    rawScript: '',
-    vacationSettings: null,
-    externalRequires: [],
-    includeVacation: false,
-    availableAccounts: [],
-    selectedAccountId: null,
-  }),
+  clearState: () => {
+    fetchGeneration++;
+    set({
+      rules: [],
+      isLoading: false,
+      isSaving: false,
+      error: null,
+      isSupported: false,
+      sieveCapabilities: null,
+      activeScriptId: null,
+      isOpaque: false,
+      rawScript: '',
+      vacationSettings: null,
+      externalRequires: [],
+      includeVacation: false,
+      availableAccounts: [],
+      selectedAccountId: null,
+    });
+  },
 }));
 
 function supportsInclude(capabilities: SieveCapabilities | null): boolean {
