@@ -170,8 +170,10 @@ describe('"All folders" search across the own and group accounts (#1082)', () =>
 
     await useEmailStore.getState().loadMoreEmails(client);
 
-    expect(client.searchEmails).toHaveBeenCalledWith('a', undefined, undefined, 1, 2);
-    expect(client.searchEmails).toHaveBeenCalledWith('a', undefined, 'group', 1, 2);
+    // Each account continues after its own rows, not at the merged length.
+    expect(client.searchEmails).toHaveBeenCalledWith('a', undefined, undefined, 1, 1);
+    expect(client.searchEmails).toHaveBeenCalledWith('a', undefined, 'group', 1, 1);
+    expect(useEmailStore.getState().emails.map(e => e.id)).toEqual(['own-1', 'grp-1', 'own-2', 'grp-2']);
     expect(useEmailStore.getState().hasMoreEmails).toBe(false);
   });
 
