@@ -3923,8 +3923,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // So does an "All folders" search (#1082).
       const unscopedSearchChanged = isUnscopedSearchActive(get()) && anyEmailChanged;
       if (accountChanges?.Email || syncedAccountEmailState || tagViewChanged || unscopedSearchChanged) {
+        // A delta that could not be read falls back to the full refresh.
         const applied = syncedAccountEmailState
-          ? await get().applyEmailDelta(client, syncedAccountEmailState)
+          ? await get().applyEmailDelta(client, syncedAccountEmailState).catch(() => false)
           : false;
         if (!applied) {
           await get().refreshCurrentMailbox(client);

@@ -143,6 +143,26 @@ describe('JMAPClient resilience', () => {
     });
   });
 
+  describe('reading lists when the server fails', () => {
+    // An empty answer read as an empty folder: a failed refresh emptied the
+    // list, and a failed delta read treated every updated row as gone.
+    it('getEmails rejects instead of returning an empty page', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, {
+        methodResponses: [['error', { type: 'serverFail', description: 'backend down' }, '0']],
+      }));
+      await expect(client.getEmails('inbox')).rejects.toThrow('backend down');
+    });
+
+    it('getSomeEmails rejects instead of returning nothing', async () => {
+      const client = await createConnectedClient();
+      fetchSpy.mockResolvedValueOnce(mockFetchResponse(200, {
+        methodResponses: [['error', { type: 'serverFail' }, '0']],
+      }));
+      await expect(client.getSomeEmails(['e1'])).rejects.toThrow('serverFail');
+    });
+  });
+
   describe('isReplaySafeRequest', () => {
     const batch = (...methods: string[]) => ({
       method: 'POST',
