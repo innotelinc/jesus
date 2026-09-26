@@ -126,8 +126,8 @@ describe('WOPI attachment launch', () => {
 });
 
 describe('WOPI calls for an attachment token', () => {
-  async function launched() {
-    const { data } = await launchAttachment({ blobId: 'Gblob1', name: 'Quote.docx', type: DOCX, size: 999 });
+  async function launched(overrides: Record<string, unknown> = {}) {
+    const { data } = await launchAttachment({ blobId: 'Gblob1', name: 'Quote.docx', type: DOCX, size: 999, ...overrides });
     (fetchJmapServer as Mock).mockClear();
     return editorCall(data);
   }
@@ -152,9 +152,27 @@ describe('WOPI calls for an attachment token', () => {
     const { documentId, token } = await launched();
     const res = await getFile(request(`/api/wopi/files/${documentId}/contents?${token}`), params(documentId));
     expect(res.status).toBe(200);
-    expect(res.headers.get('Content-Type')).toBe(DOCX);
     expect(await res.text()).toBe('DOCX-BYTES');
     expect((fetchJmapServer as Mock).mock.calls[0][0]).toContain('/jmap/download/c/Gblob1/Quote.docx');
+  });
+
+  it('GetFile serves the bytes as an inert download whatever type the launch claimed', async () => {
+    const { documentId, token } = await launched({ type: 'text/html' });
+    const res = await getFile(request(`/api/wopi/files/${documentId}/contents?${token}`), params(documentId));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toBe('application/octet-stream');
+    expect(res.headers.get('Content-Disposition')).toBe('attachment');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Security-Policy')).toBe("default-src 'none'; sandbox");
+  });
+
+  it.each(['document', 'iframe', 'script'])('GetFile refuses a browser load as %s', async (dest) => {
+    const { documentId, token } = await launched();
+    const res = await getFile(
+      request(`/api/wopi/files/${documentId}/contents?${token}`, { headers: { 'sec-fetch-dest': dest } }),
+      params(documentId),
+    );
+    expect(res.status).toBe(403);
   });
 
   it('PutFile is refused', async () => {
