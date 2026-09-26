@@ -1,5 +1,111 @@
 # Changelog
 
+## 1.11.1 (2026-09-26)
+
+1.11.1 is a security and bug-fix release. It fixes four reported vulnerabilities, two of them critical, and the findings of a security audit. Please update.
+
+Thank you for your donations:
+
+- _You? [Become a sponsor!](https://github.com/sponsors/bulwarkmail)_
+
+**One-time**
+
+- Anonymous
+- [@windsource](https://github.com/windsource)
+
+**Monthly**
+
+- [@jsaathof](https://github.com/jsaathof)
+- [@berkersal](https://github.com/berkersal)
+- [@NABarnes](https://github.com/NABarnes)
+- [@felixzieger](https://github.com/felixzieger)
+- [@pr0ton11](https://github.com/pr0ton11)
+- [@zeddD1abl0](https://github.com/zeddD1abl0)
+- [@fpauser](https://github.com/fpauser)
+- [@proxforge](https://github.com/proxforge)
+- [@spss20](https://github.com/spss20)
+- [@elgringoYan](https://github.com/elgringoYan)
+- [@pauladams8](https://github.com/pauladams8)
+- [@djpriest](https://github.com/djpriest)
+- [@umakers](https://github.com/umakers)
+- [@zplizzi](https://github.com/zplizzi)
+- [@jeremiah](https://github.com/jeremiah)
+- [@Theoretisch1337](https://github.com/Theoretisch1337)
+- [@svandive](https://github.com/svandive)
+- [@HiltMundell](https://github.com/HiltMundell)
+
+### Security
+
+- **Admin**: Only a Stalwart superuser gets into the admin dashboard. The admin probe accepted Stalwart's default tenant-admin role, so the administrator of a single tenant was signed into a dashboard that configures the whole instance (GHSA-v6hr-cmxm-pv73, thanks @douwezijlstra-frl)
+- **Admin**: Admin status is only taken from an admin-configured server. A context cookie minted while custom JMAP endpoints were allowed let a user-chosen server keep answering the admin probe after the switch was turned off (GHSA-j867-89p4-v8hm, thanks @Vip3r-MC)
+- **API**: Cross-origin writes are refused on the JMAP passthrough and every other cookie-authenticated `/api/` route, not only `/api/auth/*`. A page on a same-site sibling origin could run arbitrary JMAP as the signed-in user. The gate also decides on the decoded path, so `/api/%61uth/...` no longer skips it (GHSA-9mvj-98f5-9q6g, thanks @kah-ja)
+- **Admin**: Admin sign-in attempts are also capped at 50 per 15 minutes across all clients, because a forged `X-Forwarded-For` got a fresh per-IP budget when no reverse proxy is in front (GHSA-7pj2-232x-6698, thanks @richardweinberger)
+- **Admin**: Impersonation no longer puts the Stalwart master password into the session cookie. The webmail creates an app password on the target mailbox that expires after 8 hours and is revoked on sign-out, and a used impersonation link is refused after a restart or on another replica
+- **Mail**: A sender can no longer fake a DMARC or DKIM pass in the security badges, with a crafted envelope address or an `Authentication-Results` header of their own
+- **Mail**: Opening an SVG attachment's thumbnail on its own no longer runs the sender's script in the webmail origin
+- **Mail**: Remote content stays blocked in the mobile conversation view, the `.eml` attachment preview, the quoted original of a reply or forward, the print view, and for URL spellings the filter missed (backslashes, CSS escapes, `image-set()`)
+- **Mail**: Links in image maps (`<area>`) no longer keep `window.opener`
+- **Mail**: A `mailto:` unsubscribe goes to the single address in the link, and the confirmation shows recipient, subject and body before sending
+- **Mail**: A crafted `winmail.dat` no longer freezes the tab
+- **Composer**: A sender name containing a quote can no longer add a recipient to a draft
+- **Filters**: Rule names, header names and sizes are escaped, so rules from plugins or imported filter sets cannot add commands such as `redirect` to the Sieve script
+- **Plugins**: Hooks and slots need a declared permission, like the host API does. `http.post` can no longer reach the JMAP passthrough, `/api/admin/*`, `/api/settings` or other credentialed routes, and plugin storage is kept per account and deleted on sign-out
+- **Themes**: The theme CSS sanitizer no longer lets remote resources through (`url(//host)`, CSS escapes, `image-set()`, `@font-face` sources), and theme CSS can only target `:root` and `.dark`, also when a plugin transforms it
+- **Files**: WOPI file downloads are always served as inert attachments, so a blob typed `text/html` cannot run script in the webmail origin
+- **Server**: The SSRF guard also blocks loopback beyond `127.0.0.1`, CGNAT, benchmark, multicast and reserved ranges, and NAT64, 6to4 and Teredo addresses that wrap an internal IPv4 address. Telemetry targets are checked at connect time, and OAuth token and revocation requests never follow redirects
+- **Auth**: Synced settings are keyed on the account a bearer token belongs to, so on a multi-domain server `john@b.example` can no longer read the settings of `john@a.example`
+- **Auth**: Wrong passwords tried through the login pre-check are limited, so the route can no longer be used as a password oracle or trip Stalwart's ban against the webmail itself
+- **Auth**: Signing out ends office editor sessions opened in that browser, and a full sign-out clears search history, open tabs, Files recents, staged plugin uploads and the other accounts' leftovers, also in other open tabs
+- **Auth**: Signing out when another account's restore had failed no longer leaves that account resumable
+- **Auth**: The failed TOTP login no longer passes on a user-chosen server's error body
+- **Server**: Visitors who are not signed in no longer get detailed health data, the pending advisory text, the plugin list, the full admin policy or every server's domain list
+- **Server**: The setup token is passed in the URL fragment, so it stays out of access logs, referers and history
+- **Server**: Not-found pages outside the app tree cannot be framed, `ALLOWED_FRAME_ANCESTORS` never applies to the admin dashboard or setup, and sibling subdomains can no longer widen the sidebar-app `frame-src`
+- **Server**: Favicons are only served as raster images
+- **Docker**: Runtime state and secrets (`data/`, `local-data/`, `.env`) stay out of the standalone build and the image, and the mock JMAP server can no longer be switched on in a release build
+- **Lite**: Sign-out revokes the refresh token, and a failed token login no longer keeps the password in `sessionStorage`
+- **Lite**: Every static page gets a CSP that allows only its own inline scripts, the Stalwart bundle refuses to run inside a foreign frame, and the Stalwart install instructions use a tagged release with a published `.sha256` instead of `releases/latest`
+
+### Features
+
+- **Calendar**: Tasks with a due date show in the month view (#1107)
+
+### Changes
+
+- **Plugins**: Hooks that change outgoing mail need `email:send`, and display takeovers need `email:render-takeover`. Plugins that don't declare them lose those hooks
+- **Themes**: Theme CSS keeps only `:root` and `.dark` rules plus `@font-face`, `@keyframes`, `@media` and `@supports`. Every `url()` except a `#fragment` is removed
+- **Admin**: Impersonated sessions end after 8 hours, and sessions minted by earlier versions are signed out
+- **Server**: `/api/health?detailed=true` needs a session
+
+### Fixes
+
+- **Mail**: The inbox keeps rendering when a message has an unparsable date (#1099)
+- **Mail**: A folder no longer switches back to the unified inbox while it loads (#1102, thanks @guisea)
+- **Mail**: Replies in the unified inbox come from the identity of the account that received the mail (#1104)
+- **Mail**: Mail deleted during a list refresh no longer reappears (#966)
+- **Mail**: The message list no longer jumps while attachment chips load
+- **Mail**: Scrolling the unified inbox, cross-account views, tag views and "All folders" search no longer skips messages
+- **Mail**: A failed message-list read keeps the list on screen instead of showing an empty folder
+- **Mail**: Marking read, starring, tagging, emptying a folder and cancelling a scheduled send report it when the server refuses them
+- **Mail**: Tagging and pinning write only the keywords that change, so they no longer mark mail unread that was read on another device
+- **Mail**: New mail and folder changes keep arriving for users with seven or more shared accounts
+- **Send**: A dropped connection can no longer send a message twice
+- **Send**: Undo and edit of a message sent from a group identity act in the group's own account
+- **Composer**: A reply draft stays in its thread when it is re-opened or undone
+- **Composer**: An open draft stays on its own account across an account switch
+- **Accounts**: Quick account switches no longer mix up identities, so replies go out with the right From address
+- **Accounts**: Folders, filters and the account security page no longer show the previous account's data after a switch
+- **Accounts**: Settings sync turns back on after signing out of one of several accounts
+- **Push**: A notification opens its message in the account it came from
+- **Calendar**: Events you declined show struck through (#1110)
+- **Calendar**: Daily recurring events keep going past a DST gap
+- **Calendar**: iCal subscriptions stay with the login that created them, so refreshing or removing one no longer touches a calendar of another login
+- **Auth**: SSO sign-in behind nginx no longer fails with a 502 when the cookies would overflow its header buffer (#1096)
+- **Auth**: Sign-in and addresses work on internationalized domains (#1100)
+- **Lite**: A rate-limited token endpoint no longer signs you out
+- **i18n**: The dark/light mode titles and the "Themes" settings tab are translated in every language (#1105, #1106, thanks @dulinux), and so is the themes settings panel
+- **i18n**: Updated Portuguese (Brazil) translation (#1106, thanks @dulinux)
+
 ## 1.11.0 (2026-09-23)
 
 1.11.0 introduces **Bulwark Lite**, a static build of the webmail that runs without a Node server, and fixes many places where Bulwark and Stalwart disagreed about mail, filters, calendars, contacts and files. It contains everything from the three 1.11.0 betas. The `latest` Docker tag moves to this release.
