@@ -715,6 +715,21 @@ function loadIdentities(rawIdentities: Identity[], username: string): { identiti
  *
  * @param accountId The account to apply for; defaults to the active account.
  */
+/**
+ * Load the account's synced settings and turn syncing back on for it. Every
+ * path that makes an account active after sync was switched off for the
+ * previous one must run this, or later edits are never saved to the server.
+ */
+function resumeSettingsSync(account: Pick<AccountEntry, 'id' | 'username' | 'serverUrl'>): void {
+  fetchConfig().then(config => {
+    if (!config.settingsSyncEnabled) return;
+    useSettingsStore.getState().loadFromServer(account.username, account.serverUrl).finally(() => {
+      useSettingsStore.getState().enableSync(account.username, account.serverUrl);
+      applyPreferredIdentity(account.id);
+    });
+  }).catch(() => {});
+}
+
 export function applyPreferredIdentity(accountId?: string | null): void {
   const targetId = accountId ?? useAccountStore.getState().activeAccountId;
   if (!targetId) return;
@@ -1940,6 +1955,10 @@ export const useAuthStore = create<AuthState>()(
               }).catch((err) => debug.error('Failed to load identities after switch:', err));
             }
 
+            // Sync was switched off for the signed-out account above; the
+            // account staying signed in needs it back.
+            resumeSettingsSync(nextAccount);
+
             // The provider session is left alone: visiting its logout page
             // would take the user away from the accounts still signed in
             // here, which may share that session. Revoking the token ends
@@ -2272,13 +2291,7 @@ export const useAuthStore = create<AuthState>()(
         void syncAccountDisplayName(accountId, targetClient, get().primaryIdentity?.name);
 
         // Sync settings
-        fetchConfig().then(config => {
-          if (!config.settingsSyncEnabled) return;
-          useSettingsStore.getState().loadFromServer(targetAccount.username, targetAccount.serverUrl).finally(() => {
-            useSettingsStore.getState().enableSync(targetAccount.username, targetAccount.serverUrl);
-            applyPreferredIdentity(targetAccount.id);
-          });
-        }).catch(() => {});
+        resumeSettingsSync(targetAccount);
       },
 
       checkAuth: async () => {
