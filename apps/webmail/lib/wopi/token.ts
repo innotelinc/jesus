@@ -32,6 +32,13 @@ export interface WopiTokenPayload {
   name?: string;
   type?: string;
   size?: number;
+  /**
+   * Account PutFile uploads new content into: the login's own. For a node
+   * shared with the user, `accountId` is the owner's, and Stalwart doesn't
+   * let the user reference a blob they uploaded there (#1094). Absent on
+   * older tokens - those upload into `accountId`.
+   */
+  uploadAccountId?: string;
   canWrite: boolean;
   /** Browser origin that embeds the editor iframe (WOPI PostMessageOrigin). */
   origin: string;
@@ -104,6 +111,7 @@ export function verifyWopiToken(token: string | null, documentId: string): WopiT
   if (p.kind !== undefined && p.kind !== 'file' && p.kind !== 'attachment') return null;
   if (p.bid !== undefined && typeof p.bid !== 'string') return null;
   if (p.slot !== undefined && typeof p.slot !== 'number') return null;
+  if (p.uploadAccountId !== undefined && (typeof p.uploadAccountId !== 'string' || !p.uploadAccountId)) return null;
   if (wopiDocumentId(p) !== documentId) return null;
   if (Date.now() > p.exp) return null;
   return p;

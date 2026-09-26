@@ -58,19 +58,22 @@ export async function POST(request: NextRequest) {
     const ctx = { serverUrl, authHeader: creds.authHeader, trusted };
 
     let accountId = str('accountId');
+    const capability = blobId ? 'urn:ietf:params:jmap:mail' : 'urn:ietf:params:jmap:filenode';
+    // Files need the session even with an explicit account: PutFile uploads
+    // into the login's own account, which is not the one holding a node
+    // shared with the user (#1094).
+    const session = !accountId || !blobId
+      ? await fetchJmapSession(serverUrl, creds.authHeader, { trusted })
+      : null;
+    const ownAccountId = session?.primaryAccounts?.[capability] || '';
     if (!accountId) {
-      const session = await fetchJmapSession(serverUrl, creds.authHeader, { trusted });
-      const capability = blobId ? 'urn:ietf:params:jmap:mail' : 'urn:ietf:params:jmap:filenode';
-      accountId =
-        session?.primaryAccounts?.[capability] ||
-        Object.keys(session?.accounts ?? {})[0] ||
-        '';
+      accountId = ownAccountId || Object.keys(session?.accounts ?? {})[0] || '';
     }
     if (!accountId) {
       return NextResponse.json({ error: blobId ? 'No mail account' : 'No files account' }, { status: 404 });
     }
 
-    let document: Pick<WopiTokenPayload, 'kind' | 'fileId' | 'name' | 'type' | 'size'>;
+    let document: Pick<WopiTokenPayload, 'kind' | 'fileId' | 'name' | 'type' | 'size' | 'uploadAccountId'>;
     let name: string;
     let canWrite: boolean;
     if (blobId) {
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
       }
       name = node.name;
       canWrite = node.myRights ? !!node.myRights.mayModifyContent : true;
-      document = { kind: 'file', fileId };
+      document = { kind: 'file', fileId, uploadAccountId: ownAccountId || accountId };
     }
 
     const ext = name.split('.').pop()?.toLowerCase() || '';

@@ -166,6 +166,22 @@ function isCrossAccountId(id: string | null): boolean {
   return id != null && id.includes(':');
 }
 
+/**
+ * The account and bare server id behind a listed resource, for callers that
+ * address the node on the server themselves (the WOPI editor, #1094). A node
+ * of a shared account is listed as "accountId:nodeId"; `accountId` is only
+ * known for nodes listed across accounts.
+ */
+export function resourceServerRef(
+  resource: Pick<FileResource, 'id' | 'ownerAccountId'>,
+): { accountId?: string; id: string } {
+  const owner = resource.ownerAccountId;
+  if (owner && resource.id.startsWith(`${owner}:`)) {
+    return { accountId: owner, id: resource.id.slice(owner.length + 1) };
+  }
+  return { accountId: owner, id: resource.id };
+}
+
 function nodeToResource(node: FileNode): FileResource {
   const isDir = isFolder(node);
   return {
