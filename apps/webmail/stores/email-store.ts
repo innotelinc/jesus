@@ -434,6 +434,27 @@ function shouldClearPendingUndoSend(pending: PendingUndoSend | null, scheduledEm
 type InFlightRefresh = { promise: Promise<void>; rerun: boolean };
 const inFlightRefreshes = new WeakMap<object, Map<string, InFlightRefresh>>();
 
+/**
+ * Drafts and Sent of the account a submission belongs to. A message sent or
+ * scheduled from a shared or group identity lives in that account, so
+ * restoring it to Drafts must use that account's Drafts - the store's own
+ * list is the login account's (plus shared mailboxes under namespaced ids).
+ */
+async function submissionMailboxes(
+  client: IJMAPClient,
+  storeMailboxes: Mailbox[],
+  accountId: string | undefined,
+): Promise<{ draftsMailbox?: Mailbox; sentMailbox?: Mailbox }> {
+  const ownAccount = !accountId || accountId === client.getAccountId();
+  const mailboxes = ownAccount
+    ? (storeMailboxes.length > 0 ? storeMailboxes : await client.getMailboxes()).filter(mb => !mb.isShared)
+    : await client.getMailboxes(accountId);
+  return {
+    draftsMailbox: mailboxes.find(mb => mb.role === 'drafts'),
+    sentMailbox: mailboxes.find(mb => mb.role === 'sent'),
+  };
+}
+
 function coalesceRefresh(client: IJMAPClient, key: string, run: () => Promise<void>): Promise<void> {
   let byKey = inFlightRefreshes.get(client);
   if (!byKey) {
@@ -5095,7 +5116,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     const owner = get().scheduledEmails.find(email => email.emailSubmissionId === submissionId);
     await client.cancelEmailSubmission(submissionId, owner?.scheduledAccountId);
     if (emailId) {
-      await client.deleteEmail(emailId);
+      await client.deleteEmail(emailId, owner?.scheduledAccountId);
       set(state => ({
         selectedEmail: state.selectedEmail?.id === emailId ? null : state.selectedEmail,
         selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== emailId)),
@@ -5115,7 +5136,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       set({ pendingUndoSend: null });
     }
     if (email.isSmimeScheduled) {
-      await client.deleteEmail(email.id);
+      await client.deleteEmail(email.id, email.scheduledAccountId);
       set(state => ({
         selectedEmail: state.selectedEmail?.id === email.id ? null : state.selectedEmail,
         selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== email.id)),
@@ -5123,14 +5144,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       await get().fetchScheduledEmails(client);
       return null;
     }
-    const mailboxes = get().mailboxes.length > 0 ? get().mailboxes : await client.getMailboxes();
-    const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
-    const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+    const { draftsMailbox, sentMailbox } = await submissionMailboxes(client, get().mailboxes, email.scheduledAccountId);
     if (draftsMailbox) {
-      await client.restoreEmailToDraft(email.id, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id);
+      await client.restoreEmailToDraft(email.id, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id, email.scheduledAccountId);
     }
     await get().fetchScheduledEmails(client);
-    const restored = await client.getEmail(email.id);
+    const restored = await client.getEmail(email.id, email.scheduledAccountId);
     return restored;
   },
 
@@ -5165,22 +5184,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   cancelUndoSend: async (client, pending) => {
     await client.cancelEmailSubmission(pending.submissionId, pending.submissionAccountId);
     if (pending.emailId && pending.isSmime) {
-      await client.deleteEmail(pending.emailId);
+      await client.deleteEmail(pending.emailId, pending.submissionAccountId);
       set(state => ({
         selectedEmail: state.selectedEmail?.id === pending.emailId ? null : state.selectedEmail,
         selectedEmailIds: new Set(Array.from(state.selectedEmailIds).filter(id => id !== pending.emailId)),
       }));
     } else if (pending.emailId) {
-      const mailboxes = get().mailboxes.length > 0 ? get().mailboxes : await client.getMailboxes();
-      const draftsMailbox = mailboxes.find(mb => mb.role === 'drafts');
-      const sentMailbox = mailboxes.find(mb => mb.role === 'sent');
+      const { draftsMailbox, sentMailbox } = await submissionMailboxes(client, get().mailboxes, pending.submissionAccountId);
       if (draftsMailbox) {
-        await client.restoreEmailToDraft(pending.emailId, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id);
+        await client.restoreEmailToDraft(pending.emailId, draftsMailbox.originalId || draftsMailbox.id, sentMailbox?.originalId || sentMailbox?.id, pending.submissionAccountId);
       }
     }
     await get().refreshScheduledMetadata(client);
     set({ pendingUndoSend: null });
-    return pending.emailId && !pending.isSmime ? client.getEmail(pending.emailId) : null;
+    return pending.emailId && !pending.isSmime ? client.getEmail(pending.emailId, pending.submissionAccountId) : null;
   },
 
   loadMockData: () => {
