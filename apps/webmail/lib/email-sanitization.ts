@@ -645,6 +645,59 @@ export function blockExternalResourcesOnNode(node: Element): boolean {
   return blocked;
 }
 
+const PARKED_ATTR_PREFIX = 'data-bulwark-remote-';
+const PARKABLE_URL_ATTRS = ['src', 'poster', 'background'] as const;
+
+/**
+ * Display-only counterpart of {@link blockExternalResourcesOnNode} for HTML
+ * that is rendered in the app document itself (the quoted original in the
+ * composer) and still has to be sent as written. Every external resource
+ * reference is parked in a `data-bulwark-remote-*` attribute so nothing
+ * loads, and {@link restoreRemoteResources} puts it back exactly. Parsing
+ * happens in an inert DOMParser document, which fetches nothing.
+ */
+export function parkRemoteResources(html: string): { html: string; parked: boolean } {
+  const doc = parseHtmlSafely(`<body>${html}</body>`);
+  let parked = false;
+  for (const el of Array.from(doc.body.querySelectorAll('*'))) {
+    for (const attr of PARKABLE_URL_ATTRS) {
+      const value = el.getAttribute(attr);
+      if (isExternalResourceUrl(value)) {
+        el.setAttribute(PARKED_ATTR_PREFIX + attr, value!);
+        el.removeAttribute(attr);
+        parked = true;
+      }
+    }
+    const srcset = el.getAttribute('srcset');
+    if (srcset && srcsetHasExternalUrl(srcset)) {
+      el.setAttribute(PARKED_ATTR_PREFIX + 'srcset', srcset);
+      el.removeAttribute('srcset');
+      parked = true;
+    }
+    const style = el.getAttribute('style');
+    if (style && styleHasExternalUrl(style)) {
+      el.setAttribute(PARKED_ATTR_PREFIX + 'style', style);
+      el.setAttribute('style', stripExternalCssUrls(style));
+      parked = true;
+    }
+  }
+  return { html: parked ? doc.body.innerHTML : html, parked };
+}
+
+/** Undo {@link parkRemoteResources} so the HTML carries its original references again. */
+export function restoreRemoteResources(html: string): string {
+  if (!html.includes(PARKED_ATTR_PREFIX)) return html;
+  const doc = parseHtmlSafely(`<body>${html}</body>`);
+  for (const el of Array.from(doc.body.querySelectorAll('*'))) {
+    for (const attr of Array.from(el.attributes)) {
+      if (!attr.name.startsWith(PARKED_ATTR_PREFIX)) continue;
+      el.setAttribute(attr.name.slice(PARKED_ATTR_PREFIX.length), attr.value);
+      el.removeAttribute(attr.name);
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 /**
  * Safe HTML parsing without execution
  * Use instead of innerHTML for detection/parsing
