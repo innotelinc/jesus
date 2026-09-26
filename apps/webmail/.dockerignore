@@ -15,4 +15,9 @@ TODO.md
 # Sibling projects / test harness - not part of the webmail image
 examples/
 integration/
+repos/
+# Runtime state of a checkout that has been run (admin password hash,
+# plugin signing key, audit log, synced settings) - never part of an image
+data/
+local-data/
 **/node_modules
