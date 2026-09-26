@@ -150,6 +150,20 @@ describe('mail paths', () => {
     });
   });
 
+  it('reads the login slot a push notification names', () => {
+    expect(parseMailPath(['message', 'm1'], new URLSearchParams('slot=2'))).toEqual({
+      kind: 'message', id: 'm1', accountId: undefined, slot: 2,
+    });
+    expect(parseMailPath(['folder', 'inbox'], new URLSearchParams('slot=0'))).toEqual({
+      kind: 'folder', ref: 'inbox', accountId: undefined, slot: 0,
+    });
+    for (const bad of ['slot=', 'slot=-1', 'slot=1.5', 'slot=x']) {
+      expect(parseMailPath(['message', 'm1'], new URLSearchParams(bad))).toEqual({
+        kind: 'message', id: 'm1', accountId: undefined,
+      });
+    }
+  });
+
   it('falls back to the bare mail path with nothing selected', () => {
     expect(buildMailPath({ mailboxId: null, emailId: null, threadId: null })).toBe('/mail');
     expect(parseMailPath([])).toBeNull();
