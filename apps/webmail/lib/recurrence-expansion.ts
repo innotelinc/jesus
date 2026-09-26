@@ -418,6 +418,16 @@ function generateCandidatesForPeriod(
       candidates = expandWeekly(periodStart, rule, eventStart);
       break;
     case 'daily':
+      // The start's wall-clock time on this day. The period anchor is
+      // advanced day by day and keeps whatever time a DST gap pushed it to
+      // (02:30 -> 03:30, or midnight -> 01:00 for an all-day event), so using
+      // it made every later day fail the implicit byHour and the series
+      // stopped at the gap.
+      candidates = [new Date(
+        periodStart.getFullYear(), periodStart.getMonth(), periodStart.getDate(),
+        eventStart.getHours(), eventStart.getMinutes(), eventStart.getSeconds(), eventStart.getMilliseconds(),
+      )];
+      break;
     case 'hourly':
     case 'minutely':
     case 'secondly':
@@ -427,8 +437,11 @@ function generateCandidatesForPeriod(
       candidates = [new Date(periodStart)];
   }
 
-  // Step 2: Filter candidates by all applicable byX constraints
-  candidates = candidates.filter(d => matchesByX(d, rule));
+  // Step 2: Filter candidates by all applicable byX constraints. A daily
+  // candidate is judged by the time it was built for: on the day of a DST
+  // gap that time does not exist and the occurrence moves past the gap
+  // (RFC 5545 3.3.5), which is still this occurrence.
+  candidates = candidates.filter(d => matchesByX(d, rule, freq === 'daily' ? eventStart : undefined));
 
   candidates.sort((a, b) => a.getTime() - b.getTime());
   return candidates;
@@ -558,7 +571,7 @@ function expandWeekly(
 // ---------------------------------------------------------------------------
 // byX matching (Step 2 of §3.3.3.1)
 // ---------------------------------------------------------------------------
-function matchesByX(date: Date, rule: CalendarRecurrenceRule): boolean {
+function matchesByX(date: Date, rule: CalendarRecurrenceRule, timeOf: Date = date): boolean {
   if (rule.byMonth?.length) {
     const month = String(date.getMonth() + 1);
     if (!rule.byMonth.some(m => m.replace('L', '') === month)) return false;
@@ -598,13 +611,13 @@ function matchesByX(date: Date, rule: CalendarRecurrenceRule): boolean {
     })) return false;
   }
   if (rule.byHour?.length) {
-    if (!rule.byHour.includes(date.getHours())) return false;
+    if (!rule.byHour.includes(timeOf.getHours())) return false;
   }
   if (rule.byMinute?.length) {
-    if (!rule.byMinute.includes(date.getMinutes())) return false;
+    if (!rule.byMinute.includes(timeOf.getMinutes())) return false;
   }
   if (rule.bySecond?.length) {
-    if (!rule.bySecond.includes(date.getSeconds())) return false;
+    if (!rule.bySecond.includes(timeOf.getSeconds())) return false;
   }
   return true;
 }
