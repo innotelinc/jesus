@@ -174,10 +174,14 @@ export async function exchangeCodeForTokens(
     code_verifier: codeVerifier,
   }, serverId);
 
+  // The body carries the code, the PKCE verifier and the client secret. The
+  // endpoint was validated; a redirect would re-send all of it to a host
+  // that was not, so none is followed.
   const tokenResponse = await fetch(tokenEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
+    redirect: 'error',
   });
 
   if (!tokenResponse.ok) {
