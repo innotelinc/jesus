@@ -4042,6 +4042,9 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       return;
     }
 
+    // The rows shown before the query goes out; see removedWhileQuerying.
+    const listedBeforeQuery = get().emails.map(e => e.id);
+
     try {
       // Get emails per page from settings
       const emailsPerPage = useSettingsStore.getState().emailsPerPage;
@@ -4151,6 +4154,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       }
       if (!isCurrentView()) return;
       set({ emailListSync: syncAfterRefresh });
+
+      // Rows that left the list while the query was out were deleted, moved
+      // or filed away meanwhile, and the server may have answered before that
+      // change landed. Merging them back made a mail deleted in quick
+      // succession reappear until the next push (#966).
+      const removedWhileQuerying = new Set(listedBeforeQuery);
+      for (const email of get().emails) removedWhileQuerying.delete(email.id);
+      if (removedWhileQuerying.size > 0) {
+        const page = result.emails.filter(e => !removedWhileQuerying.has(e.id));
+        const dropped = result.emails.length - page.length;
+        result = { ...result, emails: page, total: Math.max(0, (result.total || 0) - dropped) };
+      }
 
       const currentEmails = get().emails;
       const previousTotal = get().totalEmails;
