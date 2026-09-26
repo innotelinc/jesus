@@ -14,6 +14,11 @@ TODO.md
 !README.md
 # Sibling projects / test harness - not part of the webmail image
 examples/
+# Unit tests: `next build` type-checks every .ts file, and some tests import
+# routes the Dockerfile deletes (app/api/dev-jmap)
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
 integration/
 repos/
 # Runtime state of a checkout that has been run (admin password hash,

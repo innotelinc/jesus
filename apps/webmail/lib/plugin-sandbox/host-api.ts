@@ -293,22 +293,26 @@ function isApiPostPathAllowed(path: string, allowlist: readonly string[]): boole
  * lists: they act with the user's full credentials (the JMAP passthrough,
  * WebDAV, CalDAV), change sign-in, admin or plugin state, or belong to the
  * setup wizard. A plugin talks to its own sidecar routes instead.
+ *
+ * Listed by their segment under `/api/`, not as `/api/...` strings: the Lite
+ * build reads every such string in a client chunk as an endpoint the browser
+ * calls and refuses the ones it has no stand-in for (scripts/lite/verify.mjs).
  */
-const PLUGIN_POST_DENIED_PATHS = [
-  '/api/account',
-  '/api/admin',
-  '/api/auth',
-  '/api/caldav',
-  '/api/dev-jmap',
-  '/api/plugin-approval-status',
-  '/api/plugins',
-  '/api/push',
-  '/api/settings',
-  '/api/setup',
-  '/api/system',
-  '/api/webdav',
-  '/api/wopi',
-];
+const PLUGIN_POST_DENIED_ROUTES = new Set([
+  'account',
+  'admin',
+  'auth',
+  'caldav',
+  'dev-jmap',
+  'plugin-approval-status',
+  'plugins',
+  'push',
+  'settings',
+  'setup',
+  'system',
+  'webdav',
+  'wopi',
+]);
 
 /**
  * Checked on the path the router will see: decoded once and with repeated
@@ -322,7 +326,8 @@ function isPluginPostDenied(pathname: string): boolean {
     return true;
   }
   routePath = routePath.replace(/\/{2,}/g, '/');
-  return PLUGIN_POST_DENIED_PATHS.some((denied) => routePath === denied || routePath.startsWith(`${denied}/`));
+  if (!routePath.startsWith('/api/')) return false;
+  return PLUGIN_POST_DENIED_ROUTES.has(routePath.slice('/api/'.length).split('/')[0]);
 }
 
 interface PluginHttpPostOptions {

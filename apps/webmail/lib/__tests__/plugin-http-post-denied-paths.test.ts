@@ -51,6 +51,7 @@ describe('plugin http.post denied paths', () => {
     ['/api/account/stalwart/jmap', ['/api/account/stalwart/jmap']],
     ['/api/admin/config', ['/api/admin/']],
     ['/api/settings', ['/api/settings']],
+    ['/api/wopi', ['/api/wopi']],
     ['/api/auth/session', ['/api/']],
     ['/api/%61dmin/config', ['/api/%61dmin/']],
     ['/api//admin/config', ['/api/']],
@@ -61,6 +62,11 @@ describe('plugin http.post denied paths', () => {
 
   it('still reaches a plugin sidecar route', async () => {
     await dispatchApiCall(plugin(['/api/translate']), 'http.post', ['/api/translate', { text: 'hi' }]);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reaches a route that only shares a prefix with a denied one', async () => {
+    await dispatchApiCall(plugin(['/api/admin-helper']), 'http.post', ['/api/admin-helper', {}]);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
