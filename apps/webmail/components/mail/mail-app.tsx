@@ -357,7 +357,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     deleteEmail,
     markAsRead,
     toggleStar,
-    setEmailKeywords,
+    patchEmailKeywords,
     moveToMailbox,
     moveToMailboxCrossAware,
     moveThreadToMailbox,
@@ -2402,14 +2402,6 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     try {
       const email = emails.find(e => e.id === emailToPin.id) ?? emailToPin;
       const isPinned = email.keywords?.['$pinned'] === true;
-      // JMAP keywords are a set of present keys - drop the key to unpin
-      // rather than writing a false value.
-      const keywords = { ...email.keywords };
-      if (isPinned) {
-        delete keywords['$pinned'];
-      } else {
-        keywords['$pinned'] = true;
-      }
 
       // Same routing as tags: the write goes to the email's own account, and
       // the local patch flips the icon immediately. Then refetch the first page
@@ -2417,7 +2409,8 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       // refetch where that sort does not apply (unified views) or where it
       // would replace a tag-filtered list (refreshCurrentMailbox fetches by
       // folder only). (#281)
-      await setEmailKeywords(client, email.id, keywords);
+      // Only $pinned changes; the row's other keywords may be stale.
+      await patchEmailKeywords(client, email.id, { $pinned: !isPinned });
       if (!isUnifiedView && !useEmailStore.getState().selectedKeyword) {
         void refreshCurrentMailbox(client);
       }
@@ -2435,13 +2428,16 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       const email = emails.find(e => e.id === emailId);
       if (!email) return;
 
-      const keywords = { ...email.keywords };
+      // Only the tag keywords change: writing the whole set from this row
+      // would undo keywords another client set since ($seen, $answered).
+      const keywords = email.keywords ?? {};
+      const changes: Record<string, boolean> = {};
 
       if (tagId === null) {
         // Remove all tag keywords
         Object.keys(keywords).forEach(key => {
-          if (key.startsWith(KEYWORD_PREFIX) || key.startsWith(KEYWORD_PREFIX_LEGACY)) {
-            keywords[key] = false;
+          if (keywords[key] && (key.startsWith(KEYWORD_PREFIX) || key.startsWith(KEYWORD_PREFIX_LEGACY))) {
+            changes[key] = false;
           }
         });
       } else {
@@ -2451,11 +2447,11 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
           .filter(key => keywords[key]);
         if (activeKeys.length > 0) {
           activeKeys.forEach(key => {
-            keywords[key] = false;
+            changes[key] = false;
           });
         } else {
           // Add the tag without disturbing others
-          keywords[KEYWORD_PREFIX + tagId] = true;
+          changes[KEYWORD_PREFIX + tagId] = true;
         }
       }
 
@@ -2465,7 +2461,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       // call site covered only the unified view, so a tag set on a directly
       // selected shared folder was written to the reaching account and silently
       // dropped by the server. (#281)
-      await setEmailKeywords(client, emailId, keywords);
+      await patchEmailKeywords(client, emailId, changes);
 
       // Refresh tag counts
       fetchTagCounts(client);

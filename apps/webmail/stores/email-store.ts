@@ -13,6 +13,7 @@ import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { useAuthStore } from "@/stores/auth-store";
 import { currentStoreEpoch } from "@/lib/store-epoch";
+import { keywordPointer } from "@/lib/jmap/patch-pointer";
 import { useAccountStore } from "@/stores/account-store";
 import { useMessageListTabsStore } from "@/stores/message-list-tabs-store";
 
@@ -263,6 +264,11 @@ interface EmailStore {
   toggleAdvancedSearch: () => void;
   toggleStar: (client: IJMAPClient, emailId: string) => Promise<void>;
   setEmailKeywords: (client: IJMAPClient, emailId: string, keywords: Record<string, boolean>) => Promise<void>;
+  /**
+   * Set (true) or clear (false) just the named keywords. Every other keyword
+   * is left as the server has it.
+   */
+  patchEmailKeywords: (client: IJMAPClient, emailId: string, changes: Record<string, boolean>) => Promise<void>;
   markEmailKeyword: (client: IJMAPClient, emailId: string, keyword: string) => Promise<void>;
   setEmailKeywordsLocal: (emailId: string, keywords: Record<string, boolean>) => void;
 
@@ -3173,15 +3179,36 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // answers with `notUpdated`/`updated: null` and no error, so the keyword was
     // silently lost on the next reload - the same class of bug as the batch
     // actions in `email-store-shared-folder-actions.test.ts`. (#281)
-    const { client: actionClient, accountId } = resolveKeywordActionContext(emailId, client);
+    //
+    // Only the keywords that differ from the row are written (see
+    // patchEmailKeywords): replacing the whole set from the row undid what
+    // another client had set since, such as `$seen` or `$answered`.
     const previous = (get().emails.find(e => e.id === emailId) ?? get().selectedEmail)?.keywords ?? {};
-    await actionClient.updateEmailKeywords(emailId, keywords, accountId);
-    get().setEmailKeywordsLocal(emailId, keywords);
-    refillAfterKeywordChange(
-      get,
-      client,
-      [...Object.keys(previous), ...Object.keys(keywords)].filter(k => !!previous[k] !== !!keywords[k]),
-    );
+    const changes: Record<string, boolean> = {};
+    for (const key of new Set([...Object.keys(previous), ...Object.keys(keywords)])) {
+      if (!!previous[key] !== !!keywords[key]) changes[key] = !!keywords[key];
+    }
+    await get().patchEmailKeywords(client, emailId, changes);
+  },
+
+  patchEmailKeywords: async (client, emailId, changes) => {
+    const keys = Object.keys(changes);
+    if (keys.length === 0) return;
+    const { client: actionClient, accountId } = resolveKeywordActionContext(emailId, client);
+    // `keywords/<name>` pointers touch only these keywords on the server;
+    // a cleared keyword is removed (null), since a keyword map holds `true`
+    // values only.
+    const patch = Object.fromEntries(keys.map(key => [keywordPointer(key), changes[key] ? true : null]));
+    await actionClient.batchUpdateKeywords([emailId], patch, accountId);
+
+    const previous = (get().emails.find(e => e.id === emailId) ?? get().selectedEmail)?.keywords ?? {};
+    const next: Record<string, boolean> = { ...previous };
+    for (const key of keys) {
+      if (changes[key]) next[key] = true;
+      else delete next[key];
+    }
+    get().setEmailKeywordsLocal(emailId, next);
+    refillAfterKeywordChange(get, client, keys.filter(k => !!previous[k] !== !!changes[k]));
   },
 
   setEmailKeywordsLocal: (emailId, keywords) => {
