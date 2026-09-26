@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
-import { EMAIL_SANITIZE_CONFIG, collapseBlockedImageContainers, plainTextToSafeHtml, restrictDataUriResourcesOnNode, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
+import { EMAIL_SANITIZE_CONFIG, blockExternalResourcesOnNode, collapseBlockedImageContainers, emailIframeCsp, plainTextToSafeHtml, restrictDataUriResourcesOnNode, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { getRenderableHtmlBody } from "@/lib/email-body-selection";
 import { collectReferencedCids, isEmbeddedInBody } from "@/lib/attachment-visibility";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
@@ -359,24 +359,10 @@ function EmailCard({
           // Re-apply the data:-URI allowlist DOMPurify skips on media tags.
           restrictDataUriResourcesOnNode(node);
 
-          if (!allowExternal) {
-            if (node.tagName === 'IMG') {
-              const src = node.getAttribute('src');
-              if (src && (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//'))) {
-                node.setAttribute('data-blocked-src', src);
-                node.removeAttribute('src');
-                node.setAttribute('alt', '[Image blocked]');
-                blockedExternalContent = true;
-              }
-            }
-            if (node.hasAttribute('style')) {
-              const style = node.getAttribute('style');
-              if (style && /url\s*\(/i.test(style)) {
-                const cleanStyle = style.replace(/url\s*\([^)]*\)/gi, 'none');
-                node.setAttribute('style', cleanStyle);
-                blockedExternalContent = true;
-              }
-            }
+          // The desktop viewer's blocker: srcset, <source>, poster,
+          // background attributes and escaped url()s as well as img src.
+          if (!allowExternal && blockExternalResourcesOnNode(node)) {
+            blockedExternalContent = true;
           }
 
           if (node.tagName === 'A') {
@@ -410,7 +396,7 @@ function EmailCard({
 
         let finalHtml = sanitized;
         if (blockedExternalContent) {
-          setHasBlockedContent(true);
+          if (!hasBlockedContent) setHasBlockedContent(true);
           finalHtml = collapseBlockedImageContainers(sanitized);
         }
 
@@ -441,6 +427,9 @@ function EmailCard({
     }
 
     return { html: "", isHtml: false };
+  // `hasBlockedContent` is only read to skip a redundant setState; as a
+  // dependency it would re-run the sanitizer once the banner shows.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, allowExternal, resolvedTheme, emailAlwaysLightMode, cidBlobUrls, t]);
 
   // Parts the body embeds via cid: stay out of the attachment row while the
@@ -460,11 +449,14 @@ function EmailCard({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const emailIframeSrcDoc = useMemo(() => {
     if (!emailContent.isHtml || !emailContent.html) return '';
-    const csp = "default-src 'none'; img-src data: blob: http: https:; style-src 'unsafe-inline'; font-src data: http: https:; media-src data: blob: http: https:; base-uri 'none'; form-action 'none'; frame-src 'none'";
+    // Strict while external content is blocked: the network-level backstop
+    // for whatever the DOM walk above cannot see.
+    const csp = emailIframeCsp(!allowExternal);
     return `<!DOCTYPE html><html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
+<meta name="referrer" content="no-referrer">
 <style>
   /* overflow-y hidden keeps the scrollHeight measurement below honest. overflow-x
      is auto so intrinsically wide content can pan instead of being clipped outright;
@@ -491,7 +483,7 @@ function EmailCard({
   td, th { word-break: break-word; padding: 0.5rem; }
   pre { white-space: pre-wrap; word-wrap: break-word; }
 </style></head><body dir="auto">${emailContent.html}</body></html>`;
-  }, [emailContent.isHtml, emailContent.html]);
+  }, [emailContent.isHtml, emailContent.html, allowExternal]);
 
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;

@@ -77,6 +77,22 @@ export function sanitizeEmailHtmlForIframe(html: string): string {
   return sanitizeWithDataUriGuard(html, EMAIL_IFRAME_SANITIZE_CONFIG);
 }
 
+/**
+ * CSP for the srcdoc document a message body renders in. `default-src
+ * 'none'` forbids script even if the sanitizer ever lets one through.
+ *
+ * With external content blocked, img/media/font are limited to data:/blob:
+ * only - the network-level backstop for every tracking vector, including
+ * the ones the DOM walk can't see (CSS escapes, `<style>` url(),
+ * `@font-face`). cid: parts are rewritten to blob: URLs beforehand, so they
+ * survive the strict variant.
+ */
+export function emailIframeCsp(externalBlocked: boolean): string {
+  return externalBlocked
+    ? "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:; media-src data: blob:; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    : "default-src 'none'; img-src data: blob: http: https:; style-src 'unsafe-inline'; font-src data: http: https:; media-src data: blob: http: https:; base-uri 'none'; form-action 'none'; frame-src 'none'";
+}
+
 /** Outcome of {@link sanitizeEmailBodyForIframe}. */
 export interface IframeBodySanitizeResult {
   /** Sanitized HTML, ready for the iframe srcDoc. */
