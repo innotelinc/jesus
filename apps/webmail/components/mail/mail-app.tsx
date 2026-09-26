@@ -31,7 +31,7 @@ import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { connectedAccountsGrew } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
-import { useEmailStore, buildUnifiedAccountClients, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId } from "@/stores/email-store";
+import { useEmailStore, buildUnifiedAccountClients, captureViewToken, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId } from "@/stores/email-store";
 import { groupSearchScopeFolders } from "@/lib/search-scope-folders";
 import { toast } from "@/stores/toast-store";
 import { runBatchEmailAction } from "@/lib/email-action-toast";
@@ -1346,12 +1346,15 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     // replace the user's results with the folder contents.
     if (state.searchQuery || !isFilterEmpty(state.searchFilters)) return;
 
+    const isSameView = captureViewToken();
     void buildPopulatedUnifiedAccounts()
-      .then((populated) => (
-        unifiedRole
+      .then((populated) => {
+        // The user left the view while the accounts loaded (#1102).
+        if (!isSameView()) return;
+        return unifiedRole
           ? fetchUnifiedEmailsAction(populated, unifiedRole)
-          : fetchCrossViewAction(populated, crossView!)
-      ))
+          : fetchCrossViewAction(populated, crossView!);
+      })
       .catch(() => { /* per-account failures surface through unifiedErrors */ });
   }, [connectedAccountsSignature, isAuthenticated, client, buildPopulatedUnifiedAccounts, fetchUnifiedEmailsAction, fetchCrossViewAction]);
 
@@ -2557,7 +2560,11 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         setTabletListVisible(true);
       }
 
+      const isSameView = captureViewToken();
       const populated = await buildPopulatedUnifiedAccounts();
+      // Another folder was picked while the accounts loaded; entering this
+      // view now would put it over that folder (#1102).
+      if (!isSameView()) return;
       const searchCleared = clearSearchIfFolderChangeResets();
       // Keep an active search across the switch and re-run it in this view
       // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
@@ -2591,7 +2598,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         setTabletListVisible(true);
       }
 
+      const isSameView = captureViewToken();
       const populated = await buildPopulatedUnifiedAccounts();
+      if (!isSameView()) return;
       const searchCleared = clearSearchIfFolderChangeResets();
       // Keep an active search across the switch and re-run it in this view
       // (mirrors normal mailboxes), preserving advanced filters; otherwise browse.
@@ -2991,7 +3000,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     // In unified view the active "mailbox" is a virtual role or cross view, so
     // refresh via the unified fan-out instead of fetchEmails.
     if (isUnifiedView) {
+      const isSameView = captureViewToken();
       const populated = await buildPopulatedUnifiedAccounts();
+      if (!isSameView()) return;
       const role = useEmailStore.getState().unifiedRole;
       const cross = useEmailStore.getState().crossView;
       if (role) {

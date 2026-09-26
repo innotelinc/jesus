@@ -124,7 +124,9 @@ interface EmailStore {
   // Bumped by any action that changes which mailbox/keyword/unified view is
   // active. fetchUnifiedEmails/fetchCrossView capture it before their async
   // fetch and check it on return, so a late-resolving fetch from a view the
-  // user already navigated away from can't stomp the newer view's state (#delete-folder-blend).
+  // user already navigated away from can't stomp the newer view's state (#1102).
+  // Callers that await before starting one of those fetches check it with
+  // captureViewToken().
   viewToken: number;
   isUnifiedView: boolean;
   unifiedRole: UnifiedMailboxRole | null;
@@ -686,6 +688,16 @@ function captureEmailListView(): () => boolean {
       && current.crossView === view.crossView
       && useAuthStore.getState().activeAccountId === activeAccountId;
   };
+}
+
+// fetchUnifiedEmails/fetchCrossView start a new view generation of their own,
+// so they cannot tell that the user left while the caller was still awaiting
+// something (e.g. the unified account list). Such callers capture this before
+// the await and skip the fetch if it reports false; otherwise the unified view
+// is switched back on over the folder the user picked meanwhile (#1102).
+export function captureViewToken(): () => boolean {
+  const token = useEmailStore.getState().viewToken;
+  return () => useEmailStore.getState().viewToken === token;
 }
 
 /**
@@ -1469,7 +1481,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   })),
   clearAccountMailboxes: () => set({ accountMailboxes: {} }),
   setViewingAccount: (accountId) => set({ viewingAccountId: accountId }),
-  selectAccountMailbox: (accountId, mailboxId) => set({
+  selectAccountMailbox: (accountId, mailboxId) => set(state => ({
     viewingAccountId: accountId,
     selectedMailbox: mailboxId,
     // The search panel's folder scope names a folder of the account we are
@@ -1487,7 +1499,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     threadEmailsCache: new Map(),
     threadEmailCounts: new Map(),
     isLoadingThread: null,
-  }),
+    // Account folders are always real folders; like selectMailbox, leave any
+    // unified view so a pending unified fetch or refresh can't take it over (#1102).
+    viewToken: state.viewToken + 1,
+    isUnifiedView: false,
+    unifiedRole: null,
+    crossView: null,
+  })),
   fetchAccountMailboxes: async (client, accountId) => {
     try {
       // `accountId` is overloaded across callers:
@@ -3621,15 +3639,20 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         selectedEmail: getNextSelectedEmail(state, emailId),
       }));
 
-      // Refresh the view the user is actually looking at.
+      // Refresh the view the user is actually looking at. If they leave it
+      // while the account list loads, skip the fetch rather than re-enter it.
       if (get().isUnifiedView && get().crossView) {
+        const isSameView = captureViewToken();
+        const view = get().crossView!;
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
         const accounts = await buildUnifiedAccountClients({ includeGroup });
-        await get().fetchCrossView(accounts, get().crossView!);
+        if (isSameView()) await get().fetchCrossView(accounts, view);
       } else if (get().isUnifiedView && get().unifiedRole) {
+        const isSameView = captureViewToken();
+        const role = get().unifiedRole!;
         const includeGroup = useSettingsStore.getState().includeGroupInUnified;
         const accounts = await buildUnifiedAccountClients({ includeGroup });
-        await get().fetchUnifiedEmails(accounts, get().unifiedRole!);
+        if (isSameView()) await get().fetchUnifiedEmails(accounts, role);
       } else {
         await get().fetchEmails(client, selectedMailbox);
       }
