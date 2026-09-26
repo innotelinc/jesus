@@ -2990,7 +2990,7 @@
       "enable_tasks": "فعال کردن وظایف",
       "enable_tasks_desc": "نمایش نمای وظایف در تقویم برای مدیریت کارها",
       "show_tasks_on_calendar": "نمایش وظایف روی تقویم",
-      "show_tasks_on_calendar_desc": "نمایش برچسب وظایف در نماهای روز و هفته",
+      "show_tasks_on_calendar_desc": "نمایش وظایف در نماهای ماه، هفته و روز",
       "hover_preview": "پیش‌نمایش هاور رویداد",
       "hover_preview_desc": "نمایش popover جزئیات هنگام هاور روی رویدادهای تقویم",
       "hover_preview_instant": "بلافاصله",

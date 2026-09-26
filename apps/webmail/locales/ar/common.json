@@ -2990,7 +2990,7 @@
       "enable_tasks": "تفعيل المهام",
       "enable_tasks_desc": "إظهار عرض للمهام في التقويم لإدارة قوائم المهام",
       "show_tasks_on_calendar": "إظهار المهام في التقويم",
-      "show_tasks_on_calendar_desc": "عرض شارات المهام في عروض التقويم اليومي والأسبوعي",
+      "show_tasks_on_calendar_desc": "عرض المهام في عروض التقويم الشهري والأسبوعي واليومي",
       "hover_preview": "معاينة عند التمرير فوق الحدث",
       "hover_preview_desc": "إظهار نافذة تفاصيل منبثقة عند التمرير فوق أحداث التقويم",
       "hover_preview_instant": "فوري",
