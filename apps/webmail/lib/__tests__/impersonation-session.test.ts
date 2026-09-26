@@ -1,6 +1,9 @@
 // @vitest-environment node
 import { createHmac, randomUUID } from 'node:crypto';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/auth/session-secret', () => ({
@@ -78,7 +81,12 @@ async function readSession() {
 }
 
 describe('impersonation handoff', () => {
+  // Used jtis are recorded in the state directory.
+  const stateDir = mkdtempSync(path.join(tmpdir(), 'bw-imp-'));
+  afterAll(() => rmSync(stateDir, { recursive: true, force: true }));
+
   beforeAll(() => {
+    process.env.ADMIN_STATE_DIR = stateDir;
     process.env.BULWARK_JWT_AUTH_SECRET = SECRET;
     process.env.BULWARK_STALWART_MASTER_USER = 'master@example.org';
     process.env.BULWARK_STALWART_MASTER_PASSWORD = MASTER_PASSWORD;
