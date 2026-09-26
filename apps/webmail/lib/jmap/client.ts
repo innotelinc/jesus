@@ -165,6 +165,29 @@ export class RequestTimeoutError extends Error {
   }
 }
 
+const READ_ONLY_METHOD = /\/(?:get|query|changes|queryChanges|parse)$|^Core\/echo$/;
+
+/**
+ * Whether a request may be sent again after the connection failed without
+ * an answer. The server may already have acted on it, so only requests that
+ * change nothing qualify: GETs, blob uploads (a new upload just yields
+ * another blob), and JMAP batches made only of read methods. Anything
+ * with a /set, /copy, /import or a submission would be done twice - one
+ * Send delivering two messages.
+ */
+export function isReplaySafeRequest(init?: Parameters<typeof fetch>[1]): boolean {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return true;
+  if (typeof init?.body !== 'string') return init?.body instanceof Blob;
+  try {
+    const request = JSON.parse(init.body) as { methodCalls?: unknown };
+    if (!Array.isArray(request.methodCalls) || request.methodCalls.length === 0) return false;
+    return request.methodCalls.every((call) => Array.isArray(call) && typeof call[0] === 'string' && READ_ONLY_METHOD.test(call[0]));
+  } catch {
+    return false;
+  }
+}
+
 /** A scheduled send later than the server's hold limit. */
 export class ScheduleTooLateError extends Error {
   constructor(readonly maxSeconds?: number) {
@@ -1074,6 +1097,10 @@ export class JMAPClient implements IJMAPClient {
       // idempotent: replaying an EmailSubmission/set would send the mail twice.
       // Surface it instead so the caller can report a failure the user can act on.
       if (error instanceof RequestTimeoutError) throw error;
+      // The same holds for a connection that failed after the request was
+      // written (a reset, a proxy dropping the response): only a request that
+      // changes nothing may be replayed.
+      if (!isReplaySafeRequest(init)) throw error;
       await new Promise(r => setTimeout(r, 1000));
       response = await this.timedFetch(url, init, headers, timeoutMs);
     }
