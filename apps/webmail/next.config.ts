@@ -77,8 +77,12 @@ const nextConfig: NextConfig = {
   // Sibling repos checked out under ./repos/ are unrelated source trees that
   // Turbopack's NFT can otherwise rope into the trace when dynamic fs calls
   // confuse it. Keeps the build from ballooning memory tracing dead code.
+  // The trace follows fs reads, and the runtime reads its state directories,
+  // so a build from a checkout that has been run would copy the admin
+  // password hash, the plugin signing key, the audit log and .env secrets
+  // into .next/standalone - and from there into the image.
   outputFileTracingExcludes: {
-    "*": ["./repos/**/*"],
+    "*": ["./repos/**/*", "./data/**/*", "./local-data/**/*", "./.env*"],
   },
   turbopack: {
     root: import.meta.dirname,
