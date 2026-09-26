@@ -6,8 +6,8 @@ import { wopiContext } from '@/lib/wopi/request';
 /**
  * WOPI GetFile / PutFile (#425). Content flows purely over JMAP: GetFile
  * streams the node's blob (or, for a mail attachment, the attachment blob
- * itself - #1047), PutFile uploads the editor's bytes as a new blob and
- * points the FileNode at it via `FileNode/set { blobId }`.
+ * itself - #1047), PutFile uploads the editor's bytes as a new blob into the
+ * user's own account and points the FileNode at it via `FileNode/set { blobId }`.
  */
 
 /**
@@ -115,7 +115,9 @@ export async function POST(
       return NextResponse.json({ error: 'Empty document rejected' }, { status: 409 });
     }
 
-    const blob = await uploadFileBlob(auth.ctx, auth.payload.accountId, body, node.type);
+    const blob = await uploadFileBlob(
+      auth.ctx, auth.payload.uploadAccountId || auth.payload.accountId, body, node.type,
+    );
     const { modified } = await updateFileNodeBlob(
       auth.ctx, auth.payload.accountId, fileId, blob.blobId,
     );
