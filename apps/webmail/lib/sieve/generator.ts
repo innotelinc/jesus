@@ -34,8 +34,11 @@ function generateCondition(condition: FilterCondition): string {
   const { field, comparator, value } = condition;
 
   if (field === 'size') {
-    // Size is numeric, single value only.
-    const sizeValue = Array.isArray(value) ? value[0] : value;
+    // Size is numeric, single value only. It is written unquoted, so
+    // anything but a number (with an optional K/M/G quantifier) would be
+    // Sieve source; fall back to 0.
+    const raw = String((Array.isArray(value) ? value[0] : value) ?? '').trim();
+    const sizeValue = /^\d+[KMG]?$/i.test(raw) ? raw : '0';
     const op = comparator === 'greater_than' ? ':over' : ':under';
     return `size ${op} ${sizeValue}`;
   }
@@ -67,9 +70,9 @@ function generateCondition(condition: FilterCondition): string {
     return `header :mime :anychild :matches ["Content-Disposition", "Content-Type"] ${formatStringArg(normalised, (ext) => `*.${ext}*`)}`;
   }
 
-  const headerName = field === 'header'
+  const headerName = escapeString(field === 'header'
     ? (condition.headerName || 'X-Unknown')
-    : HEADER_MAP[field];
+    : HEADER_MAP[field]);
 
   switch (comparator) {
     case 'contains':
@@ -272,7 +275,10 @@ export function generateScript(
   if (options.includeVacation) {
     metadata.includeVacation = true;
   }
-  const metadataJson = JSON.stringify(metadata);
+  // The JSON sits inside a /* ... */ comment: a "*/" in any string (a rule
+  // name, a condition value) would end the comment and turn the rest into
+  // live Sieve. JSON reads "\/" back as "/", so the metadata is unchanged.
+  const metadataJson = JSON.stringify(metadata).replace(/\*\//g, '*\\/');
   const lines: string[] = [];
 
   lines.push('/* @metadata:begin');
@@ -318,7 +324,8 @@ export function generateScript(
     }
 
     lines.push('');
-    lines.push(`# Rule: ${rule.name}`);
+    // A line break in the name would end the comment and start a command.
+    lines.push(`# Rule: ${rule.name.replace(/\s+/g, ' ')}`);
 
     const conditions = rule.conditions.map(generateCondition);
     let conditionStr: string;
