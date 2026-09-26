@@ -7,11 +7,8 @@ import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { normalizeJmapServerUrl } from '@/lib/auth/verify-jmap-auth';
 import { setStalwartAuthContextInStore } from '@/lib/stalwart/auth-context';
 import { recordLogin } from '@/lib/telemetry/login-tracker';
-import {
-  ImpersonationJwtError,
-  impersonationReplayCache,
-  verifyImpersonationJwt,
-} from '@/lib/impersonation/jwt';
+import { ImpersonationJwtError, verifyImpersonationJwt } from '@/lib/impersonation/jwt';
+import { consumeImpersonationJti } from '@/lib/impersonation/replay-store';
 import {
   readImpersonationConfig,
   resolveImpersonationServerUrl,
@@ -81,7 +78,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
-  if (!impersonationReplayCache.consume(claims.jti, claims.exp)) {
+  if (!(await consumeImpersonationJti(claims.jti, claims.exp))) {
     logger.warn('Impersonation JWT replay rejected', { jti: claims.jti });
     return NextResponse.json({ error: 'Token already used' }, { status: 401 });
   }
