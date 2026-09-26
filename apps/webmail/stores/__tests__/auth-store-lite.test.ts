@@ -30,14 +30,33 @@ function jsonResponse(body: unknown, status = 200): Response {
  * config/policy files, and fails on anything else - in particular on any
  * /api/ route of our own origin. `calls` lists the mail-server requests.
  */
-function stalwartFetch(options: { loginAnswer?: unknown; refreshAnswer?: () => Response; loginStatus?: number } = {}) {
+function stalwartFetch(options: {
+  loginAnswer?: unknown;
+  refreshAnswer?: () => Response;
+  loginStatus?: number;
+  /** Advertise an RFC 7009 revocation endpoint in the metadata document. */
+  revocation?: boolean;
+} = {}) {
   const calls: string[] = [];
+  const revoked: string[] = [];
   const mock = vi.fn(async (input: FetchInput, init?: FetchInit) => {
     const url = String(input);
     if (url === '/config.json') return jsonResponse({ jmapServerUrl: SERVER });
     if (url === '/policy.json') return jsonResponse({});
     if (url.startsWith('/')) throw new Error(`Lite must not call its own origin: ${url}`);
+    // Sign-out looks the revocation endpoint up; not counted in `calls`, as
+    // a sign-out in one test's cleanup may still be looking when the next
+    // test starts.
+    if (url.startsWith(`${SERVER}/.well-known/`)) {
+      return options.revocation
+        ? jsonResponse({ issuer: SERVER, revocation_endpoint: `${SERVER}/auth/revoke` })
+        : new Response('not found', { status: 404 });
+    }
     calls.push(`${init?.method ?? 'GET'} ${url}`);
+    if (url === `${SERVER}/auth/revoke`) {
+      revoked.push(new URLSearchParams(String(init?.body)).get('token') ?? '');
+      return new Response(null, { status: 200 });
+    }
     if (url === `${SERVER}/api/auth`) {
       if (options.loginStatus) return new Response('nope', { status: options.loginStatus });
       return jsonResponse(options.loginAnswer ?? { type: 'authenticated', client_code: 'CODE' });
@@ -52,7 +71,7 @@ function stalwartFetch(options: { loginAnswer?: unknown; refreshAnswer?: () => R
     throw new Error(`unexpected fetch ${url}`);
   });
   vi.stubGlobal('fetch', mock);
-  return { mock, calls };
+  return { mock, calls, revoked };
 }
 
 function liteStorageKeys(): string[] {
@@ -225,6 +244,17 @@ describe('auth-store in the static Lite build', () => {
     expect(connectSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps no password in web storage when token login exists but failed', async () => {
+    stalwartFetch({ loginStatus: 500 });
+
+    const ok = await useAuthStore.getState().login(SERVER, 'alice', 'pw', undefined, true);
+
+    expect(ok).toBe(true);
+    expect(useAuthStore.getState().authMode).toBe('basic');
+    expect(readLiteBasicSession(0)).toBeNull();
+    expect(liteStorageKeys()).toEqual([]);
+  });
+
   it('falls back to Basic auth with a tab-scoped session when the server has no token login', async () => {
     const { calls } = stalwartFetch({ loginStatus: 404 });
 
@@ -302,6 +332,29 @@ describe('auth-store in the static Lite build', () => {
     expect(calls).toEqual([]);
     expect(readLiteRefreshToken(0)).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it('logout revokes the refresh token where the mail server advertises revocation', async () => {
+    const { calls, revoked } = stalwartFetch({ revocation: true });
+    await useAuthStore.getState().login(SERVER, 'alice', 'pw', undefined, true);
+    calls.length = 0;
+
+    await useAuthStore.getState().logout();
+
+    expect(calls).toEqual([`POST ${SERVER}/auth/revoke`]);
+    expect(revoked).toEqual(['RT-1']);
+    expect(readLiteRefreshToken(0)).toBeNull();
+  });
+
+  it('logoutAll revokes every slot\'s refresh token', async () => {
+    saveLiteRefreshToken(0, { serverUrl: SERVER, username: 'a', refreshToken: 'r0' }, true);
+    saveLiteRefreshToken(1, { serverUrl: SERVER, username: 'b', refreshToken: 'r1' }, false);
+    const { revoked } = stalwartFetch({ revocation: true });
+
+    await useAuthStore.getState().logoutAll();
+
+    expect(revoked.sort()).toEqual(['r0', 'r1']);
+    expect(liteStorageKeys()).toEqual([]);
   });
 
   it('logoutAll clears every Lite slot', async () => {
