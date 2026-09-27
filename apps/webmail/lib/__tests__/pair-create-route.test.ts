@@ -783,3 +783,14 @@ describe('pair/create never exposes the typed password', () => {
     }
   });
 });
+
+describe('pair/create step-up limit', () => {
+  it('counts failures per mail account, whichever cookie slot sends them', async () => {
+    handler = mailServer();
+    for (let slot = 0; slot < 6; slot++) signIn(slot);
+    for (let slot = 0; slot < 5; slot++) {
+      expect((await create({ slot, password: WRONG_PASSWORD })).status).toBe(401);
+    }
+    expect((await create({ slot: 5, password: WRONG_PASSWORD })).status).toBe(429);
+  });
+});

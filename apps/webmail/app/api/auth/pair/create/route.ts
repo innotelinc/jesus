@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 import { createPairingCode, isGrantAvailable, stashGrant } from '@/lib/auth/pairing-store';
 import { pairingOwner, readPairReauthFromStore, setPairReauthInStore } from '@/lib/auth/pair-reauth';
 import { mintGrantWithPassword } from '@/lib/auth/pair-grant';
-import { beginPairStepUp, settlePairStepUp } from '@/lib/auth/pair-attempts';
+import { beginPairStepUp, pairAttemptKey, settlePairStepUp } from '@/lib/auth/pair-attempts';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
 import { readStalwartAuthContextFromStore } from '@/lib/stalwart/auth-context';
 import { isTrustedJmapServerUrl } from '@/lib/stalwart/server-fetch';
@@ -115,11 +115,15 @@ export async function POST(request: NextRequest) {
     let grantId: string;
     const password = typeof body?.password === 'string' ? body.password : '';
     if (password) {
-      if (!beginPairStepUp(owner)) {
+      const serverUrl = context.serverUrl.replace(/\/+$/, '');
+      // The login name the credential belongs to, when the session context
+      // was written under an identity address.
+      const accountName = context.accountName ?? context.username;
+      const attemptKey = pairAttemptKey(serverUrl, accountName);
+      if (!beginPairStepUp(attemptKey)) {
         return NextResponse.json({ error: 'too_many_attempts' }, { status: 429 });
       }
       const totp = typeof body?.totp === 'string' && body.totp.trim() ? body.totp.trim() : undefined;
-      const serverUrl = context.serverUrl.replace(/\/+$/, '');
       await configManager.ensureLoaded();
       const serverId = findServerByUrl(parseJmapServers(configManager.get<unknown>('jmapServers', [])), serverUrl)?.id ?? null;
 
@@ -127,19 +131,17 @@ export async function POST(request: NextRequest) {
         serverUrl,
         trusted: await isTrustedJmapServerUrl(serverUrl),
         serverId,
-        // The login name the credential belongs to, when the session context
-        // was written under an identity address.
-        username: context.accountName ?? context.username,
+        username: accountName,
         password,
         totp,
         webmailRedirectUri: resolveRedirectUri(body?.redirect_uri, webmailBase),
       });
       if (!result.ok) {
         const wrong = result.error === 'invalid_credentials' || (result.error === 'totp_required' && !!totp);
-        settlePairStepUp(owner, wrong ? 'wrong_credential' : 'other');
+        settlePairStepUp(attemptKey, wrong ? 'wrong_credential' : 'other');
         return NextResponse.json({ error: result.error }, { status: STEP_UP_ERRORS[result.error] });
       }
-      settlePairStepUp(owner, 'success');
+      settlePairStepUp(attemptKey, 'success');
       grantId = stashGrant(result.grant, owner);
       setPairReauthInStore(cookieStore, { grantId, owner });
       logger.info('Pair step-up succeeded', { flow: result.grant.flow, method: 'password' });
