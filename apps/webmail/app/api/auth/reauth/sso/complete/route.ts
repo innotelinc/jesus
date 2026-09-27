@@ -22,6 +22,22 @@ import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 
 const SSO_PENDING_COOKIE = 'sso_pending';
 const SSO_PENDING_MAX_AGE_MS = 5 * 60 * 1000;
+/** Clock skew allowed between this server and the identity provider. */
+const AUTH_TIME_SKEW_MS = 2 * 60 * 1000;
+
+/**
+ * The `auth_time` claim of an ID token received straight from the token
+ * endpoint (so its signature need not be checked here), or null.
+ */
+function idTokenAuthTime(idToken: string | undefined): number | null {
+  if (!idToken) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(idToken.split('.')[1] ?? '', 'base64url').toString('utf8'));
+    return typeof payload?.auth_time === 'number' ? payload.auth_time : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   // CSRF gate (GHSA-qvr9-m8cq-7wvg): cookies written here are SameSite=Lax,
@@ -74,8 +90,17 @@ export async function POST(request: NextRequest) {
     }
 
     // A successful exchange proves the user just authenticated at the IdP (the
-    // freshness is enforced by prompt=login on the authorize request).
+    // freshness is asked for with prompt=login on the authorize request).
     const tokens = await exchangeCodeForTokens(code, codeVerifier, redirectUri, pendingServerId);
+
+    // An IdP that ignores prompt=login answers from its existing session;
+    // when its ID token says the login is older than this step-up, it was
+    // no step-up at all. (No auth_time: nothing to check.)
+    const authTime = idTokenAuthTime(tokens.id_token);
+    if (authTime !== null && authTime * 1000 < createdAt - AUTH_TIME_SKEW_MS) {
+      logger.warn('Reauth complete: the provider did not ask for a fresh login');
+      return NextResponse.json({ error: 'reauth_not_fresh' }, { status: 401 });
+    }
 
     // ...but not as whom. The phone must get the account being paired, not
     // whichever account the IdP prompt was answered with.
