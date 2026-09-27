@@ -96,9 +96,13 @@ export async function GET(request: NextRequest) {
       parentOrigin: configManager.get<string>('parentOrigin', ''),
     },
     {
-      // Branding varies by host, so any cache between us and the browser
-      // must key its entry by the host headers we consulted.
-      headers: { Vary: 'Host, X-Forwarded-Host' },
+      // Runtime settings can change without new asset URLs. Prevent stale
+      // browser/proxy responses, retaining Vary for host-specific branding.
+      headers: {
+        Vary: 'Host, X-Forwarded-Host',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'CDN-Cache-Control': 'no-store',
+      },
     },
   );
 }
