@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildFolderRef,
   resolveFolderRef,
+  isFolderLinkOpen,
   buildMailPath,
   parseMailPath,
   buildCalendarPath,
@@ -118,6 +119,37 @@ describe('mail folder references', () => {
 
   it('returns null for a role that this account does not have', () => {
     expect(resolveFolderRef('archive', MAILBOXES)).toBeNull();
+  });
+});
+
+describe('isFolderLinkOpen', () => {
+  const plainInbox = {
+    selectedMailbox: 'a',
+    isUnifiedView: false,
+    isScheduledView: false,
+    selectedKeyword: null,
+    hasSearch: false,
+  };
+
+  it('treats the folder the list already shows as open (page reload)', () => {
+    expect(isFolderLinkOpen(resolveFolderRef('inbox', MAILBOXES)!, plainInbox)).toBe(true);
+  });
+
+  it('does not treat another folder as open', () => {
+    expect(isFolderLinkOpen('b', plainInbox)).toBe(false);
+  });
+
+  it('does not treat the folder as open while a tag, search or special view covers it', () => {
+    expect(isFolderLinkOpen('a', { ...plainInbox, selectedKeyword: 'work' })).toBe(false);
+    expect(isFolderLinkOpen('a', { ...plainInbox, hasSearch: true })).toBe(false);
+    expect(isFolderLinkOpen('a', { ...plainInbox, isUnifiedView: true })).toBe(false);
+    expect(isFolderLinkOpen('a', { ...plainInbox, isScheduledView: true })).toBe(false);
+  });
+
+  it('never treats a virtual view as open - the boot fetch does not load them', () => {
+    for (const id of [UNIFIED_MAILBOX_IDS.inbox, CROSS_VIEW_IDS.unread, SCHEDULED_MAILBOX_ID]) {
+      expect(isFolderLinkOpen(id, { ...plainInbox, selectedMailbox: id })).toBe(false);
+    }
   });
 });
 
