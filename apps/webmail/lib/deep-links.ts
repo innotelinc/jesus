@@ -190,6 +190,35 @@ export function resolveFolderRef(ref: string, mailboxes: Mailbox[] = []): string
   return decoded || null;
 }
 
+/** The parts of the mail list's state that decide what a folder link shows. */
+export interface OpenFolderView {
+  selectedMailbox: string;
+  isUnifiedView: boolean;
+  isScheduledView: boolean;
+  selectedKeyword: string | null;
+  hasSearch: boolean;
+}
+
+/**
+ * Whether a folder link names the plain folder the list already shows.
+ *
+ * The address bar carries the open folder (`buildMailPath`), so reloading the
+ * page hands that folder back as a link once the boot fetch has loaded it.
+ * Selecting it again would only fetch the same list a second time under the
+ * loading overlay. Virtual views are never "already open" at boot: the boot
+ * fetch does not load them.
+ */
+export function isFolderLinkOpen(mailboxId: string, view: OpenFolderView): boolean {
+  if (VIRTUAL_ALIAS_BY_ID[mailboxId]) return false;
+  return (
+    mailboxId === view.selectedMailbox &&
+    !view.isUnifiedView &&
+    !view.isScheduledView &&
+    !view.selectedKeyword &&
+    !view.hasSearch
+  );
+}
+
 /**
  * The canonical path for the current mail view. Returns `/mail` for the bare
  * list so the address bar stays clean when nothing is open.
