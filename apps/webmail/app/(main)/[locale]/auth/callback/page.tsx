@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth-store";
@@ -18,8 +18,14 @@ function OAuthCallbackInner() {
   const t = useTranslations("login");
   const { loginWithOAuth, loginWithServerSso } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  // The authorization code is single-use. React's development double effect
+  // ran this twice: the second pass no longer saw the pairing re-auth flag
+  // (the first had removed it) and spent the code on the login flow instead.
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     const errorParam = searchParams.get("error");
