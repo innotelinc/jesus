@@ -83,6 +83,8 @@ Then open `http://localhost:3000`. A setup wizard asks for your Stalwart server 
 
 [Updating](https://bulwarkmail.org/docs/deployment/updating) explains how to move to a new version.
 
+Container images and release files published after 1.11.2 come with a signed build provenance attestation. To check that one was built by this repository's workflows, run `gh attestation verify oci://ghcr.io/bulwarkmail/webmail:<version> --owner bulwarkmail` for an image, or `gh attestation verify <file> --repo bulwarkmail/webmail` for a downloaded file. Release files also have a `.sha256` next to them.
+
 ## Configuration
 
 Most installs are set up in the wizard on first launch and changed later in the [admin dashboard](https://bulwarkmail.org/docs/guides/admin). You can also use environment variables, which fit read-only or immutable deployments better. When both set the same key, the value saved in the admin config wins, so an environment variable only fills in what the admin config leaves unset.
