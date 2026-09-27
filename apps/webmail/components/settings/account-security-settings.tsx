@@ -1451,7 +1451,10 @@ export function AccountSecuritySettings() {
     }
   }, [isAuthenticated, client, isStalwart, probe, fetchAll, fetchAuthInfo, isOAuth, fetchPublicKeys, fetchCryptoInfo]);
 
-  if (isProbing) {
+  // Until the probe has a verdict, show the spinner instead of guessing a
+  // layout: switching layouts remounts every section below, which threw away
+  // a pairing QR that was already on screen.
+  if (isProbing || (isStalwart === null && isAuthenticated)) {
     return (
       <SettingsSection title={t('title')} description={t('description')}>
         <div className="flex items-center gap-2 py-4">
