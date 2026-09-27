@@ -32,6 +32,7 @@ Bulwark Webmail is a self-hosted webmail client for [Stalwart Mail Server](https
 - [Configuration](#configuration)
 - [Documentation](#documentation)
 - [Development](#development)
+- [Use of AI](#use-of-ai)
 - [Community and support](#community-and-support)
 - [License](#license)
 
@@ -136,6 +137,14 @@ npm run test:integration   # Stalwart in Docker + Playwright
 The [contributing guide](https://bulwarkmail.org/docs/development/contributing) covers tests, translations, code style and pull requests. [Architecture](https://bulwarkmail.org/docs/development/architecture) explains how the code is organized.
 
 The stack: [Next.js 16](https://nextjs.org/) and React 19, TypeScript, [Tailwind CSS v4](https://tailwindcss.com/), [Zustand](https://zustand-demo.pmnd.rs/), [Tiptap](https://tiptap.dev/), [next-intl](https://next-intl-docs.vercel.app/), [Tabler Icons](https://tabler.io/icons), and our own JMAP client (RFC 8620). Tests run on [Vitest](https://vitest.dev/) and [Playwright](https://playwright.dev/).
+
+## Use of AI
+
+AI tools are part of how Bulwark is developed. A change is held to the same standard whether a person or a tool wrote it: it has to be understood, reviewed and pass the checks and tests before it is merged.
+
+Bulwark itself has no AI features and doesn't send your mail, contacts, calendar or files to an AI service. If your Stalwart server classifies spam with an LLM, Bulwark shows the verdict, but the classification happens on your server.
+
+Contributors can use AI tools too, as long as they use capable, current models and not small or outdated ones. The [contributing guide](https://bulwarkmail.org/docs/development/contributing#ai-assisted-contributions) explains what we expect.
 
 ## Community and support
 
