@@ -5,6 +5,8 @@ import DOMPurify from "dompurify";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { EMAIL_SANITIZE_CONFIG, blockExternalResourcesOnNode, collapseBlockedImageContainers, emailIframeCsp, plainTextToSafeHtml, restrictDataUriResourcesOnNode, sanitizePlainTextRenderedHtml } from "@/lib/email-sanitization";
 import { getRenderableHtmlBody } from "@/lib/email-body-selection";
+import { findVerificationCode, verificationCodeBodyText } from "@/lib/verification-code";
+import { VerificationCodeChip } from "./verification-code-chip";
 import { collectReferencedCids, isEmbeddedInBody } from "@/lib/attachment-visibility";
 import { collapsePlainTextQuotes, setupQuoteCollapse } from "@/lib/quote-collapse";
 import { fitEmailBodyWidth } from "@/lib/email-fit-width";
@@ -246,6 +248,13 @@ function EmailCard({
   const hideInlineImageAttachments = useSettingsStore((state) => state.hideInlineImageAttachments);
   const emailAlwaysLightMode = useSettingsStore((state) => state.emailAlwaysLightMode);
   const plainTextFont = useSettingsStore((state) => state.plainTextFont);
+  const showVerificationCodes = useSettingsStore((state) => state.showVerificationCodes);
+  const verificationCode = useMemo(
+    () => (showVerificationCodes && isExpanded ? findVerificationCode(email.subject, verificationCodeBodyText(email)) : null),
+    // A keyword change replaces the email object; only another body needs another look.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showVerificationCodes, isExpanded, email.id, email.subject, email.bodyValues],
+  );
   const sender = email.from?.[0];
   const formatAddress = useOwnDomainAddress();
   const isUnread = !email.keywords?.$seen;
@@ -605,6 +614,12 @@ function EmailCard({
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+
+          {verificationCode && (
+            <div className="flex" style={{ paddingInline: 'var(--density-card-p)', paddingTop: 'var(--density-card-p)' }}>
+              <VerificationCodeChip code={verificationCode} className="py-1 text-sm" />
             </div>
           )}
 

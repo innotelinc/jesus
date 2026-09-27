@@ -580,7 +580,12 @@
       "copied": "Gekopieerd!",
       "copy_failed": "Kopiëren mislukt"
     },
-    "send_now": "Nu verzenden"
+    "send_now": "Nu verzenden",
+    "verification_code": {
+      "copy": "Code {code} kopiëren",
+      "copied": "Code gekopieerd",
+      "copy_failed": "Kan de code niet kopiëren"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Leesbevestiging aangevraagd (klik om uit te schakelen)",
@@ -1385,6 +1390,10 @@
         "label": "Voorbeeldtekst tonen",
         "description": "E-mailvoorbeeld weergeven in de lijst",
         "focus_description": "Inline voorbeeldtekst weergeven in de gefocuste berichtenlijst met één regel"
+      },
+      "show_verification_codes": {
+        "label": "Verificatiecodes tonen",
+        "description": "De code uit aanmeld- en bevestigingsmails aanbieden om met één klik te kopiëren, een dag lang in de lijst en in het bericht"
       },
       "attachment_click_action": {
         "label": "Actie bij klikken op bijlagen",

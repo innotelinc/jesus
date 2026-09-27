@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FileText, FileSpreadsheet, FileImage, FileArchive, File as FileIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import type { Attachment, Email } from "@/lib/jmap/types";
@@ -43,28 +43,32 @@ function shortName(name: string, max = 18): string {
   return `${head}…${ext}`;
 }
 
-// Shared by the chips and the space a loading row holds for them, so the two
-// are the same height.
-const CHIP_BOX_CLASS = "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs";
-const CHIP_ICON_CLASS = "h-3.5 w-3.5 flex-shrink-0";
+// Shared by the chips, the space a loading row holds for them and the
+// verification-code chip, so all of them are the same height.
+export const CHIP_BOX_CLASS = "inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs";
+export const CHIP_ICON_CLASS = "h-3.5 w-3.5 flex-shrink-0";
 
 interface AttachmentChipsProps {
   attachments?: Attachment[];
   onOpen: (attachment: Attachment) => void;
   /** How many chips to show before collapsing the rest into a count. */
   max?: number;
+  /** A chip drawn ahead of the attachments in the same row (the verification code). */
+  leading?: ReactNode;
   className?: string;
 }
 
-export function AttachmentChips({ attachments, onOpen, max = 2, className }: AttachmentChipsProps) {
+export function AttachmentChips({ attachments, onOpen, max = 2, leading, className }: AttachmentChipsProps) {
   const real = realAttachments(attachments);
-  if (!real.length) return null;
+  if (!real.length && !leading) return null;
 
-  const shown = real.slice(0, max);
+  // Next to a leading chip one attachment is all that still fits on the line.
+  const shown = real.slice(0, leading ? Math.min(max, 1) : max);
   const overflow = real.length - shown.length;
 
   return (
     <div className={cn("flex items-center gap-1.5 flex-wrap", className)}>
+      {leading}
       {shown.map((a) => {
         const { icon: Icon, className: iconClass } = iconFor(a.type, a.name ?? "");
         return (
@@ -149,7 +153,10 @@ export function ListAttachmentChips({ email, load, ...chipProps }: ListAttachmen
   const attachments = useListAttachments(email, load);
   if (attachments === undefined && load && email.hasAttachment) {
     // Hold a chip's height until the parts arrive, so the row does not grow
-    // under the reader when they do.
+    // under the reader when they do. A leading chip holds it just as well.
+    if (chipProps.leading) {
+      return <div className={cn("flex items-center gap-1.5", chipProps.className)}>{chipProps.leading}</div>;
+    }
     return (
       <div aria-hidden className={cn("flex", chipProps.className)}>
         <span className={cn(CHIP_BOX_CLASS, "invisible")}>

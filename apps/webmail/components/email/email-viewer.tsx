@@ -110,6 +110,8 @@ import { imageBlobUrl, inertBlobType, isFilePreviewable, isMimeTypeSafeForInline
 import { useWopiStatus, canWopiOpen } from "@/hooks/use-wopi-status";
 import { parseTnef, isTnefAttachment } from "@/lib/tnef";
 import { debug } from "@/lib/debug";
+import { findVerificationCode, verificationCodeBodyText } from "@/lib/verification-code";
+import { VerificationCodeChip } from "./verification-code-chip";
 import type { TnefAttachment } from "@/lib/tnef";
 import { PluginSlot } from "@/components/plugins/plugin-slot";
 import { usePluginSlotOffers } from "@/hooks/use-plugin-slot-offers";
@@ -705,6 +707,15 @@ export function EmailViewer({
   const readReceiptResponse = useSettingsStore((state) => state.readReceiptResponse);
   const hideInlineImageAttachments = useSettingsStore((state) => state.hideInlineImageAttachments);
   const attachmentImagePreviewsEnabled = useSettingsStore((state) => state.attachmentImagePreviewsEnabled);
+  const showVerificationCodes = useSettingsStore((state) => state.showVerificationCodes);
+  // The one-time code of a sign-in mail, read from the body as shown here, so
+  // it is found even where the list's preview stops short of it.
+  const verificationCode = useMemo(
+    () => (showVerificationCodes && email ? findVerificationCode(email.subject, verificationCodeBodyText(email)) : null),
+    // A keyword change replaces the email object; only another body needs another look.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showVerificationCodes, email?.id, email?.subject, email?.bodyValues],
+  );
   const dragOutActive = useMemo(() => isDragOutSupported(), []);
   const emailDownloadTemplate = useSettingsStore((state) => state.emailDownloadTemplate) || DEFAULT_EMAIL_TEMPLATE;
   const attachmentDownloadTemplate = useSettingsStore((state) => state.attachmentDownloadTemplate) || DEFAULT_ATTACHMENT_TEMPLATE;
@@ -3920,6 +3931,11 @@ export function EmailViewer({
                   </span>
                 )}
               </div>
+              {verificationCode && (
+                <div className="mt-1.5 flex">
+                  <VerificationCodeChip code={verificationCode} className="py-1 text-sm" />
+                </div>
+              )}
               {sortedTagIds.length > 0 && (
                 <div ref={headerTagsRef} className="mt-1.5 flex flex-wrap items-center gap-1">
                   {sortedTagIds.map((tagId) => (

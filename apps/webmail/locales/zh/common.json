@@ -580,7 +580,12 @@
       "copied": "已复制！",
       "copy_failed": "复制失败"
     },
-    "send_now": "立即发送"
+    "send_now": "立即发送",
+    "verification_code": {
+      "copy": "复制验证码 {code}",
+      "copied": "验证码已复制",
+      "copy_failed": "无法复制验证码"
+    }
   },
   "email_composer": {
     "read_receipt_on": "已请求已读回执（点击以关闭）",
@@ -1350,6 +1355,10 @@
         "label": "显示预览文本",
         "description": "在列表中显示邮件预览",
         "focus_description": "在沉浸模式的单行邮件列表中显示预览文本"
+      },
+      "show_verification_codes": {
+        "label": "显示验证码",
+        "description": "提供登录和确认邮件中的验证码，一键复制（在列表中显示一天，在邮件中始终显示）"
       },
       "disable_threading": {
         "label": "禁用对话分组",

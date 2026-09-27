@@ -580,7 +580,12 @@
       "copied": "Copiat!",
       "copy_failed": "No s'ha pogut copiar"
     },
-    "send_now": "Envia ara"
+    "send_now": "Envia ara",
+    "verification_code": {
+      "copy": "Copia el codi {code}",
+      "copied": "Codi copiat",
+      "copy_failed": "No s'ha pogut copiar el codi"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Confirmació de lectura sol·licitada (feu clic per desactivar-la)",
@@ -1353,6 +1358,10 @@
         "label": "Mostra el text de previsualització",
         "description": "Mostra la previsualització del correu a la llista",
         "focus_description": "Mostra el text de previsualització incrustat dins la llista de missatges d'una línia centrada"
+      },
+      "show_verification_codes": {
+        "label": "Mostra els codis de verificació",
+        "description": "Ofereix el codi dels correus d'inici de sessió i de confirmació per copiar-lo amb un clic, a la llista durant un dia i al missatge"
       },
       "disable_threading": {
         "label": "Desactiva l'agrupació en converses",

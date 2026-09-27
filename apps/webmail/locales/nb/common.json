@@ -580,7 +580,12 @@
       "copied": "Kopiert!",
       "copy_failed": "Kunne ikke kopiere"
     },
-    "send_now": "Send nå"
+    "send_now": "Send nå",
+    "verification_code": {
+      "copy": "Kopier kode {code}",
+      "copied": "Kode kopiert",
+      "copy_failed": "Kunne ikke kopiere koden"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Ber om lesebekreftelse (klikk for å slå av)",
@@ -1353,6 +1358,10 @@
         "label": "Vis forhåndsvisningstekst",
         "description": "Vis forhåndsvisning av e-post i listen",
         "focus_description": "Vis innebygd forhåndsvisningstekst i den fokuserte meldingslisten på én linje"
+      },
+      "show_verification_codes": {
+        "label": "Vis bekreftelseskoder",
+        "description": "Tilby koden fra innloggings- og bekreftelses-e-poster for kopiering med ett klikk, i listen i ett døgn og i meldingen"
       },
       "disable_threading": {
         "label": "Deaktiver samtalegruppering",

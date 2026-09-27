@@ -580,7 +580,12 @@
       "copied": "Copiado!",
       "copy_failed": "Falha ao copiar"
     },
-    "send_now": "Enviar agora"
+    "send_now": "Enviar agora",
+    "verification_code": {
+      "copy": "Copiar código {code}",
+      "copied": "Código copiado",
+      "copy_failed": "Não foi possível copiar o código"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Confirmação de leitura solicitada (clique para desativar)",
@@ -1385,6 +1390,10 @@
         "label": "Mostrar Texto de Visualização",
         "description": "Exibir visualização do e-mail na lista",
         "focus_description": "Exibir texto de pré-visualização em linha dentro da lista de mensagens focada de uma linha"
+      },
+      "show_verification_codes": {
+        "label": "Mostrar códigos de verificação",
+        "description": "Oferecer o código dos e-mails de início de sessão e confirmação para copiar com um clique, na lista durante um dia e na mensagem"
       },
       "attachment_click_action": {
         "label": "Ação ao clicar em anexos",

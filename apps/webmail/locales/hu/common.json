@@ -580,7 +580,12 @@
       "copied": "Másolva!",
       "copy_failed": "A másolás nem sikerült"
     },
-    "send_now": "Küldés most"
+    "send_now": "Küldés most",
+    "verification_code": {
+      "copy": "{code} kód másolása",
+      "copied": "Kód másolva",
+      "copy_failed": "Nem sikerült másolni a kódot"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Olvasási visszaigazolás kérve (kattints a letiltáshoz)",
@@ -1353,6 +1358,10 @@
         "label": "Előnézeti szöveg mutatása",
         "description": "E-mail előnézet megjelenítése a listában",
         "focus_description": "Beágyazott előnézeti szöveg megjelenítése a fókuszált egysoros üzenetlistában"
+      },
+      "show_verification_codes": {
+        "label": "Ellenőrző kódok megjelenítése",
+        "description": "A bejelentkezési és megerősítő e-mailek kódjának felajánlása egy kattintásos másolásra, a listában egy napig és az üzenetben"
       },
       "disable_threading": {
         "label": "Beszélgetéscsoportosítás letiltása",

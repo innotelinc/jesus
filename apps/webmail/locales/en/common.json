@@ -580,7 +580,12 @@
       "copied": "Copied!",
       "copy_failed": "Failed to copy"
     },
-    "send_now": "Send now"
+    "send_now": "Send now",
+    "verification_code": {
+      "copy": "Copy code {code}",
+      "copied": "Code copied",
+      "copy_failed": "Could not copy the code"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Read receipt requested (click to disable)",
@@ -1353,6 +1358,10 @@
         "label": "Show Preview Text",
         "description": "Display email preview in the list",
         "focus_description": "Display inline preview text inside the focused one-line message list"
+      },
+      "show_verification_codes": {
+        "label": "Show Verification Codes",
+        "description": "Offer the code from sign-in and confirmation emails for one-click copying, in the list for a day and in the message"
       },
       "disable_threading": {
         "label": "Disable Conversation Grouping",

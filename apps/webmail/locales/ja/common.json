@@ -580,7 +580,12 @@
       "copied": "コピーしました！",
       "copy_failed": "コピーに失敗しました"
     },
-    "send_now": "今すぐ送信"
+    "send_now": "今すぐ送信",
+    "verification_code": {
+      "copy": "コード {code} をコピー",
+      "copied": "コードをコピーしました",
+      "copy_failed": "コードをコピーできませんでした"
+    }
   },
   "email_composer": {
     "read_receipt_on": "開封確認を要求中（クリックで無効化）",
@@ -1385,6 +1390,10 @@
         "label": "プレビューテキストを表示",
         "description": "リストにメールのプレビューを表示",
         "focus_description": "集中型1行メッセージリスト内にインラインプレビューテキストを表示"
+      },
+      "show_verification_codes": {
+        "label": "確認コードを表示",
+        "description": "サインインや確認のメールに含まれるコードをワンクリックでコピーできるようにします（一覧では1日間、メッセージ内では常に）"
       },
       "attachment_click_action": {
         "label": "添付ファイルクリック時の動作",

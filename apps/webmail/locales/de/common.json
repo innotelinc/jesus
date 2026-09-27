@@ -580,7 +580,12 @@
       "copied": "Kopiert!",
       "copy_failed": "Kopieren fehlgeschlagen"
     },
-    "send_now": "Jetzt senden"
+    "send_now": "Jetzt senden",
+    "verification_code": {
+      "copy": "Code {code} kopieren",
+      "copied": "Code kopiert",
+      "copy_failed": "Code konnte nicht kopiert werden"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Lesebestätigung angefordert (klicken zum Deaktivieren)",
@@ -1350,6 +1355,10 @@
         "label": "Vorschautext anzeigen",
         "description": "E-Mail-Vorschau in der Liste anzeigen",
         "focus_description": "Inline-Vorschautext in der fokussierten einzeiligen Nachrichtenliste anzeigen"
+      },
+      "show_verification_codes": {
+        "label": "Bestätigungscodes anzeigen",
+        "description": "Code aus Anmelde- und Bestätigungs-E-Mails zum Kopieren mit einem Klick anbieten, in der Liste einen Tag lang und in der Nachricht"
       },
       "disable_threading": {
         "label": "Konversationsgruppierung deaktivieren",

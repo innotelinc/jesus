@@ -5,6 +5,7 @@ import { ThreadListItem } from "./thread-list-item";
 import type { Attachment } from "@/lib/jmap/types";
 import type { LoadListAttachments } from "@/lib/list-attachments";
 import { listRowShowsChips } from "./attachment-chips";
+import { listVerificationCode } from "@/lib/verification-code";
 import { EmailContextMenu } from "./email-context-menu";
 import { cn } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
@@ -192,6 +193,7 @@ export function EmailList({
   const tagDisplay = useMeasuredTagDisplay(parentRef);
   const density = useSettingsStore((state) => state.density);
   const showPreview = useSettingsStore((state) => state.showPreview);
+  const showVerificationCodes = useSettingsStore((state) => state.showVerificationCodes);
   const mailLayout = useSettingsStore((state) => state.mailLayout);
   const footerHasMore = hasMore ?? hasMoreEmails;
   const footerIsLoadingMore = isLoadingMoreItems ?? isLoadingMore;
@@ -214,10 +216,11 @@ export function EmailList({
       const emptyPreview = !!latest && !latest.preview?.trim() && !latest.searchSnippet?.preview;
       size += emptyPreview ? 36 - 23 : 36;
     }
-    // The attachment chip row: a 22px chip plus 6px margin.
-    if (latest && onOpenAttachment && listRowShowsChips(latest, loadAttachments)) size += 28;
+    // The chip row (attachments, verification code): a 22px chip plus 6px margin.
+    const hasCode = !!latest && showVerificationCodes && !!listVerificationCode(latest);
+    if (latest && (hasCode || (onOpenAttachment && listRowShowsChips(latest, loadAttachments)))) size += 28;
     return size;
-  }, [density, isFocusedMailLayout, showPreview, threadGroups, onOpenAttachment, loadAttachments]);
+  }, [density, isFocusedMailLayout, showPreview, showVerificationCodes, threadGroups, onOpenAttachment, loadAttachments]);
 
   // Stable per list, so the virtualizer does not rebuild every row's
   // measurement on each scroll render.

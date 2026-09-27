@@ -5,6 +5,7 @@ import { formatDate, formatDateTime, stripInvisibleLeading } from "@/lib/utils";
 import { Email, ThreadGroup } from "@/lib/jmap/types";
 import { cn } from "@/lib/utils";
 import { ListAttachmentChips } from "./attachment-chips";
+import { VerificationCodeChip, useListVerificationCode } from "./verification-code-chip";
 import type { Attachment } from "@/lib/jmap/types";
 import type { LoadListAttachments } from "@/lib/list-attachments";
 import { SelectableAvatar } from "@/components/email/selectable-avatar";
@@ -49,6 +50,20 @@ function UnreadDot({ density, compactAvatar }: { density: string; compactAvatar:
       <span className="sr-only">{t('unread')}</span>
     </div>
   );
+}
+
+/** The chip row under a row's preview: the verification code, then the attachments. */
+function RowChips({ email, loadAttachments, onOpenAttachment }: {
+  email: Email;
+  loadAttachments?: LoadListAttachments;
+  onOpenAttachment?: (attachment: Attachment) => void;
+}) {
+  const code = useListVerificationCode(email);
+  const leading = code ? <VerificationCodeChip code={code} /> : undefined;
+  if (onOpenAttachment) {
+    return <ListAttachmentChips email={email} load={loadAttachments} onOpen={onOpenAttachment} leading={leading} className="mt-1.5" />;
+  }
+  return leading ? <div className="mt-1.5 flex">{leading}</div> : null;
 }
 
 function StatusIcon({ icon: Icon, label, className }: { icon: AppIcon; label: string; className: string }) {
@@ -567,14 +582,7 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
                     {previewSnippet ? <SearchSnippetText snippet={previewSnippet} /> : (trimmedPreview || t('no_preview_available'))}
                   </p>
                 )}
-                {onOpenAttachment && (
-                  <ListAttachmentChips
-                    email={email}
-                    load={loadAttachments}
-                    onOpen={onOpenAttachment}
-                    className="mt-1.5"
-                  />
-                )}
+                <RowChips email={email} loadAttachments={loadAttachments} onOpenAttachment={onOpenAttachment} />
               </>
             )}
           </div>
@@ -1072,14 +1080,11 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                       {previewSnippet ? <SearchSnippetText snippet={previewSnippet} /> : (trimmedPreview || tEmailViewer('no_preview_available'))}
                     </p>
                   )}
-                  {onOpenAttachment && (
-                    <ListAttachmentChips
-                      email={latestEmail}
-                      load={loadAttachments}
-                      onOpen={(a) => onOpenAttachment(latestEmail, a)}
-                      className="mt-1.5"
-                    />
-                  )}
+                  <RowChips
+                    email={latestEmail}
+                    loadAttachments={loadAttachments}
+                    onOpenAttachment={onOpenAttachment ? (a) => onOpenAttachment(latestEmail, a) : undefined}
+                  />
                 </>
               )}
             </div>
