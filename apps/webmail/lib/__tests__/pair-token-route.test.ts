@@ -34,6 +34,20 @@ vi.mock('@/lib/security/url-guard', async (importOriginal) => {
   };
 });
 
+// The provider's token endpoint as configured now; the proxy only trusts a
+// sealed endpoint (secret, unguarded fetch) while it is still this one.
+let configuredEndpoint: string | null = 'https://idp.example.net/realms/acme/protocol/openid-connect/token';
+vi.mock('@/lib/oauth/token-exchange', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/oauth/token-exchange')>();
+  return {
+    ...actual,
+    getTokenEndpoint: async () => {
+      if (!configuredEndpoint) throw new Error('OAuth not configured');
+      return configuredEndpoint;
+    },
+  };
+});
+
 import { encryptPayload } from '@/lib/auth/crypto';
 import { openPhoneRefreshToken, sealPhoneRefreshToken, type SealedRefresh } from '@/lib/auth/pair-bundle';
 import { POST } from '@/app/api/auth/pair/token/route';
@@ -78,6 +92,7 @@ function upstreamParams(mock = upstream) {
 
 beforeEach(() => {
   sessionSecret = 's'.repeat(64);
+  configuredEndpoint = PROVIDER;
   for (const key of Object.keys(config)) delete config[key];
   config.oauthClientSecret = 'webmail-client-secret';
   vi.stubEnv('OAUTH_CLIENT_SECRET', '');
@@ -263,5 +278,25 @@ describe('pair/token renewal', () => {
     const untrusted = { ...SEALED, tokenEndpoint: 'https://custom.example/auth/token', trusted: false };
     await refreshWith(untrusted);
     expect(upstreamParams(publicFetch)).not.toHaveProperty('client_secret');
+  });
+});
+
+describe('pair/token trust at renewal time', () => {
+  it('stops trusting a sealed endpoint the webmail is no longer configured for', async () => {
+    configuredEndpoint = 'https://idp.example.net/realms/other/token';
+    const res = await refreshWith();
+    expect(res.status).toBe(200);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(publicFetch).toHaveBeenCalledOnce();
+    expect(upstreamParams(publicFetch)).not.toHaveProperty('client_secret');
+  });
+
+  it('keeps trusting the structured-login endpoint of a configured JMAP server', async () => {
+    configuredEndpoint = null;
+    config.jmapServerUrl = 'https://mail.example.org';
+    const res = await refreshWith({ ...SEALED, tokenEndpoint: 'https://mail.example.org/auth/token' });
+    expect(res.status).toBe(200);
+    expect(upstream).toHaveBeenCalledOnce();
+    expect(upstreamParams()).toMatchObject({ client_secret: 'webmail-client-secret' });
   });
 });
