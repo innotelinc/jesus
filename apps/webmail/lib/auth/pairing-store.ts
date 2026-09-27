@@ -50,6 +50,10 @@ export type PairingGrant =
       /** An app password minted for the phone, or the account password. */
       password: string;
       credential: 'app-password' | 'account-password';
+      /** The app password's id, to delete it if the phone never picks it up. */
+      appPasswordId?: string;
+      /** The server is admin-configured (else: rebinding-safe fetch). */
+      trusted?: boolean;
     };
 
 export type PairingStatus = 'pending' | 'redeemed' | 'expired' | 'unknown';
@@ -66,6 +70,8 @@ export const CODE_TTL_MS = 2 * 60 * 1000;
 const TOMBSTONE_MS = 10 * 60 * 1000;
 const CODE_BYTES = 32; // 256 bits of entropy
 const ID_BYTES = 16;
+/** Replaced codes kept per grant (for "expired" answers); older ones are forgotten. */
+const SUPERSEDED_KEPT = 3;
 
 interface GrantRecord {
   grant: PairingGrant | null; // null once consumed or expired
@@ -88,6 +94,8 @@ interface Store {
   grants: Map<string, GrantRecord>;
   codes: Map<string, CodeRecord>;
   statusIndex: Map<string, string>; // statusId -> code
+  /** Called with a grant that dies unredeemed (see registerGrantDisposer). */
+  disposer?: (grant: PairingGrant) => void;
 }
 
 const STORE_KEY = '__bulwarkPairingStore';
@@ -100,12 +108,32 @@ function store(): Store {
   return g[STORE_KEY];
 }
 
+/**
+ * Clean-up for grants that die without being redeemed: an app password
+ * minted for the phone must not stay valid on the server. Kept on the
+ * globalThis store, so every route bundle's sweep reaches it.
+ */
+export function registerGrantDisposer(disposer: (grant: PairingGrant) => void): void {
+  store().disposer = disposer;
+}
+
+function wipe(record: GrantRecord): void {
+  const grant = record.grant;
+  record.grant = null;
+  if (!grant) return;
+  try {
+    store().disposer?.(grant);
+  } catch {
+    // Best effort; the grant is gone either way.
+  }
+}
+
 // Wipe secrets of anything past its expiry and forget tombstones past theirs.
 // Called on every operation so memory stays bounded without a timer.
 function sweep(now: number): void {
   const { grants, codes, statusIndex } = store();
   for (const [id, record] of grants) {
-    if (record.expiresAt <= now) record.grant = null;
+    if (record.expiresAt <= now) wipe(record);
     if (record.forgetAt <= now) grants.delete(id);
   }
   for (const [code, record] of codes) {
@@ -140,7 +168,7 @@ export function isGrantAvailable(grantId: string, owner: string, now = Date.now(
 export function discardGrant(grantId: string, now = Date.now()): void {
   sweep(now);
   const record = store().grants.get(grantId);
-  if (record) record.grant = null;
+  if (record) wipe(record);
 }
 
 /**
@@ -156,8 +184,17 @@ export function createPairingCode(
 ): { code: string; statusId: string; expiresIn: number } | null {
   if (!isGrantAvailable(grantId, owner, now)) return null;
   const { codes, statusIndex, grants } = store();
-  for (const record of codes.values()) {
-    if (record.grantId === grantId && record.state === 'pending') record.state = 'superseded';
+  const superseded: string[] = [];
+  for (const [existing, record] of codes) {
+    if (record.grantId !== grantId) continue;
+    if (record.state === 'pending') record.state = 'superseded';
+    if (record.state === 'superseded') superseded.push(existing);
+  }
+  // Each new QR replaces the last; remembering every replaced one would let a
+  // session grow the store without bound within its step-up window.
+  for (const old of superseded.slice(0, Math.max(0, superseded.length - SUPERSEDED_KEPT))) {
+    statusIndex.delete(codes.get(old)!.statusId);
+    codes.delete(old);
   }
   const code = randomBytes(CODE_BYTES).toString('hex');
   const statusId = randomBytes(ID_BYTES).toString('hex');

@@ -103,6 +103,26 @@ export async function createAppPassword(opts: {
   return { id: created.id, secret: created.secret };
 }
 
+/** Delete an app password on the mailbox `authHeader` opens. */
+export async function deleteAppPassword(opts: {
+  serverUrl: string;
+  authHeader: string;
+  id: string;
+  trusted?: boolean;
+}): Promise<void> {
+  const result = await callStalwart(
+    opts.serverUrl,
+    opts.authHeader,
+    ['x:AppPassword/set', { destroy: [opts.id] }, '0'],
+    opts.trusted ?? true,
+  );
+  const destroyed = result.destroyed as string[] | undefined;
+  if (!destroyed?.includes(opts.id)) {
+    const failed = (result.notDestroyed as Record<string, { type?: string; description?: string }> | undefined)?.[opts.id];
+    throw new ImpersonationCredentialError(failed?.description || failed?.type || 'App password was not deleted');
+  }
+}
+
 /**
  * Use the master credential server-side, once, to create an expiring app
  * password on the target mailbox. The browser only ever receives this app
