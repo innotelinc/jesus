@@ -32,19 +32,18 @@ import { useTranslations } from "next-intl";
 /**
  * Unread bullet in the row gutter.
  *
- * It is absolutely positioned so it never widens the row, which means it has
- * to be told where the row's *first* line sits: centring it on the row (the
- * old `top-1/2`) drifts down as soon as the row grows a second and third line,
- * leaving it visibly out of line with the checkbox and the avatar it reads as
- * a column with. Anchor = top padding + half an avatar.
+ * It is absolutely positioned so it never widens the row. With an avatar it
+ * sits in the avatar's wrapper and centres on the avatar: the avatar centres
+ * itself against the row, so a dot anchored on the first line floats above
+ * it once the row grows a chip line. Extra-compact rows have no avatar and
+ * anchor it on their single line instead (top padding + half a line).
  */
-function UnreadDot({ density, compactAvatar }: { density: string; compactAvatar: boolean }) {
+function UnreadDot({ besideAvatar }: { besideAvatar: boolean }) {
   const t = useTranslations('email_viewer');
-  const halfFirstLine = density === 'extra-compact' ? '0.625rem' : compactAvatar ? '1rem' : '1.25rem';
   return (
     <div
-      className="absolute start-0.5 -translate-y-1/2"
-      style={{ top: `calc(var(--density-item-py) + ${halfFirstLine})` }}
+      className={cn('absolute -translate-y-1/2', besideAvatar ? '-start-2.5 top-1/2' : 'start-0.5')}
+      style={besideAvatar ? undefined : { top: 'calc(var(--density-item-py) + 0.625rem)' }}
     >
       <Circle className="w-2 h-2 fill-unread text-unread" />
       <span className="sr-only">{t('unread')}</span>
@@ -392,20 +391,23 @@ const SingleEmailItem = React.forwardRef<HTMLDivElement, SingleEmailItemProps>(
           )}
 
           {density !== 'extra-compact' && (
-            <SelectableAvatar
-              name={sender?.name}
-              email={sender?.email}
-              size={isFocusedMailLayout ? "sm" : "md"}
-              className="flex-shrink-0 self-center shadow-sm"
-              disableImages={hideJunkAvatarImages}
-              checked={isChecked}
-              onToggle={handleCheckboxClick}
-              selectLabel={tBatch('select')}
-            />
+            <div className="relative flex flex-shrink-0 self-center">
+              <SelectableAvatar
+                name={sender?.name}
+                email={sender?.email}
+                size={isFocusedMailLayout ? "sm" : "md"}
+                className="shadow-sm"
+                disableImages={hideJunkAvatarImages}
+                checked={isChecked}
+                onToggle={handleCheckboxClick}
+                selectLabel={tBatch('select')}
+              />
+              {isUnread && <UnreadDot besideAvatar />}
+            </div>
           )}
 
-          {isUnread && (
-            <UnreadDot density={density} compactAvatar={isFocusedMailLayout} />
+          {isUnread && density === 'extra-compact' && (
+            <UnreadDot besideAvatar={false} />
           )}
 
           <div className="flex-1 min-w-0">
@@ -863,6 +865,7 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
                   onToggle={handleThreadCheckboxClick}
                   selectLabel={tBatch('select')}
                 />
+                {hasUnread && <UnreadDot besideAvatar />}
                 {!isMobile && (
                   <button
                     data-expand-toggle
@@ -893,8 +896,8 @@ export const ThreadListItem = React.forwardRef<HTMLDivElement, ThreadListItemPro
               </div>
             )}
 
-            {hasUnread && (
-              <UnreadDot density={density} compactAvatar={isFocusedMailLayout} />
+            {hasUnread && density === 'extra-compact' && (
+              <UnreadDot besideAvatar={false} />
             )}
 
             <div className="flex-1 min-w-0">
