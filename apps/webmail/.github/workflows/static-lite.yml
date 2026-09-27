@@ -10,7 +10,8 @@ name: Build Static Lite
 #   - stalwart: bulwark-lite-stalwart.zip, a Stalwart `Application` bundle.
 #               Its LITE-README points `resourceUrl` at the tagged release.
 #
-# Each zip is published with a `.sha256` next to it.
+# Each zip is published with a `.sha256` next to it and a signed build
+# provenance attestation: `gh attestation verify <zip> --repo bulwarkmail/webmail`.
 #
 # scripts/lite/prepare.mjs deletes the server-only trees in place; that is
 # safe here because the Actions checkout is disposable (CI=true is the guard).
@@ -113,6 +114,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Download zips
         uses: actions/download-artifact@v4
@@ -124,6 +127,11 @@ jobs:
       - name: Checksum zips
         working-directory: zips
         run: for zip in *.zip; do sha256sum "$zip" > "$zip.sha256"; done
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: zips/*.zip
 
       - name: Upload release assets
         env:
