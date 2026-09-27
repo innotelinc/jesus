@@ -1041,26 +1041,30 @@ export function LinkDeviceSection() {
   // callback page sets the pairing re-auth proof and bounces back here, where
   // the resume effect below calls create() again.
   const startReauth = useCallback(async () => {
-    try {
-      sessionStorage.setItem('pair_reauth_resume', '1');
-    } catch { /* sessionStorage unavailable */ }
     const prefix = getPathPrefix(locale);
     const redirectUri = `${window.location.origin}${prefix}/${locale}/auth/callback`;
     // The slot lets the server re-authenticate against this account's own
     // server entry (its IdP), read from the slot's server cookie.
     const slot = useAccountStore.getState().getActiveAccount()?.cookieSlot ?? 0;
-    const res = await apiFetch('/api/auth/sso/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ redirect_uri: redirectUri, locale, purpose: 'reauth', slot }),
-    });
-    if (!res.ok) {
+    try {
+      const res = await apiFetch('/api/auth/sso/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ redirect_uri: redirectUri, locale, purpose: 'reauth', slot }),
+      });
+      if (!res.ok) throw new Error(`sso/start answered ${res.status}`);
+      const { authorize_url, state } = await res.json();
+      if (typeof authorize_url !== 'string' || typeof state !== 'string') throw new Error('sso/start answered no URL');
+      // The callback takes the re-auth route only for this state: a flag left
+      // behind by an abandoned round trip must not capture a later login.
+      try {
+        sessionStorage.setItem('pair_reauth_resume', state);
+      } catch { /* sessionStorage unavailable */ }
+      window.location.href = authorize_url;
+    } catch {
       if (aliveRef.current) setMessage({ text: t('link_device.error'), tone: 'error' });
-      return;
     }
-    const { authorize_url } = await res.json();
-    window.location.href = authorize_url;
   }, [locale, t]);
 
   const create = useCallback(async ({ password: pw, totp: code, fromResume = false }: PairCreateOptions = {}) => {

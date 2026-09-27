@@ -44,9 +44,13 @@ function OAuthCallbackInner() {
     // via prompt=login. Don't create a login session — just confirm the fresh
     // auth (sets the short-lived pairing proof cookie) and bounce back to the
     // Security settings, where the QR generation auto-resumes.
+    // The flag holds the state the step-up started with; one left behind by an
+    // abandoned round trip is dropped here instead of capturing this login.
     let pairReauthResume = false;
     try {
-      pairReauthResume = sessionStorage.getItem("pair_reauth_resume") === "1";
+      const resumeState = sessionStorage.getItem("pair_reauth_resume");
+      pairReauthResume = !!state && resumeState === state;
+      if (resumeState !== null && !pairReauthResume) sessionStorage.removeItem("pair_reauth_resume");
     } catch { /* sessionStorage unavailable */ }
     if (pairReauthResume && state) {
       try { sessionStorage.removeItem("pair_reauth_resume"); } catch { /* ignore */ }

@@ -55,6 +55,7 @@ const ERR = (status: number, error: string): Reply => ({ status, body: { error }
 
 let createReplies: Reply[] = [];
 let pairStatus = 'pending';
+let ssoStartStatus = 200;
 
 function reply({ status, body }: Reply) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -121,6 +122,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   createReplies = [];
   pairStatus = 'pending';
+  ssoStartStatus = 200;
   mocks.lite.value = false;
   mocks.oauthEnabled.value = false;
   mocks.apiFetch.mockImplementation(async (url: string) => {
@@ -129,7 +131,7 @@ beforeEach(() => {
     }
     if (url.startsWith('/api/auth/pair/status')) return reply({ status: 200, body: { status: pairStatus } });
     // A fragment-only URL keeps jsdom from attempting a real navigation.
-    if (url === '/api/auth/sso/start') return reply({ status: 200, body: { authorize_url: '#idp' } });
+    if (url === '/api/auth/sso/start') return reply({ status: ssoStartStatus, body: { authorize_url: '#idp', state: 'sso-state-1' } });
     throw new Error(`unexpected fetch ${url}`);
   });
   sessionStorage.clear();
@@ -152,7 +154,19 @@ describe('LinkDeviceSection step-up', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'link_device.use_sso' }));
     await waitFor(() => expect(ssoBodies()).toHaveLength(1));
     expect(ssoBodies()[0]).toMatchObject({ purpose: 'reauth', slot: 2 });
-    expect(sessionStorage.getItem('pair_reauth_resume')).toBe('1');
+    expect(sessionStorage.getItem('pair_reauth_resume')).toBe('sso-state-1');
+  });
+
+  it('leaves no re-auth flag behind when the IdP round trip cannot start', async () => {
+    mocks.oauthEnabled.value = true;
+    ssoStartStatus = 500;
+    createReplies = [ERR(401, 'reauth_required')];
+    render(<LinkDeviceSection />);
+    clickGenerate();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'link_device.use_sso' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('link_device.error');
+    expect(sessionStorage.getItem('pair_reauth_resume')).toBeNull();
   });
 
   it('shows no single sign-on option without it', async () => {
@@ -224,7 +238,7 @@ describe('LinkDeviceSection step-up', () => {
       locale: 'en',
       redirect_uri: `${origin()}/en/auth/callback`,
     });
-    expect(sessionStorage.getItem('pair_reauth_resume')).toBe('1');
+    expect(sessionStorage.getItem('pair_reauth_resume')).toBe('sso-state-1');
     expect(screen.queryByLabelText('password.current')).toBeNull();
   });
 
