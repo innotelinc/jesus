@@ -580,7 +580,12 @@
       "copied": "Nokopēts!",
       "copy_failed": "Neizdevās nokopēt"
     },
-    "send_now": "Sūtīt tagad"
+    "send_now": "Sūtīt tagad",
+    "verification_code": {
+      "copy": "Kopēt kodu {code}",
+      "copied": "Kods nokopēts",
+      "copy_failed": "Neizdevās nokopēt kodu"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Pieprasīts lasīšanas apstiprinājums (noklikšķiniet, lai atspējotu)",
@@ -1385,6 +1390,10 @@
         "label": "Rādīt priekšskatījuma tekstu",
         "description": "Rādīt vēstules fragmentu sarakstā",
         "focus_description": "Rādīt priekšskatījuma tekstu sarakstā"
+      },
+      "show_verification_codes": {
+        "label": "Rādīt verifikācijas kodus",
+        "description": "Piedāvāt kodu no pieteikšanās un apstiprinājuma e-pastiem kopēšanai ar vienu klikšķi, sarakstā vienu dienu un ziņojumā"
       },
       "attachment_click_action": {
         "label": "Darbība, noklikšķinot uz pielikuma",

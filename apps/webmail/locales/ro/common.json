@@ -580,7 +580,12 @@
       "copied": "Copiat!",
       "copy_failed": "Copierea a eșuat"
     },
-    "send_now": "Trimite acum"
+    "send_now": "Trimite acum",
+    "verification_code": {
+      "copy": "Copiază codul {code}",
+      "copied": "Cod copiat",
+      "copy_failed": "Codul nu a putut fi copiat"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Solicitare confirmare de citire (faceți clic pentru a dezactiva)",
@@ -1353,6 +1358,10 @@
         "label": "Afișați textul de previzualizare",
         "description": "Afișați previzualizarea e-mailurilor în listă",
         "focus_description": "Afișați textul de previzualizare în linie în lista de mesaje cu o singură linie selectată"
+      },
+      "show_verification_codes": {
+        "label": "Afișează codurile de verificare",
+        "description": "Oferă codul din e-mailurile de autentificare și confirmare pentru copiere cu un clic, în listă timp de o zi și în mesaj"
       },
       "disable_threading": {
         "label": "Dezactivați gruparea conversațiilor",

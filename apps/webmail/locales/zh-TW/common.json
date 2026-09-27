@@ -580,7 +580,12 @@
       "copied": "已複製！",
       "copy_failed": "複製失敗"
     },
-    "send_now": "立即傳送"
+    "send_now": "立即傳送",
+    "verification_code": {
+      "copy": "複製驗證碼 {code}",
+      "copied": "驗證碼已複製",
+      "copy_failed": "無法複製驗證碼"
+    }
   },
   "email_composer": {
     "read_receipt_on": "已要求傳送已讀回執（點擊以停用）",
@@ -1353,6 +1358,10 @@
         "label": "顯示預覽文字",
         "description": "在清單中顯示郵件預覽",
         "focus_description": "在專注模式的單列郵件清單中顯示行內預覽文字"
+      },
+      "show_verification_codes": {
+        "label": "顯示驗證碼",
+        "description": "提供登入與確認郵件中的驗證碼，一鍵複製（在清單中顯示一天，在郵件中始終顯示）"
       },
       "disable_threading": {
         "label": "停用對話串群組",

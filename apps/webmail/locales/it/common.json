@@ -580,7 +580,12 @@
       "copied": "Copiato!",
       "copy_failed": "Copia non riuscita"
     },
-    "send_now": "Invia ora"
+    "send_now": "Invia ora",
+    "verification_code": {
+      "copy": "Copia codice {code}",
+      "copied": "Codice copiato",
+      "copy_failed": "Impossibile copiare il codice"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Conferma di lettura richiesta (clicca per disattivare)",
@@ -1385,6 +1390,10 @@
         "label": "Mostra anteprima testo",
         "description": "Visualizza l'anteprima del messaggio nell'elenco",
         "focus_description": "Visualizza il testo di anteprima in linea nella lista di messaggi focalizzata a riga singola"
+      },
+      "show_verification_codes": {
+        "label": "Mostra codici di verifica",
+        "description": "Offri il codice delle email di accesso e conferma da copiare con un clic, nell'elenco per un giorno e nel messaggio"
       },
       "attachment_click_action": {
         "label": "Azione al clic sugli allegati",

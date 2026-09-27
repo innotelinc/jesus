@@ -580,7 +580,12 @@
       "copied": "Kopyalandı!",
       "copy_failed": "Kopyalanamadı"
     },
-    "send_now": "Şimdi gönder"
+    "send_now": "Şimdi gönder",
+    "verification_code": {
+      "copy": "{code} kodunu kopyala",
+      "copied": "Kod kopyalandı",
+      "copy_failed": "Kod kopyalanamadı"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Okundu bilgisi istendi (devre dışı bırakmak için tıklayın)",
@@ -1350,6 +1355,10 @@
         "label": "Önizleme Metnini Göster",
         "description": "Listede e-posta önizlemesini görüntüle",
         "focus_description": "Odaklı tek satırlı ileti listesinde satır içi önizleme metnini görüntüle"
+      },
+      "show_verification_codes": {
+        "label": "Doğrulama kodlarını göster",
+        "description": "Giriş ve onay e-postalarındaki kodu tek tıkla kopyalamak için sun; listede bir gün boyunca ve iletide"
       },
       "disable_threading": {
         "label": "Konuşma Gruplamamayı Devre Dışı Bırak",

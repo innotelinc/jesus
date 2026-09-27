@@ -580,7 +580,12 @@
       "copied": "Zkopírováno!",
       "copy_failed": "Kopírování se nezdařilo"
     },
-    "send_now": "Odeslat nyní"
+    "send_now": "Odeslat nyní",
+    "verification_code": {
+      "copy": "Kopírovat kód {code}",
+      "copied": "Kód zkopírován",
+      "copy_failed": "Kód se nepodařilo zkopírovat"
+    }
   },
   "email_composer": {
     "read_receipt_on": "Vyžádáno potvrzení o přečtení (kliknutím vypnete)",
@@ -1350,6 +1355,10 @@
         "label": "Zobrazit náhledový text",
         "description": "Zobrazovat náhledy e-mailů v seznamu",
         "focus_description": "Zobrazovat vložený náhledový text v jednořádkovém soustředěném seznamu"
+      },
+      "show_verification_codes": {
+        "label": "Zobrazovat ověřovací kódy",
+        "description": "Nabízet kód z přihlašovacích a potvrzovacích e-mailů ke zkopírování jedním kliknutím, v seznamu po dobu jednoho dne a ve zprávě"
       },
       "disable_threading": {
         "label": "Zakázat seskupování konverzací",
