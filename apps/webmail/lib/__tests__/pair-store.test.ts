@@ -8,6 +8,7 @@ import {
   getPairingStatus,
   isGrantAvailable,
   redeemPairingCode,
+  registerGrantDisposer,
   resetPairingStoreForTests,
   stashGrant,
   type PairingGrant,
@@ -241,5 +242,48 @@ describe('pairing store instance', () => {
     // The first instance sees the redemption made through the second.
     expect(first.getPairingStatus(pairing.statusId, T0 + 3)).toBe('redeemed');
     expect(first.redeemPairingCode(pairing.code, T0 + 3)).toEqual({ ok: false, reason: 'used' });
+  });
+});
+
+describe('pairing store after the security review', () => {
+  const APP_GRANT: PairingGrant = {
+    flow: 'password',
+    serverUrl: 'https://mail.example.org',
+    username: 'alice@example.org',
+    password: 'app_secret',
+    credential: 'app-password',
+    appPasswordId: 'ap-1',
+  };
+
+  it('hands a grant that dies unredeemed to the disposer, once', () => {
+    const disposed: PairingGrant[] = [];
+    registerGrantDisposer((g) => disposed.push(g));
+    const discarded = stashGrant(APP_GRANT, OWNER, T0);
+    discardGrant(discarded, T0 + 1);
+    discardGrant(discarded, T0 + 2);
+    const expired = stashGrant(APP_GRANT, OWNER, T0);
+    isGrantAvailable(expired, OWNER, T0 + GRANT_TTL_MS + 1); // sweeps
+    expect(disposed).toEqual([APP_GRANT, APP_GRANT]);
+  });
+
+  it('does not dispose of a redeemed grant', () => {
+    const disposed: PairingGrant[] = [];
+    registerGrantDisposer((g) => disposed.push(g));
+    const id = stashGrant(APP_GRANT, OWNER, T0);
+    expect(redeemPairingCode(newCode(id, T0).code, T0 + 1).ok).toBe(true);
+    discardGrant(id, T0 + 2);
+    isGrantAvailable(id, OWNER, T0 + GRANT_TTL_MS + 1);
+    expect(disposed).toEqual([]);
+  });
+
+  it('keeps only the last few replaced codes of a grant', () => {
+    const id = stashGrant(GRANT, OWNER, T0);
+    const all = Array.from({ length: 50 }, (_, i) => newCode(id, T0 + i));
+    expect(internals().codes.size).toBe(4);
+    expect(internals().statusIndex.size).toBe(4);
+    expect(getPairingStatus(all[49].statusId, T0 + 60)).toBe('pending');
+    expect(getPairingStatus(all[48].statusId, T0 + 60)).toBe('expired');
+    expect(getPairingStatus(all[0].statusId, T0 + 60)).toBe('unknown');
+    expect(redeemPairingCode(all[0].code, T0 + 60)).toEqual({ ok: false, reason: 'invalid' });
   });
 });

@@ -784,7 +784,47 @@ describe('pair/create never exposes the typed password', () => {
   });
 });
 
-describe('pair/create step-up limit', () => {
+describe('pair/create after the security review', () => {
+  it('deletes an app password whose grant dies unredeemed, with its own credential', async () => {
+    const base = mailServer({ apiAuth: noStructuredLogin, stalwart: true });
+    const destroyed: unknown[] = [];
+    handler = async (call) => {
+      if (call.headers.authorization === basicFor(APP_SECRET)) {
+        if (call.url === `${SERVER}/jmap/` && call.method === 'POST') {
+          destroyed.push((JSON.parse(call.body) as { methodCalls: [string, { destroy?: unknown }, string][] }).methodCalls[0][1].destroy);
+          return json({ methodResponses: [['x:AppPassword/set', { destroyed: ['ap-1'] }, '0']] });
+        }
+        return base({ ...call, headers: { ...call.headers, authorization: basicFor(PASSWORD) } });
+      }
+      return base(call);
+    };
+    signIn(0);
+    expect((await create({ password: PASSWORD })).status).toBe(200);
+    // A new step-up replaces the grant the phone never picked up.
+    expect((await create({ password: PASSWORD })).status).toBe(200);
+    await vi.waitFor(() => expect(destroyed).toEqual([['ap-1']]));
+  });
+
+  it('does not delete the app password a phone redeemed', async () => {
+    handler = mailServer({ apiAuth: noStructuredLogin, stalwart: true });
+    signIn(0);
+    const res = await create({ password: PASSWORD });
+    expect((await redeem(res.body.pairing_code)).status).toBe(200);
+    resetPairingStoreForTests();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(calls.filter((c) => c.headers.authorization === basicFor(APP_SECRET))).toEqual([]);
+  });
+
+  it('fails closed when the session cannot be read after the credential check', async () => {
+    const base = mailServer({ apiAuth: noStructuredLogin, stalwart: false });
+    handler = async (call) => (call.url === `${SERVER}/jmap/session` || (call.url === `${SERVER}/.well-known/jmap` && calls.filter((c) => c.url.endsWith('/.well-known/jmap')).length > 1)
+      ? new Response('boom', { status: 500 })
+      : base(call));
+    signIn(0);
+    const res = await create({ password: PASSWORD });
+    expect(res).toMatchObject({ status: 502, body: { error: 'pairing_unavailable' } });
+  });
+
   it('counts failures per mail account, whichever cookie slot sends them', async () => {
     handler = mailServer();
     for (let slot = 0; slot < 6; slot++) signIn(slot);

@@ -1,10 +1,10 @@
 import { logger } from '@/lib/logger';
 import { stalwartPasswordLogin, type StalwartPasswordLoginResult } from '@/lib/auth/stalwart-password-login';
-import type { PairingGrant } from '@/lib/auth/pairing-store';
+import { registerGrantDisposer, type PairingGrant } from '@/lib/auth/pairing-store';
 import { DEFAULT_CLIENT_ID, getClientSecret, getRequiredConfig } from '@/lib/oauth/token-exchange';
 import { JmapAuthVerificationError, verifyJmapIdentity } from '@/lib/auth/verify-jmap-auth';
 import { fetchJmapSession } from '@/lib/stalwart/jmap-api';
-import { createAppPassword } from '@/lib/impersonation/app-password';
+import { createAppPassword, deleteAppPassword } from '@/lib/impersonation/app-password';
 
 // The password step-up for "Link mobile app": the desktop user types their
 // current password (and TOTP code), and the server uses it once to mint the
@@ -20,6 +20,27 @@ import { createAppPassword } from '@/lib/impersonation/app-password';
 //      can see and delete ("Bulwark mobile (paired <date>)").
 //   3. Neither (not Stalwart): the verified account password, which is what
 //      the login page's mobile handoff has always passed to the app.
+
+/**
+ * An app password minted for a phone that never redeemed its code would stay
+ * valid (no expiry, full permissions, no TOTP) and use up one of the
+ * account's few app-password slots. Delete it, with its own credential,
+ * when its grant dies unredeemed.
+ */
+export function disposeUnusedGrant(grant: PairingGrant): void {
+  if (grant.flow !== 'password' || grant.credential !== 'app-password' || !grant.appPasswordId) return;
+  void deleteAppPassword({
+    serverUrl: grant.serverUrl,
+    authHeader: `Basic ${Buffer.from(`${grant.username}:${grant.password}`).toString('base64')}`,
+    id: grant.appPasswordId,
+    trusted: grant.trusted ?? true,
+  }).catch((error) => {
+    logger.warn('Pair: unused app password was not deleted', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  });
+}
+registerGrantDisposer(disposeUnusedGrant);
 
 /** The client id and redirect the app uses for its own sign-in (src/lib/totp-login.ts). */
 export const MOBILE_CLIENT_ID = DEFAULT_CLIENT_ID;
@@ -168,7 +189,14 @@ export async function mintGrantWithPassword(opts: PasswordGrantOptions): Promise
   }
 
   const session = await fetchJmapSession(opts.serverUrl, authHeader, { trusted: opts.trusted }).catch(() => null);
-  const isStalwart = !!session && Object.values(
+  if (!session) {
+    // Without the session there is no telling a Stalwart account (which must
+    // get an app password) from another server: never guess towards handing
+    // over the real password.
+    logger.warn('Pair step-up: could not read the JMAP session after the credential check');
+    return { ok: false, error: 'pairing_unavailable' };
+  }
+  const isStalwart = Object.values(
     (session as { accounts?: Record<string, { accountCapabilities?: Record<string, unknown> }> }).accounts ?? {},
   ).some((account) => !!account?.accountCapabilities?.['urn:stalwart:jmap']);
 
@@ -188,6 +216,8 @@ export async function mintGrantWithPassword(opts: PasswordGrantOptions): Promise
           username: opts.username,
           password: appPassword.secret,
           credential: 'app-password',
+          appPasswordId: appPassword.id,
+          trusted: opts.trusted,
         },
       };
     } catch (error) {
