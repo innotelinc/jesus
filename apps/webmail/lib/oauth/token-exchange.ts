@@ -121,10 +121,19 @@ export function getRequiredConfig(serverId?: string | null, options?: ClientConf
   return { clientId, serverUrl, discoveryUrl, serverId: entry?.id };
 }
 
-function getClientSecret(serverId?: string | null): string {
+export function getClientSecret(serverId?: string | null): string {
   const entry = getServerEntry(serverId);
   if (entry?.oauth?.clientSecret) return entry.oauth.clientSecret;
   return getGlobalClientSecret();
+}
+
+/**
+ * Whether the server's client is confidential. Tokens minted for it can only
+ * be refreshed with the secret, which never leaves this server - so a paired
+ * phone renews them through the webmail (see lib/auth/pair-bundle.ts).
+ */
+export function hasClientSecret(serverId?: string | null): boolean {
+  return getClientSecret(serverId) !== '';
 }
 
 export async function getTokenEndpoint(serverId?: string | null, options?: ClientConfigOptions): Promise<string> {

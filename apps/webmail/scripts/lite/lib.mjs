@@ -94,6 +94,7 @@ export const LITE_API_STRING_ALLOWLIST = [
   "/api/auth/sso/complete",
   "/api/auth/reauth/sso/complete",
   "/api/auth/pair/create",
+  "/api/auth/pair/status",
   "/api/auth/totp-token-exchange",
   "/api/auth/session",
   "/api/auth/verify",
