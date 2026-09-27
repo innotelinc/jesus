@@ -16,6 +16,8 @@ npm run dev
 
 Before you open a pull request, run `npm run typecheck && npm run lint && npx vitest run`. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` and so on).
 
+You can use AI tools for your contributions. The guide's [AI-assisted contributions](https://bulwarkmail.org/docs/development/contributing#ai-assisted-contributions) section explains what we expect.
+
 - Questions: ask on [Discord](https://discord.gg/tYCujymGrT).
 - Documentation fixes: the docs are Markdown files in the [website repository](https://github.com/bulwarkmail/website/tree/main/docs).
 - Security vulnerabilities: report them privately to [dev@bulwarkmail.org](mailto:dev@bulwarkmail.org) or through a [security advisory](https://github.com/bulwarkmail/webmail/security/advisories/new), never in a public issue.
