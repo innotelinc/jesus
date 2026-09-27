@@ -1745,7 +1745,8 @@
         "success_title": "Auf Ihrem Smartphone angemeldet",
         "success_body": "Sie können diese Seite schließen. Um ein weiteres Gerät zu verknüpfen, lassen Sie einen neuen Code anzeigen.",
         "link_another": "Weiteres Gerät verknüpfen",
-        "use_sso": "Stattdessen Single Sign-On verwenden"
+        "use_sso": "Stattdessen Single Sign-On verwenden",
+        "error_insecure_server": "Die App verbindet sich nur über https mit Mailservern, und dieser verwendet http."
       },
       "public_keys": {
         "name_label": "Name des öffentlichen Schlüssels",

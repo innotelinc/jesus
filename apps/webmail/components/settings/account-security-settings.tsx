@@ -1161,6 +1161,9 @@ export function LinkDeviceSection() {
           case 'pairing_unavailable':
             backToIdle(t('link_device.error_pairing_unavailable'));
             return;
+          case 'insecure_server':
+            backToIdle(t('link_device.error_insecure_server'));
+            return;
           case 'too_many_attempts':
             setTotp('');
             fail(t('link_device.error_too_many_attempts'));

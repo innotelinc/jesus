@@ -1745,7 +1745,8 @@
         "success_title": "Pierakstīšanās tālrunī izdevās",
         "success_body": "Varat aizvērt šo lapu. Lai saistītu citu ierīci, parādiet jaunu kodu.",
         "link_another": "Saistīt citu ierīci",
-        "use_sso": "Tā vietā izmantot vienoto pieteikšanos"
+        "use_sso": "Tā vietā izmantot vienoto pieteikšanos",
+        "error_insecure_server": "Mobilā lietotne ar pasta serveriem savienojas tikai caur https, bet šis izmanto http."
       },
       "public_keys": {
         "name_label": "Publiskās atslēgas nosaukums",

@@ -1752,7 +1752,8 @@
         "success_title": "Sessió iniciada al telèfon",
         "success_body": "Podeu tancar aquesta pàgina. Per enllaçar un altre dispositiu, mostreu un codi nou.",
         "link_another": "Enllaça un altre dispositiu",
-        "use_sso": "Utilitza l'inici de sessió únic"
+        "use_sso": "Utilitza l'inici de sessió únic",
+        "error_insecure_server": "L'aplicació mòbil només es connecta a servidors de correu per https, i aquest fa servir http."
       },
       "public_keys": {
         "name_label": "Nom de la clau pública",

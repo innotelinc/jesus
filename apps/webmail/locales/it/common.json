@@ -1745,7 +1745,8 @@
         "success_title": "Accesso effettuato sul telefono",
         "success_body": "Puoi chiudere questa pagina. Per collegare un altro dispositivo, mostra un nuovo codice.",
         "link_another": "Collega un altro dispositivo",
-        "use_sso": "Usa invece l'accesso unico (SSO)"
+        "use_sso": "Usa invece l'accesso unico (SSO)",
+        "error_insecure_server": "L'app mobile si collega ai server di posta solo tramite https, e questo usa http."
       },
       "public_keys": {
         "name_label": "Nome della chiave pubblica",

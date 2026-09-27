@@ -1759,7 +1759,8 @@
         "success_title": "Pålogget på telefonen",
         "success_body": "Du kan lukke denne siden. Vis en ny kode for å koble til en annen enhet.",
         "link_another": "Koble til en annen enhet",
-        "use_sso": "Bruk enkel pålogging i stedet"
+        "use_sso": "Bruk enkel pålogging i stedet",
+        "error_insecure_server": "Mobilappen kobler bare til e-postservere over https, og denne bruker http."
       }
     },
     "identities": {

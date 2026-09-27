@@ -1745,7 +1745,8 @@
         "success_title": "Connecté sur votre téléphone",
         "success_body": "Vous pouvez fermer cette page. Pour associer un autre appareil, affichez un nouveau code.",
         "link_another": "Associer un autre appareil",
-        "use_sso": "Utiliser plutôt l'authentification unique"
+        "use_sso": "Utiliser plutôt l'authentification unique",
+        "error_insecure_server": "L'application mobile ne se connecte aux serveurs de messagerie qu'en https, et celui-ci utilise http."
       },
       "public_keys": {
         "name_label": "Nom de la clé publique",

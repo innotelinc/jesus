@@ -60,6 +60,14 @@ function isLoopbackHttp(url: string): boolean {
 }
 
 /**
+ * Whether the app will connect to this JMAP server at all: https, or loopback
+ * http for development (the app's own rule for a paired `server_url`).
+ */
+export function appAcceptsServerUrl(serverUrl: string): boolean {
+  return serverUrl.toLowerCase().startsWith('https://') || isLoopbackHttp(serverUrl);
+}
+
+/**
  * Mirrors the app's `isAcceptableTokenEndpoint` (src/lib/oauth.ts): https (or
  * loopback http for development), on the host family of the JMAP server or
  * the webmail.

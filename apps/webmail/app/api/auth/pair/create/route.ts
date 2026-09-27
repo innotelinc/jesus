@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { createPairingCode, isGrantAvailable, stashGrant } from '@/lib/auth/pairing-store';
 import { pairingOwner, readPairReauthFromStore, setPairReauthInStore } from '@/lib/auth/pair-reauth';
 import { mintGrantWithPassword } from '@/lib/auth/pair-grant';
+import { appAcceptsServerUrl } from '@/lib/auth/pair-bundle';
 import { beginPairStepUp, pairAttemptKey, settlePairStepUp } from '@/lib/auth/pair-attempts';
 import { hasSessionSecret } from '@/lib/auth/session-secret';
 import { readStalwartAuthContextFromStore } from '@/lib/stalwart/auth-context';
@@ -111,6 +112,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'not_signed_in' }, { status: 401 });
     }
     const owner = pairingOwner(slot, context.username);
+
+    // The app refuses a mail server over plain http. Say so here, before a
+    // password attempt is spent and before the desktop would report a phone
+    // that could never connect as signed in.
+    if (!appAcceptsServerUrl(context.serverUrl)) {
+      return NextResponse.json({ error: 'insecure_server' }, { status: 400 });
+    }
 
     let grantId: string;
     const password = typeof body?.password === 'string' ? body.password : '';

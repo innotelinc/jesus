@@ -1745,7 +1745,8 @@
         "success_title": "已在手机上登录",
         "success_body": "你可以关闭此页面。如需关联其他设备，请显示新的二维码。",
         "link_another": "关联其他设备",
-        "use_sso": "改用单点登录"
+        "use_sso": "改用单点登录",
+        "error_insecure_server": "移动应用只通过 https 连接邮件服务器，而此服务器使用的是 http。"
       },
       "public_keys": {
         "name_label": "公钥名称",

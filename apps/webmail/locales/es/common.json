@@ -1745,7 +1745,8 @@
         "success_title": "Sesión iniciada en su teléfono",
         "success_body": "Puede cerrar esta página. Para vincular otro dispositivo, muestre un código nuevo.",
         "link_another": "Vincular otro dispositivo",
-        "use_sso": "Usar el inicio de sesión único"
+        "use_sso": "Usar el inicio de sesión único",
+        "error_insecure_server": "La aplicación móvil solo se conecta a servidores de correo por https, y este usa http."
       },
       "public_keys": {
         "name_label": "Nombre de la clave pública",

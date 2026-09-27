@@ -1745,7 +1745,8 @@
         "success_title": "Ingelogd op uw telefoon",
         "success_body": "U kunt deze pagina sluiten. Toon een nieuwe code om nog een apparaat te koppelen.",
         "link_another": "Nog een apparaat koppelen",
-        "use_sso": "In plaats daarvan eenmalige aanmelding gebruiken"
+        "use_sso": "In plaats daarvan eenmalige aanmelding gebruiken",
+        "error_insecure_server": "De mobiele app maakt alleen via https verbinding met mailservers, en deze gebruikt http."
       },
       "public_keys": {
         "name_label": "Naam van openbare sleutel",
