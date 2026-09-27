@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
-import { openPhoneRefreshToken, sealPhoneRefreshToken } from '@/lib/auth/pair-bundle';
-import { getClientSecret } from '@/lib/oauth/token-exchange';
+import { openPhoneRefreshToken, sealPhoneRefreshToken, type SealedRefresh } from '@/lib/auth/pair-bundle';
+import { DEFAULT_CLIENT_ID, getClientSecret, getTokenEndpoint } from '@/lib/oauth/token-exchange';
+import { isTrustedJmapServerUrl } from '@/lib/stalwart/server-fetch';
 import { fetchPublicUrl } from '@/lib/security/url-guard';
 import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 
@@ -17,6 +18,24 @@ import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 
 const UPSTREAM_TIMEOUT_MS = 10_000;
 const NO_STORE = { 'Cache-Control': 'no-store', Pragma: 'no-cache' };
+
+/**
+ * Whether the sealed endpoint is still one this webmail is configured for:
+ * the discovered token endpoint of its server entry (SSO grants), or the
+ * structured-login endpoint of an admin-configured JMAP server (password
+ * grants).
+ */
+async function stillTrusted(sealed: SealedRefresh): Promise<boolean> {
+  try {
+    if (await getTokenEndpoint(sealed.serverId, { fallbackClientId: DEFAULT_CLIENT_ID }) === sealed.tokenEndpoint) {
+      return true;
+    }
+  } catch {
+    // No OAuth configured for it (any more): try the JMAP server below.
+  }
+  const base = sealed.tokenEndpoint.replace(/\/auth\/token$/, '');
+  return base !== sealed.tokenEndpoint && await isTrustedJmapServerUrl(base);
+}
 
 function oauthError(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers: NO_STORE });
@@ -45,8 +64,11 @@ export async function POST(request: NextRequest) {
     refresh_token: sealed.refreshToken,
     client_id: sealed.clientId,
   });
-  // The secret is the admin's, for the admin's servers only.
-  const secret = sealed.trusted ? getClientSecret(sealed.serverId) : '';
+  // The secret is the admin's, for the admin's servers only - as configured
+  // now, not when the token was sealed: a server removed or moved since then
+  // gets neither the secret nor the unguarded fetch.
+  const trusted = sealed.trusted && await stillTrusted(sealed);
+  const secret = trusted ? getClientSecret(sealed.serverId) : '';
   if (secret) upstreamParams.set('client_secret', secret);
 
   let upstream: Response;
@@ -60,7 +82,7 @@ export async function POST(request: NextRequest) {
     // The body carries the refresh token and the client secret: never follow
     // a redirect with it. A user-chosen server goes through the
     // rebinding-safe fetch (which never follows redirects either).
-    upstream = sealed.trusted
+    upstream = trusted
       ? await fetch(sealed.tokenEndpoint, { ...init, redirect: 'error' })
       : (await fetchPublicUrl(sealed.tokenEndpoint, init)) as unknown as Response;
   } catch (error) {
