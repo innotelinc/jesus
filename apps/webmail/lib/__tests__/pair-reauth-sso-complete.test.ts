@@ -314,3 +314,27 @@ describe('reauth/sso/complete', () => {
     expect(redeemPairingCode(firstCode.code)).toEqual({ ok: false, reason: 'expired' });
   });
 });
+
+describe('reauth/sso/complete freshness', () => {
+  const idToken = (claims: Record<string, unknown>) =>
+    `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+
+  it('refuses a login the provider did not make fresh (old auth_time)', async () => {
+    signIn(0);
+    pending({ created_at: Date.now() });
+    exchangeCodeForTokens.mockResolvedValue({ ...FRESH, id_token: idToken({ auth_time: Math.floor(Date.now() / 1000) - 3600 }) });
+    const res = await complete();
+    expect(res).toEqual({ status: 401, body: { error: 'reauth_not_fresh' } });
+    expect(readPairReauthFromStore(cookieStore as never)).toBeNull();
+  });
+
+  it('accepts a fresh auth_time, and an ID token without one', async () => {
+    signIn(0);
+    pending({ created_at: Date.now() });
+    exchangeCodeForTokens.mockResolvedValue({ ...FRESH, id_token: idToken({ auth_time: Math.floor(Date.now() / 1000) }) });
+    expect((await complete()).status).toBe(200);
+    pending({ created_at: Date.now() });
+    exchangeCodeForTokens.mockResolvedValue({ ...FRESH, id_token: idToken({ sub: 'x' }) });
+    expect((await complete()).status).toBe(200);
+  });
+});
