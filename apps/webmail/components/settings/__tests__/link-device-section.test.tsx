@@ -453,6 +453,20 @@ describe('AccountSecuritySettings link-device visibility', () => {
     expect(screen.queryByText('email_client.title')).toBeNull();
   });
 
+  it('mounts the linker only once the server probe has a verdict', () => {
+    // A layout guessed before the verdict remounted the linker afterwards and
+    // threw away a QR that was already showing.
+    useAuthStore.setState({ isAuthenticated: true, authMode: 'oauth', client: null });
+    useAccountSecurityStore.setState({ isStalwart: null, isProbing: false });
+    const { rerender } = render(<AccountSecuritySettings />);
+    expect(screen.queryByText('link_device.title')).toBeNull();
+    expect(screen.getByText('detecting')).toBeInTheDocument();
+
+    act(() => useAccountSecurityStore.setState({ isStalwart: false }));
+    rerender(<AccountSecuritySettings />);
+    expect(screen.getByText('link_device.title')).toBeInTheDocument();
+  });
+
   it('hides the linker in Bulwark Lite', () => {
     mocks.lite.value = true;
     useAccountSecurityStore.setState({ isStalwart: false, isProbing: false });
