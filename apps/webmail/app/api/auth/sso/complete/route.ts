@@ -63,6 +63,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SSO session expired. Please try again.' }, { status: 400 });
     }
 
+    // A step-up for device pairing completes at /api/auth/reauth/sso/complete
+    // only; here it would sign this browser in as whoever answered the prompt.
+    if (pending.purpose === 'reauth') {
+      logger.warn('SSO complete: refused a pairing re-auth session');
+      cookieStore.delete(SSO_PENDING_COOKIE);
+      return NextResponse.json({ error: 'Not a login session' }, { status: 400 });
+    }
+
     const codeVerifier = pending.code_verifier as string;
     const redirectUri = pending.redirect_uri as string;
     const pendingServerId = typeof pending.server_id === 'string' ? pending.server_id : null;
