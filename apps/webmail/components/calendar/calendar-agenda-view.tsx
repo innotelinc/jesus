@@ -224,10 +224,7 @@ export function CalendarAgendaView({
                   onMouseEnter={(e) => onHoverEvent?.(ev, e.currentTarget.getBoundingClientRect())}
                   onMouseLeave={() => onHoverLeave?.()}
                   onContextMenu={onContextMenuEvent ? (e) => onContextMenuEvent(e, ev) : undefined}
-                  className={cn(
-                    "w-full flex items-start px-4 hover:bg-muted/50 transition-colors text-start",
-                    isInactive && "opacity-60"
-                  )}
+                  className="w-full flex items-start px-4 hover:bg-muted/50 transition-colors text-start"
                   style={{ gap: 'var(--density-item-gap)', paddingBlock: 'var(--density-item-py)' }}
                 >
                   <div className="flex flex-col items-center pt-0.5 min-w-[60px]">
@@ -243,13 +240,16 @@ export function CalendarAgendaView({
                     )}
                   </div>
 
-                  <div
-                    className="w-1 self-stretch rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
+                  {/* Calendar colour as a dot on the title line; hollow when
+                      declined or cancelled (repos/branding/APP.md). */}
+                  <span
+                    className="w-[9px] h-[9px] mt-[5.5px] rounded-full flex-shrink-0"
+                    style={isInactive ? { boxShadow: `inset 0 0 0 1.5px ${color}` } : { backgroundColor: color }}
+                    aria-hidden="true"
                   />
 
                   <div className="flex-1 min-w-0">
-                    <div className={cn("text-sm font-medium truncate", isInactive && "line-through")}>
+                    <div className={cn("text-sm font-medium truncate", isInactive && "line-through text-muted-foreground")}>
                       {ev.title || t("events.no_title")}
                     </div>
                     {locationName && (

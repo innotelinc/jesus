@@ -182,7 +182,7 @@ describe('CalendarAgendaView infinite scroll', () => {
       currentUserEmails: ['me@example.com'],
     });
     expect(screen.getByText('Event declined')).toHaveClass('line-through');
-    expect(screen.getByText('Event declined').closest('button')).toHaveClass('opacity-60');
+    expect(screen.getByText('Event declined')).toHaveClass('text-muted-foreground');
     expect(screen.getByText('Event accepted')).not.toHaveClass('line-through');
   });
 });
