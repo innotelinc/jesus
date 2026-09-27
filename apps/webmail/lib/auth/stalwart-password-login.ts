@@ -166,7 +166,9 @@ export async function stalwartPasswordLogin(
     code_verifier: verifier,
   });
   // Confidential clients still send their secret; harmless for public clients.
-  if (opts.clientSecret) tokenParams.set('client_secret', opts.clientSecret);
+  // The secret is the admin's, for the admin's server: a user-chosen server
+  // (allowCustomJmapEndpoint) never receives it.
+  if (opts.clientSecret && opts.trusted) tokenParams.set('client_secret', opts.clientSecret);
 
   let tokens: { access_token?: string; expires_in?: number; refresh_token?: string };
   try {
