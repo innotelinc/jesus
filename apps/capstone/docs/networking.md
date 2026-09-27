@@ -95,6 +95,10 @@ Notes:
 These bypass NPM and go straight from the router to the host. The critical
 ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
 
+The router itself — its DNS servers, the full forwarding table and the LAN
+reservations — is documented in `1-primary/cerulean/docs/router.md`. This
+section is the telephony half of that table; that file is the whole picture.
+
 | Port | Proto | Purpose |
 |---|---|---|
 | `5060` | UDP | SIP signalling |
