@@ -1745,7 +1745,8 @@
         "success_title": "휴대폰에서 로그인되었습니다",
         "success_body": "이 페이지를 닫아도 됩니다. 다른 기기를 연결하려면 새 코드를 표시하세요.",
         "link_another": "다른 기기 연결",
-        "use_sso": "대신 SSO(통합 로그인) 사용"
+        "use_sso": "대신 SSO(통합 로그인) 사용",
+        "error_insecure_server": "모바일 앱은 https로만 메일 서버에 연결하는데, 이 서버는 http를 사용합니다."
       },
       "public_keys": {
         "name_label": "공개 키 이름",

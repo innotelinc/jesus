@@ -1745,7 +1745,8 @@
         "success_title": "Zalogowano na telefonie",
         "success_body": "Możesz zamknąć tę stronę. Aby połączyć kolejne urządzenie, pokaż nowy kod.",
         "link_another": "Połącz kolejne urządzenie",
-        "use_sso": "Zamiast tego użyj logowania jednokrotnego"
+        "use_sso": "Zamiast tego użyj logowania jednokrotnego",
+        "error_insecure_server": "Aplikacja mobilna łączy się z serwerami poczty tylko przez https, a ten używa http."
       },
       "public_keys": {
         "name_label": "Nazwa klucza publicznego",

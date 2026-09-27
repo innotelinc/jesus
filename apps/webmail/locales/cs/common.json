@@ -1745,7 +1745,8 @@
         "success_title": "Přihlášeno v telefonu",
         "success_body": "Tuto stránku můžete zavřít. Chcete-li propojit další zařízení, zobrazte nový kód.",
         "link_another": "Propojit další zařízení",
-        "use_sso": "Použít místo toho jednotné přihlášení"
+        "use_sso": "Použít místo toho jednotné přihlášení",
+        "error_insecure_server": "Mobilní aplikace se k poštovním serverům připojuje jen přes https a tento server používá http."
       },
       "public_keys": {
         "name_label": "Název veřejného klíče",

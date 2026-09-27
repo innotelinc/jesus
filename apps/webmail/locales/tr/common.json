@@ -1745,7 +1745,8 @@
         "success_title": "Telefonunuzda oturum açıldı",
         "success_body": "Bu sayfayı kapatabilirsiniz. Başka bir cihaz bağlamak için yeni bir kod gösterin.",
         "link_another": "Başka bir cihaz bağla",
-        "use_sso": "Bunun yerine çoklu oturum açmayı kullan"
+        "use_sso": "Bunun yerine çoklu oturum açmayı kullan",
+        "error_insecure_server": "Mobil uygulama posta sunucularına yalnızca https üzerinden bağlanır, bu sunucu ise http kullanıyor."
       },
       "public_keys": {
         "name_label": "Ortak anahtar adı",

@@ -834,3 +834,19 @@ describe('pair/create after the security review', () => {
     expect((await create({ slot: 5, password: WRONG_PASSWORD })).status).toBe(429);
   });
 });
+
+describe('pair/create for a server the app refuses', () => {
+  it('refuses a plain-http mail server before any step-up', async () => {
+    handler = mailServer({ base: 'http://mail.lan' });
+    signIn(0, { serverUrl: 'http://mail.lan' });
+    expect(await create({ password: PASSWORD })).toMatchObject({ status: 400, body: { error: 'insecure_server' } });
+    expect(calls).toEqual([]);
+  });
+
+  it('allows loopback http, as the app does for development', async () => {
+    handler = mailServer({ base: 'http://localhost:8080' });
+    signIn(0, { serverUrl: 'http://localhost:8080' });
+    config.jmapServerUrl = 'http://localhost:8080';
+    expect((await create({ password: PASSWORD })).status).toBe(200);
+  });
+});

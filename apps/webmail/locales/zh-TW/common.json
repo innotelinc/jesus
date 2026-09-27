@@ -1759,7 +1759,8 @@
         "success_title": "已在手機上登入",
         "success_body": "你可以關閉此頁面。若要連結其他裝置，請顯示新的 QR Code。",
         "link_another": "連結其他裝置",
-        "use_sso": "改用單一登入"
+        "use_sso": "改用單一登入",
+        "error_insecure_server": "行動應用程式只透過 https 連線到郵件伺服器，而此伺服器使用的是 http。"
       }
     },
     "identities": {

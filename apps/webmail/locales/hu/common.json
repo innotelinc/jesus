@@ -1748,7 +1748,8 @@
         "success_title": "Bejelentkezve a telefonodon",
         "success_body": "Bezárhatod ezt az oldalt. Másik eszköz összekapcsolásához jeleníts meg egy új kódot.",
         "link_another": "Másik eszköz összekapcsolása",
-        "use_sso": "Egyszeri bejelentkezés használata helyette"
+        "use_sso": "Egyszeri bejelentkezés használata helyette",
+        "error_insecure_server": "A mobilalkalmazás csak https-en keresztül csatlakozik levelezőszerverekhez, ez pedig http-t használ."
       },
       "public_keys": {
         "name_label": "Nyilvános kulcs neve",

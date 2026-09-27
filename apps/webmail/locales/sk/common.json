@@ -1752,7 +1752,8 @@
         "success_title": "Prihlásené v telefóne",
         "success_body": "Túto stránku môžete zavrieť. Ak chcete prepojiť ďalšie zariadenie, zobrazte nový kód.",
         "link_another": "Prepojiť ďalšie zariadenie",
-        "use_sso": "Použiť namiesto toho jednotné prihlásenie"
+        "use_sso": "Použiť namiesto toho jednotné prihlásenie",
+        "error_insecure_server": "Mobilná aplikácia sa k poštovým serverom pripája len cez https a tento server používa http."
       },
       "public_keys": {
         "name_label": "Názov verejného kľúča",

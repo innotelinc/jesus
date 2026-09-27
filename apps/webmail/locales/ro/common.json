@@ -1752,7 +1752,8 @@
         "success_title": "Conectat pe telefon",
         "success_body": "Puteți închide această pagină. Pentru a asocia un alt dispozitiv, afișați un cod nou.",
         "link_another": "Asociați alt dispozitiv",
-        "use_sso": "Folosește autentificarea unică în schimb"
+        "use_sso": "Folosește autentificarea unică în schimb",
+        "error_insecure_server": "Aplicația mobilă se conectează la serverele de e-mail doar prin https, iar acesta folosește http."
       },
       "public_keys": {
         "name_label": "Numele cheii publice",

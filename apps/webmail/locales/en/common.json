@@ -1759,7 +1759,8 @@
         "success_title": "Signed in on your phone",
         "success_body": "You can close this page. To link another device, show a new code.",
         "link_another": "Link another device",
-        "use_sso": "Use single sign-on instead"
+        "use_sso": "Use single sign-on instead",
+        "error_insecure_server": "The mobile app only connects to mail servers over https, and this one uses http."
       }
     },
     "identities": {

@@ -329,6 +329,7 @@ describe('LinkDeviceSection step-up', () => {
     [500, 'session_secret_required', 'link_device.error_session_secret'],
     [502, 'server_unreachable', 'link_device.error_server_unreachable'],
     [502, 'pairing_unavailable', 'link_device.error_pairing_unavailable'],
+    [400, 'insecure_server', 'link_device.error_insecure_server'],
     [400, 'invalid_request', 'link_device.error'],
     [500, 'something_else', 'link_device.error'],
   ])('maps %i %s to %s', async (status, error, key) => {

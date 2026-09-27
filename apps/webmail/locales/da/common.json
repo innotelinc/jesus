@@ -1748,7 +1748,8 @@
         "success_title": "Logget ind på din telefon",
         "success_body": "Du kan lukke denne side. Vis en ny kode for at tilknytte en anden enhed.",
         "link_another": "Tilknyt en anden enhed",
-        "use_sso": "Brug single sign-on i stedet"
+        "use_sso": "Brug single sign-on i stedet",
+        "error_insecure_server": "Mobilappen forbinder kun til mailservere via https, og denne bruger http."
       },
       "public_keys": {
         "name_label": "Navn på offentlig nøgle",
