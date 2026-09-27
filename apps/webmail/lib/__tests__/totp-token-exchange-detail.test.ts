@@ -65,3 +65,41 @@ describe('totp-token-exchange error detail', () => {
     expect((await res.json()).detail).toBe(SECRET_BODY);
   });
 });
+
+describe('totp-token-exchange client secret', () => {
+  // The webmail's OAuth client secret belongs to the admin's own server. A
+  // user-chosen server (custom JMAP endpoints) must never receive it.
+  function stalwart() {
+    const bodies: string[] = [];
+    const handler = vi.fn(async (url: unknown, init?: { body?: unknown }) => {
+      bodies.push(String(init?.body ?? ''));
+      return String(url).endsWith('/api/auth')
+        ? Response.json({ type: 'authenticated', client_code: 'code-1' })
+        : Response.json({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 });
+    });
+    return { bodies, handler };
+  }
+
+  it('does not send the client secret to a user-chosen server', async () => {
+    config.allowCustomJmapEndpoint = true;
+    config.oauthClientSecret = 'webmail-client-secret';
+    const { bodies, handler } = stalwart();
+    upstream.mockImplementation(handler);
+    const { POST } = await import('@/app/api/auth/totp-token-exchange/route');
+    const res = await POST(login('https://somewhere.example'));
+    expect(res.status).toBe(200);
+    expect(bodies).toHaveLength(2);
+    expect(bodies.join(' ')).not.toContain('webmail-client-secret');
+  });
+
+  it('still sends it to the configured server', async () => {
+    config.jmapServerUrl = 'https://mail.example.org';
+    config.oauthClientSecret = 'webmail-client-secret';
+    const { bodies, handler } = stalwart();
+    vi.stubGlobal('fetch', handler);
+    const { POST } = await import('@/app/api/auth/totp-token-exchange/route');
+    const res = await POST(login('https://mail.example.org'));
+    expect(res.status).toBe(200);
+    expect(new URLSearchParams(bodies[1]).get('client_secret')).toBe('webmail-client-secret');
+  });
+});
