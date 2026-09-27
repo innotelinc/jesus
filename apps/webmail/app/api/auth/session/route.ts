@@ -20,6 +20,7 @@ import { readImpersonationConfig } from '@/lib/impersonation/master-config';
 import { revokeImpersonationCredential } from '@/lib/impersonation/app-password';
 import { IMPERSONATION_GRANT_COOKIE, openImpersonationGrant } from '@/lib/impersonation/grant-cookie';
 import { revokeWopiTokens } from '@/lib/wopi/revocation';
+import { clearPairReauthInStore } from '@/lib/auth/pair-reauth';
 
 function sessionCookieOptions() {
   return {
@@ -258,11 +259,15 @@ export async function DELETE(request: NextRequest) {
         clearStalwartAuthContextInStore(cookieStore, i);
       }
       await revokeImpersonationGrant(cookieStore);
+      // A phone that already paired keeps its own sign-in; a QR still on
+      // screen stops working.
+      clearPairReauthInStore(cookieStore);
     } else {
       const slot = getSlot(request);
       cookieStore.delete(sessionCookieName(slot));
       clearStalwartAuthContextInStore(cookieStore, slot);
       if (slot === 0) await revokeImpersonationGrant(cookieStore);
+      clearPairReauthInStore(cookieStore, slot);
     }
 
     return NextResponse.json({ ok: true });

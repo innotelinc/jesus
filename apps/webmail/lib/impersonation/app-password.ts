@@ -46,8 +46,9 @@ async function callStalwart(
   serverUrl: string,
   authHeader: string,
   methodCall: [string, Record<string, unknown>, string],
+  trusted = true,
 ): Promise<Record<string, unknown>> {
-  const session = await fetchJmapSession(serverUrl, authHeader, { trusted: true });
+  const session = await fetchJmapSession(serverUrl, authHeader, { trusted });
   const accountId = pickAccountId(session?.primaryAccounts);
   if (!session || !accountId) {
     throw new ImpersonationCredentialError('Could not open the target mailbox with the master credential');
@@ -58,7 +59,7 @@ async function callStalwart(
     apiUrl,
     authHeader,
     JSON.stringify({ using: STALWART_USING, methodCalls: [[method, { accountId, ...args }, callId]] }),
-    { trusted: true },
+    { trusted },
   );
   if (!response.ok) {
     throw new ImpersonationCredentialError(`Stalwart answered HTTP ${response.status}`);
@@ -70,6 +71,36 @@ async function callStalwart(
     throw new ImpersonationCredentialError(detail?.description || detail?.type || 'Unexpected JMAP response');
   }
   return result[1];
+}
+
+/**
+ * Create an app password on the mailbox `authHeader` opens. Without
+ * `expiresAt` it lives until the user deletes it. `trusted` is false for a
+ * user-chosen server, which must be reached through the rebinding-safe fetch.
+ */
+export async function createAppPassword(opts: {
+  serverUrl: string;
+  authHeader: string;
+  description: string;
+  expiresAt?: string;
+  trusted?: boolean;
+}): Promise<{ id: string; secret: string }> {
+  const result = await callStalwart(
+    opts.serverUrl,
+    opts.authHeader,
+    [
+      'x:AppPassword/set',
+      { create: { imp: { description: opts.description, ...(opts.expiresAt ? { expiresAt: opts.expiresAt } : {}) } } },
+      '0',
+    ],
+    opts.trusted ?? true,
+  );
+  const created = (result.created as Record<string, { id?: string; secret?: string }> | undefined)?.imp;
+  if (!created?.id || !created.secret) {
+    const failed = (result.notCreated as Record<string, { type?: string; description?: string }> | undefined)?.imp;
+    throw new ImpersonationCredentialError(failed?.description || failed?.type || 'App password was not created');
+  }
+  return { id: created.id, secret: created.secret };
 }
 
 /**
@@ -88,17 +119,13 @@ export async function mintImpersonationCredential(opts: {
 }): Promise<ImpersonationCredential> {
   const now = opts.now ?? new Date();
   const expiresAt = utcDate(new Date(now.getTime() + IMPERSONATION_SESSION_TTL_SEC * 1000));
-  const result = await callStalwart(
-    opts.serverUrl,
-    masterAuthHeader(opts.mailbox, opts.masterUser, opts.masterPassword),
-    ['x:AppPassword/set', { create: { imp: { description: opts.description, expiresAt } } }, '0'],
-  );
-  const created = (result.created as Record<string, { id?: string; secret?: string }> | undefined)?.imp;
-  if (!created?.id || !created.secret) {
-    const failed = (result.notCreated as Record<string, { type?: string; description?: string }> | undefined)?.imp;
-    throw new ImpersonationCredentialError(failed?.description || failed?.type || 'App password was not created');
-  }
-  return { id: created.id, secret: created.secret, expiresAt };
+  const created = await createAppPassword({
+    serverUrl: opts.serverUrl,
+    authHeader: masterAuthHeader(opts.mailbox, opts.masterUser, opts.masterPassword),
+    description: opts.description,
+    expiresAt,
+  });
+  return { ...created, expiresAt };
 }
 
 /** Best-effort revocation of a credential minted by {@link mintImpersonationCredential}. */
