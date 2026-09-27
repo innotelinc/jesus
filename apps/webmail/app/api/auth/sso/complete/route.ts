@@ -6,7 +6,9 @@ import {
   exchangeCodeForTokens,
   getRequiredConfig,
   getTokenEndpoint,
+  hasClientSecret,
 } from '@/lib/oauth/token-exchange';
+import { buildRedeemBundle } from '@/lib/auth/pair-bundle';
 import { refreshTokenCookieName, refreshTokenServerCookieName } from '@/lib/oauth/tokens';
 import { getCookieOptions } from '@/lib/oauth/cookie-config';
 import { storeIdToken } from '@/lib/oauth/end-session';
@@ -14,6 +16,20 @@ import { rejectCrossOriginRequest } from '@/lib/security/same-origin';
 
 const SSO_PENDING_COOKIE = 'sso_pending';
 const SSO_PENDING_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * The webmail's public base (origin + mount path) from the callback URL the
+ * flow started with (`<base>/<locale>/auth/callback`, same-origin checked at
+ * /sso/start): where a phone renews through the token proxy.
+ */
+function webmailBaseFromCallback(redirectUri: string): string | null {
+  try {
+    const url = new URL(redirectUri);
+    return `${url.origin}${url.pathname.replace(/\/[^/]+\/auth\/callback\/?$/, '').replace(/\/+$/, '')}`;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   // CSRF gate (GHSA-qvr9-m8cq-7wvg): cookies written here are SameSite=Lax,
@@ -113,16 +129,32 @@ export async function POST(request: NextRequest) {
       // The mobile client needs the bits it can't re-derive: the refresh
       // token, the token endpoint it should hit to refresh later, and the
       // client_id the IdP expects on that refresh call. The server URL is
-      // returned so the app knows which JMAP host to connect to.
+      // returned so the app knows which JMAP host to connect to. A phone
+      // cannot renew with a confidential client's secret, and current app
+      // builds refuse a provider on another host, so those renew through
+      // this webmail - the same bundle a paired phone gets.
       const { clientId, serverUrl } = getRequiredConfig(pendingServerId);
-      const tokenEndpoint = await getTokenEndpoint(pendingServerId);
+      const bundle = buildRedeemBundle({
+        flow: 'oauth',
+        serverUrl,
+        serverId: pendingServerId,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+        issuedAt: Date.now(),
+        tokenEndpoint: await getTokenEndpoint(pendingServerId),
+        clientId,
+        confidential: hasClientSecret(pendingServerId),
+        trusted: true,
+      }, webmailBaseFromCallback(redirectUri));
+      if (bundle.flow !== 'oauth') throw new Error('unexpected bundle');
       return NextResponse.json({
-        access_token: tokens.access_token,
-        expires_in: tokens.expires_in,
-        refresh_token: tokens.refresh_token,
-        token_endpoint: tokenEndpoint,
-        client_id: clientId,
-        server_url: serverUrl,
+        access_token: bundle.access_token,
+        expires_in: bundle.expires_in,
+        refresh_token: bundle.refresh_token,
+        token_endpoint: bundle.token_endpoint,
+        client_id: bundle.client_id,
+        server_url: bundle.server_url,
         mobile_redirect_uri: mobileRedirectUri,
         mobile_state: mobileState,
       });

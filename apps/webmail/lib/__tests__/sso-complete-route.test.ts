@@ -2,9 +2,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// A pairing step-up (purpose `reauth`) completes at
-// /api/auth/reauth/sso/complete only. Handed to the login route, its code
-// would sign this browser in as whoever answered the provider's prompt.
+// POST /api/auth/sso/complete. A pairing step-up (purpose `reauth`)
+// completes at /api/auth/reauth/sso/complete only: handed to this route, its
+// code would sign the browser in as whoever answered the provider's prompt.
+// For the mobile app handoff, the phone gets a bundle it can renew.
 
 vi.mock('@/lib/auth/session-secret', () => ({
   getSessionSecret: () => 's'.repeat(64),
@@ -24,13 +25,17 @@ const cookieStore = {
 vi.mock('next/headers', () => ({ cookies: async () => cookieStore }));
 
 const exchangeCodeForTokens = vi.fn();
+let tokenEndpoint = 'https://idp.example.net/token';
+let confidential = false;
 vi.mock('@/lib/oauth/token-exchange', () => ({
   exchangeCodeForTokens: (...args: unknown[]) => exchangeCodeForTokens(...args),
-  getTokenEndpoint: async () => 'https://idp.example.net/token',
+  getTokenEndpoint: async () => tokenEndpoint,
   getRequiredConfig: () => ({ clientId: 'webmail', serverUrl: 'https://mail.example.org', discoveryUrl: 'https://idp.example.net' }),
+  hasClientSecret: () => confidential,
 }));
 
 import { encryptPayload } from '@/lib/auth/crypto';
+import { openPhoneRefreshToken } from '@/lib/auth/pair-bundle';
 import { POST } from '@/app/api/auth/sso/complete/route';
 
 function pending(extra: Record<string, unknown> = {}) {
@@ -54,6 +59,8 @@ async function complete() {
 
 beforeEach(() => {
   jar.clear();
+  tokenEndpoint = 'https://idp.example.net/token';
+  confidential = false;
   exchangeCodeForTokens.mockReset().mockResolvedValue({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 });
 });
 
@@ -73,5 +80,52 @@ describe('/api/auth/sso/complete', () => {
     expect(res.status).toBe(200);
     expect(exchangeCodeForTokens).toHaveBeenCalledOnce();
     expect(jar.get('jmap_rt')).toBe('rt');
+  });
+});
+
+describe('/api/auth/sso/complete for the mobile app handoff', () => {
+  // The app renews with client_id only, at a token endpoint on the mail
+  // server's or the webmail's host. Anything else goes through the webmail.
+  const mobile = () => pending({
+    redirect_uri: 'https://webmail.example/mail/en/auth/callback',
+    mobile_redirect_uri: 'bulwarkmobile://auth/callback',
+    mobile_state: 'm-1',
+  });
+
+  it('hands a public client on the mail server straight to the app', async () => {
+    tokenEndpoint = 'https://mail.example.org/auth/token';
+    mobile();
+    const res = await complete();
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      refresh_token: 'rt',
+      token_endpoint: 'https://mail.example.org/auth/token',
+      client_id: 'webmail',
+      server_url: 'https://mail.example.org',
+      mobile_state: 'm-1',
+    });
+    expect(jar.has('jmap_rt')).toBe(false);
+  });
+
+  it('renews a confidential client through the webmail, with a sealed token', async () => {
+    tokenEndpoint = 'https://mail.example.org/auth/token';
+    confidential = true;
+    mobile();
+    const res = await complete();
+    expect(res.body.token_endpoint).toBe('https://webmail.example/mail/api/auth/pair/token');
+    expect(res.body.refresh_token).not.toBe('rt');
+    expect(openPhoneRefreshToken(res.body.refresh_token)).toMatchObject({
+      refreshToken: 'rt',
+      clientId: 'webmail',
+      tokenEndpoint: 'https://mail.example.org/auth/token',
+      trusted: true,
+    });
+  });
+
+  it('renews through the webmail when the provider is on a host the app refuses', async () => {
+    mobile();
+    const res = await complete();
+    expect(res.body.token_endpoint).toBe('https://webmail.example/mail/api/auth/pair/token');
+    expect(openPhoneRefreshToken(res.body.refresh_token)?.tokenEndpoint).toBe('https://idp.example.net/token');
   });
 });
