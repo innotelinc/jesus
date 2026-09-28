@@ -104,7 +104,7 @@ reaches the OmniRoute gateway through `OMNIROUTE_URL` (defaults to
 `20128` itself is published on loopback and docker0 only), the same gateway the
 Workflow Studio uses; set `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
 On a host other than the one running the proxy, pin that host's LAN address in `.env`
-(`OMNIROUTE_URL=http://192.168.1.46:20128`) — `host.docker.internal` resolves to the
+(`OMNIROUTE_URL=http://192.168.1.71:20128`) — `host.docker.internal` resolves to the
 local docker0, where nothing listens.
 
 The proxy's host is the only host that runs the `omniroute` service: it is behind the

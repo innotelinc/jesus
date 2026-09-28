@@ -539,127 +539,45 @@ services:
       start_period: 180s
     networks: [interview-net]
 
-  # ── LLM gateway: OmniRoute (OpenAI-compatible, port 20128) ────────────────
-  # MIT-licensed AI gateway (github.com/diegosouzapw/OmniRoute), official image
-  # diegosouzapw/omniroute. Model "auto" = zero-config routing across its free
-  # connected providers with automatic failover; the dashboard also runs on
-  # :20128, but it is no longer on the LAN — the dashboard is reached through the
-  # Authentik-fronted proxy on :20128 (5-dev/olympus/docs/gateway-sso.md) and the
-  # gateway's own login is off. dograh (host mode) dials 127.0.0.1:20128; every
-  # other consumer dials the proxy on 20128.
-  # ⚠ Free-tier cloud providers need internet; for a fully-local LLM, add your
-  # local Ollama / llama.cpp / vLLM as a provider in the dashboard and route to it.
-  omniroute:
-    # THE GATEWAY RUNS ON ITS OWN HOST — NOT ON EVERY HOST THAT RUNS THIS FILE.
-    #
-    # Everything that makes it *this* gateway — its provider connections, its
-    # settings, the dashboard password hash, and the `server.env` key that
-    # decrypts them — lives in one volume, and that volume sits beside the
-    # gateway, not beside the stack talking to it. A stack on another host does
-    # NOT start a second gateway; it pins the address of the identity-aware
-    # door in front of the real one (`OMNIROUTE_URL`, see .env.example). The
-    # gateway's host starts this service deliberately:
-    #
-    #     docker compose --profile gateway up -d omniroute
-    #
-    # MEASURED, and why this is a profile rather than only a comment. A second
-    # gateway started from this file on the app host answered requests exactly
-    # the way a working one does while holding *zero* connections:
-    # `provider_connections`=0, every key rejected `401 invalid_api_key`, and
-    # its data dir in the container's writable layer (volume mounted at `/data`
-    # while the image reads `DATA_DIR=/app/data`). It looked healthy, it
-    # published the same ports, and nothing downstream could tell it apart from
-    # the real gateway except by the answers it never routed. That is the
-    # `/data`-vs-`/app/data` failure one layer up; the cure is the same one —
-    # make the wrong configuration impossible to start, rather than detectable
-    # afterwards.
-    profiles: ["gateway"]
-    image: ${OMNIROUTE_IMAGE:-diegosouzapw/omniroute:latest}
-    container_name: omniroute
-    restart: unless-stopped
-    # Memory posture: the gateway buffers model streams; cap it so it never
-    # crowds the rest of the stack — but cap it ABOVE where it settles, because
-    # this gateway refuses work when its own cgroup runs near the limit.
-    #
-    # MEASURED. At 1g the container sits at ~0.59 GiB right after a restart and
-    # climbs past 1 GiB under combo load; OmniRoute's resource-pressure guard
-    # (highRatio .85, criticalRatio .92 of the cgroup limit) then trips with
-    # `reason=cgroup_ratio` — 56 times in 35 minutes here — and *every* model
-    # call gets
-    #
-    #   503 Service temporarily unavailable due to resource pressure. Retry shortly.
-    #
-    # in ~30 ms. Nothing downstream can tell that apart from a broken provider,
-    # so an app build stalls and the edge turns the wait into a 504. 3g keeps
-    # the guard's own threshold (~2.55 GiB) clear of the working set the gateway
-    # actually needs; the host has the headroom (15 GiB, ~9 GiB available).
-    mem_limit: 3g
-    memswap_limit: 3g
-    environment:
-      # The image ships a 1 GiB V8 heap; raise it with the cgroup, since the
-      # pressure guard also watches heap ratio (85% of the heap limit).
-      NODE_OPTIONS: --max-old-space-size=2048
-      OMNIROUTE_JWT_SECRET: "${OMNIROUTE_JWT_SECRET:-change-me-jwt-secret}"
-      OMNIROUTE_API_KEY_SECRET: "${OMNIROUTE_API_KEY_SECRET:-change-me-api-key-secret}"
-      # The image reads INITIAL_PASSWORD, and only INITIAL_PASSWORD: 114
-      # references to process.env.INITIAL_PASSWORD in its tree, and none at all
-      # to OMNIROUTE_INITIAL_PASSWORD. Passing only the OMNIROUTE_ name (as this
-      # file used to) leaves the dashboard with no password configured at all —
-      # POST /api/auth/login answers 403 "No password configured. Complete
-      # onboarding first.", which is not an error anyone can act on. Everything
-      # that mints a key through this gateway then fails: setup.sh's grader key,
-      # and the distro control plane, which disables the account it could not
-      # provision and never revisits it. The .env key stays OMNIROUTE_* — that
-      # is the name setup.sh and the control plane read — so only the name
-      # handed to the container is translated here.
-      INITIAL_PASSWORD: "${OMNIROUTE_INITIAL_PASSWORD:-change-me-admin-password}"
-      OMNIROUTE_WS_BRIDGE_SECRET: "${OMNIROUTE_WS_BRIDGE_SECRET:-change-me-ws-bridge-secret}"
-    ports:
-      # Two bindings, and deliberately not the LAN. The consumers of this port reach
-      # the host by one of two names and these cover both: a container *on this host*
-      # via `host.docker.internal:20128`, which `host-gateway` resolves to 172.17.0.1
-      # (olympus-studio, cerulean and the distro control plane all use it), and a
-      # host-mode process via 127.0.0.1:20128 (dograh).
-      #
-      # A consumer on ANY OTHER host is not covered here, and must not try to be: its
-      # `host.docker.internal` is its own docker0. That is what n8n and this stack's
-      # dashboard-api do from `.30`, and it is why the two defaults above name the
-      # proxy on 20128 rather than this port.
-      #
-      # Publishing on 0.0.0.0 also satisfied those two, and put the dashboard on the
-      # LAN — where the only gate is its own password login, because Authentik and the
-      # `cerulean-platform` group check live in the proxy that fronts this, not here.
-      # A client on another machine uses that door instead: `192.168.1.46:20128/v1`.
-      - "127.0.0.1:20128:20128"
-      - "172.17.0.1:20128:20128"
-      #
-      # THERE IS NO LAN BINDING, and that is now load-bearing rather than tidy.
-      # There used to be a third one (`OMNIROUTE_LAN_BIND`) for stacks that moved to
-      # another host, kept safe by the dashboard's own password. That safety is gone
-      # by design: `make gateway-auth-mode` sets `requireLogin=false`, so the gateway
-      # has no gate of its own and this port's reachability IS the control — see
-      # scripts/gateway-auth-mode.py, which refuses to make that change while the
-      # port answers anywhere but this host. So the LAN door is the proxy that
-      # fronts this service (`oauth2-proxy`, `192.168.1.46:20128`), which exempts
-      # `/v1` for inference clients and requires an Authentik session in
-      # `cerulean-platform` for the dashboard. Same host as this container, so it
-      # reaches the two bindings above and nothing else needs the LAN.
-      # See 5-dev/olympus/docs/gateway-sso.md.
-    volumes:
-      # MOUNT IT WHERE THE IMAGE READS IT — `/app/data`, not `/data`.
-      # The image sets `DATA_DIR=/app/data` and keeps every provider connection,
-      # its `server.env` and the SQLite store there. Mounting the volume at `/data`
-      # (as this file did) leaves the gateway reading its own container layer: it
-      # works, so nothing looks broken, but each recreate silently discards the
-      # credentials and auto/coding answers `503 No credentials for opencode` — the
-      # failure that made multi-turn app builds impossible. The volume beside it
-      # then holds a stale copy, and a backup pointed at that path would preserve
-      # the wrong thing and report success.
-      # `scripts/omniroute-vault-backup.py` asks the running container for this
-      # destination rather than assuming it, so the two cannot drift again without
-      # a nightly failure that names it.
-      - omniroute_data:/app/data
-    networks: [interview-net]
+  # ── LLM gateway: OmniRoute — NOT DEFINED HERE (moved 2026-09-28) ──────────
+  # The gateway, the Authentik-fronted proxy in front of it and that proxy's
+  # session store are one standalone stack now: `ips/extensions/llm/`
+  # (`docker-compose.host.yml`, project `innotel-gateway`), running on i1's
+  # `proxy` container (`.71`). Consumers dial the door —
+  # `http://192.168.1.71:20128/v1` — and the gateway's own `:20128` binding stays
+  # on that host's loopback and docker0.
+  #
+  # The `omniroute` service used to live here behind `profiles: ["gateway"]`, and
+  # that is exactly the split that made this stack look like the gateway's owner
+  # while `5-dev/olympus` declared the proxy: two files, two hosts, one thing to
+  # move. It is gone for the reason the profile existed — a second gateway started
+  # from an app host answers like a working one while holding *zero* provider
+  # connections (measured: `provider_connections`=0, every key `401
+  # invalid_api_key`), so the wrong configuration should be impossible to start
+  # rather than detectable afterwards. `GATEWAY_DO_NOT_START_ME_HERE` below is how
+  # the footgun fails instead of starting.
+  #
+  # `ips/scripts/check-gateway-targets.py` fails any target that still names the
+  # old host, and no longer counts this file as one that declares the gateway —
+  # which is what used to let a stale `host.docker.internal:20128` here read as
+  # legitimate (see the two defaults it is guarding).
+  GATEWAY_DO_NOT_START_ME_HERE:
+    # Keep this here, and keep it out of the way: `docker compose --profile
+    # retired up` no longer starts a gateway, because the image, the container
+    # name and the ports are all gone. Anything that tries fails at once and says
+    # why. Delete the stanza only when something else carries the pointer above.
+    profiles: ["retired"]
+    image: python:3.12-alpine
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        echo "capstone: the OmniRoute gateway is not defined here any more." >&2
+        echo "It is the standalone stack in ips/extensions/llm/ on i1 .71." >&2
+        echo "See the comment in 2-voice/capstone/docker-compose.yml." >&2
+        exit 2
+
 
   # ── Workflow automation: n8n (Community Edition) ──────────────────────────
   n8n:
@@ -737,7 +655,7 @@ services:
       # resolves to *its own* docker0 where nothing listens.
       N8N_ENABLED_MODULES: "${N8N_ENABLED_MODULES:-instance-ai}"
       N8N_INSTANCE_AI_MODEL: "${N8N_INSTANCE_AI_MODEL:-auto}"
-      N8N_INSTANCE_AI_MODEL_URL: "${N8N_INSTANCE_AI_MODEL_URL:-http://host.docker.internal:20128/v1}"
+      N8N_INSTANCE_AI_MODEL_URL: "${N8N_INSTANCE_AI_MODEL_URL:-http://192.168.1.71:20128/v1}"
       N8N_INSTANCE_AI_MODEL_API_KEY: "${N8N_INSTANCE_AI_MODEL_API_KEY:-omniroute}"
       N8N_INSTANCE_AI_SANDBOX_ENABLED: "true"
       N8N_INSTANCE_AI_SANDBOX_PROVIDER: "n8n-sandbox"
@@ -1333,7 +1251,7 @@ services:
       # modal: the same route the Workflow Studio uses, through the SSO proxy
       # (20128) rather than the gateway's own port (20128, loopback + docker0
       # only — see the ports block under `omniroute`). Empty key is fine.
-      OMNIROUTE_URL: "${OMNIROUTE_URL:-http://host.docker.internal:20128}"
+      OMNIROUTE_URL: "${OMNIROUTE_URL:-http://192.168.1.71:20128}"
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
       # standalone (default): dashboard provisions FreePBX rows directly
@@ -1500,6 +1418,11 @@ volumes:
   postgres_data:
   redis_data:
   minio-data:
+  # The gateway's own volume lives with the gateway now — `innotel-gateway_omniroute-data`
+  # on i1 `.71`, declared by `ips/extensions/llm/docker-compose.host.yml`. This name
+  # still exists on the host that ran the gateway before 2026-09-28 (`.46` keeps its
+  # copy as the rollback), so it stays declared rather than deleted, and nothing
+  # mounts it.
   omniroute_data:
   speaches_models:
   n8n_data:
