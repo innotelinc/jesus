@@ -100,15 +100,22 @@ export function CalendarWeekView({
     return Math.max(MIN_COL_WIDTH, Math.floor((root.clientWidth - gutterWidth) / 7));
   }, [isMobile, gutterWidth]);
   const [colWidth, setColWidth] = useState(MOBILE_COL_WIDTH);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  // First day in view, reported by the scroll handler below (#1293)
+  const [visibleDayKey, setVisibleDayKey] = useState<string | null>(null);
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    setColWidth(measureColWidth(root));
+    const measure = () => {
+      setColWidth(measureColWidth(root));
+      setViewportWidth(Math.max(0, root.clientWidth - gutterWidth));
+    };
+    measure();
     if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setColWidth(measureColWidth(root)));
+    const observer = new ResizeObserver(measure);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [measureColWidth]);
+  }, [measureColWidth, gutterWidth]);
 
   // Every scroll offset is computed with the column width that is rendered.
   // When that width changes (first measurement, resize) keep the same day at
@@ -177,26 +184,55 @@ export function CalendarWeekView({
     return packWeekSegments([...explicitAllDay, ...timedFullDay]);
   }, [events, days]);
 
-  const allDayRowCount = useMemo(() => {
-    return allDaySegments.reduce((maxRows, segment) => Math.max(maxRows, segment.row + 1), 0);
-  }, [allDaySegments]);
-
   const tasksByDay = useMemo(() => groupTasksByDueDay(tasks), [tasks]);
 
-  // Max tasks on any single loaded day
-  const taskRowCount = useMemo(() => {
+  // Tasks stack under the events of their own day rather than globally (#1107, #1270)
+  const dayEventRows = useMemo(() => {
+    return days.map((_, dayIndex) =>
+      allDaySegments.reduce(
+        (rows, segment) =>
+          dayIndex >= segment.startIndex && dayIndex < segment.startIndex + segment.span
+            ? Math.max(rows, segment.row + 1)
+            : rows,
+        0,
+      )
+    );
+  }, [days, allDaySegments]);
+
+  // The strip holds weeks to months of days (#759), but the all-day area is
+  // sized from the columns in view: a crowded day in another week must not
+  // add empty rows or an expand toggle here (#1293). The first visible day is
+  // tracked by date, so columns prepended while loading do not shift it.
+  const visibleStartIndex = useMemo(() => {
+    const tracked = visibleDayKey ? days.findIndex((d) => dayKey(d) === visibleDayKey) : -1;
+    if (tracked >= 0) return tracked;
+    const target = isMobile ? focus.date : startOfWeek(focus.date, { weekStartsOn: weekStart });
+    return Math.max(0, Math.min(days.length - 1, differenceInCalendarDays(target, rangeStart)));
+  }, [visibleDayKey, days, isMobile, focus.date, weekStart, rangeStart]);
+  const visibleColumns = isMobile ? Math.max(1, Math.ceil(viewportWidth / colWidth)) : 7;
+
+  // Max combined rows (events + tasks) across the visible days
+  const maxContentRows = useMemo(() => {
     let max = 0;
-    for (const day of days) {
-      const key = format(day, "yyyy-MM-dd");
-      const count = tasksByDay.get(key)?.length ?? 0;
-      if (count > max) max = count;
+    const end = Math.min(days.length, visibleStartIndex + visibleColumns);
+    for (let i = visibleStartIndex; i < end; i++) {
+      const key = format(days[i], "yyyy-MM-dd");
+      const taskCount = tasksByDay.get(key)?.length ?? 0;
+      const total = dayEventRows[i] + taskCount;
+      if (total > max) max = total;
     }
     return max;
-  }, [tasksByDay, days]);
+  }, [days, dayEventRows, tasksByDay, visibleStartIndex, visibleColumns]);
 
   const hasAllDay = useMemo(() => {
-    return allDaySegments.length > 0 || taskRowCount > 0;
-  }, [allDaySegments, taskRowCount]);
+    return maxContentRows > 0;
+  }, [maxContentRows]);
+
+  const DEFAULT_ALL_DAY_MAX_ROWS = 3;
+  const [isAllDayExpanded, setIsAllDayExpanded] = useState(false);
+  const isExpandable = maxContentRows > DEFAULT_ALL_DAY_MAX_ROWS;
+  const visibleRows = isAllDayExpanded ? maxContentRows : Math.min(DEFAULT_ALL_DAY_MAX_ROWS, maxContentRows);
+  const allDayHeight = Math.max(28, visibleRows * 24 + 4);
 
   useEffect(() => {
     if (rootRef.current) {
@@ -258,6 +294,7 @@ export function CalendarWeekView({
       const key = dayKey(day);
       if (key === visibleKeyRef.current) return;
       visibleKeyRef.current = key;
+      setVisibleDayKey(key);
       onVisibleDateChange?.(day);
     });
   }, [colWidth, colCount, days, onVisibleDateChange]);
@@ -323,14 +360,34 @@ export function CalendarWeekView({
       {hasAllDay && (
         <div className="flex border-b border-border">
           <div
-            className={cn(gutterClass, "text-[10px] text-muted-foreground p-1 text-end")}
-            style={{ minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
+            className={cn(gutterClass, "text-[10px] text-muted-foreground p-1 text-end flex flex-col justify-between")}
+            style={{ height: allDayHeight }}
           >
-            {t("events.all_day")}
+            <span>{t("events.all_day")}</span>
+            {isExpandable && (
+              <button
+                type="button"
+                aria-label="all-day-expand"
+                aria-expanded={isAllDayExpanded}
+                onClick={() => setIsAllDayExpanded((prev) => !prev)}
+                className="self-end mt-auto text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-muted transition-colors cursor-pointer"
+                title={isAllDayExpanded ? t("events.show_less", { defaultMessage: "Weniger anzeigen" }) : t("events.show_more", { defaultMessage: "Mehr anzeigen" })}
+              >
+                {isAllDayExpanded ? (
+                  <span>▲</span>
+                ) : (
+                  <>
+                    <span>+{maxContentRows - DEFAULT_ALL_DAY_MAX_ROWS}</span>
+                    <span>▼</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
           <div
-            className="relative grid border-s border-border"
-            style={{ ...columnsStyle, minHeight: Math.max(28, (allDayRowCount + taskRowCount) * 24 + 4) }}
+            data-testid="all-day-grid"
+            className="relative grid border-s border-border overflow-hidden"
+            style={{ ...columnsStyle, height: allDayHeight }}
           >
             {days.map((day) => (
               <div
@@ -371,34 +428,33 @@ export function CalendarWeekView({
               })}
             </div>
 
-            {/* Task chips in all-day area */}
-            {taskRowCount > 0 && (
-              <div className="absolute inset-x-0 pointer-events-none" style={{ top: allDayRowCount * 24 + 2 }}>
-                {days.map((day, dayIndex) => {
-                  const key = format(day, "yyyy-MM-dd");
-                  const dayTasks = tasksByDay.get(key) || [];
-                  return dayTasks.map((task, taskIndex) => (
-                    <div
-                      key={`task-${task.id}`}
-                      className="absolute px-0.5 pointer-events-auto"
-                      style={{
-                        left: `calc(${(dayIndex / colCount) * 100}% + 1px)`,
-                        width: `calc(${(1 / colCount) * 100}% - 2px)`,
-                        top: taskIndex * 24,
-                        height: 20,
-                      }}
-                    >
-                      <CalendarTaskChip
-                        task={task}
-                        calendar={calendars.find(c => task.calendarIds[c.id])}
-                        onToggleComplete={onToggleTaskComplete}
-                        onSelect={onSelectTask}
-                      />
-                    </div>
-                  ));
-                })}
-              </div>
-            )}
+            {/* Task chips in all-day area, stacked under events of their day (#1107, #1270) */}
+            <div className="absolute inset-0 pointer-events-none">
+              {days.map((day, dayIndex) => {
+                const key = format(day, "yyyy-MM-dd");
+                const dayTasks = tasksByDay.get(key) || [];
+                const baseRow = dayEventRows[dayIndex];
+                return dayTasks.map((task, taskIndex) => (
+                  <div
+                    key={`task-${task.id}`}
+                    className="absolute px-0.5 pointer-events-auto"
+                    style={{
+                      left: `calc(${(dayIndex / colCount) * 100}% + 1px)`,
+                      width: `calc(${(1 / colCount) * 100}% - 2px)`,
+                      top: (baseRow + taskIndex) * 24 + 2,
+                      height: 20,
+                    }}
+                  >
+                    <CalendarTaskChip
+                      task={task}
+                      calendar={calendars.find(c => task.calendarIds[c.id])}
+                      onToggleComplete={onToggleTaskComplete}
+                      onSelect={onSelectTask}
+                    />
+                  </div>
+                ));
+              })}
+            </div>
           </div>
         </div>
       )}
