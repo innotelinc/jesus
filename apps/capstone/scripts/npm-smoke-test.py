@@ -28,7 +28,9 @@ Checks, per https://<sub>.<NPM_BASE_DOMAIN>/ (STRICT TLS — no cert skipping):
     `main` answers 200 with that dead end for every signed-in user, so this is
     the only check here that can name a stale image
 
-Exit 0 only when every host passes; exit 1 otherwise (CI-friendly).
+Exit codes, matching scripts/ci/sso-smoke.py: 0 = every host passed, 1 = a
+host failed, 2 = the edge could not be reached at all (no route to the estate —
+the hosted-CI case) — a SKIP, not a pass.
 
 Usage:
   python3 scripts/npm-smoke-test.py                 # config from .env
@@ -90,6 +92,22 @@ def fetch(url: str, timeout: int) -> tuple[int, str | None]:
             return resp.status, resp.headers.get("Location")
     except urllib.error.HTTPError as e:
         return e.code, e.headers.get("Location")
+
+
+def edge_reachable(base_domain: str, timeout: int) -> bool:
+    """Whether the edge answers at all — the gate between a SKIP and a report.
+
+    A runner with no route to the estate (the hosted-CI case) must not fail the
+    build once per host: an edge that never answers says nothing about the
+    hosts behind it, which is a SKIP. An edge that does answer, and then fails
+    a host, is a real finding — so any HTTP status, including an error one,
+    counts as reachable and the run continues into the per-host checks.
+    """
+    try:
+        fetch(f"https://{base_domain}/", timeout)
+        return True
+    except (urllib.error.URLError, OSError, ssl.SSLError):
+        return False
 
 
 def fetch_body(url: str, timeout: int) -> tuple[int, str, str | None]:
@@ -327,6 +345,13 @@ def main() -> int:
 
     base_domain = (args.base_domain or env.get("NPM_BASE_DOMAIN") or "capstone.innotel.us").strip().lstrip(".")
     signin_base = (env.get("NPM_AUTHENTIK_URL") or f"https://auth.{base_domain}").rstrip("/")
+
+    # No route to the estate is a skip, not a list of 15 failures: a scheduled
+    # run on a hosted runner lands here, and it must not page anyone.
+    if not edge_reachable(base_domain, min(args.timeout, 8)):
+        print(f"SKIP: no answer from https://{base_domain}/ — this runner has no route to "
+              "the estate, so nothing behind the edge can be probed", file=sys.stderr)
+        return 2
 
     mod = load_hosts_module()
     hosts = [dict(h) for h in mod.HOSTS if not h.get("optional")]

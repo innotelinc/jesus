@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# ci.yml — static analysis on push and pull requests.
+# ci.yml — static analysis on push and pull requests, plus the live gates.
 #
 # The ShellCheck job runs over every tracked shell script (scripts/*.sh plus
 # the .githooks helpers) with bash semantics. The repo is maintained at zero
@@ -10,6 +10,14 @@
 #
 # The secret-scan job is the backstop the pre-commit hook names: the hook sees
 # only the added lines of one commit, so this scans the whole tracked tree.
+#
+# Three jobs look at the running estate rather than the tree — sso-smoke,
+# dograh-image-drift and npm-smoke. They exit 2 when they cannot reach it,
+# which is reported as a skip: a hosted runner has no route to the stack, so
+# that is the expected outcome there, and a runner with one turns each into a
+# gate. Because their failures are time-dependent (a certificate, an expired
+# token, an image rebuilt from the wrong tag) they also run on the schedule
+# below, not only when someone pushes.
 # ═══════════════════════════════════════════════════════════════════════════
 
 name: CI
@@ -22,6 +30,14 @@ on:
   # re-run it on its own (after rotating the token, or when the provider was
   # down during the last push) without inventing a commit to trigger it.
   workflow_dispatch:
+  # The live jobs (sso-smoke, dograh-image-drift, npm-smoke) exist for the
+  # failures a push is not there to see: a certificate that rotates into the
+  # wrong chain, a forward_host that loses its upstream, the sign-in token
+  # expiring, an image rebuilt from the registry's tag. They run daily so one of
+  # those is caught by the schedule instead of by a user. The static jobs run
+  # with them — a daily re-scan of the tree costs a runner and nothing else.
+  schedule:
+    - cron: "23 6 * * *"
 
 jobs:
   shellcheck:
@@ -134,6 +150,69 @@ jobs:
             0) echo "::notice::the sign-in chain completed end to end" ;;
             2) echo "::notice::skipped — no AUTHENTIK_TOKEN secret, or this runner cannot reach the identity provider" ;;
             *) echo "::error::the sign-in chain is broken — see the log above"; exit "$rc" ;;
+          esac
+
+  # The running stack can drift from this repo in a way no static check sees:
+  # dograh/upstream is gitignored and this repo's fixes to it live in
+  # dograh/patches/, applied at build time. An image built from the registry's
+  # ghcr.io tag — or one built without apply-dograh-patches.sh — answers every
+  # config check in this file and still renders the pre-patch dead end. This job
+  # hashes the patched files in the running dograh-api against the patched
+  # upstream tree, and asks dograh-ui for the compiled output of patch 0001.
+  #
+  # It exits 2 when it cannot look — no clone, no docker, or the containers are
+  # not running here — reported as a skip, not a pass, exactly like the SSO job
+  # above. Only real drift (exit 1) fails the build.
+  dograh-image-drift:
+    name: Dograh image drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare the running images against the patched upstream tree
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/ci/check-dograh-image-drift.py || rc=$?
+          case "$rc" in
+            0) echo "::notice::the running dograh images carry the patched tree" ;;
+            2) echo "::notice::skipped — no patched clone, no docker, or the containers do not run on this runner" ;;
+            *) echo "::error::a running dograh image drifted from the patched tree — see the log above"; exit "$rc" ;;
+          esac
+
+  # Every hostname in this estate is reached through the NPM edge, and the edge
+  # fails in ways a single push cannot see: a certificate, a forward_host that
+  # lost its upstream, an origin serving the wrong UI image. This walks every
+  # host through the public edge (strict TLS, no certificate skipping), reads
+  # each answer, and names the one request that separates a patched voice UI
+  # from a registry-built one (scripts/npm-smoke-test.py). Reporting WHICH host
+  # failed is the point of putting it on the schedule rather than leaving it to
+  # whoever notices — the script's last line is exactly that list.
+  #
+  # Exit 2 = the edge did not answer at all (no route to the estate, the
+  # hosted-runner case) → a skip. Exit 1 = a named host failed → the build.
+  npm-smoke:
+    name: NPM edge smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe every proxy host through the edge
+        env:
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'capstone.innotel.us' }}
+        run: |
+          set -uo pipefail
+          log=$(mktemp)
+          rc=0
+          python3 scripts/npm-smoke-test.py --base-domain "$NPM_BASE_DOMAIN" 2>&1 | tee "$log" || rc=$?
+          case "$rc" in
+            0) echo "::notice::every proxy host answered" ;;
+            2) echo "::notice::skipped — this runner has no route to the estate" ;;
+            *)
+              failed=$(sed -n 's/.*unhealthy: //p' "$log" | tail -1)
+              echo "::error title=NPM edge smoke::host(s) unhealthy: ${failed:-see the log above}"
+              exit "$rc"
+              ;;
           esac
 
   # Cerulean tenant gate: the Authentik group-NAME → tenant-slug matching that

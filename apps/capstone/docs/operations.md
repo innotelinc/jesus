@@ -756,12 +756,45 @@ sign-in (and answer the outpost ping through their own vhost), open hosts must s
 without a bounce. For gated hosts it also **walks the forward-auth handshake** — `/start`
 must reach `/application/o/authorize/` on the sign-in host itself, and that call must not
 return 400 — which catches the cross-domain `authentik_host` misconfiguration behind the
-"Redirect URI Error" page. Exit 0 only when everything is healthy — CI-friendly:
+"Redirect URI Error" page. It ends with **one request that names a stale voice UI**: it
+fetches `/workflow` with a cookie the API will reject and reads the body — a patched image
+resolves the cookie as the session and renders the page, a build from the registry's `main`
+renders the pre-patch "Authentication required" dead end instead, and both answer 200.
+
+Exit codes match `scripts/ci/sso-smoke.py`: **0** every host healthy, **1** a host failed
+(the last line names them: `FAIL n/N host(s) unhealthy: …`), **2** the edge did not answer
+at all — no route to the estate, which is a **skip**, not a pass:
 
 ```bash
 python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN / NPM_AUTHENTIK_URL)
 python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
 ```
+
+CI runs it as the `npm-smoke` job on the nightly schedule, on top of push and PR; a skip
+(exit 2) is a notice and only a named failure fails the build.
+
+### Guard the images against drift
+
+Configuration cannot tell whether the stack is serving this repo's build: `dograh/upstream`
+is gitignored and its fixes live in `dograh/patches/`, so an image pulled from
+`ghcr.io/innotelinc/dograh-*` — or one built without `./scripts/apply-dograh-patches.sh` —
+passes every config check and still renders the pre-patch dead end. `npm-smoke-test.py`
+sees that once, through the edge; `scripts/ci/check-dograh-image-drift.py` sees all of it,
+at the images themselves. It hashes the patched `api/**` and `pipecat/**` files in the
+running `dograh-api` against the patched upstream tree, and asks `dograh-ui` for the two
+things patch `0001` changes in its **compiled** output (the home page's OIDC branch, and
+the workflow page's removed dead end — `.next/` holds a build, so a source hash cannot be
+compared there):
+
+```bash
+./scripts/apply-dograh-patches.sh                    # make upstream the patched tree
+python3 scripts/ci/check-dograh-image-drift.py       # 0 = match, 1 = drift, 2 = cannot look
+```
+
+Same exit-code convention as above: 2 means no clone, no docker, or the containers are not
+running on this host, which the `dograh-image-drift` CI job reports as a skip (a hosted
+runner cannot reach the stack); a runner with a route to it turns the job into a gate.
+`DOGRAH_API_CONTAINER` / `DOGRAH_UI_CONTAINER` override the compose service names.
 
 ## Observability
 

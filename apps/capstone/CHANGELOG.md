@@ -193,6 +193,42 @@ none of them, and the API was one behind.
   the IdP — the entry-point walk passes on exactly the image a browser would
   find broken.
 
+### The image drift and the probe now have guards of their own
+
+- **New: `scripts/ci/check-dograh-image-drift.py` — the check that would have
+  caught the API image being one patch behind.** The one-request probe names a
+  stale UI; nothing named a stale API, because `0006`'s change is inert in this
+  deployment and no request could have distinguished it. This compares the
+  images themselves. The `api/**` and `pipecat/**` files the patch set touches
+  are hashed in the running `dograh-api` and must equal the patched
+  `dograh/upstream` tree — an exact comparison, because the API image copies the
+  tree to `/app` and installs pipecat from the submodule, so both land as plain
+  files (the pipecat root is resolved by asking the interpreter, not assumed).
+  The UI cannot be compared that way: `.next/` holds a build, not the sources.
+  `dograh-ui` is therefore asked for the two things `0001` changes in its
+  compiled output — the home page's OIDC branch, and the workflow page with the
+  dead end gone. Measured on both sides: exit 0 against the live stack, and exit
+  1 naming both UI drifts against a throwaway container from
+  `ghcr.io/innotelinc/dograh-ui:latest`, the image the incident was serving.
+- **New: the `dograh-image-drift` and `npm-smoke` CI jobs, and a nightly
+  schedule.** Both live jobs follow `sso-smoke`'s convention — exit 2 (no clone,
+  no docker, no route to the estate) is reported as a *skip*, because a hosted
+  runner cannot reach the stack, and a runner with a route turns each into a
+  gate. `npm-smoke` also had to grow that exit code first: an unreachable edge
+  used to come back as fifteen broken hosts. On a real failure the job emits the
+  host list the script already prints
+  (`FAIL n/N host(s) unhealthy: …`) rather than only the exit code, and the
+  whole workflow now runs daily — a certificate, an expiring token, or an image
+  rebuilt from the wrong tag is not something a push is there to see.
+- **New: `scripts/tests/test_npm_smoke_test.py` pins the probe's branches.**
+  `probe_ui_image` is the only check that separates a patched UI from a registry
+  build, and it is a *body* assertion — both images answer 200 — so a regression
+  there would pass silently. The tests run the real function with urllib's
+  opener stubbed, so no request leaves the process: the patched page passes, the
+  dead end fails and names `0001` even when an error status carried it, a non-200
+  without the dead end reports a cookie the image did not honour, a connect
+  failure is a failure, and the body read stays under its cap.
+
 ### The list pages repair their own half-wired rows
 
 - **New: the Agents page converges a half-wired row instead of only naming it.**
