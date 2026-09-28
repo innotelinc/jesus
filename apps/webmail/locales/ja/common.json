@@ -2849,6 +2849,8 @@
       "no_events": "予定なし",
       "all_day": "終日",
       "more": "他{count}件",
+      "show_more": "展開する",
+      "show_less": "折りたたむ",
       "no_title": "(タイトルなし)",
       "resize": "イベントのサイズ変更",
       "duplicate": "複製",

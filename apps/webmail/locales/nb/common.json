@@ -2849,6 +2849,8 @@
       "no_events": "Ingen hendelser",
       "all_day": "Hele dagen",
       "more": "+{count} til",
+      "show_more": "Vis flere",
+      "show_less": "Vis færre",
       "no_title": "(Ingen tittel)",
       "resize": "Endre størrelsen på hendelsen",
       "duplicate": "Dupliser",

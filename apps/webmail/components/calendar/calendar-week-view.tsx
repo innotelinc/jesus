@@ -371,7 +371,7 @@ export function CalendarWeekView({
                 aria-expanded={isAllDayExpanded}
                 onClick={() => setIsAllDayExpanded((prev) => !prev)}
                 className="self-end mt-auto text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 rounded px-1 py-0.5 hover:bg-muted transition-colors cursor-pointer"
-                title={isAllDayExpanded ? t("events.show_less", { defaultMessage: "Weniger anzeigen" }) : t("events.show_more", { defaultMessage: "Mehr anzeigen" })}
+                title={isAllDayExpanded ? t("events.show_less") : t("events.show_more")}
               >
                 {isAllDayExpanded ? (
                   <span>▲</span>

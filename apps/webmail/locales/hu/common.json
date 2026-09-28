@@ -2849,6 +2849,8 @@
       "no_events": "Nincs esemény",
       "all_day": "Egész napos",
       "more": "+{count} további",
+      "show_more": "Több mutatása",
+      "show_less": "Kevesebb mutatása",
       "no_title": "(Nincs cím)",
       "resize": "Esemény átméretezése",
       "duplicate": "Duplikálás",
