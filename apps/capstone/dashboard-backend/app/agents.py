@@ -519,6 +519,24 @@ def agent_probe_bulk_sql(exts: list[str]) -> str:
     )
 
 
+def agent_description_probe_sql(exts: list[str]) -> str:
+    """FreePBX's stored description for each dograh-managed extension.
+
+    The description carries the agent's workflow name (``agent_description``), so
+    it is how a workflow rename reaches the FreePBX rows — and what is left
+    naming the *old* workflow when the rename never got that far. Scoped to the
+    dograh markers so a user-created row is never read, let alone rewritten.
+    """
+    wanted = ", ".join(f"'{_sql(e)}'" for e in exts if e)
+    if not wanted:
+        return ""
+    return (
+        f"SELECT `custom_exten`, `description` FROM `custom_extensions` "
+        f"WHERE `custom_exten` IN ({wanted}) "
+        f"AND (`description` LIKE '%{DESC_MARKER}%' OR `notes` LIKE '%{NOTES_MARKER}%')"
+    )
+
+
 def find_custom_dest_sql(table: str, target: str) -> str:
     return (
         f"SELECT `key` FROM `{table}` WHERE `id`='dests' AND `type`='json-arr' "

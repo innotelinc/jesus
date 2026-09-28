@@ -22,6 +22,11 @@ Checks, per https://<sub>.<NPM_BASE_DOMAIN>/ (STRICT TLS — no cert skipping):
     (an S3 XML body, not the edge's error page) — transcripts and recordings
     are unsigned URLs on the app hosts, so a stale upstream there only ever
     shows up as a failed transcript fetch at grading time
+  • the app's own page on each origin that serves it (apex, app, dograh) renders
+    for a session cookie the API will reject, rather than the pre-patch
+    "Authentication required" dead end — a UI image built from the registry's
+    `main` answers 200 with that dead end for every signed-in user, so this is
+    the only check here that can name a stale image
 
 Exit 0 only when every host passes; exit 1 otherwise (CI-friendly).
 
@@ -234,6 +239,84 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
     return "FAIL", f"upstream error {status}"
 
 
+def walk_to_authorize(url: str, timeout: int, hops: int = 3) -> tuple[bool, str]:
+    """Follow the sign-in entry's redirects and require that they reach the IdP.
+
+    A stale UI image answers this entry with 200 and the IdP's *page*: the UI's
+    own API proxy resolved the 307 server-side, so neither the Location nor the
+    state cookie ever reached the browser and the sign-in did nothing. A status
+    check alone cannot tell that from a working sign-in — the assertion has to
+    be that the browser is sent onwards, and that the end of the chain is the
+    IdP's authorize endpoint (npm-proxy-hosts.py OIDC_PATH).
+    """
+    for _ in range(hops):
+        try:
+            status, location = fetch(url, timeout)
+        except (urllib.error.HTTPError, urllib.error.URLError, OSError, ssl.SSLError) as e:
+            return False, f"{getattr(e, 'code', e)}"
+        if not location:
+            return False, f"answered {status} with no redirect (the sign-in never leaves)"
+        if AUTHORIZE_PATH in location:
+            return True, f"{status} → authorize on {urlparse(location).netloc}"
+        if not location.startswith("http"):
+            return False, f"redirect to a non-absolute target: {location[:60]}"
+        url = location
+    return False, f"still no authorize endpoint after {hops} redirects"
+
+
+# The one request that tells a patched voice UI from a registry-built one. The
+# dead-end branch (dograh/patches/0001) renders only when the middleware lets
+# the request through, and the middleware guards on the *presence* of the
+# session cookie — so a cookie the API will reject is enough to see which image
+# is answering, with no account and nothing to undo. docs/operations.md carries
+# the same probe under the login gates.
+UI_PAGE = "/workflow"
+UI_PROBE_COOKIE = "dograh_auth_token=probe"
+UI_DEAD_END = "Authentication required"
+UI_PROBE_BODY_LIMIT = 512 * 1024
+
+
+def probe_ui_image(domain: str, timeout: int) -> tuple[bool, str]:
+    """One request that tells a patched UI image from a registry-built one.
+
+    A patched image resolves the cookie as the session and renders the page it
+    names; an image built from the ``innotelinc/dograh`` fork's ``main`` has a
+    ``getServerAccessToken()`` that knows only ``stack``/``local``, so the same
+    cookie resolves to no token and the page renders the dead end instead. Both
+    answer HTTP 200 with a page on it, which is why the assertion has to be on
+    the body — no status check can separate them.
+
+    The sign-in walk above cannot either: the edge cuts the OIDC legs straight
+    to the API (npm-proxy-hosts.py OIDC_PATH), so an unpatched UI still sends a
+    browser to the IdP and the entry passes on exactly the image that renders
+    nothing useful once the person arrives back signed in.
+    """
+    req = urllib.request.Request(
+        f"https://{domain}{UI_PAGE}",
+        headers={"User-Agent": "capstone-npm-smoke/1.0", "Cookie": UI_PROBE_COOKIE},
+    )
+    try:
+        with OPENER.open(req, timeout=timeout) as resp:
+            status = resp.status
+            body = resp.read(UI_PROBE_BODY_LIMIT).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        status = e.code
+        body = (e.read(UI_PROBE_BODY_LIMIT) or b"").decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ssl.SSLError) as e:
+        return False, f"connect: {getattr(e, 'reason', e)}"
+    if UI_DEAD_END in body:
+        return False, (
+            "the UI answered the pre-0001 dead end — this image predates "
+            "dograh/patches/0001 (a registry tag cannot carry them)"
+        )
+    if status != 200:
+        return False, (
+            f"HTTP {status}: the probe cookie was not honoured, so the page never "
+            "rendered and this check could not see the image"
+        )
+    return True, "patched UI (the probe session renders the page, no dead end)"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", default=str(REPO / ".env"))
@@ -287,6 +370,32 @@ def main() -> int:
             note = f"{status} {'MinIO' if ok else 'edge, not MinIO'}"
         except (urllib.error.URLError, OSError, ssl.SSLError) as e:
             ok, note = False, f"connect: {getattr(e, 'reason', e)}"
+        print(f"{label:45} {'PASS' if ok else 'FAIL'} ({note})")
+        if not ok:
+            failed.append(label)
+
+    # 3. The Cerulean sign-in entry, on every origin that serves the app. See
+    #    walk_to_authorize: this is the check for the fault where signing in
+    #    "does nothing" because the redirect was answered by a proxy.
+    for h in [x for x in hosts if x["key"] in mod.OIDC_HOST_KEYS]:
+        sub = h["sub"]
+        domain = base_domain if sub is None else f"{sub}.{base_domain}"
+        label = f"{domain}{mod.OIDC_PATH}/login"
+        url = f"https://{label}?next=%2Fafter-sign-in"
+        ok, note = walk_to_authorize(url, args.timeout)
+        print(f"{label:45} {'PASS' if ok else 'FAIL'} ({note})")
+        if not ok:
+            failed.append(label)
+
+    # 4. The app's own page, on the same origins (they are the ones that serve
+    #    it). See probe_ui_image: the walk above passes on a stale UI image,
+    #    because the edge route sends the sign-in to the API regardless — only
+    #    the page itself still carries the pre-patch dead end.
+    for h in [x for x in hosts if x["key"] in mod.OIDC_HOST_KEYS]:
+        sub = h["sub"]
+        domain = base_domain if sub is None else f"{sub}.{base_domain}"
+        label = f"{domain}{UI_PAGE}"
+        ok, note = probe_ui_image(domain, args.timeout)
         print(f"{label:45} {'PASS' if ok else 'FAIL'} ({note})")
         if not ok:
             failed.append(label)

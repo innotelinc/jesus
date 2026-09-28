@@ -269,6 +269,11 @@ export default function Extensions() {
                           </span>
                         )}
                       </div>
+                      {ext.pbx?.status === 'partial' && ext.pbx.detail && (
+                        <div className="mt-1 max-w-[260px] text-xs text-warning">
+                          {ext.pbx.detail}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex justify-end gap-2">

@@ -547,16 +547,111 @@ docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
   "SELECT length(client_secret), encode(sha256(client_secret::bytea),'hex') FROM authentik_providers_oauth2_oauth2provider WHERE client_id='dograh';"
 ```
 
-**2. The UI proxy follows the redirect server-side.** `/api/v1/auth/oidc/login` must answer
-**307** with the Authentik `authorize` URL *and* `set-cookie: dograh_oidc_state=…`. If it
-answers **200** with Authentik's HTML and no cookie, the Next proxy is using fetch's default
-redirect mode and swallowing both — the state/PKCE cookie never reaches the browser, and
-the callback can only answer `expired`. That is `dograh/patches/0001-…patch`
-(`redirect: "manual"`); if the running UI predates it, rebuild the image.
+**2. The login entry must hand the browser to the IdP.** `/api/v1/auth/oidc/login` has to
+answer a **3xx** carrying the Authentik `authorize` URL *and* `set-cookie:
+dograh_oidc_state=…`. If it answers **200** with Authentik's HTML and no cookie, something
+resolved the redirect server-side and served the IdP's page on the app's own origin — the
+sign-in looks like a page that does nothing, and the state/PKCE cookie is dropped with it.
+Two independent things stand between that and the browser:
+
+* `scripts/npm-proxy-hosts.py` puts a `location /api/v1/auth/oidc` on every app origin
+  (`OIDC_PATH`), so the OIDC legs reach the API on port 8000 without entering the UI proxy
+  at all. This is the one that does not depend on an image being current;
+* `dograh/patches/0001-…patch` (`redirect: "manual"`) fixes the UI proxy itself, for any
+  other route that answers 3xx. If the running UI predates it, rebuild the image.
+
+Check the entry point an operator actually opens, not just the API's own host: every name
+the app answers on reaches the API through the same UI proxy, so the apex can fail where
+the API host succeeds (measured: `api.` → 307 + cookie, while `capstone.`/`app.`/`dograh.` →
+200 with Authentik's HTML).
 
 ```bash
-curl -si localhost:3010/api/v1/auth/oidc/login | head -6      # want 307 + location + set-cookie
+for h in capstone dograh app api; do
+  printf '== %s: ' "$h"
+  curl -si "https://$h.capstone.innotel.us/api/v1/auth/oidc/login" | head -1
+done   # apex and api. want 307; app./dograh. want 302 to the apex, which answers 307
 ```
+
+`python3 scripts/npm-smoke-test.py` asserts the same thing end to end: it walks each origin's
+entry until it reaches the IdP's `/application/o/authorize/`, so the 200-with-a-page that a
+swallowed redirect produces cannot pass. It also runs the dead-end probe below on each of
+those origins, because the entry walk alone passes on a stale UI image — the edge route sends
+the sign-in to the API whatever UI is behind it.
+
+**A patch only helps if the image that ships it is the one running.** `DOGRAH_API_IMAGE` and
+`DOGRAH_UI_IMAGE` are independent pins, so a `.env` that points the API at a locally built
+`dograh-local/dograh-api:capstone` while leaving the UI on the registry's `:latest` runs a
+patched API behind an unpatched proxy — exactly the split the edge route above exists to
+survive. Pin both, and follow `docker-compose.dograh-build.yml` for the build-and-ship
+procedure (the UI cannot be built on the Capstone host).
+
+**A pin is only as good as the image behind it.** Which image is running is one
+`docker inspect` away, and whether it carries a patch is one `md5sum` — the cheapest way
+to settle "was that rebuild ever shipped?":
+
+```bash
+ssh root@<capstone-host> "docker inspect -f '{{.Image}} {{.Created}}' dograh-api"
+ssh root@<capstone-host> "docker exec dograh-api md5sum /app/api/services/auth/oidc_auth.py"
+md5sum dograh/upstream/api/services/auth/oidc_auth.py   # the patched tree — must match
+```
+
+Measured on 28 Sep: the API image had been built on the 26th, two days before
+`dograh/patches/0006`, so those two hashes differed for `oidc_auth.py` and
+`api/routes/auth.py` and matched for every other file the patches touch. That is what a
+half-shipped patch set looks like — no error, no failed check, and a running service that
+is simply not the one the repo describes.
+
+A registry tag cannot stand in for the UI pin: those images are built from the
+`innotelinc/dograh` fork's `main`, which carries the fork's own customizations and not
+`dograh/patches/`, so no tag of it has the OIDC session handling. A `.env` with
+`DOGRAH_UI_IMAGE` unset runs that image, and it renders the dead-end page below for every
+signed-in user while a signed-out visitor sees the sign-in form as usual.
+
+**An unpatched UI is one request away from being obvious.** The dead-end branch only renders
+when the middleware lets the request through, which needs a session cookie to be *present* —
+so a cookie the API will reject is enough to tell a patched UI from a stale one, with no
+account and nothing to undo:
+
+```bash
+curl -s -H 'Cookie: dograh_auth_token=probe' https://<zone>/workflow \
+  | grep -c 'Authentication required'
+# want 0. 1 means the UI predates dograh/patches/0001: the backend reports
+# auth_provider=oidc (see the health check above), the pre-0001
+# getServerAccessToken() answers null for that session, and the page renders its
+# dead-end branch instead of the agent list. The same request without the cookie
+# is a 307 to /auth/login either way, which is why it cannot show this.
+```
+
+**The UI build needs more memory than the dev container is allowed.** `development` is
+capped at 4 GiB, and webpack's persistent cache — one in-memory generation of every module,
+held for the whole build — puts `next build` over it (peak 4.4 GiB, cgroup OOM mid-compile,
+right after "Creating an optimized production build"). `dograh/patches/0007` turns that cache
+off for image builds (`NEXT_BUILD_FS_CACHE=0` in `ui/Dockerfile`), which is what brings the
+build under the cap; cap the heap with `--build-arg NODE_BUILD_HEAP_MB=2048` and nothing else
+on the stack has to be stopped for it.
+
+**The state cookie has to reach the host that finishes the sign-in.** It is written when
+the browser starts the flow and read back at the provider's registered `redirect_uri`, and
+those are only the same host by chance. This deployment registers the **apex**
+(`AUTHENTIK_REDIRECT_URI=https://<zone>/api/v1/auth/oidc/callback`, registered on the Dograh
+provider alongside the older `dograh.` name) and the edge sends `app.`/`dograh.` sign-ins
+there first, so the cookie is host-only *by design* — which is what the check below shows.
+`dograh/patches/0006-…patch` widens it only where it can name a parent covering both hosts
+(a callback four labels or more, e.g. `dograh.<zone>` → `.<zone>`); it deliberately does not
+widen a three-label host, whose parent is the organisation domain shared with the rest of
+the estate.
+
+```bash
+curl -si https://capstone.innotel.us/api/v1/auth/oidc/login \
+  | grep -iE '^(location|set-cookie)'
+# want: location …/application/o/authorize/?…redirect_uri=https%3A%2F%2Fcapstone.innotel.us%2F…
+#       set-cookie: dograh_oidc_state=…; HttpOnly; …; Secure   (no Domain — see above)
+```
+
+The trap is changing one without the other: an `AUTHENTIK_REDIRECT_URI` on a host the edge
+does not route sign-ins to — or `OIDC_CANONICAL_SUB` in `scripts/npm-proxy-hosts.py` naming a
+different host than the callback — gets a code and then loses the cookie, which renders as
+`expired` rather than as anything an operator can act on.
 
 Admission is a third gate after the token exchange: `AUTHENTIK_ALLOWED_GROUPS`
 (`cerulean-platform` here) is enforced by `api/services/auth/oidc_auth.py`, and
@@ -599,8 +694,11 @@ intent=TokenIntents.INTENT_API, description="…")` — `Token.key` is the raw v
 end-to-end check needs no knowledge of `sub` at all:
 
 ```bash
-AK_TOKEN=<authentik api token> SMOKE_PW=<random> python3 scripts/ci/sso-smoke.py
+AUTHENTIK_TOKEN=<authentik api token> python3 scripts/ci/sso-smoke.py
 # RESULT: a real sign-in completes — authorize -> callback -> token -> authenticated request.
+# The token may come from .env instead of the environment. The script mints its own password
+# for the temporary identity it creates (and deletes), and answers 0 pass / 1 fail /
+# 2 cannot-run — a skip, so CI can run it off-LAN. `DOGRAH_BASE` names the zone to test.
 ```
 
 ### Authentik groups per stack (and per-stack access)

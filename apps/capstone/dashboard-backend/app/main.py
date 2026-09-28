@@ -1427,6 +1427,41 @@ def _pbx_reload_pjsip() -> None:
         raise HTTPException(status_code=502, detail=f"pjsip reload failed: {text}")
 
 
+# ── self-repair on the list views ───────────────────────────────────────────
+# Agents, Extensions and Workflows each repair their own half-wired rows when
+# their page loads, so an operator is never shown a fault the writers could have
+# converged. They share one bound: a cooldown between attempts at the same
+# repair, and single-flight, so something genuinely unrepairable cannot turn
+# every page load into a write attempt, and two operator windows polling cannot
+# race two reloads into one PBX config.
+_REPAIR_COOLDOWN = 60.0  # seconds between two attempts at the same repair
+_repair_claims: dict[str, tuple[float, threading.Lock]] = {}
+_repair_claims_lock = threading.Lock()
+
+
+def _claim_repair(name: str) -> threading.Lock | None:
+    """Reserve `name`'s repair window, or None when it may not run now.
+
+    Release the returned lock in a ``finally`` — that is the single-flight half.
+    The timestamp is only recorded once the lock is held, so two concurrent page
+    loads cannot both decide they are the one that gets to repair.
+
+    Callers do this *before* their probe, not after: for the Workflows list the
+    probe is itself a PBX round trip, and the point of the cooldown is that an
+    unrepairable row costs nothing on most page loads.
+    """
+    with _repair_claims_lock:
+        at, lock = _repair_claims.get(name, (0.0, threading.Lock()))
+        _repair_claims[name] = (at, lock)
+    if time.time() - at < _REPAIR_COOLDOWN:
+        return None
+    if not lock.acquire(blocking=False):
+        return None
+    with _repair_claims_lock:
+        _repair_claims[name] = (time.time(), lock)
+    return lock
+
+
 def _conf_split(text: str) -> tuple[list[str], list[dict[str, Any]], list[str]]:
     """Split an Asterisk conf into (prelude, sections, trailing).
 
@@ -1511,12 +1546,99 @@ def _parse_webrtc_extensions() -> list[dict[str, Any]]:
     return exts
 
 
+def _webrtc_aor_section(ext: str) -> str:
+    """The `pjsip.aor_custom.conf` block for one extension (single WSS contact).
+
+    Shared by `extensions_create` and the repair, so the two can never disagree
+    about what a complete extension's AOR looks like.
+    """
+    return (
+        f"\n; Extension {ext} AOR (single WSS contact)\n"
+        f"[{ext}]\n"
+        f"type = aor\n"
+        f"max_contacts = 1\n"
+        f"remove_existing = yes\n"
+    )
+
+
+def _webrtc_aor_extensions() -> list[str]:
+    """Extensions that have an AOR section in pjsip.aor_custom.conf."""
+    _, sections, _ = _conf_split(_pbx_read_conf("/etc/asterisk/pjsip.aor_custom.conf"))
+    return [_section_name(s["header"]) for s in sections]
+
+
+def _webrtc_repair_missing_aors(pending: list[str]) -> bool:
+    """Append the missing AOR sections for `pending`, then reload pjsip once.
+
+    One extension is three sections in three files — endpoint, auth, AOR — and
+    `extensions_create` writes them in that order, so a run that failed part-way
+    leaves the endpoint and its auth in place and the AOR missing. The endpoint's
+    `aors =` then points at a section that does not exist: the phone registers
+    and its calls go nowhere.
+
+    Only the AOR is repaired here, and deliberately: the auth section holds the
+    SIP password, which cannot be reconstructed, so it is reported instead of
+    being "fixed" with a secret nobody knows (see _webrtc_status_payload).
+
+    Batched like the Agents repair: every missing section in one write, published
+    by one reload.
+    """
+    if not pending:
+        return False
+    lock = _claim_repair("extensions")
+    if lock is None:
+        return False
+    try:
+        conf = _pbx_read_conf("/etc/asterisk/pjsip.aor_custom.conf")
+        for ext in pending:
+            conf += _webrtc_aor_section(ext)
+        _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", conf)
+        _pbx_reload_pjsip()
+        return True
+    except HTTPException:
+        # The page still has to render, and the status already names the gap.
+        return False
+    finally:
+        lock.release()
+
+
+def _webrtc_status_payload(gaps: list[str]) -> dict[str, Any]:
+    """Provisioning state for one WebRTC extension, as the page shows it.
+
+    The one gap the dashboard cannot close is a missing auth section: the
+    password lives there and nowhere else, so it is named and handed to the
+    operator's rotate action rather than silently replaced.
+    """
+    if not gaps:
+        return {"status": "provisioned", "auth": True, "aor": True, "detail": ""}
+    if "auth" in gaps:
+        detail = (
+            "No SIP auth section — this extension's password is not recoverable; "
+            "rotate it to restore sign-in."
+        )
+    else:
+        detail = "No AOR section — this page repairs it."
+    return {
+        "status": "partial",
+        "auth": "auth" not in gaps,
+        "aor": "aor" not in gaps,
+        "detail": detail,
+    }
+
+
 @app.get("/extensions")
 def extensions_list(user: dict = Depends(require_session)):
     """WebRTC extensions provisioned on the PBX (from the durable custom conf),
     annotated with live registration state from pjsip."""
     try:
         exts = _parse_webrtc_extensions()
+        # Converge before answering, the way the Agents list does: a run that
+        # failed part-way leaves the AOR missing, and that is the one piece here
+        # the writers can restore without a secret.
+        aors = _webrtc_aor_extensions()
+        pending = [e["extension"] for e in exts if e["extension"] not in aors]
+        if _webrtc_repair_missing_aors(pending):
+            aors = _webrtc_aor_extensions()
         reg = _pbx_registration_map()
         route_map = {d: e["extension"] for d, e in _read_webrtc_did_routes().items()}
         demo = _demo_extension()
@@ -1526,6 +1648,12 @@ def extensions_list(user: dict = Depends(require_session)):
             ext["contactUri"] = (live or {}).get("contactUri")
             ext["builtIn"] = ext["extension"] == demo
             ext["dids"] = sorted(d for d, e in route_map.items() if e == ext["extension"])
+            gaps = []
+            if not ext["hasPassword"]:
+                gaps.append("auth")
+            if ext["extension"] not in aors:
+                gaps.append("aor")
+            ext["pbx"] = _webrtc_status_payload(gaps)
     except HTTPException:
         raise
     except Exception as exc:
@@ -1629,13 +1757,7 @@ def extensions_create(body: dict, user: dict = Depends(require_session)):
         f"password = {password}\n"
     )
     aor_conf = _pbx_read_conf("/etc/asterisk/pjsip.aor_custom.conf")
-    aor_conf += (
-        f"\n; Extension {ext} AOR (single WSS contact)\n"
-        f"[{ext}]\n"
-        f"type = aor\n"
-        f"max_contacts = 1\n"
-        f"remove_existing = yes\n"
-    )
+    aor_conf += _webrtc_aor_section(ext)
     _pbx_write_conf("/etc/asterisk/pjsip.endpoint_custom.conf", endpoint_conf)
     _pbx_write_conf("/etc/asterisk/pjsip.auth_custom.conf", auth_conf)
     _pbx_write_conf("/etc/asterisk/pjsip.aor_custom.conf", aor_conf)
@@ -1961,8 +2083,14 @@ def agents_list(user: dict = Depends(require_session)):
     # One PBX query answers the whole page (the per-agent probe used to be one
     # `docker exec` each — 8-way concurrency only got that down to ~2× wall
     # clock, because the execs then contend).
-    exts = [a.get("extension") or "" for a in rows]
+    # The same derivation the writers use, so the status keys and the rows they
+    # repair can never disagree.
+    exts = [_agent_pbx_extension(a) for a in rows]
     statuses = _agent_pbx_statuses(mode, exts)
+    # Converge before answering: a row that reads Partial is one the writers can
+    # repair (see _repair_partial_rows), and this page is where an operator
+    # meets that state. No-op when every row is already wired.
+    statuses = _repair_partial_rows(mode, rows, statuses, client)
     for a, ext in zip(rows, exts):
         a["pbx"] = statuses[ext]
     return {"mode": mode, "configured": True, "agents": rows,
@@ -1997,9 +2125,15 @@ def workflows_list(user: dict = Depends(require_session)):
     """All dograh workflows (id / name / status)."""
     client = _workflow_client()
     try:
-        return client.list_workflows()
+        rows = client.list_workflows()
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+    # Renaming a workflow is a dograh write; the PBX rows carry the workflow name
+    # in their FreePBX description, so they keep naming the old one until the
+    # agent is saved again. This page is where the rename is made, so it is where
+    # the stale rows converge. Bounded, and a no-op on most loads.
+    _repair_stale_workflow_rows(client)
+    return rows
 
 
 @app.get("/workflows/{workflow_id}")
@@ -2423,6 +2557,10 @@ def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
         )
         _pbx_write_conf(conf, kept.rstrip() + "\n" if kept.strip() else "")
         _pbx_exec(["rm", "-f", agents.DIALPLAN_PATH])
+    # This is the dialplan the Agents list reads to decide a row has its entry,
+    # and that read is cached: drop it, or a status taken straight after this
+    # write answers from the previous dialplan.
+    _dialplan_cache.clear()
 
 
 def _pbx_reload_dograh() -> None:
@@ -2436,19 +2574,102 @@ def _pbx_reload_dograh() -> None:
         raise HTTPException(status_code=502, detail=f"fwconsole reload failed: {text}")
 
 
-def _provision_agent_pbx(agent: dict, client: agents.DograhClient) -> None:
-    """Provision (or refresh) one agent's FreePBX rows and reload."""
-    ext = agent.get("extension") or agents.extension_from_address(agent.get("address") or "")
+def _agent_pbx_extension(agent: dict) -> str:
+    """The extension an agent's FreePBX rows hang off ("" = nothing to wire)."""
+    return agent.get("extension") or agents.extension_from_address(agent.get("address") or "")
+
+
+def _agent_row_descriptions(exts: list[str]) -> dict[str, str]:
+    """FreePBX's stored description per extension, dograh-managed rows only."""
+    sql = agents.agent_description_probe_sql(exts)
+    if not sql:
+        return {}
+    out: dict[str, str] = {}
+    for line in _pbx_mysql(sql).splitlines():
+        ext, _, desc = line.partition("\t")
+        if ext.strip():
+            out[ext.strip()] = desc.strip()
+    return out
+
+
+def _repair_stale_workflow_rows(client: agents.DograhClient) -> int:
+    """Re-apply the PBX rows of agents whose description names the wrong workflow.
+
+    A workflow rename is a dograh write, and the FreePBX rows carry the workflow
+    name inside their description (`agents.agent_description`), so a renamed
+    workflow leaves the PBX — its GUI list, and the inbound route's title —
+    telling an operator the number runs something it no longer runs.
+
+    The Workflows page is where a rename is made, so it is where the stale rows
+    are repaired: compare what the PBX holds against each agent's current
+    binding and re-apply the writers for the mismatches, batched behind one
+    reload and bounded by the shared cooldown.
+
+    An extension with no row at all is left alone — that is not a stale
+    description but an unwired agent, which the Agents list already repairs (and
+    which would otherwise turn this into a second, redundant provisioner).
+    """
+    if agents.deploy_mode() != "standalone":
+        return 0
+    if not client.configured():
+        return 0
+    lock = _claim_repair("workflows")
+    if lock is None:
+        return 0
+    try:
+        rows = client.list_agents()
+        keyed = [(a, _agent_pbx_extension(a)) for a in rows]
+        wanted = sorted({ext for _, ext in keyed if ext})
+        if not wanted:
+            return 0
+        stored = _agent_row_descriptions(wanted)
+        stale: list[dict[str, Any]] = []
+        for agent, ext in keyed:
+            held = stored.get(ext or "")
+            if not ext or held is None:
+                continue
+            label = agent.get("label") or f"Agent {ext}"
+            expected = agents.agent_description(label, agent.get("workflowName") or label)
+            if held != expected:
+                stale.append(agent)
+        if not stale:
+            return 0
+        table = _pbx_kvstore_table()
+        for agent in stale:
+            _write_agent_pbx_rows(agent, table)
+        _pbx_reload_dograh()
+        return len(stale)
+    except Exception:  # noqa: BLE001 - a list view must not fail on a repair
+        return 0
+    finally:
+        lock.release()
+
+
+def _write_agent_pbx_rows(agent: dict, table: str) -> None:
+    """Write (or refresh) one agent's FreePBX rows: extension, destination, route.
+
+    Every writer is idempotent, so this converges a row whether it was never
+    provisioned or failed part-way. No dialplan sync and no reload: both are
+    PBX-wide, so they belong to the caller — that is what lets a batch of rows
+    be published by one reload instead of one per agent.
+    """
+    ext = _agent_pbx_extension(agent)
     if not ext:
         return
     label = agent.get("label") or f"Agent {ext}"
     workflow_name = agent.get("workflowName") or label
     desc = agents.agent_description(label, workflow_name)
     target = f"dograh-inbound,{ext},1"
-    table = _pbx_kvstore_table()
     _pbx_mysql(agents.upsert_custom_extension_sql(ext, label, workflow_name))
     _pbx_ensure_custom_dest(table, target, desc)
     _pbx_ensure_inbound_route(ext, desc, target)
+
+
+def _provision_agent_pbx(agent: dict, client: agents.DograhClient) -> None:
+    """Provision (or refresh) one agent's FreePBX rows and reload."""
+    if not _agent_pbx_extension(agent):
+        return
+    _write_agent_pbx_rows(agent, _pbx_kvstore_table())
     _pbx_sync_dynamic_dialplan(client)
     _pbx_reload_dograh()
 
@@ -2610,6 +2831,77 @@ def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
         return {e: {"status": "error", "customExtension": None, "inboundRoute": None,
                     "dialplan": None, "detail": exc.detail} for e in exts}
     return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp) for e in exts}
+
+
+def _repair_partial_rows(
+    mode: str,
+    rows: list[dict[str, Any]],
+    statuses: dict[str, dict],
+    client: agents.DograhClient,
+) -> dict[str, dict]:
+    """Re-apply the FreePBX writers for every row the list read as un-wired.
+
+    The Agents list calls this, so a row left half-wired by a failed
+    provisioning run converges on its own. That state is what an operator meets
+    first — the MariaDB-rejected `CAST(... AS JSON)` aborted the apply after the
+    extension row and before the inbound route (see agents.py) — and it used to
+    be permanent until someone clicked Re-sync, on a page whose whole point is
+    to tell an operator what is wired.
+
+    Batched on purpose. The writers are idempotent and cheap, but the
+    `fwconsole reload` behind them is PBX-wide: one reload per agent is what the
+    per-row Re-sync costs, so every row is written in one pass and published by
+    a single reload.
+
+    Bounded on purpose. Something genuinely unrepairable — no
+    `custom_extensions` table, a PBX that refuses the write — must not turn
+    every page load into a write attempt, so attempts are spaced by a cooldown
+    and never run concurrently. Two operator windows polling must not race two
+    reloads into one PBX config.
+
+    Anything the PBX rejects leaves the original, honest status alone rather
+    than failing the request: the page still has to render, and that status
+    already names the missing piece.
+    """
+    if mode != "standalone":
+        return statuses
+    keyed = [(a, _agent_pbx_extension(a)) for a in rows]
+    targets = [
+        a
+        for a, ext in keyed
+        if (statuses.get(ext) or {}).get("status") in ("partial", "not-provisioned")
+    ]
+    if not targets:
+        return statuses
+    lock = _claim_repair("agents")
+    if lock is None:
+        return statuses
+    try:
+        try:
+            table = _pbx_kvstore_table()
+            wrote = False
+            for agent in targets:
+                try:
+                    _write_agent_pbx_rows(agent, table)
+                    wrote = True
+                except HTTPException:
+                    # Keep going: the rows are independent, and one refusal must
+                    # not deny the rest their repair.
+                    continue
+            if not wrote:
+                return statuses  # nothing changed, so nothing to publish
+            _pbx_sync_dynamic_dialplan(client)
+            _pbx_reload_dograh()
+            # Converged: re-read so the page shows what is really there now.
+            return _agent_pbx_statuses(mode, [ext for _, ext in keyed])
+        except Exception:  # noqa: BLE001 - best effort by design
+            # The PBX refused the write, the reload died, or it went away mid
+            # request. The page still has to render, and the status computed
+            # before this attempt already names the missing piece — so fall back
+            # to it rather than failing the request.
+            return statuses
+    finally:
+        lock.release()
 
 
 # --------------------------------------------------------------------------

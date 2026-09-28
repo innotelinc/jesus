@@ -133,6 +133,68 @@ def _docker_available():
         return False
 
 
+def assert_login_entry(client, url):
+    """The login entry must redirect to the IdP, and leave a state cookie the
+    callback host can actually read. Returns the authorize URL.
+
+    Both halves have failed in production, and each failed invisibly — the run
+    still reached the IdP, so only an assertion on the entry itself shows it:
+
+      * A 200 carrying the IdP's HTML means the UI's API proxy resolved the
+        redirect server-side. The browser never left the app's origin, so
+        neither the Location nor the Set-Cookie reached it and the sign-in
+        looked like a page that does nothing (see dograh/patches/0001).
+      * A host-only state cookie while the registered callback is on another
+        host loses the state at the callback. The app answers on the apex and
+        on its `app.`/`dograh.` names, but the provider registers one callback,
+        so a sign-in started on another name arrived without a cookie and could
+        only answer `expired` (see dograh/patches/0006).
+
+    The entry may also hand the browser to a *different* name of the same app
+    before any of that — the edge sends a sign-in that started on an alias
+    origin to the name the provider registers as the callback, because the
+    state cookie can only be set where the flow really begins
+    (OIDC_CANONICAL_SUB in npm-proxy-hosts.py). That hop is part of the entry
+    point, so it is followed here; everything asserted afterwards is unchanged.
+    """
+    status, location, _ = client.get(url)
+    for _ in range(3):
+        target = urllib.parse.urlparse(location or "")
+        if "client_id=" in (target.query or ""):
+            break  # the IdP's authorize endpoint — the entry did its job
+        if target.path != urllib.parse.urlparse(url).path or not target.netloc:
+            break  # not a hand-off between this app's own names
+        url = location or url
+        status, location, _ = client.get(url)
+    authorize = location or ""
+    cookie = next((c for c in client.jar if c.name == "dograh_oidc_state"), None)
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(authorize or "").query)
+    callback_host = urllib.parse.urlparse(query.get("redirect_uri", [""])[0]).hostname or ""
+    entry_host = urllib.parse.urlparse(url).hostname or ""
+    domain = (cookie.domain if cookie else "") or ""
+    readable = (
+        not callback_host
+        or callback_host == entry_host
+        or callback_host == domain.lstrip(".")
+        or callback_host.endswith(domain if domain.startswith(".") else "." + domain)
+    )
+    print(f"    HTTP {status}")
+    print(f"    location head: {(authorize or '-')[:72]}...")
+    print(f"    state cookie: {'yes, %d chars' % len(cookie.value) if cookie else 'MISSING'}"
+          f" (domain {domain or 'host-only'})")
+    print(f"    entry host: {entry_host} -> callback host: {callback_host or '(absent)'}")
+    v.require(status in (301, 302, 303, 307, 308) and cookie is not None,
+              f"{url} must answer a redirect AND set the state cookie "
+              f"(got HTTP {status}, cookie {'set' if cookie else 'missing'}) — "
+              f"without both, the callback can only answer `expired`")
+    v.require(readable,
+              f"the state cookie is not readable at the callback host: it is scoped to "
+              f"{domain or f'the login host ({entry_host}) only'} but the provider "
+              f"returns the browser to {callback_host} — the sign-in would lose its "
+              f"state and the callback could only answer `expired`")
+    return authorize or ""
+
+
 def drive_login(cfg, client):
     """Walk dograh's sign-in as the browser does; return the final hop's Location.
 
@@ -142,17 +204,8 @@ def drive_login(cfg, client):
     the same dance, so it stays recognisable next to that one.
     """
     step(3, "app login entry (this is what the browser hits)")
-    status, authorize, _ = client.get(APP + LOGIN_PATH)
-    state_cookie = client.cookie("dograh_oidc_state")
-    print(f"    HTTP {status}")
-    print(f"    location head: {(authorize or '-')[:72]}...")
-    print(f"    state cookie: {'yes, %d chars' % len(state_cookie) if state_cookie else 'MISSING'}")
-    v.require(status in (301, 302, 303, 307, 308) and state_cookie,
-              f"the login entry must answer a redirect AND set the state cookie "
-              f"(got HTTP {status}, cookie {'set' if state_cookie else 'missing'}) — "
-              f"without both, the callback can only answer `expired`")
-    v.require("client_id=" in (authorize or ""),
-              "the authorize URL carries no client_id")
+    authorize = assert_login_entry(client, APP + LOGIN_PATH)
+    v.require("client_id=" in authorize, "the authorize URL carries no client_id")
 
     # The authorize URL is absolute and names the IdP the app is actually
     # configured against. Pin the client to that origin: the hops that follow
@@ -280,6 +333,15 @@ def main():
             client = app_client(cfg)
             use_token(drive_login(cfg, client))
             print(f"    RESULT pass {attempt}: signed in")
+
+        # The entry point an operator actually opens. It is a different NAME for
+        # the same app, and the registered callback is on exactly one of those
+        # names, so a host-only state cookie only survives a sign-in started on
+        # that one. This is the pass that catches it.
+        apex = f"https://{cfg.base}"
+        if cfg.base and urllib.parse.urlparse(APP).hostname != cfg.base:
+            step(8, f"the operator's own entry point ({apex})")
+            assert_login_entry(app_client(cfg), apex + LOGIN_PATH)
 
         print("\nRESULT: a new identity can sign in, and an address already held by "
               "another subject does not stop one.")

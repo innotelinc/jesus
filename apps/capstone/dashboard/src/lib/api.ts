@@ -78,12 +78,24 @@ export interface ServiceLogs {
 export interface PbxExtension {
   extension: string;
   callerId: string;
-  hasPassword: true;
+  /** False when the auth section is missing — the device cannot sign in. */
+  hasPassword: boolean;
   authUser: string;
   registered?: boolean;
   contactUri?: string | null;
   builtIn?: boolean;
   dids?: string[];
+  /**
+   * Completeness of the three pjsip sections this extension is made of. The
+   * AOR is restored on load; a missing auth section is reported, because its
+   * password cannot be reconstructed.
+   */
+  pbx?: {
+    status: 'provisioned' | 'partial';
+    auth?: boolean;
+    aor?: boolean;
+    detail?: string;
+  };
 }
 
 export interface PbxExtensionUpdate {

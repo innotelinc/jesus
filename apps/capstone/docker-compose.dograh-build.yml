@@ -60,6 +60,21 @@
 # The API image builds fine on .30 (it is pip, not webpack) — but not at the
 # same time: the two built in parallel once and the UI lost. Build one at a
 # time.
+#
+# ── MEASURED: the dev container is capped too (2026-09-28) ──────────────────
+# `development` runs inside a 4 GiB cgroup (the post-incident limits), and the
+# UI build hit the same wall there: cgroup OOM at a 4.4 GiB peak, right after
+# "Creating an optimized production build". The cause is webpack's persistent
+# cache — Next sets `maxMemoryGenerations: Infinity` for production, so one
+# in-memory generation of every module is held for the whole build — and an
+# image build gets nothing from a cache that dies with its layer. ui/Dockerfile
+# now sets NEXT_BUILD_FS_CACHE=0 (dograh/patches/0007); with that and a heap cap
+# the build fits the 4 GiB container with nothing else stopped:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     build --build-arg NODE_BUILD_HEAP_MB=2048 dograh-ui    # ~6 min, no OOM
+#
+# Then ship it to .30 exactly as above.
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:

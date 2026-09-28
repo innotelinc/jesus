@@ -79,7 +79,11 @@ SSO: there is no forward-auth gate any more — no host carries an nginx
   (the Control Center, the voice app) use it directly; surfaces that do not
   (FreePBX, n8n, Grist, Grafana, Workflow Studio, OmniRoute) are fronted by an
   oauth2-proxy SSO gateway instead. Both are Authentik OIDC, and both close
-  the app's own login page. See the npm repo's docs/stack.md.
+  the app's own login page. The voice app's OIDC legs are the exception that
+  needs saying twice: they are cut straight to the API — bypassing the app's own
+  UI proxy, so a sign-in never depends on that image being current — by a
+  location on each of the app's origins. See OIDC_PATH. The npm repo's
+  docs/stack.md covers the edge as a whole.
 
 The old pre-v3.11 names dograh-ui and ws are pruned as stale on the next run
 — pass --no-prune to keep them around. Neither dograh nor dashboard is pruned:
@@ -199,6 +203,69 @@ def media_location(upstream: str) -> dict[str, Any]:
         "forward_host": upstream,
         "forward_port": MEDIA_PORT,
         "advanced_config": MEDIA_LOCATION_ADVANCED,
+    }
+
+
+# ── Cerulean SSO (the OIDC legs) ───────────────────────────────────────
+# A sign-in starts at /api/v1/auth/oidc/login and finishes at
+# /api/v1/auth/oidc/callback. Both are the *API's* routes, but on the app's own
+# origins /api/v1/* arrives through the UI's Next server first, and that proxy
+# was built to resolve redirects itself: it followed the 307 to the IdP
+# server-side and handed the browser a 200 carrying Authentik's HTML, so
+# clicking "Sign in with Cerulean" appeared to do nothing at all.
+# (dograh/patches/0001 gives the proxy `redirect: "manual"` — but that only
+# reaches a host in a rebuilt UI image, and a stale image is exactly what this
+# route exists to survive.)
+#
+# Cutting the prefix straight to the API at the edge removes the dependency:
+# the browser receives the 307, its Location and its Set-Cookie untouched.
+#
+# The provider registers exactly ONE redirect_uri, so the host that starts the
+# flow must be the host that finishes it. The canonical host below proxies the
+# prefix to the API itself; every other app origin hands the browser over to it
+# first, because the state/PKCE cookie is host-only until the API widens it
+# (dograh/patches/0006). Keep OIDC_CANONICAL_SUB in step with
+# AUTHENTIK_REDIRECT_URI in .env — a mismatch strands every sign-in on
+# `expired` at the callback.
+OIDC_PATH = "/api/v1/auth/oidc"
+OIDC_PORT = 8000
+OIDC_CANONICAL_SUB = None          # None → the apex domain
+OIDC_HOST_KEYS = {"apex", "app", "dograh"}
+
+
+def oidc_canonical_host(base_domain: str) -> str:
+    """The one name an Authentik sign-in completes on (see OIDC_CANONICAL_SUB)."""
+    if OIDC_CANONICAL_SUB is None:
+        return base_domain
+    return f"{OIDC_CANONICAL_SUB}.{base_domain}"
+
+
+def oidc_location(upstream: str) -> dict[str, Any]:
+    """The OIDC legs served by the API, skipping the app's own UI proxy."""
+    return {
+        "path": OIDC_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": OIDC_PORT,
+        "advanced_config": "",
+    }
+
+
+def oidc_handoff_location(canonical_host: str, upstream: str) -> dict[str, Any]:
+    """Send a sign-in started on an alias origin to the canonical one.
+
+    A 302 rather than a proxy: the state/PKCE cookie is host-only (the API only
+    widens it where it can infer a shared parent), so a flow that started on
+    `app.`/`dograh.` would leave its cookie there and come back to the canonical
+    host without it. `return` is answered before the location's proxy_pass, so
+    the forward fields exist only because NPM requires them.
+    """
+    return {
+        "path": OIDC_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": OIDC_PORT,
+        "advanced_config": f"return 302 https://{canonical_host}$request_uri;",
     }
 
 
@@ -560,6 +627,15 @@ def main() -> int:
     for h in hosts:
         if h["key"] in MEDIA_HOST_KEYS:
             h.setdefault("locations", [media_location(upstream)])
+        # The OIDC legs, on every origin that serves the app (see OIDC_PATH).
+        if h["key"] in OIDC_HOST_KEYS:
+            canonical = oidc_canonical_host(base_domain)
+            location = (
+                oidc_location(upstream)
+                if h["sub"] == OIDC_CANONICAL_SUB
+                else oidc_handoff_location(canonical, upstream)
+            )
+            h.setdefault("locations", []).append(location)
         if h.get("host_key") == "ZEUS_UPSTREAM_HOST":
             h["forward_host"] = zeus_upstream
     if args.ws_scheme is not None or args.ws_port is not None:

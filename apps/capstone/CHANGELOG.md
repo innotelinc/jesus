@@ -8,8 +8,10 @@ product landing page; this file keeps the per-release detail.
 Work landed after the `v3.19` tag: host-side SIP registration bans for a PBX
 that is scanned continuously, a data-layer backup for the next host move, the
 shared-box softphone signaling that a profile-off PBX container had broken, an
-Agents page that stopped paying one PBX round trip per agent, per row, and a
-portal link that pointed at a container this stack does not start.
+Agents page that stopped paying one PBX round trip per agent, per row, a portal
+link that pointed at a container this stack does not start, and a voice stack
+whose running images had not all caught up with this repo's patches — the UI had
+none of them, and the API was one behind.
 
 ### The portal link points at Zeus, and the dashboard's lint is real
 
@@ -61,10 +63,165 @@ portal link that pointed at a container this stack does not start.
   complete copy written atomically, `0600`, gitignored). A stack whose `.env`
   still holds references but has no `VAULT_ADDR` is **refused** rather than
   started with literal `vault://` strings, and `--check` is the assertion for
-  CI. `docs/operations.md` records the three gates a login passes through —
-  credential, UI proxy redirect mode, and `AUTHENTIK_ALLOWED_GROUPS` admission —
-  with the command that reads each one's truth, because all three render as the
-  same browser message.
+  CI. `docs/operations.md` records the gates a login passes through — credential,
+  UI proxy redirect mode, the state cookie's scope, and
+  `AUTHENTIK_ALLOWED_GROUPS` admission — with the command that reads each one's
+  truth, because they all render as the same browser message.
+- **Fixed: a sign-in started at the apex died at the callback.** The app answers
+  on the apex *and* on its `app.`/`dograh.` names, but the registered
+  `redirect_uri` is exactly one of them. The state/PKCE cookie is written when
+  the browser starts the flow and read back when Authentik returns it to that
+  one name, and it was host-only — so a sign-in started anywhere else arrived at
+  the callback without a cookie and could only answer `expired`. Measured on the
+  live host: `api.capstone.innotel.us` answered the correct 307 with
+  `set-cookie: dograh_oidc_state=…` and no `Domain`, while the UI hosts answered
+  200 (the proxy above). `/auth/oidc/login` now scopes the cookie to a parent
+  that covers the callback host, and clears it with the same Domain, so the
+  cookie is actually removed (`dograh/patches/0006`). Where the callback *is* a
+  name the flow starts on — this deployment's apex — there is no parent to widen
+  to and the cookie stays host-only, on purpose; see the amendment below.
+- **`scripts/ci/sso-smoke.py` now checks the entry point an operator opens.**
+  It asserted the login entry at `dograh.` — the callback host — so a host-only
+  state cookie passed, and so did a proxy that had resolved the redirect. Both
+  are now asserted (a redirect plus a cookie readable at the callback host) at
+  the host the sign-in actually starts from, following the alias hand-off below
+  when there is one, and `docs/operations.md` lists the state cookie as the
+  fourth gate a login passes with the `curl` that reads it.
+
+### The voice app's sign-in entry is served by the edge, not by the app
+
+- **New: the OIDC legs are routed straight to the API.** `scripts/npm-proxy-hosts.py`
+  writes a `location /api/v1/auth/oidc` on each origin that serves the app, so
+  `/oidc/login` and `/oidc/callback` reach dograh-api on port 8000 without passing
+  through the UI's Next server. The reason is the fault that outlived the last
+  rebuild: `/api/v1/*` on those origins is proxied by the UI, and that proxy
+  resolves redirects itself, so the API's 307 arrived at the browser as a **200
+  carrying Authentik's page**. Re-measured on 28 Sep against the running image
+  (built 13 Sep): all three UI names answered 200 with `x-powered-by: authentik`,
+  which is why "Sign in with Cerulean" still did nothing after the credential fix.
+  An edge route cannot be stale, so the sign-in no longer depends on the app's own
+  image, and `dograh/patches/0001` is left to fix the proxy for every *other*
+  route that answers 3xx. Measured after: `307` + `location: …/authorize/…` +
+  `set-cookie: dograh_oidc_state=…` on the apex, and a full sign-in driven end to
+  end from `https://capstone.innotel.us` by `scripts/ci/sso-smoke.py`.
+- **The provider registers one callback, so a sign-in has to start on it.**
+  `AUTHENTIK_REDIRECT_URI` and `AUTHENTIK_POST_LOGIN_REDIRECT` now name the apex —
+  the host operators use — and the apex callback is registered on the Dograh
+  provider next to the older `dograh.` one. The edge hands a sign-in that begins
+  on `app.`/`dograh.` to the apex *before* the flow starts, because the state/PKCE
+  cookie is only ever set where the flow really begins: the alias origins answer a
+  302 rather than proxying. This is the one place the stack picks a canonical name
+  for an app that answers on three, so `OIDC_CANONICAL_SUB` in the edge map has to
+  move with `.env` — a mismatch collects the authorization code and then loses the
+  cookie, which reads as `expired` and names nothing.
+- **Amended: `dograh/patches/0006` no longer widens a three-label host.** With the
+  apex as the callback, the derived parent was the *organisation* domain
+  (`innotel.us`) — shared with every other application in the estate. Serving the
+  state/PKCE cookie to all of them buys nothing, because the callback is the apex
+  and a host-only cookie already reaches it, so the widening now applies only from
+  four labels up (`dograh.<zone>` → `.<zone>`) and never below. That is the layout
+  the patch was written for, and `AUTHENTIK_COOKIE_DOMAIN` remains the explicit
+  override for a layout whose names share a parent this cannot infer.
+- **`npm-smoke-test.py` walks the sign-in entry to the IdP.** It checked hosts, not
+  inputs; it now opens `/api/v1/auth/oidc/login` on every origin that serves the app
+  and follows the redirects until they land on `/application/o/authorize/`. The
+  failure it guards is a 200 with a page on it, which no status check can tell from
+  a working sign-in. Before the edge route it failed on all three origins; after it,
+  all three reach the IdP.
+
+### The patches had not all reached the running images
+
+- **Fixed: "Authentication required. Please refresh the page." on every page a
+  signed-in user opened.** The symptom is a page and not a redirect: an operator
+  with a valid session reached `/`, `/workflow`, or any other SSR route and got a
+  red line of text with nothing to act on, while a signed-out visitor was handed
+  the sign-in form as usual. The two differ only in the cookie the browser
+  carries, and that is the whole diagnosis. The UI answering was
+  `ghcr.io/innotelinc/dograh-ui:latest`, pulled 13 Sep — and every UI patch this
+  repo carries, `dograh/patches/0001` among them, landed after it. The backend
+  reports `auth_provider: "oidc"` (`curl -s https://<zone>/api/v1/health`), the
+  pre-`0001` `getServerAccessToken()` knew only `stack` and `local`, so it
+  answered `null` for an `oidc` session and the workflow page rendered its
+  dead-end branch. Nothing *else* was broken, which is why only signed-in users
+  saw it: the middleware guards on the presence of the cookie and lets the
+  request through, so the page — not the middleware — is what renders without a
+  token.
+- **Fixed: by building the image the patches describe, and pinning it.** `.env`
+  pinned `DOGRAH_API_IMAGE` to the locally built
+  `dograh-local/dograh-api:capstone` and left `DOGRAH_UI_IMAGE` unset, so the UI
+  fell back to the registry — the split `docs/operations.md` warns about, in the
+  one place that decides whether anything this repo fixes reaches a browser. The
+  UI is now built from `dograh/upstream` (patches applied) on the dev host, moved
+  with `docker save | gzip -1 | ssh … docker load`, and pinned in `.env` beside
+  the API pin. A registry tag cannot stand in for it: the images are built from
+  the `innotelinc/dograh` fork's `main`, which carries the fork's own
+  customizations and not `dograh/patches/`, so no tag of it has the OIDC session
+  handling at all.
+- **New: `dograh/patches/0007`, so that build fits the host that builds it.** The
+  dev container `development` is capped at 4 GiB — the limit is part of the
+  post-incident containment — and `next build` was cgroup-OOM-killed at a 4.4 GiB
+  peak, in the same place `.30` fails: right after "Creating an optimized
+  production build". The reason is webpack's persistent cache. Next sets
+  `maxMemoryGenerations: Infinity` for production, so one in-memory generation of
+  every module is held for the whole build; an image build gets nothing from a
+  cache that dies with its layer, so `ui/Dockerfile` sets `NEXT_BUILD_FS_CACHE=0`
+  and `next.config.ts` turns the cache off for production when it is set. Measured
+  on 28 Sep: peak 4.4 GiB and the kill with the cache on; clean compile, 31/31
+  static pages, and the trace pass with it off, at
+  `--build-arg NODE_BUILD_HEAP_MB=2048`.
+- **The API image was one patch behind, and nothing observable said so.**
+  `dograh-api` on the Capstone host was built on 26 Sep; `dograh/patches/0006` was
+  written on the 28th, so the running API carried every fix but that one. It is
+  inert in *this* deployment — the provider registers the **apex** as its
+  `redirect_uri`, so `state_cookie_domain()` derives `""` (host-only), which is
+  the cookie the code wrote before the patch anyway — and that is exactly why it
+  went unnoticed: no probe could have caught it, because nothing observable
+  changed. The image was rebuilt from `dograh/upstream` and shipped the way the
+  UI is (it is pip, not webpack, so it builds on the dev host too). Verified by
+  comparing `md5sum` inside the running container against `dograh/upstream`: the
+  files that differed before the rebuild were `oidc_auth.py` and
+  `api/routes/auth.py`, the two 0006 edits, and every file the patches touch now
+  matches.
+- **The check that separates a patched UI from a stale one is one request.** The
+  dead-end only renders when the middleware lets the request through, which needs
+  a session cookie to be present, so a cookie the API will reject is enough to
+  see which image is answering. `docs/operations.md` carries it under the login
+  gates, `npm-smoke-test.py` now runs it on each of the three origins that serve
+  the app, and `scripts/ci/sso-smoke.py` walks the same image's sign-in end to
+  end with a temporary identity. The body assertion is the one that matters: the
+  edge cuts the OIDC legs straight to the API, so an unpatched UI still reaches
+  the IdP — the entry-point walk passes on exactly the image a browser would
+  find broken.
+
+### The list pages repair their own half-wired rows
+
+- **New: the Agents page converges a half-wired row instead of only naming it.**
+  A row reads **Partial** when any of its three FreePBX pieces is missing — the
+  `custom_extensions` row, the inbound route, or the dialplan entry — and the
+  state an operator meets first is the one a failed provisioning run left
+  behind (extension written, route never reached). `GET /agents` now re-applies
+  the idempotent writers for those rows on load. Batched: every row is written
+  in one pass and published by a single `fwconsole reload`, because one reload
+  per agent is what the per-row Re-sync costs. Bounded: a 60-second cooldown and
+  single-flight, so a genuinely unrepairable row cannot turn every page load
+  into a write attempt and two operator windows cannot race two reloads into one
+  PBX config. A PBX that refuses a write leaves the original status in place:
+  the page still renders, and that status names the missing piece.
+- **New: the same for the other two pages' PBX rows.** An Extensions row is
+  three pjsip sections written in order, so a run that failed part-way leaves
+  the AOR missing — an endpoint whose `aors =` points at a section that does not
+  exist — and `/extensions` restores it behind one `pjsip` reload. The one gap
+  it will not close is a missing auth section: the password lives there and
+  nowhere else, so it is reported and handed to the row's rotate action instead
+  of being "fixed" with a secret nobody knows. A Workflows row is an agent's
+  FreePBX description, which carries the workflow name: renaming a workflow
+  leaves the PBX naming the old one, so `/workflows` compares what the PBX holds
+  against each agent's current binding and re-applies the stale rows.
+- **Also fixed: the cached dialplan could answer a status taken right after it
+  changed.** The Agents list caches `dialplan show dograh-inbound` for 5 seconds,
+  and the repair writes that dialplan — so a status read in the same request
+  answered from the previous dump and a freshly wired number read **Partial**
+  until the cache expired. Writing the dialplan now drops the cache.
 
 ### A recreated identity no longer locks its owner out of sign-in
 
