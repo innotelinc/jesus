@@ -119,7 +119,7 @@ sudo systemctl enable --now capstone.service
 | Identity | Cerulean Authentik — `auth.cerulean.innotel.us` | SSO, authentication, user management (shared via Cerulean; no local Authentik instance) |
 | Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
-| LLM Router | OmniRoute — `:20128`, reached on `:20129` | OpenAI-compatible gateway to local/free models; `20128` is loopback/docker0 only, the `:20129` proxy in front of it is the LAN door for `/v1` |
+| LLM Router | OmniRoute — `:20128`, reached on `:20128` | OpenAI-compatible gateway to local/free models; `20128` is loopback/docker0 only, the `:20128` proxy in front of it is the LAN door for `/v1` |
 | Workflow | n8n (Community Edition) | Session webhooks on hang-up → grading |
 | Dashboard | Grist (NocoDB opt-in) | Names, numbers, transcripts, scores |
 | Observability | OpenTelemetry → Prometheus + Grafana — `:3301` | Pipeline latency tracking; the collector converts spans to metrics and stores no traces |

@@ -100,11 +100,11 @@ Under the hood `dashboard-api` proxies to dograh: `GET /workflows`,
 (`/api/v1/workflow/create/definition`), `PUT /workflows/{id}`
 (`/api/v1/workflow/{id}` then `/publish`) and `PUT /workflows/{id}/status`. The AI mode
 reaches the OmniRoute gateway through `OMNIROUTE_URL` (defaults to
-`http://host.docker.internal:20129`, the identity-aware proxy in front of the gateway —
+`http://host.docker.internal:20128`, the identity-aware proxy in front of the gateway —
 `20128` itself is published on loopback and docker0 only), the same gateway the
 Workflow Studio uses; set `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
 On a host other than the one running the proxy, pin that host's LAN address in `.env`
-(`OMNIROUTE_URL=http://192.168.1.46:20129`) — `host.docker.internal` resolves to the
+(`OMNIROUTE_URL=http://192.168.1.46:20128`) — `host.docker.internal` resolves to the
 local docker0, where nothing listens.
 
 The proxy's host is the only host that runs the `omniroute` service: it is behind the

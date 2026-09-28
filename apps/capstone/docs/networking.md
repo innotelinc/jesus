@@ -66,10 +66,10 @@ Notes:
   by address when its host split from the stack, because the dashboard's own login
   was turned off (`make gateway-auth-mode`, `requireLogin=false`) and the port's
   reachability is then the only control. The door is the identity-aware proxy in
-  front of it, `192.168.1.46:20129`, which exempts `/v1` for inference clients and
+  front of it, `192.168.1.46:20128`, which exempts `/v1` for inference clients and
   requires Authentik for the dashboard. Keep **that** internal too: the dashboard
   name is published with `/v1` refused at the edge. Consumers here dial
-  `host.docker.internal:20129`; a stack on another host pins the LAN address of
+  `host.docker.internal:20128`; a stack on another host pins the LAN address of
   the proxy's host in `.env`. See `docs/operations.md` → Addressing, and
   `5-dev/olympus/docs/gateway-sso.md`.
 

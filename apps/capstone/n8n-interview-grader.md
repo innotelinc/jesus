@@ -178,7 +178,7 @@ fails, because a retry replays that execution's stored (empty) payload.
 
 ## Node 3 — HTTP Request: grade via OmniRoute (auto)
 
-- Method `POST`, URL `http://192.168.1.46:20129/v1/chat/completions`
+- Method `POST`, URL `http://192.168.1.46:20128/v1/chat/completions`
   (OmniRoute gateway, model `auto` — routes across its free/connected
   providers). That address is the gateway host and the SSO proxy in front of the
   gateway, which exempts `/v1` for API clients. It used to be
