@@ -2773,6 +2773,8 @@
       "no_events": "אין אירועים",
       "all_day": "כל היום",
       "more": "+{count}נוספים",
+      "show_more": "הצג עוד",
+      "show_less": "הצג פחות",
       "no_title": "(ללא כותרת)",
       "resize": "שנה את גודל האירוע",
       "duplicate": "שכפול",

@@ -2849,6 +2849,8 @@
       "no_events": "Nessun evento",
       "all_day": "Tutto il giorno",
       "more": "+{count} altri",
+      "show_more": "Mostra di più",
+      "show_less": "Mostra meno",
       "no_title": "(Senza titolo)",
       "resize": "Ridimensiona evento",
       "duplicate": "Duplica",

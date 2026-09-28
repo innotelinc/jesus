@@ -2849,6 +2849,8 @@
       "no_events": "Cap esdeveniment",
       "all_day": "Tot el dia",
       "more": "+{count} més",
+      "show_more": "Mostra'n més",
+      "show_less": "Mostra'n menys",
       "no_title": "(Sense títol)",
       "resize": "Redimensiona l'esdeveniment",
       "duplicate": "Duplica",
