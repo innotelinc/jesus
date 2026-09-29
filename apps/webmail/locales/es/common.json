@@ -3280,6 +3280,7 @@
     "body_placeholder": "El cuerpo contiene...",
     "folder": "Carpeta",
     "all_folders": "Todas las carpetas",
+    "all_folders_except_spam_trash": "Todas las carpetas excepto Spam y Papelera",
     "has_attachment": "Adjuntos",
     "date_after": "Después de",
     "date_before": "Antes de",

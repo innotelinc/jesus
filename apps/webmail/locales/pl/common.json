@@ -3280,6 +3280,7 @@
     "body_placeholder": "Treść zawiera...",
     "folder": "Folder",
     "all_folders": "Wszystkie foldery",
+    "all_folders_except_spam_trash": "Wszystkie foldery oprócz Spamu i Kosza",
     "has_attachment": "Załączniki",
     "date_after": "Po",
     "date_before": "Przed",

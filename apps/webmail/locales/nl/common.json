@@ -3280,6 +3280,7 @@
     "body_placeholder": "Inhoud bevat...",
     "folder": "Map",
     "all_folders": "Alle mappen",
+    "all_folders_except_spam_trash": "Alle mappen behalve Spam en Prullenbak",
     "has_attachment": "Bijlagen",
     "date_after": "Na",
     "date_before": "Voor",

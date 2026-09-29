@@ -3322,6 +3322,7 @@
     "body_placeholder": "Telo správy obsahuje...",
     "folder": "Priečinok",
     "all_folders": "Všetky priečinky",
+    "all_folders_except_spam_trash": "Všetky priečinky okrem spamu a koša",
     "has_attachment": "Prílohy",
     "date_after": "Po",
     "date_before": "Pred",

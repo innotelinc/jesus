@@ -3322,6 +3322,7 @@
     "body_placeholder": "Биед агуулагдах...",
     "folder": "Хавтас",
     "all_folders": "Бүх хавтаснууд",
+    "all_folders_except_spam_trash": "Спам болон Хогийн савнаас бусад бүх хавтас",
     "has_attachment": "Хавсралт",
     "date_after": "Дараа",
     "date_before": "Өмнө нь",

@@ -3280,6 +3280,7 @@
     "body_placeholder": "Inhalt enthält...",
     "folder": "Ordner",
     "all_folders": "Alle Ordner",
+    "all_folders_except_spam_trash": "Alle Ordner außer Spam und Papierkorb",
     "has_attachment": "Anhänge",
     "date_after": "Nach dem",
     "date_before": "Vor dem",

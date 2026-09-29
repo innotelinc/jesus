@@ -1,5 +1,21 @@
 import type { Mailbox } from '@/lib/jmap/types';
 
+/**
+ * `searchMailboxId` of the "All folders" search scope: every folder of every
+ * account, Trash and Junk included. The default scope, "" ("All folders
+ * except Spam and Trash"), leaves those two out. JMAP ids never contain "*",
+ * so this cannot collide with a folder id.
+ */
+export const SEARCH_SCOPE_ALL_FOLDERS = '*';
+
+/**
+ * Whether `searchMailboxId` searches across folders (the default scope or
+ * "All folders") rather than inside the one folder picked in the dropdown.
+ */
+export function isAllFoldersSearchScope(searchMailboxId: string): boolean {
+  return searchMailboxId === '' || searchMailboxId === SEARCH_SCOPE_ALL_FOLDERS;
+}
+
 export interface SearchScopeFolderGroup {
   /** Owner JMAP account id; the React key. */
   ownerId: string;

@@ -3280,6 +3280,7 @@
     "body_placeholder": "Le corps contient...",
     "folder": "Dossier",
     "all_folders": "Tous les dossiers",
+    "all_folders_except_spam_trash": "Tous les dossiers sauf Spam et Corbeille",
     "has_attachment": "Pièces jointes",
     "date_after": "Après le",
     "date_before": "Avant le",

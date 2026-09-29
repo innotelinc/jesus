@@ -3322,6 +3322,7 @@
     "body_placeholder": "內文包含…",
     "folder": "信件匣",
     "all_folders": "所有信件匣",
+    "all_folders_except_spam_trash": "除垃圾郵件和垃圾桶外的所有信件匣",
     "has_attachment": "附件",
     "date_after": "後",
     "date_before": "前",

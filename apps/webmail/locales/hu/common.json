@@ -3322,6 +3322,7 @@
     "body_placeholder": "Törzs tartalma...",
     "folder": "Mappa",
     "all_folders": "Minden mappa",
+    "all_folders_except_spam_trash": "Minden mappa, kivéve a Spam és a Kuka",
     "has_attachment": "Csatolmányok",
     "date_after": "Ettől",
     "date_before": "Eddig",

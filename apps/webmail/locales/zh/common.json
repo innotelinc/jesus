@@ -3280,6 +3280,7 @@
     "body_placeholder": "正文包含...",
     "folder": "文件夹",
     "all_folders": "所有文件夹",
+    "all_folders_except_spam_trash": "除垃圾邮件和已删除外的所有文件夹",
     "has_attachment": "附件",
     "date_after": "后",
     "date_before": "前",

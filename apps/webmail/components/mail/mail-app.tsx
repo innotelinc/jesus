@@ -32,7 +32,7 @@ import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { connectedAccountsGrew } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
 import { useEmailStore, buildUnifiedAccountClients, captureViewToken, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId } from "@/stores/email-store";
-import { groupSearchScopeFolders } from "@/lib/search-scope-folders";
+import { groupSearchScopeFolders, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
 import { toast } from "@/stores/toast-store";
 import { runBatchEmailAction } from "@/lib/email-action-toast";
 import { MailboxShareDialog } from "@/components/layout/mailbox-share-dialog";
@@ -4006,13 +4006,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                       </div>
 
                       {/* Folder selector. Scopes the search only - it does not
-                          navigate the mail list, so it defaults to "All folders"
-                          regardless of which folder is open and keeps whatever
-                          the user picked. "All folders" spans the own AND the
-                          group/shared accounts' folders (#1082); the shared
-                          ones are listed under their owner. The unified views
-                          already search across every account's folders, so it
-                          is hidden there. */}
+                          navigate the mail list, so it defaults to "All folders
+                          except Spam and Trash" regardless of which folder is
+                          open and keeps whatever the user picked. Both
+                          folder-less scopes span the own AND the group/shared
+                          accounts' folders (#1082); "All folders" also searches
+                          Trash and Junk. The shared folders are listed under
+                          their owner. The unified views already search across
+                          every account's folders, so it is hidden there. */}
                       {!isUnifiedView && (
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.folder")}</label>
@@ -4026,7 +4027,8 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                             }}
                             className="w-full h-8 text-sm rounded-md border border-input bg-background px-3 text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
                           >
-                            <option value="">{t("advanced_search.all_folders")}</option>
+                            <option value="">{t("advanced_search.all_folders_except_spam_trash")}</option>
+                            <option value={SEARCH_SCOPE_ALL_FOLDERS}>{t("advanced_search.all_folders")}</option>
                             {searchScopeFolders.own.map((mb) => (
                               <option key={mb.id} value={mb.id}>
                                 {mb.name}

@@ -3204,6 +3204,7 @@
     "body_placeholder": "הגוף מכיל...",
     "folder": "תיקיה",
     "all_folders": "כל התיקיות",
+    "all_folders_except_spam_trash": "כל התיקיות מלבד ספאם ואשפה",
     "has_attachment": "קבצים מצורפים",
     "date_after": "אחרי",
     "date_before": "לפני",

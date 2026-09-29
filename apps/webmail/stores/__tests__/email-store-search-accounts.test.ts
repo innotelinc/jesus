@@ -4,6 +4,7 @@ import { useSettingsStore } from '../settings-store';
 import { useAuthStore } from '../auth-store';
 import { useMessageListTabsStore } from '../message-list-tabs-store';
 import { DEFAULT_SEARCH_FILTERS } from '@/lib/jmap/search-utils';
+import { SEARCH_SCOPE_ALL_FOLDERS } from '@/lib/search-scope-folders';
 import type { Email, Mailbox } from '@/lib/jmap/types';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
 
@@ -200,5 +201,104 @@ describe('"All folders" search across the own and group accounts (#1082)', () =>
     expect(calls.map(([, accountId]) => accountId)).toEqual([undefined, 'group']);
     expect(calls.every(([filter]) => !JSON.stringify(filter).includes('inMailbox'))).toBe(true);
     expect(useEmailStore.getState().emails.map(e => e.id)).toEqual(['grp-1', 'grp-2']);
+  });
+});
+
+// The default scope, "All folders except Spam and Trash" (searchMailboxId
+// ""), leaves every account's Trash and Junk out; "All folders" (the
+// SEARCH_SCOPE_ALL_FOLDERS sentinel) searches them too.
+describe('Spam and Trash in the folder-less search scopes', () => {
+  const ownTrash = { id: 'trash', name: 'Trash', role: 'trash', isShared: false } as Mailbox;
+  const ownJunk = { id: 'junk', name: 'Junk', role: 'junk', isShared: false } as Mailbox;
+  const groupTrash = {
+    id: 'group:trash', originalId: 'trash', name: 'Lixeira', role: 'trash',
+    isShared: true, accountId: 'group', accountName: 'chamados@server.tld',
+  } as Mailbox;
+  let client: ReturnType<typeof makeClient>;
+
+  const exclusionsSent = () => client.advancedSearchEmails.mock.calls.map(([filter, accountId]) => [
+    accountId,
+    ((filter.conditions ?? []) as Record<string, unknown>[]).find(c => 'inMailboxOtherThan' in c)?.inMailboxOtherThan,
+  ]);
+
+  beforeEach(() => {
+    client = makeClient();
+    useAuthStore.setState({
+      activeAccountId: 'login',
+      getClientForAccount: ((id: string) => (id === 'login' ? client : undefined)) as never,
+      getAllConnectedClients: (() => new Map([['login', client]])) as never,
+    } as never);
+    useMessageListTabsStore.setState(useMessageListTabsStore.getInitialState());
+    useSettingsStore.setState({
+      emailsPerPage: 50, messageListOrder: [], messageListOrderScope: 'inbox', emailKeywords: [],
+    } as never);
+    useEmailStore.setState({
+      ...useEmailStore.getInitialState(),
+      selectedMailbox: ownInbox.id,
+      searchFilters: { ...DEFAULT_SEARCH_FILTERS },
+      mailboxes: [ownInbox, ownTrash, ownJunk, groupInbox, groupTrash],
+    });
+  });
+
+  it('defaults to leaving every account\'s Spam and Trash out', async () => {
+    expect(useEmailStore.getState().searchMailboxId).toBe('');
+
+    await useEmailStore.getState().searchEmails(client, 'acesso');
+
+    expect(client.searchEmails).not.toHaveBeenCalled();
+    expect(client.advancedSearchEmails.mock.calls.map(([filter, accountId]) => [accountId, filter])).toEqual([
+      [undefined, { operator: 'AND', conditions: [{ text: 'acesso' }, { inMailboxOtherThan: ['trash', 'junk'] }] }],
+      ['group', { operator: 'AND', conditions: [{ text: 'acesso' }, { inMailboxOtherThan: ['trash'] }] }],
+    ]);
+    expect(useEmailStore.getState().emails.map(e => e.id)).toEqual(['grp-1', 'grp-2']);
+  });
+
+  it('keeps them out of the advanced search, the next page and a push refresh', async () => {
+    useEmailStore.setState({ searchQuery: 'a', searchFilters: { ...DEFAULT_SEARCH_FILTERS, from: 'sender@example.com' } });
+    await useEmailStore.getState().advancedSearch(client);
+
+    useSettingsStore.setState({ emailsPerPage: 1 } as never);
+    await useEmailStore.getState().advancedSearch(client);
+    await useEmailStore.getState().loadMoreEmails(client);
+
+    await useEmailStore.getState().handleStateChange({
+      '@type': 'StateChange', changed: { group: { Email: '2' } },
+    }, client);
+
+    const sent = exclusionsSent();
+    expect(sent.length).toBeGreaterThanOrEqual(8);
+    for (const [accountId, excluded] of sent) {
+      expect(excluded).toEqual(accountId === 'group' ? ['trash'] : ['trash', 'junk']);
+    }
+  });
+
+  it('searches them too under "All folders"', async () => {
+    useEmailStore.getState().setSearchMailboxId(SEARCH_SCOPE_ALL_FOLDERS);
+
+    await useEmailStore.getState().searchEmails(client, 'acesso');
+
+    expect(client.advancedSearchEmails).not.toHaveBeenCalled();
+    expect(client.searchEmails).toHaveBeenCalledWith('acesso', undefined, undefined, 50, 0);
+    expect(client.searchEmails).toHaveBeenCalledWith('acesso', undefined, 'group', 50, 0);
+
+    client.searchEmails.mockClear();
+    useEmailStore.setState({ searchFilters: { ...DEFAULT_SEARCH_FILTERS, from: 'sender@example.com' } });
+    await useEmailStore.getState().advancedSearch(client);
+    expect(exclusionsSent()).toEqual([[undefined, undefined], ['group', undefined]]);
+  });
+
+  it('searches a picked Trash folder alone', async () => {
+    useEmailStore.getState().setSearchMailboxId(ownTrash.id);
+
+    await useEmailStore.getState().searchEmails(client, 'fatura');
+
+    expect(client.searchEmails).toHaveBeenCalledTimes(1);
+    expect(client.searchEmails).toHaveBeenCalledWith('fatura', 'trash', undefined, 50, 0);
+  });
+
+  it('goes back to the default scope when the filters are cleared', () => {
+    useEmailStore.getState().setSearchMailboxId(SEARCH_SCOPE_ALL_FOLDERS);
+    useEmailStore.getState().clearSearchFilters();
+    expect(useEmailStore.getState().searchMailboxId).toBe('');
   });
 });

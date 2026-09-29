@@ -3322,6 +3322,7 @@
     "body_placeholder": "El cos conté...",
     "folder": "Carpeta",
     "all_folders": "Totes les carpetes",
+    "all_folders_except_spam_trash": "Totes les carpetes excepte Correu brossa i Paperera",
     "has_attachment": "Fitxers adjunts",
     "date_after": "Després de",
     "date_before": "Abans de",

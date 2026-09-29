@@ -3322,6 +3322,7 @@
     "body_placeholder": "Meldingsteksten inneholder...",
     "folder": "Mappe",
     "all_folders": "Alle mapper",
+    "all_folders_except_spam_trash": "Alle mapper unntatt søppelpost og papirkurv",
     "has_attachment": "Vedlegg",
     "date_after": "Etter",
     "date_before": "Før",

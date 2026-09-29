@@ -3280,6 +3280,7 @@
     "body_placeholder": "내용에 포함된 단어...",
     "folder": "폴더",
     "all_folders": "모든 폴더",
+    "all_folders_except_spam_trash": "스팸함과 휴지통을 제외한 모든 폴더",
     "has_attachment": "첨부파일 있음",
     "date_after": "이후",
     "date_before": "이전",
