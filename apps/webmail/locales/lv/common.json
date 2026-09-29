@@ -2851,6 +2851,8 @@
       "no_events": "Nav pasākumu",
       "all_day": "Visa diena",
       "more": "vēl {count}",
+      "show_more": "Rādīt vairāk",
+      "show_less": "Rādīt mazāk",
       "no_title": "(Bez virsraksta)",
       "resize": "Mainīt pasākuma laiku",
       "duplicate": "Dublēt",

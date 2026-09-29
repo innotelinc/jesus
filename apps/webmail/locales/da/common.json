@@ -2852,6 +2852,8 @@
       "no_events": "Ingen begivenheder",
       "all_day": "Hele dagen",
       "more": "+{count} mere",
+      "show_more": "Vis mere",
+      "show_less": "Vis mindre",
       "no_title": "(Ingen titel)",
       "resize": "Tilpas størrelse på begivenhed",
       "duplicate": "Duplikér",

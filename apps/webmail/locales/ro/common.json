@@ -2852,6 +2852,8 @@
       "no_events": "Fără evenimente",
       "all_day": "Toată ziua",
       "more": "+{count} mai multe",
+      "show_more": "Afișați mai mult",
+      "show_less": "Afișați mai puțin",
       "no_title": "(Fără titlu)",
       "resize": "Eveniment de redimensionare",
       "duplicate": "Duplicare",

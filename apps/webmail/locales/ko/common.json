@@ -2852,6 +2852,8 @@
       "no_events": "일정이 없어요",
       "all_day": "하루 종일",
       "more": "+{count}개 더보기",
+      "show_more": "더 보기",
+      "show_less": "간략히 보기",
       "no_title": "(제목 없음)",
       "resize": "일정 크기 조절",
       "duplicate": "복제",

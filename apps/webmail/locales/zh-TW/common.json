@@ -2852,6 +2852,8 @@
       "no_events": "沒有活動",
       "all_day": "全天",
       "more": "另有 {count} 個",
+      "show_more": "顯示更多",
+      "show_less": "顯示較少",
       "no_title": "（無標題）",
       "resize": "調整活動大小",
       "duplicate": "建立副本",
