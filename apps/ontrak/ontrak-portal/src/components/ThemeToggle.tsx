@@ -1,15 +1,31 @@
 "use client";
 
 /**
- * The theme switch.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * OnTrak — the theme switch.  THE canonical copy.
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Two axes, and only one of them is a control people look for: light/dark/system
- * is the switch in the corner, and the *scheme* (desk — the violet family the
- * training range and the desk use; operations — the graphite family the consoles
- * use) is set once by the deployment and remembered per browser. Both are written
- * by `window.OntrakTheme`, which the head snippet has already run, so this
- * component never owns the state — the document does. That is what keeps a page
- * from rendering one theme and then changing its mind.
+ * Every product ships this byte-identical as `src/components/ThemeToggle.tsx`
+ * (the copies are checked by `theme/tests/test_theme_copies.py`), together with
+ * `ontrak-theme.css` and `ontrak-theme.js`. A switch that looks or behaves
+ * differently in one product than in the next is the kind of drift the family
+ * theme exists to prevent, and it is the easiest kind to introduce by hand.
+ *
+ * TWO AXES, ONE CONTROL PEOPLE LOOK FOR.
+ *
+ *   light / dark / system   the switch in the corner — what everyone means by
+ *                           "dark mode".
+ *   scheme                  `desk` (violet — the desk and the training range) or
+ *                           `operations` (graphite — the consoles). Set once by
+ *                           the deployment, remembered per browser, and switched
+ *                           here too because an operator may genuinely prefer one.
+ *
+ * The state does not live in React. It lives on the document, written by
+ * `window.OntrakTheme`, which the head snippet has *already* run before this
+ * component hydrates. Reading from the document is what stops a page from
+ * rendering one theme and then changing its mind a frame later — the visible
+ * flash that makes a late dark mode worse than none. So this component only ever
+ * *reflects* the document and *asks* the document to change.
  */
 
 import { useEffect, useState } from "react";
@@ -49,6 +65,8 @@ export function ThemeToggle() {
       setMode(api.mode());
       setScheme(api.scheme());
     };
+    // The script fires this when the preference changes in another tab (or from a
+    // second control on the same page), so the switch never shows a stale state.
     window.addEventListener("ontrak:theme", onChange);
     return () => window.removeEventListener("ontrak:theme", onChange);
   }, []);
@@ -64,7 +82,7 @@ export function ThemeToggle() {
   };
 
   return (
-    <div className="theme" role="group" aria-label="Colour theme">
+    <div className="ot-theme" role="group" aria-label="Colour theme">
       {(Object.keys(LABELS) as Mode[]).map((key) => (
         <button
           key={key}
@@ -79,9 +97,11 @@ export function ThemeToggle() {
       ))}
       <button
         type="button"
-        title={scheme === "operations"
-          ? "Switch to the desk palette (violet)"
-          : "Switch to the operations palette (graphite)"}
+        title={
+          scheme === "operations"
+            ? "Switch to the desk palette (violet)"
+            : "Switch to the operations palette (graphite)"
+        }
         onClick={() => {
           const next = window.OntrakTheme?.setScheme(scheme === "operations" ? "desk" : "operations");
           if (next) setScheme(next);
