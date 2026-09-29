@@ -206,7 +206,8 @@ describe('"All folders" search across the own and group accounts (#1082)', () =>
 
 // The default scope, "All folders except Spam and Trash" (searchMailboxId
 // ""), leaves every account's Trash and Junk out; "All folders" (the
-// SEARCH_SCOPE_ALL_FOLDERS sentinel) searches them too.
+// SEARCH_SCOPE_ALL_FOLDERS sentinel) searches them too. While Spam or Trash
+// is open, the default scope is that folder itself.
 describe('Spam and Trash in the folder-less search scopes', () => {
   const ownTrash = { id: 'trash', name: 'Trash', role: 'trash', isShared: false } as Mailbox;
   const ownJunk = { id: 'junk', name: 'Junk', role: 'junk', isShared: false } as Mailbox;
@@ -299,6 +300,77 @@ describe('Spam and Trash in the folder-less search scopes', () => {
   it('goes back to the default scope when the filters are cleared', () => {
     useEmailStore.getState().setSearchMailboxId(SEARCH_SCOPE_ALL_FOLDERS);
     useEmailStore.getState().clearSearchFilters();
+    expect(useEmailStore.getState().searchMailboxId).toBe('');
+  });
+
+  it('searches Spam or Trash alone while that folder is open, and all but them after leaving', async () => {
+    useEmailStore.getState().selectMailbox(ownTrash.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe('trash');
+
+    await useEmailStore.getState().searchEmails(client, 'fatura');
+    expect(client.searchEmails).toHaveBeenCalledTimes(1);
+    expect(client.searchEmails).toHaveBeenCalledWith('fatura', 'trash', undefined, 50, 0);
+
+    useEmailStore.getState().selectMailbox(ownJunk.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe('junk');
+
+    useEmailStore.getState().selectMailbox(ownInbox.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe('');
+  });
+
+  it('searches an open group Trash in the group account', async () => {
+    useEmailStore.getState().selectMailbox(groupTrash.id);
+
+    await useEmailStore.getState().searchEmails(client, 'acesso');
+
+    expect(client.searchEmails).toHaveBeenCalledTimes(1);
+    expect(client.searchEmails).toHaveBeenCalledWith('acesso', 'trash', 'group', 50, 0);
+  });
+
+  it('keeps a scope the user picked when entering or leaving Spam and Trash', () => {
+    const { selectMailbox, setSearchMailboxId } = useEmailStore.getState();
+
+    setSearchMailboxId(SEARCH_SCOPE_ALL_FOLDERS);
+    selectMailbox(ownTrash.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe(SEARCH_SCOPE_ALL_FOLDERS);
+    selectMailbox(ownInbox.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe(SEARCH_SCOPE_ALL_FOLDERS);
+
+    setSearchMailboxId(groupInbox.id);
+    selectMailbox(ownJunk.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe(groupInbox.id);
+
+    // "All folders except Spam and Trash" picked while inside Trash stays too.
+    selectMailbox(ownTrash.id);
+    setSearchMailboxId('');
+    selectMailbox(ownInbox.id);
+    expect(useEmailStore.getState().searchMailboxId).toBe('');
+  });
+
+  it('resets to the open folder\'s default when the filters are cleared', () => {
+    useEmailStore.getState().selectMailbox(ownTrash.id);
+    useEmailStore.getState().setSearchMailboxId(SEARCH_SCOPE_ALL_FOLDERS);
+
+    useEmailStore.getState().clearSearchFilters();
+
+    expect(useEmailStore.getState().searchMailboxId).toBe('trash');
+  });
+
+  it('scopes to another account\'s Spam by that account\'s own folder list', () => {
+    useEmailStore.setState({
+      accountMailboxes: {
+        'account-b': [
+          { id: 'b-junk', name: 'Spam', role: 'junk', isShared: false } as Mailbox,
+          // Same id as the primary account's Trash, but an ordinary folder here.
+          { id: 'trash', name: 'Old', role: null, isShared: false } as unknown as Mailbox,
+        ],
+      },
+    });
+
+    useEmailStore.getState().selectAccountMailbox('account-b', 'b-junk');
+    expect(useEmailStore.getState().searchMailboxId).toBe('b-junk');
+
+    useEmailStore.getState().selectAccountMailbox('account-b', 'trash');
     expect(useEmailStore.getState().searchMailboxId).toBe('');
   });
 });

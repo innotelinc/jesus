@@ -16,6 +16,16 @@ export function isAllFoldersSearchScope(searchMailboxId: string): boolean {
   return searchMailboxId === '' || searchMailboxId === SEARCH_SCOPE_ALL_FOLDERS;
 }
 
+/**
+ * The search scope a folder starts with: Spam and Trash search themselves,
+ * since that is what a search from inside them looks for; every other folder
+ * searches all folders except Spam and Trash ("").
+ */
+export function defaultSearchScopeFor(mailboxes: Mailbox[], openMailboxId: string | null | undefined): string {
+  const open = openMailboxId ? mailboxes.find((mb) => mb.id === openMailboxId) : undefined;
+  return open && (open.role === 'trash' || open.role === 'junk') ? open.id : '';
+}
+
 export interface SearchScopeFolderGroup {
   /** Owner JMAP account id; the React key. */
   ownerId: string;

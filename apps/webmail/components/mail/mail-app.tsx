@@ -4006,14 +4006,15 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                       </div>
 
                       {/* Folder selector. Scopes the search only - it does not
-                          navigate the mail list, so it defaults to "All folders
-                          except Spam and Trash" regardless of which folder is
-                          open and keeps whatever the user picked. Both
-                          folder-less scopes span the own AND the group/shared
-                          accounts' folders (#1082); "All folders" also searches
-                          Trash and Junk. The shared folders are listed under
-                          their owner. The unified views already search across
-                          every account's folders, so it is hidden there. */}
+                          navigate the mail list. It defaults to "All folders
+                          except Spam and Trash", or to Spam/Trash itself while
+                          that folder is open (defaultSearchScopeFor), and keeps
+                          whatever the user picked. Both folder-less scopes span
+                          the own AND the group/shared accounts' folders (#1082);
+                          "All folders" also searches Trash and Junk. The shared
+                          folders are listed under their owner. The unified
+                          views already search across every account's folders,
+                          so it is hidden there. */}
                       {!isUnifiedView && (
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.folder")}</label>
