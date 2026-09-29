@@ -104,7 +104,9 @@ function makeClient(
 function installPushBrowser() {
   const browserSub = {
     endpoint: 'https://fcm.example/endpoint',
-    options: { applicationServerKey: new ArrayBuffer(8) },
+    // The key installFetch's relay advertises ('QUJD' = "ABC"), so the
+    // browser subscription belongs to that relay unless a test says otherwise.
+    options: { applicationServerKey: new Uint8Array([65, 66, 67]).buffer as ArrayBuffer | null },
     getKey: () => new Uint8Array([1, 2, 3]).buffer,
     unsubscribe: vi.fn(async () => true),
   };
@@ -202,6 +204,69 @@ describe('enableWebPush', () => {
     await enableWebPush({ client, relayBaseUrl: RELAY, forceRecreate: true, inboxOnly: false });
 
     expect(client.destroyed).not.toContain('push-other');
+  });
+
+  it('reuses a browser subscription made with this relay key', async () => {
+    const { browserSub, registration } = installPushBrowser();
+    installFetch({});
+
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(browserSub.unsubscribe).not.toHaveBeenCalled();
+    expect(registration.pushManager.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('replaces a browser subscription made with another relay key', async () => {
+    const { browserSub, registration } = installPushBrowser();
+    browserSub.options.applicationServerKey = new Uint8Array([9, 9, 9]).buffer;
+    const calls = installFetch({});
+
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(browserSub.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+    const [{ applicationServerKey }] = registration.pushManager.subscribe.mock.calls[0] as unknown as [
+      { applicationServerKey: Uint8Array },
+    ];
+    expect(Array.from(applicationServerKey)).toEqual([65, 66, 67]);
+    expect(calls.some((c) => c.url.endsWith('/api/push/register/web'))).toBe(true);
+  });
+
+  it('subscribes anyway when the browser cannot retrieve the existing subscription', async () => {
+    // Firefox rejects the lookup with `AbortError: Error retrieving push
+    // subscription` when its local record is stale; that must not abort enable.
+    const { registration } = installPushBrowser();
+    registration.pushManager.getSubscription.mockRejectedValue(
+      new DOMException('Error retrieving push subscription', 'AbortError'),
+    );
+    installFetch({});
+
+    const result = await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+    expect(result.subscriptionId).toBe('push-new');
+  });
+
+  it('still subscribes when unsubscribing the mismatched subscription fails', async () => {
+    const { browserSub, registration } = installPushBrowser();
+    browserSub.options.applicationServerKey = new Uint8Array([9, 9, 9]).buffer;
+    browserSub.unsubscribe.mockRejectedValue(new Error('unsubscribe failed'));
+    installFetch({});
+
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces a browser subscription whose key the browser does not expose', async () => {
+    const { browserSub, registration } = installPushBrowser();
+    browserSub.options.applicationServerKey = null;
+    installFetch({});
+
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+
+    expect(browserSub.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
   });
 });
 
