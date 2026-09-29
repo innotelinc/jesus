@@ -675,6 +675,8 @@
     "show_less": "Afișați mai puțin",
     "send_failed": "Nu s-a putut trimite e-mailul",
     "send_timeout": "Serverul a încetat să răspundă. Verificați folderul Trimise înainte de a trimite din nou — mesajul poate să fi plecat deja.",
+    "send_recipients_rejected": "Netrimis - serverul a respins toți destinatarii.",
+    "send_some_recipients_rejected": "Trimis, dar nu și acestor destinatari - serverul i-a respins.",
     "continue_draft": "Continuă schița",
     "close_draft_title": "Să salvați sau să renunțați la schiță?",
     "close_draft_message": "Aveți modificări nesalvate. Doriți să salvați acest mesaj ca schiță sau să îl ignorați?",

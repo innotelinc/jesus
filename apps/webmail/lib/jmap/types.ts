@@ -118,6 +118,18 @@ export interface SendEmailResult {
    * old draft). The mail left the server - callers should warn, not fail.
    */
   filingError?: string;
+  /**
+   * Recipients the server refused while accepting the submission (its
+   * deliveryStatus says delivered "no"). The message went out to the others
+   * only - callers should name these instead of reporting a plain success.
+   */
+  rejectedRecipients?: RejectedRecipient[];
+}
+
+/** A recipient refused at submission, with the SMTP reply the server gave. */
+export interface RejectedRecipient {
+  email: string;
+  smtpReply: string;
 }
 
 export interface ScheduledEmail extends Email {

@@ -1,5 +1,5 @@
 import { generateUUID } from '@/lib/utils';
-import type { Attachment, Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, EmailSubmission, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
+import type { Attachment, Email, Mailbox, MailboxRights, StateChange, AccountStates, CollectionChanges, ShareNotification, BusyPeriod, CalendarParticipantIdentity, CalendarEventNotification, Thread, Identity, EmailAddress, ContactCard, AddressBook, AddressBookRights, VacationResponse, Calendar, CalendarComponentType, CalendarRights, CalendarEvent, CalendarEventFilter, CalendarTask, CreateCalendarOptions, FileNode, FileNodeFilter, FileNodeRights, Principal, PushSubscription, EmailPushConfig, DeliveryStatus, EmailSubmission, RejectedRecipient, ScheduledEmail, SendEmailResult, SharedAccount } from "./types";
 import type { SieveScript, SieveCapabilities } from "./sieve-types";
 import type { CalendarEventUpdateOptions, IJMAPClient, KeywordDiscoveryResult, KeywordInfo, KeywordMigration } from "./client-interface";
 import { attachSearchSnippets, filterHasSnippetTerms, snippetFilterFor, type SearchSnippetResult } from "@/lib/search-snippet";
@@ -684,6 +684,76 @@ export function sendMethodErrors(
     }
   }
   return { failure, filing };
+}
+
+/** Call id of the deliveryStatus read-back that rides along with a send. */
+const DELIVERY_STATUS_CALL_ID = 'deliveryStatus';
+
+/**
+ * Reads back the deliveryStatus of the submission an earlier call of the same
+ * request creates as `creationId`. Stalwart runs RCPT TO while creating the
+ * submission and records a refused recipient on it as delivered "no" instead
+ * of failing the create, so the set response alone reads as a success - even
+ * when every recipient was refused and nothing was queued (#1123).
+ *
+ * A creation-id reference (RFC 8620 §5.3), not a `#ids` result reference:
+ * Stalwart does not evaluate result references into /set responses.
+ */
+function deliveryStatusCall(accountId: string, creationId: string): JMAPMethodCall {
+  return ['EmailSubmission/get', {
+    accountId,
+    ids: [`#${creationId}`],
+    properties: ['deliveryStatus'],
+  }, DELIVERY_STATUS_CALL_ID];
+}
+
+/**
+ * Splits the deliveryStatus read-back off a send response. It only reports:
+ * an error from it (a failed set leaves its back-reference dangling) must not
+ * be taken for a failed send or a filing problem by sendMethodErrors.
+ */
+function takeDeliveryStatus(response: JMAPResponse): {
+  response: JMAPResponse;
+  deliveryStatus?: Record<string, DeliveryStatus>;
+} {
+  const entry = response.methodResponses?.find(([, , callId]) => callId === DELIVERY_STATUS_CALL_ID);
+  if (!entry) return { response };
+  const [name, result] = entry;
+  return {
+    response: {
+      ...response,
+      methodResponses: response.methodResponses.filter(([, , callId]) => callId !== DELIVERY_STATUS_CALL_ID),
+    },
+    deliveryStatus: name === 'EmailSubmission/get' ? (result?.list?.[0]?.deliveryStatus ?? undefined) : undefined,
+  };
+}
+
+/**
+ * The recipients a submission's deliveryStatus (RFC 8621 §7) marks as not
+ * delivered, and whether that is all of them - then the message went nowhere.
+ */
+export function rejectedRecipients(deliveryStatus: Record<string, DeliveryStatus> | null | undefined): {
+  rejected: RejectedRecipient[];
+  all: boolean;
+} {
+  const entries = Object.entries(deliveryStatus ?? {});
+  const rejected = entries
+    .filter(([, status]) => status?.delivered === 'no')
+    .map(([email, status]) => ({ email, smtpReply: status.smtpReply?.trim() ?? '' }));
+  return { rejected, all: rejected.length > 0 && rejected.length === entries.length };
+}
+
+/** "a@example.com (550 5.1.2 Mailbox does not exist.), b@example.com" */
+export function formatRejectedRecipients(recipients: RejectedRecipient[]): string {
+  return recipients.map(({ email, smtpReply }) => (smtpReply ? `${email} (${smtpReply})` : email)).join(', ');
+}
+
+/** The server refused every recipient of a send, so nothing went out. */
+export class RecipientsRejectedError extends Error {
+  constructor(readonly recipients: RejectedRecipient[]) {
+    super(`The server rejected every recipient: ${formatRejectedRecipients(recipients)}`);
+    this.name = 'RecipientsRejectedError';
+  }
 }
 
 /** "report.pdf" -> "report (2).pdf", the way Stalwart's onExists "rename" names copies. */
@@ -3915,6 +3985,7 @@ export class JMAPClient implements IJMAPClient {
       create: buildSubmissionCreate(`#${emailId}`, firstMailFrom),
       onSuccessUpdateEmail,
     }, "1"]);
+    methodCalls.push(deliveryStatusCall(this.getSubmissionAccountId(targetAccountId), "1"));
 
     let response = await this.request(methodCalls);
 
@@ -3934,7 +4005,7 @@ export class JMAPClient implements IJMAPClient {
           accountId: this.getSubmissionAccountId(targetAccountId),
           create: buildSubmissionCreate(draftCopyId, identityMailFrom),
           onSuccessUpdateEmail,
-        }, "1"]]);
+        }, "1"], deliveryStatusCall(this.getSubmissionAccountId(targetAccountId), "1")]);
         response = {
           ...retry,
           methodResponses: [
@@ -3949,6 +4020,9 @@ export class JMAPClient implements IJMAPClient {
     let emailSubmissionId: string | undefined;
     let serverSendAt: string | undefined;
     let filingError: string | undefined;
+
+    const statusReadBack = takeDeliveryStatus(response);
+    response = statusReadBack.response;
 
     const { failure, filing } = sendMethodErrors(response.methodResponses);
     if (failure) {
@@ -4016,6 +4090,21 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // With every recipient refused nothing was queued, yet the submission
+    // exists and its onSuccessUpdateEmail filed the copy into Sent (#1123).
+    // Drop that copy and keep the old draft: the send failed.
+    const { rejected, all: noneAccepted } = rejectedRecipients(statusReadBack.deliveryStatus);
+    if (noneAccepted) {
+      if (createdEmailId) {
+        try {
+          await this.request([["Email/set", { accountId: targetAccountId, destroy: [createdEmailId] }, "0"]]);
+        } catch (err) {
+          console.error('[sendEmail] removing the unsent copy from Sent failed:', err);
+        }
+      }
+      throw new RecipientsRejectedError(rejected);
+    }
+
     // The message is out (or scheduled) - now it is safe to drop the old
     // draft. A failure here leaves an orphan in Drafts, which is reported as
     // a filing warning rather than a failed send (#849).
@@ -4045,9 +4134,10 @@ export class JMAPClient implements IJMAPClient {
       serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
+    const rejectedRecipientsResult = rejected.length ? rejected : undefined;
     return delayedUntil
-      ? { scheduled: true, emailId: createdEmailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, filingError }
-      : { scheduled: false, emailId: createdEmailId, emailSubmissionId, submissionAccountId, filingError };
+      ? { scheduled: true, emailId: createdEmailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, filingError, rejectedRecipients: rejectedRecipientsResult }
+      : { scheduled: false, emailId: createdEmailId, emailSubmissionId, submissionAccountId, filingError, rejectedRecipients: rejectedRecipientsResult };
   }
 
   /**
@@ -8949,9 +9039,10 @@ export class JMAPClient implements IJMAPClient {
           },
         } : {}),
       }, '1'],
+      deliveryStatusCall(this.getSubmissionAccountId(), 'raw-submit'),
     ];
 
-    const response = await this.request(methodCalls);
+    const { response, deliveryStatus } = takeDeliveryStatus(await this.request(methodCalls));
     let emailId: string | undefined;
     let emailSubmissionId: string | undefined;
     let serverSendAt: string | undefined;
@@ -8978,6 +9069,20 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // Every recipient refused: nothing was queued, but the imported copy was
+    // filed as sent. Remove it and fail the send (#1123).
+    const { rejected, all: noneAccepted } = rejectedRecipients(deliveryStatus);
+    if (noneAccepted) {
+      if (emailId) {
+        try {
+          await this.request([['Email/set', { accountId: this.accountId, destroy: [emailId] }, '0']]);
+        } catch (err) {
+          console.error('[sendRawEmail] removing the unsent copy failed:', err);
+        }
+      }
+      throw new RecipientsRejectedError(rejected);
+    }
+
     // These raw/S-MIME paths submit through the primary submission account, so
     // report that as the owning account rather than leaving it unset.
     const submissionAccountId = this.getSubmissionAccountId();
@@ -8986,9 +9091,10 @@ export class JMAPClient implements IJMAPClient {
       serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
+    const rejectedRecipientsResult = rejected.length ? rejected : undefined;
     return delayedUntil
-      ? { scheduled: true, emailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true }
-      : { scheduled: false, emailId, emailSubmissionId, submissionAccountId, isSmime: true };
+      ? { scheduled: true, emailId, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true, rejectedRecipients: rejectedRecipientsResult }
+      : { scheduled: false, emailId, emailSubmissionId, submissionAccountId, isSmime: true, rejectedRecipients: rejectedRecipientsResult };
   }
 
   /**
@@ -9040,9 +9146,10 @@ export class JMAPClient implements IJMAPClient {
         //destroy the temporary email after submission to avoid leaving a draft behind.
         onSuccessDestroyEmail: ['#raw-submit'],
       }, '1'],
+      deliveryStatusCall(this.getSubmissionAccountId(), 'raw-submit'),
     ];
 
-    const response = await this.request(methodCalls);
+    const { response, deliveryStatus } = takeDeliveryStatus(await this.request(methodCalls));
     let emailSubmissionId: string | undefined;
     let serverSendAt: string | undefined;
 
@@ -9064,15 +9171,21 @@ export class JMAPClient implements IJMAPClient {
       }
     }
 
+    // The temporary copy is already gone (onSuccessDestroyEmail), so all that
+    // is left is to report refused recipients (#1123).
+    const { rejected, all: noneAccepted } = rejectedRecipients(deliveryStatus);
+    if (noneAccepted) throw new RecipientsRejectedError(rejected);
+
     const submissionAccountId = this.getSubmissionAccountId();
 
     if (delayedUntil && emailSubmissionId && !serverSendAt) {
       serverSendAt = await this.getEmailSubmissionSendAt(emailSubmissionId, submissionAccountId);
     }
 
+    const rejectedRecipientsResult = rejected.length ? rejected : undefined;
     return delayedUntil
-      ? { scheduled: true, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true }
-      : { scheduled: false, emailSubmissionId, submissionAccountId, isSmime: true };
+      ? { scheduled: true, emailSubmissionId, sendAt: serverSendAt, submissionAccountId, isSmime: true, rejectedRecipients: rejectedRecipientsResult }
+      : { scheduled: false, emailSubmissionId, submissionAccountId, isSmime: true, rejectedRecipients: rejectedRecipientsResult };
   }
 
   async getScheduledEmails(limit = 50, position = 0): Promise<{ emails: ScheduledEmail[]; hasMore: boolean; total: number; totalByAccount?: Record<string, number>; nextPosition: number }> {
