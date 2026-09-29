@@ -3322,6 +3322,7 @@
     "body_placeholder": "يحتوي النص على...",
     "folder": "المجلد",
     "all_folders": "جميع المجلدات",
+    "all_folders_except_spam_trash": "جميع المجلدات باستثناء البريد المزعج والمهملات",
     "has_attachment": "المرفقات",
     "date_after": "بعد",
     "date_before": "قبل",

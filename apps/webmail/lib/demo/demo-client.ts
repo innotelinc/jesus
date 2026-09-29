@@ -172,8 +172,9 @@ export class DemoJMAPClient implements IJMAPClient {
 
   /**
    * Minimal JMAP filter evaluator for demo mode: supports the conditions the
-   * message-list category tabs use (hasKeyword / notKeyword / from and
-   * AND / OR / NOT operators). Unknown conditions match nothing.
+   * message-list category tabs and the folder-less search scopes use
+   * (hasKeyword / notKeyword / from / text / inMailbox / inMailboxOtherThan
+   * and AND / OR / NOT operators). Unknown conditions are ignored.
    */
   private matchesFilter(e: Email, filter: Record<string, unknown>): boolean {
     if (typeof filter.operator === 'string') {
@@ -192,6 +193,16 @@ export class DemoJMAPClient implements IJMAPClient {
       const match = (e.from || []).some(f =>
         (f.email || '').toLowerCase().includes(q) || (f.name || '').toLowerCase().includes(q));
       if (!match) return false;
+    }
+    if (typeof filter.text === 'string') {
+      const q = filter.text.toLowerCase();
+      const text = [e.subject, e.preview, e.from?.[0]?.name, e.from?.[0]?.email].filter(Boolean).join(' ').toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    if (typeof filter.inMailbox === 'string' && !e.mailboxIds[filter.inMailbox]) return false;
+    if (Array.isArray(filter.inMailboxOtherThan)) {
+      const excluded = new Set(filter.inMailboxOtherThan as string[]);
+      if (!Object.keys(e.mailboxIds).some(id => e.mailboxIds[id] && !excluded.has(id))) return false;
     }
     return true;
   }
@@ -315,13 +326,7 @@ export class DemoJMAPClient implements IJMAPClient {
   }
 
   async advancedSearchEmails(filter: Record<string, unknown>, _accountId?: string, limit: number = 50, position: number = 0): Promise<{ emails: Email[]; hasMore: boolean; total: number }> {
-    // Simplified: just return all emails for any advanced filter
-    let filtered = [...this.data.emails];
-    if (filter.inMailbox) filtered = filtered.filter(e => e.mailboxIds[filter.inMailbox as string]);
-    if (filter.text) {
-      const q = (filter.text as string).toLowerCase();
-      filtered = filtered.filter(e => [e.subject, e.preview].filter(Boolean).join(' ').toLowerCase().includes(q));
-    }
+    const filtered = this.data.emails.filter(e => this.matchesFilter(e, filter));
     filtered.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
     const total = filtered.length;
     const emails = filtered.slice(position, position + limit);

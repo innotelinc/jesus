@@ -3322,6 +3322,7 @@
     "body_placeholder": "Brødtekst indeholder...",
     "folder": "Mappe",
     "all_folders": "Alle mapper",
+    "all_folders_except_spam_trash": "Alle mapper undtagen spam og papirkurv",
     "has_attachment": "Vedhæftninger",
     "date_after": "Efter",
     "date_before": "Før",

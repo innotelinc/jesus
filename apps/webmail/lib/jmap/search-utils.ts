@@ -125,6 +125,18 @@ export function buildJMAPFilter(
   };
 }
 
+type JmapFilter = Record<string, unknown>;
+
+/** `AND` two JMAP filters, flattening into an existing top-level `AND`. */
+export function andFilters(base: JmapFilter, extra: JmapFilter | null): JmapFilter {
+  if (!extra || Object.keys(extra).length === 0) return base;
+  if (Object.keys(base).length === 0) return extra;
+  if (base.operator === 'AND' && Array.isArray(base.conditions)) {
+    return { operator: 'AND', conditions: [...(base.conditions as JmapFilter[]), extra] };
+  }
+  return { operator: 'AND', conditions: [base, extra] };
+}
+
 export function isFilterEmpty(filters: SearchFilters): boolean {
   return (
     !filters.from &&

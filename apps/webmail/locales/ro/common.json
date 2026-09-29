@@ -3322,6 +3322,7 @@
     "body_placeholder": "Corpul conține...",
     "folder": "Dosar",
     "all_folders": "Toate folderele",
+    "all_folders_except_spam_trash": "Toate folderele, cu excepția Spam și Coș de gunoi",
     "has_attachment": "Anexe",
     "date_after": "După",
     "date_before": "Înainte",

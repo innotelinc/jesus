@@ -3280,6 +3280,7 @@
     "body_placeholder": "本文に含む...",
     "folder": "フォルダー",
     "all_folders": "すべてのフォルダー",
+    "all_folders_except_spam_trash": "迷惑メールとゴミ箱を除くすべてのフォルダー",
     "has_attachment": "添付ファイル",
     "date_after": "以降",
     "date_before": "以前",

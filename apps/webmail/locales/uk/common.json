@@ -3280,6 +3280,7 @@
     "body_placeholder": "Тіло містить...",
     "folder": "Папка",
     "all_folders": "Всі папки",
+    "all_folders_except_spam_trash": "Всі папки, крім спаму та кошика",
     "has_attachment": "Додатки",
     "date_after": "Після",
     "date_before": "Раніше",

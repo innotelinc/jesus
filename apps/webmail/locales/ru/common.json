@@ -3280,6 +3280,7 @@
     "body_placeholder": "Текст содержит...",
     "folder": "Папка",
     "all_folders": "Все папки",
+    "all_folders_except_spam_trash": "Все папки, кроме спама и корзины",
     "has_attachment": "Вложения",
     "date_after": "После",
     "date_before": "До",

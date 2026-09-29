@@ -3322,6 +3322,7 @@
     "body_placeholder": "Body contains...",
     "folder": "Folder",
     "all_folders": "All folders",
+    "all_folders_except_spam_trash": "All folders except Spam and Trash",
     "has_attachment": "Attachments",
     "date_after": "After",
     "date_before": "Before",

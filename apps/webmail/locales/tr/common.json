@@ -3322,6 +3322,7 @@
     "body_placeholder": "Gövde içerir...",
     "folder": "Klasör",
     "all_folders": "Tüm klasörler",
+    "all_folders_except_spam_trash": "Spam ve Çöp Kutusu dışındaki tüm klasörler",
     "has_attachment": "Ekler",
     "date_after": "Sonra",
     "date_before": "Önce",

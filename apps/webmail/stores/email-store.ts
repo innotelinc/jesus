@@ -10,7 +10,8 @@ import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
 import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
-import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type AcrossAccountsSearchOptions, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
+import { isAllFoldersSearchScope, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
 import { useAuthStore } from "@/stores/auth-store";
 import { currentStoreEpoch } from "@/lib/store-epoch";
 import { keywordPointer } from "@/lib/jmap/patch-pointer";
@@ -688,7 +689,7 @@ export function resolveUnstampedEmailAccountId(opts: {
   searchActive: boolean;
   searchMailboxId: string;
 }): string | undefined {
-  if (opts.searchActive && opts.searchMailboxId === '') return undefined;
+  if (opts.searchActive && isAllFoldersSearchScope(opts.searchMailboxId)) return undefined;
   const mailbox = opts.mailboxes.find(mb => mb.id === opts.selectedMailbox);
   return mailbox?.isShared ? mailbox.accountId : undefined;
 }
@@ -1091,16 +1092,26 @@ export function buildTagViewAccountClients(passedClient: IJMAPClient): UnifiedAc
 }
 
 /**
- * Whether a search is running under the "All folders" scope (`searchMailboxId`
- * "") of the standard (non-unified) list. That scope spans every folder of the
- * own account AND of the group/shared accounts this login reaches, so the
- * search fans out like a tag view and stamps its hits with their source
- * account (#1082). A search scoped to one folder stays single-account.
+ * Whether a search is running under a folder-less scope (the default "All
+ * folders except Spam and Trash" or "All folders", see
+ * isAllFoldersSearchScope) of the standard (non-unified) list. Those scopes
+ * span the folders of the own account AND of the group/shared accounts this
+ * login reaches, so the search fans out like a tag view and stamps its hits
+ * with their source account (#1082). A search scoped to one folder stays
+ * single-account.
  */
 function isUnscopedSearchActive(
   s: Pick<EmailStore, 'isUnifiedView' | 'searchMailboxId' | 'searchQuery' | 'searchFilters'>,
 ): boolean {
-  return !s.isUnifiedView && s.searchMailboxId === '' && (!!s.searchQuery || !isFilterEmpty(s.searchFilters));
+  return !s.isUnifiedView && isAllFoldersSearchScope(s.searchMailboxId) && (!!s.searchQuery || !isFilterEmpty(s.searchFilters));
+}
+
+/**
+ * The fan-out options of a folder-less search scope: only "All folders"
+ * searches Trash and Junk, the default scope ("") leaves them out.
+ */
+function acrossAccountsSearchOptions(searchMailboxId: string): AcrossAccountsSearchOptions {
+  return { excludeTrashAndJunk: searchMailboxId !== SEARCH_SCOPE_ALL_FOLDERS };
 }
 
 /**
@@ -2072,13 +2083,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         // Paginate with the same scope the search itself ran under, not the
         // folder that happens to be open in the list.
         const { searchMailboxId } = get();
-        if (searchMailboxId === '') {
-          // "All folders": the next page of the same own + group account
+        if (isAllFoldersSearchScope(searchMailboxId)) {
+          // Folder-less scope: the next page of the same own + group account
           // fan-out the search ran (#1082).
           const built = buildTagViewAccountClients(client);
+          const scope = acrossAccountsSearchOptions(searchMailboxId);
           result = hasFilters
-            ? await advancedSearchAcrossAccounts(built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, positionsByAccount(emails))
-            : await searchAcrossAccounts(built, searchQuery, emailsPerPage, positionsByAccount(emails));
+            ? await advancedSearchAcrossAccounts(built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, positionsByAccount(emails), scope)
+            : await searchAcrossAccounts(built, searchQuery, emailsPerPage, positionsByAccount(emails), scope);
           set({ unifiedErrors: result.errors });
         } else {
           const mailboxes = resolveActionMailboxes();
@@ -2912,13 +2924,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         );
         unifiedErrors = result.errors;
 
-      } else if (searchMailboxId === '') {
-        // "All folders" (the default): every folder of the own account AND of
-        // every group/shared account this login reaches - the same fan-out the
-        // tag views use (#1038). A single own-account query silently skipped
-        // the shared accounts' mail (#1082).
+      } else if (isAllFoldersSearchScope(searchMailboxId)) {
+        // Folder-less scope: the folders of the own account AND of every
+        // group/shared account this login reaches - the same fan-out the tag
+        // views use (#1038). A single own-account query silently skipped the
+        // shared accounts' mail (#1082). The default scope leaves every
+        // account's Trash and Junk out; "All folders" searches them too.
         const built = buildTagViewAccountClients(client);
-        result = await searchAcrossAccounts(built, query, emailsPerPage, 0);
+        result = await searchAcrossAccounts(built, query, emailsPerPage, 0, acrossAccountsSearchOptions(searchMailboxId));
         unifiedErrors = result.errors;
 
       } else {
@@ -3035,12 +3048,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         );
         unifiedErrors = result.errors;
 
-      } else if (searchMailboxId === '') {
-        // "All folders": fan out over the own + group/shared accounts with a
-        // filter that carries no inMailbox clause (#1082).
+      } else if (isAllFoldersSearchScope(searchMailboxId)) {
+        // Folder-less scope: fan out over the own + group/shared accounts with
+        // a filter that carries no inMailbox clause (#1082).
         const built = buildTagViewAccountClients(client);
         result = await advancedSearchAcrossAccounts(
           built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, 0,
+          acrossAccountsSearchOptions(searchMailboxId),
         );
         unifiedErrors = result.errors;
 
@@ -4117,12 +4131,13 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
           // A refresh while a search is active must re-run it under the
           // search's own folder scope, which is independent of selectedMailbox.
           const { searchMailboxId } = get();
-          if (searchMailboxId === '') {
-            // "All folders": the same own + group account fan-out the search
-            // ran, so a change in a group account reaches the list (#1082).
+          if (isAllFoldersSearchScope(searchMailboxId)) {
+            // Folder-less scope: the same own + group account fan-out the
+            // search ran, so a change in a group account reaches the list (#1082).
             const built = buildTagViewAccountClients(client);
             result = await advancedSearchAcrossAccounts(
               built, buildJMAPFilter(searchQuery, searchFilters, undefined), emailsPerPage, 0,
+              acrossAccountsSearchOptions(searchMailboxId),
             );
             unifiedErrors = result.errors;
           } else {

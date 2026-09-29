@@ -1,6 +1,7 @@
 import type { Email, Mailbox, UnifiedMailboxRole, CrossView } from '@/lib/jmap/types';
 import { CROSS_EXCLUDED_ROLES } from '@/lib/jmap/types';
 import type { IJMAPClient } from '@/lib/jmap/client-interface';
+import { andFilters } from '@/lib/jmap/search-utils';
 import { compareEmails, type SortLevel } from '@/lib/message-list-order';
 
 export interface UnifiedAccountClient {
@@ -80,6 +81,23 @@ export function findMailboxByRole(
   role: UnifiedMailboxRole,
 ): Mailbox | undefined {
   return mailboxes.find((m) => m.role === role);
+}
+
+/** The id a JMAP request names this entry's mailbox by (the owner's raw id for shared entries). */
+export function jmapMailboxIdOf(account: UnifiedAccountClient, mailbox: Mailbox): string {
+  return account.isShared ? (mailbox.originalId ?? mailbox.id) : mailbox.id;
+}
+
+/**
+ * The condition that leaves an account's Trash and Junk out of a folder-less
+ * search, or null when the account has neither folder.
+ */
+export function trashAndJunkExclusion(account: UnifiedAccountClient): Record<string, unknown> | null {
+  const ids = (['trash', 'junk'] as const)
+    .map((role) => findMailboxByRole(account.mailboxes, role))
+    .filter((mailbox): mailbox is Mailbox => Boolean(mailbox))
+    .map((mailbox) => jmapMailboxIdOf(account, mailbox));
+  return ids.length > 0 ? { inMailboxOtherThan: ids } : null;
 }
 
 /**
@@ -545,9 +563,18 @@ export async function fetchTagEmails(
   );
 }
 
+export interface AcrossAccountsSearchOptions {
+  /**
+   * Leave every account's Trash and Junk out: the search panel's default
+   * scope, "All folders except Spam and Trash". Its "All folders" scope
+   * searches them too.
+   */
+  excludeTrashAndJunk?: boolean;
+}
+
 /**
- * Text search over every folder of every given account: the "All folders"
- * scope of the standard search panel. One `searchEmails` per account with no
+ * Text search over every folder of every given account: the folder-less
+ * scopes of the standard search panel. One query per account with no
  * `inMailbox` constraint, merged newest first.
  *
  * The unscoped search used to ask only the login's own account, so mail in
@@ -560,10 +587,18 @@ export async function searchAcrossAccounts(
   query: string,
   limit: number,
   position: FanOutPosition,
+  options: AcrossAccountsSearchOptions = {},
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
-    (account, jmapAccountId) => account.client.searchEmails(query, undefined, jmapAccountId, limit, positionFor(position, account)),
+    (account, jmapAccountId) => {
+      const exclusion = options.excludeTrashAndJunk ? trashAndJunkExclusion(account) : null;
+      return exclusion
+        ? account.client.advancedSearchEmails(
+            andFilters({ text: query.trim() }, exclusion), jmapAccountId, limit, positionFor(position, account),
+          )
+        : account.client.searchEmails(query, undefined, jmapAccountId, limit, positionFor(position, account));
+    },
     newestFirst,
   );
 }
@@ -577,10 +612,16 @@ export async function advancedSearchAcrossAccounts(
   filter: Record<string, unknown>,
   limit: number,
   position: FanOutPosition,
+  options: AcrossAccountsSearchOptions = {},
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
-    (account, jmapAccountId) => account.client.advancedSearchEmails(filter, jmapAccountId, limit, positionFor(position, account)),
+    (account, jmapAccountId) => account.client.advancedSearchEmails(
+      options.excludeTrashAndJunk ? andFilters(filter, trashAndJunkExclusion(account)) : filter,
+      jmapAccountId,
+      limit,
+      positionFor(position, account),
+    ),
     newestFirst,
   );
 }

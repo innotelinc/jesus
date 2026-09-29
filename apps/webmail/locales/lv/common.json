@@ -3280,6 +3280,7 @@
     "body_placeholder": "Teksts satur...",
     "folder": "Mape",
     "all_folders": "Visas mapes",
+    "all_folders_except_spam_trash": "Visas mapes, izņemot mēstules un atkritnes",
     "has_attachment": "Ar pielikumu",
     "date_after": "Pēc",
     "date_before": "Pirms",

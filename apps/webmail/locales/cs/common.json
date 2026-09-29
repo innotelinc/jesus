@@ -3280,6 +3280,7 @@
     "body_placeholder": "Tělo zprávy obsahuje...",
     "folder": "Složka",
     "all_folders": "Všechny složky",
+    "all_folders_except_spam_trash": "Všechny složky kromě spamu a koše",
     "has_attachment": "Obsahuje přílohu",
     "date_after": "Po",
     "date_before": "Před",
