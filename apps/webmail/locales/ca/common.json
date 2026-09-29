@@ -675,6 +675,8 @@
     "show_less": "Mostra'n menys",
     "send_failed": "No s'ha pogut enviar el correu",
     "send_timeout": "El servidor ha deixat de respondre. Comproveu la carpeta Enviats abans de tornar a enviar: el missatge pot haver sortit.",
+    "send_recipients_rejected": "No s'ha enviat: el servidor ha rebutjat tots els destinataris.",
+    "send_some_recipients_rejected": "S'ha enviat, però no a aquests destinataris: el servidor els ha rebutjat.",
     "continue_draft": "Continua l'esborrany",
     "close_draft_title": "Voleu desar o descartar l'esborrany?",
     "close_draft_message": "Teniu canvis sense desar. Voleu desar-los com a esborrany o descartar-los?",

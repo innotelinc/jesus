@@ -46,7 +46,7 @@ import { appendPlainTextSignature, getPlainTextSignature, plainTextBodyHasSignat
 import { findComposeIdentityId, findDraftIdentityId, findReplyIdentityId, resolveReplyFrom } from "@/lib/reply-identity";
 import { buildReplyRecipients, isSelfSent } from "@/lib/reply-recipients";
 import { computeReplyThreadingHeaders, type ReplyThreadingHeaders } from "@/lib/email-threading";
-import { RequestTimeoutError, ScheduleTooLateError } from "@/lib/jmap/client";
+import { RecipientsRejectedError, RequestTimeoutError, ScheduleTooLateError, formatRejectedRecipients } from "@/lib/jmap/client";
 import {
   rewriteCidImagesForEditor,
   replaceInlineImagePlaceholders,
@@ -2508,6 +2508,12 @@ export function EmailComposer({
       stateRef.current = { to: '', cc: '', bcc: '', subject: '', body: '', showCc: false, showBcc: false, selectedIdentityId: null, subAddressTag: '', draftId: null, fromOverrideEnabled: false, fromOverrideEmail: '', fromOverrideName: '', attachments: [], plainTextMode };
     } catch (err) {
       debug.error('Failed to send email:', err);
+      if (err instanceof RecipientsRejectedError) {
+        // Nothing went out; the message stays open here so the addresses
+        // can be fixed. The SMTP replies say why each one was refused (#1123).
+        toast.error(t('send_recipients_rejected'), { message: formatRejectedRecipients(err.recipients) });
+        return;
+      }
       // A timeout is not a clean failure: the submission may have reached the
       // server and gone out, with only the answer lost. Saying "send failed"
       // would invite a re-send and a duplicate, so point at Sent instead (#702).
