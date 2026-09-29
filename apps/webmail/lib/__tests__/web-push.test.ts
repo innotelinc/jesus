@@ -210,7 +210,7 @@ describe('enableWebPush', () => {
     const { browserSub, registration } = installPushBrowser();
     installFetch({});
 
-    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY, inboxOnly: false });
 
     expect(browserSub.unsubscribe).not.toHaveBeenCalled();
     expect(registration.pushManager.subscribe).not.toHaveBeenCalled();
@@ -221,7 +221,7 @@ describe('enableWebPush', () => {
     browserSub.options.applicationServerKey = new Uint8Array([9, 9, 9]).buffer;
     const calls = installFetch({});
 
-    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY, inboxOnly: false });
 
     expect(browserSub.unsubscribe).toHaveBeenCalledTimes(1);
     expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
@@ -241,7 +241,7 @@ describe('enableWebPush', () => {
     );
     installFetch({});
 
-    const result = await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+    const result = await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY, inboxOnly: false });
 
     expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
     expect(result.subscriptionId).toBe('push-new');
@@ -253,7 +253,7 @@ describe('enableWebPush', () => {
     browserSub.unsubscribe.mockRejectedValue(new Error('unsubscribe failed'));
     installFetch({});
 
-    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY, inboxOnly: false });
 
     expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
   });
@@ -263,7 +263,7 @@ describe('enableWebPush', () => {
     browserSub.options.applicationServerKey = null;
     installFetch({});
 
-    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY });
+    await enableWebPush({ client: makeClient([]), relayBaseUrl: RELAY, inboxOnly: false });
 
     expect(browserSub.unsubscribe).toHaveBeenCalledTimes(1);
     expect(registration.pushManager.subscribe).toHaveBeenCalledTimes(1);
