@@ -255,7 +255,9 @@ export function CalendarMonthView({
       const isAllDay = event?.showWithoutTime;
       const newStart = new Date(day);
       newStart.setHours(originalStart.getHours(), originalStart.getMinutes(), originalStart.getSeconds(), 0);
-      const newStartISO = isAllDay ? format(newStart, "yyyy-MM-dd") : format(newStart, "yyyy-MM-dd'T'HH:mm:ss");
+      // `start` is a LocalDateTime for all-day events too: Stalwart drops a
+      // date-only value and the event is left without a start (#1119).
+      const newStartISO = format(newStart, isAllDay ? "yyyy-MM-dd'T'00:00:00" : "yyyy-MM-dd'T'HH:mm:ss");
       if (newStartISO === data.originalStart) return;
       const client = useAuthStore.getState().client;
       if (!client) return;

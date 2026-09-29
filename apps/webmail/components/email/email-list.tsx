@@ -238,6 +238,11 @@ export function EmailList({
     estimateSize,
     overscan: 5,
     getItemKey,
+    // Keep sub-pixel row heights. The default measurer rounds them, so a
+    // row could start up to half a pixel inside the one above it and paint
+    // over that row's divider (at 125% or 150% display scaling).
+    measureElement: (element, entry) =>
+      entry?.borderBoxSize?.[0]?.blockSize ?? element.getBoundingClientRect().height,
   });
 
   const LoadingSkeleton = () => (
@@ -586,10 +591,11 @@ export function EmailList({
                     ref={virtualizer.measureElement}
                     style={{
                       position: 'absolute',
-                      top: 0,
+                      // `top`, not translateY: layout snaps it to device
+                      // pixels, so the fractional offsets stay crisp.
+                      top: virtualItem.start,
                       left: 0,
                       width: '100%',
-                      transform: `translateY(${virtualItem.start}px)`,
                     }}
                   >
                     <ThreadListItem

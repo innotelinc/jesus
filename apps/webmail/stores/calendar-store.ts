@@ -124,6 +124,24 @@ export function resolveMutationTarget(
   return { realId: id, isOccurrence: false };
 }
 
+/**
+ * A server-expanded instance reports `start` in the zone it was expanded in -
+ * the request's zone whenever the event's own start is UTC or floating, as in
+ * a Google Calendar export - not in its base event's zone. Stalwart reads a
+ * written `start` in the base event's zone, so a start worked out from the
+ * instance has to carry the instance's zone along, or the event shifts by the
+ * offset between the two (#1119). All-day starts stay floating.
+ */
+function withInstanceTimeZone(
+  storeEvent: CalendarEvent | undefined,
+  updates: Partial<CalendarEvent>,
+): Partial<CalendarEvent> {
+  if (!storeEvent || !isServerRecurrenceInstance(storeEvent)) return updates;
+  if (updates.start === undefined || updates.timeZone !== undefined) return updates;
+  if (storeEvent.showWithoutTime || updates.showWithoutTime || !storeEvent.timeZone) return updates;
+  return { ...updates, timeZone: storeEvent.timeZone };
+}
+
 /** True when the store shows server-expanded occurrences of base event `baseId` on the given account. */
 function hasExpandedOccurrencesOf(events: CalendarEvent[], baseId: string, target: MutationTarget): boolean {
   return events.some(e =>
@@ -881,7 +899,7 @@ export const useCalendarStore = create<CalendarStore>()(
             updateKeys: Object.keys(updates),
           });
           // Remap namespaced calendarIds back to original IDs
-          const cleanUpdates = sanitizeOutgoingCalendarEventData({ ...updates });
+          const cleanUpdates = sanitizeOutgoingCalendarEventData(withInstanceTimeZone(storeEvent, { ...updates }));
           if (cleanUpdates.calendarIds) {
             const remapped: Record<string, boolean> = {};
             for (const [calId, v] of Object.entries(cleanUpdates.calendarIds)) {
