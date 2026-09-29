@@ -35,9 +35,11 @@ import {
   liteRefreshTokens,
   liteTokenLogin,
   nameLiteRefreshToken,
+  readLiteAccessToken,
   readLiteBasicSession,
   revokeAllLiteSessions,
   revokeLiteSlot,
+  saveLiteAccessToken,
   saveLiteBasicSession,
   saveLiteRefreshToken,
 } from '@/lib/auth/lite-tokens';
@@ -393,6 +395,7 @@ async function exchangePasswordForTokens(params: {
     } else {
       clearLiteRefreshToken(slot);
     }
+    saveLiteAccessToken(slot, tokens.accessToken, tokens.expiresIn, rememberMe);
     return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn, has_refresh_token: !!tokens.refreshToken });
   } catch (err) {
     if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
@@ -451,6 +454,7 @@ async function exchangeOAuthCode(params: {
     } else {
       clearLiteRefreshToken(slot);
     }
+    saveLiteAccessToken(slot, tokens.accessToken, tokens.expiresIn, flow.persistent);
     return jsonResponse({ access_token: tokens.accessToken, expires_in: tokens.expiresIn });
   } catch (err) {
     if (err instanceof LiteLoginError) return jsonResponse({ error: err.code }, liteErrorStatus(err));
@@ -484,6 +488,12 @@ async function fetchSlotAccessToken(slot: number, opts: { force?: boolean } = {}
   if (closingSlots.has(slot)) return jsonResponse({ error: 'signed_out' }, 401);
   if (!IS_LITE) {
     return trackSessionWrite(slot, (signal) => apiFetch(`/api/auth/token?slot=${slot}${opts.force ? '&force=true' : ''}`, { method: 'PUT', signal }));
+  }
+  // Like the route's cookie cache: a restore resumes with the token it had,
+  // since a renewal before the refresh token's `nbf` is refused (#552).
+  if (!opts.force) {
+    const cached = readLiteAccessToken(slot);
+    if (cached) return jsonResponse({ access_token: cached.accessToken, expires_in: cached.expiresIn });
   }
   return trackSessionWrite(slot, async () => {
     try {

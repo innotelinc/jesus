@@ -13,7 +13,14 @@ import { JMAPClient } from '@/lib/jmap/client';
 import * as browserNavigation from '@/lib/browser-navigation';
 import { useAuthStore } from '../auth-store';
 import { useAccountStore } from '../account-store';
-import { readLiteRefreshToken, readLiteBasicSession, saveLiteRefreshToken, saveLiteBasicSession } from '@/lib/auth/lite-tokens';
+import {
+  readLiteAccessToken,
+  readLiteBasicSession,
+  readLiteRefreshToken,
+  saveLiteAccessToken,
+  saveLiteBasicSession,
+  saveLiteRefreshToken,
+} from '@/lib/auth/lite-tokens';
 import { readLiteOAuthFlow, saveLiteOAuthFlow } from '@/lib/auth/lite-oauth';
 
 type FetchInput = Parameters<typeof fetch>[0];
@@ -23,6 +30,11 @@ const SERVER = 'https://mail.example.com';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+/** Rauthy's answer to a refresh token used before its `nbf` (#552). */
+function notYetValid(): Response {
+  return jsonResponse({ error: 'JwtToken', message: 'Token is not valid yet' }, 401);
 }
 
 /**
@@ -137,7 +149,7 @@ describe('auth-store in the static Lite build', () => {
     vi.unstubAllGlobals();
   });
 
-  it('"remember me" logs in through Stalwart token login and keeps only a refresh token in localStorage', async () => {
+  it('"remember me" logs in through Stalwart token login and keeps the tokens, never the password, in localStorage', async () => {
     const { calls } = stalwartFetch();
 
     const ok = await useAuthStore.getState().login(SERVER, 'alice', 'pw', undefined, true);
@@ -151,6 +163,7 @@ describe('auth-store in the static Lite build', () => {
     // The client the token was issued to rides along, so refreshes present the same one.
     expect(readLiteRefreshToken(0)).toEqual({ serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1', clientId: 'bulwark-webmail' });
     expect(localStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
+    expect(localStorage.getItem('bulwark-lite:access:0')).toContain('"accessToken":"AT-1"');
     // No password anywhere in web storage.
     const dump = JSON.stringify({ ...localStorage, ...sessionStorage });
     expect(dump).not.toContain('"pw"');
@@ -271,7 +284,37 @@ describe('auth-store in the static Lite build', () => {
     expect(localStorage.getItem('bulwark-lite:basic:0')).toBeNull();
   });
 
-  it('restores a remembered token session on reload by refreshing against the mail server', async () => {
+  it('resumes a reload with the cached access token instead of renewing early (#552)', async () => {
+    saveLiteRefreshToken(0, { serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1' }, true);
+    saveLiteAccessToken(0, 'AT-cached', 1800, true);
+    const id = registerAccount('oauth');
+    // A provider that gates refresh on `nbf` refuses a renewal this early.
+    const { calls } = stalwartFetch({ refreshAnswer: notYetValid });
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(calls).toEqual([]);
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.client?.getAuthHeader()).toBe('Bearer AT-cached');
+    expect(useAccountStore.getState().getAccountById(id)?.isConnected).toBe(true);
+    expect(readLiteRefreshToken(0)?.refreshToken).toBe('RT-1');
+  });
+
+  it('renews on reload once the cached access token is in its last minute', async () => {
+    saveLiteRefreshToken(0, { serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1' }, true);
+    saveLiteAccessToken(0, 'AT-stale', 30, true);
+    registerAccount('oauth');
+    const { calls } = stalwartFetch();
+
+    await useAuthStore.getState().checkAuth();
+
+    expect(calls).toEqual([`POST ${SERVER}/auth/token`]);
+    expect(useAuthStore.getState().client?.getAuthHeader()).toBe('Bearer AT-refreshed');
+    expect(readLiteAccessToken(0)?.accessToken).toBe('AT-refreshed');
+  });
+
+  it('restores a remembered session without a cached access token by refreshing against the mail server', async () => {
     saveLiteRefreshToken(0, { serverUrl: SERVER, username: 'alice', refreshToken: 'RT-1' }, true);
     registerAccount('oauth');
     const { calls } = stalwartFetch();
@@ -433,6 +476,8 @@ describe('auth-store in the static Lite build', () => {
         serverUrl: SERVER, username: 'alice@example.com', refreshToken: 'RT-sso', clientId: 'app-client', tokenEndpoint: PROVIDER_TOKEN,
       });
       expect(localStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
+      // The reload that follows sign-in resumes with this token (#552).
+      expect(localStorage.getItem('bulwark-lite:access:0')).toContain('"accessToken":"AT-sso"');
       // A code is good for one attempt.
       expect(readLiteOAuthFlow()).toBeNull();
 
@@ -449,6 +494,8 @@ describe('auth-store in the static Lite build', () => {
 
       expect(localStorage.getItem('bulwark-lite:refresh:0')).toBeNull();
       expect(sessionStorage.getItem('bulwark-lite:refresh:0')).not.toBeNull();
+      expect(localStorage.getItem('bulwark-lite:access:0')).toBeNull();
+      expect(sessionStorage.getItem('bulwark-lite:access:0')).not.toBeNull();
     });
 
     it('refuses a callback it did not start', async () => {
