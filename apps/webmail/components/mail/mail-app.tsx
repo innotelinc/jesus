@@ -4012,9 +4012,12 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                           whatever the user picked. Both folder-less scopes span
                           the own AND the group/shared accounts' folders (#1082);
                           "All folders" also searches Trash and Junk. The shared
-                          folders are listed under their owner. The unified
-                          views already search across every account's folders,
-                          so it is hidden there. */}
+                          folders are listed under their owner, and subfolders
+                          are indented under their parent as in the sidebar
+                          (a native select has no tree, so the indent is
+                          non-breaking spaces, as in the filter rule modal).
+                          The unified views already search across every
+                          account's folders, so it is hidden there. */}
                       {!isUnifiedView && (
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">{t("advanced_search.folder")}</label>
@@ -4032,14 +4035,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
                             <option value={SEARCH_SCOPE_ALL_FOLDERS}>{t("advanced_search.all_folders")}</option>
                             {searchScopeFolders.own.map((mb) => (
                               <option key={mb.id} value={mb.id}>
-                                {mb.name}
+                                {"\u00A0".repeat(mb.depth * 3)}{mb.name}
                               </option>
                             ))}
                             {searchScopeFolders.shared.map((group) => (
                               <optgroup key={group.ownerId} label={group.label}>
                                 {group.mailboxes.map((mb) => (
                                   <option key={mb.id} value={mb.id}>
-                                    {mb.name}
+                                    {"\u00A0".repeat(mb.depth * 3)}{mb.name}
                                   </option>
                                 ))}
                               </optgroup>
