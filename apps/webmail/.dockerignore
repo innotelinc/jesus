@@ -15,7 +15,8 @@ TODO.md
 # Sibling projects / test harness - not part of the webmail image
 examples/
 # Unit tests: `next build` type-checks every .ts file, and some tests import
-# routes the Dockerfile deletes (app/api/dev-jmap)
+# routes the Dockerfile deletes (app/api/dev-jmap). The Dockerfile deletes the
+# tests as well, since a remote Git context skips this file.
 **/__tests__
 **/*.test.ts
 **/*.test.tsx
