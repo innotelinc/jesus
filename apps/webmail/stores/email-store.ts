@@ -4,7 +4,7 @@ import type { UnifiedMailboxRole, CrossView } from "@/lib/jmap/types";
 import type { IJMAPClient } from "@/lib/jmap/client-interface";
 import { useSettingsStore, getMessageListOrderFor } from "@/stores/settings-store";
 import { useCalendarStore } from "@/stores/calendar-store";
-import { orderKeywords, type SortLevel } from "@/lib/message-list-order";
+import { orderKeywords, placeHeldRows, type HeldKeywords, type SortLevel } from "@/lib/message-list-order";
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
@@ -75,15 +75,20 @@ interface EmailStore {
   // Emails the user just read (unread view) or unstarred (starred view) that
   // should stay visible in that self-filtering cross view until it is re-opened,
   // instead of vanishing on the next push refresh. In a folder sorted on a
-  // keyword (#718): the open conversation's rows, kept although a read/star/tag
-  // change moved them past the loaded part of the server order. Cleared on
-  // navigation.
+  // keyword (#718): the open conversation's rows and the held ones (listHold),
+  // kept although a read/star/tag change moved them past the loaded part of
+  // the server order. Cleared on navigation.
   retainedInViewIds: Set<string>;
   hasMoreEmails: boolean; // Track if more emails are available to load
   totalEmails: number; // Total number of emails in the current mailbox/query
   // The configured message-list order the current folder view was fetched
   // with (#718); empty for chronological. Thread grouping mirrors it.
   listOrder: SortLevel[];
+  // The list row opened last and the keywords its messages had then. Its
+  // messages sort by those, so reading one in an "unread first" list leaves
+  // the row where it was clicked; opening another row releases it. Cleared
+  // on navigation.
+  listHold: ListHold | null;
   isPushConnected: boolean; // Track if push notifications are connected
   lastPushUpdate: number | null; // Timestamp of last push update
   // Delta sync (RFC 8620 §5.2). The Email collection state the plain
@@ -194,6 +199,8 @@ interface EmailStore {
    */
   fetchAccountMailboxes: (client: IJMAPClient, accountId: string) => Promise<void>;
   selectEmail: (email: Email | null) => void;
+  /** Holds a list row in place (see listHold); `rowKey` as from listRowKey. */
+  holdListRow: (rowKey: string) => void;
   selectMailbox: (mailboxId: string) => void;
   setLoading: (loading: boolean) => void;
   setLoadingEmail: (loading: boolean) => void;
@@ -489,6 +496,20 @@ function coalesceRefresh(client: IJMAPClient, key: string, run: () => Promise<vo
   })();
   registry.set(key, entry);
   return entry.promise;
+}
+
+/** See EmailStore.listHold. */
+export interface ListHold {
+  rowKey: string;
+  keywords: HeldKeywords;
+}
+
+/**
+ * The list row an email is shown in: its thread, or the email itself when the
+ * list is not threaded - the same key EmailList groups by.
+ */
+export function listRowKey(email: Email, isScheduledView: boolean): string {
+  return useSettingsStore.getState().disableThreading || isScheduledView ? email.id : threadKeyFor(email);
 }
 
 /** Delta-sync baseline of the plain folder list (see EmailStore.emailListSync). */
@@ -1469,6 +1490,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   hasMoreEmails: false,
   totalEmails: 0,
   listOrder: [],
+  listHold: null,
   isPushConnected: false,
   lastPushUpdate: null,
   emailListSync: null,
@@ -1588,6 +1610,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     if (email && (!prev || email.id !== prev.id)) {
       emailHooks.onEmailOpen.emitSync(email);
     }
+  },
+  holdListRow: (rowKey) => {
+    const { listHold, emails, isScheduledView } = get();
+    if (listHold?.rowKey === rowKey) return;
+    const keywords = new Map<string, Email['keywords']>();
+    for (const email of emails) {
+      if (listRowKey(email, isScheduledView) === rowKey) keywords.set(email.id, email.keywords);
+    }
+    set({ listHold: { rowKey, keywords } });
   },
   selectKeyword: (keyword) => set(state => ({
     selectedKeyword: keyword,
@@ -1806,8 +1837,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // an already-visited account doesn't flash a spinner over the visible mail.
     const background = opts?.background ?? false;
     // Loading a real mailbox is a fresh navigation (leaving any cross view), so
-    // drop the unread/starred retain set.
-    set(background ? { error: null, retainedInViewIds: new Set() } : { isLoading: true, error: null, retainedInViewIds: new Set() }); // Keep previous emails visible during transition
+    // drop the unread/starred retain set and the held row.
+    set(background ? { error: null, retainedInViewIds: new Set(), listHold: null } : { isLoading: true, error: null, retainedInViewIds: new Set(), listHold: null }); // Keep previous emails visible during transition
     try {
       const targetMailboxId = mailboxId || get().selectedMailbox;
       if (targetMailboxId === VIRTUAL_SCHEDULED_MAILBOX_ID) {
@@ -4276,15 +4307,17 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       // load-more brings them back where they now belong. Not the open
       // conversation's, though: every action on an email looks it up in this
       // list, so "mark as unread" on the mail just read must still find it.
-      // They stay until something else is opened, and load-more does not
-      // count them.
+      // Nor the held row, which stays where it was clicked. They stay until
+      // something else is opened, and load-more does not count them.
+      const held = get().listHold?.keywords;
       let retainedInViewIds: Set<string> | undefined;
       if (keepOpenThread) {
         const open = get().selectedEmail;
         const openThread = open ? threadKeyFor(open) : null;
         retainedInViewIds = new Set();
         for (const email of currentEmails) {
-          if (mergedIds.has(email.id) || threadKeyFor(email) !== openThread) continue;
+          if (mergedIds.has(email.id)) continue;
+          if (threadKeyFor(email) !== openThread && !held?.has(email.id)) continue;
           merged.push(email);
           mergedIds.add(email.id);
           retainedInViewIds.add(email.id);
@@ -4302,6 +4335,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         merged = mergeRetainedRows(currentEmails, merged, get().retainedInViewIds);
         retainedAddedCount = merged.length - beforeLen;
       }
+
+      // The fresh order has the held row where its new read/star/tag state
+      // sorts; put it back where the list shows it (the order EmailList uses).
+      merged = placeHeldRows(merged, searchQuery || crossView || hasFilters ? [] : get().listOrder, held);
 
       // Check if anything actually changed to avoid unnecessary re-renders
       const hasChanged =
@@ -4424,6 +4461,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       newExpandedThreadIds.delete(threadKey);
     } else {
       newExpandedThreadIds.add(threadKey);
+      // Expanding marks the thread read; hold it before that lands.
+      get().holdListRow(threadKey);
     }
 
     set({ expandedThreadIds: newExpandedThreadIds });
@@ -4936,6 +4975,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       crossView: null,
       selectedKeyword: null,
       retainedInViewIds: new Set(),
+      listHold: null,
       viewToken: token,
     });
     try {
@@ -5020,6 +5060,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       crossView: view,
       selectedKeyword: null,
       retainedInViewIds: new Set(),
+      listHold: null,
       viewToken: token,
     });
     try {
@@ -5066,6 +5107,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       crossView: null,
       unifiedErrors: new Map(),
       retainedInViewIds: new Set(),
+      listHold: null,
       viewToken: state.viewToken + 1,
     }));
   },
@@ -5497,6 +5539,15 @@ useEmailStore.subscribe((state, prev) => {
     });
   if (sameCross && sameUnified) return;
   useEmailStore.setState(projected);
+});
+
+// Opening a message holds its list row (see listHold), however it was opened:
+// a click, next/previous, or the pick after a delete. This runs before the
+// message is marked read, so the hold records it unread.
+useEmailStore.subscribe((state, prev) => {
+  const email = state.selectedEmail;
+  if (!email || email.id === prev.selectedEmail?.id) return;
+  state.holdListRow(listRowKey(email, state.isScheduledView));
 });
 
 // ---------------------------------------------------------------------------

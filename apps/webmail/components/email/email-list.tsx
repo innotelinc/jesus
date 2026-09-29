@@ -143,12 +143,15 @@ export function EmailList({
   // Search results and cross-account views are always chronological.
   const fetchedListOrder = useEmailStore((state) => state.listOrder);
   const crossView = useEmailStore((state) => state.crossView);
+  // The row opened last stays where it was clicked while that order would
+  // move it (e.g. read in "unread first").
+  const listHold = useEmailStore((state) => state.listHold);
 
   const threadGroups = useMemo(() => {
     const listOrder = searchQuery || crossView || !isFilterEmpty(searchFilters) ? [] : fetchedListOrder;
     const groups = groupEmailsByThread(emails, disableThreading || isScheduledView, threadEmailCounts);
-    return sortThreadGroups(groups, listOrder);
-  }, [emails, disableThreading, isScheduledView, threadEmailCounts, fetchedListOrder, searchQuery, crossView, searchFilters]);
+    return sortThreadGroups(groups, listOrder, listHold?.keywords);
+  }, [emails, disableThreading, isScheduledView, threadEmailCounts, fetchedListOrder, searchQuery, crossView, searchFilters, listHold]);
 
   const { contextMenu, openContextMenu, closeContextMenu, menuRef } = useContextMenu<Email>();
   /**
