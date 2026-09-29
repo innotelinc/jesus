@@ -49,6 +49,15 @@ describe('findVerificationCode', () => {
     expect(findVerificationCode('', 'Sign in to Claude.ai177945Copy and paste the temporary verification code')).toBe('177945');
   });
 
+  it('does not take a group of digits out of an id', () => {
+    expect(findVerificationCode('', 'Your verification code was sent. Request ffacd0b43b97d-4887a30a5a2si2098f4f')).toBeNull();
+  });
+
+  it('does not read a status code as the keyword of a one-time code', () => {
+    expect(findVerificationCode('', 'Rejected with code 550 (5.1.1) after 48291733 ms')).toBeNull();
+    expect(findVerificationCode('', 'Antwort mit Code 421: Server ausgelastet, Sitzung 48291733 beendet')).toBeNull();
+  });
+
   it('prefers the code in the subject', () => {
     expect(findVerificationCode('Your code is 482913', 'Your verification code for account 5512345 is below')).toBe('482913');
   });
@@ -89,6 +98,10 @@ describe('findVerificationCode', () => {
     ['a card notice', 'Ihre Kreditkarte',
       'Geben Sie niemals Ihren Sicherheitscode oder Ihre PIN weiter. Ihre Karte endet auf 4821. Meeting-ID: 845 1234 5678'],
     ['a QR code', 'Deine Mitgliedskarte', 'Scanne den QR-Code in der App. Deine Mitgliedsnummer 20394857.'],
+    ['a delivery report from Gmail', 'Successfully delivered message',
+      "Your message has been successfully delivered to the following recipients:\n\n<x@gmail.com> (delivered to 'gmail-smtp-in.l.google.com' with code 250 (2.1.5) 'OK ffacd0b43b97d-4887a30a5a2si20984394f4f.30 - gsmtp')"],
+    ['a delivery report from Outlook', 'Successfully delivered message',
+      "<x@example.com> (delivered to 'example-com.mail.protection.outlook.com' with code 250 (2.6.0) '2.6.0 <a1b2@mail.example.org> [InternalId=21045339521540, Hostname=PAXPR03MB8065.eurprd03.prod.outlook.com] 12825 bytes in 0.108, 115.431 KB/sec Queued mail for delivery')"],
   ])('finds nothing in %s', (_, subject, text) => {
     expect(findVerificationCode(subject, text)).toBeNull();
   });
