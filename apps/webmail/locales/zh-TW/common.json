@@ -254,6 +254,7 @@
       "button": "清空信件匣",
       "confirm_title": "清空信件匣",
       "confirm_message": "此信件匣中的所有郵件都將永久刪除。此動作無法復原。",
+      "confirm_message_trash": "此信件匣中的所有郵件都將移至垃圾桶。",
       "confirm_button": "清空信件匣",
       "junk_hint": "您可以清空垃圾郵件信件匣，永久刪除其中的所有郵件。",
       "trash_hint": "您可以清空垃圾桶，永久刪除其中的所有郵件。"

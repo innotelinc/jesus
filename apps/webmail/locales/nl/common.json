@@ -254,6 +254,7 @@
       "button": "Map legen",
       "confirm_title": "Map legen",
       "confirm_message": "Alle e-mails in deze map worden permanent verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+      "confirm_message_trash": "Alle e-mails in deze map worden naar de prullenbak verplaatst.",
       "confirm_button": "Map legen",
       "junk_hint": "U kunt de map Spam legen om alle berichten permanent te verwijderen.",
       "trash_hint": "U kunt de prullenbak legen om alle berichten permanent te verwijderen."

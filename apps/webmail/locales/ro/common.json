@@ -254,6 +254,7 @@
       "button": "Folder gol",
       "confirm_title": "Folder gol",
       "confirm_message": "Toate e-mailurile din acest dosar vor fi șterse definitiv. Această acțiune nu poate fi anulată.",
+      "confirm_message_trash": "Toate e-mailurile din acest dosar vor fi mutate în coșul de gunoi.",
       "confirm_button": "Folder gol",
       "junk_hint": "Puteți goli folderul „Junk” pentru a șterge definitiv toate mesajele.",
       "trash_hint": "Puteți goli folderul Coș de gunoi pentru a șterge definitiv toate mesajele."

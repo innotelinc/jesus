@@ -254,6 +254,7 @@
       "button": "清空文件夹",
       "confirm_title": "清空文件夹",
       "confirm_message": "此文件夹中的所有邮件都将被永久删除。此操作无法撤销。",
+      "confirm_message_trash": "此文件夹中的所有邮件都将移至已删除文件夹。",
       "confirm_button": "清空文件夹",
       "junk_hint": "您可以清空垃圾邮件文件夹以永久删除所有邮件。",
       "trash_hint": "您可以清空已删除文件夹以永久删除所有邮件。"

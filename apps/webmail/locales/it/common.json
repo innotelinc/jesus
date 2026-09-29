@@ -254,6 +254,7 @@
       "button": "Svuota cartella",
       "confirm_title": "Svuota cartella",
       "confirm_message": "Tutti i messaggi in questa cartella verranno eliminati definitivamente. Questa azione non può essere annullata.",
+      "confirm_message_trash": "Tutte le e-mail di questa cartella verranno spostate nel cestino.",
       "confirm_button": "Svuota cartella",
       "junk_hint": "Puoi svuotare la cartella Spam per rimuovere definitivamente tutti i messaggi.",
       "trash_hint": "Puoi svuotare il Cestino per rimuovere definitivamente tutti i messaggi."

@@ -254,6 +254,7 @@
       "button": "Tøm mappe",
       "confirm_title": "Tøm mappe",
       "confirm_message": "Alle e-postene i denne mappen slettes permanent. Denne handlingen kan ikke angres.",
+      "confirm_message_trash": "Alle e-poster i denne mappen flyttes til papirkurven.",
       "confirm_button": "Tøm mappe",
       "junk_hint": "Du kan tømme søppelpostmappen for å fjerne alle meldinger permanent.",
       "trash_hint": "Du kan tømme papirkurven for å fjerne alle meldinger permanent."

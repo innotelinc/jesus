@@ -254,6 +254,7 @@
       "button": "Iztīrīt mapi",
       "confirm_title": "Iztīrīt mapi",
       "confirm_message": "Visas vēstules šajā mapē tiks dzēstas neatgriezeniski. Šo darbību nevar atcelt.",
+      "confirm_message_trash": "Visas šīs mapes vēstules tiks pārvietotas uz atkritni.",
       "confirm_button": "Iztīrīt mapi",
       "junk_hint": "Jūs varat iztīrīt mapi Mēstules, lai neatgriezeniski dzēstu visus ziņojumus.",
       "trash_hint": "Jūs varat iztīrīt Atkritni, lai neatgriezeniski dzēstu visus ziņojumus."

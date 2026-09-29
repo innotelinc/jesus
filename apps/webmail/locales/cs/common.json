@@ -254,6 +254,7 @@
       "button": "Vyprázdnit složku",
       "confirm_title": "Vyprázdnit složku",
       "confirm_message": "Všechny zprávy v této složce budou trvale odstraněny. Tuto akci nelze vrátit zpět.",
+      "confirm_message_trash": "Všechny e-maily v této složce budou přesunuty do koše.",
       "confirm_button": "Vyprázdnit složku",
       "junk_hint": "Můžete vyprázdnit složku Spam a trvale odstranit všechny zprávy.",
       "trash_hint": "Můžete vyprázdnit Koš a trvale odstranit všechny zprávy."

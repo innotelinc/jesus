@@ -2837,6 +2837,49 @@ export class JMAPClient implements IJMAPClient {
     return totalDestroyed;
   }
 
+  async moveMailboxContents(
+    fromMailboxId: string,
+    toMailboxId: string,
+    accountId?: string,
+    markAsRead?: boolean,
+  ): Promise<number> {
+    const targetAccountId = accountId || this.accountId;
+    const batchSize = Math.min(500, this.getMaxObjectsInGet(), this.getMaxObjectsInSet());
+    const patch: Record<string, unknown> = { mailboxIds: { [toMailboxId]: true } };
+    if (markAsRead) patch["keywords/$seen"] = true;
+    let totalMoved = 0;
+
+    // Moved emails leave the folder, so the next query returns the next page.
+    // `update` is keyed by id and cannot take a result reference, hence the
+    // separate query per batch.
+    while (true) {
+      const queryResponse = await this.request([
+        ["Email/query", {
+          accountId: targetAccountId,
+          filter: { inMailbox: fromMailboxId },
+          limit: batchSize,
+        }, "0"],
+      ]);
+      const ids: string[] = queryResponse.methodResponses?.[0]?.[1]?.ids || [];
+      if (ids.length === 0) break;
+
+      // A refused update leaves the ids in the folder, and the next query
+      // would return them again forever.
+      const setResponse = await this.request([
+        ["Email/set", {
+          accountId: targetAccountId,
+          update: Object.fromEntries(ids.map(id => [id, patch])),
+        }, "0"],
+      ]);
+      this.assertEmailSetSucceeded(setResponse, 'move the folder contents');
+
+      totalMoved += ids.length;
+      if (ids.length < batchSize) break;
+    }
+
+    return totalMoved;
+  }
+
   async markMailboxAsRead(mailboxId: string, accountId?: string): Promise<number> {
     const targetAccountId = accountId || this.accountId;
     const pageSize = Math.min(500, this.getMaxObjectsInSet());

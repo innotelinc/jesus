@@ -254,6 +254,7 @@
       "button": "Opróżnij folder",
       "confirm_title": "Opróżnij folder",
       "confirm_message": "Wszystkie wiadomości w tym folderze zostaną trwale usunięte. Tej operacji nie można cofnąć.",
+      "confirm_message_trash": "Wszystkie wiadomości z tego folderu zostaną przeniesione do kosza.",
       "confirm_button": "Opróżnij folder",
       "junk_hint": "Możesz opróżnić folder Spam, aby trwale usunąć wszystkie wiadomości.",
       "trash_hint": "Możesz opróżnić Kosz, aby trwale usunąć wszystkie wiadomości."

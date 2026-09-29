@@ -31,7 +31,7 @@ import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { connectedAccountsGrew } from "@/lib/unified-mailbox";
 import { KeyboardShortcutsModal } from "@/components/keyboard-shortcuts-modal";
-import { useEmailStore, buildUnifiedAccountClients, captureViewToken, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId } from "@/stores/email-store";
+import { useEmailStore, buildUnifiedAccountClients, captureViewToken, ArchiveMailboxNotFoundError, findArchiveMailbox, resolveUnstampedEmailAccountId, emptyFolderMovesToTrash } from "@/stores/email-store";
 import { groupSearchScopeFolders, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
 import { toast } from "@/stores/toast-store";
 import { runBatchEmailAction } from "@/lib/email-action-toast";
@@ -2814,7 +2814,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
 
     const confirmed = await confirmDialog({
       title: tCtxMenu('email_list.empty_folder.confirm_title'),
-      message: tCtxMenu('email_list.empty_folder.confirm_message'),
+      message: emptyFolderMovesToTrash(mailbox)
+        ? tCtxMenu('email_list.empty_folder.confirm_message_trash')
+        : tCtxMenu('email_list.empty_folder.confirm_message'),
       confirmText: tCtxMenu('email_list.empty_folder.confirm_button'),
       variant: "destructive",
     });

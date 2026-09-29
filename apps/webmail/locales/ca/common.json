@@ -254,6 +254,7 @@
       "button": "Buida la carpeta",
       "confirm_title": "Buida la carpeta",
       "confirm_message": "Tots els correus d'aquesta carpeta se suprimiran definitivament. Aquesta acció no es pot desfer.",
+      "confirm_message_trash": "Tots els correus d'aquesta carpeta es mouran a la paperera.",
       "confirm_button": "Buida la carpeta",
       "junk_hint": "Podeu buidar la carpeta de correu brossa per eliminar definitivament tots els missatges.",
       "trash_hint": "Podeu buidar la paperera per eliminar definitivament tots els missatges."

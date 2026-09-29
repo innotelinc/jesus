@@ -254,6 +254,7 @@
       "button": "Esvaziar pasta",
       "confirm_title": "Esvaziar pasta",
       "confirm_message": "Todos os e-mails nesta pasta serão permanentemente excluídos. Esta ação não pode ser desfeita.",
+      "confirm_message_trash": "Todos os e-mails desta pasta serão movidos para a lixeira.",
       "confirm_button": "Esvaziar pasta",
       "junk_hint": "Você pode esvaziar a pasta de Spam para remover permanentemente todas as mensagens.",
       "trash_hint": "Você pode esvaziar a Lixeira para remover permanentemente todas as mensagens."

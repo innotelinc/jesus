@@ -254,6 +254,7 @@
       "button": "Vider le dossier",
       "confirm_title": "Vider le dossier",
       "confirm_message": "Tous les e-mails de ce dossier seront définitivement supprimés. Cette action est irréversible.",
+      "confirm_message_trash": "Tous les e-mails de ce dossier seront déplacés vers la corbeille.",
       "confirm_button": "Vider le dossier",
       "junk_hint": "Vous pouvez vider le dossier Indésirables pour supprimer définitivement tous les messages.",
       "trash_hint": "Vous pouvez vider la corbeille pour supprimer définitivement tous les messages."
