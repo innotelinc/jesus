@@ -254,6 +254,7 @@
       "button": "폴더 비우기",
       "confirm_title": "폴더 비우기",
       "confirm_message": "이 폴더의 모든 메일이 영구적으로 삭제돼요. 이 작업은 되돌릴 수 없어요.",
+      "confirm_message_trash": "이 폴더의 모든 메일이 휴지통으로 이동돼요.",
       "confirm_button": "폴더 비우기",
       "junk_hint": "스팸함을 비워 모든 메시지를 영구적으로 삭제할 수 있어요.",
       "trash_hint": "휴지통을 비워 모든 메시지를 영구적으로 삭제할 수 있어요."

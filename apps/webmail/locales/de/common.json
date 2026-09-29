@@ -254,6 +254,7 @@
       "button": "Ordner leeren",
       "confirm_title": "Ordner leeren",
       "confirm_message": "Alle E-Mails in diesem Ordner werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirm_message_trash": "Alle E-Mails in diesem Ordner werden in den Papierkorb verschoben.",
       "confirm_button": "Ordner leeren",
       "junk_hint": "Sie können den Spam-Ordner leeren, um alle Nachrichten dauerhaft zu entfernen.",
       "trash_hint": "Sie können den Papierkorb leeren, um alle Nachrichten dauerhaft zu entfernen."

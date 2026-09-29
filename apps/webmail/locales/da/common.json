@@ -254,6 +254,7 @@
       "button": "Tøm mappe",
       "confirm_title": "Tøm mappe",
       "confirm_message": "Alle e-mails i denne mappe vil blive slettet permanent. Denne handling kan ikke fortrydes.",
+      "confirm_message_trash": "Alle e-mails i denne mappe flyttes til papirkurven.",
       "confirm_button": "Tøm mappe",
       "junk_hint": "Du kan tømme spam-mappen for permanent at fjerne alle beskeder.",
       "trash_hint": "Du kan tømme papirkurven for permanent at fjerne alle beskeder."

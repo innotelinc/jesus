@@ -1392,6 +1392,13 @@ function findTrashMailbox(
   });
 }
 
+// Emptying Trash or Junk destroys their mail, as does every delete for users
+// who chose permanent deletion; any other folder is emptied into the trash.
+export function emptyFolderMovesToTrash(mailbox: Pick<Mailbox, 'role'>): boolean {
+  if (mailbox.role === 'trash' || mailbox.role === 'junk') return false;
+  return useSettingsStore.getState().deleteAction !== 'permanent';
+}
+
 // Plugin re-render for already fetched emails.
 // Plugins can trigger: window.dispatchEvent(new Event('plugin:rerender-fetched-emails'))
 if (typeof window !== 'undefined') {
@@ -4881,10 +4888,27 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   emptyMailbox: async (client, mailboxId) => {
     try {
       set({ isLoading: true, error: null });
-      const mailbox = resolveActionMailboxes().find(mb => mb.id === mailboxId);
+      const mailboxes = resolveActionMailboxes();
+      const mailbox = mailboxes.find(mb => mb.id === mailboxId);
       const accountId = mailbox?.isShared ? mailbox.accountId : undefined;
       const jmapMailboxId = mailbox?.originalId || mailboxId;
-      await resolveActionClient(client).emptyMailbox(jmapMailboxId, accountId);
+
+      let trashMailbox: Mailbox | undefined;
+      let markAsRead = false;
+      if (mailbox && emptyFolderMovesToTrash(mailbox)) {
+        trashMailbox = findTrashMailbox(mailboxes, { accountId });
+        // The user asked to move to trash, not permanently delete.
+        if (!trashMailbox) throw new Error('Trash mailbox not found - cannot move emails to trash');
+        markAsRead = useSettingsStore.getState().deleteAction === 'trash-and-read';
+        await resolveActionClient(client).moveMailboxContents(
+          jmapMailboxId,
+          trashMailbox.originalId || trashMailbox.id,
+          accountId,
+          markAsRead,
+        );
+      } else {
+        await resolveActionClient(client).emptyMailbox(jmapMailboxId, accountId);
+      }
 
       // Clear emails from local state if we're viewing this mailbox
       const currentMailbox = get().selectedMailbox;
@@ -4892,26 +4916,32 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         set({ emails: [], selectedEmail: null });
       }
 
+      const updateCounters = (mb: Mailbox): Mailbox => {
+        if (mb.id === mailboxId) {
+          return { ...mb, totalEmails: 0, unreadEmails: 0, totalThreads: 0, unreadThreads: 0 };
+        }
+        if (mailbox && mb.id === trashMailbox?.id) {
+          return {
+            ...mb,
+            totalEmails: mb.totalEmails + mailbox.totalEmails,
+            unreadEmails: mb.unreadEmails + (markAsRead ? 0 : mailbox.unreadEmails),
+            totalThreads: mb.totalThreads + mailbox.totalThreads,
+            unreadThreads: mb.unreadThreads + (markAsRead ? 0 : mailbox.unreadThreads),
+          };
+        }
+        return mb;
+      };
+
       const viewingId = get().viewingAccountId;
       if (viewingId) {
         set((state) => ({
           accountMailboxes: {
             ...state.accountMailboxes,
-            [viewingId]: (state.accountMailboxes[viewingId] ?? []).map(mb =>
-              mb.id === mailboxId
-                ? { ...mb, totalEmails: 0, unreadEmails: 0, totalThreads: 0, unreadThreads: 0 }
-                : mb
-            ),
+            [viewingId]: (state.accountMailboxes[viewingId] ?? []).map(updateCounters),
           },
         }));
       } else {
-        set({
-          mailboxes: get().mailboxes.map(mb =>
-            mb.id === mailboxId
-              ? { ...mb, totalEmails: 0, unreadEmails: 0, totalThreads: 0, unreadThreads: 0 }
-              : mb
-          ),
-        });
+        set({ mailboxes: get().mailboxes.map(updateCounters) });
       }
       set({ isLoading: false });
     } catch (error) {

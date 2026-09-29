@@ -495,6 +495,18 @@ export class DemoJMAPClient implements IJMAPClient {
     return removed;
   }
 
+  async moveMailboxContents(fromMailboxId: string, toMailboxId: string, _accountId?: string, markAsRead?: boolean): Promise<number> {
+    let moved = 0;
+    for (const email of this.data.emails) {
+      if (!email.mailboxIds[fromMailboxId]) continue;
+      email.mailboxIds = { [toMailboxId]: true };
+      if (markAsRead) email.keywords.$seen = true;
+      moved++;
+    }
+    this.recalcMailboxCounts();
+    return moved;
+  }
+
   async markMailboxAsRead(mailboxId: string): Promise<number> {
     let count = 0;
     for (const email of this.data.emails) {

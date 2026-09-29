@@ -254,6 +254,7 @@
       "button": "Klasörü boşalt",
       "confirm_title": "Klasörü boşalt",
       "confirm_message": "Bu klasördeki tüm e-postalar kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+      "confirm_message_trash": "Bu klasördeki tüm e-postalar çöp kutusuna taşınacak.",
       "confirm_button": "Klasörü boşalt",
       "junk_hint": "Tüm iletileri kalıcı olarak kaldırmak için Önemsiz klasörünü boşaltabilirsiniz.",
       "trash_hint": "Tüm iletileri kalıcı olarak kaldırmak için Çöp Kutusu klasörünü boşaltabilirsiniz."

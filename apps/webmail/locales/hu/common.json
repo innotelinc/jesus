@@ -254,6 +254,7 @@
       "button": "Mappa ürítése",
       "confirm_title": "Mappa ürítése",
       "confirm_message": "A mappa összes e-mailje véglegesen törlődik. Ez a művelet nem vonható vissza.",
+      "confirm_message_trash": "A mappában lévő összes e-mail a Kukába kerül.",
       "confirm_button": "Mappa ürítése",
       "junk_hint": "A Spam mappa ürítésével véglegesen eltávolíthatod az összes üzenetet.",
       "trash_hint": "A Kuka mappa ürítésével véglegesen eltávolíthatod az összes üzenetet."

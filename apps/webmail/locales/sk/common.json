@@ -254,6 +254,7 @@
       "button": "Vyprázdniť priečinku",
       "confirm_title": "Vyprázdniť priečinku",
       "confirm_message": "Všetky e-maily v tejto priečinke budú trvalo odstránené. Túto akciu nie je možné vrátiť.",
+      "confirm_message_trash": "Všetky e-maily v tomto priečinku budú presunuté do koša.",
       "confirm_button": "Vyprázdniť priečinku",
       "junk_hint": "Môžete vyprázdniť priečinku Spam a trvalo odstrániť všetky správy.",
       "trash_hint": "Môžete vyprázdniť Koš a trvalo odstrániť všetky správy."

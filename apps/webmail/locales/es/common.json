@@ -254,6 +254,7 @@
       "button": "Vaciar carpeta",
       "confirm_title": "Vaciar carpeta",
       "confirm_message": "Todos los correos de esta carpeta se eliminarán permanentemente. Esta acción no se puede deshacer.",
+      "confirm_message_trash": "Todos los correos de esta carpeta se moverán a la papelera.",
       "confirm_button": "Vaciar carpeta",
       "junk_hint": "Puede vaciar la carpeta de Spam para eliminar permanentemente todos los mensajes.",
       "trash_hint": "Puede vaciar la Papelera para eliminar permanentemente todos los mensajes."
