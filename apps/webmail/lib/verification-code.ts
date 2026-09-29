@@ -53,6 +53,10 @@ const ONE_TIME_PASSWORD = /\b(?:one[- ]time|single[- ]use|temporary) pass(?:word
 
 const WORD = /[\p{L}\p{M}]+(?:-[\p{L}\p{M}]+)*/gu;
 
+// "with code 250 (2.1.5)" in a delivery report: a code word followed by a
+// number too short to be a one-time code names a status or error code.
+const LABELS_SHORT_NUMBER = /^\s*[:=]?\s*\d{1,3}(?![\p{L}\p{N}]|[.,]\d|[ -]\d)/u;
+
 function isCodeWordPart(part: string, previous: string | undefined): boolean {
   if (UPPERCASE_CODE_WORDS.test(part)) return true;
   const lower = part.toLowerCase();
@@ -77,8 +81,9 @@ function findCodeWords(text: string): Span[] {
     const end = start + match[0].length;
     const parts = match[0].split('-');
     const hit = parts.some((part, i) => isCodeWordPart(part, i > 0 ? parts[i - 1] : previousWord));
+    const next = text.slice(end, end + 12);
     // "Code of Conduct", "code of practice"
-    if (hit && !/^\s+of\s/i.test(text.slice(end, end + 4))) spans.push({ start, end });
+    if (hit && !/^\s+of\s/i.test(next) && !LABELS_SHORT_NUMBER.test(next)) spans.push({ start, end });
     previousWord = parts[parts.length - 1];
   }
   for (const re of [CJK_CODE_WORDS, ONE_TIME_PASSWORD]) {
@@ -108,6 +113,17 @@ const CANDIDATE = new RegExp(
 // Digits run into the words around them, which the pass above takes as one
 // token: "ein:86771674Teile", "Claude.ai177945Copy", "732888Gib".
 const GLUED_DIGITS = /(?<=\p{L})\d{4,10}(?!\d)|(?<!\d)\d{4,10}(?=\p{L})/gu;
+
+const ALNUM = /[\p{L}\p{N}]/u;
+
+/** Whether the digits at start..end have only letters around them, as in
+ *  "ai177945Copy", and are not one group of an id like "4887a30a5a2si2098"
+ *  or "PAXPR03MB8065". */
+function gluedToWords(text: string, start: number, end: number): boolean {
+  while (start > 0 && ALNUM.test(text[start - 1])) start--;
+  while (end < text.length && ALNUM.test(text[end])) end++;
+  return /^\p{L}*\d+\p{L}*$/u.test(text.slice(start, end));
+}
 
 const YEAR = /^(?:19|20)\d\d$/;
 // 10min, 600px, 100GB
@@ -227,6 +243,7 @@ function bestCandidate(rawText: string): Candidate | null {
   let best: Candidate | null = null;
   for (const re of [CANDIDATE, GLUED_DIGITS]) {
     for (const match of text.matchAll(re)) {
+      if (re === GLUED_DIGITS && !gluedToWords(text, match.index!, match.index! + match[0].length)) continue;
       const candidate = scoreCandidate(text, match[0], match.index!, keywords);
       if (candidate && (!best || candidate.score < best.score)) best = candidate;
     }
