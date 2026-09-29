@@ -17,6 +17,7 @@ APIs, no audio leaving the box.
 [![Conformity](https://github.com/innotelinc/capstone/actions/workflows/conform.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/conform.yml)
 [![Release](https://github.com/innotelinc/capstone/actions/workflows/release.yml/badge.svg)](https://github.com/innotelinc/capstone/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/innotelinc/capstone?color=6366f1)](https://innotelinc.github.io/capstone/releases)
+[![Theme: Unity](https://img.shields.io/badge/theme-Unity-6366f1)](https://github.com/innotelinc/innotel-platform-stack/blob/main/standards/unity/README.md)
 
 *One script, and your phone grows a brain.*
 
