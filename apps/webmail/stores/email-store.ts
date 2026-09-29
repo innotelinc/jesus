@@ -11,7 +11,7 @@ import { resolveThreadRoute } from "@/lib/thread-routing";
 import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type AcrossAccountsSearchOptions, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
-import { isAllFoldersSearchScope, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
+import { defaultSearchScopeFor, isAllFoldersSearchScope, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
 import { useAuthStore } from "@/stores/auth-store";
 import { currentStoreEpoch } from "@/lib/store-epoch";
 import { keywordPointer } from "@/lib/jmap/patch-pointer";
@@ -694,12 +694,15 @@ export function resolveUnstampedEmailAccountId(opts: {
   return mailbox?.isShared ? mailbox.accountId : undefined;
 }
 
-function resolveActionMailboxes(): Mailbox[] {
-  const state = useEmailStore.getState();
+function mailboxesInView(state: Pick<EmailStore, 'viewingAccountId' | 'accountMailboxes' | 'mailboxes'>): Mailbox[] {
   if (state.viewingAccountId) {
     return state.accountMailboxes[state.viewingAccountId] ?? state.mailboxes;
   }
   return state.mailboxes;
+}
+
+function resolveActionMailboxes(): Mailbox[] {
+  return mailboxesInView(useEmailStore.getState());
 }
 
 // List requests can finish after navigation. Never apply an old folder/tag
@@ -1531,7 +1534,12 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // would query that foreign folder id against the wrong account and come
     // back empty, while the dropdown (which renders no matching option) reads
     // "All folders". Reset it so the scope matches what is shown. (#1082)
-    searchMailboxId: "",
+    // Only the new account's own list names its Spam/Trash: another
+    // account's mailbox ids can collide with them.
+    searchMailboxId: defaultSearchScopeFor(
+      accountId ? state.accountMailboxes[accountId] ?? [] : state.mailboxes,
+      mailboxId,
+    ),
     isLoadingMore: false,
     selectedEmail: null,
     selectedEmailIds: new Set(),
@@ -1622,21 +1630,28 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       console.error('Failed to fetch tag counts:', error);
     }
   }),
-  selectMailbox: (mailboxId) => set(state => ({
-    selectedMailbox: mailboxId,
-    isLoadingMore: false,
-    selectedEmail: null,
-    selectedEmailIds: new Set(),
-    selectedKeyword: null,
-    expandedThreadIds: new Set(),
-    threadEmailsCache: new Map(),
-    threadEmailCounts: new Map(),
-    isLoadingThread: null,
-    viewToken: state.viewToken + 1,
-    isUnifiedView: false,
-    unifiedRole: null,
-    crossView: null,
-  })),
+  selectMailbox: (mailboxId) => set(state => {
+    const mailboxes = mailboxesInView(state);
+    // The folder's default search scope follows it (Spam and Trash search
+    // themselves); a scope the user picked in the dropdown stays.
+    const scopeIsDefault = state.searchMailboxId === defaultSearchScopeFor(mailboxes, state.selectedMailbox);
+    return {
+      selectedMailbox: mailboxId,
+      ...(scopeIsDefault ? { searchMailboxId: defaultSearchScopeFor(mailboxes, mailboxId) } : {}),
+      isLoadingMore: false,
+      selectedEmail: null,
+      selectedEmailIds: new Set(),
+      selectedKeyword: null,
+      expandedThreadIds: new Set(),
+      threadEmailsCache: new Map(),
+      threadEmailCounts: new Map(),
+      isLoadingThread: null,
+      viewToken: state.viewToken + 1,
+      isUnifiedView: false,
+      unifiedRole: null,
+      crossView: null,
+    };
+  }),
   setLoading: (loading) => set({ isLoading: loading }),
   setLoadingEmail: (loading) => set({ isLoadingEmail: loading }),
   setError: (error) => set({ error }),
@@ -1730,12 +1745,18 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         ? { isLoading: false, mailboxSyncStates: fetched.states }
         : { mailboxSyncStates: fetched.states };
       if (!selectionValid) {
+        // A search scope naming a folder that is gone (e.g. the Spam/Trash
+        // the default scope followed) falls back to the default.
+        const scope = get().searchMailboxId;
+        const scopePatch = !isAllFoldersSearchScope(scope) && !mailboxes.some(m => m.id === scope)
+          ? { searchMailboxId: '' }
+          : {};
         // Find inbox from PRIMARY account (not shared accounts)
         const inboxMailbox = mailboxes.find(m => m.role === 'inbox' && !m.isShared);
         if (inboxMailbox) {
-          set({ mailboxes, selectedMailbox: inboxMailbox.id, ...loadingPatch });
+          set({ mailboxes, selectedMailbox: inboxMailbox.id, ...scopePatch, ...loadingPatch });
         } else {
-          set({ mailboxes, selectedMailbox: '', ...loadingPatch });
+          set({ mailboxes, selectedMailbox: '', ...scopePatch, ...loadingPatch });
         }
       } else {
         set({ mailboxes, ...loadingPatch });
@@ -3127,7 +3148,10 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   clearSearchFilters: () => {
-    set({ searchFilters: { ...DEFAULT_SEARCH_FILTERS }, searchMailboxId: "" });
+    set((state) => ({
+      searchFilters: { ...DEFAULT_SEARCH_FILTERS },
+      searchMailboxId: defaultSearchScopeFor(mailboxesInView(state), state.selectedMailbox),
+    }));
   },
 
   toggleAdvancedSearch: () => {
@@ -5517,9 +5541,11 @@ if (typeof window !== 'undefined') {
         Array.isArray(snap.mailboxes) &&
         snap.mailboxes.length > 0
       ) {
+        const selectedMailbox = typeof snap.selectedMailbox === 'string' ? snap.selectedMailbox : '';
         useEmailStore.setState({
           mailboxes: snap.mailboxes,
-          selectedMailbox: typeof snap.selectedMailbox === 'string' ? snap.selectedMailbox : '',
+          selectedMailbox,
+          searchMailboxId: defaultSearchScopeFor(snap.mailboxes, selectedMailbox),
           ...(Array.isArray(snap.emails) && snap.emails.length > 0
             ? {
                 emails: snap.emails,
