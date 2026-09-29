@@ -17,11 +17,12 @@ import { IS_LITE_STALWART, getLiteInjectedClientId } from '@/lib/lite';
  * (or, for an account an external OpenID provider signs in, through that
  * provider's redirect flow: lib/auth/lite-oauth.ts)
  *
- * and renew with `grant_type=refresh_token`. The refresh token is the only
- * thing that persists: localStorage when the user ticked "remember me",
- * sessionStorage (this tab only) otherwise. Servers without /api/auth (older
- * Stalwart, other JMAP servers) fall back to Basic auth; those sessions can
- * only survive a reload inside the same tab.
+ * and renew with `grant_type=refresh_token`. The tokens are what persists:
+ * localStorage when the user ticked "remember me", sessionStorage (this tab
+ * only) otherwise. The current access token is kept beside the refresh token
+ * so a reload resumes with it instead of renewing early. Servers without
+ * /api/auth (older Stalwart, other JMAP servers) fall back to Basic auth;
+ * those sessions can only survive a reload inside the same tab.
  *
  * Trade-off, documented in LITE-README.md: a refresh token in web storage is
  * readable by any script on the origin. That is the standard SPA position,
@@ -81,6 +82,12 @@ interface StoredRefreshToken {
   revocationEndpoint?: string;
 }
 
+interface StoredAccessToken {
+  accessToken: string;
+  /** Unix seconds. */
+  expiresAt: number;
+}
+
 interface StoredBasicSession {
   serverUrl: string;
   username: string;
@@ -88,7 +95,16 @@ interface StoredBasicSession {
 }
 
 const REFRESH_KEY_PREFIX = 'bulwark-lite:refresh:';
+const ACCESS_KEY_PREFIX = 'bulwark-lite:access:';
 const BASIC_KEY_PREFIX = 'bulwark-lite:basic:';
+
+/**
+ * Seconds of life a cached access token needs left to be reused. Mirrors
+ * ACCESS_TOKEN_MIN_REMAINING_SECONDS in lib/oauth/tokens.ts, which cannot be
+ * imported here (server-only): inside this window the scheduled renewal is
+ * due anyway, and providers that gate refresh on `nbf` have opened by then.
+ */
+const ACCESS_TOKEN_MIN_REMAINING_SECONDS = 60;
 
 function trimUrl(url: string): string {
   return url.replace(/\/+$/, '');
@@ -168,10 +184,36 @@ export function nameLiteRefreshToken(slot: number, username: string): void {
   saveLiteRefreshToken(slot, { ...stored, username }, refreshTokenIsPersistent(slot));
 }
 
+/** Forgets the slot's refresh token and the access token cached beside it. */
 export function clearLiteRefreshToken(slot: number): void {
-  const key = `${REFRESH_KEY_PREFIX}${slot}`;
+  for (const key of [`${REFRESH_KEY_PREFIX}${slot}`, `${ACCESS_KEY_PREFIX}${slot}`]) {
+    remove(storage('local'), key);
+    remove(storage('session'), key);
+  }
+}
+
+/**
+ * Caches the slot's current access token, so a reload resumes with it rather
+ * than spending the refresh token. Providers that stamp refresh tokens with
+ * `nbf` (Rauthy: iat + access token lifetime - 60s) refuse an early renewal,
+ * and a refused renewal ends the session (#552). `persistent` follows the
+ * refresh token: a remembered session reopened in a new tab needs it too.
+ */
+export function saveLiteAccessToken(slot: number, accessToken: string, expiresIn: number, persistent: boolean): void {
+  const key = `${ACCESS_KEY_PREFIX}${slot}`;
   remove(storage('local'), key);
   remove(storage('session'), key);
+  const entry: StoredAccessToken = { accessToken, expiresAt: Math.floor(Date.now() / 1000) + expiresIn };
+  writeJson(storage(persistent ? 'local' : 'session'), key, entry);
+}
+
+/** The slot's cached access token, while it has more than a minute to live. */
+export function readLiteAccessToken(slot: number): { accessToken: string; expiresIn: number } | null {
+  const key = `${ACCESS_KEY_PREFIX}${slot}`;
+  const entry = readJson<StoredAccessToken>(storage('local'), key) ?? readJson<StoredAccessToken>(storage('session'), key);
+  if (!entry || typeof entry.accessToken !== 'string' || !entry.accessToken || !Number.isFinite(entry.expiresAt)) return null;
+  const expiresIn = entry.expiresAt - Math.floor(Date.now() / 1000);
+  return expiresIn >= ACCESS_TOKEN_MIN_REMAINING_SECONDS ? { accessToken: entry.accessToken, expiresIn } : null;
 }
 
 /**
@@ -282,7 +324,7 @@ export function clearAllLiteSessions(): void {
     try {
       for (let i = 0; i < store.length; i++) {
         const key = store.key(i);
-        if (key && (key.startsWith(REFRESH_KEY_PREFIX) || key.startsWith(BASIC_KEY_PREFIX))) keys.push(key);
+        if (key && [REFRESH_KEY_PREFIX, ACCESS_KEY_PREFIX, BASIC_KEY_PREFIX].some((prefix) => key.startsWith(prefix))) keys.push(key);
       }
     } catch {
       continue;
@@ -449,12 +491,15 @@ export async function liteRefreshTokens(slot: number, clientIdOverride?: string)
     clearLiteRefreshToken(slot);
     throw new LiteLoginError('refresh_rejected', response.status || 401, tokens.error);
   }
+  const persistent = refreshTokenIsPersistent(slot);
   if (tokens.refresh_token && tokens.refresh_token !== stored.refreshToken) {
-    saveLiteRefreshToken(slot, { ...stored, refreshToken: tokens.refresh_token }, refreshTokenIsPersistent(slot));
+    saveLiteRefreshToken(slot, { ...stored, refreshToken: tokens.refresh_token }, persistent);
   }
+  const expiresIn = tokens.expires_in || 3600;
+  saveLiteAccessToken(slot, tokens.access_token, expiresIn, persistent);
   return {
     accessToken: tokens.access_token,
-    expiresIn: tokens.expires_in || 3600,
+    expiresIn,
     refreshToken: tokens.refresh_token ?? stored.refreshToken,
   };
 }
