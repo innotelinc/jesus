@@ -23,7 +23,14 @@ ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 # The mock JMAP server (DEV_MOCK_JMAP) accepts any password and is for
 # `npm run dev` only; images ship without it.
-RUN rm -rf "app/api/dev-jmap" && npx next build --webpack
+# `next build` type-checks every .ts file, and some unit tests import the
+# deleted route, so the tests go too. .dockerignore already drops them from a
+# local context, but a remote Git context never applies .dockerignore (#1118).
+RUN rm -rf "app/api/dev-jmap" && \
+    find . -path ./node_modules -prune -o \
+      \( -name __tests__ -o -name "*.test.ts" -o -name "*.test.tsx" \) \
+      -prune -exec rm -rf {} \; && \
+    npx next build --webpack
 
 FROM node:24-alpine AS runner
 
