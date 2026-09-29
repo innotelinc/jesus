@@ -137,11 +137,15 @@ the same shape so a shared box has one media plane instead of two:
 | Host publish | `docker-compose.full.yml` → `${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp` | **none** — the bundled PBX is profile-gated off in add-on mode, so Capstone publishes no RTP |
 | File cap | `docker-entrypoint-full.sh` → `/etc/asterisk/rtp_custom.conf` | `pbx/entrypoint-dograh.sh` → the same file, same shape (`pbx/asterisk/rtp_custom.conf`) |
 | Durable row | `kvstore_Sipsettings.rtpstart` / `.rtpend`, written at boot | the same write in `pbx/entrypoint-dograh.sh` |
-| STUN/TURN | `PJSIP_STUN_TURN_ADDR`, default `coturn:<TURN_LISTENING_PORT>` | the same env, defaulting to the local `coturn` service |
+| TURN | `PJSIP_STUN_TURN_ADDR`, default `coturn:<TURN_LISTENING_PORT>` | the same env, defaulting to the local `coturn` service |
+| STUN discovery | `PJSIP_STUN_ADDR`, default `stun.l.google.com:19302` — **not** coturn, which runs `--no-stun` and is RFC 5389 anyway (Asterisk's client is RFC 3489) | the same env |
+| Browsers' STUN | `PJSIP_WEBRTC_STUN_ADDR`, tracks `PJSIP_STUN_ADDR` (the `webrtcstunaddr` row) | the same env |
+| RTP rows guard | `pbx/rtp_settings_guard.py`, run from the entrypoint after every reload | the same tool, byte-for-byte, run from `pbx/entrypoint-dograh.sh` |
 
 Both products use the **same env names and defaults**
 (`FREEPBX_RTP_PORT_START`, `FREEPBX_RTP_PORT_END`, `PJSIP_STUN_TURN_ADDR`,
-`TURN_LISTENING_PORT`), so a standalone Capstone box and the shared Zeus box cap
+`PJSIP_STUN_ADDR`, `PJSIP_WEBRTC_STUN_ADDR`, `TURN_LISTENING_PORT`), so a
+standalone Capstone box and the shared Zeus box cap
 Asterisk identically — a mode switch stays a pointer change, exactly like the
 dialplan.
 

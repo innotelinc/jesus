@@ -379,6 +379,15 @@ services:
       - --no-tls
       - --fingerprint
       - --lt-cred-mech
+      # STUN is OFF on purpose. TURN is authenticated (--lt-cred-mech), but a
+      # bare STUN Binding request is unauthenticated *by design*, so an open
+      # 3478 on the WAN is a public STUN reflector — which is what happened on
+      # the shared box (an internet scanner drove it as one). Nothing here needs
+      # coturn's STUN: Asterisk's client is RFC 3489 and coturn is RFC 5389 (see
+      # pbx/rtp_settings_guard.py), and the browsers get their server-reflexive
+      # candidates from PJSIP_WEBRTC_STUN_ADDR. TURN relay is untouched —
+      # zeus/docker-compose.full.yml carries the same flag; keep the two in step.
+      - --no-stun
       - --user=${TURN_USERNAME:-turnuser}:${TURN_PASSWORD:-change-me-turn-password}
       - --realm=${TURN_REALM:-turn.example.com}
       - --listening-port=3478
@@ -1065,6 +1074,16 @@ services:
       # PJSIP_STUN_TURN_ADDR overrides the address (default: the `coturn`
       # compose service on the same network).
       PJSIP_STUN_TURN_ADDR: ${PJSIP_STUN_TURN_ADDR:-}
+      # STUN discovery server for the RTP engine — deliberately NOT the TURN
+      # address: coturn runs --no-stun here, and it is RFC 5389 while Asterisk's
+      # client is RFC 3489, so it could never answer it. The default answers
+      # both generations and returns MAPPED-ADDRESS, the attribute the legacy
+      # client parses. Empty disables discovery; see pbx/rtp_settings_guard.py.
+      PJSIP_STUN_ADDR: ${PJSIP_STUN_ADDR:-}
+      # STUN server handed to the *browsers* (the webrtcstunaddr row). Tracks
+      # PJSIP_STUN_ADDR by default; only the STUN row moves — webrtcturnaddr
+      # stays on coturn, which is what actually relays the media.
+      PJSIP_WEBRTC_STUN_ADDR: ${PJSIP_WEBRTC_STUN_ADDR:-}
       TURN_USERNAME: ${TURN_USERNAME:-}
       TURN_PASSWORD: ${TURN_PASSWORD:-}
       TURN_LISTENING_PORT: ${TURN_LISTENING_PORT:-3478}
@@ -1107,6 +1126,9 @@ services:
       - ./pbx/entrypoint-dograh.sh:/usr/local/bin/entrypoint-dograh.sh:ro
       # shared-voice-plane dialplan renderer (per-context merge, markers)
       - ./pbx/asterisk_converge.py:/opt/asterisk_converge.py:ro
+      # Re-asserts the rtp_additional.conf rows FreePBX rewrites wrong after
+      # every reload (the lower-cased TURN credential and the STUN server).
+      - ./pbx/rtp_settings_guard.py:/opt/rtp_settings_guard.py:ro
       - asterisk-config:/etc/asterisk
       - asterisk-sounds:/var/lib/asterisk/sounds
       - asterisk-spool:/var/spool/asterisk

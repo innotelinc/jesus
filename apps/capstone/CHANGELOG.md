@@ -681,6 +681,43 @@ or `SKIP_TARBALL=1` to leave just the directory.
   there is nothing durable to back up, and the stale volume beside it would have
   been reported as a healthy backup.
 
+### The RTP plane stops point-steering at coturn, and the concurrency row gets written
+
+Three failures on the shared box had one property in common — nothing on either
+side of the wire said anything was wrong — so none of them had been noticed:
+
+- **A `stunaddr` that could not be answered.** Asterisk's STUN client
+  (`main/stun.c`) speaks RFC 3489 — a 16-byte transaction id and no RFC 5389
+  magic cookie — while coturn is RFC 5389 and, as that RFC requires, silently
+  drops a datagram that is not a STUN message. A `stunaddr` pointed at coturn
+  therefore gathered nothing and cost 3×3s of retries on *every* call
+  (`stun.c: Attempt 3 to send STUN request … timed out`). STUN discovery and
+  TURN are now separate addresses: `PJSIP_STUN_ADDR` (default
+  `stun.l.google.com:19302`, which answers both generations and returns
+  `MAPPED-ADDRESS`, the one attribute the legacy client parses) for discovery,
+  `PJSIP_STUN_TURN_ADDR` for the relay that actually works.
+- **A TURN credential FreePBX lower-cased.** `Sipsettings::genConfig()` runs
+  every RTP value through `strtolower()` before writing `rtp_additional.conf`,
+  and a TURN password is case-sensitive — so coturn answered `credentials are
+  incorrect (check_stun_auth)` once per call and the WebRTC relay candidates
+  were dead. `pbx/rtp_settings_guard.py` (new, with its own tests, and
+  byte-identical to Zeus's copy) re-asserts the true-case credential and the
+  STUN server, and `pbx/entrypoint-dograh.sh` runs it after every reload.
+- **A concurrency limit that was never enforced.** `[macro-user-callerid]`
+  reads `DB(AMPUSER/${AMPUSER}/concurrency_limit)` twice, but FreePBX only
+  creates that AstDB row in `Core::addUser`; an extension the legacy migration
+  inserted straight into the database never went through it. Both lookups
+  expanded to nothing, so the expression read `… & 0 & >0 & 0>=]` and Asterisk
+  logged `ast_yyerror` on every call while evaluating the guard false. The
+  entrypoint now seeds the row the way FreePBX would, per extension, every boot.
+
+coturn also stops answering STUN at all (`--no-stun`): TURN is authenticated,
+but a bare STUN Binding request is unauthenticated *by design*, so 3478 on the
+WAN made the box a public STUN reflector — which it was, scanned and then
+driven as one. Browsers get their server-reflexive candidates from
+`PJSIP_WEBRTC_STUN_ADDR` instead, and only the STUN row moves: `webrtcturnaddr`
+stays on coturn, which is what actually relays the media.
+
 ## v3.19 — Grading you can choose, calls that can run long
 
 Release `v3.19` hands the operator control of grading: which workflows are

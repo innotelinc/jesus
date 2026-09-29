@@ -11,6 +11,9 @@ to dograh over ARI:
 | `extensions_custom.conf` | converged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
 | `asterisk_converge.py` | (sibling of `asterisk/`) | Shared-voice-plane per-context dialplan renderer (`pbx/asterisk_converge.py`) |
 | `tests/test_asterisk_converge.py` | (sibling of `asterisk/`) | Unit tests for the converge tool (`python3 -m unittest discover -s pbx/tests`) |
+| `rtp_custom.conf` | `rtp_custom.conf` (rewritten from env on every boot) | RTP plane: `stunaddr` / `icesupport` + the `rtpstart`/`rtpend` cap. **Entrypoint-owned** — the runtime copy is generated, this is the shape reference |
+| `rtp_settings_guard.py` | (sibling of `asterisk/`) | Re-asserts the two `rtp_additional.conf` rows FreePBX rewrites wrong (`stunaddr`, the lower-cased TURN credential) after each reload — run from the entrypoint as `/opt/rtp_settings_guard.py` |
+| `tests/test_rtp_settings_guard.py` | (sibling of `asterisk/`) | Unit tests for the RTP settings converger |
 
 `pbx/entrypoint-dograh.sh` applies these into the `pbx-asterisk-config` volume
 on every boot, then execs the stock entrypoint (MariaDB → Asterisk → web
@@ -164,7 +167,13 @@ answer.
 
 - **SIP Settings → RTP** — `stunaddr` / `turnaddr` / `turnusername` /
   `turnpassword` → `rtp_additional.conf`: the RTP engine discovers its
-  external address via STUN and can relay media through TURN for ICE peers.
+  external address via STUN and relays media through TURN for ICE peers.
+  `stunaddr` is set from `PJSIP_STUN_ADDR` (`stun.l.google.com:19302` by
+  default) and is deliberately **not** the TURN address — coturn runs
+  `--no-stun` here, and it is RFC 5389 while Asterisk's client is RFC 3489, so
+  it could never answer it. A reload rewrites that file from the settings DB
+  and lower-cases the TURN password on the way, so `pbx/rtp_settings_guard.py`
+  re-asserts both rows afterwards (the same tool, byte-for-byte, as zeus's).
 - **SIP Settings → WebRTC** — `webrtcstunaddr` / `webrtcturnaddr` /
   `webrtcturnusername` / `webrtcturnpassword` fields.
 - **SIP Settings → binds + HTTP TLS** — the **WSS transport is enabled on
@@ -251,12 +260,56 @@ Verify the browser's exact path (strict TLS, no `--insecure`):
 python3 scripts/webrtc-register-test.py --host dashboard.<domain> --port 443
 ```
 
-The STUN/TURN address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
+The **TURN** address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
 compose service, same Docker network — always resolvable from inside the
-container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. TURN
-creds come from `TURN_USERNAME` / `TURN_PASSWORD`. For remote WebRTC
-clients, forward `3478/tcp` + `3478/udp` and `49152-49251/udp` on the router
-(see below) and make sure the coturn `TURN_EXTERNAL_IP` is the public IP.
+container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. The
+**STUN** address is separate (`PJSIP_STUN_ADDR`, default
+`stun.l.google.com:19302`), because coturn runs with `--no-stun` and could not
+answer this Asterisk anyway — see the note below. Browsers get their STUN from
+`PJSIP_WEBRTC_STUN_ADDR` (tracks `PJSIP_STUN_ADDR`), while `webrtcturnaddr`
+stays on coturn. TURN creds come from `TURN_USERNAME` / `TURN_PASSWORD`. For
+remote WebRTC clients, forward `3478/tcp` + `3478/udp` and `49152-49251/udp` on
+the router (see below) and make sure the coturn `TURN_EXTERNAL_IP` is the
+public IP.
+
+#### coturn serves TURN, not STUN
+
+The `coturn` service runs with `--no-stun`. TURN is authenticated
+(`--lt-cred-mech`), but a bare STUN Binding request is unauthenticated *by
+design* — so publishing 3478 on the WAN makes the box a public STUN reflector,
+and the shared box was scanned and then driven as one. Nothing here needs
+coturn's STUN: Asterisk's client is RFC 3489 and coturn is RFC 5389, so
+Asterisk could never use it, and the browsers are handed `PJSIP_WEBRTC_STUN_ADDR`
+instead. Only the STUN row moves — `webrtcturnaddr` stays on coturn, which is
+what actually relays the media. coturn 4.18 *does* ship a deprecated
+`--rfc3489-compatibility`, but enabling it means answering unauthenticated STUN
+on the WAN again, which is the exposure `--no-stun` closes. The zeus compose
+files carry the same flag; keep the two in step.
+
+#### The rows FreePBX rewrites, and the concurrency row nobody wrote
+
+`fwconsole reload` rebuilds `/etc/asterisk/rtp_additional.conf` from
+`kvstore_Sipsettings`, and two rows do not survive the trip — both fail
+silently, with nothing on either side of the wire to say the relay is gone:
+
+| Row | What FreePBX does | What it costs |
+| --- | --- | --- |
+| `turnpassword` / `turnusername` | `Sipsettings::genConfig()` runs every RTP value through `strtolower()` | A TURN password is case-sensitive. coturn logs `credentials are incorrect (check_stun_auth)` once per call and Asterisk's relay candidates are dead |
+| `stunaddr` | written as given — but it must name a server that speaks RFC 3489 | Coturn can't (and here runs `--no-stun`), so every call logs `stun.c: Attempt 3 to send STUN request … timed out` (3 × 3s) and discovers nothing |
+
+`pbx/rtp_settings_guard.py` re-asserts both rows from the values the boot owner
+already knows, and `pbx/entrypoint-dograh.sh` runs it after the post-reload RTP
+write. `--check` is read-only; `--apply` converges.
+
+A *third* silent failure sits next to it: `[macro-user-callerid]` reads
+`DB(AMPUSER/${AMPUSER}/concurrency_limit)` twice to enforce the outbound
+concurrency limit, but FreePBX only creates that AstDB row in `Core::addUser`.
+An extension the legacy migration inserted straight into the database never went
+through it, so both lookups expand to nothing, the expression reads
+`… & 0 & >0 & 0>=]` and Asterisk logs `ast_expr2.fl: ast_yyerror(): … unexpected
+'>'` on **every call** while evaluating the guard false — the limit was never
+enforced. The entrypoint seeds the row (defaulting to `CONCURRENCYLIMITDEFAULT`)
+per extension, idempotently, on every boot.
 
 Verify:
 
@@ -265,7 +318,11 @@ docker exec pbx-freepbx asterisk -rx "pjsip show transports"
 # expect 0.0.0.0-udp :5060 and 0.0.0.0-wss :8089
 
 docker exec pbx-freepbx cat /etc/asterisk/rtp_additional.conf
-# expect stunaddr=turnaddr=coturn:3478 + creds
+# expect stunaddr=stun.l.google.com:19302 + turnaddr=coturn:3478 + mixed-case creds
+
+# The guard is read-only with --check; it must be in sync after a boot/reload.
+docker exec pbx-freepbx python3 /opt/rtp_settings_guard.py --check
+# expect: rtp_additional.conf in sync (exit 0)
 
 docker exec pbx-freepbx cat /etc/asterisk/pjsip.endpoint_custom.conf
 # expect the [webrtc-template](!) section and [102](webrtc-template)
