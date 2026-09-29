@@ -311,6 +311,13 @@ through it, so both lookups expand to nothing, the expression reads
 enforced. The entrypoint seeds the row (defaulting to `CONCURRENCYLIMITDEFAULT`)
 per extension, idempotently, on every boot.
 
+Seeding **after** the reload is what makes it work: the AstDB these rows live in
+is in the container's writable layer (only `/var/lib/asterisk/sounds` is on a
+volume), so a `--force-recreate` starts it empty and the boot-time extension
+mirror repopulates `AMPUSER` while Asterisk comes up. Seeding earlier finds no
+extensions at all — silently. The block therefore sits in the post-reload
+section, next to the RTP guard.
+
 Verify:
 
 ```bash
