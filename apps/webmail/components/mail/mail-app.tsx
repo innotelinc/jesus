@@ -3525,6 +3525,8 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   const handleOpenConversation = async (thread: ThreadGroup) => {
     if (!client) return;
 
+    // The view marks the thread read; keep its row where it was tapped.
+    useEmailStore.getState().holdListRow(thread.threadKey);
     setConversationThread(thread);
     setIsLoadingConversation(true);
     setActiveView("viewer");
