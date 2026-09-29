@@ -2852,6 +2852,8 @@
       "no_events": "Žádné události",
       "all_day": "Celý den",
       "more": "+{count} dalších",
+      "show_more": "Zobrazit více",
+      "show_less": "Zobrazit méně",
       "no_title": "(Bez názvu)",
       "resize": "Změnit velikost události",
       "duplicate": "Duplikovat",

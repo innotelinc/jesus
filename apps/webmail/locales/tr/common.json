@@ -2852,6 +2852,8 @@
       "no_events": "Etkinlik yok",
       "all_day": "Tüm gün",
       "more": "+{count} daha",
+      "show_more": "Daha fazla göster",
+      "show_less": "Daha az göster",
       "no_title": "(Başlık yok)",
       "resize": "Etkinliği yeniden boyutlandır",
       "duplicate": "Çoğalt",

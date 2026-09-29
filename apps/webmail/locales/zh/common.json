@@ -2852,6 +2852,8 @@
       "no_events": "没有活动",
       "all_day": "全天",
       "more": "+{count} 更多",
+      "show_more": "展开",
+      "show_less": "收起",
       "no_title": "（无标题）",
       "resize": "调整事件大小",
       "duplicate": "复制",

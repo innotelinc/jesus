@@ -2852,6 +2852,8 @@
       "no_events": "No events",
       "all_day": "All day",
       "more": "+{count} more",
+      "show_more": "Show more",
+      "show_less": "Show less",
       "no_title": "(No title)",
       "resize": "Resize event",
       "duplicate": "Duplicate",

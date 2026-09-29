@@ -2852,6 +2852,8 @@
       "no_events": "Keine Termine",
       "all_day": "Ganztägig",
       "more": "+{count} weitere",
+      "show_more": "Mehr anzeigen",
+      "show_less": "Weniger anzeigen",
       "no_title": "(Kein Titel)",
       "resize": "Termingröße ändern",
       "duplicate": "Duplizieren",

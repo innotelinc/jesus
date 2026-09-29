@@ -2852,6 +2852,8 @@
       "no_events": "Geen evenementen",
       "all_day": "Hele dag",
       "more": "+{count} meer",
+      "show_more": "Meer tonen",
+      "show_less": "Minder tonen",
       "no_title": "(Geen titel)",
       "resize": "Evenement formaat wijzigen",
       "duplicate": "Dupliceren",
