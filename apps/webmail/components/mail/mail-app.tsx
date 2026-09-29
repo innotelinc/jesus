@@ -1594,6 +1594,16 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail?.id]);
 
+  // Opening a message hides the list on tablet, but plenty of paths clear the
+  // reading pane without going through a "back" handler (delete/move/archive,
+  // a failed fetch, history restore, sending the open draft). Bring the list
+  // back once there is nothing left to read, so tablet never ends up on an
+  // empty reading pane with only the bottom bar.
+  const readingPaneEmpty = !showComposer && !conversationThread && !selectedEmail && !isLoadingEmail;
+  useEffect(() => {
+    if (readingPaneEmpty && !tabletListVisible) setTabletListVisible(true);
+  }, [readingPaneEmpty, tabletListVisible, setTabletListVisible]);
+
   // Handle mark-as-read with delay based on settings
   useEffect(() => {
     // Clear any existing timeout when email changes
@@ -3396,7 +3406,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   const isFocusedMailLayout = mailLayout === 'focus';
   const isHorizontalMailLayout = mailLayout === 'horizontal' && !isMobile && !isTablet;
   const hasViewerContent = showComposer || Boolean(conversationThread) || Boolean(selectedEmail);
-  const shouldCollapseListPane = (isTablet && !tabletListVisible) || (!isMobile && isFocusedMailLayout && hasViewerContent);
+  const shouldCollapseListPane = (isTablet && !tabletListVisible && !readingPaneEmpty) || (!isMobile && isFocusedMailLayout && hasViewerContent);
   const shouldHideViewerPane = !isMobile && !hasViewerContent && isFocusedMailLayout;
   const shouldHideHorizontalViewerPane = isHorizontalMailLayout && !hasViewerContent;
 
