@@ -430,6 +430,7 @@ export interface IJMAPClient {
   getCalendarsAccountId(): string;
   getCalendars(): Promise<Calendar[]>;
   getAllCalendars(): Promise<Calendar[]>;
+  getAllCalendarsWithFailures(): Promise<{ calendars: Calendar[]; failedAccountIds: string[] }>;
   createCalendar(calendar: Partial<Calendar>, targetAccountId?: string, options?: CreateCalendarOptions): Promise<Calendar>;
   updateCalendar(calendarId: string, updates: Partial<Calendar>, targetAccountId?: string): Promise<void>;
   setDefaultCalendar(calendarId: string, targetAccountId?: string): Promise<void>;

@@ -275,10 +275,15 @@ async function refetchAfterOccurrenceMutation(): Promise<void> {
  * namespaced transition (aggregation switched on, an account switch, or a
  * just-created calendar added with its raw id) changes the id string while the
  * calendar is the same. Remap by raw identity so the selection survives instead
- * of silently resetting to "all". Keeps BIRTHDAY_CALENDAR_ID; drops ids that
- * resolve to no calendar.
+ * of silently resetting to "all". Keeps BIRTHDAY_CALENDAR_ID and ids starting
+ * with one of `unloadedPrefixes` (calendars of an account that failed to load
+ * are unknown, not deleted); drops ids that resolve to no calendar.
  */
-export function reconcileSelectedIds(selectedCalendarIds: string[], calendars: Calendar[]): string[] {
+export function reconcileSelectedIds(
+  selectedCalendarIds: string[],
+  calendars: Calendar[],
+  unloadedPrefixes: string[] = [],
+): string[] {
   const byStoreId = new Set(calendars.map((c) => c.id));
   const rawToStoreId = new Map<string, string>();
   for (const c of calendars) {
@@ -290,6 +295,8 @@ export function reconcileSelectedIds(selectedCalendarIds: string[], calendars: C
   for (const id of selectedCalendarIds) {
     let mapped: string | undefined;
     if (id === BIRTHDAY_CALENDAR_ID || byStoreId.has(id)) mapped = id;
+    // Before the raw remap: another account may hold the same raw id.
+    else if (unloadedPrefixes.some((prefix) => id.startsWith(prefix))) mapped = id;
     else mapped = rawToStoreId.get(rawIdentityOf(id));
     if (mapped && !seen.has(mapped)) {
       out.push(mapped);
@@ -297,6 +304,23 @@ export function reconcileSelectedIds(selectedCalendarIds: string[], calendars: C
     }
   }
   return out;
+}
+
+/**
+ * The selection to keep after a calendars fetch: the reconciled one, or the
+ * default when no real calendar is left in it. The virtual birthday calendar
+ * always survives reconciliation, so it must not count - counting it pinned
+ * the selection to "birthdays only" once the real calendars had dropped out.
+ */
+function selectionAfterFetch(
+  selectedCalendarIds: string[],
+  calendars: Calendar[],
+  defaultSelected: string[],
+  unloadedPrefixes?: string[],
+): string[] {
+  const reconciled = reconcileSelectedIds(selectedCalendarIds, calendars, unloadedPrefixes);
+  if (reconciled.some((id) => id !== BIRTHDAY_CALENDAR_ID)) return reconciled;
+  return reconciled.includes(BIRTHDAY_CALENDAR_ID) ? [...defaultSelected, BIRTHDAY_CALENDAR_ID] : defaultSelected;
 }
 
 // In-flight refresh dedup. Concurrent callers (auto-interval +
@@ -626,16 +650,22 @@ export const useCalendarStore = create<CalendarStore>()(
         // alongside without blocking the grid.
         void get().fetchParticipantIdentities(client);
         try {
-          const calendars = await client.getAllCalendars();
-          const { selectedCalendarIds } = get();
-          const stillValid = reconcileSelectedIds(selectedCalendarIds, calendars);
+          // Throws when the primary account fails, so a failed fetch leaves the
+          // list and the selection as they were.
+          const { calendars, failedAccountIds } = await client.getAllCalendarsWithFailures();
           // Default the visible selection to event calendars only - tasks-only
           // calendars stay out of the event grid.
           const defaultSelected = calendars.filter(c => !c.isTasksOnly).map(c => c.id);
           set({
             calendars,
             isLoading: false,
-            selectedCalendarIds: stillValid.length > 0 ? stillValid : defaultSelected,
+            selectedCalendarIds: selectionAfterFetch(
+              get().selectedCalendarIds,
+              calendars,
+              defaultSelected,
+              // Shared calendars' ids are `<accountId>:<id>` (getAllCalendars).
+              failedAccountIds.map((accountId) => `${accountId}:`),
+            ),
           });
         } catch (error) {
           debug.error('Failed to fetch calendars:', error);
@@ -684,24 +714,32 @@ export const useCalendarStore = create<CalendarStore>()(
       fetchAllAccountsCalendars: async (accounts) => {
         set({ isLoading: true, error: null });
         try {
+          // Id prefixes of the calendars that could not be loaded this time.
+          const unloadedPrefixes: string[] = [];
           const results = await Promise.all(
             accounts.map(async ({ client, localAccountId }) => {
+              const prefix = buildCrossAccountIdPrefix(localAccountId);
               try {
-                const list = await client.getAllCalendars();
+                const { calendars: list, failedAccountIds } = await client.getAllCalendarsWithFailures();
+                unloadedPrefixes.push(...failedAccountIds.map((accountId) => `${prefix}${accountId}:`));
                 return prefixCalendarsWithLocalAccount(list, localAccountId);
               } catch (error) {
                 debug.error(`Failed to fetch calendars for account ${localAccountId}:`, error);
+                unloadedPrefixes.push(prefix);
                 return [] as Calendar[];
               }
             }),
           );
           const calendars = results.flat();
-          const { selectedCalendarIds } = get();
-          const stillValid = reconcileSelectedIds(selectedCalendarIds, calendars);
           set({
             calendars,
             isLoading: false,
-            selectedCalendarIds: stillValid.length > 0 ? stillValid : calendars.map(c => c.id),
+            selectedCalendarIds: selectionAfterFetch(
+              get().selectedCalendarIds,
+              calendars,
+              calendars.map(c => c.id),
+              unloadedPrefixes,
+            ),
           });
         } catch (error) {
           debug.error('Failed to fetch all-account calendars:', error);
