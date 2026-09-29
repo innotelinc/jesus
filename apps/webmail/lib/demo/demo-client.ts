@@ -884,6 +884,9 @@ export class DemoJMAPClient implements IJMAPClient {
 
   async getCalendars(): Promise<Calendar[]> { return [...this.data.calendars]; }
   async getAllCalendars(): Promise<Calendar[]> { return [...this.data.calendars]; }
+  async getAllCalendarsWithFailures(): Promise<{ calendars: Calendar[]; failedAccountIds: string[] }> {
+    return { calendars: [...this.data.calendars], failedAccountIds: [] };
+  }
 
   async createCalendar(calendar: Partial<Calendar>): Promise<Calendar> {
     const full: Calendar = {

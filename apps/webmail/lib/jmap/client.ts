@@ -434,6 +434,15 @@ function isTaskObject(obj: { '@type'?: string; progress?: unknown; due?: unknown
   return false;
 }
 
+/**
+ * Whether a calendar method error means the account grants this user no
+ * calendar access at all - the expected answer from a shared account the
+ * fan-out probed on suspicion (see getCalendarCapableAccountIds).
+ */
+function isCalendarAccessDenial(type: string | undefined, message: string | undefined): boolean {
+  return type === 'forbidden' || type === 'accountNotFound' || /not have access/i.test(message ?? '');
+}
+
 const CALENDAR_EVENT_PROPERTIES = [
   'id',
   '@type',
@@ -6379,42 +6388,63 @@ export class JMAPClient implements IJMAPClient {
 
   async getAllCalendars(): Promise<Calendar[]> {
     try {
-      const allCalendars: Calendar[] = [];
-      const primaryId = this.getCalendarsAccountId();
-      const accountIds = this.getCalendarCapableAccountIds();
-
-      for (const accountId of accountIds) {
-        const isPrimary = accountId === primaryId;
-        if (!isPrimary && this.calendarAccessDenied.has(accountId)) continue;
-        const account = this.accounts[accountId];
-
-        try {
-          const response = await this.requestCalendars(accountId);
-
-          if (response.methodResponses?.[0]?.[0] === "Calendar/get") {
-            const rawCalendars = (response.methodResponses[0][1].list || []) as Calendar[];
-            const tasksOnly = await this.getTasksOnlyCalendarIds(accountId, rawCalendars.map((c) => c.id));
-            const calendars = rawCalendars.map((cal) => ({
-              ...cal,
-              id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
-              originalId: cal.id,
-              accountId,
-              accountName: account?.name || (isPrimary ? this.username : accountId),
-              isShared: !isPrimary,
-              isTasksOnly: tasksOnly.has(cal.id),
-            }));
-            allCalendars.push(...calendars);
-          }
-        } catch (error) {
-          console.error(`Failed to fetch calendars for account ${accountId}:`, error);
-        }
-      }
-
-      return allCalendars;
+      return (await this.getAllCalendarsWithFailures()).calendars;
     } catch (error) {
       console.error('Failed to fetch all calendars:', error);
-      return this.getCalendars();
+      return [];
     }
+  }
+
+  /**
+   * getAllCalendars() for callers that reconcile state against the list: a
+   * failure on the primary account throws instead of yielding a list without
+   * its calendars, and shared accounts that could not be loaded are named in
+   * `failedAccountIds`. Read as "no calendars", a failed fetch dropped every
+   * calendar from the persisted selection.
+   */
+  async getAllCalendarsWithFailures(): Promise<{ calendars: Calendar[]; failedAccountIds: string[] }> {
+    const allCalendars: Calendar[] = [];
+    const failedAccountIds: string[] = [];
+    const primaryId = this.getCalendarsAccountId();
+    const accountIds = this.getCalendarCapableAccountIds();
+
+    for (const accountId of accountIds) {
+      const isPrimary = accountId === primaryId;
+      if (!isPrimary && this.calendarAccessDenied.has(accountId)) continue;
+      const account = this.accounts[accountId];
+
+      try {
+        const response = await this.requestCalendars(accountId);
+        const [method, result] = response.methodResponses?.[0] ?? [];
+
+        if (method !== "Calendar/get") {
+          // Shared accounts are probed on suspicion (see
+          // getCalendarCapableAccountIds); one that grants no calendar access
+          // has no calendars to lose.
+          if (!isPrimary && isCalendarAccessDenial(result?.type, result?.description)) continue;
+          throw new Error(result?.description || result?.type || "Calendar/get failed");
+        }
+
+        const rawCalendars = (result.list || []) as Calendar[];
+        const tasksOnly = await this.getTasksOnlyCalendarIds(accountId, rawCalendars.map((c) => c.id));
+        const calendars = rawCalendars.map((cal) => ({
+          ...cal,
+          id: isPrimary ? cal.id : `${accountId}:${cal.id}`,
+          originalId: cal.id,
+          accountId,
+          accountName: account?.name || (isPrimary ? this.username : accountId),
+          isShared: !isPrimary,
+          isTasksOnly: tasksOnly.has(cal.id),
+        }));
+        allCalendars.push(...calendars);
+      } catch (error) {
+        if (isPrimary) throw error;
+        console.error(`Failed to fetch calendars for account ${accountId}:`, error);
+        failedAccountIds.push(accountId);
+      }
+    }
+
+    return { calendars: allCalendars, failedAccountIds };
   }
 
   async createCalendar(calendar: Partial<Calendar>, targetAccountId?: string, options?: CreateCalendarOptions): Promise<Calendar> {
@@ -6913,8 +6943,7 @@ export class JMAPClient implements IJMAPClient {
       // calendar access at all. Remember the rejection and go quiet instead
       // of re-probing - and re-logging - on every range change.
       const type = (error as { jmapErrorType?: string } | null)?.jmapErrorType;
-      const denied = type === 'forbidden' || type === 'accountNotFound' ||
-        /not have access/i.test(error instanceof Error ? error.message : '');
+      const denied = isCalendarAccessDenial(type, error instanceof Error ? error.message : undefined);
       if (targetAccountId && denied) {
         this.calendarAccessDenied.add(targetAccountId);
         debug.log('calendar', `No calendar access to account ${targetAccountId} - skipping it from now on`);
