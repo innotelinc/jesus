@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Nom d'affichage",
     "autocomplete_search_server": "Rechercher sur le serveur",
     "autocomplete_searching": "Recherche en cours...",
+    "mention_recipients": "Destinataires",
     "toolbar": {
       "bold": "Gras",
       "italic": "Italique",

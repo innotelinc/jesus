@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Nome visualizzato",
     "autocomplete_search_server": "Cerca nel server",
     "autocomplete_searching": "Ricerca in corso...",
+    "mention_recipients": "Destinatari",
     "toolbar": {
       "bold": "Grassetto",
       "italic": "Corsivo",

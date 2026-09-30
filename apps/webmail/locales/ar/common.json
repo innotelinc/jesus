@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "الاسم المعروض",
     "autocomplete_search_server": "البحث في الخادم",
     "autocomplete_searching": "جارٍ البحث...",
+    "mention_recipients": "المستلمون",
     "toolbar": {
       "bold": "غامق",
       "italic": "مائل",

@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "표시 이름",
     "autocomplete_search_server": "서버에서 검색",
     "autocomplete_searching": "검색 중...",
+    "mention_recipients": "수신자",
     "toolbar": {
       "bold": "굵게",
       "italic": "기울임꼴",

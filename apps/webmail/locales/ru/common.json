@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Отображаемое имя",
     "autocomplete_search_server": "Искать на сервере",
     "autocomplete_searching": "Поиск...",
+    "mention_recipients": "Получатели",
     "toolbar": {
       "bold": "Жирный",
       "italic": "Курсив",

@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Nom mostrat",
     "autocomplete_search_server": "Cerca al servidor",
     "autocomplete_searching": "Cercant...",
+    "mention_recipients": "Destinataris",
     "toolbar": {
       "bold": "Negreta",
       "italic": "Cursiva",

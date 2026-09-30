@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Дэлгэцийн нэр",
     "autocomplete_search_server": "Серверээс хайх",
     "autocomplete_searching": "Хайж байна...",
+    "mention_recipients": "Хүлээн авагчид",
     "toolbar": {
       "bold": "Болд",
       "italic": "Налуу",
