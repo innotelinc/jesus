@@ -71,9 +71,10 @@ export function isFilePreviewable(name?: string, type?: string): boolean {
   return getFilePreviewKind(name, type) !== 'unsupported';
 }
 
-// Canonical types for the extensions the preview renders from a blob. No
-// script-capable type (SVG, HTML) may appear here: the preview trusts these
-// over whatever the sender declared.
+// Canonical types for the extensions the preview renders from a blob: PDF and
+// every image, audio and video extension above except SVG. No script-capable
+// type (SVG, HTML) may appear here: the preview trusts these over whatever
+// the sender declared.
 const EXT_TO_MIME: Record<string, string> = {
   pdf: 'application/pdf',
   png: 'image/png',
@@ -83,13 +84,22 @@ const EXT_TO_MIME: Record<string, string> = {
   webp: 'image/webp',
   avif: 'image/avif',
   bmp: 'image/bmp',
+  ico: 'image/x-icon',
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
   ogg: 'audio/ogg',
   m4a: 'audio/mp4',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  // Ogg Opus (RFC 7845); audio/opus names the bare RTP payload.
+  opus: 'audio/ogg',
   mp4: 'video/mp4',
   webm: 'video/webm',
   ogv: 'video/ogg',
+  mov: 'video/quicktime',
+  m4v: 'video/mp4',
+  avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska',
 };
 
 const GENERIC_MIME_TYPES = new Set(['', 'application/octet-stream', 'binary/octet-stream']);
