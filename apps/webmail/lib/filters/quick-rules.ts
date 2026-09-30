@@ -95,6 +95,15 @@ export function extractListId(raw: unknown): string | null {
   return id;
 }
 
+/**
+ * A raw header value (JMAP `header:Name` without a form) as one line: folding
+ * undone, surrounding whitespace dropped. Encoded words stay encoded.
+ */
+export function unfoldHeader(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  return raw.replace(/\r?\n[ \t]+/g, ' ').trim();
+}
+
 /** The List-Id every message has, or null when one lacks it or they differ. */
 export function sharedListId(listIds: Array<string | null | undefined>): string | null {
   let shared: string | null = null;

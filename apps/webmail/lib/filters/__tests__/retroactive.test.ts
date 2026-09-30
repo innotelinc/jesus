@@ -212,9 +212,14 @@ describe('retroQueryFilter', () => {
     });
   });
 
-  it('narrows a header condition to messages that have the header', () => {
+  it('leaves header conditions to the client, since the header filter finds nothing on Stalwart', () => {
     const r = rule([{ field: 'header', headerName: 'List-Id', comparator: 'contains', value: 'news.acme.com' }]);
-    expect(retroQueryFilter(r, 'inbox')).toEqual({ operator: 'AND', conditions: [{ inMailbox: 'inbox' }, { header: ['List-Id'] }] });
+    expect(retroQueryFilter(r, 'inbox')).toEqual({ inMailbox: 'inbox' });
+    const both = rule([
+      { field: 'from', comparator: 'address_is', value: 'anna@acme.com' },
+      { field: 'header', headerName: 'List-Id', comparator: 'contains', value: 'news.acme.com' },
+    ]);
+    expect(retroQueryFilter(both, 'inbox')).toEqual({ operator: 'AND', conditions: [{ inMailbox: 'inbox' }, { from: 'anna@acme.com' }] });
   });
 
   it('does not narrow by full-text search where it could miss a Sieve substring', () => {
@@ -235,7 +240,22 @@ describe('retroProperties and toRetroMessage', () => {
       { field: 'subject', comparator: 'contains', value: 'x' },
       { field: 'header', headerName: 'List-Id', comparator: 'contains', value: 'y' },
     ]);
-    expect(retroProperties(r)).toEqual(['mailboxIds', 'keywords', 'from', 'header:Subject:asText:all', 'header:List-Id:asText:all']);
+    expect(retroProperties(r)).toEqual([
+      'mailboxIds', 'keywords', 'from',
+      'header:Subject:asText:all', 'header:Subject:all',
+      'header:List-Id:asText:all', 'header:List-Id:all',
+    ]);
+  });
+
+  it('falls back to the raw header where the server has no text form (Stalwart and List-Id)', () => {
+    const message = toRetroMessage({
+      id: 'e1',
+      'header:List-Id:asText:all': [null],
+      'header:List-Id:all': [' Rules live list\r\n <rules-live.example.org>'],
+    });
+    expect(message.headers['list-id']).toEqual(['Rules live list <rules-live.example.org>']);
+    const r = rule([{ field: 'header', headerName: 'List-Id', comparator: 'contains', value: 'rules-live.example.org' }]);
+    expect(ruleMatches(r, message)).toBe(true);
   });
 
   it('maps an Email/get record', () => {

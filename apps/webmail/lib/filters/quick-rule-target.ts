@@ -5,7 +5,7 @@ import { useAccountStore } from '@/stores/account-store';
 import { useEmailStore, resolveEmailActionContext } from '@/stores/email-store';
 import { useIdentityStore } from '@/stores/identity-store';
 import { cachedRemoteIdentities } from '@/hooks/use-pro-multi-account-identities';
-import { extractListId, headerValue, normalizeAddress } from './quick-rules';
+import { extractListId, headerValue, normalizeAddress, unfoldHeader } from './quick-rules';
 
 /** The account a rule made from a message goes into. */
 export interface QuickRuleTarget {
@@ -50,8 +50,12 @@ export function resolveQuickRuleTarget(email: Email): QuickRuleTarget | null {
   const client = context.client;
   const ownAccountId = client.getAccountId();
   const accountId = context.accountId ?? ownAccountId;
+  // A shared folder's store id is namespaced (`owner:id`), and so are the
+  // mailboxIds of the messages in it. Its bare `originalId` can equal one of
+  // the user's own folder ids (a group account has an Inbox too), so it must
+  // not be compared.
   const inSharedFolder = Object.keys(email.mailboxIds ?? {}).some(id =>
-    context.mailboxes.some(m => m.isShared && (m.id === id || m.originalId === id)));
+    context.mailboxes.some(m => m.isShared && m.id === id));
   const clientAccountId = email.sourceClientAccountId
     ?? useEmailStore.getState().viewingAccountId
     ?? auth.activeAccountId
@@ -76,7 +80,7 @@ export function resolveQuickRuleTarget(email: Email): QuickRuleTarget | null {
 export function sourceMailboxOf(email: Email, target: QuickRuleTarget): Mailbox | undefined {
   const ids = Object.entries(email.mailboxIds ?? {}).filter(([, on]) => on).map(([id]) => id);
   const selected = useEmailStore.getState().selectedMailbox;
-  const find = (id: string) => target.mailboxes.find(m => m.id === id || m.originalId === id);
+  const find = (id: string) => target.mailboxes.find(m => m.id === id);
   if (selected && ids.includes(selected)) {
     const mailbox = find(selected);
     if (mailbox) return mailbox;
@@ -127,7 +131,14 @@ export function knownListId(target: QuickRuleTarget, email: Email): string | nul
 export async function loadListIds(target: QuickRuleTarget, emails: Email[]): Promise<void> {
   const missing = emails.filter(e => knownListId(target, e) === undefined).map(e => e.id);
   if (missing.length === 0) return;
-  const records = await target.client.getEmailFields(missing, ['header:List-Id:asText'], target.accountId);
-  const found = new Map(records.map(r => [String(r.id), extractListId(r['header:List-Id:asText'])]));
+  // Stalwart parses List-Id as a structured header and answers the text form
+  // with null, so the raw form is asked for too; the id itself is plain ASCII.
+  const records = await target.client.getEmailFields(
+    missing, ['header:List-Id:asText', 'header:List-Id'], target.accountId,
+  );
+  const found = new Map(records.map(r => [
+    String(r.id),
+    extractListId(r['header:List-Id:asText'] ?? unfoldHeader(r['header:List-Id'])),
+  ]));
   for (const id of missing) listIdCache.set(`${target.key}|${id}`, found.get(id) ?? null);
 }
