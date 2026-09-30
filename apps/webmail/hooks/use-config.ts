@@ -35,6 +35,7 @@ export interface ConfigData {
   loginShowHeading: boolean;
   loginShowSubtitle: boolean;
   loginShowTotp: boolean;
+  loginShowTokenLogin: boolean;
   loginShowVersion: boolean;
   demoMode: boolean;
   autoSsoEnabled: boolean;
@@ -173,6 +174,7 @@ export function useConfig(): AppConfig {
     loginShowHeading: configCache?.loginShowHeading ?? true,
     loginShowSubtitle: configCache?.loginShowSubtitle ?? true,
     loginShowTotp: configCache?.loginShowTotp ?? true,
+    loginShowTokenLogin: configCache?.loginShowTokenLogin ?? false,
     loginShowVersion: configCache?.loginShowVersion ?? true,
     demoMode: configCache?.demoMode || false,
     autoSsoEnabled: configCache?.autoSsoEnabled || false,
@@ -215,6 +217,7 @@ export function useConfig(): AppConfig {
         loginShowHeading: configCache.loginShowHeading,
         loginShowSubtitle: configCache.loginShowSubtitle,
         loginShowTotp: configCache.loginShowTotp,
+        loginShowTokenLogin: configCache.loginShowTokenLogin,
         loginShowVersion: configCache.loginShowVersion,
         demoMode: configCache.demoMode,
         autoSsoEnabled: configCache.autoSsoEnabled,
@@ -258,6 +261,7 @@ export function useConfig(): AppConfig {
           loginShowHeading: data.loginShowHeading,
           loginShowSubtitle: data.loginShowSubtitle,
           loginShowTotp: data.loginShowTotp,
+          loginShowTokenLogin: data.loginShowTokenLogin,
           loginShowVersion: data.loginShowVersion,
           demoMode: data.demoMode,
           autoSsoEnabled: data.autoSsoEnabled,

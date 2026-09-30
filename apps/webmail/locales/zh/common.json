@@ -17,6 +17,7 @@
     "reconnecting": "连接已断开，正在尝试重连…",
     "error": {
       "invalid_credentials": "邮箱地址或密码无效。请检查后重试。",
+      "invalid_token": "服务器未接受此访问令牌。请检查令牌是否完整，以及是否已过期或被撤销。",
       "connection_failed": "无法访问服务器。检查您的网络连接，然后重试。",
       "cors_blocked": "服务器可访问，但正在阻止跨源请求。请检查 JMAP 服务器的 CORS 设置，并允许此域名。",
       "server_error": "服务器暂时不可用，请稍后重试。",
@@ -28,6 +29,11 @@
     "show_password": "显示密码",
     "hide_password": "隐藏密码",
     "totp_toggle": "我有双重验证代码",
+    "token_toggle": "使用访问令牌登录",
+    "password_toggle": "使用密码登录",
+    "token_label": "访问令牌",
+    "token_placeholder": "粘贴 API 令牌",
+    "token_hint": "请在邮件服务商的设置中创建 API 令牌，然后粘贴到这里。",
     "remember_me": "记住我",
     "config_error": {
       "title": "配置错误",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "认证方式",
       "auth_method_oauth": "单点登录 (OAuth/OIDC)",
       "auth_method_basic": "密码",
+      "auth_method_token": "访问令牌",
       "demo_account": "演示账户",
       "email": {
         "label": "邮件",

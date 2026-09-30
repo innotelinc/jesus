@@ -17,6 +17,7 @@
     "reconnecting": "Connexion perdue. Tentative de reconnexion…",
     "error": {
       "invalid_credentials": "Email ou mot de passe invalide",
+      "invalid_token": "Le serveur n'a pas accepté ce jeton d'accès. Vérifiez qu'il est complet et qu'il n'a pas expiré ni été révoqué.",
       "connection_failed": "Échec de la connexion au serveur",
       "cors_blocked": "Le serveur est joignable mais bloque les requêtes cross-origin. Vérifiez la configuration CORS de votre serveur JMAP et autorisez ce domaine.",
       "server_error": "Le serveur est temporairement indisponible. Veuillez réessayer plus tard.",
@@ -28,6 +29,11 @@
     "show_password": "Afficher le mot de passe",
     "hide_password": "Masquer le mot de passe",
     "totp_toggle": "J'ai un code 2FA",
+    "token_toggle": "Se connecter avec un jeton d'accès",
+    "password_toggle": "Se connecter avec un mot de passe",
+    "token_label": "Jeton d'accès",
+    "token_placeholder": "Collez votre jeton d'API",
+    "token_hint": "Créez un jeton d'API dans les paramètres de votre fournisseur de messagerie, puis collez-le ici.",
     "remember_me": "Se souvenir de moi",
     "config_error": {
       "title": "Erreur de configuration",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Authentification",
       "auth_method_oauth": "Authentification unique (OAuth/OIDC)",
       "auth_method_basic": "Mot de passe",
+      "auth_method_token": "Jeton d'accès",
       "demo_account": "Compte de démonstration",
       "email": {
         "label": "Adresse email",

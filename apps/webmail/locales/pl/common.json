@@ -17,6 +17,7 @@
     "reconnecting": "Utracono połączenie. Próba ponownego połączenia…",
     "error": {
       "invalid_credentials": "Nieprawidłowy adres e-mail lub hasło. Sprawdź dane logowania i spróbuj ponownie.",
+      "invalid_token": "Serwer nie zaakceptował tego tokenu dostępu. Sprawdź, czy jest kompletny i czy nie wygasł ani nie został unieważniony.",
       "connection_failed": "Nie można połączyć się z serwerem. Sprawdź połączenie internetowe i spróbuj ponownie.",
       "cors_blocked": "Serwer jest osiągalny, ale blokuje żądania między domenami. Sprawdź ustawienia CORS serwera JMAP i zezwól na tę domenę.",
       "server_error": "Serwer jest tymczasowo niedostępny. Spróbuj ponownie później.",
@@ -28,6 +29,11 @@
     "show_password": "Pokaż hasło",
     "hide_password": "Ukryj hasło",
     "totp_toggle": "Mam kod 2FA",
+    "token_toggle": "Zaloguj się tokenem dostępu",
+    "password_toggle": "Zaloguj się hasłem",
+    "token_label": "Token dostępu",
+    "token_placeholder": "Wklej swój token API",
+    "token_hint": "Utwórz token API w ustawieniach swojego dostawcy poczty i wklej go tutaj.",
     "remember_me": "Zapamiętaj mnie",
     "config_error": {
       "title": "Błąd konfiguracji",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Uwierzytelnianie",
       "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
       "auth_method_basic": "Hasło",
+      "auth_method_token": "Token dostępu",
       "demo_account": "Konto demo",
       "email": {
         "label": "Adres e-mail",

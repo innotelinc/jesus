@@ -17,6 +17,7 @@
     "reconnecting": "Savienojums pārtraukts. Mēģina izveidot savienojumu...",
     "error": {
       "invalid_credentials": "Nepareiza e-pasta adrese vai parole. Pārbaudiet datus un mēģiniet vēlreiz.",
+      "invalid_token": "Serveris nepieņēma šo piekļuves marķieri. Pārbaudiet, vai tas ir pilnīgs un nav beidzies vai atsaukts.",
       "connection_failed": "Neizdevās izveidot savienojumu ar serveri. Pārbaudiet interneta pieslēgumu.",
       "cors_blocked": "Serveris ir pieejams, bet bloķē pieprasījumus no citiem avotiem. Pārbaudiet JMAP servera CORS iestatījumus.",
       "server_error": "Serveris īslaicīgi nav pieejams. Mēģiniet vēlāk.",
@@ -28,6 +29,11 @@
     "show_password": "Rādīt paroli",
     "hide_password": "Slēpt paroli",
     "totp_toggle": "Man ir 2FA kods",
+    "token_toggle": "Pierakstīties ar piekļuves marķieri",
+    "password_toggle": "Pierakstīties ar paroli",
+    "token_label": "Piekļuves marķieris",
+    "token_placeholder": "Ielīmējiet savu API marķieri",
+    "token_hint": "Izveidojiet API marķieri sava e-pasta pakalpojumu sniedzēja iestatījumos un ielīmējiet to šeit.",
     "remember_me": "Atcerēties mani",
     "config_error": {
       "title": "Konfigurācijas kļūda",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Autentifikācija",
       "auth_method_oauth": "Vienotā pierakstīšanās (OAuth/OIDC)",
       "auth_method_basic": "Parole",
+      "auth_method_token": "Piekļuves marķieris",
       "demo_account": "Demo konts",
       "email": {
         "label": "E-pasta adrese",

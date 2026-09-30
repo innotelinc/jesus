@@ -17,6 +17,7 @@
     "reconnecting": "Kapcsolat megszakadt. Újracsatlakozás...",
     "error": {
       "invalid_credentials": "Helytelen e-mail vagy jelszó. Ellenőrizd a megadott adatokat és próbáld újra.",
+      "invalid_token": "A szerver nem fogadta el ezt a hozzáférési tokent. Ellenőrizd, hogy teljes-e, és hogy nem járt-e le, vagy nem vonták-e vissza.",
       "connection_failed": "Nem sikerült elérni a szervert. Ellenőrizd az internetkapcsolatod és próbáld újra.",
       "cors_blocked": "A szerver elérhető, de blokkolja a több tartományból érkező kéréseket. Ellenőrizd a JMAP szerver CORS beállításait és engedélyezd ezt a tartományt.",
       "server_error": "A szerver átmenetileg nem elérhető. Kérjük, próbáld újra később.",
@@ -28,6 +29,11 @@
     "show_password": "Jelszó megjelenítése",
     "hide_password": "Jelszó elrejtése",
     "totp_toggle": "Van egy 2FA kódom",
+    "token_toggle": "Bejelentkezés hozzáférési tokennel",
+    "password_toggle": "Bejelentkezés jelszóval",
+    "token_label": "Hozzáférési token",
+    "token_placeholder": "Illeszd be az API-tokened",
+    "token_hint": "Hozz létre egy API-tokent a levelezési szolgáltatód beállításaiban, és illeszd be ide.",
     "remember_me": "Emlékezz rám",
     "config_error": {
       "title": "Konfigurációs hiba",
@@ -1604,6 +1610,7 @@
       "auth_method_label": "Hitelesítés",
       "auth_method_oauth": "Egyszeri bejelentkezés (OAuth/OIDC)",
       "auth_method_basic": "Jelszó",
+      "auth_method_token": "Hozzáférési token",
       "demo_account": "Demó fiók",
       "email": {
         "label": "E-mail cím",
