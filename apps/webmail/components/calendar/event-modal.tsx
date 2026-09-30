@@ -647,7 +647,7 @@ export function EventModal({
     } finally {
       setIsSaving(false);
     }
-  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, customRule, alertRows, attendees, sendInvitations, currentUserEmails, existingParticipants, resolveContactName, event, onSave, isSaving]);
+  }, [title, description, location, virtualLocation, startDate, startTime, endDate, endTime, allDay, calendarId, recurrence, customRule, alertRows, attendees, sendInvitations, currentUserEmails, existingParticipants, resolveContactName, event, onSave, isSaving, t]);
 
   const handleRsvp = useCallback((status: CalendarParticipant['participationStatus']) => {
     if (!event || !userParticipantId || !onRsvp) return;
@@ -1453,7 +1453,7 @@ export function EventModal({
           >
             {/* While a save is in flight the button was disabled with no visible change, so a
                 slow request (mobile, VPN) looked like a dead button for the whole timeout. */}
-            {isSaving ? t("form.saving") : t("form.save")}
+            {isSaving ? t("subscription.saving") : t("form.save")}
           </Button>
         </div>
         )}
