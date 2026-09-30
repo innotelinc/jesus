@@ -64,6 +64,18 @@ describe('plugin signing key storage', () => {
     await expect(getPublicKeyBase64()).resolves.toBe(expected.subarray(-32).toString('base64'));
   });
 
+  it('treats an empty PLUGIN_SIGNING_KEY_FILE as unset', async () => {
+    const configDir = path.join(dir, 'config');
+    const pem = privateKeyPem();
+    await mkdir(configDir);
+    await writeFile(path.join(configDir, 'plugin-signing.key'), pem);
+    vi.stubEnv('PLUGIN_SIGNING_KEY_FILE', '');
+    vi.stubEnv('ADMIN_CONFIG_DIR', configDir);
+
+    const expected = createPublicKey(pem).export({ type: 'spki', format: 'der' }) as Buffer;
+    await expect(getPublicKeyBase64()).resolves.toBe(expected.subarray(-32).toString('base64'));
+  });
+
   it('keeps generating plugin-signing.key when external path is unset', async () => {
     const configDir = path.join(dir, 'config');
     vi.stubEnv('ADMIN_CONFIG_DIR', configDir);

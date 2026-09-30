@@ -47,8 +47,11 @@ async function loadExternal(path: string): Promise<{ privateKey: KeyObject; publ
 }
 
 async function loadOrCreate(): Promise<{ privateKey: KeyObject; publicKey: KeyObject }> {
-  const externalPath = process.env.PLUGIN_SIGNING_KEY_FILE;
-  if (externalPath !== undefined) return loadExternal(externalPath);
+  // An empty value (`PLUGIN_SIGNING_KEY_FILE=` in an env file) means unset,
+  // like the other *_FILE variables. Reading '' fails, and a failed load
+  // makes every bundle ship unsigned with only a console warning.
+  const externalPath = process.env.PLUGIN_SIGNING_KEY_FILE?.trim();
+  if (externalPath) return loadExternal(externalPath);
 
   await ensureConfigDir();
   const path = getConfigPath(KEY_FILENAME);
