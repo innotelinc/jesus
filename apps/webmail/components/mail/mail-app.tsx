@@ -26,7 +26,7 @@ import { ProtocolAccountPicker } from "@/components/protocol/protocol-account-pi
 import { ThreadConversationView } from "@/components/email/thread-conversation-view";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ThreadGroup, Email, Mailbox, isUnifiedMailboxId, UNIFIED_ROLE_BY_ID, CROSS_VIEW_BY_ID, isCrossViewId } from "@/lib/jmap/types";
-import { useAccountStore } from "@/stores/account-store";
+import { useAccountStore, waitForConnectedAccount } from "@/stores/account-store";
 import { usePolicyStore } from "@/stores/policy-store";
 import type { UnifiedAccountClient } from "@/lib/unified-mailbox";
 import { connectedAccountsGrew } from "@/lib/unified-mailbox";
@@ -132,6 +132,30 @@ export interface MailAppProps {
    * the JMAP session is up; see the deep-link effect below.
    */
   linkSegments?: string[];
+}
+
+
+/**
+ * The folder list once it has been reloaded after an account switch. Until
+ * then the store holds the previous mailbox's folders, or none, and resolving
+ * a folder link against them reports a folder that is merely not loaded yet
+ * as gone - or, worse, finds the previous mailbox's folder of that name.
+ */
+function freshMailboxes(previous: Mailbox[], timeoutMs = 10_000): Promise<Mailbox[]> {
+  const ready = (mailboxes: Mailbox[]) => mailboxes !== previous && mailboxes.length > 0;
+  const now = useEmailStore.getState().mailboxes;
+  if (ready(now)) return Promise.resolve(now);
+  return new Promise((resolve) => {
+    const finish = (mailboxes: Mailbox[]) => {
+      clearTimeout(timer);
+      unsubscribe();
+      resolve(mailboxes);
+    };
+    const timer = setTimeout(() => finish(useEmailStore.getState().mailboxes), timeoutMs);
+    const unsubscribe = useEmailStore.subscribe((state) => {
+      if (ready(state.mailboxes)) finish(state.mailboxes);
+    });
+  });
 }
 
 export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
@@ -1367,6 +1391,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   // this, the URL is an output of the view (see buildMailUrl), not an input.
   const deepLinkHandledRef = useRef(false);
   const applyMailDeepLink = async (link: MailDeepLink, opts?: { onLoad?: boolean }) => {
+    // The folder list before an account switch, if one happened: until the
+    // new mailbox's folders arrive the store still holds these (or nothing).
+    let switchedFrom: Mailbox[] | null = null;
     // A permalink can name the account it belongs to. Ids are only meaningful
     // within their account, so switch first - but only to a login that is
     // actually connected; we can't authenticate on someone's behalf. A push
@@ -1376,13 +1403,14 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
       : undefined);
     const switchesAccount = !!linkAccountId && linkAccountId !== useAuthStore.getState().activeAccountId;
     if (switchesAccount) {
-      const target = useAccountStore.getState().accounts.find(
-        (a) => a.id === linkAccountId && a.isConnected,
-      );
-      if (!target) {
+      // The login may still be reconnecting - a tapped notification reopens
+      // the app and the logins come back one at a time - so wait for it
+      // rather than calling a late mailbox unavailable.
+      if (!(await waitForConnectedAccount(linkAccountId))) {
         toast.error(t('deep_link.account_unavailable'));
         return;
       }
+      switchedFrom = useEmailStore.getState().mailboxes;
       await switchAccount(linkAccountId);
     }
 
@@ -1390,8 +1418,11 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     if (!activeClient) return;
 
     if (link.kind === 'folder') {
+      const mailboxes = switchedFrom
+        ? await freshMailboxes(switchedFrom)
+        : useEmailStore.getState().mailboxes;
       const state = useEmailStore.getState();
-      const mailboxId = resolveFolderRef(link.ref, state.mailboxes);
+      const mailboxId = resolveFolderRef(link.ref, mailboxes);
       if (!mailboxId) {
         toast.error(t('deep_link.folder_not_found'));
         return;
