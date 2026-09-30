@@ -708,12 +708,36 @@ function LoginPageContent() {
     window.location.href = authUrl.toString();
   };
 
-  const handleOAuthLogin = async () => {
-    if (LITE_OAUTH_AVAILABLE) {
+  /**
+   * Starts OAuth for the selected server, or for `target`: a server in the
+   * list with its own OAuth client (a Gmail bridge, say), offered on the page
+   * whichever server is selected so that "Sign in with Google" is one tap.
+   */
+  const handleOAuthLogin = async (target?: PublicJmapServerEntry) => {
+    if (LITE_OAUTH_AVAILABLE && !target) {
       await startLiteOAuth(probeTarget);
       return;
     }
-    if (!oauthMetadata || !effectiveOauthClientId) return;
+    const server = target ?? selectedServer;
+    const clientId = target ? target.oauth?.clientId : effectiveOauthClientId;
+    let metadata = target ? null : oauthMetadata;
+    if (target) {
+      setOauthLoading(true);
+      setSelectedServerId(target.id);
+      try {
+        const res = await apiFetch(`/api/auth/oauth/metadata?server_id=${encodeURIComponent(target.id)}`);
+        metadata = res.ok ? ((await res.json()) as OAuthMetadata) : null;
+      } catch {
+        metadata = null;
+      }
+      if (!metadata) {
+        // The target is now the selected server: its discovery runs again and
+        // the page shows the usual "discovery failed" notice.
+        setOauthLoading(false);
+        return;
+      }
+    }
+    if (!metadata || !clientId) return;
     // In mobile-handoff mode the client-side PKCE flow doesn't help us:
     // tokens would land in sessionStorage on the webmail origin and the
     // mobile app couldn't read them. Route through the server-side SSO
@@ -733,14 +757,14 @@ function LoginPageContent() {
 
     // Resolve the JMAP URL to send to the callback. Server-list entries win
     // over the custom-endpoint input, which wins over the global server URL.
-    const oauthServerUrl = selectedServer?.url
+    const oauthServerUrl = server?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : configuredServerUrl);
 
     sessionStorage.setItem("oauth_code_verifier", verifier);
     sessionStorage.setItem("oauth_state", state);
     sessionStorage.setItem("oauth_server_url", oauthServerUrl!);
-    if (selectedServer?.id) {
-      sessionStorage.setItem("oauth_server_id", selectedServer.id);
+    if (server?.id) {
+      sessionStorage.setItem("oauth_server_id", server.id);
     } else {
       sessionStorage.removeItem("oauth_server_id");
     }
@@ -758,9 +782,9 @@ function LoginPageContent() {
     const nextSlot = useAccountStore.getState().getNextCookieSlot();
     sessionStorage.setItem("oauth_cookie_slot", nextSlot.toString());
 
-    const authUrl = new URL(oauthMetadata.authorization_endpoint);
+    const authUrl = new URL(metadata.authorization_endpoint);
     authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("client_id", effectiveOauthClientId);
+    authUrl.searchParams.set("client_id", clientId);
     authUrl.searchParams.set("redirect_uri", redirectUri);
     authUrl.searchParams.set("scope", oauthScopes || DEFAULT_OAUTH_SCOPES);
     authUrl.searchParams.set("state", state);
@@ -886,6 +910,27 @@ function LoginPageContent() {
       )}
     </div>
   ) : null;
+
+  // Other servers in the list that sign in with their own OAuth client get a
+  // button of their own, so signing in with Google does not first mean finding
+  // the bridge in the server menu. Not in mobile handoff, which signs in
+  // server-side against the selected server.
+  const otherOauthServers = isMobileHandoff
+    ? []
+    : jmapServers.filter((s) => s.oauth?.clientId && s.id !== selectedServer?.id);
+  const otherOauthButtons = otherOauthServers.map((s) => (
+    <Button
+      key={s.id}
+      type="button"
+      variant="outline"
+      className="w-full h-11 font-medium text-[15px] rounded-xl border-border/60 hover:bg-muted/50"
+      onClick={() => handleOAuthLogin(s)}
+      disabled={oauthLoading || isLoading}
+    >
+      <LogIn className="w-4 h-4 me-2" />
+      {s.oauth?.buttonLabel || `${t("sign_in_sso")} (${s.label})`}
+    </Button>
+  ));
 
   // Demo-only mode: show only a large demo login button
   if (demoMode && !isAddAccountMode) {
@@ -1203,7 +1248,7 @@ function LoginPageContent() {
                   <Button
                     type="button"
                     className="w-full h-11 font-medium text-[15px] bg-primary hover:bg-primary/90 transition-all duration-200 rounded-xl shadow-md shadow-primary/15 hover:shadow-lg hover:shadow-primary/20"
-                    onClick={handleOAuthLogin}
+                    onClick={() => handleOAuthLogin()}
                     disabled={oauthLoading}
                   >
                     {oauthLoading ? (
@@ -1434,7 +1479,7 @@ function LoginPageContent() {
                   )}
                 </Button>
 
-                {(oauthMetadata || liteSsoOffered) && (
+                {(oauthMetadata || liteSsoOffered || otherOauthButtons.length > 0) && (
                   <>
                     <div className="relative my-2">
                       <div className="absolute inset-0 flex items-center">
@@ -1445,20 +1490,23 @@ function LoginPageContent() {
                       </div>
                     </div>
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-11 font-medium text-[15px] rounded-xl border-border/60 hover:bg-muted/50"
-                      onClick={handleOAuthLogin}
-                      disabled={oauthLoading || isLoading}
-                    >
-                      {oauthLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin me-2" />
-                      ) : (
-                        <LogIn className="w-4 h-4 me-2" />
-                      )}
-                      {selectedServer?.oauth?.buttonLabel || t("sign_in_sso")}
-                    </Button>
+                    {(oauthMetadata || liteSsoOffered) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-11 font-medium text-[15px] rounded-xl border-border/60 hover:bg-muted/50"
+                        onClick={() => handleOAuthLogin()}
+                        disabled={oauthLoading || isLoading}
+                      >
+                        {oauthLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin me-2" />
+                        ) : (
+                          <LogIn className="w-4 h-4 me-2" />
+                        )}
+                        {selectedServer?.oauth?.buttonLabel || t("sign_in_sso")}
+                      </Button>
+                    )}
+                    {otherOauthButtons}
                   </>
                 )}
 
