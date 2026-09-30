@@ -17,6 +17,7 @@
     "reconnecting": "Conexiune pierdută. Se încearcă reconectarea…",
     "error": {
       "invalid_credentials": "Adresă de e-mail sau parolă invalidă. Vă rugăm să verificați datele de autentificare și să încercați din nou.",
+      "invalid_token": "Serverul nu a acceptat acest token de acces. Verificați dacă este complet și dacă nu a expirat sau nu a fost revocat.",
       "connection_failed": "Nu se poate stabili conexiunea cu serverul. Verificați conexiunea la internet și încercați din nou.",
       "cors_blocked": "Serverul este accesibil, dar blochează cererile de tip „cross-origin”. Verificați setările CORS ale serverului JMAP și permiteți acest domeniu.",
       "server_error": "Serverul este temporar indisponibil. Vă rugăm să încercați din nou mai târziu.",
@@ -28,6 +29,11 @@
     "show_password": "Afișează parola",
     "hide_password": "Ascunde parola",
     "totp_toggle": "Am un cod 2FA",
+    "token_toggle": "Autentificare cu un token de acces",
+    "password_toggle": "Autentificare cu o parolă",
+    "token_label": "Token de acces",
+    "token_placeholder": "Lipiți tokenul API",
+    "token_hint": "Creați un token API în setările furnizorului dvs. de e-mail și lipiți-l aici.",
     "remember_me": "Reține-mă",
     "config_error": {
       "title": "Eroare de configurare",
@@ -1604,6 +1610,7 @@
       "auth_method_label": "Autentificare",
       "auth_method_oauth": "Autentificare unică (OAuth /OIDC)",
       "auth_method_basic": "Parolă",
+      "auth_method_token": "Token de acces",
       "demo_account": "Cont demo",
       "email": {
         "label": "Adresă de e-mail",

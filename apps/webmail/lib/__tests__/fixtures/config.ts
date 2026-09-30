@@ -29,6 +29,7 @@ export function createConfig(overrides: Partial<ConfigData> = {}): ConfigData {
     loginShowHeading: true,
     loginShowSubtitle: true,
     loginShowTotp: true,
+    loginShowTokenLogin: false,
     loginShowVersion: true,
     demoMode: false,
     autoSsoEnabled: false,

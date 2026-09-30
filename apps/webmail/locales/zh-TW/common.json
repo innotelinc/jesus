@@ -17,6 +17,7 @@
     "reconnecting": "連線中斷，正在嘗試重新連線…",
     "error": {
       "invalid_credentials": "電子郵件地址或密碼不正確。請檢查您的登入資訊後再試一次。",
+      "invalid_token": "伺服器不接受此存取權杖。請確認權杖完整，且未過期或遭撤銷。",
       "connection_failed": "無法連線至伺服器。請檢查網路連線後再試一次。",
       "cors_blocked": "可連線至伺服器，但跨來源請求遭到封鎖。請檢查 JMAP 伺服器的 CORS 設定，並允許此網域。",
       "server_error": "伺服器目前無法使用，請稍後再試。",
@@ -28,6 +29,11 @@
     "show_password": "顯示密碼",
     "hide_password": "隱藏密碼",
     "totp_toggle": "我有 2FA 驗證碼",
+    "token_toggle": "使用存取權杖登入",
+    "password_toggle": "使用密碼登入",
+    "token_label": "存取權杖",
+    "token_placeholder": "貼上 API 權杖",
+    "token_hint": "請在郵件服務供應商的設定中建立 API 權杖，然後貼到這裡。",
     "remember_me": "記住我",
     "config_error": {
       "title": "設定錯誤",
@@ -1604,6 +1610,7 @@
       "auth_method_label": "驗證方式",
       "auth_method_oauth": "單一登入（OAuth/OIDC）",
       "auth_method_basic": "密碼",
+      "auth_method_token": "存取權杖",
       "demo_account": "示範帳號",
       "email": {
         "label": "電子郵件地址",

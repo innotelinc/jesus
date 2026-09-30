@@ -17,6 +17,7 @@
     "reconnecting": "Conexão perdida. Tentando reconectar…",
     "error": {
       "invalid_credentials": "E-mail ou senha inválidos",
+      "invalid_token": "O servidor não aceitou este token de acesso. Verifique se ele está completo e se não expirou nem foi revogado.",
       "connection_failed": "Falha ao conectar com o servidor",
       "cors_blocked": "O servidor está acessível mas está bloqueando requisições de origem cruzada. Verifique as configurações de CORS do seu servidor JMAP e permita este domínio.",
       "server_error": "O servidor está temporariamente indisponível. Tente novamente mais tarde.",
@@ -28,6 +29,11 @@
     "show_password": "Mostrar senha",
     "hide_password": "Ocultar senha",
     "totp_toggle": "Tenho um código 2FA",
+    "token_toggle": "Entrar com um token de acesso",
+    "password_toggle": "Entrar com uma senha",
+    "token_label": "Token de acesso",
+    "token_placeholder": "Cole seu token de API",
+    "token_hint": "Crie um token de API nas configurações do seu provedor de e-mail e cole-o aqui.",
     "remember_me": "Lembrar-me",
     "config_error": {
       "title": "Erro de Configuração",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Autenticação",
       "auth_method_oauth": "Login único (OAuth/OIDC)",
       "auth_method_basic": "Senha",
+      "auth_method_token": "Token de acesso",
       "demo_account": "Conta de demonstração",
       "email": {
         "label": "Endereço de E-mail",

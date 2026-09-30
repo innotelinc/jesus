@@ -17,6 +17,7 @@
     "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt...",
     "error": {
       "invalid_credentials": "Ugyldig e-postadresse eller passord. Sjekk påloggingsopplysningene dine og prøv igjen.",
+      "invalid_token": "Serveren godtok ikke dette tilgangstokenet. Sjekk at det er fullstendig, og at det ikke har utløpt eller blitt tilbakekalt.",
       "connection_failed": "Kan ikke nå serveren. Sjekk internettforbindelsen og prøv igjen.",
       "cors_blocked": "Serveren er tilgjengelig, men blokkerer forespørsler fra andre opprinnelser. Sjekk JMAP-serverens CORS-innstillinger og tillat dette domenet.",
       "server_error": "Serveren er midlertidig utilgjengelig. Prøv igjen senere.",
@@ -28,6 +29,11 @@
     "show_password": "Vis passord",
     "hide_password": "Skjul passord",
     "totp_toggle": "Jeg har en kode for tofaktorautentisering",
+    "token_toggle": "Logg på med et tilgangstoken",
+    "password_toggle": "Logg på med passord",
+    "token_label": "Tilgangstoken",
+    "token_placeholder": "Lim inn API-tokenet ditt",
+    "token_hint": "Opprett et API-token i innstillingene hos e-postleverandøren din, og lim det inn her.",
     "remember_me": "Husk meg",
     "config_error": {
       "title": "Konfigurasjonsfeil",
@@ -1604,6 +1610,7 @@
       "auth_method_label": "Autentisering",
       "auth_method_oauth": "Enkel pålogging (OAuth/OIDC)",
       "auth_method_basic": "Passord",
+      "auth_method_token": "Tilgangstoken",
       "demo_account": "Demokonto",
       "email": {
         "label": "E-postadresse",

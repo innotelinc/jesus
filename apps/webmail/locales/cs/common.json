@@ -17,6 +17,7 @@
     "reconnecting": "Spojení ztraceno. Pokus o opětovné připojení…",
     "error": {
       "invalid_credentials": "Neplatná e-mailová adresa nebo heslo. Zkontrolujte přihlašovací údaje a zkuste to znovu.",
+      "invalid_token": "Server tento přístupový token nepřijal. Zkontrolujte, zda je úplný a zda nevypršel nebo nebyl odvolán.",
       "connection_failed": "Nelze se připojit k serveru. Zkontrolujte připojení k internetu a zkuste to znovu.",
       "cors_blocked": "Server je dostupný, ale blokuje požadavky mezi doménami. Zkontrolujte nastavení CORS serveru JMAP a povolte tuto doménu.",
       "server_error": "Server je dočasně nedostupný. Zkuste to prosím později.",
@@ -28,6 +29,11 @@
     "show_password": "Zobrazit heslo",
     "hide_password": "Skrýt heslo",
     "totp_toggle": "Mám 2FA kód",
+    "token_toggle": "Přihlásit se přístupovým tokenem",
+    "password_toggle": "Přihlásit se heslem",
+    "token_label": "Přístupový token",
+    "token_placeholder": "Vložte svůj API token",
+    "token_hint": "Vytvořte API token v nastavení svého poskytovatele e-mailu a vložte ho sem.",
     "remember_me": "Zapamatovat si mě",
     "config_error": {
       "title": "Chyba konfigurace",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Ověřování",
       "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
       "auth_method_basic": "Heslo",
+      "auth_method_token": "Přístupový token",
       "demo_account": "Demo účet",
       "email": {
         "label": "E-mailová adresa",

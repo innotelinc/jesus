@@ -17,6 +17,7 @@
     "reconnecting": "연결이 끊어졌어요. 다시 연결을 시도할게요...",
     "error": {
       "invalid_credentials": "이메일이나 비밀번호가 맞지 않아요. 다시 확인해 주세요.",
+      "invalid_token": "서버가 이 액세스 토큰을 받아들이지 않았어요. 토큰이 완전한지, 만료되거나 취소되지 않았는지 확인해 주세요.",
       "connection_failed": "서버에 연결할 수 없어요. 인터넷 연결을 확인하고 다시 시도해 주세요.",
       "cors_blocked": "서버에는 연결되었지만 교차 출처 요청(CORS)이 차단되었어요. JMAP 서버 설정을 확인해 주세요.",
       "server_error": "일시적으로 서버를 사용할 수 없어요. 나중에 다시 시도해 주세요.",
@@ -28,6 +29,11 @@
     "show_password": "비밀번호 표시",
     "hide_password": "비밀번호 숨기기",
     "totp_toggle": "2단계 인증 코드가 있어요",
+    "token_toggle": "액세스 토큰으로 로그인",
+    "password_toggle": "비밀번호로 로그인",
+    "token_label": "액세스 토큰",
+    "token_placeholder": "API 토큰을 붙여 넣으세요",
+    "token_hint": "메일 서비스 설정에서 API 토큰을 만든 후 여기에 붙여 넣으세요.",
     "remember_me": "로그인 유지",
     "config_error": {
       "title": "설정 오류",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "인증 방법",
       "auth_method_oauth": "SSO (OAuth/OIDC)",
       "auth_method_basic": "비밀번호",
+      "auth_method_token": "액세스 토큰",
       "demo_account": "데모 계정",
       "email": {
         "label": "이메일 주소",

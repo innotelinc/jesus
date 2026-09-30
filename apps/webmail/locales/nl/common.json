@@ -17,6 +17,7 @@
     "reconnecting": "Verbinding verloren. Opnieuw verbinden…",
     "error": {
       "invalid_credentials": "Ongeldig e-mailadres of wachtwoord",
+      "invalid_token": "De server heeft dit toegangstoken niet geaccepteerd. Controleer of het volledig is en niet is verlopen of ingetrokken.",
       "connection_failed": "Kan geen verbinding maken met de server",
       "cors_blocked": "De server is bereikbaar maar blokkeert cross-origin verzoeken. Controleer de CORS-instellingen van uw JMAP-server en sta dit domein toe.",
       "server_error": "De server is tijdelijk niet beschikbaar. Probeer het later opnieuw.",
@@ -28,6 +29,11 @@
     "show_password": "Wachtwoord tonen",
     "hide_password": "Wachtwoord verbergen",
     "totp_toggle": "Ik heb een 2FA-code",
+    "token_toggle": "Aanmelden met een toegangstoken",
+    "password_toggle": "Aanmelden met een wachtwoord",
+    "token_label": "Toegangstoken",
+    "token_placeholder": "Plak uw API-token",
+    "token_hint": "Maak een API-token aan in de instellingen van uw e-mailprovider en plak het hier.",
     "remember_me": "Onthoud mij",
     "config_error": {
       "title": "Configuratiefout",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Authenticatie",
       "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
       "auth_method_basic": "Wachtwoord",
+      "auth_method_token": "Toegangstoken",
       "demo_account": "Demoaccount",
       "email": {
         "label": "E-mailadres",

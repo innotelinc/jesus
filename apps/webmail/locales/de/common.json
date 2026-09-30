@@ -17,6 +17,7 @@
     "reconnecting": "Verbindung verloren. Verbindung wird wiederhergestellt…",
     "error": {
       "invalid_credentials": "Ungültige E-Mail-Adresse oder Passwort",
+      "invalid_token": "Der Server hat dieses Zugriffstoken nicht akzeptiert. Prüfen Sie, ob es vollständig ist und nicht abgelaufen oder widerrufen wurde.",
       "connection_failed": "Verbindung zum Server fehlgeschlagen",
       "cors_blocked": "Der Server ist erreichbar, blockiert aber Cross-Origin-Anfragen. Überprüfen Sie die CORS-Einstellungen Ihres JMAP-Servers und erlauben Sie diese Domain.",
       "server_error": "Der Server ist vorübergehend nicht erreichbar. Bitte versuchen Sie es später erneut.",
@@ -28,6 +29,11 @@
     "show_password": "Passwort anzeigen",
     "hide_password": "Passwort verbergen",
     "totp_toggle": "Ich habe einen 2FA-Code",
+    "token_toggle": "Mit Zugriffstoken anmelden",
+    "password_toggle": "Mit Passwort anmelden",
+    "token_label": "Zugriffstoken",
+    "token_placeholder": "API-Token einfügen",
+    "token_hint": "Erstellen Sie in den Einstellungen Ihres E-Mail-Anbieters ein API-Token und fügen Sie es hier ein.",
     "remember_me": "Angemeldet bleiben",
     "config_error": {
       "title": "Konfigurationsfehler",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Authentifizierung",
       "auth_method_oauth": "Single Sign-On (OAuth/OIDC)",
       "auth_method_basic": "Passwort",
+      "auth_method_token": "Zugriffstoken",
       "demo_account": "Demokonto",
       "email": {
         "label": "E-Mail-Adresse",

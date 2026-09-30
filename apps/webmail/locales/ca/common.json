@@ -17,6 +17,7 @@
     "reconnecting": "S'ha perdut la connexió. S'està intentant reconnectar…",
     "error": {
       "invalid_credentials": "El correu electrònic o la contrasenya no són vàlids. Comproveu les credencials i torneu-ho a provar.",
+      "invalid_token": "El servidor no ha acceptat aquest token d'accés. Comproveu que sigui complet i que no hagi caducat ni s'hagi revocat.",
       "connection_failed": "No s'ha pogut contactar amb el servidor. Comproveu la connexió a Internet i torneu-ho a provar.",
       "cors_blocked": "El servidor és accessible, però està bloquejant les sol·licituds d'origen creuat. Comproveu la configuració CORS del servidor JMAP i permeteu aquest domini.",
       "server_error": "El servidor no està disponible temporalment. Torneu-ho a provar més tard.",
@@ -28,6 +29,11 @@
     "show_password": "Mostra la contrasenya",
     "hide_password": "Amaga la contrasenya",
     "totp_toggle": "Tinc un codi 2FA",
+    "token_toggle": "Inicia la sessió amb un token d'accés",
+    "password_toggle": "Inicia la sessió amb una contrasenya",
+    "token_label": "Token d'accés",
+    "token_placeholder": "Enganxeu el vostre token d'API",
+    "token_hint": "Creeu un token d'API a la configuració del vostre proveïdor de correu i enganxeu-lo aquí.",
     "remember_me": "Recorda'm",
     "config_error": {
       "title": "Error de configuració",
@@ -1604,6 +1610,7 @@
       "auth_method_label": "Autenticació",
       "auth_method_oauth": "Inici de sessió únic (OAuth/OIDC)",
       "auth_method_basic": "Contrasenya",
+      "auth_method_token": "Token d'accés",
       "demo_account": "Compte de demostració",
       "email": {
         "label": "Adreça electrònica",

@@ -52,6 +52,7 @@ const configValidators = {
   loginShowHeading: isBoolean,
   loginShowSubtitle: isBoolean,
   loginShowTotp: isBoolean,
+  loginShowTokenLogin: isBoolean,
   loginShowVersion: isBoolean,
   demoMode: isBoolean,
   autoSsoEnabled: isBoolean,

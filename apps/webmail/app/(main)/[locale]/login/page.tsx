@@ -14,7 +14,7 @@ import { useConfig } from "@/hooks/use-config";
 import { useMenuNavigation } from "@/hooks/use-menu-navigation";
 import { apiFetch, getPathPrefix, toRouterPath, withBasePath } from "@/lib/browser-navigation";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy } from "@/components/icons";
+import { AlertCircle, Loader2, X, Info, Eye, EyeOff, LogIn, Sun, Moon, Monitor, Check, Shield, Play, Copy, KeyRound } from "@/components/icons";
 import { type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { DEFAULT_OAUTH_SCOPES } from "@/lib/oauth/scopes";
@@ -155,9 +155,9 @@ function LoginPageContent() {
     : "";
   const mobileState = mobileRedirectUri ? rawMobileState : "";
   const isMobileHandoff = Boolean(mobileRedirectUri);
-  const { login, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
+  const { login, loginWithToken, loginDemo, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore(useShallow((s) => ({ theme: s.theme, setTheme: s.setTheme, initializeTheme: s.initializeTheme })));
-  const { appName, jmapServerUrl: configuredServerUrl, oauthEnabled, oauthOnly, oauthClientId: globalOauthClientId, oauthIssuerUrl: globalOauthIssuerUrl, oauthScopes, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, loginLogoMaxHeight, loginLogoMaxWidth, loginShowHeading, loginShowSubtitle, loginShowTotp, loginShowVersion, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode, allowCustomJmapEndpoint, jmapServers, jmapServerAutoPickByDomain } = useConfig();
+  const { appName, jmapServerUrl: configuredServerUrl, oauthEnabled, oauthOnly, oauthClientId: globalOauthClientId, oauthIssuerUrl: globalOauthIssuerUrl, oauthScopes, rememberMeEnabled, devMode, demoMode, loginLogoLightUrl, loginLogoDarkUrl, loginCompanyName, loginImprintUrl, loginPrivacyPolicyUrl, loginWebsiteUrl, loginLogoMaxHeight, loginLogoMaxWidth, loginShowHeading, loginShowSubtitle, loginShowTotp, loginShowTokenLogin, loginShowVersion, isLoading: configLoading, error: configError, autoSsoEnabled, embeddedMode: _embeddedMode, allowCustomJmapEndpoint, jmapServers, jmapServerAutoPickByDomain } = useConfig();
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   // Login logo sizing: when a max height/width is configured, drop the fixed
@@ -190,6 +190,11 @@ function LoginPageContent() {
     : globalOauthIssuerUrl;
   const [totpCode, setTotpCode] = useState("");
   const [showTotpField, setShowTotpField] = useState(false);
+  // Access-token sign-in (Bearer auth) in place of username and password.
+  // The mobile hand-off passes a password on to the app, so it has none.
+  const [tokenMode, setTokenMode] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+  const signInWithToken = tokenMode && loginShowTokenLogin && !isMobileHandoff;
   const [rememberMe, setRememberMe] = useState(false);
   // Lite (no server session): "remember me" needs Stalwart's token login on the
   // target server. Probe it once per URL and hide the box when it is missing;
@@ -213,6 +218,7 @@ function LoginPageContent() {
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedSuggestion = useRef(false);
   const totpInputRef = useRef<HTMLInputElement>(null);
+  const tokenInputRef = useRef<HTMLInputElement>(null);
   const prevError = useRef<string | null>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const themeButtonRef = useRef<HTMLButtonElement>(null);
@@ -257,7 +263,7 @@ function LoginPageContent() {
   // (the endpoint is rate limited).
   const [liteOAuthByDomain, setLiteOAuthByDomain] = useState<{ domain: string; discovery: LiteOAuthDiscovery | null } | null>(null);
   const [liteOAuthFailed, setLiteOAuthFailed] = useState(false);
-  const liteDomain = LITE_OAUTH_AVAILABLE ? completeAddressDomain(formData.username) : "";
+  const liteDomain = LITE_OAUTH_AVAILABLE && !signInWithToken ? completeAddressDomain(formData.username) : "";
   const liteAccount = liteDomain ? formData.username.trim() : "";
   useEffect(() => {
     if (!liteAccount || !probeTarget) return;
@@ -777,6 +783,12 @@ function LoginPageContent() {
     // when the admin hasn't configured a server list.
     const effectiveServerUrl = selectedServer?.url
       || (allowCustomJmapEndpoint ? jmapEndpoint : serverUrl);
+    if (signInWithToken) {
+      if (await loginWithToken(effectiveServerUrl, accessToken, rememberMeEnabled && rememberMe)) {
+        router.push('/');
+      }
+      return;
+    }
     // Lite on Stalwart: an account whose domain signs in at an external
     // provider has no password Stalwart could check. Asked again here (cached)
     // because Enter can beat the debounced lookup; a name without a domain is
@@ -1258,8 +1270,9 @@ function LoginPageContent() {
                     </div>
                   )}
 
-                  {/* Username field */}
-                  <div className="space-y-1.5">
+                  {/* Username field. The access token names the account, so
+                      token sign-in has none. */}
+                  <div className={cn("space-y-1.5", signInWithToken && "hidden")}>
                     <label htmlFor="username" className="block text-sm font-medium text-foreground">
                       {t("username_label")}
                     </label>
@@ -1274,7 +1287,7 @@ function LoginPageContent() {
                         onKeyDown={handleKeyDown}
                         className="h-11 px-3.5 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
                         placeholder={t("username_placeholder")}
-                        required
+                        required={!signInWithToken}
                         autoComplete="off"
                         data-form-type="other"
                         data-lpignore="true"
@@ -1315,7 +1328,7 @@ function LoginPageContent() {
                   {/* Password field. Hidden for an account that signs in at an
                       external provider (Lite on Stalwart): the submit button is
                       the SSO button then. */}
-                  <div className={cn("space-y-1.5", liteSsoRequired && "hidden")}>
+                  <div className={cn("space-y-1.5", (liteSsoRequired || signInWithToken) && "hidden")}>
                     <label htmlFor="password" className="block text-sm font-medium text-foreground">
                       {t("password_label")}
                     </label>
@@ -1327,7 +1340,7 @@ function LoginPageContent() {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         className="h-11 px-3.5 pe-11 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200"
                         placeholder={t("password_placeholder")}
-                        required={!liteSsoRequired}
+                        required={!liteSsoRequired && !signInWithToken}
                         autoComplete="current-password"
                       />
                       <button
@@ -1346,11 +1359,35 @@ function LoginPageContent() {
                     </div>
                   </div>
 
+                  {signInWithToken && (
+                    <div className="space-y-1.5">
+                      <label htmlFor="access-token" className="block text-sm font-medium text-foreground">
+                        {t("token_label")}
+                      </label>
+                      <Input
+                        ref={tokenInputRef}
+                        id="access-token"
+                        type="password"
+                        value={accessToken}
+                        onChange={(e) => setAccessToken(e.target.value)}
+                        className="h-11 px-3.5 bg-muted/40 border-border/60 rounded-xl focus:bg-background focus:border-primary/50 transition-all duration-200 font-mono"
+                        placeholder={t("token_placeholder")}
+                        required
+                        autoComplete="off"
+                        spellCheck={false}
+                        data-lpignore="true"
+                      />
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {t("token_hint")}
+                      </p>
+                    </div>
+                  )}
+
                   {/* 2FA toggle / field. The manual toggle can be hidden via
                       LOGIN_SHOW_TOTP (loginShowTotp) for deployments whose mail
                       server has no per-account TOTP (auth delegated to an
                       external directory); server-required TOTP still shows. */}
-                  {liteSsoRequired ? null : !showTotpField ? (
+                  {liteSsoRequired || signInWithToken ? null : !showTotpField ? (
                     loginShowTotp ? (
                     <button
                       type="button"
@@ -1386,6 +1423,21 @@ function LoginPageContent() {
                         aria-label={t("totp_label")}
                       />
                     </div>
+                  )}
+
+                  {loginShowTokenLogin && !isMobileHandoff && !liteSsoRequired && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearError();
+                        setTokenMode(!signInWithToken);
+                        setTimeout(() => (signInWithToken ? inputRef : tokenInputRef).current?.focus(), 50);
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      {signInWithToken ? t("password_toggle") : t("token_toggle")}
+                    </button>
                   )}
 
                   {/* Remember me */}

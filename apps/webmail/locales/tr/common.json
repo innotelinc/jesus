@@ -17,6 +17,7 @@
     "reconnecting": "Bağlantı kesildi. Yeniden bağlanılmaya çalışılıyor…",
     "error": {
       "invalid_credentials": "Geçersiz e-posta veya şifre. Lütfen bilgilerinizi kontrol edip tekrar deneyin.",
+      "invalid_token": "Sunucu bu erişim belirtecini kabul etmedi. Belirtecin eksiksiz olduğunu, süresinin dolmadığını ve iptal edilmediğini kontrol edin.",
       "connection_failed": "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edip tekrar deneyin.",
       "cors_blocked": "Sunucuya ulaşılıyor ancak çapraz kaynak istekleri engelleniyor. JMAP sunucunuzun CORS ayarlarını kontrol edip bu etki alanına izin verin.",
       "server_error": "Sunucu geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.",
@@ -28,6 +29,11 @@
     "show_password": "Şifreyi göster",
     "hide_password": "Şifreyi gizle",
     "totp_toggle": "2FA kodum var",
+    "token_toggle": "Erişim belirteciyle giriş yap",
+    "password_toggle": "Şifreyle giriş yap",
+    "token_label": "Erişim belirteci",
+    "token_placeholder": "API belirtecinizi yapıştırın",
+    "token_hint": "E-posta sağlayıcınızın ayarlarında bir API belirteci oluşturun ve buraya yapıştırın.",
     "remember_me": "Beni hatırla",
     "config_error": {
       "title": "Yapılandırma Hatası",
@@ -1601,6 +1607,7 @@
       "auth_method_label": "Kimlik Doğrulama",
       "auth_method_oauth": "Tekil Oturum Açma (OAuth/OIDC)",
       "auth_method_basic": "Parola",
+      "auth_method_token": "Erişim belirteci",
       "demo_account": "Demo Hesabı",
       "email": {
         "label": "E-posta Adresi",
