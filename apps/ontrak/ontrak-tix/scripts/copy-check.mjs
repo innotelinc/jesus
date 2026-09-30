@@ -1,29 +1,31 @@
 #!/usr/bin/env node
 /**
- * Check that the Tix sign-in gate carries the product and the way in, and nothing else.
+ * Check that the Tix sign-in gate and the desk chrome carry no family taglines.
  *
  *   npm run copy:check
  *
  * Why this exists: signing in is the product's front door, and a front door says
  * which product it belongs to and lets you in. Everything else that accumulates
  * there — the family's taglines ("one identity, every product"), a description of
- * the identity service's accounts, groups and second factors — belongs on a
- * marketing page if anywhere, and it is the copy that survives longest, because
- * nothing breaks when it goes stale: no test fails, no build errors, it just keeps
- * being wrong on the one screen every user sees first.
+ * the identity service's accounts, groups and second factors, an attribution to
+ * the parent line in the sidebar footer — belongs on a marketing page if anywhere,
+ * and it is the copy that survives longest, because nothing breaks when it goes
+ * stale: no test fails, no build errors, it just keeps being wrong on the one
+ * screen every user sees first.
  *
- * The scan is comments-stripped, so the explanation of *why* the family has one
+ * The rules are split in two, because they are not the same rule:
+ *
+ *   gate    the sign-in page carries the product and the way in, and nothing else.
+ *   chrome  the desk shell — the sidebar every signed-in screen shares — carries
+ *           the product and a link to the front door: no family names.
+ *
+ * Both scans are comments-stripped, so the explanation of *why* the family has one
  * identity layer stays welcome while the sentence does not.
  *
- * Scoped to `src/app/sign-in/page.tsx` deliberately, not to every screen that
- * mentions the provider:
- *
- *   - the root layout is a bare `<body>` — there is no masthead or footer here to
- *     guard, unlike the portal and the Genie console;
- *   - the break-glass screen at `sign-in/break-glass` says "single sign-on" in
- *     visible labels ("Use single sign-on", "Back to single sign-on"). Those are
- *     controls, not a pitch, and a rule that banned the phrase there would be a
- *     rule that had to be worked around.
+ * The break-glass screen at `sign-in/break-glass` is deliberately not scanned: it
+ * says "single sign-on" in visible labels ("Use single sign-on", "Back to single
+ * sign-on"). Those are controls, not a pitch, and a rule that banned the phrase
+ * there would be a rule that had to be worked around.
  */
 
 import fs from "node:fs";
@@ -33,6 +35,9 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 
 /** The sign-in gate: the front door, in full. */
 const GATE_FILES = ["src/app/sign-in/page.tsx"];
+
+/** The chrome every signed-in screen shares. */
+const CHROME_FILES = ["src/app/(desk)/layout.tsx"];
 
 /**
  * Phrases that must not appear on the gate.
@@ -48,6 +53,15 @@ const GATE_PHRASES = [
   ["second factor", "login-screen sales copy"],
   ["accounts, groups", "login-screen sales copy"],
   ["single sign-on", "login-screen sales copy"],
+];
+
+/** Phrases that must not appear in the desk chrome. */
+const CHROME_PHRASES = [
+  ["innotel labs", "an attribution the product's own name already carries"],
+  ["the family", "a reference to the family, not to this product"],
+  ["family landing", "a link back to the family site"],
+  ["platform stack", "a reference to the platform, not to this product"],
+  ["innotel-platform-stack", "a link back to the family's standards repository"],
 ];
 
 /** Any link to the family's own sites, wherever the anchor text hides it. */
@@ -71,11 +85,11 @@ function lineAt(text, index) {
 
 const problems = [];
 
-for (const file of GATE_FILES) {
+function inspect(file, phrases) {
   const text = stripComments(fs.readFileSync(path.join(ROOT, file), "utf8"));
   const lower = text.toLowerCase();
 
-  for (const [phrase, why] of GATE_PHRASES) {
+  for (const [phrase, why] of phrases) {
     let at = lower.indexOf(phrase);
     while (at !== -1) {
       problems.push(`${file}:${lineAt(text, at)}  “${phrase}” — ${why}`);
@@ -89,11 +103,16 @@ for (const file of GATE_FILES) {
   }
 }
 
+for (const file of GATE_FILES) inspect(file, GATE_PHRASES);
+for (const file of CHROME_FILES) inspect(file, CHROME_PHRASES);
+
+const files = GATE_FILES.length + CHROME_FILES.length;
+
 if (problems.length > 0) {
   for (const problem of problems) console.error(`  not ok  ${problem}`);
-  console.error(`\nFAIL  ${problems.length} problem${problems.length === 1 ? "" : "s"} in ${GATE_FILES.length} file${GATE_FILES.length === 1 ? "" : "s"}`);
+  console.error(`\nFAIL  ${problems.length} problem${problems.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`);
   console.error("      The front door carries the product and the way in. Everything else goes.");
   process.exit(1);
 }
 
-console.log(`OK  ${GATE_FILES.length} gate file, no family taglines and no login-screen copy`);
+console.log(`OK  ${files} files, no family taglines and no login-screen copy`);
