@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { X, Download, Loader2, ExternalLink } from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import { getFilePreviewKind, isMimeTypeSafeForInlinePreview, previewBlobType } from "@/lib/file-preview";
+import { getFilePreviewKind, imageBlobUrl, isMimeTypeSafeForInlinePreview, previewBlobType } from "@/lib/file-preview";
 import dynamic from "next/dynamic";
 import { EmlPreview, type ParsedEml } from "@/components/files/eml-preview";
 
@@ -215,12 +215,20 @@ export function FilePreviewModal({ name, onClose, onDownload, getFileContent }: 
           const typedBlob = blob.type !== effectiveType
             ? new Blob([blob], { type: effectiveType })
             : blob;
-          revokeUrl = URL.createObjectURL(typedBlob);
-          if (!cancelled) {
-            setObjectUrl(revokeUrl);
-            setCanOpenInNewTab(isMimeTypeSafeForInlinePreview(effectiveType));
-            if (previewType === "pdf") setPdfBlob(typedBlob);
+          // "Open image in new tab" loads the <img> URL as a document of its
+          // own, so an image gets one that stays inert there: a sender's SVG
+          // must not run script as the webmail origin (GHSA-xvjh-v9c6-qcvc).
+          const url = previewType === "image"
+            ? await imageBlobUrl(typedBlob)
+            : URL.createObjectURL(typedBlob);
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            return;
           }
+          revokeUrl = url;
+          setObjectUrl(url);
+          setCanOpenInNewTab(isMimeTypeSafeForInlinePreview(effectiveType));
+          if (previewType === "pdf") setPdfBlob(typedBlob);
         }
       } catch {
         if (!cancelled) setError(true);
