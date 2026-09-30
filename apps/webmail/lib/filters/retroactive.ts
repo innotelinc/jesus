@@ -1,5 +1,6 @@
 import type { EmailAddress } from '@/lib/jmap/types';
 import type { FilterAction, FilterCondition, FilterRule } from '@/lib/jmap/sieve-types';
+import { unfoldHeader } from './quick-rules';
 
 /**
  * Running a filter rule over mail that is already there. Sieve only sees new
@@ -167,23 +168,19 @@ export function ruleMatches(rule: FilterRule, message: RetroMessage): boolean {
 
 /**
  * The JMAP filter for the rule's candidates in `mailboxId`: always a superset
- * of what the rule matches. Only exact-address and exact-domain conditions and
- * the presence of a header narrow it; substring and pattern conditions would
- * need a full-text match, which can miss what a Sieve substring finds.
+ * of what the rule matches. Only exact-address and exact-domain conditions
+ * narrow it. Substring and pattern conditions would need a full-text match,
+ * which can miss what a Sieve substring finds, and the `header` filter finds
+ * nothing at all on Stalwart 0.16 (not even a header every message has), so
+ * header conditions are left to `ruleMatches`.
  */
 export function retroQueryFilter(rule: FilterRule, mailboxId: string): Record<string, unknown> {
   const narrow = (condition: FilterCondition): Record<string, unknown> | null => {
-    if (usesAddressTest(condition)) {
-      const values = valueList(condition.value);
-      if (values.length === 0) return null;
-      const each = values.map(v => ({ [condition.field]: v }));
-      return each.length === 1 ? each[0] : { operator: 'OR', conditions: each };
-    }
-    if (condition.field === 'header' && condition.comparator !== 'not_contains' && condition.comparator !== 'not_is') {
-      const header = conditionHeader(condition);
-      return header ? { header: [header] } : null;
-    }
-    return null;
+    if (!usesAddressTest(condition)) return null;
+    const values = valueList(condition.value);
+    if (values.length === 0) return null;
+    const each = values.map(v => ({ [condition.field]: v }));
+    return each.length === 1 ? each[0] : { operator: 'OR', conditions: each };
   };
 
   const narrowed = rule.conditions.map(narrow);
@@ -205,7 +202,12 @@ export function retroProperties(rule: FilterRule): string[] {
       properties.add(condition.field);
     } else {
       const header = conditionHeader(condition);
-      if (header) properties.add(`header:${header}:asText:all`);
+      // The raw form backs up the text form, which Stalwart answers with null
+      // for headers it parses as structured (List-Id).
+      if (header) {
+        properties.add(`header:${header}:asText:all`);
+        properties.add(`header:${header}:all`);
+      }
     }
   }
   return [...properties];
@@ -214,11 +216,14 @@ export function retroProperties(rule: FilterRule): string[] {
 /** Turn an Email/get record with `retroProperties` into a RetroMessage. */
 export function toRetroMessage(record: Record<string, unknown>): RetroMessage {
   const headers: Record<string, string[]> = {};
+  const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : value == null ? [] : [value]);
   for (const [key, value] of Object.entries(record)) {
     const m = /^header:(.+):asText:all$/.exec(key);
     if (!m) continue;
-    const list = Array.isArray(value) ? value : value == null ? [] : [value];
-    headers[m[1].toLowerCase()] = list.filter((v): v is string => typeof v === 'string');
+    const raw = asList(record[`header:${m[1]}:all`]);
+    headers[m[1].toLowerCase()] = asList(value)
+      .map((text, i) => (typeof text === 'string' ? text : unfoldHeader(raw[i])))
+      .filter((v): v is string => typeof v === 'string');
   }
   return {
     id: String(record.id),
