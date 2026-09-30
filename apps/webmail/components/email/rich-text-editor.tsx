@@ -9,6 +9,7 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextDirection } from "@/components/email/text-direction";
+import { PlainTextPaste } from "@/components/email/plain-text-paste";
 import { TextStyle, BackgroundColor } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import { FontSize, FONT_SIZES } from "@/components/email/font-size";
@@ -236,7 +237,14 @@ export function RichTextEditor({
       // into editable content (#822).
       SignatureBlock.configure({ editHint: tComposer('signature_edit_hint') }),
       TextDirection,
+      PlainTextPaste,
     ],
+    // One newline per paragraph when copying out as plain text, the inverse
+    // of PlainTextPaste: a blank line is an empty paragraph, so the default
+    // "\n\n" separator doubled every line break.
+    coreExtensionOptions: {
+      clipboardTextSerializer: { blockSeparator: "\n" },
+    },
     content,
     editorProps: {
       attributes: {
