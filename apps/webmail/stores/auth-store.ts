@@ -1539,7 +1539,7 @@ export const useAuthStore = create<AuthState>()(
             ? sessionStorage.getItem('oauth_cookie_slot')
             : null;
           const pendingSlot = rawSlot !== null ? parseInt(rawSlot, 10) : NaN;
-          const slot = !isNaN(pendingSlot) && pendingSlot >= 0 && pendingSlot <= 4
+          const slot = !isNaN(pendingSlot) && pendingSlot >= 0 && pendingSlot < MAX_ACCOUNT_SLOTS
             ? pendingSlot
             : accountStore.getNextCookieSlot();
 
