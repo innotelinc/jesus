@@ -27,16 +27,16 @@ export interface ImpersonationConfig {
  */
 export function readImpersonationConfig(): ImpersonationConfig | null {
   const jwtSecret =
-    process.env.BULWARK_JWT_AUTH_SECRET ??
-    readFileEnv(process.env.BULWARK_JWT_AUTH_SECRET_FILE) ??
+    process.env.BULWARK_JWT_AUTH_SECRET ||
+    readFileEnv(process.env.BULWARK_JWT_AUTH_SECRET_FILE) ||
     "";
   const masterUser =
-    process.env.BULWARK_STALWART_MASTER_USER ??
-    readFileEnv(process.env.BULWARK_STALWART_MASTER_USER_FILE) ??
+    process.env.BULWARK_STALWART_MASTER_USER ||
+    readFileEnv(process.env.BULWARK_STALWART_MASTER_USER_FILE) ||
     "";
   const masterPassword =
-    process.env.BULWARK_STALWART_MASTER_PASSWORD ??
-    readFileEnv(process.env.BULWARK_STALWART_MASTER_PASSWORD_FILE) ??
+    process.env.BULWARK_STALWART_MASTER_PASSWORD ||
+    readFileEnv(process.env.BULWARK_STALWART_MASTER_PASSWORD_FILE) ||
     "";
   if (!jwtSecret || !masterUser || !masterPassword) return null;
   return {
