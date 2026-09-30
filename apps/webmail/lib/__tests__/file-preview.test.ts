@@ -106,6 +106,21 @@ describe('previewBlobType', () => {
     expect(previewBlobType('photo.jpg', 'application/x-as400attachment', '')).toBe('image/jpeg');
   });
 
+  it('derives a viewable type from every image, audio and video extension but SVG', () => {
+    const kinds: Record<string, string[]> = {
+      image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp', 'ico'],
+      audio: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus'],
+      video: ['mp4', 'webm', 'ogv', 'mov', 'm4v', 'avi', 'mkv'],
+    };
+    for (const [kind, extensions] of Object.entries(kinds)) {
+      for (const ext of extensions) {
+        const name = `file.${ext}`;
+        expect(getFilePreviewKind(name)).toBe(kind);
+        expect(previewBlobType(name, 'application/x-as400attachment', '')).toMatch(new RegExp(`^${kind}/`));
+      }
+    }
+  });
+
   it('hands the unsandboxed PDF viewer nothing but application/pdf', () => {
     // The PDF preview iframe cannot be sandboxed (the browser's PDF viewer
     // refuses to run there), so XML or XHTML declared on a .pdf must not
