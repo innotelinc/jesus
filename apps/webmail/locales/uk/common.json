@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Відображуване ім'я",
     "autocomplete_search_server": "Шукати на сервері",
     "autocomplete_searching": "Пошук...",
+    "mention_recipients": "Одержувачі",
     "toolbar": {
       "bold": "Жирний",
       "italic": "Курсив",

@@ -65,7 +65,9 @@ import {
   ICON_MAP,
 } from "@/lib/email-composer-utils";
 import { isValidEmail } from "@/lib/validation";
+import { buildMentionCandidates } from "@/lib/recipient-mentions";
 import { RichTextEditor } from "@/components/email/rich-text-editor";
+import { isRecipientMentionActive } from "@/components/email/recipient-mention";
 import type { Editor } from "@tiptap/react";
 import { htmlToPlainText as htmlToPlainTextShared } from "@/lib/html-to-text";
 import { fileStorage } from "@/lib/plugin-storage";
@@ -1113,6 +1115,10 @@ export function EmailComposer({
   const toStr = formatRecipientList(withInput(to, toInput));
   const ccStr = formatRecipientList(withInput(cc, ccInput));
   const bccStr = formatRecipientList(withInput(bcc, bccInput));
+
+  // Who an "@" in the body offers. Never Bcc: naming a blind-copied
+  // recipient in the text would disclose them to everyone else.
+  const mentionCandidates = useMemo(() => buildMentionCandidates(to, cc), [to, cc]);
 
   // Uploaded/hydrated attachments in ComposerDraftData shape, so a state
   // snapshot (pro tab move, unmount save) carries them across a remount
@@ -2658,6 +2664,9 @@ export function EmailComposer({
 
     if (isPlainEscape) {
       if (activeAutoField) return;
+      // Same for the "@" recipient list in the body: this handler runs in the
+      // capture phase, before the editor could close the list itself.
+      if (isRecipientMentionActive(editorRef.current)) return;
       e.preventDefault();
       handleClose();
       return;
@@ -3116,6 +3125,7 @@ export function EmailComposer({
               placeholder={t('body_placeholder')}
               hasError={validationErrors.body}
               onEditorReady={(ed) => { editorRef.current = ed; }}
+              mentionCandidates={mentionCandidates}
             />
           </div>
         )}

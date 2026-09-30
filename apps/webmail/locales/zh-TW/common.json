@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "顯示名稱",
     "autocomplete_search_server": "在伺服器上搜尋",
     "autocomplete_searching": "正在搜尋…",
+    "mention_recipients": "收件者",
     "toolbar": {
       "bold": "粗體",
       "italic": "斜體",

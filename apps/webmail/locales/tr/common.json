@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Görünen ad",
     "autocomplete_search_server": "Sunucuda ara",
     "autocomplete_searching": "Aranıyor...",
+    "mention_recipients": "Alıcılar",
     "toolbar": {
       "bold": "Kalın",
       "italic": "İtalik",

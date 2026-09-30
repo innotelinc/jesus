@@ -718,6 +718,7 @@
     "recipient_name_placeholder": "Numele afișat",
     "autocomplete_search_server": "Caută pe server",
     "autocomplete_searching": "Se caută...",
+    "mention_recipients": "Destinatari",
     "toolbar": {
       "bold": "Aldin",
       "italic": "Cursiv",
