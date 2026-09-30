@@ -524,9 +524,10 @@ export function EventModal({
     // grid and prefill are display dates), so label them with that zone.
     const timeZone = getEffectiveTimeZone();
 
+    const trimmedDescription = description.trim();
+
     const data: Partial<CalendarEvent> = {
       title: trimmedTitle,
-      description: description.trim(),
       start: startStr,
       duration,
       timeZone: allDay ? null : timeZone,
@@ -536,6 +537,13 @@ export function EventModal({
       freeBusyStatus: "busy",
       privacy: "public",
     };
+
+    // On an existing event the empty string is how a description gets cleared, but
+    // sending it on creation writes a `DESCRIPTION:` with nothing after it — which
+    // invitation e-mails then render as a "Description" heading over blank space.
+    if (trimmedDescription || event) {
+      data.description = trimmedDescription;
+    }
 
     if (!event) {
       data.uid = generateUUID();
