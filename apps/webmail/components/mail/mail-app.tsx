@@ -379,6 +379,7 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
     isAdvancedSearchOpen,
     setSearchFilters,
     setSearchMailboxId,
+    scopeSearchToOpenFolder,
     clearSearchFilters,
     toggleAdvancedSearch,
     advancedSearch,
@@ -2714,10 +2715,13 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
   };
 
   const handleUnreadFilterClick = async (mailboxId: string) => {
-    const isTogglingOff = selectedMailbox === mailboxId && searchFilters.isUnread === true;
+    const isTogglingOff = selectedMailbox === mailboxId && !selectedKeyword && searchFilters.isUnread === true;
 
-    // Select the mailbox if not already selected
-    if (selectedMailbox !== mailboxId) {
+    // Open the mailbox unless it is already the one listed. A tag view keeps
+    // selectedMailbox, so it counts as another view.
+    if (selectedMailbox !== mailboxId || selectedKeyword) {
+      if (isUnifiedView) exitUnifiedView();
+      setScheduledView(false);
       selectMailbox(mailboxId);
       selectEmail(null);
     }
@@ -2740,8 +2744,9 @@ export function MailApp({ linkSegments: routeSegments }: MailAppProps = {}) {
         await fetchEmails(client, mailboxId);
       }
     } else {
-      // Enable unread filter
+      // Enable unread filter, in this folder only
       clearSearchFilters();
+      scopeSearchToOpenFolder();
       setSearchFilters({ isUnread: true });
       if (client) {
         await advancedSearch(client);

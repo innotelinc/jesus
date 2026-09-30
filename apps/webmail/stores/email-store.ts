@@ -136,6 +136,10 @@ interface EmailStore {
   // folder does not silently narrow the search to it, and so an explicit
   // choice survives navigating the mail list (#788).
   searchMailboxId: string;
+  // Set when a folder's unread count scoped the search to that folder: the
+  // scope then moves with the open folder, the way the search itself does
+  // (#553). A scope picked in the dropdown or a filter reset clears it.
+  searchScopeFollowsFolder: boolean;
   isAdvancedSearchOpen: boolean;
   searchAbortController: AbortController | null;
   /** Plugin-contributed search results (CRM hits, Slack messages, etc.) populated by emailHooks.onProvideSearchResults. */
@@ -281,6 +285,7 @@ interface EmailStore {
   advancedSearch: (client: IJMAPClient) => Promise<void>;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
   setSearchMailboxId: (mailboxId: string) => void;
+  scopeSearchToOpenFolder: () => void;
   clearSearchFilters: () => void;
   toggleAdvancedSearch: () => void;
   toggleStar: (client: IJMAPClient, emailId: string) => Promise<void>;
@@ -1535,6 +1540,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   // Advanced search state
   searchFilters: { ...DEFAULT_SEARCH_FILTERS },
   searchMailboxId: "",
+  searchScopeFollowsFolder: false,
   isAdvancedSearchOpen: false,
   searchAbortController: null,
   externalSearchResults: [],
@@ -1582,11 +1588,14 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
     // back empty, while the dropdown (which renders no matching option) reads
     // "All folders". Reset it so the scope matches what is shown. (#1082)
     // Only the new account's own list names its Spam/Trash: another
-    // account's mailbox ids can collide with them.
-    searchMailboxId: defaultSearchScopeFor(
-      accountId ? state.accountMailboxes[accountId] ?? [] : state.mailboxes,
-      mailboxId,
-    ),
+    // account's mailbox ids can collide with them. A scope that follows
+    // the open folder moves to the new one.
+    searchMailboxId: state.searchScopeFollowsFolder
+      ? mailboxId
+      : defaultSearchScopeFor(
+        accountId ? state.accountMailboxes[accountId] ?? [] : state.mailboxes,
+        mailboxId,
+      ),
     isLoadingMore: false,
     selectedEmail: null,
     selectedEmailIds: new Set(),
@@ -1689,11 +1698,15 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   selectMailbox: (mailboxId) => set(state => {
     const mailboxes = mailboxesInView(state);
     // The folder's default search scope follows it (Spam and Trash search
-    // themselves); a scope the user picked in the dropdown stays.
+    // themselves); a scope the user picked in the dropdown stays. The
+    // unread badge's scope follows any real folder.
     const scopeIsDefault = state.searchMailboxId === defaultSearchScopeFor(mailboxes, state.selectedMailbox);
+    const scopeFollows = state.searchScopeFollowsFolder && mailboxes.some(m => m.id === mailboxId);
     return {
       selectedMailbox: mailboxId,
-      ...(scopeIsDefault ? { searchMailboxId: defaultSearchScopeFor(mailboxes, mailboxId) } : {}),
+      ...(scopeFollows
+        ? { searchMailboxId: mailboxId }
+        : scopeIsDefault ? { searchMailboxId: defaultSearchScopeFor(mailboxes, mailboxId) } : {}),
       isLoadingMore: false,
       selectedEmail: null,
       selectedEmailIds: new Set(),
@@ -3200,13 +3213,21 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
   },
 
   setSearchMailboxId: (mailboxId) => {
-    set({ searchMailboxId: mailboxId });
+    set({ searchMailboxId: mailboxId, searchScopeFollowsFolder: false });
+  },
+
+  // The unread badge filters its own folder. The default scope searches
+  // every folder of every account (#788, #1082), so it has to name the
+  // folder, and keep naming whichever folder is open.
+  scopeSearchToOpenFolder: () => {
+    set((state) => ({ searchMailboxId: state.selectedMailbox, searchScopeFollowsFolder: true }));
   },
 
   clearSearchFilters: () => {
     set((state) => ({
       searchFilters: { ...DEFAULT_SEARCH_FILTERS },
       searchMailboxId: defaultSearchScopeFor(mailboxesInView(state), state.selectedMailbox),
+      searchScopeFollowsFolder: false,
     }));
   },
 
@@ -5189,6 +5210,7 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
       searchQuery: isScheduledView ? "" : state.searchQuery,
       searchFilters: isScheduledView ? { ...DEFAULT_SEARCH_FILTERS } : state.searchFilters,
       searchMailboxId: isScheduledView ? "" : state.searchMailboxId,
+      searchScopeFollowsFolder: isScheduledView ? false : state.searchScopeFollowsFolder,
     };
   }),
   clearPendingUndoSend: () => set({ pendingUndoSend: null }),
