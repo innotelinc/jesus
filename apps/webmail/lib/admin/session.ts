@@ -121,14 +121,18 @@ export async function requireAdminAuth(request: Request): Promise<{ payload: Adm
  * browser drops Secure cookies on plain HTTP, so setting it unconditionally in
  * production made admin sign-in fail silently on an HTTP deployment while the
  * wizard right next to it worked. Without a request (older callers) the
- * previous production default stands.
+ * previous production default stands. An explicit COOKIE_SECURE wins over
+ * both, as it does for the mailbox cookies: a TLS proxy that does not send
+ * X-Forwarded-Proto would otherwise make the request look like plain HTTP.
  */
 export async function setAdminSessionCookie(request?: Request): Promise<void> {
   const token = createAdminSession();
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: request ? isHttpsRequest(request) : process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE !== undefined
+      ? process.env.COOKIE_SECURE === 'true'
+      : request ? isHttpsRequest(request) : process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: getSessionTTL(),

@@ -23,6 +23,14 @@ describe('admin session cookie Secure flag', () => {
     expect(await secureFlagFor(new Request('http://app:3000/api/admin/auth'))).toBe(false);
   });
 
+  it('lets COOKIE_SECURE win over the request', async () => {
+    vi.stubEnv('COOKIE_SECURE', 'true');
+    expect(await secureFlagFor(new Request('http://app:3000/api/admin/auth', { headers: { 'x-forwarded-proto': 'http' } }))).toBe(true);
+    cookieSet.mockClear();
+    vi.stubEnv('COOKIE_SECURE', 'false');
+    expect(await secureFlagFor(new Request('https://mail.example/api/admin/auth', { headers: { 'x-forwarded-proto': 'https' } }))).toBe(false);
+  });
+
   it('keeps the production default when no request is passed', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     expect(await secureFlagFor()).toBe(true);
