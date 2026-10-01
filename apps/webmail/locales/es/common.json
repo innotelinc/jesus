@@ -1515,6 +1515,10 @@
         "label": "Aviso de asunto vacío",
         "description": "Pedir confirmación antes de enviar un mensaje sin asunto."
       },
+      "recipient_mentions": {
+        "label": "Mencionar destinatarios con @",
+        "description": "Al escribir @ en el mensaje se ofrecen sus destinatarios y se inserta el nombre de pila del elegido. Intro o Tab elige el nombre resaltado."
+      },
       "hide_inline_image_attachments": {
         "label": "Ocultar imágenes incrustadas de los adjuntos",
         "description": "Las imágenes incrustadas en el cuerpo del mensaje no se listan como adjuntos separados"

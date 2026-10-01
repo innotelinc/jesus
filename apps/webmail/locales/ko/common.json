@@ -1515,6 +1515,10 @@
         "label": "빈 제목 경고",
         "description": "제목 없는 메시지를 보내기 전에 확인을 요청합니다."
       },
+      "recipient_mentions": {
+        "label": "@로 받는 사람 언급",
+        "description": "본문에 @를 입력하면 받는 사람이 제안되고 선택한 사람의 이름이 삽입됩니다. Enter 또는 Tab으로 강조된 이름을 선택합니다."
+      },
       "hide_inline_image_attachments": {
         "label": "첨부 파일 목록에서 인라인 이미지 숨기기",
         "description": "메시지 본문에 포함된 이미지는 별도의 첨부 파일로 표시되지 않습니다"

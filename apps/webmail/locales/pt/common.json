@@ -1515,6 +1515,10 @@
         "label": "Aviso de assunto vazio",
         "description": "Pedir confirmação antes de enviar uma mensagem sem assunto."
       },
+      "recipient_mentions": {
+        "label": "Mencionar destinatários com @",
+        "description": "Ao digitar @ na mensagem, são sugeridos os destinatários e é inserido o primeiro nome do escolhido. Enter ou Tab escolhe o nome destacado."
+      },
       "hide_inline_image_attachments": {
         "label": "Ocultar imagens incorporadas dos anexos",
         "description": "As imagens incorporadas no corpo da mensagem não são listadas como anexos separados"

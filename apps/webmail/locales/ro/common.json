@@ -1518,6 +1518,10 @@
         "label": "Avertisment pentru subiect gol",
         "description": "Cere confirmare înainte de a trimite un mesaj fără subiect."
       },
+      "recipient_mentions": {
+        "label": "Menționează destinatarii cu @",
+        "description": "Tastarea @ în mesaj propune destinatarii și inserează prenumele celui ales. Enter sau Tab alege numele evidențiat."
+      },
       "hide_inline_image_attachments": {
         "label": "Ascundeți imaginile încorporate din atașamente",
         "description": "Imaginile încorporate în corpul mesajului nu sunt listate ca atașamente separate"

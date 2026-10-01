@@ -1,6 +1,6 @@
 "use client";
 
-import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import React, { forwardRef, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import { PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Suggestion, exitSuggestion, type SuggestionMount, type SuggestionOptions } from "@tiptap/suggestion";
@@ -104,14 +104,16 @@ export interface RecipientMentionListHandle {
 }
 
 interface RecipientMentionListProps {
+  editor: Editor;
   items: MentionCandidate[];
   command: (item: MentionCandidate) => void;
   mount: SuggestionMount;
 }
 
 export const RecipientMentionList = forwardRef<RecipientMentionListHandle, RecipientMentionListProps>(
-  function RecipientMentionList({ items, command, mount }, ref) {
+  function RecipientMentionList({ editor, items, command, mount }, ref) {
     const t = useTranslations("email_composer");
+    const listId = useId();
     // Every keystroke brings new items; the highlight starts over with them.
     const [selection, setSelection] = useState({ items, index: 0 });
     const selected = selection.items === items ? selection.index : 0;
@@ -136,6 +138,26 @@ export const RecipientMentionList = forwardRef<RecipientMentionListHandle, Recip
       listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
     }, [selected]);
 
+    // The caret stays in the editor, so the editor points screen readers at
+    // the list and its highlighted name, as the To/Cc autocomplete does for
+    // its input. Removed again when the list closes.
+    useEffect(() => {
+      if (editor.isDestroyed) return;
+      const dom = editor.view.dom;
+      dom.setAttribute("aria-autocomplete", "list");
+      dom.setAttribute("aria-controls", listId);
+      return () => {
+        dom.removeAttribute("aria-autocomplete");
+        dom.removeAttribute("aria-controls");
+        dom.removeAttribute("aria-activedescendant");
+      };
+    }, [editor, listId]);
+
+    useEffect(() => {
+      if (editor.isDestroyed) return;
+      editor.view.dom.setAttribute("aria-activedescendant", `${listId}-${selected}`);
+    }, [editor, listId, selected]);
+
     useImperativeHandle(ref, () => ({
       onKeyDown: (event) => {
         if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey || items.length === 0) return false;
@@ -158,6 +180,7 @@ export const RecipientMentionList = forwardRef<RecipientMentionListHandle, Recip
     return (
       <div
         ref={listRef}
+        id={listId}
         role="listbox"
         aria-label={t("mention_recipients")}
         className="z-50 w-72 max-w-[calc(100vw-16px)] max-h-48 overflow-y-auto bg-background border border-border rounded-md shadow-lg"
@@ -174,6 +197,7 @@ export const RecipientMentionList = forwardRef<RecipientMentionListHandle, Recip
         {items.map((item, i) => (
           <button
             key={item.email}
+            id={`${listId}-${i}`}
             type="button"
             role="option"
             aria-selected={i === selected}
@@ -188,8 +212,12 @@ export const RecipientMentionList = forwardRef<RecipientMentionListHandle, Recip
             }}
           >
             <Avatar name={item.name} email={item.email} size="sm" className="shrink-0 w-6 h-6 text-[10px]" />
-            <span className="font-medium truncate">{item.name || item.label}</span>
-            <span className="text-muted-foreground truncate">{item.email}</span>
+            {/* What will be inserted comes first: for "Nagy János" that may be
+                the surname, which the full name alone would not show. */}
+            <span className="font-medium shrink-0">@{item.label}</span>
+            <span className="text-muted-foreground truncate">
+              {item.name && item.name !== item.label ? `${item.name} · ${item.email}` : item.email}
+            </span>
           </button>
         ))}
       </div>

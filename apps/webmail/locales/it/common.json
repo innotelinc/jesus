@@ -1515,6 +1515,10 @@
         "label": "Avviso oggetto vuoto",
         "description": "Chiedi conferma prima di inviare un messaggio senza oggetto."
       },
+      "recipient_mentions": {
+        "label": "Menziona i destinatari con @",
+        "description": "Digitando @ nel messaggio vengono proposti i destinatari e viene inserito il nome di quello scelto. Invio o Tab seleziona il nome evidenziato."
+      },
       "hide_inline_image_attachments": {
         "label": "Nascondi le immagini inline dagli allegati",
         "description": "Le immagini incorporate nel corpo del messaggio non vengono elencate come allegati separati"

@@ -1515,6 +1515,10 @@
         "label": "空主题提醒",
         "description": "发送没有主题的邮件前请求确认。"
       },
+      "recipient_mentions": {
+        "label": "使用 @ 提及收件人",
+        "description": "在正文中输入 @ 会列出收件人，并插入所选收件人的名字。按 Enter 或 Tab 选择高亮的名字。"
+      },
       "hide_inline_image_attachments": {
         "label": "在附件列表中隐藏内嵌图片",
         "description": "嵌入到邮件正文中的图片不会作为单独的附件显示"

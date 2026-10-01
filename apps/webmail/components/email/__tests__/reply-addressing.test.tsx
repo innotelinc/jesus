@@ -113,6 +113,7 @@ vi.mock('@/stores/settings-store', () => {
     autoSelectReplyIdentity: false,
     replyIdentityMatch: 'domain',
     attachmentReminderEnabled: false,
+    recipientMentionsEnabled: true,
     attachmentReminderKeywords: [],
     sendDelaySeconds: 0,
     signaturePosition: 'above_quote',

@@ -245,8 +245,8 @@ describe('RichTextEditor recipient list', () => {
     const list = await screen.findByRole('listbox', { name: 'mention_recipients' });
     const options = within(list).getAllByRole('option');
     expect(options.map((o) => o.textContent)).toEqual([
-      'Max Mustermannmax.mustermann@dornig.de',
-      'Evaeva.weber@dornig.de',
+      '@MaxMax Mustermann · max.mustermann@dornig.de',
+      '@Evaeva.weber@dornig.de',
     ]);
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
 

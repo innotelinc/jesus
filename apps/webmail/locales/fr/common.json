@@ -1515,6 +1515,10 @@
         "label": "Avertissement d'objet vide",
         "description": "Demander confirmation avant d'envoyer un message sans objet."
       },
+      "recipient_mentions": {
+        "label": "Mentionner les destinataires avec @",
+        "description": "Saisir @ dans le message propose ses destinataires et insère le prénom de celui choisi. Entrée ou Tab sélectionne le nom en surbrillance."
+      },
       "hide_inline_image_attachments": {
         "label": "Masquer les images intégrées des pièces jointes",
         "description": "Les images intégrées au corps du message ne sont pas listées comme pièces jointes séparées"
