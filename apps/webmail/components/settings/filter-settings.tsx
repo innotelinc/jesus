@@ -32,11 +32,13 @@ function isReadonlyRule(r: FilterRule): boolean {
   return r.origin === "external" || r.origin === "opaque";
 }
 
-function RuleSummary({ rule }: { rule: FilterRule }) {
+export function RuleSummary({ rule }: { rule: FilterRule }) {
   const t = useTranslations("settings.filters");
 
   const conditions = rule.conditions.slice(0, 2).map((c) => {
     const field = t(`condition_fields.${c.field}`);
+    // "All messages" says it all: no comparator, no value.
+    if (c.field === "all") return field;
     const comparator = t(`comparators.${c.comparator}`);
     // has_any is a no-value test ("attachment is present"); appending
     // `""` would look broken in the summary line.
@@ -100,7 +102,9 @@ export function VisualRuleSummary({ rule }: { rule: FilterRule }) {
         </span>
         {rule.conditions.map((c, i) => {
           const field = t(`condition_fields.${c.field}`);
-          const comparator = t(`comparators.${c.comparator}`);
+          // "All messages" says it all: no comparator, no value.
+          const everyMessage = c.field === "all";
+          const comparator = everyMessage ? null : t(`comparators.${c.comparator}`);
           return (
             <span key={i} className="contents">
               {i > 0 && (
@@ -108,8 +112,8 @@ export function VisualRuleSummary({ rule }: { rule: FilterRule }) {
               )}
               <span className="inline-flex min-w-0 max-w-full items-baseline gap-1 px-1.5 py-px rounded-sm bg-muted/60 text-foreground">
                 <span className="shrink-0 font-medium text-blue-600 dark:text-blue-400">{field}</span>
-                <span className="shrink-0 text-muted-foreground">{comparator}</span>
-                {!(c.field === "attachment" && c.comparator === "has_any") && (
+                {!everyMessage && <span className="shrink-0 text-muted-foreground">{comparator}</span>}
+                {!everyMessage && !(c.field === "attachment" && c.comparator === "has_any") && (
                   // The values of one condition stay in its chip, where "or"
                   // cannot be mistaken for the joiner between conditions. They
                   // wrap between each other under the first value, the "or"

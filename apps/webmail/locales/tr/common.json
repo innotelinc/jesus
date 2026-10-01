@@ -2117,7 +2117,8 @@
         "subject": "Konu",
         "header": "Özel Başlık",
         "size": "Boyut",
-        "body": "Gövde"
+        "body": "Gövde",
+        "all": "Tüm iletiler"
       },
       "comparators": {
         "has_any": "mevcut",

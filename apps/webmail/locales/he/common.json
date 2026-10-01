@@ -2037,7 +2037,8 @@
         "header": "כותרת מותאמת אישית",
         "size": "גודל",
         "body": "גוף",
-        "attachment": "קובץ מצורף"
+        "attachment": "קובץ מצורף",
+        "all": "כל ההודעות"
       },
       "comparators": {
         "contains": "מכיל",

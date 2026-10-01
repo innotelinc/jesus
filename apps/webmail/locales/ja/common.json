@@ -2117,7 +2117,8 @@
         "subject": "件名",
         "header": "カスタムヘッダー",
         "size": "サイズ",
-        "body": "本文"
+        "body": "本文",
+        "all": "すべてのメール"
       },
       "comparators": {
         "has_any": "あり",

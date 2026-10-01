@@ -2124,7 +2124,8 @@
         "subject": "主題",
         "header": "自訂標頭",
         "size": "大小",
-        "body": "內文"
+        "body": "內文",
+        "all": "所有郵件"
       },
       "comparators": {
         "has_any": "存在",

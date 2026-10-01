@@ -2117,7 +2117,8 @@
         "subject": "Temat",
         "header": "Niestandardowy nagłówek",
         "size": "Rozmiar",
-        "body": "Treść"
+        "body": "Treść",
+        "all": "Wszystkie wiadomości"
       },
       "comparators": {
         "has_any": "jest obecny",

@@ -2117,7 +2117,8 @@
         "subject": "Betreff",
         "header": "Benutzerdefinierter Header",
         "size": "Größe",
-        "body": "Nachrichtentext"
+        "body": "Nachrichtentext",
+        "all": "Alle Nachrichten"
       },
       "comparators": {
         "has_any": "vorhanden",
