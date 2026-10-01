@@ -318,6 +318,7 @@ export function EmailComposer({
   const attachmentReminderEnabled = useSettingsStore((state) => state.attachmentReminderEnabled);
   const attachmentReminderKeywords = useSettingsStore((state) => state.attachmentReminderKeywords);
   const emptySubjectWarningEnabled = useSettingsStore((state) => state.emptySubjectWarningEnabled);
+  const recipientMentionsEnabled = useSettingsStore((state) => state.recipientMentionsEnabled);
   const updateSetting = useSettingsStore((state) => state.updateSetting);
   const sendDelaySeconds = useSettingsStore((state) => state.sendDelaySeconds);
   const signaturePosition = useSettingsStore((state) => state.signaturePosition);
@@ -3208,7 +3209,7 @@ export function EmailComposer({
               placeholder={t('body_placeholder')}
               hasError={validationErrors.body}
               onEditorReady={(ed) => { editorRef.current = ed; }}
-              mentionCandidates={mentionCandidates}
+              mentionCandidates={recipientMentionsEnabled ? mentionCandidates : undefined}
             />
           </div>
         )}

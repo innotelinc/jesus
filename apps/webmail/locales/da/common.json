@@ -1518,6 +1518,10 @@
         "label": "Advarsel om tomt emne",
         "description": "Bed om bekræftelse, før en besked uden emne sendes."
       },
+      "recipient_mentions": {
+        "label": "Nævn modtagere med @",
+        "description": "Når du skriver @ i beskeden, foreslås modtagerne, og den valgtes fornavn indsættes. Enter eller Tab vælger det fremhævede navn."
+      },
       "hide_inline_image_attachments": {
         "label": "Skjul indlejrede billeder fra vedhæftninger",
         "description": "Billeder indlejret i beskedteksten vises ikke som separate vedhæftninger"

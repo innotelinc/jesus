@@ -828,6 +828,7 @@ export function RichTextEditor({
       {mention && mention.items.length > 0 && createPortal(
         <RecipientMentionList
           ref={mentionListRef}
+          editor={mention.editor}
           items={mention.items}
           command={mention.command}
           mount={mention.mount}

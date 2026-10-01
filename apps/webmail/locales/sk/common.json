@@ -1518,6 +1518,10 @@
         "label": "Upozornenie na prázdny predmet",
         "description": "Pred odoslaním správy bez predmetu požiadať o potvrdenie."
       },
+      "recipient_mentions": {
+        "label": "Spomínať príjemcov pomocou @",
+        "description": "Napísaním @ v správe sa ponúknu jej príjemcovia a vloží sa krstné meno vybraného. Enter alebo Tab vyberie zvýraznené meno."
+      },
       "hide_inline_image_attachments": {
         "label": "Skryť vložené obrázky zo zoznamu príloh",
         "description": "Obrázky vložené priamo do textu správy sa nezobrazia ako samostatné prílohy"

@@ -1515,6 +1515,10 @@
         "label": "Ostrzeżenie o pustym temacie",
         "description": "Poproś o potwierdzenie przed wysłaniem wiadomości bez tematu."
       },
+      "recipient_mentions": {
+        "label": "Wspominaj odbiorców za pomocą @",
+        "description": "Wpisanie @ w wiadomości podpowiada jej odbiorców i wstawia imię wybranego. Enter lub Tab wybiera podświetlone imię."
+      },
       "hide_inline_image_attachments": {
         "label": "Ukryj obrazy osadzone z listy załączników",
         "description": "Obrazy osadzone w treści wiadomości nie są wyświetlane jako osobne załączniki"

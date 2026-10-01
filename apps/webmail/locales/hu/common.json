@@ -1518,6 +1518,10 @@
         "label": "Figyelmeztetés üres tárgy esetén",
         "description": "Megerősítés kérése tárgy nélküli üzenet küldése előtt."
       },
+      "recipient_mentions": {
+        "label": "Címzettek említése @ jellel",
+        "description": "Ha @ jelet ír az üzenetbe, megjelennek a címzettek, és a kiválasztott keresztneve kerül beszúrásra. Az Enter vagy a Tab a kiemelt nevet választja."
+      },
       "hide_inline_image_attachments": {
         "label": "Beágyazott képek elrejtése a csatolmányok közül",
         "description": "Az üzenet törzsébe ágyazott képek nem jelennek meg külön csatolmányként"

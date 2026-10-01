@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import type { Editor } from '@tiptap/core';
 import { EmailComposer } from '../email-composer';
+import { useSettingsStore } from '@/stores/settings-store';
 
 // The real composer around the real editor and its "@" recipient list: the
 // two share the keyboard, and the composer handles Escape (close) and
@@ -92,6 +93,7 @@ vi.mock('@/stores/settings-store', () => {
     attachmentReminderEnabled: false,
     attachmentReminderKeywords: [],
     emptySubjectWarningEnabled: true,
+    recipientMentionsEnabled: true,
     sendDelaySeconds: 0,
     signaturePosition: 'above_quote',
     signatureSeparatorEnabled: false,
@@ -239,7 +241,38 @@ describe('composer with the @ recipient list', () => {
     const { editor } = await renderComposer();
     await typeInto(editor, ' @');
     const options = within(await screen.findByRole('listbox', { name: 'mention_recipients' })).getAllByRole('option');
-    expect(options.map((o) => o.textContent)).toEqual(['Bob Builderbob@example.com', 'Carolcarol.smith@example.com']);
+    // What will be inserted first, then the full name where it differs.
+    expect(options.map((o) => o.textContent)).toEqual(['@BobBob Builder · bob@example.com', '@Carolcarol.smith@example.com']);
+  });
+
+  it('points screen readers from the editor at the list and the highlighted name', async () => {
+    const { editor } = await renderComposer();
+    await typeInto(editor, ' @');
+    const list = await screen.findByRole('listbox', { name: 'mention_recipients' });
+    const options = within(list).getAllByRole('option');
+    const dom = editor.view.dom;
+    expect(dom.getAttribute('aria-autocomplete')).toBe('list');
+    expect(dom.getAttribute('aria-controls')).toBe(list.id);
+    expect(dom.getAttribute('aria-activedescendant')).toBe(options[0].id);
+
+    press(editor, 'ArrowDown');
+    await waitFor(() => expect(dom.getAttribute('aria-activedescendant')).toBe(options[1].id));
+
+    press(editor, 'Escape');
+    await waitFor(() => expect(mentionList()).toBeNull());
+    expect(dom.hasAttribute('aria-controls')).toBe(false);
+    expect(dom.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('offers nothing when mentions are turned off in the settings', async () => {
+    useSettingsStore.setState({ recipientMentionsEnabled: false });
+    try {
+      const { editor } = await renderComposer();
+      await typeInto(editor, ' @');
+      expect(mentionList()).toBeNull();
+    } finally {
+      useSettingsStore.setState({ recipientMentionsEnabled: true });
+    }
   });
 
   it('lets Escape close the open list, not the composer; the next Escape asks to close', async () => {

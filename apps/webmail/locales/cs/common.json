@@ -1515,6 +1515,10 @@
         "label": "Upozornění na prázdný předmět",
         "description": "Před odesláním zprávy bez předmětu požádat o potvrzení."
       },
+      "recipient_mentions": {
+        "label": "Zmiňovat příjemce pomocí @",
+        "description": "Napsáním @ ve zprávě se nabídnou její příjemci a vloží se křestní jméno vybraného. Enter nebo Tab vybere zvýrazněné jméno."
+      },
       "hide_inline_image_attachments": {
         "label": "Skrýt vložené obrázky ze seznamu příloh",
         "description": "Obrázky vložené přímo do textu zprávy se nezobrazí jako samostatné přílohy"
