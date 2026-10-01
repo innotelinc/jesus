@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Visningsnavn",
     "autocomplete_search_server": "Søk på serveren",
     "autocomplete_searching": "Søker...",
+    "mention_recipients": "Mottakere",
     "toolbar": {
       "bold": "Fet skrift",
       "italic": "Kursiv",

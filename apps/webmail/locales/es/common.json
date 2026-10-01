@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Nombre para mostrar",
     "autocomplete_search_server": "Buscar en el servidor",
     "autocomplete_searching": "Buscando...",
+    "mention_recipients": "Destinatarios",
     "toolbar": {
       "bold": "Negrita",
       "italic": "Cursiva",

@@ -690,6 +690,7 @@
     "recipient_name_placeholder": "שם תצוגה",
     "autocomplete_search_server": "חיפוש בשרת",
     "autocomplete_searching": "מחפש...",
+    "mention_recipients": "נמענים",
     "toolbar": {
       "bold": "מודגש",
       "italic": "נטוי",

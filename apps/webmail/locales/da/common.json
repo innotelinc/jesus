@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Visningsnavn",
     "autocomplete_search_server": "Søg på serveren",
     "autocomplete_searching": "Søger...",
+    "mention_recipients": "Modtagere",
     "toolbar": {
       "bold": "Fed",
       "italic": "Kursiv",
