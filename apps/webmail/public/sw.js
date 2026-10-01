@@ -206,7 +206,7 @@ async function handlePush(event) {
     body = unreadTotal > 1 ? `${unreadTotal} unread messages` : "You have new mail";
   }
 
-  const quiet = await withinQuietWindow();
+  const quiet = await withinQuietWindow(accountId);
   await self.registration.showNotification(title, {
     body,
     // Shared per-account tag: each new push replaces the account's single
@@ -231,27 +231,30 @@ async function handlePush(event) {
 
 // One message often lands in several of the user's accounts at once - a list,
 // a forward, the same newsletter on two logins - and each account has its own
-// notification. Only the first alert of a burst makes a sound; the ones that
-// follow within the window show up silently. The window runs from the last
-// audible alert and is not extended by the silent ones, so a steady trickle
-// still rings every so often.
+// notification. Only the first alert of a burst makes a sound; other accounts'
+// alerts within the window show up silently. A second alert for the same
+// account still rings, as before. The window runs from the last audible alert
+// and is not extended by the silent ones, so a steady trickle still rings
+// every so often.
 const QUIET_WINDOW_MS = 30_000;
 
 function lastAlertKey() {
   return `${self.location.origin}${BASE_PATH}/__push-state/last-alert`;
 }
 
-/** True when an audible alert went off less than QUIET_WINDOW_MS ago; otherwise records this one. */
-async function withinQuietWindow() {
+/** True when another account alerted audibly less than QUIET_WINDOW_MS ago; otherwise records this one. */
+async function withinQuietWindow(accountId) {
   const now = Date.now();
+  const account = accountId || "default";
   try {
     const cache = await caches.open(PUSH_STATE_CACHE);
     const res = await cache.match(lastAlertKey());
-    const last = res ? Number((await res.json()).at) : 0;
-    if (last && now - last >= 0 && now - last < QUIET_WINDOW_MS) return true;
+    const lastAlert = res ? await res.json() : null;
+    const last = lastAlert ? Number(lastAlert.at) : 0;
+    if (last && lastAlert.accountId !== account && now - last >= 0 && now - last < QUIET_WINDOW_MS) return true;
     await cache.put(
       lastAlertKey(),
-      new Response(JSON.stringify({ at: now }), {
+      new Response(JSON.stringify({ at: now, accountId: account }), {
         headers: { "Content-Type": "application/json" },
       }),
     );

@@ -87,4 +87,15 @@ describe('service worker quiet window', () => {
     await push(delivery('b', 'e3'));
     expect(shade.get('bulwark-mail:b')!.options).toMatchObject({ renotify: true, silent: false });
   });
+
+  it('still rings for a second message in the same account inside the window', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-30T10:00:00Z'));
+    const { push, shade } = loadWorker();
+
+    await push(delivery('a', 'e1'));
+    vi.setSystemTime(new Date('2026-09-30T10:00:10Z'));
+    await push(delivery('a', 'e2'));
+    expect(shade.get('bulwark-mail:a')!.options).toMatchObject({ renotify: true, silent: false });
+  });
 });
