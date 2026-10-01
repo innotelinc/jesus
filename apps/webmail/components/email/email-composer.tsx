@@ -131,7 +131,7 @@ export interface ComposerDraftData {
    * File). Without these the composer starts with zero attachments and the
    * next save/send rebuilds the draft without them - silent data loss (#849).
    */
-  attachments?: Array<{ blobId: string; name?: string; type?: string; size: number; cid?: string; disposition?: string }>;
+  attachments?: Array<{ blobId: string; name?: string; type?: string; size: number; cid?: string; disposition?: string; sourceAccountId?: string }>;
   /** When set, overrides the header From: and the envelope MAIL FROM, where the server allows it. */
   fromOverrideEmail?: string;
   fromOverrideName?: string;
@@ -644,6 +644,9 @@ export function EmailComposer({
           blobId: att.blobId,
           ...(att.cid ? { cid: att.cid } : {}),
           ...(att.disposition === 'inline' ? { disposition: 'inline' as const } : {}),
+          // A forward stashed before its first save still holds the original
+          // account's blobs: keep the tag so they are copied before saving.
+          ...(att.sourceAccountId ? { sourceAccountId: att.sourceAccountId } : {}),
           fromDraftPart: true,
         }));
     }
@@ -756,7 +759,9 @@ export function EmailComposer({
   // another account's identities - those blobs are copied over first, or
   // Email/set fails with blobNotFound. Blob/copy cannot do it: every login is
   // its own JMAP session. Each part is copied once; later saves reuse it.
-  const rehomeForeignBlobs = async (): Promise<void> => {
+  // Quoted inline images are only used at send time, so they are copied only
+  // when `inlineCids` names the ones the body still shows.
+  const rehomeForeignBlobs = async (inlineCids?: ReadonlySet<string>): Promise<void> => {
     const target = composerClient;
     if (!target || !composerAccountId) return;
     const isForeign = (owner?: string) => !!owner && owner !== composerAccountId;
@@ -768,21 +773,21 @@ export function EmailComposer({
       return blobId;
     };
 
-    const moved = new Map<ComposerAttachment, ComposerAttachment>();
-    for (const att of attachmentsRef.current) {
+    for (const att of [...attachmentsRef.current]) {
       if (!att.blobId || att.uploading || !isForeign(att.sourceAccountId)) continue;
       const blobId = await copyBlob({ ...att, blobId: att.blobId });
-      moved.set(att, { ...att, blobId, sourceAccountId: composerAccountId });
-    }
-    if (moved.size) {
-      const remap = (list: ComposerAttachment[]) => list.map(att => moved.get(att) ?? att);
-      // Ref first, synchronously: callers read attachmentsRef right after.
-      attachmentsRef.current = remap(attachmentsRef.current);
-      setAttachments(remap);
+      const copied = { ...att, blobId, sourceAccountId: composerAccountId };
+      // Recorded part by part, so a failure further on does not copy this one
+      // again on the retry. Ref first, synchronously: callers read
+      // attachmentsRef right after.
+      const swap = (list: ComposerAttachment[]) => list.map(a => (a === att ? copied : a));
+      attachmentsRef.current = swap(attachmentsRef.current);
+      setAttachments(swap);
     }
 
+    if (!inlineCids?.size) return;
     for (const entry of inlineImagesRef.current) {
-      if (!isForeign(entry.sourceAccountId)) continue;
+      if (!inlineCids.has(entry.cid) || !isForeign(entry.sourceAccountId)) continue;
       entry.blobId = await copyBlob(entry);
       entry.sourceAccountId = composerAccountId;
     }
@@ -1178,6 +1183,7 @@ export function EmailComposer({
       size: att.size,
       ...(att.cid ? { cid: att.cid } : {}),
       ...(att.disposition ? { disposition: att.disposition } : {}),
+      ...(att.sourceAccountId ? { sourceAccountId: att.sourceAccountId } : {}),
     }));
 
   // Keep a ref to current state for the unmount save
@@ -2183,6 +2189,12 @@ export function EmailComposer({
     return undefined;
   };
 
+  // The cids of the inline images (tagged with data-cid) the body still shows.
+  const bodyInlineCids = (html: string): Set<string> => {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    return new Set(Array.from(doc.querySelectorAll('img[data-cid]'), (img) => img.getAttribute('data-cid') ?? ''));
+  };
+
   // Rewrite data: URLs of dropped images (tagged with data-cid) into cid:
   // references so recipient clients that strip data URIs can still render them.
   const rewriteInlineImages = (html: string): {
@@ -2404,10 +2416,14 @@ export function EmailComposer({
     // Before any blobId is read: forwarded parts may still sit on the account
     // that holds the original message.
     try {
-      await rehomeForeignBlobs();
+      await rehomeForeignBlobs(plainTextMode ? undefined : bodyInlineCids(body));
     } catch (error) {
-      // The send below then fails with blobNotFound and reports it.
+      // Nothing was sent; the composer and its draft stay as they are.
       debug.warn('email', 'Failed to copy forwarded parts to the sending account:', error);
+      toast.error(t('validation.attachment_upload_failed'));
+      isSendingRef.current = false;
+      setIsSending(false);
+      return;
     }
 
     const rewritten = plainTextMode ? null : rewriteInlineImages(body);
