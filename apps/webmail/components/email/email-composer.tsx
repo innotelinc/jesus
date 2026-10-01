@@ -238,6 +238,10 @@ interface EmailComposerProps {
 
 type ComposerAttachment = {
   file?: File;
+  // Login whose server holds `blobId`, set for parts of the original message
+  // on a forward - the message may go out through another account, which
+  // cannot resolve them. See rehomeForeignBlobs.
+  sourceAccountId?: string;
   name: string;
   type: string;
   size: number;
@@ -661,11 +665,12 @@ export function EmailComposer({
           type: att.type || 'application/octet-stream',
           size: att.size,
           blobId: att.blobId,
+          sourceAccountId: sourceAccountId ?? undefined,
         }));
     }
     return [];
   });
-  const inlineImagesRef = useRef<Array<{ cid: string; blobId: string; type: string; name: string; size: number; dataUrl: string }>>([]);
+  const inlineImagesRef = useRef<Array<{ cid: string; blobId: string; type: string; name: string; size: number; dataUrl: string; sourceAccountId?: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationErrors, setValidationErrors] = useState<{ to?: boolean; body?: boolean }>({});
   const [shakeField, setShakeField] = useState<string | null>(null);
@@ -742,6 +747,46 @@ export function EmailComposer({
   const composerClientRef = useRef(composerClient);
   composerClientRef.current = composerClient;
   const currentIdentityRawId = currentIdentityParts.rawId ?? currentIdentity?.id;
+  // Login that owns the blobs uploaded through `composerClient`.
+  const composerAccountId = currentIdentityParts.localAccountId ?? activeAccountId ?? undefined;
+
+  // Forwarded attachments and quoted inline images reference part blobs of the
+  // original message, which only the account that holds it can resolve. When
+  // the message goes out through another account - a From picked by hand from
+  // another account's identities - those blobs are copied over first, or
+  // Email/set fails with blobNotFound. Blob/copy cannot do it: every login is
+  // its own JMAP session. Each part is copied once; later saves reuse it.
+  const rehomeForeignBlobs = async (): Promise<void> => {
+    const target = composerClient;
+    if (!target || !composerAccountId) return;
+    const isForeign = (owner?: string) => !!owner && owner !== composerAccountId;
+    const copyBlob = async (part: { blobId: string; name: string; type: string; sourceAccountId?: string }) => {
+      const source = useAuthStore.getState().getClientForAccount(part.sourceAccountId!);
+      if (!source) throw new Error(`No connected client for account ${part.sourceAccountId}`);
+      const buffer = await source.fetchBlobArrayBuffer(part.blobId, part.name, part.type);
+      const { blobId } = await target.uploadBlob(new File([buffer], part.name, { type: part.type }));
+      return blobId;
+    };
+
+    const moved = new Map<ComposerAttachment, ComposerAttachment>();
+    for (const att of attachmentsRef.current) {
+      if (!att.blobId || att.uploading || !isForeign(att.sourceAccountId)) continue;
+      const blobId = await copyBlob({ ...att, blobId: att.blobId });
+      moved.set(att, { ...att, blobId, sourceAccountId: composerAccountId });
+    }
+    if (moved.size) {
+      const remap = (list: ComposerAttachment[]) => list.map(att => moved.get(att) ?? att);
+      // Ref first, synchronously: callers read attachmentsRef right after.
+      attachmentsRef.current = remap(attachmentsRef.current);
+      setAttachments(remap);
+    }
+
+    for (const entry of inlineImagesRef.current) {
+      if (!isForeign(entry.sourceAccountId)) continue;
+      entry.blobId = await copyBlob(entry);
+      entry.sourceAccountId = composerAccountId;
+    }
+  };
   // RFC 5322 §3.6.4 threading for this message: computed from the original
   // on a reply (not a forward), carried over from a re-opened reply draft.
   // Drafts store it too, so a reply stays in its thread when re-opened or
@@ -962,7 +1007,12 @@ export function EmailComposer({
   useEffect(() => {
     if (plainTextMode) return;
     if (mode !== 'reply' && mode !== 'replyAll' && mode !== 'forward') return;
-    if (!composerClient || !replyTo?.attachments?.length) return;
+    // The quoted parts live on the account that holds the original message,
+    // which is not necessarily the one this message goes out through.
+    const originClient = (sourceAccountId && sourceAccountId !== composerAccountId
+      ? useAuthStore.getState().getClientForAccount(sourceAccountId)
+      : undefined) ?? composerClient;
+    if (!originClient || !replyTo?.attachments?.length) return;
 
     // Hydrate every cid the quoted body actually renders as an <img>, rather
     // than only parts declared `image/*` + `inline`. Some clients (notably
@@ -990,6 +1040,7 @@ export function EmailComposer({
         name: att.name || 'inline',
         size: att.size,
         dataUrl: '',
+        sourceAccountId: sourceAccountId ?? undefined,
       });
     }
 
@@ -999,7 +1050,7 @@ export function EmailComposer({
       for (const att of inlineAtts) {
         if (!att.cid) continue;
         try {
-          const buffer = await composerClient.fetchBlobArrayBuffer(
+          const buffer = await originClient.fetchBlobArrayBuffer(
             att.blobId,
             att.name || 'inline',
             att.type,
@@ -1846,9 +1897,16 @@ export function EmailComposer({
       return null;
     }
 
+    try {
+      await rehomeForeignBlobs();
+    } catch (error) {
+      // The save below then fails with blobNotFound and reports it.
+      debug.warn('email', 'Failed to copy forwarded parts to the sending account:', error);
+    }
+
     // Prepare attachments for draft. cid/disposition ride along so inline
     // parts of a re-opened draft keep matching the body's cid: references.
-    const uploadedAttachments = attachments
+    const uploadedAttachments = attachmentsRef.current
       .filter(att => att.blobId && !att.uploading)
       .map(att => ({
         blobId: att.blobId!,
@@ -2342,6 +2400,15 @@ export function EmailComposer({
     const finalBody = plainTextMode
       ? (signatureAlreadyInBody ? body : appendPlainTextSignature(body, signatureIdentity, signatureOpts))
       : (signatureAlreadyInBody ? htmlToPlainText(body) : appendPlainTextSignature(htmlToPlainText(body), signatureIdentity, signatureOpts));
+
+    // Before any blobId is read: forwarded parts may still sit on the account
+    // that holds the original message.
+    try {
+      await rehomeForeignBlobs();
+    } catch (error) {
+      // The send below then fails with blobNotFound and reports it.
+      debug.warn('email', 'Failed to copy forwarded parts to the sending account:', error);
+    }
 
     const rewritten = plainTextMode ? null : rewriteInlineImages(body);
     const finalHtmlBody = plainTextMode
