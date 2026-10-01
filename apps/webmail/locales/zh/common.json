@@ -1965,6 +1965,32 @@
       },
       "about": {
         "title": "Bulwark 网页邮箱"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "在垃圾邮件和钓鱼邮件进入收件箱之前点击拦截。放行真实邮件。三面盾牌全部失去，收件箱就会失守。",
+        "kinds": {
+          "spam": "垃圾邮件",
+          "phishing": "钓鱼邮件",
+          "legit": "真实邮件"
+        },
+        "click_to_block": "点击拦截",
+        "let_through": "放行",
+        "start": "开始",
+        "play_again": "再玩一次",
+        "score": "得分",
+        "combo": "连击奖励",
+        "shields_left": "剩余盾牌 {count}/{total}",
+        "seconds": "{seconds} 秒",
+        "best": "最高分：{score}",
+        "new_best": "新纪录",
+        "held": "收件箱守住了",
+        "overrun": "收件箱失守",
+        "stats": {
+          "caught": "已拦截",
+          "delivered": "已送达",
+          "mistakes": "失误"
+        }
       }
     },
     "sidebar_apps": {

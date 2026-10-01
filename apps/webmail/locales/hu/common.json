@@ -1968,6 +1968,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Kattints a spamre és az adathalász levelekre, mielőtt elérik a beérkezett leveleidet. A valódi leveleket engedd át. Ha mindhárom pajzsot elveszíted, a postafiók elesik.",
+        "kinds": {
+          "spam": "Spam",
+          "phishing": "Adathalászat",
+          "legit": "Valódi levél"
+        },
+        "click_to_block": "Kattints a blokkoláshoz",
+        "let_through": "Engedd át",
+        "start": "Indítás",
+        "play_again": "Újra",
+        "score": "Pontszám",
+        "combo": "Sorozatbónusz",
+        "shields_left": "{total} pajzsból {count} maradt",
+        "seconds": "{seconds} mp",
+        "best": "Rekord: {score}",
+        "new_best": "Új rekord",
+        "held": "A postafiók kitartott",
+        "overrun": "A postafiók elesett",
+        "stats": {
+          "caught": "Blokkolva",
+          "delivered": "Kézbesítve",
+          "mistakes": "Hibák"
+        }
       }
     },
     "sidebar_apps": {

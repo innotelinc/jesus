@@ -1965,6 +1965,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Klik op spam en phishing voordat ze uw inbox bereiken. Laat echte e-mail door. Verliest u alle drie de schilden, dan valt de inbox.",
+        "kinds": {
+          "spam": "Spam",
+          "phishing": "Phishing",
+          "legit": "Echte e-mail"
+        },
+        "click_to_block": "Klik om te blokkeren",
+        "let_through": "Doorlaten",
+        "start": "Starten",
+        "play_again": "Opnieuw spelen",
+        "score": "Score",
+        "combo": "Reeksbonus",
+        "shields_left": "{count} van {total} schilden over",
+        "seconds": "{seconds} s",
+        "best": "Record: {score}",
+        "new_best": "Nieuw record",
+        "held": "Inbox verdedigd",
+        "overrun": "Inbox overlopen",
+        "stats": {
+          "caught": "Geblokkeerd",
+          "delivered": "Bezorgd",
+          "mistakes": "Fouten"
+        }
       }
     },
     "sidebar_apps": {

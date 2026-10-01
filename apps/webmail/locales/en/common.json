@@ -1972,6 +1972,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Click spam and phishing before they reach your inbox. Let real mail through. Lose all three shields and the inbox falls.",
+        "kinds": {
+          "spam": "Spam",
+          "phishing": "Phishing",
+          "legit": "Real mail"
+        },
+        "click_to_block": "Click to block",
+        "let_through": "Let it through",
+        "start": "Start",
+        "play_again": "Play again",
+        "score": "Score",
+        "combo": "Streak bonus",
+        "shields_left": "{count} of {total} shields left",
+        "seconds": "{seconds}s",
+        "best": "Best: {score}",
+        "new_best": "New best",
+        "held": "Inbox held",
+        "overrun": "Inbox overrun",
+        "stats": {
+          "caught": "Blocked",
+          "delivered": "Delivered",
+          "mistakes": "Mistakes"
+        }
       }
     },
     "sidebar_apps": {

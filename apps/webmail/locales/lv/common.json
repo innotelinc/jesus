@@ -1965,6 +1965,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Noklikšķiniet uz mēstulēm un pikšķerēšanas vēstulēm, pirms tās sasniedz iesūtni. Īstās vēstules laidiet cauri. Zaudējot visus trīs vairogus, iesūtne krīt.",
+        "kinds": {
+          "spam": "Mēstule",
+          "phishing": "Pikšķerēšana",
+          "legit": "Īsta vēstule"
+        },
+        "click_to_block": "Noklikšķiniet, lai bloķētu",
+        "let_through": "Laidiet cauri",
+        "start": "Sākt",
+        "play_again": "Spēlēt vēlreiz",
+        "score": "Punkti",
+        "combo": "Sērijas bonuss",
+        "shields_left": "Atlikuši {count} no {total} vairogiem",
+        "seconds": "{seconds} s",
+        "best": "Rekords: {score}",
+        "new_best": "Jauns rekords",
+        "held": "Iesūtne nosargāta",
+        "overrun": "Iesūtne krita",
+        "stats": {
+          "caught": "Bloķētas",
+          "delivered": "Piegādātas",
+          "mistakes": "Kļūdas"
+        }
       }
     },
     "sidebar_apps": {
