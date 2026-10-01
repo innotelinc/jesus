@@ -120,6 +120,7 @@
     "unified_archive": "Todos los archivos",
     "unified_junk": "Todo el spam",
     "all_accounts": "Todas las cuentas",
+    "all_accounts_loading": "Cargando cuentas: {loaded} de {total}",
     "unified_mailbox": "Buzón unificado",
     "expand": "Expandir",
     "collapse": "Contraer",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Nombre para mostrar",
     "autocomplete_search_server": "Buscar en el servidor",
     "autocomplete_searching": "Buscando...",
+    "mention_recipients": "Destinatarios",
     "toolbar": {
       "bold": "Negrita",
       "italic": "Cursiva",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Aviso de asunto vacío",
         "description": "Pedir confirmación antes de enviar un mensaje sin asunto."
+      },
+      "recipient_mentions": {
+        "label": "Mencionar destinatarios con @",
+        "description": "Al escribir @ en el mensaje se ofrecen sus destinatarios y se inserta el nombre de pila del elegido. Intro o Tab elige el nombre resaltado."
       },
       "hide_inline_image_attachments": {
         "label": "Ocultar imágenes incrustadas de los adjuntos",

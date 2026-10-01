@@ -120,6 +120,7 @@
     "unified_archive": "Toutes les archives",
     "unified_junk": "Tous les indésirables",
     "all_accounts": "Tous les comptes",
+    "all_accounts_loading": "Chargement des comptes : {loaded} sur {total}",
     "unified_mailbox": "Boîte aux lettres unifiée",
     "expand": "Développer",
     "collapse": "Réduire",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Nom d'affichage",
     "autocomplete_search_server": "Rechercher sur le serveur",
     "autocomplete_searching": "Recherche en cours...",
+    "mention_recipients": "Destinataires",
     "toolbar": {
       "bold": "Gras",
       "italic": "Italique",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Avertissement d'objet vide",
         "description": "Demander confirmation avant d'envoyer un message sans objet."
+      },
+      "recipient_mentions": {
+        "label": "Mentionner les destinataires avec @",
+        "description": "Saisir @ dans le message propose ses destinataires et insère le prénom de celui choisi. Entrée ou Tab sélectionne le nom en surbrillance."
       },
       "hide_inline_image_attachments": {
         "label": "Masquer les images intégrées des pièces jointes",

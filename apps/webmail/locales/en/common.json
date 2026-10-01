@@ -120,6 +120,7 @@
     "unified_archive": "All Archive",
     "unified_junk": "All Junk",
     "all_accounts": "All Accounts",
+    "all_accounts_loading": "Loading accounts: {loaded} of {total}",
     "unified_mailbox": "Unified Mailbox",
     "expand": "Expand",
     "collapse": "Collapse",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Display name",
     "autocomplete_search_server": "Search the server",
     "autocomplete_searching": "Searching...",
+    "mention_recipients": "Recipients",
     "toolbar": {
       "bold": "Bold",
       "italic": "Italic",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Empty subject warning",
         "description": "Ask for confirmation before sending a message with no subject."
+      },
+      "recipient_mentions": {
+        "label": "Mention recipients with @",
+        "description": "Typing @ in the message offers its recipients and inserts the chosen one's first name. Enter or Tab picks the highlighted name."
       },
       "hide_inline_image_attachments": {
         "label": "Hide inline images from attachments",

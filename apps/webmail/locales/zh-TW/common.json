@@ -120,6 +120,7 @@
     "unified_archive": "所有封存郵件",
     "unified_junk": "所有垃圾郵件",
     "all_accounts": "所有帳號",
+    "all_accounts_loading": "正在載入帳號：{loaded}/{total}",
     "unified_mailbox": "整合信箱",
     "expand": "展開",
     "collapse": "收合",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "顯示名稱",
     "autocomplete_search_server": "在伺服器上搜尋",
     "autocomplete_searching": "正在搜尋…",
+    "mention_recipients": "收件者",
     "toolbar": {
       "bold": "粗體",
       "italic": "斜體",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "空主題提醒",
         "description": "傳送沒有主題的郵件前請求確認。"
+      },
+      "recipient_mentions": {
+        "label": "使用 @ 提及收件者",
+        "description": "在內文輸入 @ 會列出收件者，並插入所選收件者的名字。按 Enter 或 Tab 選擇醒目標示的名字。"
       },
       "hide_inline_image_attachments": {
         "label": "在附件清單中隱藏內嵌圖片",

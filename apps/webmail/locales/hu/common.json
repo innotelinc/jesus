@@ -120,6 +120,7 @@
     "unified_archive": "Összes archívum",
     "unified_junk": "Összes spam",
     "all_accounts": "Minden fiók",
+    "all_accounts_loading": "Fiókok betöltése: {loaded} / {total}",
     "unified_mailbox": "Egységes postafiók",
     "expand": "Kibontás",
     "collapse": "Összecsukás",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Megjelenített név",
     "autocomplete_search_server": "Keresés a kiszolgálón",
     "autocomplete_searching": "Keresés...",
+    "mention_recipients": "Címzettek",
     "toolbar": {
       "bold": "Félkövér",
       "italic": "Dőlt",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Figyelmeztetés üres tárgy esetén",
         "description": "Megerősítés kérése tárgy nélküli üzenet küldése előtt."
+      },
+      "recipient_mentions": {
+        "label": "Címzettek említése @ jellel",
+        "description": "Ha @ jelet ír az üzenetbe, megjelennek a címzettek, és a kiválasztott keresztneve kerül beszúrásra. Az Enter vagy a Tab a kiemelt nevet választja."
       },
       "hide_inline_image_attachments": {
         "label": "Beágyazott képek elrejtése a csatolmányok közül",

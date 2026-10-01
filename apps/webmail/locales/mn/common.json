@@ -120,6 +120,7 @@
     "unified_archive": "Бүх архив",
     "unified_junk": "Бүх хог",
     "all_accounts": "Бүх дансууд",
+    "all_accounts_loading": "Бүртгэлүүдийг ачаалж байна: {total}-аас {loaded}",
     "unified_mailbox": "Нэгдсэн шуудангийн хайрцаг",
     "expand": "Өргөтгөх",
     "collapse": "Нуналт",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Дэлгэцийн нэр",
     "autocomplete_search_server": "Серверээс хайх",
     "autocomplete_searching": "Хайж байна...",
+    "mention_recipients": "Хүлээн авагчид",
     "toolbar": {
       "bold": "Болд",
       "italic": "Налуу",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Хоосон сэдвийн анхааруулга",
         "description": "Гарчиггүй мессеж илгээхээсээ өмнө баталгаажуулахыг хүс."
+      },
+      "recipient_mentions": {
+        "label": "Хүлээн авагчдыг @-ээр дурдах",
+        "description": "Захидалд @ бичихэд хүлээн авагчдыг санал болгож, сонгосон хүний нэрийг оруулна. Enter эсвэл Tab тодруулсан нэрийг сонгоно."
       },
       "hide_inline_image_attachments": {
         "label": "Хавсралтаас дотортой зургийг нуух",

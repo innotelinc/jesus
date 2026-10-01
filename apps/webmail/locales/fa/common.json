@@ -120,6 +120,7 @@
     "unified_archive": "همه بایگانی‌ها",
     "unified_junk": "همه هرزنامه‌ها",
     "all_accounts": "همه حساب‌ها",
+    "all_accounts_loading": "در حال بارگیری حساب‌ها: {loaded} از {total}",
     "unified_mailbox": "صندوق پستی یکپارچه",
     "expand": "باز کردن",
     "collapse": "جمع کردن",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "نام نمایشی",
     "autocomplete_search_server": "جستجو در سرور",
     "autocomplete_searching": "در حال جستجو...",
+    "mention_recipients": "گیرندگان",
     "toolbar": {
       "bold": "پررنگ",
       "italic": "کج",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "هشدار موضوع خالی",
         "description": "پیش از ارسال پیام بدون موضوع تأیید بگیرید."
+      },
+      "recipient_mentions": {
+        "label": "اشاره به گیرندگان با @",
+        "description": "تایپ @ در متن پیام، گیرندگان را پیشنهاد می‌دهد و نام کوچک فرد انتخاب‌شده را درج می‌کند. Enter یا Tab نام برجسته‌شده را انتخاب می‌کند."
       },
       "hide_inline_image_attachments": {
         "label": "مخفی کردن تصاویر داخلی",

@@ -120,6 +120,7 @@
     "unified_archive": "Tutti gli archivi",
     "unified_junk": "Tutto lo spam",
     "all_accounts": "Tutti gli account",
+    "all_accounts_loading": "Caricamento account: {loaded} di {total}",
     "unified_mailbox": "Casella di posta unificata",
     "expand": "Espandi",
     "collapse": "Comprimi",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Nome visualizzato",
     "autocomplete_search_server": "Cerca nel server",
     "autocomplete_searching": "Ricerca in corso...",
+    "mention_recipients": "Destinatari",
     "toolbar": {
       "bold": "Grassetto",
       "italic": "Corsivo",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Avviso oggetto vuoto",
         "description": "Chiedi conferma prima di inviare un messaggio senza oggetto."
+      },
+      "recipient_mentions": {
+        "label": "Menziona i destinatari con @",
+        "description": "Digitando @ nel messaggio vengono proposti i destinatari e viene inserito il nome di quello scelto. Invio o Tab seleziona il nome evidenziato."
       },
       "hide_inline_image_attachments": {
         "label": "Nascondi le immagini inline dagli allegati",

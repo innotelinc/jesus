@@ -120,6 +120,7 @@
     "unified_archive": "모든 보관함",
     "unified_junk": "모든 스팸함",
     "all_accounts": "모든 계정",
+    "all_accounts_loading": "계정 불러오는 중: {total}개 중 {loaded}개",
     "unified_mailbox": "통합 메일함",
     "expand": "펼치기",
     "collapse": "접기",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "표시 이름",
     "autocomplete_search_server": "서버에서 검색",
     "autocomplete_searching": "검색 중...",
+    "mention_recipients": "수신자",
     "toolbar": {
       "bold": "굵게",
       "italic": "기울임꼴",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "빈 제목 경고",
         "description": "제목 없는 메시지를 보내기 전에 확인을 요청합니다."
+      },
+      "recipient_mentions": {
+        "label": "@로 받는 사람 언급",
+        "description": "본문에 @를 입력하면 받는 사람이 제안되고 선택한 사람의 이름이 삽입됩니다. Enter 또는 Tab으로 강조된 이름을 선택합니다."
       },
       "hide_inline_image_attachments": {
         "label": "첨부 파일 목록에서 인라인 이미지 숨기기",

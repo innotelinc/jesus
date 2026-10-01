@@ -120,6 +120,7 @@
     "unified_archive": "كل الأرشيف",
     "unified_junk": "كل البريد المزعج",
     "all_accounts": "كل الحسابات",
+    "all_accounts_loading": "جارٍ تحميل الحسابات: {loaded} من {total}",
     "unified_mailbox": "صندوق البريد الموحّد",
     "expand": "توسيع",
     "collapse": "طي",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "الاسم المعروض",
     "autocomplete_search_server": "البحث في الخادم",
     "autocomplete_searching": "جارٍ البحث...",
+    "mention_recipients": "المستلمون",
     "toolbar": {
       "bold": "غامق",
       "italic": "مائل",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "تحذير الموضوع الفارغ",
         "description": "طلب تأكيد قبل إرسال رسالة بدون موضوع."
+      },
+      "recipient_mentions": {
+        "label": "الإشارة إلى المستلمين باستخدام @",
+        "description": "تؤدي كتابة @ في الرسالة إلى اقتراح المستلمين وإدراج الاسم الأول للمستلم المختار. يختار Enter أو Tab الاسم المميز."
       },
       "hide_inline_image_attachments": {
         "label": "إخفاء الصور المضمّنة من المرفقات",

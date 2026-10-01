@@ -120,6 +120,7 @@
     "unified_archive": "Arhivă completă",
     "unified_junk": "Toate mesajele nedorite",
     "all_accounts": "Toate conturile",
+    "all_accounts_loading": "Se încarcă conturile: {loaded} din {total}",
     "unified_mailbox": "Căsuță poștală unificată",
     "expand": "Extindeți",
     "collapse": "Reduceți",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Numele afișat",
     "autocomplete_search_server": "Caută pe server",
     "autocomplete_searching": "Se caută...",
+    "mention_recipients": "Destinatari",
     "toolbar": {
       "bold": "Aldin",
       "italic": "Cursiv",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Avertisment pentru subiect gol",
         "description": "Cere confirmare înainte de a trimite un mesaj fără subiect."
+      },
+      "recipient_mentions": {
+        "label": "Menționează destinatarii cu @",
+        "description": "Tastarea @ în mesaj propune destinatarii și inserează prenumele celui ales. Enter sau Tab alege numele evidențiat."
       },
       "hide_inline_image_attachments": {
         "label": "Ascundeți imaginile încorporate din atașamente",
