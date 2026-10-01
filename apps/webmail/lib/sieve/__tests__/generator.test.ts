@@ -241,22 +241,53 @@ describe('generateScript', () => {
       expect(matches).toHaveLength(1);
     });
 
-    it('does not append stop after discard', () => {
+    // discard and reject only cancel the implicit keep (RFC 5228 4.4,
+    // RFC 5429): without a stop, the rules below still act on the message.
+    it('appends stop after discard', () => {
       const script = generateScript([makeRule({
         actions: [{ type: 'discard' }],
         stopProcessing: true,
       })]);
-      const matches = script.match(/stop;/g);
-      expect(matches).toBeNull();
+      expect(script).toContain('    discard;\n    stop;\n}');
+      expect(script.match(/stop;/g)).toHaveLength(1);
     });
 
-    it('does not append stop after reject', () => {
+    it('appends stop after reject', () => {
       const script = generateScript([makeRule({
         actions: [{ type: 'reject', value: 'No' }],
         stopProcessing: true,
       })]);
-      const matches = script.match(/stop;/g);
-      expect(matches).toBeNull();
+      expect(script).toContain('    reject "No";\n    stop;\n}');
+      expect(script.match(/stop;/g)).toHaveLength(1);
+    });
+
+    it('leaves a rule that does not stop processing open after discard', () => {
+      const script = generateScript([makeRule({
+        actions: [{ type: 'discard' }],
+        stopProcessing: false,
+      })]);
+      expect(script).not.toContain('stop;');
+    });
+
+    it('writes one stop when the stop action ends up last behind the flags', () => {
+      // Flags are written first, so the stop action placed before a flag in
+      // the list still comes last.
+      const script = generateScript([makeRule({
+        actions: [{ type: 'stop' }, { type: 'mark_read' }],
+        stopProcessing: true,
+      })]);
+      expect(script).toContain('    addflag "\\\\Seen";\n    stop;\n}');
+      expect(script.match(/stop;/g)).toHaveLength(1);
+    });
+
+    it('adds no second stop behind a stop action earlier in the block', () => {
+      // The block runs straight through, so that stop ends the script.
+      const script = generateScript([makeRule({
+        actions: [{ type: 'stop' }, { type: 'discard' }],
+        stopProcessing: true,
+      })]);
+      expect(script).toContain('    stop;\n    discard;\n}');
+      expect(script.match(/stop;/g)).toHaveLength(1);
     });
   });
 
