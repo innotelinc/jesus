@@ -359,11 +359,13 @@ export function generateScript(
 
     const actionLines = generateActions(rule.actions, useMailboxId);
 
-    if (rule.stopProcessing) {
-      const lastAction = rule.actions[rule.actions.length - 1];
-      if (!lastAction || !['stop', 'discard', 'reject'].includes(lastAction.type)) {
-        actionLines.push('stop;');
-      }
+    // discard and reject only cancel the implicit keep (RFC 5228 4.4,
+    // RFC 5429); the script goes on, and the rules below would still act on
+    // the message. So "stop processing" always writes a stop, unless the
+    // block has one already: it runs straight through, so any stop in it ends
+    // the script.
+    if (rule.stopProcessing && !actionLines.includes('stop;')) {
+      actionLines.push('stop;');
     }
 
     lines.push(`if ${conditionStr} {`);
