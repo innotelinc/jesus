@@ -1972,6 +1972,32 @@
       },
       "about": {
         "title": "Bulwark nettpost"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Klikk på søppelpost og phishing før de når innboksen din. Slipp ekte e-post gjennom. Mister du alle tre skjoldene, faller innboksen.",
+        "kinds": {
+          "spam": "Søppelpost",
+          "phishing": "Phishing",
+          "legit": "Ekte e-post"
+        },
+        "click_to_block": "Klikk for å blokkere",
+        "let_through": "Slipp gjennom",
+        "start": "Start",
+        "play_again": "Spill igjen",
+        "score": "Poeng",
+        "combo": "Rekkebonus",
+        "shields_left": "{count} av {total} skjold igjen",
+        "seconds": "{seconds} s",
+        "best": "Rekord: {score}",
+        "new_best": "Ny rekord",
+        "held": "Innboksen holdt stand",
+        "overrun": "Innboksen ble overkjørt",
+        "stats": {
+          "caught": "Blokkert",
+          "delivered": "Levert",
+          "mistakes": "Feil"
+        }
       }
     },
     "sidebar_apps": {

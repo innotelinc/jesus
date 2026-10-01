@@ -1972,6 +1972,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Fes clic a la brossa i al phishing abans que arribin a la teva safata d'entrada. Deixa passar el correu real. Si perds els tres escuts, la safata cau.",
+        "kinds": {
+          "spam": "Brossa",
+          "phishing": "Phishing",
+          "legit": "Correu real"
+        },
+        "click_to_block": "Fes clic per bloquejar",
+        "let_through": "Deixa'l passar",
+        "start": "Comença",
+        "play_again": "Torna a jugar",
+        "score": "Punts",
+        "combo": "Bonificació de ratxa",
+        "shields_left": "Queden {count} de {total} escuts",
+        "seconds": "{seconds} s",
+        "best": "Rècord: {score}",
+        "new_best": "Nou rècord",
+        "held": "La safata ha resistit",
+        "overrun": "La safata ha caigut",
+        "stats": {
+          "caught": "Bloquejats",
+          "delivered": "Lliurats",
+          "mistakes": "Errors"
+        }
       }
     },
     "sidebar_apps": {

@@ -1968,6 +1968,32 @@
       },
       "about": {
         "title": "Bulwark Webmail"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "Klik på spam og phishing, før de når din indbakke. Lad ægte mails komme igennem. Mister du alle tre skjolde, falder indbakken.",
+        "kinds": {
+          "spam": "Spam",
+          "phishing": "Phishing",
+          "legit": "Ægte mail"
+        },
+        "click_to_block": "Klik for at blokere",
+        "let_through": "Lad den komme igennem",
+        "start": "Start",
+        "play_again": "Spil igen",
+        "score": "Point",
+        "combo": "Stribebonus",
+        "shields_left": "{count} af {total} skjolde tilbage",
+        "seconds": "{seconds} s",
+        "best": "Rekord: {score}",
+        "new_best": "Ny rekord",
+        "held": "Indbakken holdt",
+        "overrun": "Indbakken blev overrendt",
+        "stats": {
+          "caught": "Blokeret",
+          "delivered": "Leveret",
+          "mistakes": "Fejl"
+        }
       }
     },
     "sidebar_apps": {

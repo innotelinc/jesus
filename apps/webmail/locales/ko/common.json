@@ -1965,6 +1965,32 @@
       },
       "about": {
         "title": "Bulwark Webmail 정보"
+      },
+      "spam_siege": {
+        "title": "Spam Siege",
+        "intro": "스팸과 피싱이 받은편지함에 닿기 전에 클릭해서 막아 주세요. 진짜 메일은 통과시켜 주세요. 방패 세 개를 모두 잃으면 받은편지함이 함락돼요.",
+        "kinds": {
+          "spam": "스팸",
+          "phishing": "피싱",
+          "legit": "진짜 메일"
+        },
+        "click_to_block": "클릭해서 차단",
+        "let_through": "통과시키기",
+        "start": "시작",
+        "play_again": "다시 하기",
+        "score": "점수",
+        "combo": "연속 보너스",
+        "shields_left": "방패 {total}개 중 {count}개 남음",
+        "seconds": "{seconds}초",
+        "best": "최고: {score}",
+        "new_best": "최고 기록 경신",
+        "held": "받은편지함을 지켰어요",
+        "overrun": "받은편지함이 함락됐어요",
+        "stats": {
+          "caught": "차단",
+          "delivered": "배달",
+          "mistakes": "실수"
+        }
       }
     },
     "sidebar_apps": {
