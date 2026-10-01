@@ -19,7 +19,7 @@ import { type OAuthMetadata } from "@/lib/oauth/discovery";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/oauth/pkce";
 import { DEFAULT_OAUTH_SCOPES } from "@/lib/oauth/scopes";
 import { useUpdateStore, selectBanner } from "@/stores/update-store";
-import type { PublicJmapServerEntry } from "@/lib/admin/jmap-servers";
+import { offersOwnOAuth, type PublicJmapServerEntry } from "@/lib/admin/jmap-servers";
 import { IS_LITE, getLiteInjectedClientId } from "@/lib/lite";
 import { getLiteClientId, probeLiteTokenLogin } from "@/lib/auth/lite-tokens";
 import {
@@ -188,9 +188,10 @@ function LoginPageContent() {
   const effectiveOauthIssuerUrl = selectedServer
     ? selectedServer.oauth?.issuerUrl || selectedServer.url
     : globalOauthIssuerUrl;
-  // A server entry that names its own OAuth client signs in with OAuth even
-  // while OAuth is off globally: a Gmail bridge next to a password server.
-  const serverOauthEnabled = oauthEnabled || !!selectedServer?.oauth?.clientId;
+  // A server entry that names its own OAuth client and button label signs in
+  // with OAuth even while OAuth is off globally: a Gmail bridge next to a
+  // password server.
+  const serverOauthEnabled = oauthEnabled || offersOwnOAuth(selectedServer);
   const [totpCode, setTotpCode] = useState("");
   const [showTotpField, setShowTotpField] = useState(false);
   // Access-token sign-in (Bearer auth) in place of username and password.
@@ -929,7 +930,7 @@ function LoginPageContent() {
   // server-side against the selected server.
   const otherOauthServers = isMobileHandoff
     ? []
-    : jmapServers.filter((s) => s.oauth?.clientId && s.id !== selectedServer?.id);
+    : jmapServers.filter((s) => offersOwnOAuth(s) && s.id !== selectedServer?.id);
   const otherOauthButtons = otherOauthServers.map((s) => (
     <Button
       key={s.id}
@@ -940,7 +941,7 @@ function LoginPageContent() {
       disabled={oauthLoading || isLoading}
     >
       <LogIn className="w-4 h-4 me-2" />
-      {s.oauth?.buttonLabel || `${t("sign_in_sso")} (${s.label})`}
+      {s.oauth?.buttonLabel}
     </Button>
   ));
 
@@ -1271,7 +1272,7 @@ function LoginPageContent() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <LogIn className="w-4 h-4" />
-                        {t("sign_in_sso")}
+                        {selectedServer?.oauth?.buttonLabel || t("sign_in_sso")}
                       </div>
                     )}
                   </Button>
