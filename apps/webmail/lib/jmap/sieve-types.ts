@@ -17,7 +17,9 @@ export interface SieveCapabilities {
 
 export type FilterConditionField =
   | 'from' | 'to' | 'cc' | 'subject' | 'header' | 'size' | 'body'
-  | 'attachment';
+  | 'attachment'
+  // Every message (Sieve `true`): no value, and always the comparator 'any'.
+  | 'all';
 
 export type FilterComparator =
   | 'contains' | 'not_contains'
@@ -38,7 +40,9 @@ export type FilterComparator =
   //                sub.acme.com nor acme.com.evil)
   // Older Bulwark versions read these as `header :contains`, so a script
   // they save keeps working, only less strictly.
-  | 'address_is' | 'domain_is';
+  | 'address_is' | 'domain_is'
+  // For field === 'all': any message at all.
+  | 'any';
 
 export type FilterActionType =
   | 'move' | 'copy' | 'forward'

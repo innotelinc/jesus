@@ -2117,7 +2117,8 @@
         "subject": "Objet",
         "header": "En-tête personnalisé",
         "size": "Taille",
-        "body": "Corps"
+        "body": "Corps",
+        "all": "Tous les messages"
       },
       "comparators": {
         "has_any": "est présent",

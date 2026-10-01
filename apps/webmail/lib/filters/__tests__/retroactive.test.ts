@@ -155,6 +155,13 @@ describe('retroactiveSupport', () => {
     }
   });
 
+  it('never runs a rule for all messages on old mail', () => {
+    // It would act on everything in the folder, a "delete" on the whole inbox.
+    const all = rule([{ field: 'all', comparator: 'any', value: '' }], [{ type: 'mark_read' }]);
+    expect(retroactiveSupport(all)).toEqual({ ok: false, reason: 'condition' });
+    expect(planRetroactive(all, [message()])).toEqual({ ids: [], steps: [] });
+  });
+
   it('refuses a folder known only by its path, and keep', () => {
     expect(retroactiveSupport(rule([{ field: 'from', comparator: 'address_is', value: 'a@b.c' }], [{ type: 'move', value: 'News' }])).ok).toBe(false);
     expect(retroactiveSupport(rule([{ field: 'from', comparator: 'address_is', value: 'a@b.c' }], [{ type: 'keep' }])).ok).toBe(false);

@@ -2117,7 +2117,8 @@
         "subject": "Temats",
         "header": "Pielāgota galvene",
         "size": "Izmērs",
-        "body": "Teksts"
+        "body": "Teksts",
+        "all": "Visas vēstules"
       },
       "comparators": {
         "has_any": "ir klāt",
