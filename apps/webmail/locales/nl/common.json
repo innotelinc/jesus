@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Weergavenaam",
     "autocomplete_search_server": "Op de server zoeken",
     "autocomplete_searching": "Bezig met zoeken...",
+    "mention_recipients": "Ontvangers",
     "toolbar": {
       "bold": "Vet",
       "italic": "Cursief",

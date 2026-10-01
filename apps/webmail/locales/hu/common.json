@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Megjelenített név",
     "autocomplete_search_server": "Keresés a kiszolgálón",
     "autocomplete_searching": "Keresés...",
+    "mention_recipients": "Címzettek",
     "toolbar": {
       "bold": "Félkövér",
       "italic": "Dőlt",

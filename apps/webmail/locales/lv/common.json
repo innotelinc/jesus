@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Parādāmais vārds",
     "autocomplete_search_server": "Meklēt serverī",
     "autocomplete_searching": "Meklē...",
+    "mention_recipients": "Adresāti",
     "toolbar": {
       "bold": "Treknraksts",
       "italic": "Kursīvs",

@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Wyświetlana nazwa",
     "autocomplete_search_server": "Szukaj na serwerze",
     "autocomplete_searching": "Wyszukiwanie...",
+    "mention_recipients": "Odbiorcy",
     "toolbar": {
       "bold": "Pogrubienie",
       "italic": "Kursywa",

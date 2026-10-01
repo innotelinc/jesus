@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Zobrazované jméno",
     "autocomplete_search_server": "Hledat na serveru",
     "autocomplete_searching": "Hledání...",
+    "mention_recipients": "Příjemci",
     "toolbar": {
       "bold": "Tučné",
       "italic": "Kurzíva",

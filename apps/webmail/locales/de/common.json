@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "Anzeigename",
     "autocomplete_search_server": "Auf dem Server suchen",
     "autocomplete_searching": "Suche läuft...",
+    "mention_recipients": "Empfänger",
     "toolbar": {
       "bold": "Fett",
       "italic": "Kursiv",

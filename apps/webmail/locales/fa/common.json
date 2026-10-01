@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "نام نمایشی",
     "autocomplete_search_server": "جستجو در سرور",
     "autocomplete_searching": "در حال جستجو...",
+    "mention_recipients": "گیرندگان",
     "toolbar": {
       "bold": "پررنگ",
       "italic": "کج",

@@ -725,6 +725,7 @@
     "recipient_name_placeholder": "表示名",
     "autocomplete_search_server": "サーバーを検索",
     "autocomplete_searching": "検索中...",
+    "mention_recipients": "宛先",
     "toolbar": {
       "bold": "太字",
       "italic": "斜体",
