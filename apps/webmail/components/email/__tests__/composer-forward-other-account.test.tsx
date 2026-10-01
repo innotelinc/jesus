@@ -117,7 +117,7 @@ vi.mock('@/stores/settings-store', () => {
 vi.mock('@/stores/contact-store', () => {
   const state = {
     contacts: [],
-    getAutocomplete: async () => [],
+    getAutocomplete: () => [],
     addToTrustedSendersBook: async () => {},
   };
   const hook = (sel?: (s: typeof state) => unknown) =>
@@ -282,6 +282,77 @@ describe('forwarding a message held by another account', () => {
     expect(activeClient.createDraft).not.toHaveBeenCalled();
     expect(sourceClient.createDraft.mock.calls[0][8]).toEqual([
       { blobId: 'blob-src', name: 'scan.pdf', type: 'application/pdf', size: 5 },
+    ]);
+  });
+
+  it('still copies the parts of a forward restored before its first save', async () => {
+    // A pro tab move or an unmount stashes the composer before the autosave
+    // ran: the restored attachments still hold the other account's blobs.
+    multi.allIdentities = [ACTIVE_IDENTITY];
+    const { activeClient, sourceClient } = mockClients();
+    render(
+      <EmailComposer
+        mode="forward"
+        replyTo={{ subject: 'Scans', accountId: 'acct-src', attachments: [SCAN] }}
+        initialData={{
+          to: '', cc: '', bcc: '', subject: 'Scans', body: '',
+          showCc: false, showBcc: false, selectedIdentityId: null, subAddressTag: '',
+          mode: 'forward', draftId: null,
+          attachments: [{ ...SCAN, sourceAccountId: 'acct-src' }],
+        }}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByDisplayValue(/Scans/), { target: { value: 'Scans for you' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+    expect(sourceClient.fetchBlobArrayBuffer).toHaveBeenCalledWith('blob-src', 'scan.pdf', 'application/pdf');
+    expect(activeClient.createDraft.mock.calls[0][8]).toEqual([
+      { blobId: 'blob-copied', name: 'scan.pdf', type: 'application/pdf', size: 5 },
+    ]);
+  });
+
+  it('sends the copies, and does not send when a part cannot be copied', async () => {
+    multi.allIdentities = [ACTIVE_IDENTITY];
+    const { activeClient, sourceClient } = mockClients();
+    const NOTES = { blobId: 'blob-notes', name: 'notes.txt', type: 'text/plain', size: 3 };
+    // The second part cannot be downloaded until the holding login is back.
+    let notesReachable = false;
+    sourceClient.fetchBlobArrayBuffer.mockImplementation(async (blobId: string) => {
+      if (blobId === 'blob-notes' && !notesReachable) throw new Error('download failed');
+      return new ArrayBuffer(5);
+    });
+    activeClient.uploadBlob
+      .mockResolvedValueOnce({ blobId: 'blob-scan-copy' })
+      .mockResolvedValueOnce({ blobId: 'blob-notes-copy' });
+    const onSend = vi.fn();
+    render(
+      <EmailComposer
+        mode="forward"
+        replyTo={{ subject: 'Scans', accountId: 'acct-src', attachments: [SCAN, NOTES] }}
+        onSend={onSend}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText('to_placeholder'), { target: { value: 'friend@example.com' } });
+
+    const send = async () => {
+      fireEvent.click(screen.getAllByTestId('composer-send')[0]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    };
+    await send();
+    expect(onSend).not.toHaveBeenCalled();
+    expect(activeClient.uploadBlob).toHaveBeenCalledTimes(1);
+
+    // The retry copies only the part that failed.
+    notesReachable = true;
+    await send();
+    expect(sourceClient.fetchBlobArrayBuffer.mock.calls.filter(([id]) => id === 'blob-src')).toHaveLength(1);
+    expect(activeClient.uploadBlob).toHaveBeenCalledTimes(2);
+    expect(onSend).toHaveBeenCalledTimes(1);
+    expect(onSend.mock.calls[0][0].attachments).toEqual([
+      { blobId: 'blob-scan-copy', name: 'scan.pdf', type: 'application/pdf', size: 5 },
+      { blobId: 'blob-notes-copy', name: 'notes.txt', type: 'text/plain', size: 3 },
     ]);
   });
 
