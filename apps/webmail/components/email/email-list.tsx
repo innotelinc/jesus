@@ -7,7 +7,7 @@ import type { LoadListAttachments } from "@/lib/list-attachments";
 import { listRowShowsChips } from "./attachment-chips";
 import { listVerificationCode } from "@/lib/verification-code";
 import { EmailContextMenu } from "./email-context-menu";
-import { cn } from "@/lib/utils";
+import { cn, cleanPreview } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -246,7 +246,7 @@ export function EmailList({
     if (showPreview && density !== 'extra-compact') {
       // A mail without a preview draws a one-line "No preview available",
       // a line (23px) shorter than a real one.
-      const emptyPreview = !!latest && !latest.preview?.trim() && !latest.searchSnippet?.preview;
+      const emptyPreview = !!latest && !cleanPreview(latest.preview) && !latest.searchSnippet?.preview;
       size += emptyPreview ? 36 - 23 : 36;
     }
     // The chip row (attachments, verification code): a 22px chip plus 6px margin.
