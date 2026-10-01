@@ -19,7 +19,8 @@ function isJmapServers(value: unknown): value is PublicJmapServerEntry[] {
     if (entry.oauth === undefined) return true;
     return isRecord(entry.oauth)
       && (entry.oauth.clientId === undefined || isString(entry.oauth.clientId))
-      && (entry.oauth.issuerUrl === undefined || isString(entry.oauth.issuerUrl));
+      && (entry.oauth.issuerUrl === undefined || isString(entry.oauth.issuerUrl))
+      && (entry.oauth.buttonLabel === undefined || isString(entry.oauth.buttonLabel));
   });
 }
 

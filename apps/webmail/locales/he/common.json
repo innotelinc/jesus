@@ -142,6 +142,7 @@
     "unified_archive": "הכל ארכיון",
     "unified_junk": "הכל דואר זבל",
     "all_accounts": "כל החשבונות",
+    "all_accounts_loading": "טוען חשבונות: {loaded} מתוך {total}",
     "shared": "משותף",
     "scheduled": "מתוכננים",
     "unified_all_unread": "הכל שלא נקראו",
@@ -689,6 +690,7 @@
     "recipient_name_placeholder": "שם תצוגה",
     "autocomplete_search_server": "חיפוש בשרת",
     "autocomplete_searching": "מחפש...",
+    "mention_recipients": "נמענים",
     "toolbar": {
       "bold": "מודגש",
       "italic": "נטוי",
@@ -1477,6 +1479,10 @@
       "empty_subject_warning": {
         "label": "אזהרה על נושא ריק",
         "description": "בקש אישור לפני שליחת הודעה ללא נושא."
+      },
+      "recipient_mentions": {
+        "label": "אזכור נמענים עם @",
+        "description": "הקלדת @ בהודעה מציעה את הנמענים ומכניסה את השם הפרטי של הנמען שנבחר. Enter או Tab בוחרים את השם המסומן."
       },
       "hide_inline_image_attachments": {
         "label": "הסתר תמונות מוטבעות מקבצים מצורפים",

@@ -120,6 +120,7 @@
     "unified_archive": "Všechny archivy",
     "unified_junk": "Všechen spam",
     "all_accounts": "Všechny účty",
+    "all_accounts_loading": "Načítání účtů: {loaded} z {total}",
     "unified_mailbox": "Sjednocená schránka",
     "expand": "Rozbalit",
     "collapse": "Sbalit",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Zobrazované jméno",
     "autocomplete_search_server": "Hledat na serveru",
     "autocomplete_searching": "Hledání...",
+    "mention_recipients": "Příjemci",
     "toolbar": {
       "bold": "Tučné",
       "italic": "Kurzíva",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Upozornění na prázdný předmět",
         "description": "Před odesláním zprávy bez předmětu požádat o potvrzení."
+      },
+      "recipient_mentions": {
+        "label": "Zmiňovat příjemce pomocí @",
+        "description": "Napsáním @ ve zprávě se nabídnou její příjemci a vloží se křestní jméno vybraného. Enter nebo Tab vybere zvýrazněné jméno."
       },
       "hide_inline_image_attachments": {
         "label": "Skrýt vložené obrázky ze seznamu příloh",

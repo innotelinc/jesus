@@ -120,6 +120,7 @@
     "unified_archive": "すべてのアーカイブ",
     "unified_junk": "すべての迷惑メール",
     "all_accounts": "すべてのアカウント",
+    "all_accounts_loading": "アカウントを読み込み中: {total} 件中 {loaded} 件",
     "unified_mailbox": "統合メールボックス",
     "expand": "展開",
     "collapse": "折りたたむ",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "表示名",
     "autocomplete_search_server": "サーバーを検索",
     "autocomplete_searching": "検索中...",
+    "mention_recipients": "宛先",
     "toolbar": {
       "bold": "太字",
       "italic": "斜体",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "件名なしの警告",
         "description": "件名のないメッセージを送信する前に確認します。"
+      },
+      "recipient_mentions": {
+        "label": "@で宛先をメンション",
+        "description": "本文で@を入力すると宛先の候補が表示され、選んだ相手の名前が挿入されます。EnterまたはTabで強調表示された名前を選びます。"
       },
       "hide_inline_image_attachments": {
         "label": "添付ファイル一覧からインライン画像を隠す",

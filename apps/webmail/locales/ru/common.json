@@ -120,6 +120,7 @@
     "unified_archive": "Все архивы",
     "unified_junk": "Весь спам",
     "all_accounts": "Все аккаунты",
+    "all_accounts_loading": "Загрузка аккаунтов: {loaded} из {total}",
     "unified_mailbox": "Общий почтовый ящик",
     "expand": "Развернуть",
     "collapse": "Свернуть",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Отображаемое имя",
     "autocomplete_search_server": "Искать на сервере",
     "autocomplete_searching": "Поиск...",
+    "mention_recipients": "Получатели",
     "toolbar": {
       "bold": "Жирный",
       "italic": "Курсив",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Предупреждение о пустой теме",
         "description": "Запрашивать подтверждение перед отправкой письма без темы."
+      },
+      "recipient_mentions": {
+        "label": "Упоминать получателей через @",
+        "description": "При вводе @ в тексте письма предлагаются его получатели, и вставляется имя выбранного. Enter или Tab выбирает выделенное имя."
       },
       "hide_inline_image_attachments": {
         "label": "Скрывать встроенные изображения из вложений",

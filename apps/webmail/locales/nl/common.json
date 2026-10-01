@@ -120,6 +120,7 @@
     "unified_archive": "Alle archieven",
     "unified_junk": "Alle spam",
     "all_accounts": "Alle accounts",
+    "all_accounts_loading": "Accounts laden: {loaded} van {total}",
     "unified_mailbox": "Gecombineerd postvak",
     "expand": "Uitklappen",
     "collapse": "Inklappen",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Weergavenaam",
     "autocomplete_search_server": "Op de server zoeken",
     "autocomplete_searching": "Bezig met zoeken...",
+    "mention_recipients": "Ontvangers",
     "toolbar": {
       "bold": "Vet",
       "italic": "Cursief",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Waarschuwing bij leeg onderwerp",
         "description": "Vraag om bevestiging voordat een bericht zonder onderwerp wordt verzonden."
+      },
+      "recipient_mentions": {
+        "label": "Ontvangers noemen met @",
+        "description": "Als je @ typt in het bericht, worden de ontvangers voorgesteld en wordt de voornaam van de gekozen ontvanger ingevoegd. Enter of Tab kiest de gemarkeerde naam."
       },
       "hide_inline_image_attachments": {
         "label": "Inline-afbeeldingen verbergen uit bijlagenlijst",

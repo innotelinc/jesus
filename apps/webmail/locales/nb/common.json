@@ -120,6 +120,7 @@
     "unified_archive": "Alle arkiver",
     "unified_junk": "All søppelpost",
     "all_accounts": "Alle kontoer",
+    "all_accounts_loading": "Laster inn kontoer: {loaded} av {total}",
     "unified_mailbox": "Samlet postkasse",
     "expand": "Utvid",
     "collapse": "Fold sammen",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Visningsnavn",
     "autocomplete_search_server": "Søk på serveren",
     "autocomplete_searching": "Søker...",
+    "mention_recipients": "Mottakere",
     "toolbar": {
       "bold": "Fet skrift",
       "italic": "Kursiv",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Advarsel om tomt emne",
         "description": "Be om bekreftelse før du sender en melding uten emne."
+      },
+      "recipient_mentions": {
+        "label": "Nevn mottakere med @",
+        "description": "Når du skriver @ i meldingen, foreslås mottakerne, og fornavnet til den valgte settes inn. Enter eller Tab velger det uthevede navnet."
       },
       "hide_inline_image_attachments": {
         "label": "Skjul innebygde bilder i vedleggslisten",

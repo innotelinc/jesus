@@ -120,6 +120,7 @@
     "unified_archive": "Alle arkiver",
     "unified_junk": "Alt spam",
     "all_accounts": "Alle konti",
+    "all_accounts_loading": "Indlæser konti: {loaded} af {total}",
     "unified_mailbox": "Samlet postkasse",
     "expand": "Udvid",
     "collapse": "Skjul",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Visningsnavn",
     "autocomplete_search_server": "Søg på serveren",
     "autocomplete_searching": "Søger...",
+    "mention_recipients": "Modtagere",
     "toolbar": {
       "bold": "Fed",
       "italic": "Kursiv",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Advarsel om tomt emne",
         "description": "Bed om bekræftelse, før en besked uden emne sendes."
+      },
+      "recipient_mentions": {
+        "label": "Nævn modtagere med @",
+        "description": "Når du skriver @ i beskeden, foreslås modtagerne, og den valgtes fornavn indsættes. Enter eller Tab vælger det fremhævede navn."
       },
       "hide_inline_image_attachments": {
         "label": "Skjul indlejrede billeder fra vedhæftninger",

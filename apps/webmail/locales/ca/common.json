@@ -120,6 +120,7 @@
     "unified_archive": "Tot l'arxiu",
     "unified_junk": "Tot el correu brossa",
     "all_accounts": "Tots els comptes",
+    "all_accounts_loading": "Carregant comptes: {loaded} de {total}",
     "unified_mailbox": "Bústia unificada",
     "expand": "Desplega",
     "collapse": "Replega",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Nom mostrat",
     "autocomplete_search_server": "Cerca al servidor",
     "autocomplete_searching": "Cercant...",
+    "mention_recipients": "Destinataris",
     "toolbar": {
       "bold": "Negreta",
       "italic": "Cursiva",
@@ -1515,6 +1517,10 @@
       "empty_subject_warning": {
         "label": "Avís d'assumpte buit",
         "description": "Demana confirmació abans d'enviar un missatge sense assumpte."
+      },
+      "recipient_mentions": {
+        "label": "Esmentar destinataris amb @",
+        "description": "En escriure @ al missatge s'ofereixen els destinataris i s'insereix el nom de pila del triat. Retorn o Tab tria el nom ressaltat."
       },
       "hide_inline_image_attachments": {
         "label": "Amaga les imatges incrustades dels fitxers adjunts",

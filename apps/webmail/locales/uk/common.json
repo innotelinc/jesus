@@ -120,6 +120,7 @@
     "unified_archive": "Усі архіви",
     "unified_junk": "Весь спам",
     "all_accounts": "Усі облікові записи",
+    "all_accounts_loading": "Завантаження облікових записів: {loaded} з {total}",
     "unified_mailbox": "Спільна поштова скринька",
     "expand": "Розгорнути",
     "collapse": "Згорнути",
@@ -724,6 +725,7 @@
     "recipient_name_placeholder": "Відображуване ім'я",
     "autocomplete_search_server": "Шукати на сервері",
     "autocomplete_searching": "Пошук...",
+    "mention_recipients": "Одержувачі",
     "toolbar": {
       "bold": "Жирний",
       "italic": "Курсив",
@@ -1512,6 +1514,10 @@
       "empty_subject_warning": {
         "label": "Попередження про порожню тему",
         "description": "Запитувати підтвердження перед надсиланням листа без теми."
+      },
+      "recipient_mentions": {
+        "label": "Згадувати одержувачів через @",
+        "description": "Під час введення @ у тексті листа пропонуються його одержувачі, і вставляється ім'я вибраного. Enter або Tab вибирає виділене ім'я."
       },
       "hide_inline_image_attachments": {
         "label": "Приховувати вбудовані зображення з вкладень",
