@@ -1973,7 +1973,8 @@
         "button": "Імпорт"
       },
       "about": {
-        "title": "Оплот веб-пошти"
+        "title": "Оплот веб-пошти",
+        "source_code": "Вихідний код"
       },
       "spam_siege": {
         "title": "Spam Siege",

@@ -1976,7 +1976,8 @@
         "button": "Importálás"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Forráskód"
       },
       "spam_siege": {
         "title": "Spam Siege",

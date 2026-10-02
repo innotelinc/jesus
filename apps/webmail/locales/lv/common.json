@@ -1973,7 +1973,8 @@
         "contacts_description": "Kontaktu sinhronizācija, adrešu grāmatu darbības un uzticamie sūtītāji"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Pirmkods"
       },
       "spam_siege": {
         "title": "Spam Siege",

@@ -1980,7 +1980,8 @@
         "button": "Importer"
       },
       "about": {
-        "title": "Bulwark nettpost"
+        "title": "Bulwark nettpost",
+        "source_code": "Kildekode"
       },
       "spam_siege": {
         "title": "Spam Siege",

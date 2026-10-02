@@ -1935,7 +1935,8 @@
         "button": "ייבוא"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "קוד מקור"
       },
       "spam_siege": {
         "title": "Spam Siege",

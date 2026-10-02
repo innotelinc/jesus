@@ -1976,7 +1976,8 @@
         "button": "Importér"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Kildekode"
       },
       "spam_siege": {
         "title": "Spam Siege",

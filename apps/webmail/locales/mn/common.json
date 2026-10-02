@@ -1980,7 +1980,8 @@
         "button": "Импорт"
       },
       "about": {
-        "title": "Тухай"
+        "title": "Тухай",
+        "source_code": "Эх код"
       },
       "spam_siege": {
         "title": "Spam Siege",

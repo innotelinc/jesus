@@ -1973,7 +1973,8 @@
         "button": "Importar"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Código fuente"
       },
       "spam_siege": {
         "title": "Spam Siege",
