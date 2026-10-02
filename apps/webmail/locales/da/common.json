@@ -24,7 +24,8 @@
       "generic": "Der opstod en uventet fejl. Kontakt din administrator, hvis problemet fortsætter.",
       "totp_required": "En to-faktor-godkendelseskode er påkrævet. Indtast din kode nedenfor.",
       "totp_invalid": "Ugyldig godkendelseskode. Kontrollér din autentificeringsapp og prøv igen.",
-      "oauth_discovery_failed": "SSO er aktiveret, men identitetsudbyderen kunne ikke nås. Kontrollér din OAuth-konfiguration."
+      "oauth_discovery_failed": "SSO er aktiveret, men identitetsudbyderen kunne ikke nås. Kontrollér din OAuth-konfiguration.",
+      "token_exchange_failed": "Din adgangskode og kode blev accepteret, men mailserveren nægtede at starte en session for denne app. Bed din administrator om at kontrollere OAuth-klientindstillingerne."
     },
     "show_password": "Vis adgangskode",
     "hide_password": "Skjul adgangskode",

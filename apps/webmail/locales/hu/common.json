@@ -24,7 +24,8 @@
       "generic": "Váratlan hiba történt. Ha a probléma továbbra is fennáll, vedd fel a kapcsolatot a rendszergazdával.",
       "totp_required": "Kétfaktoros hitelesítési kód szükséges. Kérjük, add meg a kódot lent.",
       "totp_invalid": "Érvénytelen hitelesítési kód. Ellenőrizd a hitelesítő alkalmazásod és próbáld újra.",
-      "oauth_discovery_failed": "SSO engedélyezve van, de az identitásszolgáltató nem érhető el. Ellenőrizd az OAuth konfigurációt."
+      "oauth_discovery_failed": "SSO engedélyezve van, de az identitásszolgáltató nem érhető el. Ellenőrizd az OAuth konfigurációt.",
+      "token_exchange_failed": "A jelszót és a kódot elfogadtuk, de a levelezőszerver nem indított munkamenetet ehhez az alkalmazáshoz. Kérje meg a rendszergazdát, hogy ellenőrizze az OAuth-kliens beállításait."
     },
     "show_password": "Jelszó megjelenítése",
     "hide_password": "Jelszó elrejtése",

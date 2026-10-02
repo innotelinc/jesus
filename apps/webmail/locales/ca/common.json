@@ -24,7 +24,8 @@
       "generic": "S'ha produït un error inesperat. Si el problema persisteix, contacteu amb l'administrador.",
       "totp_required": "Cal un codi d'autenticació de dos factors. Introduïu-lo a continuació.",
       "totp_invalid": "El codi d'autenticació no és vàlid. Comproveu l'aplicació d'autenticació i torneu-ho a provar.",
-      "oauth_discovery_failed": "El SSO està activat, però no s'ha pogut contactar amb el proveïdor d'identitat. Comproveu la configuració d'OAuth."
+      "oauth_discovery_failed": "El SSO està activat, però no s'ha pogut contactar amb el proveïdor d'identitat. Comproveu la configuració d'OAuth.",
+      "token_exchange_failed": "La contrasenya i el codi s'han acceptat, però el servidor de correu s'ha negat a iniciar una sessió per a aquesta aplicació. Demaneu a l'administrador que revisi la configuració del client OAuth."
     },
     "show_password": "Mostra la contrasenya",
     "hide_password": "Amaga la contrasenya",
