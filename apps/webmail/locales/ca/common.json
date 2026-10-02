@@ -2942,6 +2942,10 @@
       "tasks_hint": "Tasques (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# esdeveniment anterior} other {# esdeveniments anteriors}}",
+      "hidden_after": "{count, plural, one {# esdeveniment posterior} other {# esdeveniments posteriors}}",
+      "show_all_hours": "Mostra totes les hores",
+      "show_display_hours": "Mostra només {start} – {end}",
       "create": "Crea un esdeveniment",
       "edit": "Edita l'esdeveniment",
       "delete": "Suprimeix l'esdeveniment",
@@ -3101,6 +3105,14 @@
       "unit": "Unitat del recordatori"
     },
     "settings": {
+      "limit_hours": "Limita les hores visibles",
+      "limit_hours_desc": "Mostra només aquestes hores a les vistes de dia i setmana. Els esdeveniments fora d'aquestes hores continuen accessibles amb les fletxes de dalt i de baix de cada dia.",
+      "visible_hours": "Hores visibles",
+      "visible_hours_start": "Inici de les hores visibles",
+      "visible_hours_end": "Final de les hores visibles",
+      "hide_non_working_days": "Amaga els dies no laborables",
+      "hide_non_working_days_desc": "Treu de la vista setmanal els dies que no treballes. Els seus esdeveniments continuen apareixent a les vistes de mes, dia i agenda.",
+      "working_days": "Dies laborables",
       "title": "Configuració del calendari",
       "default_view": "Vista predeterminada",
       "week_starts_on": "La setmana comença el",

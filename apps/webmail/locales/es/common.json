@@ -2942,6 +2942,10 @@
       "tasks_hint": "Tareas (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# evento anterior} other {# eventos anteriores}}",
+      "hidden_after": "{count, plural, one {# evento posterior} other {# eventos posteriores}}",
+      "show_all_hours": "Mostrar todas las horas",
+      "show_display_hours": "Mostrar solo {start} – {end}",
       "create": "Crear evento",
       "edit": "Editar evento",
       "delete": "Eliminar evento",
@@ -3101,6 +3105,14 @@
       "unit": "Unidad del recordatorio"
     },
     "settings": {
+      "limit_hours": "Limitar las horas visibles",
+      "limit_hours_desc": "Mostrar solo estas horas en las vistas de día y semana. Los eventos fuera de ellas siguen accesibles con las flechas de arriba y abajo de cada día.",
+      "visible_hours": "Horas visibles",
+      "visible_hours_start": "Inicio de las horas visibles",
+      "visible_hours_end": "Fin de las horas visibles",
+      "hide_non_working_days": "Ocultar días no laborables",
+      "hide_non_working_days_desc": "Quitar de la vista semanal los días que no trabajas. Sus eventos siguen apareciendo en las vistas de mes, día y agenda.",
+      "working_days": "Días laborables",
       "title": "Configuración del calendario",
       "default_view": "Vista predeterminada",
       "week_starts_on": "La semana comienza el",

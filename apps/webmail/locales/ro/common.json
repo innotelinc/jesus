@@ -2942,6 +2942,10 @@
       "tasks_hint": "Sarcini (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# eveniment anterior} few {# evenimente anterioare} other {# de evenimente anterioare}}",
+      "hidden_after": "{count, plural, one {# eveniment ulterior} few {# evenimente ulterioare} other {# de evenimente ulterioare}}",
+      "show_all_hours": "Afișează toate orele",
+      "show_display_hours": "Afișează doar {start} – {end}",
       "create": "Creați un eveniment",
       "edit": "Editați evenimentul",
       "delete": "Ștergere eveniment",
@@ -3101,6 +3105,14 @@
       "unit": "Unitatea de reamintire"
     },
     "settings": {
+      "limit_hours": "Limitează orele vizibile",
+      "limit_hours_desc": "Afișează doar aceste ore în vizualizările pe zi și pe săptămână. Evenimentele din afara lor rămân accesibile prin săgețile din partea de sus și de jos a fiecărei zile.",
+      "visible_hours": "Ore vizibile",
+      "visible_hours_start": "Începutul orelor vizibile",
+      "visible_hours_end": "Sfârșitul orelor vizibile",
+      "hide_non_working_days": "Ascunde zilele nelucrătoare",
+      "hide_non_working_days_desc": "Omite din vizualizarea pe săptămână zilele în care nu lucrezi. Evenimentele lor apar în continuare în vizualizările pe lună, pe zi și agendă.",
+      "working_days": "Zile lucrătoare",
       "title": "Setări calendar",
       "default_view": "Vizualizare implicită",
       "week_starts_on": "Săptămâna începe pe",

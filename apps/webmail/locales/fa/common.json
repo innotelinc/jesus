@@ -2942,6 +2942,10 @@
       "tasks_hint": "وظایف (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {# رویداد قبلی}}",
+      "hidden_after": "{count, plural, other {# رویداد بعدی}}",
+      "show_all_hours": "نمایش همه ساعت‌ها",
+      "show_display_hours": "فقط نمایش {start} – {end}",
       "create": "ایجاد رویداد",
       "edit": "ویرایش رویداد",
       "delete": "حذف رویداد",
@@ -3101,6 +3105,14 @@
       "unit": "واحد یادآور"
     },
     "settings": {
+      "limit_hours": "محدود کردن ساعت‌های نمایش",
+      "limit_hours_desc": "در نمای روز و هفته فقط این ساعت‌ها نمایش داده می‌شوند. رویدادهای خارج از آن‌ها از طریق پیکان‌های بالا و پایین هر روز در دسترس هستند.",
+      "visible_hours": "ساعت‌های نمایش",
+      "visible_hours_start": "شروع ساعت‌های نمایش",
+      "visible_hours_end": "پایان ساعت‌های نمایش",
+      "hide_non_working_days": "پنهان کردن روزهای تعطیل",
+      "hide_non_working_days_desc": "روزهایی که کار نمی‌کنید از نمای هفته حذف می‌شوند. رویدادهای آن‌ها همچنان در نمای ماه، روز و دستور کار نمایش داده می‌شوند.",
+      "working_days": "روزهای کاری",
       "title": "تنظیمات تقویم",
       "default_view": "نمای پیش‌فرض",
       "week_starts_on": "شروع هفته",

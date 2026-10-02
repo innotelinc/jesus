@@ -2942,6 +2942,10 @@
       "tasks_hint": "Görevler (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {# önceki etkinlik}}",
+      "hidden_after": "{count, plural, other {# sonraki etkinlik}}",
+      "show_all_hours": "Tüm saatleri göster",
+      "show_display_hours": "Yalnızca {start} – {end} göster",
       "create": "Etkinlik oluştur",
       "edit": "Etkinliği düzenle",
       "delete": "Etkinliği sil",
@@ -3101,6 +3105,14 @@
       "unit": "Hatırlatıcı birimi"
     },
     "settings": {
+      "limit_hours": "Görünür saatleri sınırla",
+      "limit_hours_desc": "Gün ve hafta görünümlerinde yalnızca bu saatleri göster. Bunların dışındaki etkinliklere her günün üstündeki ve altındaki oklarla ulaşılabilir.",
+      "visible_hours": "Görünür saatler",
+      "visible_hours_start": "Görünür saatlerin başlangıcı",
+      "visible_hours_end": "Görünür saatlerin bitişi",
+      "hide_non_working_days": "Çalışılmayan günleri gizle",
+      "hide_non_working_days_desc": "Çalışmadığınız günleri hafta görünümünden çıkar. Bu günlerin etkinlikleri ay, gün ve ajanda görünümlerinde görünmeye devam eder.",
+      "working_days": "Çalışma günleri",
       "title": "Takvim ayarları",
       "default_view": "Varsayılan görünüm",
       "week_starts_on": "Hafta başlangıcı",

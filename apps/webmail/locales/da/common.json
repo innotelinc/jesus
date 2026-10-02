@@ -2942,6 +2942,10 @@
       "tasks_hint": "Opgaver (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# tidligere begivenhed} other {# tidligere begivenheder}}",
+      "hidden_after": "{count, plural, one {# senere begivenhed} other {# senere begivenheder}}",
+      "show_all_hours": "Vis alle timer",
+      "show_display_hours": "Vis kun {start} – {end}",
       "create": "Opret begivenhed",
       "edit": "Redigér begivenhed",
       "delete": "Slet begivenhed",
@@ -3101,6 +3105,14 @@
       "unit": "Påmindelsesenhed"
     },
     "settings": {
+      "limit_hours": "Begræns synlige timer",
+      "limit_hours_desc": "Vis kun disse timer i dags- og ugevisningen. Begivenheder uden for dem kan stadig nås via pilene øverst og nederst på hver dag.",
+      "visible_hours": "Synlige timer",
+      "visible_hours_start": "Start på synlige timer",
+      "visible_hours_end": "Slut på synlige timer",
+      "hide_non_working_days": "Skjul fridage",
+      "hide_non_working_days_desc": "Udelad de dage, du ikke arbejder, fra ugevisningen. Deres begivenheder vises stadig i måneds-, dags- og agendavisningen.",
+      "working_days": "Arbejdsdage",
       "title": "Kalenderindstillinger",
       "default_view": "Standardvisning",
       "week_starts_on": "Ugen starter på",

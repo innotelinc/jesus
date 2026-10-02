@@ -2866,6 +2866,10 @@
       "tasks_hint": "משימות (ק)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {אירוע מוקדם יותר אחד} other {# אירועים מוקדמים יותר}}",
+      "hidden_after": "{count, plural, one {אירוע מאוחר יותר אחד} other {# אירועים מאוחרים יותר}}",
+      "show_all_hours": "הצגת כל השעות",
+      "show_display_hours": "הצגת {start} – {end} בלבד",
       "create": "צור אירוע",
       "edit": "ערוך אירוע",
       "delete": "מחק את האירוע",
@@ -3025,6 +3029,14 @@
       "unit": "יחידת תזכורת"
     },
     "settings": {
+      "limit_hours": "הגבלת השעות המוצגות",
+      "limit_hours_desc": "הצגת שעות אלה בלבד בתצוגת היום והשבוע. אירועים מחוץ להן נשארים נגישים דרך החצים בראש ובתחתית כל יום.",
+      "visible_hours": "שעות מוצגות",
+      "visible_hours_start": "תחילת השעות המוצגות",
+      "visible_hours_end": "סוף השעות המוצגות",
+      "hide_non_working_days": "הסתרת ימים שאינם ימי עבודה",
+      "hide_non_working_days_desc": "השמטת הימים שבהם אינך עובד/ת מתצוגת השבוע. האירועים שלהם עדיין מופיעים בתצוגות החודש, היום וסדר היום.",
+      "working_days": "ימי עבודה",
       "title": "הגדרות לוח שנה",
       "default_view": "תצוגת ברירת מחדל",
       "week_starts_on": "השבוע מתחיל ב",

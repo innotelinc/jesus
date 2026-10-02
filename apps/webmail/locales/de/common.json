@@ -2942,6 +2942,10 @@
       "tasks_hint": "Aufgaben (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# früherer Termin} other {# frühere Termine}}",
+      "hidden_after": "{count, plural, one {# späterer Termin} other {# spätere Termine}}",
+      "show_all_hours": "Alle Stunden anzeigen",
+      "show_display_hours": "Nur {start} – {end} anzeigen",
       "create": "Termin erstellen",
       "edit": "Termin bearbeiten",
       "delete": "Termin löschen",
@@ -3101,6 +3105,14 @@
       "unit": "Erinnerungseinheit"
     },
     "settings": {
+      "limit_hours": "Sichtbare Stunden begrenzen",
+      "limit_hours_desc": "In der Tages- und Wochenansicht nur diese Stunden anzeigen. Termine außerhalb bleiben über die Pfeile oben und unten an jedem Tag erreichbar.",
+      "visible_hours": "Sichtbare Stunden",
+      "visible_hours_start": "Beginn der sichtbaren Stunden",
+      "visible_hours_end": "Ende der sichtbaren Stunden",
+      "hide_non_working_days": "Arbeitsfreie Tage ausblenden",
+      "hide_non_working_days_desc": "Tage, an denen du nicht arbeitest, in der Wochenansicht weglassen. Ihre Termine erscheinen weiterhin in der Monats-, Tages- und Agendaansicht.",
+      "working_days": "Arbeitstage",
       "title": "Kalendereinstellungen",
       "default_view": "Standardansicht",
       "week_starts_on": "Woche beginnt am",

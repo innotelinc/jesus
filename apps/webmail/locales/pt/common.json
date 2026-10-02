@@ -2942,6 +2942,10 @@
       "tasks_hint": "Tarefas (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# evento anterior} other {# eventos anteriores}}",
+      "hidden_after": "{count, plural, one {# evento posterior} other {# eventos posteriores}}",
+      "show_all_hours": "Mostrar todas as horas",
+      "show_display_hours": "Mostrar apenas {start} – {end}",
       "create": "Criar evento",
       "edit": "Editar evento",
       "delete": "Excluir evento",
@@ -3101,6 +3105,14 @@
       "unit": "Unidade do lembrete"
     },
     "settings": {
+      "limit_hours": "Limitar as horas visíveis",
+      "limit_hours_desc": "Mostrar apenas estas horas nas visualizações de dia e semana. Os eventos fora delas continuam acessíveis pelas setas no topo e na base de cada dia.",
+      "visible_hours": "Horas visíveis",
+      "visible_hours_start": "Início das horas visíveis",
+      "visible_hours_end": "Fim das horas visíveis",
+      "hide_non_working_days": "Ocultar dias não úteis",
+      "hide_non_working_days_desc": "Remover da visualização semanal os dias em que você não trabalha. Os eventos desses dias continuam aparecendo nas visualizações de mês, dia e agenda.",
+      "working_days": "Dias úteis",
       "title": "Configurações do calendário",
       "default_view": "Visualização padrão",
       "week_starts_on": "Semana começa em",

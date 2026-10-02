@@ -2942,6 +2942,10 @@
       "tasks_hint": "할 일 (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {이전 일정 #개}}",
+      "hidden_after": "{count, plural, other {이후 일정 #개}}",
+      "show_all_hours": "모든 시간 표시",
+      "show_display_hours": "{start} – {end}만 표시",
       "create": "일정 만들기",
       "edit": "일정 수정",
       "delete": "일정 삭제",
@@ -3101,6 +3105,14 @@
       "unit": "알림 단위"
     },
     "settings": {
+      "limit_hours": "표시 시간 제한",
+      "limit_hours_desc": "일간 및 주간 보기에서 이 시간대만 표시합니다. 범위 밖의 일정은 각 날짜 위아래의 화살표로 볼 수 있습니다.",
+      "visible_hours": "표시 시간",
+      "visible_hours_start": "표시 시작 시간",
+      "visible_hours_end": "표시 종료 시간",
+      "hide_non_working_days": "휴무일 숨기기",
+      "hide_non_working_days_desc": "근무하지 않는 요일을 주간 보기에서 제외합니다. 해당 일정은 월간, 일간, 일정 목록 보기에 계속 표시됩니다.",
+      "working_days": "근무일",
       "title": "캘린더 설정",
       "default_view": "기본 뷰",
       "week_starts_on": "한 주의 시작",

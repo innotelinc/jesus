@@ -2942,6 +2942,10 @@
       "tasks_hint": "Taken (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# eerder evenement} other {# eerdere evenementen}}",
+      "hidden_after": "{count, plural, one {# later evenement} other {# latere evenementen}}",
+      "show_all_hours": "Alle uren tonen",
+      "show_display_hours": "Alleen {start} – {end} tonen",
       "create": "Evenement aanmaken",
       "edit": "Evenement bewerken",
       "delete": "Evenement verwijderen",
@@ -3101,6 +3105,14 @@
       "unit": "Herinneringseenheid"
     },
     "settings": {
+      "limit_hours": "Zichtbare uren beperken",
+      "limit_hours_desc": "Toon alleen deze uren in de dag- en weekweergave. Evenementen daarbuiten blijven bereikbaar via de pijlen boven en onder elke dag.",
+      "visible_hours": "Zichtbare uren",
+      "visible_hours_start": "Begin van de zichtbare uren",
+      "visible_hours_end": "Einde van de zichtbare uren",
+      "hide_non_working_days": "Niet-werkdagen verbergen",
+      "hide_non_working_days_desc": "Laat de dagen waarop je niet werkt weg uit de weekweergave. Hun evenementen blijven zichtbaar in de maand-, dag- en agendaweergave.",
+      "working_days": "Werkdagen",
       "title": "Agenda-instellingen",
       "default_view": "Standaardweergave",
       "week_starts_on": "Week begint op",
