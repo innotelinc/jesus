@@ -24,7 +24,8 @@
       "generic": "An unexpected error occurred. If this persists, contact your administrator.",
       "totp_required": "A two-factor authentication code is required. Please enter your code below.",
       "totp_invalid": "Invalid authentication code. Please check your authenticator app and try again.",
-      "oauth_discovery_failed": "SSO is enabled but the identity provider could not be reached. Check your OAuth configuration."
+      "oauth_discovery_failed": "SSO is enabled but the identity provider could not be reached. Check your OAuth configuration.",
+      "token_exchange_failed": "Your password and code were accepted, but the mail server refused to start a session for this app. Ask your administrator to check its OAuth client settings."
     },
     "show_password": "Show password",
     "hide_password": "Hide password",
