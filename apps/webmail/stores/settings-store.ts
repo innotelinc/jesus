@@ -373,6 +373,14 @@ interface SettingsState {
   /** Scroll continuously through months/weeks/days (#759) instead of one period at a time. */
   calendarFreeScroll: boolean;
   calendarHoverPreview: CalendarHoverPreview;
+  /** Draw only calendarDayStartHour..calendarDayEndHour in the day and week views (#1164). */
+  calendarLimitHours: boolean;
+  calendarDayStartHour: number;
+  calendarDayEndHour: number;
+  /** Leave the days missing from calendarWorkingDays out of the week view (#1164). */
+  calendarHideNonWorkingDays: boolean;
+  /** Weekdays as `Date.getDay` numbers (0 = Sunday). */
+  calendarWorkingDays: number[];
 
   // Calendar Tasks
   enableCalendarTasks: boolean;
@@ -618,6 +626,11 @@ const DEFAULT_SETTINGS = {
   showWeekNumbers: false,
   calendarFreeScroll: true,
   calendarHoverPreview: 'delay-500ms' as CalendarHoverPreview,
+  calendarLimitHours: true,
+  calendarDayStartHour: 8,
+  calendarDayEndHour: 20,
+  calendarHideNonWorkingDays: false,
+  calendarWorkingDays: [1, 2, 3, 4, 5] as number[],
 
   // Calendar Tasks
   enableCalendarTasks: false,
@@ -858,6 +871,11 @@ export const useSettingsStore = create<SettingsState>()(
           showWeekNumbers: state.showWeekNumbers,
           calendarFreeScroll: state.calendarFreeScroll,
           calendarHoverPreview: state.calendarHoverPreview,
+          calendarLimitHours: state.calendarLimitHours,
+          calendarDayStartHour: state.calendarDayStartHour,
+          calendarDayEndHour: state.calendarDayEndHour,
+          calendarHideNonWorkingDays: state.calendarHideNonWorkingDays,
+          calendarWorkingDays: state.calendarWorkingDays,
           toolbarPosition: state.toolbarPosition,
           hideAccountSwitcher: state.hideAccountSwitcher,
           showRailAccountList: state.showRailAccountList,

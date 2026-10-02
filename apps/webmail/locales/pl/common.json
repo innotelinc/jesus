@@ -2942,6 +2942,10 @@
       "tasks_hint": "Zadania (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# wcześniejsze wydarzenie} few {# wcześniejsze wydarzenia} many {# wcześniejszych wydarzeń} other {# wcześniejszego wydarzenia}}",
+      "hidden_after": "{count, plural, one {# późniejsze wydarzenie} few {# późniejsze wydarzenia} many {# późniejszych wydarzeń} other {# późniejszego wydarzenia}}",
+      "show_all_hours": "Pokaż wszystkie godziny",
+      "show_display_hours": "Pokaż tylko {start} – {end}",
       "create": "Utwórz wydarzenie",
       "edit": "Edytuj wydarzenie",
       "delete": "Usuń wydarzenie",
@@ -3101,6 +3105,14 @@
       "unit": "Jednostka przypomnienia"
     },
     "settings": {
+      "limit_hours": "Ogranicz widoczne godziny",
+      "limit_hours_desc": "Pokazuj w widoku dnia i tygodnia tylko te godziny. Wydarzenia poza nimi są dostępne przez strzałki u góry i u dołu każdego dnia.",
+      "visible_hours": "Widoczne godziny",
+      "visible_hours_start": "Początek widocznych godzin",
+      "visible_hours_end": "Koniec widocznych godzin",
+      "hide_non_working_days": "Ukryj dni wolne od pracy",
+      "hide_non_working_days_desc": "Pomijaj w widoku tygodnia dni, w które nie pracujesz. Ich wydarzenia nadal widać w widokach miesiąca, dnia i agendy.",
+      "working_days": "Dni robocze",
       "title": "Ustawienia kalendarza",
       "default_view": "Domyślny widok",
       "week_starts_on": "Tydzień zaczyna się w",

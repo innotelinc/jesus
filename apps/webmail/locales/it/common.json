@@ -2942,6 +2942,10 @@
       "tasks_hint": "Attività (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# evento precedente} other {# eventi precedenti}}",
+      "hidden_after": "{count, plural, one {# evento successivo} other {# eventi successivi}}",
+      "show_all_hours": "Mostra tutte le ore",
+      "show_display_hours": "Mostra solo {start} – {end}",
       "create": "Crea evento",
       "edit": "Modifica evento",
       "delete": "Elimina evento",
@@ -3101,6 +3105,14 @@
       "unit": "Unità promemoria"
     },
     "settings": {
+      "limit_hours": "Limita le ore visibili",
+      "limit_hours_desc": "Mostra solo queste ore nelle viste giorno e settimana. Gli eventi al di fuori restano raggiungibili con le frecce in alto e in basso di ogni giorno.",
+      "visible_hours": "Ore visibili",
+      "visible_hours_start": "Inizio delle ore visibili",
+      "visible_hours_end": "Fine delle ore visibili",
+      "hide_non_working_days": "Nascondi i giorni non lavorativi",
+      "hide_non_working_days_desc": "Togli dalla vista settimanale i giorni in cui non lavori. I loro eventi restano visibili nelle viste mese, giorno e agenda.",
+      "working_days": "Giorni lavorativi",
       "title": "Impostazioni calendario",
       "default_view": "Vista predefinita",
       "week_starts_on": "La settimana inizia il",

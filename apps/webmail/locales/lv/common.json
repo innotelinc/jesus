@@ -2941,6 +2941,10 @@
       "tasks_hint": "Uzdevumi (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, zero {# agrāku notikumu} one {# agrāks notikums} other {# agrāki notikumi}}",
+      "hidden_after": "{count, plural, zero {# vēlāku notikumu} one {# vēlāks notikums} other {# vēlāki notikumi}}",
+      "show_all_hours": "Rādīt visas stundas",
+      "show_display_hours": "Rādīt tikai {start} – {end}",
       "create": "Izveidot pasākumu",
       "edit": "Rediģēt pasākumu",
       "delete": "Dzēst pasākumu",
@@ -3100,6 +3104,14 @@
       "unit": "Atgādinājuma vienība"
     },
     "settings": {
+      "limit_hours": "Ierobežot redzamās stundas",
+      "limit_hours_desc": "Dienas un nedēļas skatā rādīt tikai šīs stundas. Notikumi ārpus tām ir pieejami ar bultiņām katras dienas augšā un apakšā.",
+      "visible_hours": "Redzamās stundas",
+      "visible_hours_start": "Redzamo stundu sākums",
+      "visible_hours_end": "Redzamo stundu beigas",
+      "hide_non_working_days": "Slēpt brīvdienas",
+      "hide_non_working_days_desc": "Izlaist no nedēļas skata dienas, kurās nestrādājat. To notikumi joprojām redzami mēneša, dienas un darba kārtības skatā.",
+      "working_days": "Darba dienas",
       "title": "Kalendāra iestatījumi",
       "default_view": "Noklusējuma skats",
       "week_starts_on": "Nedēļa sākas ar",

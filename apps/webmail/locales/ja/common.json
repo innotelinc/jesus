@@ -2942,6 +2942,10 @@
       "tasks_hint": "タスク (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {これより前の予定 # 件}}",
+      "hidden_after": "{count, plural, other {これより後の予定 # 件}}",
+      "show_all_hours": "すべての時間を表示",
+      "show_display_hours": "{start}～{end} のみ表示",
       "create": "予定を作成",
       "edit": "予定を編集",
       "delete": "予定を削除",
@@ -3101,6 +3105,14 @@
       "unit": "リマインダー単位"
     },
     "settings": {
+      "limit_hours": "表示する時間帯を制限",
+      "limit_hours_desc": "日表示と週表示でこの時間帯だけを表示します。範囲外の予定には各日の上下にある矢印からアクセスできます。",
+      "visible_hours": "表示する時間帯",
+      "visible_hours_start": "表示開始時刻",
+      "visible_hours_end": "表示終了時刻",
+      "hide_non_working_days": "休日を非表示",
+      "hide_non_working_days_desc": "勤務しない曜日を週表示から除外します。その日の予定は月表示・日表示・予定リストに引き続き表示されます。",
+      "working_days": "勤務日",
       "title": "カレンダー設定",
       "default_view": "デフォルトの表示",
       "week_starts_on": "週の開始曜日",

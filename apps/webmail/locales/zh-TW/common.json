@@ -2942,6 +2942,10 @@
       "tasks_hint": "任務 (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {較早的活動 # 個}}",
+      "hidden_after": "{count, plural, other {較晚的活動 # 個}}",
+      "show_all_hours": "顯示所有時段",
+      "show_display_hours": "僅顯示 {start} – {end}",
       "create": "建立活動",
       "edit": "編輯活動",
       "delete": "刪除活動",
@@ -3101,6 +3105,14 @@
       "unit": "提醒單位"
     },
     "settings": {
+      "limit_hours": "限制顯示時段",
+      "limit_hours_desc": "在日檢視和週檢視中只顯示這些時段。範圍外的活動仍可透過每天頂部和底部的箭頭查看。",
+      "visible_hours": "顯示時段",
+      "visible_hours_start": "顯示開始時間",
+      "visible_hours_end": "顯示結束時間",
+      "hide_non_working_days": "隱藏非工作日",
+      "hide_non_working_days_desc": "在週檢視中省略你不工作的日子。這些日子的活動仍會顯示在月、日和行程檢視中。",
+      "working_days": "工作日",
       "title": "行事曆設定",
       "default_view": "預設檢視",
       "week_starts_on": "一週開始於",

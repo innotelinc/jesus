@@ -2942,6 +2942,10 @@
       "tasks_hint": "Feladatok (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# korábbi esemény} other {# korábbi esemény}}",
+      "hidden_after": "{count, plural, one {# későbbi esemény} other {# későbbi esemény}}",
+      "show_all_hours": "Minden óra megjelenítése",
+      "show_display_hours": "Csak {start} – {end} megjelenítése",
       "create": "Esemény létrehozása",
       "edit": "Esemény szerkesztése",
       "delete": "Esemény törlése",
@@ -3101,6 +3105,14 @@
       "unit": "Emlékeztető egysége"
     },
     "settings": {
+      "limit_hours": "Látható órák korlátozása",
+      "limit_hours_desc": "A napi és heti nézetben csak ezeket az órákat mutatja. Az ezen kívül eső események a napok tetején és alján lévő nyilakkal érhetők el.",
+      "visible_hours": "Látható órák",
+      "visible_hours_start": "Látható órák kezdete",
+      "visible_hours_end": "Látható órák vége",
+      "hide_non_working_days": "Munkaszüneti napok elrejtése",
+      "hide_non_working_days_desc": "A heti nézetből kimaradnak azok a napok, amikor nem dolgozol. Eseményeik továbbra is megjelennek a havi, napi és napirend nézetben.",
+      "working_days": "Munkanapok",
       "title": "Naptár beállítások",
       "default_view": "Alapértelmezett nézet",
       "week_starts_on": "Hét kezdőnapja",

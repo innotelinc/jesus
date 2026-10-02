@@ -2942,6 +2942,10 @@
       "tasks_hint": "任务 (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, other {更早的日程 # 个}}",
+      "hidden_after": "{count, plural, other {更晚的日程 # 个}}",
+      "show_all_hours": "显示全部时段",
+      "show_display_hours": "仅显示 {start} – {end}",
       "create": "创建活动",
       "edit": "编辑活动",
       "delete": "删除活动",
@@ -3101,6 +3105,14 @@
       "unit": "提醒单位"
     },
     "settings": {
+      "limit_hours": "限制显示时段",
+      "limit_hours_desc": "在日视图和周视图中只显示这些时段。范围外的日程仍可通过每天顶部和底部的箭头查看。",
+      "visible_hours": "显示时段",
+      "visible_hours_start": "显示开始时间",
+      "visible_hours_end": "显示结束时间",
+      "hide_non_working_days": "隐藏非工作日",
+      "hide_non_working_days_desc": "在周视图中省略你不工作的日子。这些日子的日程仍会显示在月、日和日程列表视图中。",
+      "working_days": "工作日",
       "title": "日历设置",
       "default_view": "默认视图",
       "week_starts_on": "一周开始于",

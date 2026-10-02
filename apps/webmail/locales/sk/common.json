@@ -2942,6 +2942,10 @@
       "tasks_hint": "Úlohy (k)"
     },
     "events": {
+      "hidden_before": "{count, plural, one {# skoršia udalosť} few {# skoršie udalosti} many {# skoršej udalosti} other {# skorších udalostí}}",
+      "hidden_after": "{count, plural, one {# neskoršia udalosť} few {# neskoršie udalosti} many {# neskoršej udalosti} other {# neskorších udalostí}}",
+      "show_all_hours": "Zobraziť všetky hodiny",
+      "show_display_hours": "Zobraziť len {start} – {end}",
       "create": "Vytvoriť udalosť",
       "edit": "Upraviť udalosť",
       "delete": "Odstrániť udalosť",
@@ -3101,6 +3105,14 @@
       "unit": "Jednotka pripomenutia"
     },
     "settings": {
+      "limit_hours": "Obmedziť zobrazené hodiny",
+      "limit_hours_desc": "V dennom a týždennom zobrazení ukazovať len tieto hodiny. Udalosti mimo nich sú dostupné cez šípky hore a dole pri každom dni.",
+      "visible_hours": "Zobrazené hodiny",
+      "visible_hours_start": "Začiatok zobrazených hodín",
+      "visible_hours_end": "Koniec zobrazených hodín",
+      "hide_non_working_days": "Skryť nepracovné dni",
+      "hide_non_working_days_desc": "Vynechať z týždenného zobrazenia dni, keď nepracujete. Ich udalosti sa naďalej zobrazujú v mesačnom, dennom a agendovom zobrazení.",
+      "working_days": "Pracovné dni",
       "title": "Nastavenia kalendára",
       "default_view": "Predvolené zobrazenie",
       "week_starts_on": "Týždeň začína v",
