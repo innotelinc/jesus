@@ -9028,6 +9028,7 @@ export class JMAPClient implements IJMAPClient {
     fromAccountId: string,
     toAccountId: string,
     destMailboxId: string,
+    options?: { keepOriginal?: boolean },
   ): Promise<string> {
     // Email/copy drops keywords unless the create sets them, so carry the
     // source's over — otherwise the moved message shows up as unread.
@@ -9059,6 +9060,7 @@ export class JMAPClient implements IJMAPClient {
     if (!id) {
       throw new Error("Email/copy succeeded but no ID returned");
     }
+    if (options?.keepOriginal) return id;
 
     const destroyResponse = await this.request([
       ["Email/set", { accountId: fromAccountId, destroy: [emailId] }, "0"],
