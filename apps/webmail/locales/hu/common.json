@@ -2120,7 +2120,8 @@
         "subject": "Tárgy",
         "header": "Egyéni fejléc",
         "size": "Méret",
-        "body": "Törzs"
+        "body": "Törzs",
+        "all": "Minden üzenet"
       },
       "comparators": {
         "has_any": "jelen van",

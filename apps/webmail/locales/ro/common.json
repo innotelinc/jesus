@@ -2124,7 +2124,8 @@
         "subject": "Subiect",
         "header": "Antet personalizat",
         "size": "Dimensiune",
-        "body": "Corpul mesajului"
+        "body": "Corpul mesajului",
+        "all": "Toate mesajele"
       },
       "comparators": {
         "has_any": "este prezent",

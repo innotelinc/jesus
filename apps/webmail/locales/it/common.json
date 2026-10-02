@@ -2117,7 +2117,8 @@
         "subject": "Oggetto",
         "header": "Intestazione personalizzata",
         "size": "Dimensione",
-        "body": "Corpo"
+        "body": "Corpo",
+        "all": "Tutti i messaggi"
       },
       "comparators": {
         "has_any": "è presente",

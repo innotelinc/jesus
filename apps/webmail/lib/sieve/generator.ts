@@ -36,6 +36,9 @@ function formatStringArg(values: string[], transform: (s: string) => string = (s
 function generateCondition(condition: FilterCondition): string {
   const { field, comparator, value } = condition;
 
+  // Every message: there is nothing to compare.
+  if (field === 'all') return 'true';
+
   if (field === 'size') {
     // Size is numeric, single value only. It is written unquoted, so
     // anything but a number (with an optional K/M/G quantifier) would be

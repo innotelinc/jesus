@@ -2117,7 +2117,8 @@
         "subject": "Asunto",
         "header": "Encabezado personalizado",
         "size": "Tamaño",
-        "body": "Cuerpo"
+        "body": "Cuerpo",
+        "all": "Todos los mensajes"
       },
       "comparators": {
         "has_any": "está presente",
