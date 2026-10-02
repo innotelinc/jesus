@@ -70,4 +70,29 @@ describe('Copy to entry of the message menu', () => {
     expect(screen.getByTestId('move-to:archive')).toBeTruthy();
     expect(screen.queryByTestId('move-to:b-work')).toBeNull();
   });
+
+  it('offers the shared account folders first for a message in a shared mailbox (#1149)', () => {
+    const sharedBox = (id: string, name: string, role?: string) =>
+      mailbox(`S:${id}`, { name, role, originalId: id, accountId: 'S', accountName: 'info@example.org', isShared: true });
+    const mailboxes = [
+      mailbox('inbox', { role: 'inbox', name: 'Inbox', accountId: 'A', accountName: 'me@example.org' }),
+      mailbox('junk', { role: 'junk', name: 'Junk', accountId: 'A', accountName: 'me@example.org' }),
+      sharedBox('inbox', 'Inbox', 'inbox'),
+      sharedBox('junk', 'Junk', 'junk'),
+    ];
+    const onMoveToMailbox = vi.fn();
+    renderMenu({
+      email: { id: 'e1', keywords: { $seen: true }, mailboxIds: { 'S:inbox': true } } as unknown as Email,
+      mailboxes,
+      selectedMailbox: 'S:inbox',
+      onMoveToMailbox,
+    });
+    fireEvent.mouseEnter(screen.getByTestId('ctx-move-to').parentElement!);
+
+    const items = screen.getAllByTestId(/^move-to:/).map((el) => el.getAttribute('data-testid'));
+    expect(items).toEqual(['move-to:S:junk', 'move-to:inbox', 'move-to:junk']);
+
+    fireEvent.click(screen.getByTestId('move-to:S:junk'));
+    expect(onMoveToMailbox).toHaveBeenCalledWith('S:junk');
+  });
 });

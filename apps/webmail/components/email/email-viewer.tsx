@@ -14,7 +14,8 @@ import { buildContactsPath, buildMailPath } from "@/lib/deep-links";
 import { useCopyLink } from "@/hooks/use-copy-link";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
-import { formatFileSize, cn, buildMailboxTree, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
+import { formatFileSize, cn, MailboxNode, formatDateTime, generateUUID } from "@/lib/utils";
+import { buildMoveTargets, resolveMoveOwnerAccountId } from "@/lib/move-targets";
 import { emailDisplayDate } from "@/lib/email-date";
 import { TagBadge } from "./tag-badge";
 import { TagPicker } from "./tag-picker";
@@ -1018,32 +1019,12 @@ export function EmailViewer({
   }, [detailSidebarWidth]);
 
 
-  // Build mailbox tree for move-to dropdown
-  const moveTargetIds = useMemo(() => new Set(
-    mailboxes
-      .filter(
-        (m) =>
-          m.id !== selectedMailbox &&
-          m.role !== "drafts" &&
-          !m.id.startsWith("shared-") &&
-          m.myRights?.mayAddItems
-      )
-      .map((m) => m.id)
-  ), [mailboxes, selectedMailbox]);
-
-  const moveTree = useMemo(() => {
-    const tree = buildMailboxTree(mailboxes);
-    const filterTree = (nodes: MailboxNode[]): MailboxNode[] => {
-      return nodes.reduce<MailboxNode[]>((acc, node) => {
-        const filteredChildren = filterTree(node.children);
-        if (moveTargetIds.has(node.id) || filteredChildren.length > 0) {
-          acc.push({ ...node, children: filteredChildren });
-        }
-        return acc;
-      }, []);
-    };
-    return filterTree(tree);
-  }, [mailboxes, moveTargetIds]);
+  // Move-to dropdown: the message's own account first (#1149)
+  const moveOwnerAccountId = resolveMoveOwnerAccountId(email, mailboxes, selectedMailbox);
+  const { tree: moveTree, targetIds: moveTargetIds } = useMemo(
+    () => buildMoveTargets(mailboxes, { currentMailboxId: selectedMailbox, ownerAccountId: moveOwnerAccountId }),
+    [mailboxes, selectedMailbox, moveOwnerAccountId],
+  );
 
   // Get mailbox icon based on role
   const getMoveMailboxIcon = (role?: string) => {
