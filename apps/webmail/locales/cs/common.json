@@ -1973,7 +1973,8 @@
         "button": "Importovat"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Zdrojový kód"
       },
       "spam_siege": {
         "title": "Spam Siege",

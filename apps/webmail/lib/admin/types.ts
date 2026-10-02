@@ -215,6 +215,10 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   loginImprintUrl: { envVar: 'LOGIN_IMPRINT_URL', type: 'url', defaultValue: '' },
   loginPrivacyPolicyUrl: { envVar: 'LOGIN_PRIVACY_POLICY_URL', type: 'url', defaultValue: '' },
   loginWebsiteUrl: { envVar: 'LOGIN_WEBSITE_URL', type: 'url', defaultValue: '' },
+  // Where users get the source of the build they are running (AGPL-3.0 §13).
+  // Operators of a modified build point it at their fork; the About card then
+  // links there instead of the upstream repository (#1161). Empty = upstream.
+  sourceCodeUrl: { envVar: 'SOURCE_CODE_URL', type: 'url', defaultValue: '' },
   // Login header customization. The logo box is otherwise a fixed 64×64
   // (w-16/h-16), which fits a wide wordmark to ~13px tall; set a max height
   // and/or width (any CSS length, e.g. "230px" or "3rem") to size it. The

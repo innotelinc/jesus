@@ -1973,7 +1973,8 @@
         "button": "İçe Aktar"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Kaynak kodu"
       },
       "spam_siege": {
         "title": "Spam Siege",

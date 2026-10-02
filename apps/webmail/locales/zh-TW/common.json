@@ -1980,7 +1980,8 @@
         "button": "匯入"
       },
       "about": {
-        "title": "Bulwark 網頁郵件"
+        "title": "Bulwark 網頁郵件",
+        "source_code": "原始碼"
       },
       "spam_siege": {
         "title": "Spam Siege",

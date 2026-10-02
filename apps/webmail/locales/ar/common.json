@@ -1980,7 +1980,8 @@
         "button": "استيراد"
       },
       "about": {
-        "title": "بريد Bulwark الإلكتروني"
+        "title": "بريد Bulwark الإلكتروني",
+        "source_code": "الشيفرة المصدرية"
       },
       "spam_siege": {
         "title": "Spam Siege",

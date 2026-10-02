@@ -1980,7 +1980,8 @@
         "button": "Import"
       },
       "about": {
-        "title": "Bulwark Webmail"
+        "title": "Bulwark Webmail",
+        "source_code": "Cod sursă"
       },
       "spam_siege": {
         "title": "Spam Siege",
