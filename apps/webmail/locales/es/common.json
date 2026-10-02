@@ -819,6 +819,8 @@
     "emails_moved": "{count} correos movidos",
     "moved_to_mailbox": "Movido a {mailbox}",
     "move_failed": "Error al mover",
+    "emails_copied": "{count} correos copiados",
+    "copy_failed": "Error al copiar",
     "move_error": "No se pudieron mover los correos a la carpeta seleccionada",
     "email_tagged": "Correo etiquetado",
     "emails_tagged": "{count} correos etiquetados",
@@ -2117,7 +2119,8 @@
         "subject": "Asunto",
         "header": "Encabezado personalizado",
         "size": "Tamaño",
-        "body": "Cuerpo"
+        "body": "Cuerpo",
+        "all": "Todos los mensajes"
       },
       "comparators": {
         "has_any": "está presente",
@@ -2355,6 +2358,7 @@
     "pin": "Anclar",
     "unpin": "Desanclar",
     "move_to": "Mover a...",
+    "copy_to_account": "Copiar a cuenta...",
     "archive": "Archivar",
     "delete": "Eliminar",
     "mark_as_spam": "Reportar spam",

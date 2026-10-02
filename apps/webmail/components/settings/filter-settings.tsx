@@ -13,6 +13,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 import type { FilterRule } from "@/lib/jmap/sieve-types";
 import type { Mailbox } from "@/lib/jmap/types";
+import { forwardsAround, worstCaseForwards } from "@/lib/filters/forward-limit";
 import { useVacationStore } from "@/stores/vacation-store";
 import { useManagedAccountStore } from "@/stores/managed-account-store";
 import {
@@ -32,11 +33,13 @@ function isReadonlyRule(r: FilterRule): boolean {
   return r.origin === "external" || r.origin === "opaque";
 }
 
-function RuleSummary({ rule }: { rule: FilterRule }) {
+export function RuleSummary({ rule }: { rule: FilterRule }) {
   const t = useTranslations("settings.filters");
 
   const conditions = rule.conditions.slice(0, 2).map((c) => {
     const field = t(`condition_fields.${c.field}`);
+    // "All messages" says it all: no comparator, no value.
+    if (c.field === "all") return field;
     const comparator = t(`comparators.${c.comparator}`);
     // has_any is a no-value test ("attachment is present"); appending
     // `""` would look broken in the summary line.
@@ -100,7 +103,9 @@ export function VisualRuleSummary({ rule }: { rule: FilterRule }) {
         </span>
         {rule.conditions.map((c, i) => {
           const field = t(`condition_fields.${c.field}`);
-          const comparator = t(`comparators.${c.comparator}`);
+          // "All messages" says it all: no comparator, no value.
+          const everyMessage = c.field === "all";
+          const comparator = everyMessage ? null : t(`comparators.${c.comparator}`);
           return (
             <span key={i} className="contents">
               {i > 0 && (
@@ -108,8 +113,8 @@ export function VisualRuleSummary({ rule }: { rule: FilterRule }) {
               )}
               <span className="inline-flex min-w-0 max-w-full items-baseline gap-1 px-1.5 py-px rounded-sm bg-muted/60 text-foreground">
                 <span className="shrink-0 font-medium text-blue-600 dark:text-blue-400">{field}</span>
-                <span className="shrink-0 text-muted-foreground">{comparator}</span>
-                {!(c.field === "attachment" && c.comparator === "has_any") && (
+                {!everyMessage && <span className="shrink-0 text-muted-foreground">{comparator}</span>}
+                {!everyMessage && !(c.field === "attachment" && c.comparator === "has_any") && (
                   // The values of one condition stay in its chip, where "or"
                   // cannot be mistaken for the joiner between conditions. They
                   // wrap between each other under the first value, the "or"
@@ -247,6 +252,20 @@ export function FilterSettings() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const draggedIndexRef = useRef<number | null>(null);
+
+  // A message can collect only so many forwards on this server. The rules run
+  // in the order listed, and one that stops ends the script for its messages,
+  // so the order counts (see lib/filters/forward-limit.ts).
+  const redirectLimit = sieveCapabilities?.maxNumberRedirects;
+  const tooManyForwards =
+    typeof redirectLimit === "number" && redirectLimit > 0 && worstCaseForwards(rules) > redirectLimit;
+  // The edited rule where it is; a new one goes below Bulwark's own rules.
+  const editedIndex = editingRule ? rules.findIndex((r) => r.id === editingRule.id) : -1;
+  const forwardsOfEdited = forwardsAround(
+    rules,
+    editedIndex >= 0 ? editedIndex : rules.filter((r) => !isReadonlyRule(r)).length,
+    editedIndex >= 0,
+  );
 
   useEffect(() => {
     if (client && isSupported) {
@@ -516,6 +535,12 @@ export function FilterSettings() {
           </div>
         )}
 
+        {!isOpaque && tooManyForwards && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {t("forward_limit", { count: redirectLimit })}
+          </p>
+        )}
+
         {!isOpaque && rules.length > 0 && (
           <div className="space-y-1" role="list" aria-label={t("rule_list")}>
             {rules.map((rule, index) => {
@@ -702,9 +727,8 @@ export function FilterSettings() {
           rule={editingRule}
           mailboxes={mailboxes}
           maxRedirects={sieveCapabilities?.maxNumberRedirects}
-          otherForwards={rules
-            .filter((r) => r.enabled && r.id !== editingRule?.id)
-            .reduce((n, r) => n + r.actions.filter((a) => a.type === "forward").length, 0)}
+          forwardsBefore={forwardsOfEdited.before}
+          forwardsAfter={forwardsOfEdited.after}
           onSave={handleSaveRule}
           onClose={() => {
             setShowRuleModal(false);
