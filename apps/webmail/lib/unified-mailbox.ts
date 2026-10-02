@@ -93,11 +93,16 @@ export function jmapMailboxIdOf(account: UnifiedAccountClient, mailbox: Mailbox)
  * search, or null when the account has neither folder.
  */
 export function trashAndJunkExclusion(account: UnifiedAccountClient): Record<string, unknown> | null {
-  const ids = (['trash', 'junk'] as const)
+  const ids = trashAndJunkIds(account);
+  return ids.length > 0 ? { inMailboxOtherThan: ids } : null;
+}
+
+/** The JMAP ids of an account's Trash and Junk folders (those it has). */
+export function trashAndJunkIds(account: UnifiedAccountClient): string[] {
+  return (['trash', 'junk'] as const)
     .map((role) => findMailboxByRole(account.mailboxes, role))
     .filter((mailbox): mailbox is Mailbox => Boolean(mailbox))
     .map((mailbox) => jmapMailboxIdOf(account, mailbox));
-  return ids.length > 0 ? { inMailboxOtherThan: ids } : null;
 }
 
 /**
@@ -545,6 +550,11 @@ export async function advancedSearchCrossViewEmails(
  * the same page (`limit`/`position`) with pinned-first ordering plus the
  * configured list order, mirroring `fetchEmails`, and the pages are merged
  * under that same order. Per-account failures land in `errors`.
+ *
+ * Trash and Junk are left out, as in Gmail's label views: a deleted message
+ * keeps its keywords, so it stayed listed under the tag (and came back on
+ * every refresh after Delete removed the row), looking no different from
+ * live mail (#1156). It is still reachable from the Trash folder itself.
  */
 export async function fetchTagEmails(
   accounts: UnifiedAccountClient[],
@@ -556,9 +566,13 @@ export async function fetchTagEmails(
 ): Promise<UnifiedFetchResult> {
   return fanOutAccountQuery(
     accounts,
-    (account, jmapAccountId) => account.client.getEmails(
-      undefined, jmapAccountId, limit, positionFor(position, account), keyword, true, extraFilter, order,
-    ),
+    (account, jmapAccountId) => {
+      const filter = andFilters(extraFilter ?? {}, trashAndJunkExclusion(account));
+      return account.client.getEmails(
+        undefined, jmapAccountId, limit, positionFor(position, account), keyword, true,
+        Object.keys(filter).length > 0 ? filter : undefined, order,
+      );
+    },
     compareEmails(order, { pinnedFirst: true }),
   );
 }
