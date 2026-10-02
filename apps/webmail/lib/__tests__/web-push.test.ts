@@ -306,7 +306,27 @@ describe('resyncWebPush', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     expect(await resyncWebPush({ client, relayBaseUrl: RELAY, inboxOnly: false })).toBe(false);
     installFetch({});
-    expect(await resyncWebPush({ client, relayBaseUrl: RELAY, inboxOnly: false })).toBe(true);
+    // Not on the very next tab focus...
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY, inboxOnly: false })).toBe(false);
+    // ...but a quarter of an hour later.
+    const later = Date.now() + 16 * 60_000;
+    vi.spyOn(Date, 'now').mockReturnValue(later);
+    try {
+      expect(await resyncWebPush({ client, relayBaseUrl: RELAY, inboxOnly: false })).toBe(true);
+    } finally {
+      vi.mocked(Date.now).mockRestore();
+    }
+  });
+
+  it('keeps the opt-in when recreating the subscription fails', async () => {
+    localStorage.setItem(SUB_KEY, 'push-old');
+    localStorage.setItem(DEVICE_KEY, THIS_DEVICE);
+    // The server lost the old subscription, and creating a new one fails.
+    const client = makeClient([]);
+    vi.mocked(client.createPushSubscription).mockRejectedValue(new Error('server down'));
+    installFetch({});
+    expect(await resyncWebPush({ client, relayBaseUrl: RELAY, inboxOnly: false })).toBe(false);
+    expect(localStorage.getItem(SUB_KEY)).toBe('push-old');
   });
 
   it('re-syncs an enabled registration and installs the missing filter', async () => {

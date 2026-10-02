@@ -526,7 +526,9 @@ export async function enableWebPush(
       }
       await params.client.destroyPushSubscription(storedServerId).catch(() => undefined);
     }
-    localStorage.removeItem(subIdKey);
+    // The stored id stays until the replacement is verified below: it is
+    // what tells resyncWebPush this account opted in, so dropping it here
+    // would end recovery for good after one interrupted attempt.
   }
 
   // Reap leftover subscriptions that would otherwise starve the new one's
@@ -719,6 +721,8 @@ export async function isWebPushEnabled(accountId: string): Promise<boolean> {
 // clamps `expires` to 7 days, so a tab or installed app left open for a
 // week would otherwise let the subscription lapse and push stop silently.
 const RESYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// After a failed attempt: soon again, but not on every return to the tab.
+const RESYNC_RETRY_MS = 15 * 60 * 1000;
 const lastResyncAt = new Map<string, number>();
 
 export interface ResyncWebPushParams {
@@ -762,8 +766,9 @@ export async function resyncWebPush(params: ResyncWebPushParams): Promise<boolea
     });
     return true;
   } catch {
-    // A failed attempt must not wait a day for the next one.
-    lastResyncAt.delete(accountId);
+    // A failed attempt must not wait a day for the next one, nor rerun the
+    // whole enable on every tab focus.
+    lastResyncAt.set(accountId, Date.now() - RESYNC_INTERVAL_MS + RESYNC_RETRY_MS);
     return false;
   }
 }
