@@ -137,7 +137,6 @@ describe('push preview JMAP failures', () => {
   it.each([
     [['error', { type: 'serverFail' }, 'eq'], ['error', { type: 'resultReference' }, 'eg']],
     [['Email/query', { ids: ['e1'], total: 1 }, 'eq'], ['error', { type: 'serverFail' }, 'eg']],
-    [['Email/query', { ids: [] }, 'eq'], ['Email/get', { list: [] }, 'eg']],
   ])('does not report zero unread on an email method failure', async (query, get) => {
     fetchJmapServer.mockReset()
       .mockResolvedValueOnce(jsonResponse(SESSION))
@@ -155,6 +154,32 @@ describe('push preview JMAP failures', () => {
         ['Email/get', { list: [] }, 'eg'],
       ] }));
     expect(await callRoute('a')).toEqual({ status: 200, body: { email: null, unreadTotal: 0, slot: 0 } });
+  });
+
+  // `total` is optional in a JMAP Email/query response.
+  it('counts the ids when the server leaves out the total', async () => {
+    fetchJmapServer.mockReset()
+      .mockResolvedValueOnce(jsonResponse(SESSION))
+      .mockResolvedValueOnce(jsonResponse({ methodResponses: [['Mailbox/query', { ids: ['inbox'] }, 'mb']] }))
+      .mockResolvedValueOnce(jsonResponse({ methodResponses: [
+        ['Email/query', { ids: [] }, 'eq'],
+        ['Email/get', { list: [] }, 'eg'],
+      ] }));
+    expect(await callRoute('a')).toEqual({ status: 200, body: { email: null, unreadTotal: 0, slot: 0 } });
+  });
+
+  it('previews the named message even when the Inbox lookups fail', async () => {
+    fetchJmapServer.mockReset()
+      .mockResolvedValueOnce(jsonResponse(SESSION))
+      .mockResolvedValueOnce(jsonResponse({ methodResponses: [['Mailbox/query', { ids: ['inbox'] }, 'mb']] }))
+      .mockResolvedValueOnce(jsonResponse({ methodResponses: [
+        ['error', { type: 'serverFail' }, 'eq'],
+        ['error', { type: 'resultReference' }, 'eg'],
+        ['Email/get', { list: [{ id: 'd', threadId: 'td' }] }, 'delivered'],
+      ] }));
+    expect(await callRoute('a', 'd')).toEqual({
+      status: 200, body: { email: { id: 'd', threadId: 'td' }, unreadTotal: 1, slot: 0 },
+    });
   });
 });
 
