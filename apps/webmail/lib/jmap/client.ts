@@ -679,6 +679,7 @@ function computeHasMore(position: number, emailCount: number, total: number, lim
 interface JMAPMethodError {
   type?: string;
   description?: string;
+  properties?: string[];
 }
 
 /**
@@ -687,6 +688,11 @@ interface JMAPMethodError {
  * EmailSubmission comes from its implicit onSuccessUpdateEmail /
  * onSuccessDestroyEmail call: the message has already left, so it is a filing
  * problem, not a failed send (reporting it as one invites a duplicate resend).
+ *
+ * A refused create ahead of the submission (the Email/set or Email/import of
+ * the message itself) is the failure: the submission's `#creationId` then points at
+ * nothing and Stalwart fails the whole call with "Invalid reference to
+ * non-existing object", which says nothing about why the message was refused.
  */
 export function sendMethodErrors(
   methodResponses: JMAPResponse['methodResponses'] | undefined,
@@ -697,6 +703,9 @@ export function sendMethodErrors(
   for (const [name, result] of methodResponses ?? []) {
     if (name === 'EmailSubmission/set' && Object.keys(result?.created ?? {}).length > 0) {
       submitted = true;
+    } else if (!submitted && name !== 'EmailSubmission/set' && name !== 'error') {
+      const refused = Object.values((result?.notCreated ?? {}) as Record<string, JMAPMethodError>)[0];
+      if (refused) failure ??= refused;
     } else if (name === 'error') {
       if (submitted) filing ??= result;
       else failure ??= result;
@@ -4137,7 +4146,8 @@ export class JMAPClient implements IJMAPClient {
     const { failure, filing } = sendMethodErrors(response.methodResponses);
     if (failure) {
       console.error('[sendEmail] JMAP method error:', failure);
-      throw new Error(failure.description || `Failed to send email: ${failure.type}`);
+      const propsHint = failure.properties?.length ? ` (properties: ${failure.properties.join(', ')})` : '';
+      throw new Error(`${failure.description || `Failed to send email: ${failure.type}`}${propsHint}`);
     }
     if (filing) {
       console.error('[sendEmail] post-send method error:', filing);
