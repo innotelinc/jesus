@@ -2117,7 +2117,8 @@
         "subject": "제목",
         "header": "사용자 지정 헤더",
         "size": "크기",
-        "body": "본문"
+        "body": "본문",
+        "all": "모든 메일"
       },
       "comparators": {
         "has_any": "있음",

@@ -2117,7 +2117,8 @@
         "subject": "主题",
         "header": "自定义标头",
         "size": "大小",
-        "body": "正文"
+        "body": "正文",
+        "all": "所有邮件"
       },
       "comparators": {
         "has_any": "存在",

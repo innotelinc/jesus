@@ -49,7 +49,7 @@ interface FilterRuleModalProps {
 }
 
 const ALL_FIELDS: FilterConditionField[] = [
-  "from", "to", "cc", "subject", "header", "size", "body", "attachment",
+  "from", "to", "cc", "subject", "header", "size", "body", "attachment", "all",
 ];
 
 const TEXT_COMPARATORS: FilterComparator[] = [
@@ -63,9 +63,13 @@ const SIZE_COMPARATORS: FilterComparator[] = ["greater_than", "less_than"];
 
 const ATTACHMENT_COMPARATORS: FilterComparator[] = ["has_any", "has_type"];
 
+// "All messages" has nothing to choose: its one comparator is not shown.
+const ALL_MESSAGES_COMPARATORS: FilterComparator[] = ["any"];
+
 function comparatorsFor(field: FilterConditionField): FilterComparator[] {
   if (field === "size") return SIZE_COMPARATORS;
   if (field === "attachment") return ATTACHMENT_COMPARATORS;
+  if (field === "all") return ALL_MESSAGES_COMPARATORS;
   if (field === "from" || field === "to" || field === "cc") return ADDRESS_COMPARATORS;
   return TEXT_COMPARATORS;
 }
@@ -100,6 +104,11 @@ function inputStringToValue(s: string): string | string[] {
 function isConditionValueEmpty(v: string | string[]): boolean {
   if (Array.isArray(v)) return v.length === 0 || v.every((x) => !x.trim());
   return !v.trim();
+}
+
+// Conditions that test without a value: "has an attachment" and "all messages".
+function takesNoValue(c: Pick<FilterCondition, "field" | "comparator">): boolean {
+  return c.field === "all" || (c.field === "attachment" && c.comparator === "has_any");
 }
 
 function makeEmptyAction(): FilterAction {
@@ -181,11 +190,11 @@ export function FilterRuleModal({
   // comma the user just typed mid-edit.
   const validConditions = useMemo(() => conditions
     .filter((c) => {
-      if (c.field === "attachment" && c.comparator === "has_any") return true;
+      if (takesNoValue(c)) return true;
       return !isConditionValueEmpty(c.value);
     })
     .map((c) => {
-      if (c.field === "attachment" && c.comparator === "has_any") return c;
+      if (takesNoValue(c)) return c;
       if (c.field === "size") return c; // numeric, single-value only
       if (typeof c.value !== "string") return c; // already structured
       const parsed = inputStringToValue(c.value);
@@ -246,7 +255,7 @@ export function FilterRuleModal({
   const applySuggestion = (suggestion: RuleSuggestion) => {
     setConditions((prev) => {
       // The blank row a rule starts with makes way for the suggestion.
-      const kept = prev.filter((c) => !(c.field !== "attachment" && isConditionValueEmpty(c.value)));
+      const kept = prev.filter((c) => !(c.field !== "attachment" && c.field !== "all" && isConditionValueEmpty(c.value)));
       const replaceAt = suggestion.replaces ? kept.findIndex(suggestion.replaces) : -1;
       if (replaceAt === -1) return [...kept, suggestion.condition];
       return kept.map((c, i) => (i === replaceAt ? suggestion.condition : c));
@@ -271,9 +280,9 @@ export function FilterRuleModal({
         if (updates.field && updates.field !== "header") {
           delete updated.headerName;
         }
-        // has_any takes no value; clear it so we don't leak old text into
-        // the generated Sieve.
-        if (updated.field === "attachment" && updated.comparator === "has_any") {
+        // has_any and "all messages" take no value; clear it so we don't
+        // leak old text into the generated Sieve.
+        if (takesNoValue(updated)) {
           updated.value = "";
         }
         // Size is numeric, single value only - collapse any list to scalar.
@@ -437,24 +446,27 @@ export function FilterRuleModal({
                     />
                   )}
 
-                  <select
-                    value={condition.comparator}
-                    onChange={(e) =>
-                      updateCondition(index, { comparator: e.target.value as FilterComparator })
-                    }
-                    className={selectClass}
-                    aria-label={t("comparators.contains")}
-                  >
-                    {comparatorsFor(condition.field).map((c) => (
-                      <option key={c} value={c}>
-                        {t(`comparators.${c}`)}
-                      </option>
-                    ))}
-                  </select>
+                  {condition.field !== "all" && (
+                    <select
+                      value={condition.comparator}
+                      onChange={(e) =>
+                        updateCondition(index, { comparator: e.target.value as FilterComparator })
+                      }
+                      className={selectClass}
+                      aria-label={t("comparators.contains")}
+                    >
+                      {comparatorsFor(condition.field).map((c) => (
+                        <option key={c} value={c}>
+                          {t(`comparators.${c}`)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
-                  {/* has_any takes no value; render a stub so the row layout
-                      stays consistent but no input is editable. */}
-                  {condition.field === "attachment" && condition.comparator === "has_any" ? (
+                  {/* has_any and "all messages" take no value; render a stub
+                      so the row layout stays consistent but no input is
+                      editable. */}
+                  {takesNoValue(condition) ? (
                     <div className="flex-1 min-w-[120px]" />
                   ) : (
                     <Input

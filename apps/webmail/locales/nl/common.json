@@ -2117,7 +2117,8 @@
         "subject": "Onderwerp",
         "header": "Aangepaste header",
         "size": "Grootte",
-        "body": "Inhoud"
+        "body": "Inhoud",
+        "all": "Alle berichten"
       },
       "comparators": {
         "has_any": "aanwezig",

@@ -2124,7 +2124,8 @@
         "subject": "Predmet",
         "header": "Vlastná hlavička",
         "size": "Veľkosť",
-        "body": "Telo správy"
+        "body": "Telo správy",
+        "all": "Všetky správy"
       },
       "comparators": {
         "has_any": "je prítomná",

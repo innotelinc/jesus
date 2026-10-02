@@ -2124,7 +2124,8 @@
         "subject": "Assumpte",
         "header": "Capçalera personalitzada",
         "size": "Mida",
-        "body": "Cos"
+        "body": "Cos",
+        "all": "Tots els missatges"
       },
       "comparators": {
         "has_any": "és present",

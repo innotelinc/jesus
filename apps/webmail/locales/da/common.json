@@ -2120,7 +2120,8 @@
         "subject": "Emne",
         "header": "Brugerdefineret header",
         "size": "Størrelse",
-        "body": "Brødtekst"
+        "body": "Brødtekst",
+        "all": "Alle beskeder"
       },
       "comparators": {
         "has_any": "er til stede",

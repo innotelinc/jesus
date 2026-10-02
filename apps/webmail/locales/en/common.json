@@ -2124,7 +2124,8 @@
         "subject": "Subject",
         "header": "Custom Header",
         "size": "Size",
-        "body": "Body"
+        "body": "Body",
+        "all": "All messages"
       },
       "comparators": {
         "has_any": "is present",

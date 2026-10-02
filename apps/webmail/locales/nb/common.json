@@ -2124,7 +2124,8 @@
         "subject": "Emne",
         "header": "Egendefinert meldingshode",
         "size": "Størrelse",
-        "body": "Meldingstekst"
+        "body": "Meldingstekst",
+        "all": "Alle meldinger"
       },
       "comparators": {
         "has_any": "finnes",
