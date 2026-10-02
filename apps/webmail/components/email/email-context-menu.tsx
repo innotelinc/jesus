@@ -40,6 +40,7 @@ import {
 import { buildMailPath } from "@/lib/deep-links";
 import { useCopyLink } from "@/hooks/use-copy-link";
 import { buildMailboxTree, MailboxNode } from "@/lib/utils";
+import { buildMoveTargets, resolveMoveOwnerAccountId } from "@/lib/move-targets";
 import { localizeMailboxName } from "@/lib/mailbox-label";
 import { getEmailTagIds } from "@/lib/thread-utils";
 import { TagPicker } from "./tag-picker";
@@ -181,19 +182,11 @@ export function EmailContextMenu({
   const isScheduled = email.isScheduled === true;
   const canCancelScheduled = isScheduled && email.scheduledUndoStatus === 'pending';
 
-  // Build mailbox tree for move-to submenu with proper hierarchy
-  const moveTargetIds = new Set(
-    mailboxes
-      .filter(
-        (m) =>
-          m.id !== selectedMailbox &&
-          m.role !== "drafts" &&
-          !m.id.startsWith("shared-") &&
-          m.myRights?.mayAddItems
-      )
-      .map((m) => m.id)
-  );
-  const mailboxTree = buildMailboxTree(mailboxes);
+  // Move-to submenu: the message's own account first (#1149)
+  const { tree: moveTree, targetIds: moveTargetIds } = buildMoveTargets(mailboxes, {
+    currentMailboxId: selectedMailbox,
+    ownerAccountId: resolveMoveOwnerAccountId(email, mailboxes, selectedMailbox),
+  });
 
   // Filter tree to only include branches that contain valid targets
   const filterTree = (nodes: MailboxNode[], targetIds: Set<string>): MailboxNode[] => {
@@ -205,7 +198,6 @@ export function EmailContextMenu({
       return acc;
     }, []);
   };
-  const moveTree = filterTree(mailboxTree, moveTargetIds);
 
   // Folders of the other connected accounts a copy can land in.
   const copyTrees = (copyTargets ?? [])
