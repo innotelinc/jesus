@@ -19,6 +19,7 @@ import type { Mailbox } from "@/lib/jmap/types";
 import { buildMailboxTree, flattenMailboxTree, type MailboxNode, generateUUID, cn } from "@/lib/utils";
 import type { RuleSuggestion } from "@/lib/filters/quick-rules";
 import { retroactiveSupport } from "@/lib/filters/retroactive";
+import { ruleForwards, ruleStops } from "@/lib/filters/forward-limit";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useKeywordFormat } from "@/hooks/use-keyword-format";
 
@@ -36,8 +37,13 @@ interface FilterRuleModalProps {
   mailboxes: Mailbox[];
   /** Server cap on redirects per message (Sieve `maxNumberRedirects`). */
   maxRedirects?: number | null;
-  /** Forward actions in the other enabled rules, which share that cap. */
-  otherForwards?: number;
+  /**
+   * Forwards a message can have collected when it reaches this rule, and
+   * the most it can still collect below it when the rule does not stop
+   * (see forwardsAround in lib/filters/forward-limit.ts).
+   */
+  forwardsBefore?: number;
+  forwardsAfter?: number;
   onSave: (rule: FilterRule, options?: { applyToExisting: boolean }) => void;
   onClose: () => void;
 }
@@ -107,7 +113,8 @@ export function FilterRuleModal({
   offerApplyToExisting = false,
   mailboxes,
   maxRedirects,
-  otherForwards = 0,
+  forwardsBefore = 0,
+  forwardsAfter = 0,
   onSave,
   onClose,
 }: FilterRuleModalProps) {
@@ -159,7 +166,11 @@ export function FilterRuleModal({
     return "";
   }, [mailboxPathMap]);
 
-  const forwardCount = actions.filter((a) => a.type === "forward").length;
+  // What counts is the most forwards one message can collect: those of the
+  // rules above that let it go on, this rule's, and those below unless this
+  // rule stops.
+  const forwardCount = ruleForwards({ actions });
+  const otherForwards = forwardsBefore + (ruleStops({ actions, stopProcessing }) ? 0 : forwardsAfter);
   const forwardLimit = typeof maxRedirects === "number" && maxRedirects > 0 ? maxRedirects : null;
   const forwardOverLimit = forwardLimit !== null && forwardCount + otherForwards > forwardLimit;
 

@@ -13,6 +13,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { toast } from "@/stores/toast-store";
 import type { FilterRule } from "@/lib/jmap/sieve-types";
 import type { Mailbox } from "@/lib/jmap/types";
+import { forwardsAround, worstCaseForwards } from "@/lib/filters/forward-limit";
 import { useVacationStore } from "@/stores/vacation-store";
 import { useManagedAccountStore } from "@/stores/managed-account-store";
 import {
@@ -247,6 +248,20 @@ export function FilterSettings() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const draggedIndexRef = useRef<number | null>(null);
+
+  // A message can collect only so many forwards on this server. The rules run
+  // in the order listed, and one that stops ends the script for its messages,
+  // so the order counts (see lib/filters/forward-limit.ts).
+  const redirectLimit = sieveCapabilities?.maxNumberRedirects;
+  const tooManyForwards =
+    typeof redirectLimit === "number" && redirectLimit > 0 && worstCaseForwards(rules) > redirectLimit;
+  // The edited rule where it is; a new one goes below Bulwark's own rules.
+  const editedIndex = editingRule ? rules.findIndex((r) => r.id === editingRule.id) : -1;
+  const forwardsOfEdited = forwardsAround(
+    rules,
+    editedIndex >= 0 ? editedIndex : rules.filter((r) => !isReadonlyRule(r)).length,
+    editedIndex >= 0,
+  );
 
   useEffect(() => {
     if (client && isSupported) {
@@ -516,6 +531,12 @@ export function FilterSettings() {
           </div>
         )}
 
+        {!isOpaque && tooManyForwards && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {t("forward_limit", { count: redirectLimit })}
+          </p>
+        )}
+
         {!isOpaque && rules.length > 0 && (
           <div className="space-y-1" role="list" aria-label={t("rule_list")}>
             {rules.map((rule, index) => {
@@ -702,9 +723,8 @@ export function FilterSettings() {
           rule={editingRule}
           mailboxes={mailboxes}
           maxRedirects={sieveCapabilities?.maxNumberRedirects}
-          otherForwards={rules
-            .filter((r) => r.enabled && r.id !== editingRule?.id)
-            .reduce((n, r) => n + r.actions.filter((a) => a.type === "forward").length, 0)}
+          forwardsBefore={forwardsOfEdited.before}
+          forwardsAfter={forwardsOfEdited.after}
           onSave={handleSaveRule}
           onClose={() => {
             setShowRuleModal(false);
