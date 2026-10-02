@@ -2940,7 +2940,8 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
             }
             const blob = await sourceClient.fetchBlob(full.blobId, undefined, undefined, sourceJmapAccountId);
             const keywords: Record<string, boolean> = { ...(full.keywords ?? {}) };
-            await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords, destJmapAccountId);
+            // The original date, or the copy sorts as today's mail.
+            await destClient.importRawEmail(blob, { [destMailboxId]: true }, keywords, destJmapAccountId, full.receivedAt);
             if (!keepOriginal) await sourceClient.deleteEmail(emailId, sourceJmapAccountId);
             return emailId;
           }),

@@ -42,3 +42,22 @@ describe('copyEmailAcrossAccounts', () => {
     expect(calls.some(([m]) => m === 'Email/set')).toBe(false);
   });
 });
+
+describe('importRawEmail', () => {
+  it('keeps the original date of a message carried over from another account', async () => {
+    const client = new JMAPClient('https://jmap.example.com', 'user@example.com', 'pass');
+    Object.assign(client, { accountId: 'me' });
+    vi.spyOn(client, 'uploadBlob').mockResolvedValue({ blobId: 'b1' } as never);
+    const request = vi.spyOn(client as unknown as { request: (c: Call[]) => Promise<unknown> }, 'request')
+      .mockResolvedValue({ methodResponses: [['Email/import', { created: { 'smime-import': { id: 'n1' } } }, '0']] });
+
+    await client.importRawEmail(new Blob(['raw']), { inbox: true }, { $seen: true }, undefined, '2024-03-01T10:00:00Z');
+    const emails = (request.mock.calls[0][0][0][1] as { emails: Record<string, Record<string, unknown>> }).emails;
+    expect(emails['smime-import'].receivedAt).toBe('2024-03-01T10:00:00Z');
+
+    // Without a date the server stamps the import time, as before.
+    await client.importRawEmail(new Blob(['raw']), { inbox: true });
+    const plain = (request.mock.calls[1][0][0][1] as { emails: Record<string, Record<string, unknown>> }).emails;
+    expect(plain['smime-import']).not.toHaveProperty('receivedAt');
+  });
+});

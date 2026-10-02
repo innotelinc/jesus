@@ -56,7 +56,7 @@ describe('email-store crossAccountMoveEmails keepOriginal', () => {
   it('a move imports, deletes the source and drops it from the view', async () => {
     await useEmailStore.getState().crossAccountMoveEmails(new Map([['local-A', ['e1']]]), 'local-B', 'dest-inbox');
 
-    expect(dest.importRawEmail).toHaveBeenCalledWith(expect.any(Blob), { 'dest-inbox': true }, { $seen: true }, undefined);
+    expect(dest.importRawEmail).toHaveBeenCalledWith(expect.any(Blob), { 'dest-inbox': true }, { $seen: true }, undefined, expect.any(String));
     expect(source.deleteEmail).toHaveBeenCalledWith('e1', undefined);
     const state = useEmailStore.getState();
     expect(state.emails.map((e) => e.id)).toEqual(['e2']);
@@ -70,6 +70,9 @@ describe('email-store crossAccountMoveEmails keepOriginal', () => {
     );
 
     expect(dest.importRawEmail).toHaveBeenCalledTimes(2);
+    // Each copy keeps its original date instead of arriving as today's mail.
+    const e1 = await source.getEmail.mock.results[0].value;
+    expect((dest.importRawEmail.mock.calls[0] as unknown[])[4]).toBe(e1.receivedAt);
     expect(source.deleteEmail).not.toHaveBeenCalled();
     const state = useEmailStore.getState();
     expect(state.emails.map((e) => e.id)).toEqual(['e1', 'e2']);
