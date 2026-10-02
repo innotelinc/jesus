@@ -13,6 +13,7 @@ import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type AcrossAccountsSearchOptions, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { defaultSearchScopeFor, isAllFoldersSearchScope, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
 import { useAuthStore } from "@/stores/auth-store";
+import { pathNamesMailFolder } from "@/lib/deep-links";
 import { currentStoreEpoch } from "@/lib/store-epoch";
 import { keywordPointer } from "@/lib/jmap/patch-pointer";
 import { useAccountStore } from "@/stores/account-store";
@@ -5828,12 +5829,20 @@ if (typeof window !== 'undefined') {
         Array.isArray(snap.mailboxes) &&
         snap.mailboxes.length > 0
       ) {
-        const selectedMailbox = typeof snap.selectedMailbox === 'string' ? snap.selectedMailbox : '';
+        const snapMailbox = typeof snap.selectedMailbox === 'string' ? snap.selectedMailbox : '';
+        // The snapshot holds the last plain folder that was open, which may be
+        // Trash from a session that ended in a unified view. Only a reload of
+        // a folder link continues there; opening the app starts in the
+        // account's own inbox, and rows cached for another folder are dropped.
+        const ownInbox = (snap.mailboxes as Mailbox[]).find(m => m.role === 'inbox' && !m.isShared);
+        const selectedMailbox = pathNamesMailFolder(window.location.pathname) || !ownInbox
+          ? snapMailbox
+          : ownInbox.id;
         useEmailStore.setState({
           mailboxes: snap.mailboxes,
           selectedMailbox,
           searchMailboxId: defaultSearchScopeFor(snap.mailboxes, selectedMailbox),
-          ...(Array.isArray(snap.emails) && snap.emails.length > 0
+          ...(selectedMailbox === snapMailbox && Array.isArray(snap.emails) && snap.emails.length > 0
             ? {
                 emails: snap.emails,
                 totalEmails: typeof snap.totalEmails === 'number' ? snap.totalEmails : snap.emails.length,
