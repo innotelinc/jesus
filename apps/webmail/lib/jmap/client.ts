@@ -2078,10 +2078,13 @@ export class JMAPClient implements IJMAPClient {
     return allEmails;
   }
 
-  async getTagCounts(tagIds: string[], accountId?: string): Promise<Record<string, { total: number; unread: number }>> {
+  async getTagCounts(tagIds: string[], accountId?: string, excludeMailboxIds?: string[]): Promise<Record<string, { total: number; unread: number }>> {
     if (tagIds.length === 0) return {};
     const result: Record<string, { total: number; unread: number }> = {};
     const targetAccountId = accountId || this.accountId;
+    const exclusion = excludeMailboxIds && excludeMailboxIds.length > 0
+      ? [{ inMailboxOtherThan: excludeMailboxIds }]
+      : [];
 
     const CALLS_PER_TAG = 2;
     const perRequest = itemsPerRequest(this.getMaxCallsInRequest(), CALLS_PER_TAG);
@@ -2094,7 +2097,9 @@ export class JMAPClient implements IJMAPClient {
           // Total count for this tag
           methodCalls.push(["Email/query", {
             accountId: targetAccountId,
-            filter: { hasKeyword: keyword },
+            filter: exclusion.length > 0
+              ? { operator: "AND", conditions: [{ hasKeyword: keyword }, ...exclusion] }
+              : { hasKeyword: keyword },
             // limit 1, not 0: Stalwart treats 0 as "no limit" and returns every id.
             limit: 1,
             calculateTotal: true,
@@ -2107,6 +2112,7 @@ export class JMAPClient implements IJMAPClient {
               conditions: [
                 { hasKeyword: keyword },
                 { notKeyword: "$seen" },
+                ...exclusion,
               ],
             },
             // limit 1, not 0: Stalwart treats 0 as "no limit" and returns every id.

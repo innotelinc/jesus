@@ -252,10 +252,11 @@ export class DemoJMAPClient implements IJMAPClient {
     return this.data.emails.find(e => e.id === emailId) ?? null;
   }
 
-  async getTagCounts(tagIds: string[]): Promise<Record<string, { total: number; unread: number }>> {
+  async getTagCounts(tagIds: string[], _accountId?: string, excludeMailboxIds?: string[]): Promise<Record<string, { total: number; unread: number }>> {
     const result: Record<string, { total: number; unread: number }> = {};
+    const exclusion = excludeMailboxIds?.length ? { inMailboxOtherThan: excludeMailboxIds } : null;
     for (const tagId of tagIds) {
-      const tagged = this.data.emails.filter(e => e.keywords[tagId]);
+      const tagged = this.data.emails.filter(e => e.keywords[tagId] && (!exclusion || this.matchesFilter(e, exclusion)));
       result[tagId] = {
         total: tagged.length,
         unread: tagged.filter(e => !e.keywords.$seen).length,
