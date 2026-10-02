@@ -775,6 +775,17 @@ export class RecipientsRejectedError extends Error {
   }
 }
 
+/**
+ * The send request came back without an EmailSubmission: nothing confirms the
+ * message left, and it may still have. The draft is kept.
+ */
+export class SendUnconfirmedError extends Error {
+  constructor() {
+    super('Send confirmation was not received. Check Sent before sending again. Your draft has been kept.');
+    this.name = 'SendUnconfirmedError';
+  }
+}
+
 /** "report.pdf" -> "report (2).pdf", the way Stalwart's onExists "rename" names copies. */
 function numberedFileName(name: string, n: number): string {
   const dot = name.lastIndexOf('.');
@@ -4193,7 +4204,7 @@ export class JMAPClient implements IJMAPClient {
     // all. Nothing confirms the message left: report a failure and keep the
     // old draft rather than replacing it as if the send had worked.
     if (!emailSubmissionId) {
-      throw new Error('Send confirmation was not received. Check Sent before sending again. Your draft has been kept.');
+      throw new SendUnconfirmedError();
     }
 
     // With every recipient refused nothing was queued, yet the submission

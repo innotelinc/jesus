@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { JMAPClient } from '../jmap/client';
+import { JMAPClient, SendUnconfirmedError } from '../jmap/client';
 
 /**
  * #849: replacing a draft (autosave, send) used to bundle the destroy of the
@@ -238,7 +238,10 @@ describe('compose failure recovery', () => {
   beforeEach(() => { vi.restoreAllMocks(); vi.spyOn(console, 'error').mockImplementation(() => {}); });
   it.each([{ methodError: true }, { missingSubmission: true }])('does not claim success or delete the old draft without confirmation: %j', async options => {
     const client = createClient(); const captured = mockFlow(options);
-    await expect(client.sendEmail(['bob@example.com'], 'Subject', 'body', undefined, undefined, 'identity-1', 'user@example.com', 'old-draft')).rejects.toThrow();
+    await expect(client.sendEmail(['bob@example.com'], 'Subject', 'body', undefined, undefined, 'identity-1', 'user@example.com', 'old-draft')).rejects.toThrow(
+      // Only the missing submission is unconfirmed; a method error is a plain failure.
+      options.missingSubmission ? SendUnconfirmedError : Error,
+    );
     expect(emailSetCalls(captured).some(call => call.destroy)).toBe(false);
   });
   it('accepts empty notCreated maps as success', async () => {
