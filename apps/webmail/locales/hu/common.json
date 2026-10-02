@@ -819,6 +819,8 @@
     "emails_moved": "{count} e-mail áthelyezve",
     "moved_to_mailbox": "Áthelyezve ide: {mailbox}",
     "move_failed": "Áthelyezés sikertelen",
+    "emails_copied": "{count} e-mail másolva",
+    "copy_failed": "Másolás sikertelen",
     "move_error": "Nem sikerült áthelyezni az e-maileket a kiválasztott mappába",
     "email_tagged": "E-mail címkézve",
     "emails_tagged": "{count} e-mail címkézve",
@@ -2120,7 +2122,8 @@
         "subject": "Tárgy",
         "header": "Egyéni fejléc",
         "size": "Méret",
-        "body": "Törzs"
+        "body": "Törzs",
+        "all": "Minden üzenet"
       },
       "comparators": {
         "has_any": "jelen van",
@@ -2355,6 +2358,7 @@
     "pin": "Rögzítés",
     "unpin": "Rögzítés feloldása",
     "move_to": "Áthelyezés ide...",
+    "copy_to_account": "Másolás fiókba...",
     "archive": "Archiválás",
     "delete": "Törlés",
     "mark_as_spam": "Spam jelentése",

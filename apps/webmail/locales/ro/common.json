@@ -819,6 +819,8 @@
     "emails_moved": "{count} e-mailuri mutate",
     "moved_to_mailbox": "Mutată la {mailbox}",
     "move_failed": "Mutarea a eșuat",
+    "emails_copied": "{count} e-mailuri copiate",
+    "copy_failed": "Copierea a eșuat",
     "move_error": "Nu s-au putut muta e-mailurile în folderul selectat",
     "email_tagged": "E-mail etichetat",
     "emails_tagged": "{count} e-mailuri etichetate",
@@ -2124,7 +2126,8 @@
         "subject": "Subiect",
         "header": "Antet personalizat",
         "size": "Dimensiune",
-        "body": "Corpul mesajului"
+        "body": "Corpul mesajului",
+        "all": "Toate mesajele"
       },
       "comparators": {
         "has_any": "este prezent",
@@ -2355,6 +2358,7 @@
     "pin": "Fixează",
     "unpin": "Anulează fixarea",
     "move_to": "Mergi la...",
+    "copy_to_account": "Copiază în cont...",
     "archive": "Arhivează",
     "delete": "Șterge",
     "mark_as_spam": "Raportează spamul",

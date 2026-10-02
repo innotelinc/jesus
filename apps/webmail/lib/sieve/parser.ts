@@ -847,10 +847,15 @@ export function parseScript(content: string): ParseResult {
     // identifies it as ours.
     const filteredExternal = external.rules.filter(r => {
       const raw = r.rawBlock || '';
-      const match = raw.match(/#\s*Rule:\s*(.+?)\s*$/m);
+      // The name ends with its line, and may be empty.
+      const match = raw.match(/#\s*Rule:[ \t]*(.*?)[ \t]*$/m);
       if (match) {
-        const name = match[1].trim();
-        if (bulwarkRules.some(b => b.name === name)) return false;
+        // The generator writes the name on one line, its whitespace runs
+        // collapsed; compared as written, "Foo  Bar" would come back as
+        // someone else's rule, and as one more copy on every save.
+        const oneLine = (name: string) => name.replace(/\s+/g, ' ').trim();
+        const name = oneLine(match[1]);
+        if (bulwarkRules.some(b => oneLine(b.name) === name)) return false;
       }
       if (/#\s*Vacation auto-reply/i.test(raw)) return false;
       return true;
