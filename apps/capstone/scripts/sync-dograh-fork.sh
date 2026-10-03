@@ -152,27 +152,52 @@ fi
 #   Token to create or update workflow `.github/workflows/...` without `workflow` scope)
 #
 # That is a plain git rejection, so it reads as a generic "failed to push some
-# refs" and the whole sync dies without a hint of what to fix. Check the scope
-# up front — the token's scopes are the response's `X-OAuth-Scopes` header — and
-# fail with the actual remedy. A fine-grained token does not return that header,
-# so this stays quiet rather than guessing at one.
+# refs" and the whole sync dies without a hint of what to fix. Two guards cover
+# it, because neither alone sees every token:
+#
+#   * up front — the token's scopes are the `X-OAuth-Scopes` response header,
+#     so a classic PAT can be checked before spending a push on it.
+#   * after the push — a fine-grained PAT returns no such header at all, so the
+#     preflight has nothing to read. The rejection text is still unambiguous
+#     though, so the push output is matched for it and the same remedy printed.
+#
+# CHANGED_WORKFLOWS is whichever of the two detected the offending paths, so the
+# fatal can always name them.
+CHANGED_WORKFLOWS=""
+
+workflow_scope_fatal() {
+  echo "FATAL: this sync changes .github/workflows/*, but FORK_SYNC_SECRET is missing the 'workflow' scope." >&2
+  echo "       GitHub rejects that push with 'refusing to allow a Personal Access Token to create or" >&2
+  echo "       update workflow ... without workflow scope'. Left uncaught it surfaces only as a bare" >&2
+  echo "       'failed to push some refs'." >&2
+  if [ -n "${1:-}" ]; then echo "       $1" >&2; fi
+  echo "       Fix: grant the token the 'workflow' scope (classic PAT: repo + workflow;" >&2
+  echo "       fine-grained: Contents: write + Workflows: write), then re-run this workflow." >&2
+  if [ -n "$CHANGED_WORKFLOWS" ]; then
+    echo "       workflows this sync touches:" >&2
+    while IFS= read -r wf; do echo "         $wf" >&2; done <<<"$CHANGED_WORKFLOWS"
+  fi
+  exit 1
+}
+
 if [ "$PUSH" -eq 1 ] && [ -n "${GH_TOKEN:-}" ]; then
-  changed_workflows="$(git diff --name-only "$UPSTREAM_HEAD" origin/main -- .github/workflows 2>/dev/null || true)"
-  if [ -n "$changed_workflows" ]; then
-    scopes="$(curl -sS -I -H "Authorization: token ${GH_TOKEN}" https://api.github.com/user 2>/dev/null \
-      | tr -d '\r' | sed -n 's/^[Xx]-[Oo][Aa]uth-[Ss]copes: *//p' | head -1)"
+  CHANGED_WORKFLOWS="$(git diff --name-only "$UPSTREAM_HEAD" origin/main -- .github/workflows 2>/dev/null || true)"
+  if [ -n "$CHANGED_WORKFLOWS" ]; then
+    headers="$(curl -sS -I -H "Authorization: token ${GH_TOKEN}" https://api.github.com/user 2>/dev/null \
+      | tr -d '\r' || true)"
     # The header is comma-and-space separated ("repo, workflow"), so the split
     # has to drop the spaces or a token that HAS the scope reads as missing it.
-    if [ -n "$scopes" ] && ! printf '%s' "$scopes" | tr ',' '\n' | tr -d ' ' | grep -qx 'workflow'; then
-      echo "FATAL: this sync changes .github/workflows/*, but FORK_SYNC_SECRET is missing the 'workflow' scope." >&2
-      echo "       GitHub will reject the push with 'refusing to allow a Personal Access Token to create or" >&2
-      echo "       update workflow ... without workflow scope'." >&2
-      echo "       token scopes: ${scopes:-none}" >&2
-      echo "       Fix: grant the token the 'workflow' scope (classic PAT: repo + workflow;" >&2
-      echo "       fine-grained: Contents: write + Workflows: write), then re-run." >&2
-      echo "       workflows this sync would touch:" >&2
-      while IFS= read -r wf; do echo "         $wf" >&2; done <<<"$changed_workflows"
-      exit 1
+    #
+    # Presence and emptiness are different answers. A classic PAT always sends
+    # the header, and an empty one means "no scopes granted" — definitely
+    # missing the scope, so it can be caught here. A fine-grained PAT sends no
+    # header at all, which says nothing; that case goes to the post-push guard
+    # rather than being guessed at from silence.
+    if printf '%s\n' "$headers" | grep -qi '^x-oauth-scopes:'; then
+      scopes="$(printf '%s\n' "$headers" | sed -n 's/^[Xx]-[Oo][Aa]uth-[Ss]copes: *//p' | head -1)"
+      if ! printf '%s' "$scopes" | tr ',' '\n' | tr -d ' ' | grep -qx 'workflow'; then
+        workflow_scope_fatal "scopes reported by GitHub: ${scopes:-(none)}"
+      fi
     fi
   fi
 fi
@@ -201,7 +226,22 @@ ${CONFLICTS:+Kept fork version after 3-way conflict (review): $CONFLICTS}"
   # over an x-access-token URL (no matching remote-tracking ref), which has
   # been blocking CI releases. The explicit lease keeps the same overwrite
   # protection against concurrent push changes to the fork's main.
-  git push -q --force-with-lease="main:${FORK_HEAD}" "$PUSH_URL" rebuilt:main
+  #
+  # The push output is captured rather than streamed so a workflow-scope
+  # rejection can be recognized and reported as itself; every other failure
+  # replays the log verbatim, so nothing is lost.
+  push_log="$WORK/push.log"
+  if ! git push -q --force-with-lease="main:${FORK_HEAD}" "$PUSH_URL" rebuilt:main >"$push_log" 2>&1; then
+    cat "$push_log" >&2
+    if grep -q 'refusing to allow a Personal Access Token' "$push_log"; then
+      # Recompute against the commit actually being pushed — the preflight's
+      # view is from upstream vs the fork, not from what we are sending.
+      CHANGED_WORKFLOWS="$(git diff --name-only "$FORK_HEAD" rebuilt -- .github/workflows || true)"
+      workflow_scope_fatal "the up-front check did not flag this token, which means it reports no scope header at all (a fine-grained PAT)."
+    fi
+    echo "FATAL: failed to push the rebuilt fork to $FORK_REPO main." >&2
+    exit 1
+  fi
   echo "pushed rebuilt fork to $FORK_REPO main ($(git rev-parse --short HEAD))"
 else
   echo "dry run — rebuilt tree ready on branch 'rebuilt' (not pushed)."
