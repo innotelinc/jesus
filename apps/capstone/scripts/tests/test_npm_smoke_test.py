@@ -213,10 +213,10 @@ class WalkToAuthorizeTests(unittest.TestCase):
                 "https://capstone.innotel.us/api/v1/auth/oidc/login", 12
             )
         self.assertTrue(ok)
-        self.assertGreaterEqual(seen[0], smoke.SIGNIN_TIMEOUT_FLOOR)
+        self.assertGreaterEqual(seen[0], smoke.PROBE_TIMEOUT_FLOOR)
         # The floor has to clear the API's own 15s discovery fetch, or the entry
         # can still time out on a cold start.
-        self.assertGreater(smoke.SIGNIN_TIMEOUT_FLOOR, 15)
+        self.assertGreater(smoke.PROBE_TIMEOUT_FLOOR, 15)
 
     def test_a_budget_above_the_floor_is_left_alone(self):
         seen = []

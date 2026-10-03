@@ -257,6 +257,9 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
     return "FAIL", f"upstream error {status}"
 
 
+# Floor for a probe that has to reach a real upstream through the edge, rather
+# than just a redirect the edge answers itself.
+#
 # The sign-in entry on the CANONICAL host is not a pure redirect: the API builds
 # the authorize URL from its own OIDC discovery document, and the first sign-in
 # after an API start fetches that document from the IdP before it can answer.
@@ -265,9 +268,16 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
 # fetch is slow — a cold start, a cold TLS connection to the IdP — even though
 # the entry is working. (The alias hosts never see this: the edge answers them
 # with a 302 hand-off before the API is reached, so only the apex exercises the
-# discovery fetch.) The budget below leaves room for the fetch, the redirect and
-# the TLS handshake, and still catches an entry that never answers at all.
-SIGNIN_TIMEOUT_FLOOR = 25
+# discovery fetch.) The media prefix has the same shape: on the apex the edge
+# proxies it to MinIO, whose first answer after an idle spell can take longer
+# than the default budget.
+#
+# The floor leaves room for the upstream's own timeout, the TLS handshake and
+# the response, and still catches a host that never answers at all.
+PROBE_TIMEOUT_FLOOR = 25
+# Kept as a name for the sign-in walk, whose budget is asserted to clear the
+# API's own 15s discovery fetch.
+SIGNIN_TIMEOUT_FLOOR = PROBE_TIMEOUT_FLOOR
 
 
 def walk_to_authorize(url: str, timeout: int, hops: int = 3) -> tuple[bool, str]:
@@ -280,10 +290,10 @@ def walk_to_authorize(url: str, timeout: int, hops: int = 3) -> tuple[bool, str]
     be that the browser is sent onwards, and that the end of the chain is the
     IdP's authorize endpoint (npm-proxy-hosts.py OIDC_PATH).
 
-    The per-request budget is floored at SIGNIN_TIMEOUT_FLOOR so a slow
+    The per-request budget is floored at PROBE_TIMEOUT_FLOOR so a slow
     discovery fetch is not mistaken for a broken entry.
     """
-    timeout = max(timeout, SIGNIN_TIMEOUT_FLOOR)
+    timeout = max(timeout, PROBE_TIMEOUT_FLOOR)
     for _ in range(hops):
         try:
             status, location = fetch(url, timeout)
@@ -407,7 +417,11 @@ def main() -> int:
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
         label = f"{domain}{mod.MEDIA_PATH}/"
         try:
-            status, body, _ = fetch_body(f"https://{label}", args.timeout)
+            # Floored like the sign-in walk: the edge proxies this to MinIO,
+            # and a cold first answer can outlast the default budget.
+            status, body, _ = fetch_body(
+                f"https://{label}", max(args.timeout, PROBE_TIMEOUT_FLOOR)
+            )
             ok = "<ListBucketResult" in body or "<Error>" in body
             note = f"{status} {'MinIO' if ok else 'edge, not MinIO'}"
         except (urllib.error.URLError, OSError, ssl.SSLError) as e:
@@ -421,7 +435,7 @@ def main() -> int:
     #    "does nothing" because the redirect was answered by a proxy. The
     #    per-request budget is raised inside the walk — the apex entry can spend
     #    up to the API's own discovery timeout before it answers (see
-    #    SIGNIN_TIMEOUT_FLOOR), which the default 12s is below.
+    #    PROBE_TIMEOUT_FLOOR), which the default 12s is below.
     for h in [x for x in hosts if x["key"] in mod.OIDC_HOST_KEYS]:
         sub = h["sub"]
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
