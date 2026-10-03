@@ -87,6 +87,17 @@ class FakeSession:
 class ZeusReturnTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if not STRATEGIES.exists():
+            # `dograh/upstream/` is gitignored — scripts/setup.sh clones it from
+            # github.com/innotelinc/dograh — so a bare checkout (this CI job, which
+            # is deliberately network-free) has no strategy file to load. Skip and
+            # say so, rather than failing: a missing subtree is not the return
+            # branch being broken, and reporting it as a red build is how a real
+            # regression learns to hide behind a known-failing test.
+            raise unittest.SkipTest(
+                f"dograh source absent at {STRATEGIES.relative_to(ROOT)} "
+                "(gitignored; cloned by scripts/setup.sh)"
+            )
         cls.strategies = load_strategy()
 
     def test_return_is_disabled_by_default(self):
