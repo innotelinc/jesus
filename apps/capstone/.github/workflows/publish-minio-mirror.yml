@@ -1,0 +1,74 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# publish-minio-mirror.yml — publish the estate's MinIO image mirror.
+#
+# Upstream MinIO no longer serves anonymous pulls from anywhere public —
+# docker.io `minio/minio` is gone (404) and quay.io `minio/minio` answers 401 —
+# so the estate pulls the object store from this repo's GHCR namespace instead.
+# This mirrors the maintained community CE build `pgsty/minio` (same MinIO
+# binary, entrypoint and bundled `mc`, republished under the plain RELEASE tags)
+# as `ghcr.io/<owner>/<repo>/minio:<tag>` (+ `:latest`). A push from Actions in
+# this public repository publishes a PUBLIC package, so a fresh host can pull it
+# anonymously.
+#
+# It is a reusable workflow so the release pipeline (every `v*` tag) and a manual
+# dispatch publish the exact same reference. The mirror had silently never been
+# created because the tag it pulled could no longer resolve, so the tag now
+# comes from one place — the `minio_tag` input — and the pinned default is the
+# single source of truth for every consumer (docker-compose.yml, .env.example,
+# scripts/offline-images.txt).
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Publish MinIO mirror
+
+on:
+  workflow_call:
+    inputs:
+      minio_tag:
+        description: "pgsty/minio RELEASE tag to mirror"
+        required: false
+        type: string
+        default: "RELEASE.2026-08-04T00-00-00Z"
+  workflow_dispatch:
+    inputs:
+      minio_tag:
+        description: "pgsty/minio RELEASE tag to mirror"
+        required: false
+        default: "RELEASE.2026-08-04T00-00-00Z"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  # The repository's own GHCR namespace (ghcr.io/<owner>/<repo>).
+  IMAGE_NAMESPACE: ${{ github.repository }}
+
+jobs:
+  mirror:
+    name: Mirror pgsty/minio into GHCR
+    runs-on: ubuntu-latest
+    env:
+      MINIO_IMAGE_TAG: ${{ inputs.minio_tag }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Mirror the amd64 image only — the platform the offline bundle ships.
+      # pgsty publishes multi-arch manifests, but only the amd64 content is
+      # pulled, so a multi-arch push would be rejected as incomplete.
+      - name: Pull and re-push the image
+        run: |
+          set -euo pipefail
+          minio_tag="${MINIO_IMAGE_TAG:-RELEASE.2026-08-04T00-00-00Z}"
+          full="$REGISTRY/$IMAGE_NAMESPACE/minio"
+          docker pull --platform linux/amd64 "pgsty/minio:$minio_tag"
+          docker tag "pgsty/minio:$minio_tag" "$full:$minio_tag"
+          docker tag "pgsty/minio:$minio_tag" "$full:latest"
+          docker push "$full:$minio_tag"
+          docker push "$full:latest"
+          echo "::notice::published $full:$minio_tag (pgsty/minio mirror)"
