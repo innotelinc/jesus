@@ -8,22 +8,32 @@
 # hasn't moved).
 #
 # Required secrets:
-#   FORK_SYNC_SECRET — GitHub PAT with write (Contents: write) access to
-#     the dograh source repo. The workflow's GITHUB_TOKEN only covers this
-#     repo, so a PAT scoped to the source repo is required to push the sync.
+#   FORK_SYNC_SECRET — a GitHub PAT with write access to TWO repositories:
 #
-#     It must ALSO carry the `workflow` scope. The fork carries workflow files
-#     (`.github/workflows/build-api-image.yml` and friends), and GitHub refuses
-#     a push that creates or updates a workflow file from a token without that
-#     scope:
+#     1. innotelinc/dograh — the fork this workflow pushes the rebuilt tree to.
+#        The workflow's GITHUB_TOKEN only covers capstone itself, so a PAT is
+#        required to push to the fork at all.
 #
-#       ! [remote rejected] rebuilt -> main (refusing to allow a Personal
-#       Access Token to create or update workflow `...` without `workflow` scope)
+#        It must ALSO carry workflow-file permission. The fork carries workflow
+#        files (`.github/workflows/build-api-image.yml` and friends), and
+#        GitHub refuses a push that creates or updates a workflow file from a
+#        token without it:
 #
-#     That is a plain git push rejection, so the job dies with "failed to push
-#     some refs" and no release is cut — silently, every day, until someone
-#     reads the log. A classic PAT therefore needs `repo` + `workflow`; a
-#     fine-grained one needs Contents: write and Workflows: write.
+#          ! [remote rejected] rebuilt -> main (refusing to allow a Personal
+#          Access Token to create or update workflow `...` without `workflow` scope)
+#
+#        That is a plain git push rejection, so the job dies with "failed to
+#        push some refs" and no release is cut — silently, every day, until
+#        someone reads the log.
+#
+#     2. innotelinc/capstone — the `release` job below reuses this token for
+#        `gh release create`, which publishes to THIS repo. A token scoped only
+#        to the fork clears the push and then fails on the release.
+#
+#     So, for a fine-grained PAT: select both repositories, give each
+#     Contents: Read and write, and give innotelinc/dograh additionally
+#     Workflows: Read and write. A classic PAT needs just `repo` + `workflow`,
+#     which cover both.
 #
 # Release versioning (bump from last release):
 #   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
