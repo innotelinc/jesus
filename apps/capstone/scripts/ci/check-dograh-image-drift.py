@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """check-dograh-image-drift.py — prove the running dograh images came from this tree.
 
-dograh/upstream is gitignored and this repo's fixes to it live in
-dograh/patches/, applied at build time. Nothing stops the stack from running
+dograh/upstream is a gitignored clone of innotelinc/dograh, which carries our
+customizations as commits. Nothing stops the stack from running
 something else, and the incident this guards against is exactly that: a stack
 serving the registry's ghcr.io images — which carry none of the patches — while
 every file in the repo says otherwise. The configuration reads the same either
@@ -21,11 +21,10 @@ What is compared, and why it is not uniform:
     longer renders the pre-patch dead end. (0007 is a build-only change — a cap
     on webpack's in-memory cache — with no runtime artifact to look for.)
 
-Exit codes, matching scripts/ci/sso-smoke.py: 0 = the images carry the patched
-tree, 1 = drift, 2 = cannot run (no clone, no docker, or the containers are not
+Exit codes, matching scripts/ci/sso-smoke.py: 0 = the images carry our tree,
+1 = drift, 2 = cannot run (no clone, no docker, or the containers are not
 running here) — which is a SKIP, not a pass.
 
-    ./scripts/apply-dograh-patches.sh              # make upstream the patched tree
     python3 scripts/ci/check-dograh-image-drift.py
 
 The container names are the compose service names; override them with
@@ -106,13 +105,65 @@ def resolve_pipecat_root(container: str) -> str:
     return lines[-1] if lines else ""
 
 
+# The fork carries our customizations as commits on main, not as patches. The
+# files to compare are whatever those commits changed relative to the upstream
+# they sit on top of, which is the same question the patches used to answer by
+# reading `+++ b/` lines.
+#
+#   dograh/upstream            <- the fork's clone
+#   dograh/patches/            <- gone; the delta is in git history now
+#   upstream/main              <- the author's tree we rebase onto
+#
+# Comparing against `upstream/main` rather than the merge-base keeps this correct
+# after a sync: a file upstream changed AND we changed is ours to compare, and a
+# file only upstream changed is not part of our delta at all.
+SYNC_BASE = "upstream/main"
+
+# The customizations are one commit. Diffing against upstream/main also picks up
+# the fork's deployment/docs layer (deploy/**, ABOUT.md, workflows), which lives
+# in the repo and not in either image, so scoping to the commits that touch code
+# is what keeps this comparing files the images actually carry.
+CODE_PREFIXES = ("api/", "ui/", "pipecat/")
+
+
 def touched_paths() -> dict[str, list[str]]:
-    """{repo-relative path: [patch name, ...]} for every file the patch set touches."""
+    """{repo-relative path: [commit subject, ...]} for every file our delta touches."""
+    if not (UPSTREAM / ".git").is_dir():
+        return {}
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(UPSTREAM), *args],
+            capture_output=True, text=True, check=False,
+        )
+
+    base = ""
+    if git("rev-parse", "--verify", SYNC_BASE).returncode == 0:
+        base = SYNC_BASE
+    else:
+        # No upstream remote fetched (setup.sh clones with --depth 1 and does not
+        # add one). Fall back to the merge-base with origin/main, which is where
+        # our delta starts either way.
+        base = git("merge-base", "origin/main", "HEAD").stdout.strip()
+    if not base:
+        # Without a base there is no delta to compare, and returning {} here made
+        # the caller report PASS while hashing nothing -- a false pass on the one
+        # check whose whole job is to notice a mismatch.
+        return {}
+
+    revs = [f"{base}..HEAD"]
+    if base == SYNC_BASE:
+        # Also catch customizations that landed on origin/main but are not in
+        # this clone yet, so a stale clone cannot pass.
+        revs.append(f"{SYNC_BASE}..origin/main")
+
     touched: dict[str, list[str]] = {}
-    for patch in sorted(PATCH_DIR.glob("*.patch")):
-        for line in patch.read_text().splitlines():
-            if line.startswith("+++ b/"):
-                touched.setdefault(line[6:].strip(), []).append(patch.name)
+    for rev in revs:
+        out = git("diff", "--name-only", rev).stdout
+        for line in out.splitlines():
+            path = line.strip()
+            if path.startswith(CODE_PREFIXES):
+                touched.setdefault(path, []).append("our delta")
     return touched
 
 
@@ -152,21 +203,32 @@ def patch_labels(names: list[str]) -> str:
 
 
 def main() -> int:
-    print("dograh image drift — the running images against dograh/upstream + dograh/patches/\n")
+    print("dograh image drift — the running images against the fork tree in dograh/upstream\n")
 
     if not (UPSTREAM / ".git").is_dir():
-        print("SKIP: dograh/upstream is not cloned, so there is no patched tree to compare "
+        print("SKIP: dograh/upstream is not cloned, so there is no tree to compare "
               "against (scripts/setup.sh clones it)", file=sys.stderr)
         return 2
 
-    check = subprocess.run([str(PATCH_SCRIPT), "--check"], capture_output=True, text=True)
-    if check.returncode != 0:
-        print("SKIP: dograh/upstream is not the patched tree — run "
-              "./scripts/apply-dograh-patches.sh first, then this check", file=sys.stderr)
-        sys.stderr.write(check.stdout)
-        return 2
+    # Nothing to pre-apply any more: the clone IS the fork's tree, customizations
+    # included. A clone that predates the sync would simply have fewer files to
+    # compare, so report that as a skip rather than a false pass.
+    head = subprocess.run(
+        ["git", "-C", str(UPSTREAM), "log", "--format=%h %s", "-1"],
+        capture_output=True, text=True, check=False,
+    ).stdout.strip()
+    print(f"comparing against dograh/upstream @ {head or 'unknown'}")
 
     touched = touched_paths()
+    if not touched:
+        # An empty delta means we could not work out what our customizations are,
+        # so there is nothing to compare. Reporting PASS here would be the exact
+        # false pass this check exists to prevent.
+        print("SKIP: no baseline to diff our customizations against, so there is "
+              "nothing to compare — fetch the upstream remote in dograh/upstream "
+              "(git remote add upstream https://github.com/dograh-hq/dograh.git && "
+              "git fetch upstream) or re-clone it", file=sys.stderr)
+        return 2
     api_files = {p: n for p, n in touched.items()
                  if p.split("/", 1)[0] in ("api", PIPECAT_PACKAGE)}
     ui_files = {p: n for p, n in touched.items() if p.split("/", 1)[0] == "ui"}

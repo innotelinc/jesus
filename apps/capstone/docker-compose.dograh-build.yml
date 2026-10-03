@@ -10,12 +10,11 @@
 # takes 15-25 minutes; the ui build needs npm and also takes a while):
 #
 #   git -C dograh/upstream submodule update --init --recursive
-#   ./scripts/apply-dograh-patches.sh    # this repo's fixes to dograh
 #
-# That second step matters: dograh/upstream is gitignored, so the fixes this
-# repo makes to the dograh UI (OIDC session handling, the workflow pages) live
-# in dograh/patches/ and are applied here. scripts/setup.sh does it
-# automatically; a bare build-from-source does not.
+# Nothing else is needed: our fixes to dograh are commits on innotelinc/dograh
+# main, so the clone already carries them (OIDC session handling, the workflow
+# pages, the memory-capped UI build). They used to be patches applied by
+# scripts/apply-dograh-patches.sh; see innotelinc/dograh FORKING.md.
 #
 # On a memory-constrained host the UI build can be capped instead of being
 # OOM-killed (Next's webpack pass and its type-check are run sequentially):
@@ -68,7 +67,7 @@
 # cache — Next sets `maxMemoryGenerations: Infinity` for production, so one
 # in-memory generation of every module is held for the whole build — and an
 # image build gets nothing from a cache that dies with its layer. ui/Dockerfile
-# now sets NEXT_BUILD_FS_CACHE=0 (dograh/patches/0007); with that and a heap cap
+# now sets NEXT_BUILD_FS_CACHE=0; with that and a heap cap
 # the build fits the 4 GiB container with nothing else stopped:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
