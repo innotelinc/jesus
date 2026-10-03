@@ -12,6 +12,19 @@
 #     the dograh source repo. The workflow's GITHUB_TOKEN only covers this
 #     repo, so a PAT scoped to the source repo is required to push the sync.
 #
+#     It must ALSO carry the `workflow` scope. The fork carries workflow files
+#     (`.github/workflows/build-api-image.yml` and friends), and GitHub refuses
+#     a push that creates or updates a workflow file from a token without that
+#     scope:
+#
+#       ! [remote rejected] rebuilt -> main (refusing to allow a Personal
+#       Access Token to create or update workflow `...` without `workflow` scope)
+#
+#     That is a plain git push rejection, so the job dies with "failed to push
+#     some refs" and no release is cut — silently, every day, until someone
+#     reads the log. A classic PAT therefore needs `repo` + `workflow`; a
+#     fine-grained one needs Contents: write and Workflows: write.
+#
 # Release versioning (bump from last release):
 #   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
 #   upstream major bump → Capstone major bump  (v2.0 → v3.0)
@@ -75,6 +88,11 @@ jobs:
             ./scripts/sync-dograh-fork.sh --push
           fi
 
+  # A release cut with `github.token` mints a v* tag with GITHUB_TOKEN, and
+  # GitHub does not run workflows for events a GITHUB_TOKEN creates — so the
+  # tag never reaches release.yml and the Capstone images/artifacts for a
+  # scheduled release are never published. Cutting with FORK_SYNC_SECRET (a
+  # real PAT) makes the tag a normal user event and release.yml fires.
   release:
     name: Bump version & cut release
     needs: sync-fork
@@ -84,7 +102,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       release_url: ${{ steps.cut.outputs.release_url }}
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.FORK_SYNC_SECRET || github.token }}
     steps:
       - uses: actions/checkout@v7
 
