@@ -35,7 +35,7 @@ silently — the only symptom is that ICE/TURN never works and the log fills up.
    message. Nothing is logged server-side and no reply comes back, so the RTP
    engine retried 3x3s on *every call*:
 
-       stun.c: Attempt 3 to send STUN request to '172.19.0.2' timed out.
+       stun.c: Attempt 3 to send STUN request to '172.19.x.y' timed out.
        Check that the server address is correct and reachable.
 
    Verified live: a cookie-carrying probe to coturn was answered, a cookie-less
