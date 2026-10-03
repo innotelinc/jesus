@@ -21,7 +21,7 @@ dograh_admin_name: "{{ lookup('env', 'DOGRAH_ADMIN_NAME') | default('Capstone Op
 # this default was pointing the only ARI client at it. Keep the two in step: a
 # playbook run PUTs this value on every invocation, so a loopback default here
 # silently reverses the LAN-IP rule on the next run.
-dograh_lan_ip: "{{ lookup('env', 'PJSIP_MEDIA_ADDRESS') | default('192.168.1.46', true) }}"
+dograh_lan_ip: "{{ lookup('env', 'PJSIP_MEDIA_ADDRESS') | default('192.168.1.30', true) }}"
 dograh_ari_endpoint: "{{ lookup('env', 'DOGRAH_ARI_ENDPOINT') | default('http://' ~ dograh_lan_ip ~ ':8088', true) }}"
 dograh_ari_app_name: "{{ lookup('env', 'DOGRAH_ARI_APP_NAME') | default('dograh', true) }}"
 dograh_ari_password: "{{ lookup('env', 'DOGRAH_ARI_PASSWORD') | default('', true) }}"

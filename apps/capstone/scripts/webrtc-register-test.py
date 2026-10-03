@@ -366,7 +366,7 @@ def main() -> int:
     ap.add_argument("--answer", type=float, default=0.0,
                     help="after registering, auto-answer inbound INVITEs and hold each call "
                          "this many seconds before sending BYE (proves ANSWERED CDRs)")
-    ap.add_argument("--rtp-ip", default="192.168.1.46",
+    ap.add_argument("--rtp-ip", default="192.168.1.30",
                     help="LAN IP advertised in the answer SDP for the RTP socket")
     ap.add_argument("--insecure", action="store_true",
                     help="skip TLS verification (self-signed test cert)")

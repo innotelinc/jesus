@@ -410,7 +410,7 @@ if [ -f "${SRC}/websocket_client.conf" ]; then
     # image can still hold host.docker.internal, which is not resolvable here
     # (ast_sockaddr_resolve fails on that alias) — repair it to the host LAN IP
     # rather than leaving a URI whose failure is silent (no audio, empty log).
-    _ws_lan="${PJSIP_MEDIA_ADDRESS:-192.168.1.46}"
+    _ws_lan="${PJSIP_MEDIA_ADDRESS:-192.168.1.30}"
     sed -i "s|host\.docker\.internal|${_ws_lan}|" "${DEST}/websocket_client.conf"
     echo ">>> [dograh-ari] websocket_client.conf repaired: host.docker.internal -> ${_ws_lan}"
   fi
@@ -1305,7 +1305,7 @@ fi
 # endpoint (so that endpoint advertises the reachable address). The transport
 # setting goes in the durable pjsip.transports_custom.conf (which Apply Config
 # does NOT regenerate), so it survives reloads. Overridables: PJSIP_LOCAL_NET
-# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.46), PJSIP_LAN_ENDPOINTS
+# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.30), PJSIP_LAN_ENDPOINTS
 # (space-separated, default 101).
 inject_pjsip_media_address() {
   # transport: mark the LAN subnet as local so remote peers keep the public
@@ -1351,7 +1351,7 @@ PY
   fi
   # endpoints: force media_address to the host LAN IP for LAN-only extensions
   local ecfg="${DEST}/pjsip.endpoint.conf"
-  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.46}"
+  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.30}"
   local eps="${PJSIP_LAN_ENDPOINTS:-101}"
   if [ -f "$ecfg" ]; then
     python3 - "$ecfg" "$lan_ip" "$eps" <<'PY'
@@ -1508,7 +1508,7 @@ sync_ucp_ami_secret() {
 tighten_ami_acl() {
   local f="${DEST}/manager_custom.conf"
   [ -f "${f}" ] || return 0
-  python3 - "${f}" "${PJSIP_LOCAL_NET:-}" "${PJSIP_MEDIA_ADDRESS:-192.168.1.46}" <<'PYEOF'
+  python3 - "${f}" "${PJSIP_LOCAL_NET:-}" "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}" <<'PYEOF'
 import re, sys
 path, want, lan_ip = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(path).read()

@@ -92,7 +92,7 @@ LAN_ONLY_PORTS = [
 # and a gateway pointed at them exits on "dial tcp ...: connect: connection
 # refused" rather than degrading.
 SESSION_STORE_PORT = 16380
-SESSION_STORE_HOST = "192.168.1.46"
+SESSION_STORE_HOST = "192.168.1.71"
 
 OK = "\033[32mPASS\033[0m"
 BAD = "\033[31mFAIL\033[0m"

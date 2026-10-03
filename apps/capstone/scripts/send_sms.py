@@ -85,7 +85,7 @@ def _zeus_base_url() -> str:
       2. ZEUS_PORTAL_URL env (explicit override).
       3. .env CAPSTONE_ZEUS_URL (portable-stack convention).
       4. compose default http://zeus-portal:3000 (container network).
-      5. LAN fallback http://192.168.1.46:3001 (same host, outside compose).
+      5. LAN fallback http://192.168.1.30:3001 (same host, outside compose).
     """
     for name in ("CAPSTONE_PBX", "ZEUS_PORTAL_URL", "CAPSTONE_ZEUS_URL"):
         val = os.environ.get(name) or _cpbx_env().get(name)
