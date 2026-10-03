@@ -806,7 +806,7 @@ for i in $(seq 1 60); do
     # the row was never created. Seed it exactly the way FreePBX would; it is
     # per extension and idempotent, so this is safe to re-run every boot.
     if command -v asterisk >/dev/null 2>&1; then
-      conc_default="$(mysql -u root asterisk -N -B 2>/dev/null \
+      conc_default="$(mysql -u root asterisk -N -B \
         -e "SELECT value FROM freepbx_settings WHERE keyword='CONCURRENCYLIMITDEFAULT'" 2>/dev/null | head -1)"
       [ -n "${conc_default}" ] || conc_default="0"
       conc_seeded=0
