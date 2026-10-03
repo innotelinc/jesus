@@ -145,6 +145,38 @@ if [ -n "$CONFLICTS" ]; then
   echo "$CONFLICTS" | tr '|' '\n' | sed 's/^/    /'
 fi
 
+# The fork carries workflow files, and GitHub refuses a push that creates or
+# updates one from a token without the `workflow` scope:
+#
+#   ! [remote rejected] rebuilt -> main (refusing to allow a Personal Access
+#   Token to create or update workflow `.github/workflows/...` without `workflow` scope)
+#
+# That is a plain git rejection, so it reads as a generic "failed to push some
+# refs" and the whole sync dies without a hint of what to fix. Check the scope
+# up front — the token's scopes are the response's `X-OAuth-Scopes` header — and
+# fail with the actual remedy. A fine-grained token does not return that header,
+# so this stays quiet rather than guessing at one.
+if [ "$PUSH" -eq 1 ] && [ -n "${GH_TOKEN:-}" ]; then
+  changed_workflows="$(git diff --name-only "$UPSTREAM_HEAD" origin/main -- .github/workflows 2>/dev/null || true)"
+  if [ -n "$changed_workflows" ]; then
+    scopes="$(curl -sS -I -H "Authorization: token ${GH_TOKEN}" https://api.github.com/user 2>/dev/null \
+      | tr -d '\r' | sed -n 's/^[Xx]-[Oo][Aa]uth-[Ss]copes: *//p' | head -1)"
+    # The header is comma-and-space separated ("repo, workflow"), so the split
+    # has to drop the spaces or a token that HAS the scope reads as missing it.
+    if [ -n "$scopes" ] && ! printf '%s' "$scopes" | tr ',' '\n' | tr -d ' ' | grep -qx 'workflow'; then
+      echo "FATAL: this sync changes .github/workflows/*, but FORK_SYNC_SECRET is missing the 'workflow' scope." >&2
+      echo "       GitHub will reject the push with 'refusing to allow a Personal Access Token to create or" >&2
+      echo "       update workflow ... without workflow scope'." >&2
+      echo "       token scopes: ${scopes:-none}" >&2
+      echo "       Fix: grant the token the 'workflow' scope (classic PAT: repo + workflow;" >&2
+      echo "       fine-grained: Contents: write + Workflows: write), then re-run." >&2
+      echo "       workflows this sync would touch:" >&2
+      while IFS= read -r wf; do echo "         $wf" >&2; done <<<"$changed_workflows"
+      exit 1
+    fi
+  fi
+fi
+
 echo "── 3. Verifying rebuilt tree ──"
 if git diff --quiet "$UPSTREAM_HEAD" origin/main -- . ':!'"$CONFLICTS" >/dev/null 2>&1; then :; fi
 git status --porcelain | head -5
