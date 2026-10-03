@@ -257,6 +257,19 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
     return "FAIL", f"upstream error {status}"
 
 
+# The sign-in entry on the CANONICAL host is not a pure redirect: the API builds
+# the authorize URL from its own OIDC discovery document, and the first sign-in
+# after an API start fetches that document from the IdP before it can answer.
+# dograh's discovery call carries its own 15s timeout, so a per-request budget
+# below that reports the entry as "The read operation timed out" whenever that
+# fetch is slow — a cold start, a cold TLS connection to the IdP — even though
+# the entry is working. (The alias hosts never see this: the edge answers them
+# with a 302 hand-off before the API is reached, so only the apex exercises the
+# discovery fetch.) The budget below leaves room for the fetch, the redirect and
+# the TLS handshake, and still catches an entry that never answers at all.
+SIGNIN_TIMEOUT_FLOOR = 25
+
+
 def walk_to_authorize(url: str, timeout: int, hops: int = 3) -> tuple[bool, str]:
     """Follow the sign-in entry's redirects and require that they reach the IdP.
 
@@ -266,7 +279,11 @@ def walk_to_authorize(url: str, timeout: int, hops: int = 3) -> tuple[bool, str]
     check alone cannot tell that from a working sign-in — the assertion has to
     be that the browser is sent onwards, and that the end of the chain is the
     IdP's authorize endpoint (npm-proxy-hosts.py OIDC_PATH).
+
+    The per-request budget is floored at SIGNIN_TIMEOUT_FLOOR so a slow
+    discovery fetch is not mistaken for a broken entry.
     """
+    timeout = max(timeout, SIGNIN_TIMEOUT_FLOOR)
     for _ in range(hops):
         try:
             status, location = fetch(url, timeout)
@@ -401,7 +418,10 @@ def main() -> int:
 
     # 3. The Cerulean sign-in entry, on every origin that serves the app. See
     #    walk_to_authorize: this is the check for the fault where signing in
-    #    "does nothing" because the redirect was answered by a proxy.
+    #    "does nothing" because the redirect was answered by a proxy. The
+    #    per-request budget is raised inside the walk — the apex entry can spend
+    #    up to the API's own discovery timeout before it answers (see
+    #    SIGNIN_TIMEOUT_FLOOR), which the default 12s is below.
     for h in [x for x in hosts if x["key"] in mod.OIDC_HOST_KEYS]:
         sub = h["sub"]
         domain = base_domain if sub is None else f"{sub}.{base_domain}"

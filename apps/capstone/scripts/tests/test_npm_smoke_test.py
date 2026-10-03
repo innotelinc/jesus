@@ -190,5 +190,47 @@ class EdgeReachableTests(unittest.TestCase):
             self.assertFalse(smoke.edge_reachable("capstone.innotel.us", 5))
 
 
+class WalkToAuthorizeTests(unittest.TestCase):
+    """The sign-in walk's per-request budget.
+
+    The canonical host answers the entry by building the authorize URL from its
+    own OIDC discovery document, whose fetch carries a 15s timeout of its own.
+    A request budget below that reports a working entry as a timeout on a cold
+    start — the intermittent "capstone.innotel.us/api/v1/auth/oidc/login FAIL
+    (The read operation timed out)" on the schedule. The walk floors the budget
+    so a slow discovery fetch is not mistaken for a broken entry.
+    """
+
+    def test_the_budget_is_floored_above_the_api_discovery_timeout(self):
+        seen = []
+
+        def fake_fetch(url, timeout):
+            seen.append(timeout)
+            return 307, "https://auth.cerulean.innotel.us/application/o/authorize/?client_id=dograh"
+
+        with _patched("fetch", fake_fetch):
+            ok, _ = smoke.walk_to_authorize(
+                "https://capstone.innotel.us/api/v1/auth/oidc/login", 12
+            )
+        self.assertTrue(ok)
+        self.assertGreaterEqual(seen[0], smoke.SIGNIN_TIMEOUT_FLOOR)
+        # The floor has to clear the API's own 15s discovery fetch, or the entry
+        # can still time out on a cold start.
+        self.assertGreater(smoke.SIGNIN_TIMEOUT_FLOOR, 15)
+
+    def test_a_budget_above_the_floor_is_left_alone(self):
+        seen = []
+
+        def fake_fetch(url, timeout):
+            seen.append(timeout)
+            return 307, "https://auth.cerulean.innotel.us/application/o/authorize/?client_id=dograh"
+
+        with _patched("fetch", fake_fetch):
+            smoke.walk_to_authorize(
+                "https://capstone.innotel.us/api/v1/auth/oidc/login", 40
+            )
+        self.assertEqual(seen[0], 40)
+
+
 if __name__ == "__main__":
     unittest.main()
