@@ -140,9 +140,35 @@ while IFS=$'\t' read -r status file; do
 done < <(my_delta)
 
 CONFLICTS="$(sort -u "$CONFLICTS_FILE" | paste -sd'|' - 2>/dev/null || true)"
+
+# A conflict means both sides changed the file and the fork's copy won wholesale.
+# That is the intended behaviour for files the fork owns outright — it keeps its
+# own README, changelog, version line and release manifest, so upstream touching
+# them is routine and keeping the fork's copy IS the sync. Anything else is
+# shared code, where the same rule silently discards upstream's work, so that
+# fails the job instead of scrolling past in a release log.
+FORK_OWNED_RE='^(README\.md|CHANGELOG\.md|\.release-please-manifest\.json|api/pyproject\.toml|ui/package\.json)$'
+
 if [ -n "$CONFLICTS" ]; then
   echo "!! 3-way merge conflicts — kept fork version (review these):"
   echo "$CONFLICTS" | tr '|' '\n' | sed 's/^/    /'
+
+  unexpected="$(echo "$CONFLICTS" | tr '|' '\n' | grep -Ev "$FORK_OWNED_RE" || true)"
+  if [ -n "$unexpected" ]; then
+    # Dry runs exist to inspect the merge, so they warn and carry on; a real
+    # sync has no business shipping a tree that dropped upstream's changes.
+    if [ "$PUSH" -eq 1 ]; then
+      echo "FATAL: upstream changed files this fork also changed, so upstream's work was discarded:" >&2
+    else
+      echo "WARNING: upstream changed files this fork also changed, so upstream's work was discarded:" >&2
+      echo "         (dry run — not failing here; a --push sync will refuse this tree)" >&2
+    fi
+    while IFS= read -r f; do echo "         $f" >&2; done <<<"$unexpected"
+    echo "       The sync keeps the fork's version on conflict, so none of upstream's change to those" >&2
+    echo "       files is in the rebuilt tree. Merge them by hand and commit the result to the fork —" >&2
+    echo "       the delta rule then keeps your merged version — or re-run with --force to ship anyway." >&2
+    if [ "$PUSH" -eq 1 ]; then exit 1; fi
+  fi
 fi
 
 # The fork carries workflow files, and GitHub refuses a push that creates or

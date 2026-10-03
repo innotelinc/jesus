@@ -26,8 +26,16 @@ The contract under test:
     real cause still reaches the log
   * with no ``.github/workflows`` change to push, neither guard arms
 
-The two guarded regions are cut out of the real script and sourced, so these
-cases run the shipped code rather than a restatement of it.
+The conflict classifier is covered too. A 3-way conflict keeps the fork's
+version, which is correct for files the fork owns outright but silently drops
+upstream's work for anything shared, so:
+
+  * conflicts confined to fork-owned files are informational, not fatal
+  * a conflict on shared code fails a real sync and names the files
+  * a dry run only warns, so the merge can still be inspected
+
+The guarded regions are cut out of the real script and sourced, so these cases
+run the shipped code rather than a restatement of it.
 """
 
 import os
@@ -60,6 +68,10 @@ def _between(start: str, stop: str) -> str:
 # regression that made every push fail loudly would be visible here.
 _GUARD_BLOCK = _between(r"^# The fork carries workflow files", r"Verifying rebuilt tree")
 _PUSH_BLOCK = _between(r"^  push_log=", r"^else$")
+
+# The conflict classifier, from the CONFLICTS assignment through the block that
+# decides whether the conflict list is fatal.
+_CONFLICT_BLOCK = _between(r'^CONFLICTS="\$\(sort', r"^echo \"── 3\.")
 
 # A scope-header value means "this classic PAT reported its scopes"; None means
 # the response carried no header at all, which is what a fine-grained PAT does.
@@ -209,6 +221,67 @@ class WorkflowScopeGuardTests(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertNotIn(_REMEDY, out)
         self.assertIn(_PUSHED, out)
+
+    # ---- conflict classification ----
+
+    def run_conflicts(self, files, push=1):
+        """Run the shipped conflict classifier with a fixed conflict list."""
+        driver = "\n".join(
+            [
+                "set -uo pipefail",
+                f"CONFLICTS_FILE=$(mktemp)",
+                f"PUSH={push}",
+            ]
+            + [f"echo {shlex.quote(f)} >> \"$CONFLICTS_FILE\"" for f in files]
+            + [_CONFLICT_BLOCK, 'echo "__DONE__"']
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "conflicts.sh")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(driver)
+            proc = subprocess.run(
+                ["bash", path], capture_output=True, text=True, timeout=60
+            )
+        return proc.returncode, proc.stdout + proc.stderr
+
+    def test_fork_owned_conflicts_are_not_fatal(self):
+        # The exact list the last real sync produced, minus the dead file that
+        # has since been deleted from the fork. Keeping the fork's copy of all
+        # of these IS the sync, so a real run must still succeed.
+        rc, out = self.run_conflicts(
+            [
+                ".release-please-manifest.json",
+                "CHANGELOG.md",
+                "README.md",
+                "api/pyproject.toml",
+                "ui/package.json",
+            ]
+        )
+        self.assertEqual(rc, 0, out)
+        self.assertIn("__DONE__", out)
+        self.assertNotIn("FATAL", out)
+
+    def test_shared_code_conflict_fails_a_real_sync(self):
+        rc, out = self.run_conflicts(
+            ["README.md", "api/services/pipecat/recording_router_processor.py"]
+        )
+        self.assertEqual(rc, 1, out)
+        self.assertIn("FATAL", out)
+        self.assertIn("recording_router_processor.py", out, "the file must be named")
+        self.assertIn("merge them by hand", out.lower(), "the remedy must be stated")
+
+    def test_shared_code_conflict_only_warns_on_a_dry_run(self):
+        rc, out = self.run_conflicts(["src/shared.py"], push=0)
+        self.assertEqual(rc, 0, msg=f"a dry run must not fail; it is for inspecting\n{out}")
+        self.assertIn("WARNING", out)
+        self.assertNotIn("FATAL", out)
+
+    def test_a_fork_owned_name_is_not_matched_by_prefix(self):
+        # The pattern is anchored, so a path that merely contains a fork-owned
+        # name is still treated as shared code.
+        rc, out = self.run_conflicts(["docs/CHANGELOG.md"])
+        self.assertEqual(rc, 1, out)
+        self.assertIn("FATAL", out)
 
     def test_script_still_carries_both_guards(self):
         # Cheap regression on the extraction itself: if either guard is dropped
