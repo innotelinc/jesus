@@ -288,17 +288,12 @@ else
         warn "could not clone the dograh source (offline?) — the stack uses the prebuilt image, so this is non-fatal"
     fi
 fi
-# dograh/upstream is gitignored, so this repo's fixes to it live as patches in
-# dograh/patches/ and are re-applied on every setup run (idempotent). Without
-# this a fresh clone would silently lose them — including the OIDC session fix
-# that makes the workflow pages render for signed-in users.
-if [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
-    if "$REPO/scripts/apply-dograh-patches.sh"; then
-        pass "dograh patches applied"
-    else
-        warn "one or more dograh patches did not apply — check dograh/patches"
-    fi
-fi
+# Our fixes to dograh live as commits on innotelinc/dograh main, not as patches
+# applied here. They used to live in dograh/patches/ and be applied by
+# scripts/apply-dograh-patches.sh, which meant a fresh clone silently lost them
+# unless this ran, and an upstream change to a patched file made the patch fail
+# to apply with no partial success. The clone is now the fork's tree outright.
+
 # Building dograh-api from source needs the pipecat submodule + 10-20 min.
 # Only initialize it when a source build was requested.
 if [ "${DOGRAH_BUILD_FROM_SOURCE:-0}" = "1" ] && [ -d "$DOGRAH_UPSTREAM_DIR/.git" ]; then
