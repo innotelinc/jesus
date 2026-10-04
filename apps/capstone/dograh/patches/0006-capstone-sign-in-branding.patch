@@ -1,0 +1,156 @@
+diff --git a/ui/src/app/auth/login/LoginForm.tsx b/ui/src/app/auth/login/LoginForm.tsx
+index dfa73481..2e7df389 100644
+--- a/ui/src/app/auth/login/LoginForm.tsx
++++ b/ui/src/app/auth/login/LoginForm.tsx
+@@ -61,24 +61,16 @@ export function LoginForm({
+     const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+     const href = `${backendBase}${oidcLoginPath}?next=${encodeURIComponent("/after-sign-in")}`;
+     return (
+-      <AuthShell enterpriseSlot={<AuthEnterpriseCTA />}>
++      <AuthShell>
+         <div className="space-y-1.5 text-center">
+-          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+-          <p className="text-sm text-muted-foreground">
+-            Continue with your Cerulean account
+-          </p>
++          <h1 className="text-2xl font-semibold tracking-tight">Capstone</h1>
+         </div>
+ 
+         <SignInError error={error} />
+ 
+         <Button asChild className="w-full">
+-          <a href={href}>Sign in with Cerulean</a>
++          <a href={href}>Sign In</a>
+         </Button>
+-
+-        <p className="text-center text-xs text-muted-foreground">
+-          Accounts are managed in Cerulean. Contact an administrator if you
+-          cannot sign in.
+-        </p>
+       </AuthShell>
+     );
+   }
+diff --git a/ui/src/app/layout.tsx b/ui/src/app/layout.tsx
+index 7326640f..72a60513 100644
+--- a/ui/src/app/layout.tsx
++++ b/ui/src/app/layout.tsx
+@@ -33,8 +33,8 @@ const geistMono = Geist_Mono({
+ });
+ 
+ export const metadata: Metadata = {
+-  title: "Dograh",
+-  description: "Open Source Voice Assistant Workflow Builder",
++  title: "Capstone",
++  description: "AI Voice Agent Platform",
+ };
+ 
+ export default function RootLayout({
+diff --git a/ui/src/components/auth/AuthShell.tsx b/ui/src/components/auth/AuthShell.tsx
+index 32ae6f03..50fd7531 100644
+--- a/ui/src/components/auth/AuthShell.tsx
++++ b/ui/src/components/auth/AuthShell.tsx
+@@ -1,25 +1,19 @@
+-// Shared dark two-column auth shell, used by BOTH the Stack Auth handler
++// Shared two-column auth shell, used by BOTH the Stack Auth handler
+ // (/handler/[...stack], cloud) and the local/OSS auth pages (/auth/login,
+ // /auth/signup). LEFT: a centered card that wraps the auth form (`children`).
+-// RIGHT (lg+ only): a brand/value panel with the Dograh logo, proof points, and
+-// a Bland-style enterprise CTA block at the bottom (passed in as `enterpriseSlot`).
+-// Mobile collapses to the single card column. The form column scrolls and stays
+-// centered so tall (sign-up) forms never clip on short viewports. Palette is the
+-// app's blacks/greys with one warm CTA accent.
++// RIGHT (lg+ only): the platform value proposition. Mobile collapses to the
++// single card column. The form column scrolls and stays centered so tall
++// (sign-up) forms never clip on short viewports.
++//
++// Capstone customization: the brand panel shows only "AI Voice Agent Platform"
++// — no upstream logo, proof-point chips, or enterprise CTA — and the form
++// column carries no dograh watermark. `enterpriseSlot` is still accepted so
++// the upstream call sites keep compiling, but it is intentionally not rendered.
+ 
+ import type { ReactNode } from "react";
+ 
+-import { BrandLogo } from "@/components/BrandLogo";
+-
+-const HIGHLIGHTS = [
+-  "Speech-to-speech",
+-  "MCP-native",
+-  "BYOK - any model",
+-];
+-
+ export function AuthShell({
+   children,
+-  enterpriseSlot,
+ }: {
+   children: ReactNode;
+   enterpriseSlot?: ReactNode;
+@@ -27,21 +21,21 @@ export function AuthShell({
+   return (
+     <div className="grid min-h-screen w-full bg-background lg:grid-cols-[55%_45%]">
+       {/* Form column (LEFT) — scrolls and stays centered so tall forms never
+-          clip. Carries the giant faded "dograh" imprint along its bottom. */}
+-      <main className="auth-imprint flex min-h-screen flex-col overflow-y-auto">
++          clip. */}
++      <main className="flex min-h-screen flex-col overflow-y-auto">
+         <div className="flex min-h-full items-center justify-center p-6 sm:p-10">
+           <div className="w-full max-w-md space-y-6 rounded-2xl border border-border/60 bg-card p-6 shadow-lg sm:p-8">
+             {/* Mobile-only wordmark (brand panel is hidden) */}
+-            <div className="lg:hidden">
+-              <BrandLogo className="h-7" />
++            <div className="text-center text-lg font-semibold tracking-tight lg:hidden">
++              Capstone
+             </div>
+             {children}
+           </div>
+         </div>
+       </main>
+ 
+-      {/* Brand / value panel (RIGHT) — hidden on mobile */}
+-      <aside className="relative hidden flex-col justify-between overflow-hidden border-l border-border/60 bg-zinc-950 p-10 lg:flex xl:p-14">
++      {/* Value panel (RIGHT) — hidden on mobile */}
++      <aside className="relative hidden flex-col items-center justify-center overflow-hidden border-l border-border/60 bg-zinc-950 p-10 lg:flex xl:p-14">
+         {/* Ambient depth: soft radial glow behind the content */}
+         <div
+           aria-hidden
+@@ -49,38 +43,9 @@ export function AuthShell({
+           style={{ background: "radial-gradient(circle, var(--cta), transparent 70%)" }}
+         />
+ 
+-        <div className="relative">
+-          <BrandLogo inverse className="h-8" />
+-        </div>
+-
+-        <div className="relative max-w-md space-y-5">
+-          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-zinc-50 xl:text-4xl">
+-            The open-source voice AI platform.
+-          </h1>
+-          <ul className="flex flex-wrap gap-2">
+-            {HIGHLIGHTS.map((point) => (
+-              <li
+-                key={point}
+-                className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-zinc-300"
+-              >
+-                {point}
+-              </li>
+-            ))}
+-          </ul>
+-        </div>
+-
+-        {/* Enterprise CTA block (Bland-style) — bottom margin lifts it off the
+-            viewport edge while justify-between keeps the column layout */}
+-        <div className="relative mb-12 max-w-md space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-5 xl:mb-16">
+-          <h2 className="text-sm font-semibold text-zinc-100">
+-            Need on-prem, data residency &amp; a data perimeter?
+-          </h2>
+-          <p className="text-sm text-zinc-400">
+-            We deploy Dograh inside your environment for regulated and
+-            high-scale teams.
+-          </p>
+-          {enterpriseSlot}
+-        </div>
++        <h1 className="relative text-center text-3xl font-semibold leading-tight tracking-tight text-zinc-50 xl:text-4xl">
++          AI Voice Agent Platform
++        </h1>
+       </aside>
+     </div>
+   );

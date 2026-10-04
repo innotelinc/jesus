@@ -597,7 +597,7 @@ services:
       context: .
       dockerfile: n8n.Dockerfile
     image: ${N8N_IMAGE:-capstone-n8n-otel:local}
-    pull_policy: build
+    pull_policy: missing
     container_name: n8n
     restart: unless-stopped
     # Memory posture: workflow runs are bursty; NODE_OPTIONS (in the env block
@@ -847,7 +847,7 @@ services:
       context: .
       dockerfile: workflow-studio.Dockerfile
     image: ${WORKFLOW_STUDIO_IMAGE:-capstone-workflow-studio:local}
-    pull_policy: build
+    pull_policy: missing
     container_name: workflow-studio
     restart: unless-stopped
     ports:
@@ -1204,7 +1204,7 @@ services:
       context: ./dashboard-backend
       dockerfile: Dockerfile
     image: ${DASHBOARD_API_IMAGE:-capstone-dashboard-api:local}
-    pull_policy: build
+    pull_policy: missing
     container_name: dashboard-api
     restart: unless-stopped
     ports:
@@ -1281,6 +1281,13 @@ services:
       # (docker exec). addon: Zeus shared PBX — dashboard only manages dograh;
       # the shared box applies the *_custom.conf moniker on sync.
       CAPSTONE_DEPLOY_MODE: "${CAPSTONE_DEPLOY_MODE:-standalone}"
+      # PBX self-healing (standalone mode only). The bundled freepbx sits behind
+      # profiles: ["standalone"], so a profile-less `docker compose up -d` stops
+      # it; the API starts it on the next PBX action and a background watchdog
+      # recovers it otherwise. Seconds; PBX_WATCHDOG_INTERVAL=0 disables the
+      # watchdog.
+      PBX_START_WAIT_S: "${PBX_START_WAIT_S:-60}"
+      PBX_WATCHDOG_INTERVAL: "${PBX_WATCHDOG_INTERVAL:-60}"
       # Shared Magnate storefront for entitlement checks (RevenueOps);
       # empty when running standalone (no billing).
       MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"
@@ -1311,7 +1318,7 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     image: ${DASHBOARD_IMAGE:-capstone-dashboard:local}
-    pull_policy: build
+    pull_policy: missing
     container_name: dashboard
     restart: unless-stopped
     environment:
