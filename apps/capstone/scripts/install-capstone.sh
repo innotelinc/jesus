@@ -109,6 +109,13 @@ install_service() {
   $SUDO cp "$root$TARGET/systemd/capstone-dograh-ari.service" "$root/etc/systemd/system/capstone-dograh-ari.service"
   $SUDO cp "$root$TARGET/systemd/capstone-dograh-ari.timer" "$root/etc/systemd/system/capstone-dograh-ari.timer"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-dograh-ari.service"
+  # Dashboard redeploy: both Control Center images are built from source, so a
+  # code change does nothing until they are rebuilt and recreated. The service
+  # is hash-gated (a no-op when the sources match the last deploy), and the
+  # timer runs it every 5 minutes so the running API never lags the repo.
+  $SUDO cp "$root$TARGET/systemd/capstone-dashboard-redeploy.service" "$root/etc/systemd/system/capstone-dashboard-redeploy.service"
+  $SUDO cp "$root$TARGET/systemd/capstone-dashboard-redeploy.timer" "$root/etc/systemd/system/capstone-dashboard-redeploy.timer"
+  $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-dashboard-redeploy.service"
   # systemctl --root works offline (no running systemd needed), so it also
   # works from inside the installer chroot. Prefer it whenever a root dir is
   # given, or when we're in the chroot phase of a disk install.
@@ -123,12 +130,15 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer"
     $SUDO systemctl --root "$sysroot" enable capstone-dograh-ari.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-dograh-ari.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-dograh-ari.timer"
+    $SUDO systemctl --root "$sysroot" enable capstone-dashboard-redeploy.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-dashboard-redeploy.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-dashboard-redeploy.timer"
     # start only makes sense with a running systemd (live install)
     if [ -z "$root" ] && [ -d /run/systemd/system ]; then
       $SUDO systemctl start capstone.service 2>/dev/null || true
       $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
       $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
       $SUDO systemctl start capstone-dograh-ari.timer 2>/dev/null || true
+      $SUDO systemctl start capstone-dashboard-redeploy.timer 2>/dev/null || true
     fi
   else
     $SUDO systemctl daemon-reload 2>/dev/null || true
@@ -140,10 +150,13 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer /etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer
     $SUDO systemctl enable capstone-dograh-ari.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-dograh-ari.timer /etc/systemd/system/timers.target.wants/capstone-dograh-ari.timer
+    $SUDO systemctl enable capstone-dashboard-redeploy.timer 2>/dev/null || \
+      $SUDO ln -sf /etc/systemd/system/capstone-dashboard-redeploy.timer /etc/systemd/system/timers.target.wants/capstone-dashboard-redeploy.timer
     $SUDO systemctl start capstone.service 2>/dev/null || true
     $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
     $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
     $SUDO systemctl start capstone-dograh-ari.timer 2>/dev/null || true
+    $SUDO systemctl start capstone-dashboard-redeploy.timer 2>/dev/null || true
   fi
 }
 

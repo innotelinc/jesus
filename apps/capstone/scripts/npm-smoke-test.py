@@ -220,9 +220,39 @@ def check_sso_chain(start_url: str, signin_base: str, timeout: int) -> str | Non
     return None
 
 
-def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tuple[str, str]:
+def upstream_reachable(host: str, port: int, timeout: int) -> bool | None:
+    """TCP-connect probe of a host's upstream: True/False, or None when the
+    upstream address is unknown (off-host CI) so the caller stays generic."""
+    if not host or not port:
+        return None
+    try:
+        with socket.create_connection((host, port), timeout=min(timeout, 5)):
+            return True
+    except OSError:
+        return False
+
+
+def classify_5xx(status: int, upstream: tuple[str, int] | None,
+                 reachable: bool | None) -> str:
+    """Say WHY a 5xx happened: a listening upstream that still errors is a
+    service fault; nothing listening is a stopped/unreachable upstream — very
+    different diagnoses, and the one that a profile-gated PBX produces."""
+    if not upstream or reachable is None:
+        return f"upstream error {status}"
+    host, port = upstream
+    if reachable:
+        return (f"upstream error {status} — {host}:{port} is listening, so the "
+                "service itself is failing (not a stopped upstream)")
+    return (f"upstream error {status} — nothing listening on {host}:{port}; the "
+            "service is stopped or unreachable (not a host fault)")
+
+
+def check_host(domain: str, gated: bool, signin_base: str, timeout: int,
+               upstream: tuple[str, int] | None = None) -> tuple[str, str]:
     """One host → (verdict, note). Gated hosts must bounce to SSO; open
-    hosts must serve without a bounce. Both must present a valid cert."""
+    hosts must serve without a bounce. Both must present a valid cert. A 5xx is
+    classified against the upstream so a stopped box reads differently from a
+    broken host."""
     try:
         status, location = fetch(f"https://{domain}/", timeout)
     except urllib.error.HTTPError as e:  # pragma: no cover
@@ -248,13 +278,15 @@ def check_host(domain: str, gated: bool, signin_base: str, timeout: int) -> tupl
             return check_oauth2_proxy_chain(location, timeout)
         if status < 500:
             return "FAIL", f"NOT gated — served {status} without SSO"
-        return "FAIL", f"upstream error {status}"
+        reachable = upstream_reachable(*upstream, timeout) if upstream else None
+        return "FAIL", classify_5xx(status, upstream, reachable)
     # Open host: no SSO bounce, any real HTTP answer is fine.
     if location and "outpost.goauthentik.io/start" in location:
         return "FAIL", "SSO-gated but expected open"
     if status < 500:
         return "PASS", f"open ({status})"
-    return "FAIL", f"upstream error {status}"
+    reachable = upstream_reachable(*upstream, timeout) if upstream else None
+    return "FAIL", classify_5xx(status, upstream, reachable)
 
 
 # Floor for a probe that has to reach a real upstream through the edge, rather
@@ -367,11 +399,31 @@ def main() -> int:
     parser.add_argument("--env-file", default=str(REPO / ".env"))
     parser.add_argument("--base-domain", default=None, help="override NPM_BASE_DOMAIN")
     parser.add_argument("--timeout", type=int, default=12, help="per-request timeout seconds")
+    parser.add_argument("--upstream-host", default=None,
+                        help="host running the stack — classifies a 5xx as a stopped upstream vs a "
+                             "broken host (env NPM_UPSTREAM_HOST, fallback PJSIP_MEDIA_ADDRESS)")
+    parser.add_argument("--zeus-upstream-host", default=None,
+                        help="host serving subscribe.<domain> (env ZEUS_UPSTREAM_HOST)")
     args = parser.parse_args()
     env = load_env_file(Path(args.env_file))
 
     base_domain = (args.base_domain or env.get("NPM_BASE_DOMAIN") or "capstone.innotel.us").strip().lstrip(".")
     signin_base = (env.get("NPM_AUTHENTIK_URL") or f"https://auth.{base_domain}").rstrip("/")
+    # Upstream address used only to explain a 5xx. Absent (an edge-only CI box)
+    # the note stays generic — see classify_5xx.
+    upstream_host = (args.upstream_host or env.get("NPM_UPSTREAM_HOST")
+                     or env.get("PJSIP_MEDIA_ADDRESS") or "").strip()
+    zeus_upstream = (args.zeus_upstream_host or env.get("ZEUS_UPSTREAM_HOST") or "").strip()
+
+    # A runner with no route to the stack cannot test it. Exit 2 (skip) — the
+    # same convention scripts/ci/sso-smoke.py uses — so a hosted CI runner that
+    # cannot resolve the edge is reported as a skip, not a broken edge.
+    try:
+        socket.getaddrinfo(base_domain, 443)
+    except OSError as e:
+        print(f"SKIP cannot resolve {base_domain} from this runner ({e}) — "
+              "the edge is not reachable here", file=sys.stderr)
+        return 2
 
     # No route to the estate is a skip, not a list of 15 failures: a scheduled
     # run on a hosted runner lands here, and it must not page anyone.
@@ -401,7 +453,9 @@ def main() -> int:
         sub = h["sub"]
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
         gated = bool(h.get("gated"))
-        verdict, note = check_host(domain, gated, signin_base, args.timeout)
+        host_up = zeus_upstream if h.get("host_key") == "ZEUS_UPSTREAM_HOST" else upstream_host
+        upstream = (host_up, h["port"]) if host_up else None
+        verdict, note = check_host(domain, gated, signin_base, args.timeout, upstream)
         print(f"{domain:45} {verdict} ({note})")
         if verdict == "FAIL":
             failed.append(domain)

@@ -21,6 +21,7 @@
 #      interview agent workflows, creates the Asterisk ARI telephony config
 #      (shows up in the dograh UI), and binds extensions 8000/8001/8002
 #  6b. Wires the FreePBX half: inbound routes DID 8000/8001/8002 → dograh
+#  6c. dograh ARI/Stasis healthcheck + installs the 10-min auto-recovery timer
 #   7. Recreates n8n with the fresh secrets so the grader chain is live
 #  7b. Provisions the Nginx Proxy Manager proxy hosts (scripts/npm-proxy-hosts.py)
 #      when NPM is reachable and credentials are configured — skipped otherwise
@@ -626,6 +627,45 @@ else
         warn "FreePBX inbound-route sync failed (FreePBX API not ready?) — re-run later:"
         warn "    python3 scripts/sync_dograh_routes.py"
     fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6c. dograh ARI / Stasis healthcheck — calls hang up without this
+# ═══════════════════════════════════════════════════════════════════════════
+# Asterisk routes every dograh extension into Stasis(<DOGRAH_STASIS_APP_NAME>).
+# dograh parks an ARI config whose connection keeps failing and never retries it
+# on its own, so a PBX that was down (or restarting) long enough leaves the whole
+# range unable to take calls with no PBX-side symptom — the Control Center
+# reports it as "Calls to 8008 will drop … registered: none". Step 6's wire run
+# un-parks the config; this confirms the app actually registered, instead of
+# leaving a silent half-wired stack. The capstone-dograh-ari systemd timer
+# (installed by scripts/install-capstone.sh) repeats this every 10 minutes.
+echo ""
+echo "── 6c. dograh ARI / Stasis healthcheck ──"
+if "$REPO/scripts/dograh-ari-recover.sh" recover; then
+    pass "dograh Stasis app registered — calls to the agents will connect"
+else
+    warn "dograh Stasis app is not registered yet — the PBX may still be starting"
+    warn "    re-check with:  scripts/dograh-ari-recover.sh check"
+fi
+
+# Install the recovery timer where this host runs systemd, so the check above
+# is not a one-time step: a config dograh later parks (PBX down long enough)
+# self-heals within 10 minutes instead of waiting for the next setup run. Same
+# units scripts/install-capstone.sh installs; skipped (not failed) without root
+# or systemd — a container-only host still got the healthcheck above.
+if [ "$(id -u)" = "0" ] && command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    cp "$REPO/systemd/capstone-dograh-ari.service" /etc/systemd/system/capstone-dograh-ari.service
+    cp "$REPO/systemd/capstone-dograh-ari.timer" /etc/systemd/system/capstone-dograh-ari.timer
+    sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$REPO|" /etc/systemd/system/capstone-dograh-ari.service
+    systemctl daemon-reload 2>/dev/null || true
+    if systemctl enable --now capstone-dograh-ari.timer 2>/dev/null; then
+        pass "capstone-dograh-ari.timer enabled — Stasis app re-checked every 10 minutes"
+    else
+        warn "could not enable capstone-dograh-ari.timer — inspect: systemctl status capstone-dograh-ari.timer"
+    fi
+else
+    warn "not root (or no running systemd) — skipped the ARI recovery timer; install it with scripts/install-capstone.sh as root"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
