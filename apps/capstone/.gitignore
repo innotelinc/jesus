@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+# Throwaway target dir for dashboard-backend test deps (the deploy host is not
+# a dev box, so tests install into the tree instead of a venv):
+#   pip install --target dashboard-backend/.deps -r dashboard-backend/requirements.txt
+.deps/
 
 # Env / secrets
 .env
