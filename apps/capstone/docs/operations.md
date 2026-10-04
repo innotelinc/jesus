@@ -511,6 +511,12 @@ client id `dograh`, redirect URI `https://dograh.<NPM_BASE_DOMAIN>/api/v1/auth/o
 issuer `https://auth.<domain>/application/o/dograh/`. Two independent failures produce the
 same useless browser message, and each looks like the other from the UI:
 
+`scripts/doctor-signin.sh` walks all three gates read-only and names the broken one:
+
+```bash
+./scripts/doctor-signin.sh --url https://capstone.innotel.us
+```
+
 **1. The credential is a `vault://` reference that nothing resolved.** `.env` may hold
 `AUTHENTIK_CLIENT_SECRET=vault://cerulean/capstone#AUTHENTIK_CLIENT_SECRET`. Compose
 interpolates `.env` literally, so `docker-compose.yml`'s
@@ -982,6 +988,58 @@ busy rather than serving calls:
 > adds the channel, ~2 min).
 
 ## Troubleshooting
+
+### `PBX error` on every agent (the PBX container is stopped)
+
+The bundled `freepbx` service sits behind `profiles: ["standalone"]`. Compose
+**stops** a profile-gated service whenever you run `docker compose up` without
+that profile, so a routine `docker compose up -d` (to deploy another service)
+takes the PBX down while leaving `dashboard-api` up. Every PBX action is a
+`docker exec`, and Docker answers a stopped container with
+`409 … is not running`; before the self-healing change that surfaced as
+`PBX error` on every Agents row, a `502` from `GET /extensions`, and `upstream
+error 502` for `voice.<domain>` in the NPM smoke test (which is also why CI can
+fail on a host that is only a proxy in front of the stopped box).
+
+Recovery, in order:
+
+```bash
+# 1. Bring the profile-gated PBX back (via the vault wrapper if .env holds refs)
+docker compose --profile standalone up -d freepbx
+
+# 2. Confirm it is up and Asterisk inside it answers
+docker ps --filter label=com.docker.compose.service=freepbx
+docker exec pbx-freepbx asterisk -rx 'core show version'
+```
+
+The Control Center now self-heals this: the first PBX action starts the
+container (`PBX_START_WAIT_S`, default 60s, `0` = fail fast) and a background
+watchdog recovers it within `PBX_WATCHDOG_INTERVAL` (default 60s, `0` =
+disabled) even when nothing is calling the API. The Agents page shows a
+dismissible notice that clears itself once the PBX is stable. If the container
+starts and immediately exits, the error reports the exit code and the tail of
+its logs instead of an opaque `409`. To avoid the outage in the first place,
+always include the profile: `docker compose --profile standalone up -d`.
+
+### A dashboard code change isn't live
+
+Both Control Center images (`dashboard-api`, `dashboard`) are built from source,
+so editing `dashboard-backend/app` or `dashboard/src` does nothing to the running
+stack until they are rebuilt and recreated. The symptom is a fix that "landed"
+but the deployed API still behaves — or errors — like the old code (for example
+still returning Docker's raw `409 … is not running` after the PBX self-healing
+change).
+
+```bash
+scripts/redeploy-dashboard.sh          # rebuild + restart, only if sources changed
+scripts/redeploy-dashboard.sh --check  # exit 1 if a deploy is pending (CI-friendly)
+scripts/redeploy-dashboard.sh --force  # rebuild unconditionally
+```
+
+The script is hash-gated: it stamps the dashboard sources after a successful
+deploy and touches no Docker when they match. `install-capstone.sh` enables
+`capstone-dashboard-redeploy.timer`, which runs it every 5 minutes, so the
+running API does not lag the repo.
 
 ### Interview (or any call) cut off at a fixed time
 

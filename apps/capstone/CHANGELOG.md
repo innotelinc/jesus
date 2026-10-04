@@ -38,6 +38,68 @@ none of them, and the API was one behind.
   now, the real findings it turned up are fixed, and CI runs it — which is what
   makes the dashboard build's lint step mean anything.
 
+### A stopped PBX container self-heals instead of breaking every agent row
+
+- **Fixed: the Agents page showed `PBX error` on every row when the bundled
+  FreePBX container was stopped.** `freepbx` sits behind
+  `profiles: ["standalone"]`, so a plain `docker compose up -d` (no
+  `--profile`) stops it — Compose drops services whose profile was not
+  requested in the invocation. Every PBX action is a `docker exec`, and Docker
+  answers a stopped container with `409 … is not running`; that raw string was
+  stored verbatim as each agent's PBX detail. `_pbx_exec` now starts the
+  container itself (serialized, waiting up to `PBX_START_WAIT_S`, default 60s)
+  and reports a state problem rather than an opaque transport error, and a
+  background watchdog (`PBX_WATCHDOG_INTERVAL`, default 60s, `0` disables)
+  recovers it even when nothing is calling the API. The Agents page surfaces
+  the recovery with a dismissible banner that clears itself once the PBX is
+  stable, instead of silently waiting. If the container starts and immediately
+  exits (a crash loop, which the auto-start cannot heal), the error now names
+  the exit code and the tail of `docker logs pbx-freepbx` rather than repeating
+  the opaque `409`.
+- **New: a Start action in the Control Center's service drawer**
+  (`POST /services/{id}/start`), shown for an offline row — the counterpart to
+  Restart, which assumes a running container. Both knobs are passed through
+  from `.env` in `docker-compose.yml`.
+- **New: the PBX recovery history is on the Health page.** Each start attempt
+  (API request or watchdog) is recorded in a small ring buffer and surfaced as
+  `pbxRecovery` on the PBX row of `GET /health` (and alone at `GET /pbx/health`),
+  so a flapping box reads as "recovered 3 times, 1 failed" instead of just its
+  current state.
+- **New: `scripts/redeploy-dashboard.sh` + `capstone-dashboard-redeploy.timer`.**
+  Both Control Center images are built from source, so a code change is invisible
+  until they are rebuilt and recreated — the reason a "fixed" API kept answering
+  with the old code. The script is hash-gated (a stamp of the dashboard sources
+  compared against the last deploy; no Docker call when they match), supports
+  `--check` for CI and `--force`, and the timer `install-capstone.sh` enables
+  runs it every 5 minutes.
+- **Fixed: the NPM smoke test now tells a stopped upstream from a broken host.**
+  A 5xx used to read `upstream error 502` whether the edge could not reach the
+  box or the box was failing; the smoke test now probes the upstream address
+  (`NPM_UPSTREAM_HOST` / `PJSIP_MEDIA_ADDRESS`) and says which — `nothing
+  listening … the service is stopped or unreachable (not a host fault)` — so a
+  profile-gated PBX outage is not mistaken for a proxy fault.
+- **Fixed: the built-in 8000-8007 agents read as "Partial".** Those extensions
+  are defined by the static dialplan, not by FreePBX custom-extension /
+  inbound-route rows, so the row-count test alone reported every one as partial.
+  `_pbx_status_payload` now treats a static extension as provisioned when the
+  dialplan carries it (and not-provisioned when it does not), keeping the
+  three-row rule for the dynamic numbers the Control Center adds.
+- **New: a "Repair ARI" action on the Agents page** (`POST
+  /agents/stasis/recover`). A parked dograh telephony config never retries by
+  itself, so its Stasis app is never registered and every call rings once then
+  drops. The action reactivates the config, re-discovers the app name, re-points
+  the static and dynamic dialplan at it, and re-polls ARI — reporting `pending`
+  (the caller re-polls `/agents`) rather than an error while dograh reconnects.
+  The static rewrite validates the app name before it reaches `sed`, refusing
+  anything outside `[A-Za-z0-9_]`.
+- **New: a CI job (`Deploy drift + NPM edge smoke`) that runs the deploy
+  drift check and the NPM smoke test together.** Neither a stale image nor a
+  broken edge shows up in a build, so the job runs
+  `scripts/redeploy-dashboard.sh --check` (a pending deploy is a warning, since
+  the redeploy timer reconciles it) and `scripts/npm-smoke-test.py` (exit 2 — a
+  runner that cannot resolve the edge — is a skip, matching `sso-smoke.py`;
+  only a real unhealthy host fails).
+
 ### Dograh sign-in stops failing on a credential that was never a credential
 
 - **Fixed: "Sign-in could not be completed" on the voice app.** Two faults, one
@@ -717,6 +779,55 @@ WAN made the box a public STUN reflector — which it was, scanned and then
 driven as one. Browsers get their server-reflexive candidates from
 `PJSIP_WEBRTC_STUN_ADDR` instead, and only the STUN row moves: `webrtcturnaddr`
 stays on coturn, which is what actually relays the media.
+### The voice app signs in as Capstone, and a doctor names the broken gate
+
+- **The sign-in screen is Capstone-branded.** The OIDC login page carried
+  upstream's copy — a "Sign in / Continue with your Cerulean account" heading, a
+  "Sign in with Cerulean" button, an "Accounts are managed in Cerulean" footnote,
+  the Dograh logo with proof-point chips, and a faded dograh watermark. It now
+  shows **Capstone**, a **Sign In** button, and a brand panel whose only text is
+  **AI Voice Agent Platform**; the browser title (upstream `metadata.title`
+  "Dograh") is **Capstone** too. Travels as
+  `dograh/patches/0006-capstone-sign-in-branding.patch`.
+- **New: `scripts/doctor-signin.sh`.** "Sign-in could not be completed. Please try
+  again." is the browser's message for *every* failure in the chain, so the chain
+  is probed the way a browser walks it: the credential inside the running
+  `dograh-api` (a literal `vault://` reference is printed as such, never the
+  secret), the login entry's redirect status and `dograh_oidc_state` cookie, and
+  `AUTHENTIK_ALLOWED_GROUPS` membership. Read-only, and it exits non-zero so a
+  scheduled run shows up. `docs/operations.md` links it from the OIDC section.
+
+### The Agents page stops calling wired-up built-ins "Partial"
+
+- **Fixed: every built-in 8000-8007 agent showed `Partial`.** Provisioning was
+  judged by FreePBX `custom_extensions` + `incoming` rows plus the dialplan — but
+  the built-in range is defined by the canonical dialplan
+  (`pbx/asterisk/extensions_custom.conf`) and has no such rows, so all three
+  counts could never agree. A static extension present in the live dialplan now
+  reads **Provisioned**; the dynamic row-count rule is unchanged, and
+  `dashboard-backend/tests/test_agent_status.py` pins both.
+
+### Repair ARI from the Agents page, and a timer that runs it for you
+
+- **New: one-click `Repair ARI`** on the Agents-page Stasis banner
+  (`POST /agents/stasis/recover`). It reactivates the ARI config dograh parked
+  (parking is one-way upstream), re-points the static and generated dialplans at
+  the discovered `dograh_<hex>` app, reloads FreePBX, then polls
+  `ari show apps` and reports `recovered` or `pending` — the in-UI counterpart of
+  `scripts/dograh-ari-recover.sh`. App names are validated before being written.
+- **Fixed: the recovery timer was never installed by `scripts/setup.sh`.** Only
+  `scripts/install-capstone.sh` installed `capstone-dograh-ari.timer`, so a
+  normal one-command setup got the healthcheck never. Step 6c now runs the
+  recovery once after wiring and, on a root host with running systemd, installs
+  and starts the 10-minute timer.
+
+### Cards that lead somewhere
+
+- **The Dashboard KPI cards and the Monitoring snapshot cards are links.** Total
+  Services → Services, Active Ports → Network Ports, Alerts, Secrets and Uptime
+  to theirs; a Monitoring snapshot card smooth-scrolls to its own trend chart.
+  A fixed top navigation row (Dashboard · Services · Monitoring · Health · Agents)
+  puts the major sections one click away from every page.
 
 ## v3.19 — Grading you can choose, calls that can run long
 

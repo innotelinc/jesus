@@ -417,3 +417,49 @@ jobs:
             fi
           done < <(git ls-files scripts)
           exit $bad
+
+  # The two halves of "a fix landed but the live site still errors": the repo
+  # may be ahead of what is deployed (a stale image), or the edge itself may be
+  # broken (a 502 on one host, an SSO banner that never resolves). Neither
+  # shows up in a build, so this job runs both edge-facing checks together:
+  #
+  #   • redeploy-dashboard.sh --check — is the committed dashboard source in
+  #     sync with the last deploy? A hosted runner has no deploy stamp, so this
+  #     only reports on a runner that has one (the edge box); drift there is a
+  #     warning, because the redeploy timer reconciles it — the hard failure is
+  #     reserved for the smoke test below.
+  #   • npm-smoke-test.py — DNS, TLS, the SSO gate and the media prefix for
+  #     every proxy host, through the public edge. Exit 2 (a hosted runner
+  #     cannot resolve the edge) is a SKIP, matching scripts/ci/sso-smoke.py;
+  #     only a real failure (exit 1) fails the build.
+  edge-drift-smoke:
+    name: Deploy drift + NPM edge smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Is the deployed dashboard in sync with the source?
+        run: |
+          set -uo pipefail
+          rc=0
+          scripts/redeploy-dashboard.sh --check || rc=$?
+          case "$rc" in
+            0) echo "::notice::dashboard sources match the last deploy" ;;
+            1) echo "::warning::a dashboard deploy is pending — the running images lag the repo (the redeploy timer reconciles it)" ;;
+            *) echo "::error::redeploy-dashboard --check failed (exit $rc)"; exit "$rc" ;;
+          esac
+
+      - name: Walk every NPM proxy host through the public edge
+        env:
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'capstone.innotel.us' }}
+          NPM_UPSTREAM_HOST: ${{ vars.NPM_UPSTREAM_HOST }}
+          ZEUS_UPSTREAM_HOST: ${{ vars.ZEUS_UPSTREAM_HOST }}
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/npm-smoke-test.py --base-domain "$NPM_BASE_DOMAIN" || rc=$?
+          case "$rc" in
+            0) echo "::notice::every proxied host answered" ;;
+            2) echo "::notice::skipped — this runner cannot resolve $NPM_BASE_DOMAIN" ;;
+            *) echo "::error::the edge has an unhealthy host — see the log above"; exit "$rc" ;;
+          esac
