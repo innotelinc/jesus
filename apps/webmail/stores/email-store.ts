@@ -8,7 +8,7 @@ import { orderKeywords, placeHeldRows, type HeldKeywords, type SortLevel } from 
 import { SearchFilters, DEFAULT_SEARCH_FILTERS, buildJMAPFilter, isFilterEmpty } from "@/lib/jmap/search-utils";
 import { emailHooks } from "@/lib/plugin-hooks";
 import { resolveThreadRoute } from "@/lib/thread-routing";
-import { threadKeyFor, threadIdFromKey } from "@/lib/thread-utils";
+import { threadKeyFor, threadIdFromKey, KEYWORD_PREFIX, KEYWORD_PREFIX_LEGACY } from "@/lib/thread-utils";
 import type { ExternalSearchResult } from "@/lib/plugin-types";
 import { positionsByAccount, fetchUnifiedEmails, fetchUnifiedMailboxCounts, searchUnifiedEmails, advancedSearchUnifiedEmails, fetchCrossViewEmails, searchCrossViewEmails, advancedSearchCrossViewEmails, fetchTagEmails, trashAndJunkIds, searchAcrossAccounts, advancedSearchAcrossAccounts, getCrossUnreadTotal, type AcrossAccountsSearchOptions, type UnifiedAccountClient, type UnifiedMailboxCounts } from "@/lib/unified-mailbox";
 import { defaultSearchScopeFor, isAllFoldersSearchScope, SEARCH_SCOPE_ALL_FOLDERS } from "@/lib/search-scope-folders";
@@ -313,7 +313,13 @@ interface EmailStore {
   // Batch operations
   /** Acts on the selection, or on `target`'s messages when given. */
   batchMarkAsRead: (client: IJMAPClient, read: boolean, target?: BatchActionTarget) => Promise<void>;
-  batchDelete: (client: IJMAPClient, permanent?: boolean) => Promise<void>;
+  /**
+   * Put a tag on, or take it off, every selected message. Their other tags
+   * and keywords stay as they are, and so does the selection, so several
+   * tags can be applied in a row. Rejects when a write fails. (#1077)
+   */
+  batchSetTag: (client: IJMAPClient, tagId: string, add: boolean) => Promise<void>;
+  batchDelete:(client: IJMAPClient, permanent?: boolean) => Promise<void>;
   /**
    * Acts on the selection, or on `target`'s messages when given; with a
    * target, `mailboxId` is the destination's JMAP id in that account.
@@ -3597,6 +3603,64 @@ export const useEmailStore = create<EmailStore>((set, get) => ({
         isLoading: false
       });
     }
+  },
+
+  batchSetTag: async (client, tagId, add) => {
+    const { selectedEmailIds, emails } = get();
+    if (selectedEmailIds.size === 0) return;
+
+    // Both prefixes name the same tag when read, so taking one off clears
+    // either spelling; putting one on writes the current spelling only.
+    const tagKeys = [KEYWORD_PREFIX + tagId, KEYWORD_PREFIX_LEGACY + tagId];
+    const changedKeys = add ? [tagKeys[0]] : tagKeys;
+    const patch = Object.fromEntries(changedKeys.map(key => [keywordPointer(key), add ? true : null]));
+
+    // Group by the account each message lives in, exactly as a single-message
+    // tag change is routed: its source in an aggregate view, the selected
+    // folder's owner in a shared folder. (#281)
+    const loaded = new Map(emails.map(e => [e.id, e]));
+    const groups = new Map<IJMAPClient, Map<string | undefined, string[]>>();
+    for (const emailId of selectedEmailIds) {
+      // A loaded message already in the wanted state needs no write. One the
+      // list does not hold (a collapsed thread member) is written regardless.
+      const email = loaded.get(emailId);
+      if (email && tagKeys.some(key => email.keywords?.[key] === true) === add) continue;
+      const { client: actionClient, accountId } = resolveKeywordActionContext(emailId, client);
+      const byAccount = groups.get(actionClient) ?? new Map<string | undefined, string[]>();
+      groups.set(actionClient, byAccount);
+      byAccount.set(accountId, [...(byAccount.get(accountId) ?? []), emailId]);
+    }
+
+    const writes = [...groups].flatMap(([actionClient, byAccount]) =>
+      [...byAccount].map(async ([accountId, ids]) => {
+        await actionClient.batchUpdateKeywords(ids, patch, accountId);
+        return ids;
+      }),
+    );
+    if (writes.length === 0) return;
+    const results = await Promise.allSettled(writes);
+
+    // Only the accounts whose write went through are patched locally.
+    const written = new Set(results.flatMap(result => result.status === 'fulfilled' ? result.value : []));
+    const retag = (keywords: Record<string, boolean> | undefined) => {
+      const next = { ...keywords };
+      if (add) next[tagKeys[0]] = true;
+      else for (const key of tagKeys) delete next[key];
+      return next;
+    };
+    set((state) => ({
+      emails: state.emails.map(e => written.has(e.id) ? { ...e, keywords: retag(e.keywords) } : e),
+      selectedEmail: state.selectedEmail && written.has(state.selectedEmail.id)
+        ? { ...state.selectedEmail, keywords: retag(state.selectedEmail.keywords) }
+        : state.selectedEmail,
+    }));
+    if (written.size > 0) {
+      void get().fetchTagCounts(client);
+      refillAfterKeywordChange(get, client, changedKeys);
+    }
+
+    const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failed) throw failed.reason;
   },
 
   batchDelete: async (client, permanent = false) => {

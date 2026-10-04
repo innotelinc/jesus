@@ -96,6 +96,11 @@ interface EmailContextMenuProps {
   onRescheduleScheduled?: () => void;
   // Batch actions
   onBatchMarkAsRead?: (read: boolean) => void;
+  /** Tags every selected message carries, and those only some of them do. */
+  batchTagIds?: string[];
+  batchPartialTagIds?: string[];
+  /** Takes the tag off when the whole selection has it, else puts it on all. */
+  onBatchToggleTag?: (tagId: string) => void;
   onBatchDelete?: () => void;
   onBatchArchive?: () => void;
   onBatchMoveToMailbox?: (mailboxId: string) => void;
@@ -153,6 +158,9 @@ export function EmailContextMenu({
   onMarkAsSpam,
   onUndoSpam,
   onBatchMarkAsRead,
+  batchTagIds,
+  batchPartialTagIds,
+  onBatchToggleTag,
   onBatchDelete,
   onBatchArchive,
   onBatchMoveToMailbox,
@@ -427,14 +435,22 @@ export function EmailContextMenu({
         />
       )}
 
-      {/* Set tag submenu - only for single email */}
-      {!showBatchActions && (
-        <ContextMenuSubMenu icon={Tag} label={t("tag")}>
+      {/* Set tag submenu - the row's own tags, or the whole selection's (#1077) */}
+      {(!showBatchActions || onBatchToggleTag) && (
+        <ContextMenuSubMenu icon={Tag} label={t("tag")} testId="ctx-tag">
           <div className="w-56 max-w-[18rem]">
-            <TagPicker
-              selectedIds={currentTagIds}
-              onToggle={(tagId) => onSetTag?.(tagId)}
-            />
+            {showBatchActions ? (
+              <TagPicker
+                selectedIds={batchTagIds ?? []}
+                partialIds={batchPartialTagIds}
+                onToggle={(tagId) => onBatchToggleTag?.(tagId)}
+              />
+            ) : (
+              <TagPicker
+                selectedIds={currentTagIds}
+                onToggle={(tagId) => onSetTag?.(tagId)}
+              />
+            )}
           </div>
         </ContextMenuSubMenu>
       )}

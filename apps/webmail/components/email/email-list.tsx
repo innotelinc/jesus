@@ -7,6 +7,7 @@ import type { LoadListAttachments } from "@/lib/list-attachments";
 import { listRowShowsChips } from "./attachment-chips";
 import { listVerificationCode } from "@/lib/verification-code";
 import { EmailContextMenu, type CopyTargetAccount } from "./email-context-menu";
+import { BatchTagButton } from "./batch-tag-button";
 import { cn, cleanPreview } from "@/lib/utils";
 import { Trash2, Mail, MailX, MailOpen, Loader2, SearchX, AlertTriangle, CalendarClock, ShieldCheck } from "@/components/icons";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
@@ -18,7 +19,7 @@ import { useAccountStore } from "@/stores/account-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useMessageListTabsStore } from "@/stores/message-list-tabs-store";
-import { groupEmailsByThread, sortThreadGroups, threadKeyFor } from "@/lib/thread-utils";
+import { groupEmailsByThread, sortThreadGroups, threadKeyFor, getEmailTagIds } from "@/lib/thread-utils";
 import { useContextMenu } from "@/hooks/use-context-menu";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import { useTranslations } from "next-intl";
@@ -105,6 +106,7 @@ export function EmailList({
     selectAllEmails: _selectAllEmails,
     clearSelection,
     batchMarkAsRead,
+    batchSetTag,
     batchDelete,
     batchMoveToMailbox,
     batchArchive,
@@ -361,6 +363,32 @@ export function EmailList({
     }
   };
 
+  // What the tag picker shows for the selection: a tag on every selected
+  // message is checked, one on only some of them is drawn as partial.
+  const selectionTags = useMemo(() => {
+    const selected = emails.filter((email) => selectedEmailIds.has(email.id));
+    const counts = new Map<string, number>();
+    for (const email of selected) {
+      for (const tagId of getEmailTagIds(email.keywords)) counts.set(tagId, (counts.get(tagId) ?? 0) + 1);
+    }
+    const all: string[] = [];
+    const some: string[] = [];
+    for (const [tagId, count] of counts) (count === selected.length ? all : some).push(tagId);
+    return { all, some };
+  }, [emails, selectedEmailIds]);
+
+  // A tag every selected message has comes off; any other goes onto all of
+  // them. The selection stays, so several tags can be changed in a row.
+  const handleBatchToggleTag = async (tagId: string) => {
+    if (!client) return;
+    try {
+      await batchSetTag(client, tagId, !selectionTags.all.includes(tagId));
+    } catch (error) {
+      console.error("Failed to tag emails:", error);
+      toast.error(tNotifications('error_updating'));
+    }
+  };
+
   const handleBatchUndoSpam = async () => {
     if (!client || isProcessing) return;
     setIsProcessing(true);
@@ -539,6 +567,15 @@ export function EmailList({
                 <Mail className="w-4 h-4" />
               )}
             </Button>
+            <BatchTagButton
+              key={hasSelection ? 'selection' : 'none'}
+              title={tContextMenu('tag')}
+              selectedIds={selectionTags.all}
+              partialIds={selectionTags.some}
+              onToggle={handleBatchToggleTag}
+              active={hasSelection && !isScheduledView}
+              disabled={isProcessing}
+            />
             {effectiveMailboxRole === 'junk' && (
               <Button
                 variant="ghost"
@@ -778,6 +815,9 @@ export function EmailList({
             });
           }}
           onBatchMarkAsRead={(read) => client && batchMarkAsRead(client, read)}
+          batchTagIds={selectionTags.all}
+          batchPartialTagIds={selectionTags.some}
+          onBatchToggleTag={handleBatchToggleTag}
           onBatchDelete={async () => {
             if (!client) return;
             const count = selectedEmailIds.size;
