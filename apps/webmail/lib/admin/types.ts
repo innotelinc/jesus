@@ -298,9 +298,10 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   // from `<url>/hosting/discovery` unless the URL already carries a path.
   // Empty = feature off.
   wopiClientUrl: { envVar: 'WOPI_CLIENT_URL', type: 'url', defaultValue: '' },
-  // How the WOPI editor reaches this webmail (WOPISrc base). Empty = derive
-  // from the request origin; set it when the editor sees a different host
-  // than the browser (docker networks, split DNS).
+  // How the WOPI editor reaches this webmail (WOPISrc base). Empty = the
+  // origin the browser uses; set it when the editor sees a different host
+  // than the browser (docker networks, split DNS). The base path of a
+  // sub-path install is added to a bare origin (#1130).
   wopiHostUrl: { envVar: 'WOPI_HOST_URL', type: 'url', defaultValue: '' },
 };
 
