@@ -50,6 +50,10 @@ COMMENT_LINE_RE = re.compile(r"^\s*(?:;.*)?$")  # blank or comment-only line
 MARKER_LINE_RE = re.compile(r"^\s*;\s*>>>\s*(?:begin|end)\s+\S+")
 BEGIN_MARK = "; >>> begin {owner}"
 END_MARK = "; >>> end {owner}"
+#: Asterisk's file-scope directives. They are read wherever they appear, so a
+#: `#include` that trails the last context is not part of that context — but the
+#: parser would put it in the body, and a replace-owner rewrite deletes the body.
+DIRECTIVE_RE = re.compile(r"^\s*#\s*(?:include|tryinclude|exec)\b")
 
 
 # --------------------------------------------------------------------------
@@ -97,7 +101,30 @@ def split_blocks(text: str):
         name = SECTION_RE.match(lines[h]).group(1)
         end = starts[hdrs[i + 1]] if i + 1 < len(hdrs) else len(lines)
         blocks.append(("ctx", name, lines[starts[h]:end]))
-    return blocks
+    return _split_trailing_directives(blocks)
+
+
+def _split_trailing_directives(blocks: list) -> list:
+    """Move file-scope directives that trail the last context out of its body.
+
+    Asterisk reads `#include`/`#exec` wherever they appear, so a directive after
+    the last context is not part of it; left in the body, a replace-owner rewrite
+    deletes it. The measured loss: `#include extensions_custom_dograh.conf`,
+    appended at end-of-file by `scripts/sync_dograh_routes.py`, was dropped the
+    first time `[dograh-inbound]` was converged — which orphaned the file that
+    carries agent extensions beyond the static 8000-8007 set (8008 was in the
+    table, in the file, and in no live dialplan).
+    """
+    if not blocks or blocks[-1][0] != "ctx":
+        return blocks
+    kind, name, body = blocks[-1]
+    i = len(body) - 1
+    while i >= 0 and (body[i].strip() == "" or DIRECTIVE_RE.match(body[i])):
+        i -= 1
+    split = i + 1
+    if split >= len(body) or not any(DIRECTIVE_RE.match(ln) for ln in body[split:]):
+        return blocks
+    return blocks[:-1] + [(kind, name, body[:split]), ("text", body[split:])]
 
 
 def serialize(blocks) -> str:
