@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Unit tests for the Agents-page PBX provisioning status.
+"""Unit tests for the Agents page's PBX self-healing.
 
-`_pbx_status_payload` decides whether an agent row shows Provisioned / Partial /
-Not provisioned in the Control Center. The built-in 8000-8007 agents are defined
-by the static dialplan, not by FreePBX custom-extension / inbound-route rows, so
-the status rule has to treat them differently from the numbers the Control
-Center adds — otherwise every built-in agent reads as "Partial".
+The bundled FreePBX sits behind a compose profile and can be stopped while
+dashboard-api keeps running, so the first PBX action has to bring it back
+(`_ensure_pbx_running`), a crash loop has to name its exit code, and the
+recovery history has to reach the Health page. The provisioning-status rule
+itself lives with the row-count tests in `test_agents_api.py`.
 
 Run with:  python3 -m unittest discover -s dashboard-backend/tests -v
 """
@@ -23,39 +23,6 @@ try:  # pragma: no cover - depends on the environment
     _HAVE_DEPS = True
 except Exception:  # noqa: BLE001 - any import failure means the deps are absent
     _HAVE_DEPS = False
-
-
-@unittest.skipUnless(_HAVE_DEPS, "dashboard-api dependencies are not installed")
-class PbxStatusPayloadTest(unittest.TestCase):
-    def test_static_extension_in_dialplan_is_provisioned(self):
-        # Regression: the built-in 8000-8007 agents have no FreePBX
-        # custom-extension / inbound-route rows (the static dialplan defines
-        # them), so the row-count test alone reported every one as "partial".
-        payload = main._pbx_status_payload(False, False, True, is_static=True)
-        self.assertEqual(payload["status"], "provisioned")
-
-    def test_static_extension_missing_from_dialplan_is_partial(self):
-        # Nothing static about an extension when the dialplan does not carry it.
-        payload = main._pbx_status_payload(False, False, False, is_static=True)
-        self.assertEqual(payload["status"], "not-provisioned")
-
-    def test_dynamic_extension_needs_all_three(self):
-        self.assertEqual(
-            main._pbx_status_payload(True, True, True)["status"], "provisioned")
-        self.assertEqual(
-            main._pbx_status_payload(True, True, False)["status"], "partial")
-        self.assertEqual(
-            main._pbx_status_payload(False, True, True)["status"], "partial")
-
-    def test_nothing_provisioned_is_not_provisioned(self):
-        self.assertEqual(
-            main._pbx_status_payload(False, False, False)["status"], "not-provisioned")
-
-    def test_flags_are_reported_verbatim(self):
-        payload = main._pbx_status_payload(True, False, True, is_static=True)
-        self.assertEqual(payload["customExtension"], True)
-        self.assertEqual(payload["inboundRoute"], False)
-        self.assertEqual(payload["dialplan"], True)
 
 
 @unittest.skipUnless(_HAVE_DEPS, "dashboard-api dependencies are not installed")

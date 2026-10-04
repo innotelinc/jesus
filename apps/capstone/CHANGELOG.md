@@ -797,16 +797,6 @@ stays on coturn, which is what actually relays the media.
   `AUTHENTIK_ALLOWED_GROUPS` membership. Read-only, and it exits non-zero so a
   scheduled run shows up. `docs/operations.md` links it from the OIDC section.
 
-### The Agents page stops calling wired-up built-ins "Partial"
-
-- **Fixed: every built-in 8000-8007 agent showed `Partial`.** Provisioning was
-  judged by FreePBX `custom_extensions` + `incoming` rows plus the dialplan — but
-  the built-in range is defined by the canonical dialplan
-  (`pbx/asterisk/extensions_custom.conf`) and has no such rows, so all three
-  counts could never agree. A static extension present in the live dialplan now
-  reads **Provisioned**; the dynamic row-count rule is unchanged, and
-  `dashboard-backend/tests/test_agent_status.py` pins both.
-
 ### Repair ARI from the Agents page, and a timer that runs it for you
 
 - **New: one-click `Repair ARI`** on the Agents-page Stasis banner

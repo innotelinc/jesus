@@ -3228,23 +3228,16 @@ def _pbx_dialplan_text() -> str:
         return val
 
 
-def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool,
-                        is_static: bool = False) -> dict:
+def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool) -> dict:
     """Provisioning status for one extension, in the shape the list expects.
 
-    The built-in 8000-8007 agents are defined by the static dialplan, not by
-    FreePBX custom-extension / inbound-route rows, so for them the only signal
-    that matters is whether the dialplan carries the number. The numbers the
-    Control Center adds are dynamic and need all three rows to be provisioned
-    (any subset is "partial").
+    A row is judged by all three of its FreePBX/dialplan pieces here. The
+    built-in 8000-8007 agents reach Provisioned the same way as any other:
+    `_repair_partial_rows` writes the missing custom-extension / inbound-route
+    rows on load, so a half-wired built-in is repaired rather than re-labelled.
     """
-    if is_static:
-        status = "provisioned" if has_dp else "not-provisioned"
-    elif has_ext and has_route and has_dp:
-        status = "provisioned"
-    elif has_ext or has_route or has_dp:
-        status = "partial"
-    else:
+    status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
+    if not (has_ext or has_route or has_dp):
         status = "not-provisioned"
     payload = {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
                "dialplan": has_dp}
@@ -3304,9 +3297,7 @@ def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
     except HTTPException as exc:
         return {e: {"status": "error", "customExtension": None, "inboundRoute": None,
                     "dialplan": None, "detail": exc.detail} for e in exts}
-    return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp,
-                                   is_static=e in agents.STATIC_EXTENSIONS)
-            for e in exts}
+    return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp) for e in exts}
 
 
 def _repair_partial_rows(
