@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { dashboardBaseUrl } from '../lib/config';
 import { api } from '../lib/api';
@@ -109,6 +109,17 @@ function GlobalSearch() {
     </div>
   );
 }
+
+// Top-level section links — a fixed row at the top of every page so the major
+// sections (Services, Monitoring, …) are one click away from anywhere, not just
+// from the sidebar. Hidden below lg so the search stays usable on small screens.
+const TOP_NAV = [
+  { label: 'Dashboard', path: '/' },
+  { label: 'Services', path: '/services' },
+  { label: 'Monitoring', path: '/monitoring' },
+  { label: 'Health', path: '/health' },
+  { label: 'Agents', path: '/agents' },
+];
 
 // Section label shown for the current route (falls back to the raw path).
 const SECTION_LABELS: [string, string][] = [
@@ -276,11 +287,30 @@ export default function TopHeader({
             </svg>
           </button>
         )}
-        <div className="hidden shrink-0 items-center gap-2 text-sm md:flex">
+        <div className="hidden shrink-0 items-center gap-2 text-sm md:flex lg:hidden">
           <span className="text-muted-foreground">Control Center</span>
           <span className="text-muted-foreground/50">/</span>
           <span className="truncate font-semibold tracking-tight">{section}</span>
         </div>
+        <nav className="hidden shrink-0 items-center gap-0.5 lg:flex" aria-label="Sections">
+          {TOP_NAV.map(item => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/'}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
         <div className="min-w-0 flex-1">
           <GlobalSearch />
         </div>

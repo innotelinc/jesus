@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { HealthMatrixEntry, StackAccessStatus } from '../types';
+import type { HealthMatrixEntry, PbxRecovery, StackAccessStatus } from '../types';
 import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
 import Button from '../components/Button';
-import { cn } from '../lib/utils';
+import { cn, formatRelativeTime } from '../lib/utils';
 import Chart from '../components/Chart';
 import type { MetricPoint } from '../types';
 import { exportJSON } from '../lib/export';
@@ -71,6 +71,32 @@ export default function Health() {
     () => (stackAccess?.stacks ?? []).filter(s => s.applications > 0),
     [stackAccess],
   );
+
+  // The PBX self-heals (see the watchdog), so how often it has had to be
+  // recovered is a real signal — and a stale one if it only updates with the
+  // whole dashboard payload. Poll it on its own faster cadence, falling back to
+  // the copy embedded in /health when the standalone endpoint is unavailable.
+  const [pbxLive, setPbxLive] = useState<PbxRecovery | null>(null);
+  const [pbxLoading, setPbxLoading] = useState(false);
+  const loadPbxRecovery = useCallback(async () => {
+    setPbxLoading(true);
+    try {
+      setPbxLive(await api.pbxHealth());
+    } catch {
+      setPbxLive(null); // fall back to healthData.pbxRecovery below
+    } finally {
+      setPbxLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPbxRecovery();
+    // 15s: fast enough to watch a recovery land, cheap (no docker exec).
+    const timer = window.setInterval(() => { void loadPbxRecovery(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [loadPbxRecovery]);
+
+  const pbxRecovery = pbxLive ?? healthData.find(e => e.pbxRecovery)?.pbxRecovery;
 
   return (
     <div className="space-y-6">
@@ -329,6 +355,84 @@ export default function Health() {
           )}
         </div>
       </div>
+
+      {/* PBX self-healing — how often the profile-gated PBX box had to be
+          brought back, and by whom (an API request or the watchdog). */}
+      {pbxRecovery && (
+        <div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">PBX self-healing</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Recovery history for the profile-gated FreePBX box. On-demand (an API request) and
+                background (the watchdog) starts are both recorded here · refreshed every 15s.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void loadPbxRecovery()} disabled={pbxLoading}>
+              {pbxLoading ? 'Refreshing…' : 'Refresh'}
+            </Button>
+          </div>
+
+          <div className="mt-2 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                pbxRecovery.mode === 'addon' ? 'add-on mode (Zeus PBX)' : 'standalone',
+                pbxRecovery.running ? 'PBX running' : 'PBX stopped',
+                pbxRecovery.watchdogEnabled
+                  ? `watchdog every ${pbxRecovery.watchdogIntervalSeconds}s`
+                  : 'watchdog disabled',
+                `${pbxRecovery.recoveries} recovered`,
+                `${pbxRecovery.failures} failed`,
+              ].map(chip => (
+                <span key={chip} className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{chip}</span>
+              ))}
+            </div>
+
+            {pbxRecovery.lastRecoveryAt && (
+              <p className="text-xs text-muted-foreground">
+                Last recovered {formatRelativeTime(pbxRecovery.lastRecoveryAt)}
+                {pbxRecovery.lastSource ? ` by ${pbxRecovery.lastSource}` : ''}.
+              </p>
+            )}
+
+            <div className="border rounded-2xl bg-card shadow-sm overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">When</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Outcome</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Source</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Detail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pbxRecovery.events.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        No recovery events — the PBX has not needed starting.
+                      </td>
+                    </tr>
+                  ) : pbxRecovery.events.map((ev, idx) => (
+                    <tr key={idx} className="hover:bg-muted/40 transition-colors">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{formatRelativeTime(ev.at)}</td>
+                      <td className="px-4 py-3">
+                        <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium', ev.outcome === 'recovered' ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger')}>
+                          {ev.outcome === 'recovered' ? 'recovered' : 'failed'}
+                          {ev.waitedSeconds != null && ev.outcome === 'recovered' ? ` in ${ev.waitedSeconds}s` : ''}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{ev.source}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
+                        <span title={ev.detail}>{ev.detail.length > 90 ? `${ev.detail.slice(0, 90)}…` : ev.detail}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div>

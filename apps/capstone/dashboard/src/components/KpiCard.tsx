@@ -1,5 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 
 interface KpiCardProps {
   title: string;
@@ -9,9 +10,14 @@ interface KpiCardProps {
   trend?: { value: number; direction: 'up' | 'down' | 'neutral' };
   color?: 'default' | 'success' | 'warning' | 'danger' | 'info';
   className?: string;
+  /** When set, the whole card links to that route — a KPI is a door into the
+   *  section that explains it (Total Services → Services, Active Ports →
+   *  Network Ports). */
+  to?: string;
 }
 
-export default function KpiCard({ title, value, subtitle, icon, trend, color = 'default', className }: KpiCardProps) {
+export default function KpiCard({ title, value, subtitle, icon, trend, color = 'default', className, to }: KpiCardProps) {
+  const navigate = useNavigate();
   const colorMap: Record<string, string> = {
     default: 'bg-gradient-to-br from-primary to-info text-primary-foreground',
     success: 'bg-gradient-to-br from-success/90 to-success/60 text-success-foreground',
@@ -24,7 +30,27 @@ export default function KpiCard({ title, value, subtitle, icon, trend, color = '
   const trendDir = trend?.direction === 'up' ? '↑' : trend?.direction === 'down' ? '↓' : '→';
 
   return (
-    <div className={cn('group relative overflow-hidden rounded-2xl border bg-card p-5 text-sm shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5', className)}>
+    <div
+      {...(to
+        ? {
+            role: 'link' as const,
+            tabIndex: 0,
+            onClick: () => navigate(to),
+            onKeyDown: (e: KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                navigate(to);
+              }
+            },
+          }
+        : {})}
+      className={cn(
+        'group relative block overflow-hidden rounded-2xl border bg-card p-5 text-sm shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5',
+        to && 'cursor-pointer hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        className,
+      )}
+      aria-label={to ? `${title}: view details` : undefined}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-2">
           <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>

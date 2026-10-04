@@ -85,6 +85,9 @@ class FakeDograh:
             {"id": 10, "address": "8003", "label": "Reception",
              "inbound_workflow_id": 1, "is_active": True},
         ]
+        # Parked ARI config: dograh disables a config whose connection keeps
+        # failing and never retries it, so the recover path must reactivate it.
+        self.config_inactive = False
 
     def _workflow_response(self, wider: int) -> dict:
         w = self.workflows[wider]
@@ -131,8 +134,12 @@ class FakeDograh:
         if method == "GET" and path == "/api/v1/organizations/telephony-configs/7":
             return FakeResponse({
                 "id": 7, "name": "Asterisk ARI (dograh)",
+                "inactive": self.config_inactive,
                 "credentials": {"stasis_app_name": self.stasis_app},
             })
+        if method == "POST" and path == "/api/v1/organizations/telephony-configs/7/reactivate":
+            self.config_inactive = False
+            return FakeResponse({"status": "reactivated"})
         if method == "GET" and path.endswith("/phone-numbers"):
             return FakeResponse({"phone_numbers": self.numbers})
         raise AssertionError(f"unexpected dograh request: {method} {path}")
@@ -405,6 +412,51 @@ class PbxDynamicDialplanTest(unittest.TestCase):
             body = client.get("/agents").json()
         self.assertIn("stasis", body)
         self.assertTrue(body["stasis"]["ok"])
+
+    # ── the Agents-page "Repair ARI" action ───────────────────────────────
+
+    def test_stasis_recover_unparks_and_reasserts_the_app(self):
+        self.dograh.config_inactive = True
+        with mock.patch.dict(main.app.dependency_overrides,
+                             {main.require_session: lambda: {"email": "ops@test", "role": "admin"}}):
+            client = TestClient(main.app)
+            res = client.post("/agents/stasis/recover")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["status"], "recovered")
+        self.assertEqual(body["app"], "dograh_deadbeef")
+        self.assertIn("dograh_deadbeef", body["registered"])
+        # The parked config was reactivated, on dograh.
+        self.assertFalse(self.dograh.config_inactive)
+        self.assertIn(
+            ("POST", "/api/v1/organizations/telephony-configs/7/reactivate"),
+            self.dograh.calls,
+        )
+        # The static dialplan was re-pointed at the discovered app...
+        sed = [c for c in self.pbx.commands
+               if c[:2] == ["sh", "-c"] and "Stasis(dograh_deadbeef)" in c[2]]
+        self.assertTrue(sed)
+        # ...and the dynamic dialplan re-synced with it.
+        self.assertIn("Stasis(dograh_deadbeef)", self.pbx.files[self.DYN])
+
+    def test_stasis_recover_reports_pending_when_dograh_has_not_reconnected(self):
+        # ARI is up but dograh still hasn't registered the app: report pending,
+        # not an error — the caller re-polls /agents.
+        self.dograh.stasis_app = "dograh_cafebabe"
+        self.pbx.ari_apps = ["dograh_deadbeef"]
+        with mock.patch.dict(os.environ, {"STASIS_RECOVER_WAIT_S": "0"}):
+            with mock.patch.dict(main.app.dependency_overrides,
+                                 {main.require_session: lambda: {"email": "ops@test", "role": "admin"}}):
+                body = TestClient(main.app).post("/agents/stasis/recover").json()
+        self.assertEqual(body["status"], "pending")
+        self.assertEqual(body["app"], "dograh_cafebabe")
+        self.assertNotIn("dograh_cafebabe", body["registered"])
+
+    def test_static_stasis_rewrite_refuses_unsafe_names(self):
+        with self.assertRaises(main.HTTPException):
+            main._pbx_set_static_stasis_app("dograh; rm -rf /")
+        with self.assertRaises(main.HTTPException):
+            main._pbx_set_static_stasis_app("")
 
 
 if __name__ == "__main__":

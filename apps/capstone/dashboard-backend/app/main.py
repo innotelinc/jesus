@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import base64
+import logging
 import math
 import os
 import re
@@ -27,6 +28,7 @@ import shutil
 import threading
 import time
 import urllib.parse
+from collections import deque
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
@@ -55,6 +57,8 @@ from .auth import (
 )
 from .entitlements import check_entitlement
 from .tenant_gate import has_tenant_access
+
+logger = logging.getLogger("capstone.dashboard")
 
 ENV_FILE = os.environ.get("DASHBOARD_ENV_FILE", "/config/.env")
 PASSWD_FILE = os.environ.get("HOST_PASSWD_FILE", "/etc/host-passwd")
@@ -654,18 +658,22 @@ def build_health() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     matrix = []
     incidents = []
     for s in svcs:
-        matrix.append(
-            {
-                "service": s["name"],
-                "health": s["healthScore"],
-                "availability": s["health"]["availability"],
-                "latencyMs": s["health"]["latencyMs"],
-                "errorRate": s["health"]["errorRate"],
-                "dependencies": s["health"]["dependencies"],
-                "lastCheck": s["health"]["checkedAt"],
-                "status": s["status"],
-            }
-        )
+        entry = {
+            "service": s["name"],
+            "health": s["healthScore"],
+            "availability": s["health"]["availability"],
+            "latencyMs": s["health"]["latencyMs"],
+            "errorRate": s["health"]["errorRate"],
+            "dependencies": s["health"]["dependencies"],
+            "lastCheck": s["health"]["checkedAt"],
+            "status": s["status"],
+        }
+        # The PBX self-heals itself (see _ensure_pbx_running / the watchdog), so
+        # its health row carries the recovery history: an operator sees that it
+        # was down and was brought back, not just its current state.
+        if s["id"] == PBX_SERVICE_ID:
+            entry["pbxRecovery"] = pbx_recovery_status(running=s["status"] != "offline")
+        matrix.append(entry)
     # Incident: one open incident per service currently critical/offline
     for s in svcs:
         if s["status"] in ("critical", "offline"):
@@ -781,6 +789,10 @@ def build_alerts() -> list[dict[str, Any]]:
                 "assignedTo": meta.get("owner", ""),
                 "tags": meta.get("tags", []),
             })
+    # PBX self-healing: a recovery means the box was down; a failed start means
+    # it still is. Derived from the recovery history rather than a container
+    # status, because a recovered box looks perfectly healthy afterwards.
+    alerts.extend(_pbx_recovery_alerts())
     if not alerts:
         alerts.append({
             "id": "al-all-clear",
@@ -1369,6 +1381,35 @@ def service_restart(service_id: str, user: dict = Depends(require_session)):
     return {"status": "restarted", "service": service_id}
 
 
+@app.post("/services/{service_id}/start")
+def service_start(service_id: str, user: dict = Depends(require_session)):
+    """Start a stopped service container (idempotent when already running).
+
+    The counterpart to the Restart action for an offline row — e.g. the
+    bundled FreePBX, which a profile-less `docker compose up` stops.
+    """
+    if service_id == SELF_ID:
+        raise HTTPException(status_code=403, detail="Refusing to start the dashboard aggregator itself")
+    container = container_for_service(service_id)
+    if container is None:
+        raise HTTPException(status_code=404, detail=f"No container for service '{service_id}'")
+    if _container_running(container):
+        return {"status": "running", "service": service_id}
+    try:
+        container.start()
+    except Exception as exc:
+        # Already-starting containers answer 304 Not Modified; report the live
+        # state instead of failing the action.
+        try:
+            container.reload()
+        except Exception:
+            pass
+        if not _container_running(container):
+            raise HTTPException(status_code=500, detail=f"Start failed: {exc}") from exc
+    invalidate_all()
+    return {"status": "started", "service": service_id}
+
+
 # --------------------------------------------------------------------------
 # WebRTC extension management (PBX)
 # --------------------------------------------------------------------------
@@ -1384,17 +1425,336 @@ def service_restart(service_id: str, user: dict = Depends(require_session)):
 # pbx-freepbx); container_for_service matches on the compose service label.
 PBX_SERVICE_ID = "freepbx"
 
+# The bundled FreePBX sits behind a compose profile and can be stopped while
+# dashboard-api keeps running (profile-off, crash, manual stop). Every PBX
+# action is a `docker exec`, and Docker answers a stopped container with 409
+# "is not running" — so without this the whole Agents page reads as "PBX error".
+# The first PBX action brings the container back and waits up to this many
+# seconds for it; override with PBX_START_WAIT_S (0 = fail fast, don't wait).
+PBX_START_WAIT_S = 60.0
+_pbx_start_lock = threading.Lock()
+
+# Recovery history — a small ring buffer of start attempts (recovered/failed)
+# made by either an API request or the background watchdog. Surfaced on the
+# Control Center's Health page (and at GET /pbx/health) and as alerts, so an
+# operator sees the PBX flapping rather than only its current state.
+_pbx_events: deque[dict[str, Any]] = deque(maxlen=20)
+_pbx_events_lock = threading.Lock()
+
+# Per-request record of an automatic PBX start. The request that triggers the
+# start blocks until the box is running, so its response would otherwise look
+# completely normal — this lets the Agents page tell the operator the PBX was
+# down and has been brought back instead of silently recovering.
+_pbx_autostart_ctx = threading.local()
+
+
+def _record_pbx_event(outcome: str, *, source: str, detail: str = "",
+                      waited_seconds: float | None = None) -> None:
+    with _pbx_events_lock:
+        _pbx_events.append({
+            "at": now_iso(),
+            "outcome": outcome,          # recovered | failed
+            "source": source,            # request | watchdog
+            "detail": detail,
+            "waitedSeconds": waited_seconds,
+        })
+
+
+def _pbx_autostart_reset() -> None:
+    _pbx_autostart_ctx.info = None
+
+
+def _pbx_autostart_note(info: dict[str, Any]) -> None:
+    _pbx_autostart_ctx.info = info
+
+
+def _pbx_autostart_take() -> dict[str, Any] | None:
+    """Return (and clear) the current request's auto-start record, if any."""
+    info = getattr(_pbx_autostart_ctx, "info", None)
+    _pbx_autostart_ctx.info = None
+    return info
+
+
+def _container_running(container) -> bool:
+    """True when the container's live state says it is running."""
+    try:
+        return bool((container.attrs.get("State") or {}).get("Running"))
+    except Exception:  # pragma: no cover - defensive
+        return getattr(container, "status", "") == "running"
+
+
+def _container_state(container) -> dict[str, Any]:
+    try:
+        return container.attrs.get("State") or {}
+    except Exception:  # pragma: no cover - defensive
+        return {}
+
+
+def _container_log_tail(container, lines: int = 15) -> str:
+    """Last few log lines of a container, for a crash diagnostic."""
+    try:
+        raw = container.logs(tail=lines, timestamps=False)
+    except Exception:
+        return ""
+    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+    return text.strip()[-1200:]
+
+
+def _pbx_exit_error(container, state: dict[str, Any]) -> HTTPException:
+    """A clear error when the PBX starts and immediately exits (crash loop).
+
+    `start()` succeeding is not enough — a broken entrypoint or config makes
+    the container exit seconds later, which is otherwise reported as the same
+    opaque "not running" error. Name the exit code and show the log tail.
+    """
+    detail = (
+        f"PBX container '{PBX_SERVICE_ID}' started but exited (exit code "
+        f"{state.get('ExitCode')}) — it is not staying up. Check `docker logs "
+        f"pbx-freepbx`."
+    )
+    tail = _container_log_tail(container)
+    if tail:
+        detail += f" Last output: {tail}"
+    return HTTPException(status_code=502, detail=detail)
+
+
+def _ensure_pbx_running(container, source: str = "request"):
+    """Return `container` once the PBX container is running, starting it if not.
+
+    Serialized: concurrent page loads that all hit a stopped PBX trigger one
+    `start()` and the rest wait for it, rather than each racing to start the
+    same container. Raises HTTPException when it cannot be brought up.
+    ``source`` ("request" | "watchdog") is recorded in the recovery history.
+    """
+    if _container_running(container):
+        return container
+    with _pbx_start_lock:
+        # Re-check under the lock — another request may have started it while
+        # we waited for the lock.
+        try:
+            container.reload()
+        except Exception:
+            pass
+        if _container_running(container):
+            return container
+        started_at = time.time()
+        try:
+            container.start()
+        except Exception as exc:
+            # Some daemons answer start() on an already-starting container with
+            # 304 Not Modified; treat "running now" as success anyway.
+            try:
+                container.reload()
+            except Exception:
+                pass
+            if not _container_running(container):
+                detail = f"PBX container '{PBX_SERVICE_ID}' failed to start: {exc}"
+                _record_pbx_event("failed", source=source, detail=detail)
+                raise HTTPException(status_code=502, detail=detail) from exc
+            _record_pbx_autostart(started_at, source)
+            return container
+        # FreePBX takes a while to boot; wait until it reports running so the
+        # caller's exec does not race the daemon.
+        try:
+            wait_s = max(0.0, float(os.environ.get("PBX_START_WAIT_S") or PBX_START_WAIT_S))
+        except ValueError:
+            wait_s = PBX_START_WAIT_S
+        deadline = started_at + wait_s
+        while time.time() < deadline:
+            time.sleep(min(2.0, max(0.0, deadline - time.time())))
+            try:
+                container.reload()
+            except Exception:
+                continue
+            if _container_running(container):
+                # Fresh state — drop cached service/health reads so /services
+                # reflects the container coming back within one refresh.
+                invalidate_all()
+                _record_pbx_autostart(started_at, source)
+                return container
+            state = _container_state(container)
+            if state.get("Status") in {"exited", "dead"}:
+                # It came up and died again (crash loop) — fail fast with the
+                # exit code and logs rather than waiting out the whole window.
+                err = _pbx_exit_error(container, state)
+                _record_pbx_event("failed", source=source, detail=err.detail)
+                raise err
+        detail = (
+            f"PBX container '{PBX_SERVICE_ID}' is still starting — it has not "
+            f"reported running after {int(wait_s)}s. Retry in a moment."
+        )
+        _record_pbx_event("failed", source=source, detail=detail)
+        raise HTTPException(status_code=503, detail=detail)
+
+
+def _record_pbx_autostart(started_at: float, source: str = "request") -> None:
+    """Note that the PBX was brought back from a stopped state."""
+    waited = round(max(0.0, time.time() - started_at), 1)
+    _pbx_autostart_note({"startedAt": now_iso(), "waitedSeconds": waited})
+    _record_pbx_event("recovered", source=source,
+                      detail="PBX container started", waited_seconds=waited)
+
+
+PBX_WATCHDOG_INTERVAL = 60.0
+# How many recoveries before the alert escalates from info to warning. A single
+# recovery is a fact worth showing; repeated ones mean it keeps stopping.
+PBX_FLAP_ALERT_THRESHOLD = 2
+_pbx_watchdog_started = False
+
+
+def _pbx_watchdog_interval() -> float:
+    """Configured watchdog interval in seconds (<=0 disables it)."""
+    try:
+        return float(os.environ.get("PBX_WATCHDOG_INTERVAL") or PBX_WATCHDOG_INTERVAL)
+    except ValueError:
+        return PBX_WATCHDOG_INTERVAL
+
+
+def pbx_recovery_status(running: bool | None = None) -> dict[str, Any]:
+    """PBX self-healing state + recent recovery history (Health page).
+
+    ``running`` can be supplied by a caller that already read the container
+    state (build_health), avoiding a second docker round trip.
+    """
+    if running is None:
+        container = container_for_service(PBX_SERVICE_ID) if docker is not None else None
+        running = bool(container and _container_running(container))
+    with _pbx_events_lock:
+        events = list(_pbx_events)
+    recoveries = [e for e in events if e["outcome"] == "recovered"]
+    interval = _pbx_watchdog_interval()
+    last = recoveries[-1] if recoveries else None
+    return {
+        "mode": agents.deploy_mode(),
+        "running": bool(running),
+        "watchdogEnabled": interval > 0,
+        "watchdogIntervalSeconds": interval,
+        "recoveries": len(recoveries),
+        "failures": sum(1 for e in events if e["outcome"] == "failed"),
+        "lastRecoveryAt": last["at"] if last else None,
+        "lastSource": last["source"] if last else None,
+        # newest first — the page renders them top-down
+        "events": list(reversed(events[-10:])),
+    }
+
+
+def _pbx_recovery_alerts() -> list[dict[str, Any]]:
+    """Alerts derived from the PBX recovery history.
+
+    The watchdog recovers the box silently, which is exactly why a flapping PBX
+    would otherwise go unnoticed: every page just says "healthy" again. Surface
+    a failed start as critical, and a recovery as info/warning so repeated
+    recoveries read as the problem they are. Stable ids let the operator
+    acknowledge/resolve them like any other alert.
+    """
+    with _pbx_events_lock:
+        events = list(_pbx_events)
+    if not events:
+        return []
+    out: list[dict[str, Any]] = []
+    latest = events[-1]
+    if latest["outcome"] == "failed":
+        out.append({
+            "id": "al-pbx-start-failed",
+            "time": latest["at"],
+            "service": "FreePBX",
+            "severity": "critical",
+            "message": f"PBX container failed to start: {latest['detail'] or 'see docker logs pbx-freepbx'}",
+            "status": "open",
+            "assignedTo": "PBX Ops",
+            "tags": ["pbx", "self-heal"],
+        })
+    recoveries = [e for e in events if e["outcome"] == "recovered"]
+    if recoveries:
+        count = len(recoveries)
+        last = recoveries[-1]
+        out.append({
+            "id": "al-pbx-recovered",
+            "time": last["at"],
+            "service": "FreePBX",
+            "severity": "warning" if count >= PBX_FLAP_ALERT_THRESHOLD else "info",
+            "message": (
+                f"PBX container was recovered {count} time{'s' if count != 1 else ''} "
+                f"(last by the {last['source']}) — it keeps stopping; check why it is "
+                "being taken down."
+            ),
+            "status": "open",
+            "assignedTo": "PBX Ops",
+            "tags": ["pbx", "self-heal", last["source"]],
+            "count": count,
+        })
+    return out
+
+
+# --------------------------------------------------------------------------
+# PBX watchdog
+# --------------------------------------------------------------------------
+# The bundled freepbx service sits behind `profiles: ["standalone"]`, so a
+# plain `docker compose up -d` (no --profile) stops it — Compose drops services
+# whose profile was not requested. Everything the Control Center does to the
+# PBX is a `docker exec`, so a stopped box used to surface as "PBX error" on
+# every agent row. `_ensure_pbx_running` recovers it on demand; this watchdog
+# recovers it even when nothing is calling the API, so inbound calls survive a
+# profile-less `up`. Set PBX_WATCHDOG_INTERVAL=0 to disable.
+
+
+def _pbx_watchdog_loop(interval: float) -> None:
+    while True:
+        try:
+            if agents.deploy_mode() == "standalone":
+                container = container_for_service(PBX_SERVICE_ID)
+                if container is not None and not _container_running(container):
+                    logger.warning(
+                        "PBX watchdog: container '%s' is down — starting it", PBX_SERVICE_ID)
+                    _ensure_pbx_running(container, source="watchdog")
+                    logger.info(
+                        "PBX watchdog: container '%s' is running again", PBX_SERVICE_ID)
+        except HTTPException as exc:
+            logger.warning("PBX watchdog could not recover the PBX: %s", exc.detail)
+        except Exception as exc:  # noqa: BLE001 - the loop must never die
+            logger.warning("PBX watchdog error: %s", exc)
+        time.sleep(interval)
+
+
+@app.on_event("startup")
+def _start_pbx_watchdog() -> None:
+    """Start the background PBX supervisor once, in standalone mode only."""
+    global _pbx_watchdog_started
+    if _pbx_watchdog_started or docker is None:
+        return
+    interval = _pbx_watchdog_interval()
+    if interval <= 0:
+        logger.info("PBX watchdog disabled (PBX_WATCHDOG_INTERVAL=%s)", interval)
+        return
+    _pbx_watchdog_started = True
+    threading.Thread(
+        target=_pbx_watchdog_loop, args=(interval,), name="pbx-watchdog", daemon=True,
+    ).start()
+    logger.info("PBX watchdog started (every %.0fs)", interval)
+
 
 def _pbx_exec(cmd: list[str], stdin_text: str | None = None) -> tuple[int, str]:
-    """Run a command inside the PBX container. Returns (exit_code, output)."""
+    """Run a command inside the PBX container, starting it first if stopped.
+
+    Returns (exit_code, output)."""
     container = container_for_service(PBX_SERVICE_ID)
     if container is None:
         raise HTTPException(status_code=503, detail="PBX container not running")
+    container = _ensure_pbx_running(container)
     try:
         code, out = container.exec_run(cmd, stdin=False, socket=False,
                                        demux=True, workdir=None, environment=[])
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"PBX exec failed: {exc}")
+        # A container stopped between the check above and the exec raises
+        # Docker's 409 here; report it as a state problem, not an opaque
+        # transport error, and let the next request start it.
+        msg = str(exc)
+        if "is not running" in msg or "409" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail=f"PBX container '{PBX_SERVICE_ID}' is not running: {msg}",
+            ) from exc
+        raise HTTPException(status_code=502, detail=f"PBX exec failed: {exc}") from exc
     stdout = (out[0] or b"").decode("utf-8", errors="replace") if isinstance(out, tuple) else ""
     stderr = (out[1] or b"").decode("utf-8", errors="replace") if isinstance(out, tuple) else ""
     text = (stdout + stderr).strip()
@@ -2071,6 +2431,7 @@ def extension_routes_delete(did: str, user: dict = Depends(require_session)):
 @app.get("/agents")
 def agents_list(user: dict = Depends(require_session)):
     """Dograh agents + their FreePBX provisioning status."""
+    _pbx_autostart_reset()
     mode = agents.deploy_mode()
     client = agents.DograhClient()
     if not client.configured():
@@ -2093,14 +2454,69 @@ def agents_list(user: dict = Depends(require_session)):
     statuses = _repair_partial_rows(mode, rows, statuses, client)
     for a, ext in zip(rows, exts):
         a["pbx"] = statuses[ext]
-    return {"mode": mode, "configured": True, "agents": rows,
-            "stasis": _stasis_health(client, rows)}
+    payload = {"mode": mode, "configured": True, "agents": rows,
+               "stasis": _stasis_health(client, rows)}
+    # Tell the page when this load brought a stopped PBX back, so the operator
+    # is not left wondering why the first request took as long as it did.
+    autostart = _pbx_autostart_take()
+    if autostart:
+        payload["pbxAutoStart"] = autostart
+    return payload
 
 
 @app.get("/agents/workflows")
 def agents_workflows(user: dict = Depends(require_session)):
     """Workflows available to bind an agent to (dograh /api/v1/workflow/fetch)."""
     return workflows_list(user)
+
+
+@app.post("/agents/stasis/recover")
+def agents_stasis_recover(user: dict = Depends(require_session)):
+    """Repair the ARI path behind the Agents page "Repair ARI" action.
+
+    A parked dograh telephony config never retries by itself, so its Stasis app
+    is never registered and every call rings once then drops. Reactivate the
+    config, re-discover the app name, re-point both the static and dynamic
+    dialplan at it, then poll ARI until the app registers (or the wait window
+    lapses — the caller re-polls /agents and reports pending, not an error).
+    """
+    mode = agents.deploy_mode()
+    client = agents.DograhClient()
+    if not client.configured():
+        raise HTTPException(
+            status_code=503,
+            detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once, then set DOGRAH_API_TOKEN in .env",
+        )
+    if mode != "standalone":
+        raise HTTPException(
+            status_code=409,
+            detail="Add-on mode: ARI registration is owned by the shared PBX.",
+        )
+    # Parking is one-way upstream, so clear it before re-discovering the name.
+    try:
+        if (client.telephony_config() or {}).get("inactive"):
+            client.reactivate_config()
+        app = client.refresh_stasis_app_name()
+    except agents.DograhError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    # Re-point the static dialplan and re-sync the dynamic one, then reload so
+    # Asterisk picks both up.
+    _pbx_set_static_stasis_app(app)
+    _pbx_sync_dynamic_dialplan(client)
+    _pbx_reload_dograh()
+
+    deadline = time.time() + _stasis_recover_wait_s()
+    while True:
+        registered = _stasis_registered_apps()
+        if app in registered or time.time() >= deadline:
+            break
+        time.sleep(1.0)
+    return {
+        "status": "recovered" if app in registered else "pending",
+        "app": app,
+        "registered": registered,
+        "mode": mode,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -2740,6 +3156,50 @@ def _stasis_health(client: agents.DograhClient, rows: list[dict[str, Any]]) -> d
     return info
 
 
+# The ARI app name is interpolated into a shell command, so it is validated
+# against a conservative charset before it ever reaches `sed`.
+_STASIS_APP_RE = re.compile(r"[A-Za-z0-9_]{1,64}")
+
+
+def _pbx_set_static_stasis_app(app: str) -> None:
+    """Re-point the static 8000-8007 dialplan at a live ARI app name.
+
+    Mirrors pbx/entrypoint-dograh.sh: rewrite every ``Stasis(<name>)`` in
+    extensions_custom.conf with the app Asterisk actually has registered. The
+    name is validated first — it is interpolated into the sed program, so
+    anything but ``[A-Za-z0-9_]`` is refused rather than run.
+    """
+    name = (app or "").strip()
+    if not _STASIS_APP_RE.fullmatch(name):
+        raise HTTPException(status_code=422,
+                            detail=f"unsafe Stasis application name: {app!r}")
+    path = "/etc/asterisk/extensions_custom.conf"
+    code, text = _pbx_exec(
+        ["sh", "-c", f"sed -i 's/Stasis([A-Za-z0-9_]*)/Stasis({name})/g' '{path}'"]
+    )
+    if code != 0:
+        raise HTTPException(status_code=502,
+                            detail=f"static Stasis rewrite failed: {text}")
+
+
+def _stasis_recover_wait_s() -> float:
+    """How long /agents/stasis/recover re-polls ARI for the app to register."""
+    raw = (os.environ.get("STASIS_RECOVER_WAIT_S") or "").strip()
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return 8.0
+
+
+def _stasis_registered_apps() -> list[str]:
+    """ARI application names currently registered, or [] when the CLI fails."""
+    try:
+        code, text = _pbx_exec(["asterisk", "-rx", "ari show apps"])
+    except HTTPException:
+        return []
+    return agents.parse_ari_apps(text) if code == 0 else []
+
+
 _DIALPLAN_TTL = 5.0  # seconds — short: provisioning changes should show fast
 _dialplan_cache: dict[str, tuple[float, str]] = {}
 # Serializes the cache *miss*, not every read: the Agents list probes its
@@ -2768,9 +3228,23 @@ def _pbx_dialplan_text() -> str:
         return val
 
 
-def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool) -> dict:
-    status = "provisioned" if (has_ext and has_route and has_dp) else "partial"
-    if not (has_ext or has_route or has_dp):
+def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool,
+                        is_static: bool = False) -> dict:
+    """Provisioning status for one extension, in the shape the list expects.
+
+    The built-in 8000-8007 agents are defined by the static dialplan, not by
+    FreePBX custom-extension / inbound-route rows, so for them the only signal
+    that matters is whether the dialplan carries the number. The numbers the
+    Control Center adds are dynamic and need all three rows to be provisioned
+    (any subset is "partial").
+    """
+    if is_static:
+        status = "provisioned" if has_dp else "not-provisioned"
+    elif has_ext and has_route and has_dp:
+        status = "provisioned"
+    elif has_ext or has_route or has_dp:
+        status = "partial"
+    else:
         status = "not-provisioned"
     payload = {"status": status, "customExtension": has_ext, "inboundRoute": has_route,
                "dialplan": has_dp}
@@ -2830,7 +3304,9 @@ def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
     except HTTPException as exc:
         return {e: {"status": "error", "customExtension": None, "inboundRoute": None,
                     "dialplan": None, "detail": exc.detail} for e in exts}
-    return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp) for e in exts}
+    return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp,
+                                   is_static=e in agents.STATIC_EXTENSIONS)
+            for e in exts}
 
 
 def _repair_partial_rows(
@@ -3077,6 +3553,13 @@ def links(user: dict = Depends(require_session)):
 def health(user: dict = Depends(require_session)):
     matrix, _ = build_health()
     return matrix
+
+
+@app.get("/pbx/health")
+def pbx_health(user: dict = Depends(require_session)):
+    """PBX self-healing state + recovery history on its own, for callers that
+    want it without the whole matrix."""
+    return pbx_recovery_status()
 
 
 @app.get("/authentik/access")

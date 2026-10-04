@@ -233,6 +233,34 @@ class DograhClient:
         self._stasis_app = name or STASIS_APP_PLACEHOLDER
         return self._stasis_app
 
+    def refresh_stasis_app_name(self) -> str:
+        """Re-discover the Stasis app name, ignoring the cached value.
+
+        The recovery path must do this: a config that dograh parked and then
+        reactivated can come back under the same name, but the cached value may
+        have been learned before the first connection ever succeeded.
+        """
+        self._stasis_app = None
+        return self.discovered_stasis_app_name()
+
+    def telephony_config(self) -> dict[str, Any]:
+        """Config detail, including the `inactive` flag dograh parks a config with."""
+        return self._request(
+            "GET", f"/api/v1/organizations/telephony-configs/{self.config_id()}"
+        ) or {}
+
+    def reactivate_config(self) -> None:
+        """Clear the parked flag on the ARI config.
+
+        Parking is one-way upstream — a config whose ARI connection keeps
+        failing is marked inactive and never retried — so reactivating it is the
+        only way the Stasis app ever registers again without a redeploy.
+        """
+        self._request(
+            "POST",
+            f"/api/v1/organizations/telephony-configs/{self.config_id()}/reactivate",
+        )
+
     def list_agents(self) -> list[dict[str, Any]]:
         data = self._request("GET", self._phone_path())
         return [normalize_agent(p) for p in (data or {}).get("phone_numbers", []) or []]

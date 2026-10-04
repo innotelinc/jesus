@@ -12,6 +12,7 @@ import type {
   DashboardStats,
   Entitlement,
   StackAccessStatus,
+  PbxRecovery,
 } from '../types';
 import { dashboardBaseUrl } from './config';
 import type { Verdict } from './utils';
@@ -250,6 +251,8 @@ export interface AgentsResponse {
   configured: boolean;
   agents: Agent[];
   stasis?: StasisHealth;
+  /** Present when this load brought a stopped PBX container back. */
+  pbxAutoStart?: { startedAt: string; waitedSeconds: number };
   error?: string;
 }
 
@@ -343,6 +346,8 @@ export const api = {
   users: () => getJSON<User[]>('/users'),
   links: () => getJSON<ResourceLink[]>('/links'),
   health: () => getJSON<HealthMatrixEntry[]>('/health'),
+  /** PBX self-healing state + recovery history, on its own poll cadence. */
+  pbxHealth: () => getJSON<PbxRecovery>('/pbx/health'),
   /** Per-stack SSO / access inventory from the Cerulean Authentik instance. */
   authentikAccess: () => getJSON<StackAccessStatus>('/authentik/access'),
   incidents: () => getJSON<Incident[]>('/incidents'),
@@ -353,6 +358,7 @@ export const api = {
   serviceLogs: (id: string, tail = 200) =>
     getJSON<ServiceLogs>(`/services/${encodeURIComponent(id)}/logs?tail=${tail}`),
   restartService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/restart`, 'POST'),
+  startService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/start`, 'POST'),
   extensions: () => getJSON<PbxExtension[]>('/extensions'),
   createExtension: (body: PbxExtensionCreate) =>
     postJSON<{ status: string; extension: string }>('/extensions', body),
@@ -388,6 +394,11 @@ export const api = {
     postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}/sync`, {}),
   deleteAgent: (id: number) =>
     deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
+  /** Un-park the ARI config and re-assert the dialplan's Stasis app name. */
+  recoverStasis: () =>
+    postJSON<{ status: 'recovered' | 'pending'; app: string; registered: string[]; warnings: string[] }>(
+      '/agents/stasis/recover', {},
+    ),
   /** Deleted rows are hidden unless `includeDeleted` (the reports page toggle). */
   interviewReports: (includeDeleted = false) =>
     getJSON<InterviewReportsResponse>(

@@ -93,6 +93,23 @@ export default function ServiceDetailDrawer({ service, open, onClose, onChanged,
     }
   };
 
+  const doStart = async () => {
+    if (!service || busy) return;
+    setBusy(true);
+    setActionMsg(null);
+    try {
+      await api.startService(service.id);
+      setActionMsg({ kind: 'ok', text: `${service.name} starting — reloading state…` });
+      onChanged?.();
+      // FreePBX in particular takes a while to boot; surface fresh data again.
+      setTimeout(() => onChanged?.(), 3500);
+    } catch (error) {
+      setActionMsg({ kind: 'err', text: error instanceof Error ? error.message : 'Start failed' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openLogsTab = () => setTab('logs');
 
   return (
@@ -200,7 +217,12 @@ export default function ServiceDetailDrawer({ service, open, onClose, onChanged,
           )}
 
           <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-            {confirmingRestart ? (
+            {service.status === 'offline' ? (
+              <Button variant="secondary" size="sm" disabled={busy} onClick={() => void doStart()}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                {busy ? 'Starting…' : 'Start'}
+              </Button>
+            ) : confirmingRestart ? (
               <>
                 <Button variant="destructive" size="sm" disabled={busy} onClick={() => void doRestart()}>
                   {busy ? 'Restarting…' : 'Confirm restart'}

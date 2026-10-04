@@ -32,25 +32,48 @@ function ModeBanner({ mode }: { mode: 'standalone' | 'addon' }) {
 /** Warn when the generated dialplan routes into an ARI app that isn't registered.
  *  numbers beyond 8000-8007 call `Stasis(<app>)`; an unregistered app means
  *  Asterisk hangs the channel up immediately — the call rings then drops. */
-function StasisBanner({ stasis }: { stasis?: StasisHealth }) {
+function StasisBanner({
+  stasis,
+  onRecover,
+  busy,
+}: {
+  stasis?: StasisHealth;
+  onRecover?: () => void;
+  busy?: boolean;
+}) {
   if (!stasis || stasis.ok !== false) return null;
   return (
     <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
-      <p className="font-semibold">
-        Calls to {stasis.dynamicExtensions.join(', ')} will drop: the dialplan's Stasis app isn't registered.
-      </p>
-      <p className="mt-1">
-        {stasis.detail ??
-          `Extensions_custom_dograh.conf routes into Stasis(${stasis.expected}), but Asterisk has no ARI ` +
-          `application by that name.`}
-      </p>
-      <p className="mt-1 text-xs opacity-90">
-        Dialplan app: <code className="rounded bg-muted px-1 py-0.5 font-mono">{stasis.expected}</code>
-        {' · '}registered:{' '}
-        <code className="rounded bg-muted px-1 py-0.5 font-mono">
-          {stasis.registered.length ? stasis.registered.join(', ') : 'none'}
-        </code>
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold">
+            Calls to {stasis.dynamicExtensions.join(', ')} will drop: the dialplan's Stasis app isn't registered.
+          </p>
+          <p className="mt-1">
+            {stasis.detail ??
+              `Extensions_custom_dograh.conf routes into Stasis(${stasis.expected}), but Asterisk has no ARI ` +
+              `application by that name.`}
+          </p>
+          <p className="mt-1 text-xs opacity-90">
+            Dialplan app: <code className="rounded bg-muted px-1 py-0.5 font-mono">{stasis.expected}</code>
+            {' · '}registered:{' '}
+            <code className="rounded bg-muted px-1 py-0.5 font-mono">
+              {stasis.registered.length ? stasis.registered.join(', ') : 'none'}
+            </code>
+          </p>
+        </div>
+        {onRecover && (
+          <button
+            type="button"
+            onClick={onRecover}
+            disabled={busy}
+            title="Un-park the ARI config and re-assert the Stasis app name"
+            className="shrink-0 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-500/20 disabled:opacity-50 dark:text-red-300"
+          >
+            {busy ? 'Repairing…' : 'Repair ARI'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -87,6 +110,10 @@ export default function Agents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set when the API had to bring a stopped PBX container back on this load.
+  const [pbxAutoStart, setPbxAutoStart] = useState<{ startedAt: string; waitedSeconds: number } | null>(null);
+
+  const [stasisBusy, setStasisBusy] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newAddress, setNewAddress] = useState('');
@@ -110,8 +137,13 @@ export default function Agents() {
   const [searchParams] = useSearchParams();
   const openedAgentParam = useRef<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  // Lets the delayed post-recovery re-check call the latest refresh without
+  // making refresh depend on itself.
+  const refreshRef = useRef<((opts?: { silent?: boolean }) => Promise<void>) | null>(null);
+  const autoStartProbe = useRef<number | null>(null);
+
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const res = await api.agents();
@@ -119,6 +151,20 @@ export default function Agents() {
       setConfigured(res.configured);
       setAgents(res.agents);
       setStasis(res.stasis);
+      if (res.pbxAutoStart) {
+        setPbxAutoStart(res.pbxAutoStart);
+        // One delayed re-check once the PBX has had time to settle: if it is
+        // stable by then the recovery notice clears itself.
+        if (autoStartProbe.current === null) {
+          autoStartProbe.current = window.setTimeout(() => {
+            autoStartProbe.current = null;
+            void refreshRef.current?.({ silent: true });
+          }, 6000);
+        }
+      } else {
+        setPbxAutoStart(prev =>
+          prev && !res.agents.some(a => a.pbx?.status === 'error') ? null : prev);
+      }
       if (!res.configured && res.error) {
         setError(res.error);
       }
@@ -128,11 +174,16 @@ export default function Agents() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load agents');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
+  useEffect(() => { refreshRef.current = refresh; }, [refresh]);
   useEffect(() => { void refresh(); }, [refresh]);
+  // Drop the pending re-check if the page unmounts before it fires.
+  useEffect(() => () => {
+    if (autoStartProbe.current !== null) window.clearTimeout(autoStartProbe.current);
+  }, []);
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -226,6 +277,26 @@ export default function Agents() {
       setError(e instanceof Error ? e.message : 'Update failed');
     } finally {
       setBusy(null);
+    }
+  };
+
+  const repairStasis = async () => {
+    setStasisBusy(true);
+    setError(null);
+    try {
+      const res = await api.recoverStasis();
+      if (res.status === 'recovered') {
+        flash(`Stasis app ${res.app} is registered again — calls will connect.`);
+      } else if (res.warnings.length > 0) {
+        flash(res.warnings.join(' '));
+      } else {
+        flash(`Repair started — dograh is reconnecting to Stasis(${res.app}); check again in a moment.`);
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'ARI repair failed');
+    } finally {
+      setStasisBusy(false);
     }
   };
 
@@ -362,7 +433,30 @@ export default function Agents() {
         </div>
       )}
 
-      {configured && <StasisBanner stasis={stasis} />}
+      {pbxAutoStart && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold">The PBX container was stopped — it's been started again.</p>
+              <p className="mt-1">
+                Agent provisioning below reflects the recovered PBX.
+                {pbxAutoStart.waitedSeconds > 0 && ` Startup took ${pbxAutoStart.waitedSeconds}s.`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPbxAutoStart(null)}
+              className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-300"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {configured && (
+        <StasisBanner stasis={stasis} onRecover={() => void repairStasis()} busy={stasisBusy} />
+      )}
 
       {configured && <ModeBanner mode={mode} />}
 

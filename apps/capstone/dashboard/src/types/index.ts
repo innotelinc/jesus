@@ -169,6 +169,30 @@ export interface HealthMatrixEntry {
   dependencies: string[];
   lastCheck: string;
   status: ServiceStatus;
+  /** Present only on the PBX row: its self-healing state + recovery history. */
+  pbxRecovery?: PbxRecovery;
+}
+
+/** One PBX start attempt recorded by the API or the background watchdog. */
+export interface PbxRecoveryEvent {
+  at: string;
+  outcome: 'recovered' | 'failed';
+  source: 'request' | 'watchdog';
+  detail: string;
+  waitedSeconds: number | null;
+}
+
+export interface PbxRecovery {
+  mode: 'standalone' | 'addon';
+  running: boolean;
+  watchdogEnabled: boolean;
+  watchdogIntervalSeconds: number;
+  recoveries: number;
+  failures: number;
+  lastRecoveryAt: string | null;
+  lastSource: 'request' | 'watchdog' | null;
+  /** Newest first. */
+  events: PbxRecoveryEvent[];
 }
 
 export interface Incident {
