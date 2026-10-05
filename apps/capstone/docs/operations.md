@@ -1016,10 +1016,19 @@ The Control Center now self-heals this: the first PBX action starts the
 container (`PBX_START_WAIT_S`, default 60s, `0` = fail fast) and a background
 watchdog recovers it within `PBX_WATCHDOG_INTERVAL` (default 60s, `0` =
 disabled) even when nothing is calling the API. The Agents page shows a
-dismissible notice that clears itself once the PBX is stable. If the container
-starts and immediately exits, the error reports the exit code and the tail of
-its logs instead of an opaque `409`. To avoid the outage in the first place,
-always include the profile: `docker compose --profile standalone up -d`.
+dismissible notice that clears itself once the PBX is stable. A `fwconsole
+reload` that collides with one already in flight (FreePBX serialises reloads
+with its own lock — the `capstone-pbx-sync` timer and another page's repair are
+routine partners) is waited out and retried rather than reported as a failed
+repair: tune the wait with `PBX_RELOAD_MAX_WAIT` (default 60s, `0` = fail fast)
+and the retry gap with `PBX_RELOAD_POLL` (default 2s). The dashboard's
+docker-derived `/health`, `/services` and `/stats` caches are refreshed on a
+background timer (`DASHBOARD_CACHE_WARM_INTERVAL`, default 5s, `0` disables) so
+a slow `docker stats` walk can no longer turn a healthy endpoint into a
+reverse-proxy timeout. If the container starts and immediately exits, the error
+reports the exit code and the tail of its logs instead of an opaque `409`. To
+avoid the outage in the first place, always include the profile:
+`docker compose --profile standalone up -d`.
 
 ### A dashboard code change isn't live
 

@@ -370,19 +370,23 @@ _cache_lock = threading.Lock()
 
 def ttl_cache(ttl: float, key: str = ""):
     def deco(fn):
+        # Exposed on the wrapper so the cache warmer can force a recompute
+        # without guessing the key (it may be overridden by `key=`).
+        cache_key = key or fn.__qualname__
+
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            k = key or fn.__qualname__
             now = time.time()
             with _cache_lock:
-                hit = _cache.get(k)
+                hit = _cache.get(cache_key)
                 if hit and now - hit[0] < ttl:
                     return hit[1]
             val = fn(*args, **kwargs)
             with _cache_lock:
-                _cache[k] = (time.time(), val)
+                _cache[cache_key] = (time.time(), val)
             return val
 
+        wrapper.cache_key = cache_key
         return wrapper
 
     return deco
@@ -1733,6 +1737,66 @@ def _start_pbx_watchdog() -> None:
     logger.info("PBX watchdog started (every %.0fs)", interval)
 
 
+# --------------------------------------------------------------------------
+# Cache warmer
+# --------------------------------------------------------------------------
+# container_stats_map() walks *every* container with its own `docker stats`
+# call. On a busy host that round trip takes seconds even when idle and tens of
+# seconds under memory pressure — enough to blow past a proxy's read timeout,
+# which is exactly how a healthy endpoint surfaces as a 504. The same cold path
+# sits inside build_services(), so /health, /services and /stats all pay it on
+# the first request after every short TTL. Refreshing them on a timer takes the
+# cold path off the request entirely: a handler only ever reads the warm cache.
+CACHE_WARM_INTERVAL = 5.0
+_cache_warmer_started = False
+
+
+def _cache_warm_interval() -> float:
+    """Configured warm interval in seconds (<=0 disables the warmer)."""
+    try:
+        return float(os.environ.get("DASHBOARD_CACHE_WARM_INTERVAL") or CACHE_WARM_INTERVAL)
+    except ValueError:
+        return CACHE_WARM_INTERVAL
+
+
+def _refresh(fn) -> Any:
+    """Recompute a ttl_cache'd function now, ignoring its still-valid entry.
+
+    The warmer must not read its own cache back: with a 5s tick and a 6-8s TTL,
+    a tick that skips because the entry is a few seconds old leaves the entry to
+    expire before the next tick, reopening the cold path it exists to close.
+    """
+    invalidate(getattr(fn, "cache_key", fn.__qualname__))
+    return fn()
+
+
+def _cache_warmer_loop(interval: float) -> None:
+    while True:
+        try:
+            _refresh(container_stats_map)
+            _refresh(build_services)
+        except Exception as exc:  # noqa: BLE001 - the loop must never die
+            logger.debug("cache warmer error: %s", exc)
+        time.sleep(interval)
+
+
+@app.on_event("startup")
+def _start_cache_warmer() -> None:
+    """Keep the docker-derived caches warm so requests never see the cold path."""
+    global _cache_warmer_started
+    if _cache_warmer_started or docker is None:
+        return
+    interval = _cache_warm_interval()
+    if interval <= 0:
+        logger.info("cache warmer disabled (DASHBOARD_CACHE_WARM_INTERVAL=%s)", interval)
+        return
+    _cache_warmer_started = True
+    threading.Thread(
+        target=_cache_warmer_loop, args=(interval,), name="cache-warmer", daemon=True,
+    ).start()
+    logger.info("cache warmer started (every %.0fs)", interval)
+
+
 def _pbx_exec(cmd: list[str], stdin_text: str | None = None) -> tuple[int, str]:
     """Run a command inside the PBX container, starting it first if stopped.
 
@@ -2448,10 +2512,14 @@ def agents_list(user: dict = Depends(require_session)):
     # repair can never disagree.
     exts = [_agent_pbx_extension(a) for a in rows]
     statuses = _agent_pbx_statuses(mode, exts)
-    # Converge before answering: a row that reads Partial is one the writers can
-    # repair (see _repair_partial_rows), and this page is where an operator
-    # meets that state. No-op when every row is already wired.
-    statuses = _repair_partial_rows(mode, rows, statuses, client)
+    # Converge before answering — but bounded: a row that reads Partial is one
+    # the writers can repair (see _repair_partial_rows), and this page is where
+    # an operator meets that state; the writers' PBX round trips, though, can
+    # outlast the reverse proxy's read timeout and turn this page into a 504.
+    # A pass that finishes inside the budget keeps the old behaviour (the page
+    # answers converged); one that does not keeps running in the background and
+    # the page renders the status it has now. No-op when every row is wired.
+    statuses = _repair_partial_rows_bounded(mode, rows, statuses, client)
     for a, ext in zip(rows, exts):
         a["pbx"] = statuses[ext]
     payload = {"mode": mode, "configured": True, "agents": rows,
@@ -2979,15 +3047,65 @@ def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
     _dialplan_cache.clear()
 
 
+# FreePBX serialises `fwconsole reload` with a lock file ($ASTRUNDIR/
+# reload.lock — libraries/Console/Reload.class.php): a second reload while one
+# is in flight prints {"error":"Process is already running."} and exits -1.
+# That is not a failure of our config — it is a collision with a reload that is
+# already publishing the same database, and on this estate it is routine: the
+# capstone-pbx-sync timer, another page's repair and an operator's Re-sync can
+# all drive one. Treating it as a failure is what turned a benign collision
+# into a critical "won't resync to repair dialplan" alert. Our rows are written
+# *before* this call, so the in-flight reload may have started before them —
+# waiting it out and running our own is the only way to know they went live;
+# answering success on the collision could leave them unpublished. The wait is
+# bounded so a reload that never releases its lock still surfaces honestly
+# rather than hanging the caller.
+PBX_RELOAD_BUSY_MARKER = "Process is already running"
+PBX_RELOAD_MAX_WAIT = 60.0  # seconds to wait out an in-flight reload before failing
+PBX_RELOAD_POLL = 2.0
+
+
+def _pbx_reload_max_wait() -> float:
+    """How long to wait out a colliding reload (env-overridable; <=0 never waits)."""
+    try:
+        return float(os.environ.get("PBX_RELOAD_MAX_WAIT") or PBX_RELOAD_MAX_WAIT)
+    except (TypeError, ValueError):
+        return PBX_RELOAD_MAX_WAIT
+
+
+def _pbx_reload_poll() -> float:
+    """Delay between reload retries while another holds FreePBX's lock."""
+    try:
+        return float(os.environ.get("PBX_RELOAD_POLL") or PBX_RELOAD_POLL)
+    except (TypeError, ValueError):
+        return PBX_RELOAD_POLL
+
+
+def _pbx_reload_busy(text: str) -> bool:
+    """True when `fwconsole reload` refused only because another reload holds
+    FreePBX's reload.lock, rather than the reload itself failing."""
+    return PBX_RELOAD_BUSY_MARKER in (text or "")
+
+
 def _pbx_reload_dograh() -> None:
     """Apply the dograh FreePBX rows: chown (entrypoint edits /etc/asterisk as
-    root) then fwconsole reload so routes + dialplan go live."""
+    root) then fwconsole reload so routes + dialplan go live.
+
+    A reload that collides with one already holding FreePBX's lock is waited
+    out and retried rather than reported as a failure — see
+    PBX_RELOAD_BUSY_MARKER."""
     code, text = _pbx_exec(["fwconsole", "chown"])
     if code != 0:
         raise HTTPException(status_code=502, detail=f"fwconsole chown failed: {text}")
-    code, text = _pbx_exec(["fwconsole", "reload"])
-    if code != 0:
-        raise HTTPException(status_code=502, detail=f"fwconsole reload failed: {text}")
+    deadline = time.monotonic() + _pbx_reload_max_wait()
+    while True:
+        code, text = _pbx_exec(["fwconsole", "reload"])
+        if code == 0:
+            return
+        if not _pbx_reload_busy(text) or time.monotonic() >= deadline:
+            raise HTTPException(status_code=502, detail=f"fwconsole reload failed: {text}")
+        logger.info("fwconsole reload collided with an in-flight reload; waiting it out")
+        time.sleep(_pbx_reload_poll())
 
 
 def _agent_pbx_extension(agent: dict) -> str:
@@ -3298,6 +3416,69 @@ def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
         return {e: {"status": "error", "customExtension": None, "inboundRoute": None,
                     "dialplan": None, "detail": exc.detail} for e in exts}
     return {e: _pbx_status_payload(*counts.get(e, (False, False)), e in dp) for e in exts}
+
+
+# How long the Agents list will wait for an inline repair pass before letting
+# it finish in the background. The writers' round trips (a kvstore read, a
+# dialplan sync, an `fwconsole reload`) are what make a half-wired page slow, so
+# the budget is what keeps the list answering: a PBX that heals quickly still
+# answers converged, and a slow one no longer holds the response past the
+# reverse proxy's read timeout. Env-overridable for a box that wants to wait.
+AGENTS_REPAIR_INLINE_BUDGET = 5.0
+
+
+def _agents_repair_budget() -> float:
+    try:
+        return float(os.environ.get("AGENTS_REPAIR_INLINE_BUDGET") or AGENTS_REPAIR_INLINE_BUDGET)
+    except (TypeError, ValueError):
+        return AGENTS_REPAIR_INLINE_BUDGET
+
+
+def _repair_partial_rows_bounded(
+    mode: str,
+    rows: list[dict[str, Any]],
+    statuses: dict[str, dict],
+    client: agents.DograhClient,
+) -> dict[str, dict]:
+    """`_repair_partial_rows`, but never slower than the inline budget.
+
+    The repair is idempotent and single-flighted, so running it on a worker
+    thread and waiting a bounded time is safe: a pass that finishes within the
+    budget is returned as before, and one that does not is left to finish on its
+    own (its lock keeps a second page load from starting a competing reload)
+    while the caller answers with the statuses the probe already produced.
+    Spawns nothing when no row is repairable — the common all-wired load costs
+    exactly one threadless check.
+    """
+    if not _has_repairable_rows(mode, rows, statuses):
+        return statuses
+    box: dict[str, dict] = {}
+    done = threading.Event()
+
+    def _run() -> None:
+        try:
+            box["statuses"] = _repair_partial_rows(mode, rows, statuses, client)
+        except Exception:  # noqa: BLE001 - best effort, exactly as the inline path
+            box["statuses"] = statuses
+        finally:
+            done.set()
+
+    threading.Thread(target=_run, name="agents-repair", daemon=True).start()
+    if done.wait(_agents_repair_budget()):
+        return box.get("statuses", statuses)
+    # Still converging: answer now, let the thread publish the repair so the
+    # next load (or the page's own re-check) sees the converged rows.
+    logger.info("agents repair still running past the inline budget; answering with the probe statuses")
+    return statuses
+
+
+def _has_repairable_rows(mode: str, rows: list[dict[str, Any]], statuses: dict[str, dict]) -> bool:
+    if mode != "standalone":
+        return False
+    return any(
+        (statuses.get(_agent_pbx_extension(a)) or {}).get("status") in ("partial", "not-provisioned")
+        for a in rows
+    )
 
 
 def _repair_partial_rows(

@@ -231,5 +231,69 @@ class PbxRecoveryStatusTest(unittest.TestCase):
         self.assertNotIn("pbxRecovery", other)
 
 
+@unittest.skipUnless(_HAVE_DEPS, "dashboard-api dependencies are not installed")
+class CacheWarmerTest(unittest.TestCase):
+    """The Health/Services/Stats views read docker-derived caches whose cold
+    path — a `docker stats` walk over every container — takes seconds on an idle
+    host and tens of seconds under load, long enough to surface as a proxy 504.
+    The warmer keeps those caches warm off the request path."""
+
+    def test_interval_reads_the_env_and_falls_back_on_garbage(self):
+        previous = os.environ.pop("DASHBOARD_CACHE_WARM_INTERVAL", None)
+        try:
+            self.assertEqual(main._cache_warm_interval(), main.CACHE_WARM_INTERVAL)
+            os.environ["DASHBOARD_CACHE_WARM_INTERVAL"] = "2.5"
+            self.assertEqual(main._cache_warm_interval(), 2.5)
+            os.environ["DASHBOARD_CACHE_WARM_INTERVAL"] = "nonsense"
+            self.assertEqual(main._cache_warm_interval(), main.CACHE_WARM_INTERVAL)
+        finally:
+            if previous is None:
+                os.environ.pop("DASHBOARD_CACHE_WARM_INTERVAL", None)
+            else:
+                os.environ["DASHBOARD_CACHE_WARM_INTERVAL"] = previous
+
+    def test_refresh_recomputes_even_when_the_cache_is_fresh(self):
+        """A warmer tick that reads its own fresh entry leaves it to expire before
+        the next tick, reopening the cold path — so it must force a recompute."""
+        calls = {"n": 0}
+
+        def fn():
+            calls["n"] += 1
+            return calls["n"]
+
+        cached = main.ttl_cache(600.0, key="warmer-test")(fn)
+        self.assertEqual(cached(), 1)
+        self.assertEqual(cached(), 1)  # served from cache
+        self.assertEqual(main._refresh(cached), 2)
+        self.assertEqual(calls["n"], 2)
+
+    def test_loop_warms_the_docker_caches(self):
+        with mock.patch.object(main, "_refresh") as refresh, \
+             mock.patch.object(main.time, "sleep", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                main._cache_warmer_loop(5.0)
+        refresh.assert_has_calls(
+            [mock.call(main.container_stats_map), mock.call(main.build_services)]
+        )
+
+    def test_loop_survives_a_failing_refresh(self):
+        sleeps = {"n": 0}
+
+        def boom(_fn):
+            if sleeps["n"] == 0:
+                raise RuntimeError("docker hiccup")
+
+        def fake_sleep(_seconds):
+            sleeps["n"] += 1
+            if sleeps["n"] >= 2:
+                raise KeyboardInterrupt
+
+        with mock.patch.object(main, "_refresh", side_effect=boom), \
+             mock.patch.object(main.time, "sleep", side_effect=fake_sleep):
+            with self.assertRaises(KeyboardInterrupt):
+                main._cache_warmer_loop(5.0)
+        self.assertEqual(sleeps["n"], 2)  # the first failure still slept, loop lived
+
+
 if __name__ == "__main__":
     unittest.main()

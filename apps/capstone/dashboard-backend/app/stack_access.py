@@ -32,6 +32,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 # Human-facing user types. Everything else is a machine identity, and those are
@@ -40,6 +41,11 @@ MACHINE_USER_TYPES = {"internal", "service_account", "internal_service_account"}
 
 DEFAULT_TIMEOUT = 12
 CACHE_TTL_SECONDS = 60
+
+# Reachability is one call per user, so this is the part that made the panel
+# slow on a real IdP: N users serialised into N round trips. Bound the fan-out —
+# an IdP tolerates a handful of parallel reads but not an unbounded burst.
+MAX_REACHABILITY_WORKERS = 8
 
 
 def _env(name: str, explicit: str | None = None) -> str:
@@ -151,17 +157,24 @@ def build_access_status(
     if cached is not None:
         return cached
 
-    users = _list_all(root, api_token, "/api/v3/core/users/", include_groups="true")
+    # The four inventory endpoints are independent, so fetch them concurrently:
+    # on a slow IdP that is one round trip's latency instead of four.
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        f_users = ex.submit(_list_all, root, api_token, "/api/v3/core/users/", include_groups="true")
+        f_groups = ex.submit(_list_all, root, api_token, "/api/v3/core/groups/")
+        f_apps = ex.submit(_list_all, root, api_token, "/api/v3/core/applications/", superuser_full_list="true")
+        f_bindings = ex.submit(_list_all, root, api_token, "/api/v3/policies/bindings/")
+        users = f_users.result()
+        groups = f_groups.result()
+        apps = f_apps.result()
+        bindings = f_bindings.result()
+
     state, _probe = _get(
         f"{root}/api/v3/core/users/?page_size=1", api_token, timeout=timeout
     )
     if not users:
         result["error"] = f"Authentik did not return a user list (HTTP {state or 'unreachable'})"
         return result
-
-    groups = _list_all(root, api_token, "/api/v3/core/groups/")
-    apps = _list_all(root, api_token, "/api/v3/core/applications/", superuser_full_list="true")
-    bindings = _list_all(root, api_token, "/api/v3/policies/bindings/")
 
     usernames = {u["pk"]: u.get("username", "") for u in users}
     gated_pks = _is_gated(bindings)
@@ -197,10 +210,25 @@ def build_access_status(
     # "reach" them and counting them would claim access that is not really
     # granted (it is the absence of a gate, surfaced in ``tilesOnly``).
     gated_slugs = {a.get("slug") for a in apps if a.get("provider")}
+    # One call per user, fanned out across a bounded pool. Results are collected
+    # by pk and the output is still assembled in sorted order, so the payload is
+    # identical to the serial version — just faster.
+    reachable_by_user: dict = {}
+    with ThreadPoolExecutor(max_workers=MAX_REACHABILITY_WORKERS) as ex:
+        futures = {
+            ex.submit(_list_all, root, api_token, "/api/v3/core/applications/", for_user=str(u["pk"])): u["pk"]
+            for u in users
+        }
+        for future, pk in futures.items():
+            try:
+                reachable_by_user[pk] = future.result()
+            except Exception:  # noqa: BLE001 - a single user must not fail the page
+                reachable_by_user[pk] = []
+
     users_out: list[dict] = []
     for user in sorted(users, key=lambda u: u.get("username", "")):
         pk = user["pk"]
-        reachable = _list_all(root, api_token, "/api/v3/core/applications/", for_user=str(pk))
+        reachable = reachable_by_user.get(pk, [])
         reachable = [a for a in reachable if a.get("slug") in gated_slugs]
         reachable_stacks = sorted({a.get("group") or "Ungrouped" for a in reachable})
         users_out.append(

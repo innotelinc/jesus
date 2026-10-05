@@ -1288,6 +1288,15 @@ services:
       # watchdog.
       PBX_START_WAIT_S: "${PBX_START_WAIT_S:-60}"
       PBX_WATCHDOG_INTERVAL: "${PBX_WATCHDOG_INTERVAL:-60}"
+      # FreePBX serialises `fwconsole reload` with a lock file, so a reload can
+      # collide with one already in flight (the pbx-sync timer, another page's
+      # repair). A collision is waited out and retried rather than reported as a
+      # failed repair. Seconds; PBX_RELOAD_MAX_WAIT=0 fails fast instead.
+      PBX_RELOAD_MAX_WAIT: "${PBX_RELOAD_MAX_WAIT:-60}"
+      PBX_RELOAD_POLL: "${PBX_RELOAD_POLL:-2}"
+      # Keep the docker-derived /health, /services and /stats caches warm so a
+      # request never pays the cold `docker stats` walk. Seconds; 0 disables.
+      DASHBOARD_CACHE_WARM_INTERVAL: "${DASHBOARD_CACHE_WARM_INTERVAL:-5}"
       # Shared Magnate storefront for entitlement checks (RevenueOps);
       # empty when running standalone (no billing).
       MAGNATE_PUBLIC_URL: "${MAGNATE_PUBLIC_URL:-}"

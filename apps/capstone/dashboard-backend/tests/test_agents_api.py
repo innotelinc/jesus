@@ -108,6 +108,9 @@ class FakePbx:
         self.sql: list[str] = []
         self.confs: dict[str, str] = {}
         self.fail_on = ""  # substring that makes a write raise
+        # Number of `fwconsole reload` attempts that collide with an in-flight
+        # reload (FreePBX's reload.lock) before one is allowed through.
+        self.reload_busy = 0
 
     # ── the docker exec seam ────────────────────────────────────────────────
     def exec_(self, cmd):
@@ -122,6 +125,12 @@ class FakePbx:
                            + body if body else "There is no existence of 'dograh-inbound'")
             if cmd[2] == "ari show apps":
                 return 0, f"=====\n{self.stasis_app}"
+            return 0, ""
+        if cmd[:2] == ["fwconsole", "reload"]:
+            if self.reload_busy > 0:
+                self.reload_busy -= 1
+                return 1, json.dumps({"error": "Process is already running.",
+                                      "trace": "Process ID : 10197"})
             return 0, ""
         if cmd[0] == "cat":
             return 0, self.confs.get(cmd[1], "")
@@ -276,6 +285,31 @@ class AgentsAutoRepairTest(unittest.TestCase):
             self.agent(self.client.get("/agents"))
         probes = [s for s in pbx.sql if "information_schema.tables" in s]
         self.assertEqual(len(probes), 1, "the cooldown did not bound the attempts")
+
+    def test_a_reload_collision_with_an_in_flight_reload_is_waited_out(self):
+        # FreePBX's reload.lock: a reload that collides with one already running
+        # is not a failure of our config — it is retried, and the row still
+        # converges rather than surfacing a critical "won't resync" alert.
+        pbx = self.pbx(dialplan={"8003"})
+        pbx.reload_busy = 1
+        os.environ["PBX_RELOAD_POLL"] = "0"
+        self.addCleanup(os.environ.pop, "PBX_RELOAD_POLL", None)
+        agent = self.agent(self.client.get("/agents"))
+        self.assertEqual(agent["pbx"]["status"], "provisioned")
+        self.assertEqual(len(pbx.reloads()), 2, "the collided reload was not retried")
+
+    def test_a_reload_that_never_releases_the_lock_still_answers(self):
+        # A reload that never lets go must not hang the request: the wait is
+        # bounded, and the page still renders with the honest status.
+        pbx = self.pbx(dialplan={"8003"})
+        pbx.reload_busy = 10 ** 6
+        os.environ["PBX_RELOAD_MAX_WAIT"] = "0"  # the deadline is already past
+        os.environ["PBX_RELOAD_POLL"] = "0"
+        self.addCleanup(os.environ.pop, "PBX_RELOAD_MAX_WAIT", None)
+        self.addCleanup(os.environ.pop, "PBX_RELOAD_POLL", None)
+        agent = self.agent(self.client.get("/agents"))
+        self.assertEqual(agent["pbx"]["status"], "partial")
+        self.assertEqual(len(pbx.reloads()), 1, "a stuck lock must not be retried forever")
 
     def test_addon_mode_reports_pending_sync_and_never_touches_the_pbx(self):
         os.environ["CAPSTONE_DEPLOY_MODE"] = "addon"

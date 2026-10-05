@@ -39,6 +39,10 @@ dograh/upstream/
 
 # Repo-local generated/tracked artifacts
 
+# Failure screenshots from dashboard/e2e/smoke.mjs — regenerated per run, never
+# a tracked artifact.
+dashboard/e2e/artifacts/
+
 # Cerulean Vault token copies (data/vault/token/<product>.token) — live credentials.
 data/vault/token/
 data/vault/init/

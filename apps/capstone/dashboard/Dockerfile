@@ -4,6 +4,17 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Cap the Node heap so the build survives small/loaded hosts. Left uncapped,
+# node sizes its default heap from the host's RAM, grows past what is actually
+# available, and is OOM-killed mid-build (exit 137) instead of finishing in a
+# bounded footprint. Overridable for a CI runner with more headroom.
+ARG NODE_OPTIONS=--max-old-space-size=1400
+ENV NODE_OPTIONS=$NODE_OPTIONS
+# Playwright is a devDependency for the smoke test only; its postinstall would
+# otherwise download a browser into the build stage — hundreds of MB the image
+# never uses. The CI smoke job installs the browser itself.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

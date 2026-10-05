@@ -141,6 +141,11 @@ export default function Agents() {
   // making refresh depend on itself.
   const refreshRef = useRef<((opts?: { silent?: boolean }) => Promise<void>) | null>(null);
   const autoStartProbe = useRef<number | null>(null);
+  // The API bounds its FreePBX repair so a half-wired row can no longer hold
+  // the response past the proxy timeout — which means the repair may still be
+  // running when the list first paints. Re-check a couple of times so the chip
+  // converges on its own, then stop (the Re-sync action stays for a manual sweep).
+  const repairProbe = useRef<{ attempts: number; timer: number | null }>({ attempts: 0, timer: null });
 
   const refresh = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -165,6 +170,22 @@ export default function Agents() {
         setPbxAutoStart(prev =>
           prev && !res.agents.some(a => a.pbx?.status === 'error') ? null : prev);
       }
+      const repairable = res.mode === 'standalone'
+        && res.agents.some(a => a.pbx?.status === 'partial' || a.pbx?.status === 'not-provisioned');
+      if (!repairable) {
+        // Converged (or nothing to converge): stop watching.
+        repairProbe.current.attempts = 0;
+        if (repairProbe.current.timer !== null) {
+          window.clearTimeout(repairProbe.current.timer);
+          repairProbe.current.timer = null;
+        }
+      } else if (repairProbe.current.timer === null && repairProbe.current.attempts < 3) {
+        repairProbe.current.attempts += 1;
+        repairProbe.current.timer = window.setTimeout(() => {
+          repairProbe.current.timer = null;
+          void refreshRef.current?.({ silent: true });
+        }, 15000);
+      }
       if (!res.configured && res.error) {
         setError(res.error);
       }
@@ -180,9 +201,10 @@ export default function Agents() {
 
   useEffect(() => { refreshRef.current = refresh; }, [refresh]);
   useEffect(() => { void refresh(); }, [refresh]);
-  // Drop the pending re-check if the page unmounts before it fires.
+  // Drop the pending re-checks if the page unmounts before they fire.
   useEffect(() => () => {
     if (autoStartProbe.current !== null) window.clearTimeout(autoStartProbe.current);
+    if (repairProbe.current.timer !== null) window.clearTimeout(repairProbe.current.timer);
   }, []);
 
   const flash = (msg: string) => {

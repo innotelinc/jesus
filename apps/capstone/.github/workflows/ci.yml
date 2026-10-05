@@ -261,6 +261,53 @@ jobs:
       - name: Type-check + production build (tsc && vite build)
         run: npm run build
 
+  # The unit tests mount pages against mocked modules and never run the built
+  # bundle in a real browser, so a page can be green there and still fail where
+  # an operator looks: a chunk that 404s, a route that no longer matches, a
+  # render that throws on real JSON. This loads the production bundle in
+  # headless Chromium (dashboard/e2e/smoke.mjs), stubs the aggregator, and
+  # asserts the operator entry points actually paint — with no uncaught error
+  # and no failed request behind them. It is hermetic (no estate, no backend),
+  # so it always runs rather than skipping like the live jobs above.
+  #
+  # Point it at a real deployment with CAPSTONE_BASE (and CAPSTONE_COOKIE to
+  # walk it authenticated); a base this runner cannot reach is reported as a
+  # skip (exit 2), matching scripts/ci/sso-smoke.py.
+  dashboard-ui-smoke:
+    name: Dashboard browser smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the production bundle
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Walk the operator pages in a real browser
+        run: npm run smoke
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-ui-smoke-artifacts
+          path: dashboard/e2e/artifacts
+          if-no-files-found: ignore
+
   # Regression guard: user-facing hosts must never be localhost or docker
   # bridge IPs. setup.sh's old LAN-IP detector picked docker0's 172.17.0.1 and
   # baked it into .env, which leaked into every dashboard link, port host, and
