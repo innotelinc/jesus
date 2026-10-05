@@ -33,7 +33,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, Iterable
 
 # Agent extensions the static pbx/asterisk/extensions_custom.conf defines.
 # Numbers outside this set need a dynamic [dograh-inbound] include, written to
@@ -572,10 +572,50 @@ def find_custom_dest_sql(table: str, target: str) -> str:
     )
 
 
-def dialplan_body(numbers: list[str], stasis_app: str | None = None) -> str:
-    """The extensions_custom_dograh.conf moniker for numbers outside the
-    static 8000-8007 set: [dograh-inbound] Stasis entries plus a
-    [from-internal-custom] leg so the numbers are dialable internally too."""
+_SECTION_RE = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+_EXTEN_LINE_RE = re.compile(r"^\s*exten\s*=>\s*([\w-]+)\s*,")
+
+
+def inbound_extensions(text: str, context: str = "dograh-inbound") -> set[str]:
+    """Exact `exten => <name>` entries a context defines in a config file's text.
+
+    Read from the file that owns the context (`extensions_custom.conf`) rather
+    than from `dialplan show`: the show view merges the `#include`d generated
+    file, where the same context is declared again, and the two declarations
+    cannot be told apart after the merge. A caller that must know what
+    *this* file supplies has to read this file.
+    """
+    found: set[str] = set()
+    in_context = False
+    for line in (text or "").splitlines():
+        header = _SECTION_RE.match(line)
+        if header:
+            in_context = header.group(1).strip() == context
+            continue
+        if in_context:
+            exten = _EXTEN_LINE_RE.match(line)
+            if exten:
+                found.add(exten.group(1))
+    return found
+
+
+def dialplan_body(numbers: list[str], stasis_app: str | None = None,
+                  *, missing_static: Iterable[str] = ()) -> str:
+    """The extensions_custom_dograh.conf moniker for the numbers this file owns.
+
+    Numbers outside the static 8000-8007 set (one created in the Workflow Studio
+    or the Control Center's Agents page) are always emitted — this file is their
+    only dialplan. `missing_static` names static 8000-8007 extensions the live
+    `extensions_custom.conf` does NOT define: a shared PBX whose Capstone
+    fragment was never converged, where the static block that normally supplies
+    them is absent and every DID the `incoming` table routes at
+    `dograh-inbound,80NN` is an invalid extension, so the call drops and the
+    caller hears "busy". Those are emitted here, with the same call envelope and
+    voicemail fallback as `pbx/asterisk/extensions_custom.conf`, so the file is
+    equivalent rather than a diminished copy — and only when absent, so a
+    standalone box whose entrypoint already defines them never gets a duplicate
+    entry for the same extension.
+    """
     dynamic = sorted(
         {
             str(n).strip()
@@ -583,7 +623,14 @@ def dialplan_body(numbers: list[str], stasis_app: str | None = None) -> str:
             if str(n).strip() and extension_from_address(str(n)) not in STATIC_EXTENSIONS
         }
     )
-    if not dynamic:
+    static = sorted(
+        {
+            str(e).strip()
+            for e in missing_static
+            if str(e).strip() and extension_from_address(str(e)) in STATIC_EXTENSIONS
+        }
+    )
+    if not dynamic and not static:
         return ""
     app = stasis_app_name(stasis_app)
     lines = [
@@ -597,8 +644,21 @@ def dialplan_body(numbers: list[str], stasis_app: str | None = None) -> str:
             f" same => n,Stasis({app})",
             " same => n,Hangup()",
         ]
+    for ext in static:
+        # The static agent block, mirrored from pbx/asterisk/extensions_custom.conf:
+        # the call envelope Zeus's voice-context read expects, then the voicemail
+        # fallback for when dograh returns control without completing the call.
+        lines += [
+            f"exten => {ext},1,NoOp(Dograh voice agent inbound)",
+            " same => n,Set(AI_CALL_ID=${UNIQUEID})",
+            " same => n,Set(AI_CONTEXT_TOKEN=${UNIQUEID})",
+            f" same => n,Stasis({app})",
+            " same => n,GotoIf($[\"${DOGRAH_VM_MAILBOX}\" != \"\"]?vm-fallback:hangup)",
+            " same => n(vm-fallback),VoiceMail(${DOGRAH_VM_MAILBOX}@default,u)",
+            " same => n(hangup),Hangup()",
+        ]
     lines += ["", "[from-internal-custom]"]
-    for ext in dynamic:
+    for ext in sorted(set(dynamic) | set(static)):
         lines += [
             f"exten => {ext},1,NoOp(Dialing the dograh agent)",
             f" same => n,Goto(dograh-inbound,{ext},1)",

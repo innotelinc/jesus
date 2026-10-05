@@ -319,7 +319,17 @@ class PbxDynamicDialplanTest(unittest.TestCase):
         })
         self.urlopen = mock.patch("urllib.request.urlopen", side_effect=self.dograh)
         self.urlopen.start()
-        self.pbx = FakePbx({self.CONF: "[from-internal]\nexten => 101,1,Dial(SIP/101)\n"})
+        # The conf defines the static block for 8003 (as a converged
+        # standalone entrypoint would), so the sync leaves it alone; the
+        # heal-when-missing path is exercised by its own test.
+        self.pbx = FakePbx({self.CONF: (
+            "[dograh-inbound]\n"
+            "exten => 8003,1,NoOp(Dograh voice agent inbound)\n"
+            " same => n,Stasis(dograh_deadbeef)\n"
+            " same => n,Hangup()\n"
+            "[from-internal]\n"
+            "exten => 101,1,Dial(SIP/101)\n"
+        )})
         self.exec_patch = mock.patch.object(main, "_pbx_exec", side_effect=self.pbx)
         self.exec_patch.start()
 
@@ -337,7 +347,7 @@ class PbxDynamicDialplanTest(unittest.TestCase):
         self.assertIn("exten => 8008,1,NoOp(Dograh voice agent inbound)", body)
         self.assertIn("Stasis(dograh_deadbeef)", body)  # discovered live
         self.assertIn("Goto(dograh-inbound,8008,1)", body)
-        # The static 8000-8007 set is never re-emitted.
+        # The static block the conf already defines is never re-emitted.
         self.assertNotIn("exten => 8003,1,NoOp", body)
         # And the include is wired into extensions_custom.conf.
         self.assertIn("#include extensions_custom_dograh.conf",
@@ -361,7 +371,13 @@ class PbxDynamicDialplanTest(unittest.TestCase):
 
     def test_sync_removes_include_when_no_dynamic_numbers(self):
         self.pbx.files[self.DYN] = "; stale\n"
+        # The static block is defined where it belongs, so the only agent here
+        # (8003, static) leaves the dynamic file with nothing of its own.
         self.pbx.files[self.CONF] = (
+            "[dograh-inbound]\n"
+            "exten => 8003,1,NoOp(Dograh voice agent inbound)\n"
+            " same => n,Stasis(dograh_deadbeef)\n"
+            " same => n,Hangup()\n"
             "[from-internal]\n#include extensions_custom_dograh.conf\n"
         )
         self.dograh.numbers = [
@@ -372,6 +388,47 @@ class PbxDynamicDialplanTest(unittest.TestCase):
         self.assertNotIn(self.DYN, self.pbx.files)
         self.assertNotIn("#include extensions_custom_dograh.conf",
                          self.pbx.files[self.CONF])
+
+    def test_sync_heals_a_missing_static_agent_block(self):
+        # Shared-PBX regression: extensions_custom.conf lost its
+        # [dograh-inbound] block, so every DID routed at dograh-inbound,80NN was
+        # an invalid extension and the caller heard "busy". The sync must
+        # re-supply the static lines — with the same envelope + voicemail
+        # fallback as the canonical fragment — so the Agents page repair closes
+        # the outage on its own.
+        # The conf lost its static block — the shared-PBX failure mode.
+        self.pbx.files[self.CONF] = "[from-internal]\nexten => 101,1,Dial(SIP/101)\n"
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        body = self.pbx.files[self.DYN]
+        self.assertIn("exten => 8003,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertIn("Stasis(dograh_deadbeef)", body)
+        self.assertIn("Set(AI_CALL_ID=${UNIQUEID})", body)
+        self.assertIn("Set(AI_CONTEXT_TOKEN=${UNIQUEID})", body)
+        self.assertIn("VoiceMail(${DOGRAH_VM_MAILBOX}@default,u)", body)
+        self.assertIn("Goto(dograh-inbound,8003,1)", body)
+        # Healed once the conf defines it — the static block is never duplicated
+        # across the two files, and the dynamic number still stays.
+        self.pbx.files[self.CONF] += (
+            "[dograh-inbound]\n"
+            "exten => 8003,1,NoOp(Dograh voice agent inbound)\n"
+        )
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        healed = self.pbx.files[self.DYN]
+        self.assertNotIn("exten => 8003,1,NoOp", healed)
+        self.assertIn("exten => 8008,1,NoOp", healed)
+
+    def test_sync_leaves_the_static_block_to_the_conf_that_defines_it(self):
+        self.pbx.files[self.CONF] = (
+            "[dograh-inbound]\n"
+            "exten => 8003,1,NoOp(Dograh voice agent inbound)\n"
+            " same => n,Stasis(dograh_deadbeef)\n"
+            " same => n,Hangup()\n"
+            "[from-internal]\n"
+        )
+        main._pbx_sync_dynamic_dialplan(main.agents.DograhClient())
+        body = self.pbx.files[self.DYN]
+        self.assertNotIn("exten => 8003,1,NoOp", body)   # not duplicated
+        self.assertIn("exten => 8008,1,NoOp", body)      # the dynamic one stays
 
     # ── _stasis_health: the Agents page warning ────────────────────────────
 

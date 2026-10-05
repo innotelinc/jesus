@@ -506,6 +506,50 @@ class FreePbxBuildersTest(unittest.TestCase):
         self.assertEqual(body.count("exten => 8009,1,NoOp"), 2)
         self.assertEqual(body.count("exten => 8010,1,NoOp"), 2)
 
+    def test_dialplan_body_emits_requested_missing_static(self):
+        # Shared-PBX safety net: a static 8000-8007 extension the live conf does
+        # not define is emitted with the fragment's envelope + voicemail
+        # fallback, so the file is equivalent to pbx/asterisk/extensions_custom.conf.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            body = agents.dialplan_body(["8003", "8008"], missing_static=["8003"])
+        self.assertIn("exten => 8003,1,NoOp(Dograh voice agent inbound)", body)
+        self.assertIn("Set(AI_CALL_ID=${UNIQUEID})", body)
+        self.assertIn("Set(AI_CONTEXT_TOKEN=${UNIQUEID})", body)
+        self.assertIn("GotoIf($[\"${DOGRAH_VM_MAILBOX}\" != \"\"]?vm-fallback:hangup)", body)
+        self.assertIn("VoiceMail(${DOGRAH_VM_MAILBOX}@default,u)", body)
+        self.assertIn("Goto(dograh-inbound,8003,1)", body)
+
+    def test_dialplan_body_missing_static_only_when_no_dynamic(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            body = agents.dialplan_body(["8003"], missing_static=["8003"])
+        self.assertIn("exten => 8003,1,NoOp(Dograh voice agent inbound)", body)
+        # A static extension that is NOT requested is still never re-emitted.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(agents.dialplan_body(["8003", "8007"]), "")
+
+    def test_dialplan_body_ignores_non_static_missing_static(self):
+        # `missing_static` is a static-only channel; a dynamic number passed in
+        # it must not be emitted twice.
+        with mock.patch.dict(os.environ, {}, clear=True):
+            body = agents.dialplan_body(["8008"], missing_static=["8008"])
+        self.assertEqual(body.count("exten => 8008,1,NoOp"), 2)  # once per context
+
+    def test_inbound_extensions_reads_only_the_named_context(self):
+        text = (
+            "; comment\n"
+            "[from-internal-custom]\n"
+            "exten => 101,1,NoOp(not dograh)\n"
+            "[dograh-inbound]\n"
+            "exten => 8000,1,NoOp(a)\n"
+            " same => n,Stasis(dograh)\n"
+            "exten => 8003,1,NoOp(b)\n"
+            "[other]\n"
+            "exten => 9999,1,NoOp(c)\n"
+        )
+        self.assertEqual(agents.inbound_extensions(text), {"8000", "8003"})
+        self.assertEqual(agents.inbound_extensions(""), set())
+        self.assertEqual(agents.inbound_extensions("[dograh-inbound]\n"), set())
+
 
 if __name__ == "__main__":
     unittest.main()

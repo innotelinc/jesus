@@ -3016,7 +3016,20 @@ def _pbx_ensure_inbound_route(did: str, description: str, target: str) -> None:
 
 def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
     """Regenerate extensions_custom_dograh.conf from the CURRENT dograh list,
-    and wire/drop the #include in extensions_custom.conf (standalone only)."""
+    and wire/drop the #include in extensions_custom.conf (standalone only).
+
+    Also takes over the static 8000-8007 block when `extensions_custom.conf` does
+    not define it. That block is Capstone's own fragment
+    (`pbx/asterisk/extensions_custom.conf`), converged by the entrypoint on a
+    standalone box; on a shared PBX nothing re-applies it once the bundled
+    FreePBX is retired, and a missing block makes every DID the `incoming` table
+    routes at `dograh-inbound,80NN` an invalid extension — the call drops and the
+    caller hears "busy". Writing it here, in the file this sync owns, lets the
+    Agents page's own repair close that outage. The check reads
+    `extensions_custom.conf` itself, never the merged `dialplan show`, so the
+    dynamic file's entries can never be mistaken for the static block and the
+    two sources cannot oscillate.
+    """
     try:
         numbers = [a.get("address") for a in client.list_agents() if a.get("address")]
     except agents.DograhError:
@@ -3025,17 +3038,24 @@ def _pbx_sync_dynamic_dialplan(client: agents.DograhClient) -> None:
         app = client.discovered_stasis_app_name()
     except agents.DograhError:
         app = agents.stasis_app_name()
-    body = agents.dialplan_body(numbers, app)
     conf = "/etc/asterisk/extensions_custom.conf"
+    inc = _pbx_read_conf(conf)
+    defined = agents.inbound_extensions(inc)
+    missing_static = [
+        ext
+        for ext in (agents.extension_from_address(str(n)) for n in numbers)
+        if ext in agents.STATIC_EXTENSIONS and ext not in defined
+    ]
+    body = agents.dialplan_body(numbers, app, missing_static=missing_static)
     if body:
         _pbx_write_conf(agents.DIALPLAN_PATH, body)
-        inc = _pbx_read_conf(conf)
         if f"#include {agents.DIALPLAN_CONF}" not in inc:
             _pbx_write_conf(conf, inc.rstrip() + f"\n\n#include {agents.DIALPLAN_CONF}\n")
     else:
-        # No dynamic numbers left — remove the include + file so FreePBX
-        # never sees a dangling context (mirrors sync_dograh_routes).
-        inc = _pbx_read_conf(conf)
+        # Nothing this file owns is left (no dynamic numbers, and the static
+        # block is defined elsewhere or there is nothing to route) — remove the
+        # include + file so FreePBX never sees a dangling context (mirrors
+        # sync_dograh_routes).
         kept = "\n".join(
             ln for ln in inc.splitlines() if ln.strip() != f"#include {agents.DIALPLAN_CONF}"
         )
