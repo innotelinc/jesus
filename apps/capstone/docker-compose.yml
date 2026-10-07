@@ -152,6 +152,10 @@ x-sso-gateway: &sso-gateway
 services:
   # ── dograh core ──────────────────────────────────────────────────────────
   postgres:
+    # dograh-api blocks on all three of postgres/redis/minio; without a restart
+    # policy a stop (a host reboot, an OOM, a `compose down` of one service)
+    # left it crash-looping on ConnectionRefused with every other service green.
+    restart: unless-stopped
     image: pgvector/pgvector:pg17
     environment:
       POSTGRES_USER: postgres
@@ -169,6 +173,7 @@ services:
     networks: [interview-net]
 
   redis:
+    restart: unless-stopped
     image: redis:7
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-redissecret}"]
     ports:
@@ -183,6 +188,7 @@ services:
     networks: [interview-net]
 
   minio:
+    restart: unless-stopped
     # Mirrored into this repo's GHCR namespace by the release pipeline
     # (.github/workflows/release.yml). Upstream MinIO no longer serves
     # anonymous pulls from anywhere public — docker.io `minio/minio` is gone
