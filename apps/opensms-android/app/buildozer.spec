@@ -42,7 +42,7 @@ version.filename = %(source.dir)s/main.py
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3, kivy, kivymd, pyjnius, android, docutils, filetype, pillow, plyer==2.1.0, Pygments, requests, annotated-doc, annotated-types, pydantic-core, pydantic==2.12.5, idna, anyio, starlette, typing-extensions, typing-inspection, opentelemetry-api, fastapi, click, h11, uvicorn
+requirements = python3, kivy, kivymd, materialyoucolor==3.0.3, materialshapes, pycairo, pillow, exceptiongroup, asyncgui, asynckivy, pyjnius, android, docutils, filetype, pillow, plyer==2.1.0, Pygments, requests, annotated-doc, annotated-types, pydantic-core, pydantic==2.12.5, idna, anyio, starlette, typing-extensions, typing-inspection, opentelemetry-api, fastapi, click, h11, uvicorn
 # pydantic==2.12.5, fastapi==0.129.0
 
 # (str) Custom source folders for requirements
@@ -66,7 +66,7 @@ orientation = all
 # launched. This is optionally followed by ":foreground" for foreground services or
 # ":foreground:sticky" for sticky foreground services. The default is a background service.
 # Bound services are not supported.
-#services = NAME:ENTRYPOINT_TO_PY,NAME2:ENTRYPOINT2_TO_PY
+services = opensmssvc:services/appSvc.py:foreground:foregroundServiceType=dataSync
 
 #
 # OSX Specific
@@ -255,7 +255,7 @@ android.enable_androidx = True
 
 # (str) screenOrientation to set for the main activity.
 # Valid values can be found at https://developer.android.com/guide/topics/manifest/activity-element
-#android.manifest.orientation = fullSensor
+android.manifest.orientation = fullSensor
 
 # (list) Android additional libraries to copy into libs/armeabi
 #android.add_libs_armeabi = libs/android/*.so
