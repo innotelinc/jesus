@@ -7,13 +7,18 @@ from threading import Thread
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.utils import platform
-from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty
+from kivy.metrics import dp, sp
+from kivy.clock import Clock
+from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty, ColorProperty
 
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import MDNavigationBar, MDNavigationItem
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
+from kivymd.uix.label import MDLabel
+from kivymd.uix.dialog import MDDialog
+from kivymd.utils.set_bars_colors import set_bars_colors
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -72,6 +77,7 @@ class OpenSmsApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.accent_palette = "Orange"
+        self.set_bars_colors()
         return Builder.load_file(kv_file_path)
 
     def on_start(self):
@@ -94,6 +100,10 @@ class OpenSmsApp(MDApp):
             request_permissions(self.total_permissions)
             self.internal_storage = app_storage_path()
             self.config_dir = os.path.join(self.internal_storage, 'config')
+            os.makedirs(self.config_dir, exist_ok=True)
+            self.request_path = os.path.join(self.config_dir, "request.json")
+            self.resp_path = os.path.join(self.config_dir, "resp.json")
+            self.write_request()
             # start the listner service on Android
             try:
                 self.start_service()
@@ -103,11 +113,14 @@ class OpenSmsApp(MDApp):
         else:
             self.internal_storage = self.user_data_dir
             self.config_dir = os.path.join(base_path, 'services', 'config')
+            os.makedirs(self.config_dir, exist_ok=True)
+            self.request_path = os.path.join(self.config_dir, "request.json")
+            self.resp_path = os.path.join(self.config_dir, "resp.json")
+            self.write_request()
             Thread(target=app_service_thread, daemon=True).start()
-
-        os.makedirs(self.config_dir, exist_ok=True)
-        self.request_path = os.path.join(self.config_dir, "request.json")
-        self.resp_path = os.path.join(self.config_dir, "resp.json")
+        # All generic things
+        Thread(target=self.resp_check_loop, daemon=True).start()
+        print(self.root.ids)
         print("Init success...")
 
     def start_service(self):
@@ -126,18 +139,33 @@ class OpenSmsApp(MDApp):
         mActivity = PythonActivity.mActivity
         service.stop(mActivity)
 
-    def dir_resp_checker(self):
+    def resp_check_loop(self):
         import time
+        api_srv_btn = self.root.ids.home_scr.ids.api_srv_btn
         while True:
             resp = None
             if os.path.exists(self.resp_path):
-                with open(self.resp_path, "r") as rf:
-                    resp = json.load(rf)
-                if resp:
-                    server_stat = resp.get("server", "")
-                    if server_stat == "started":
-                        if not self.api_started:
-                            self.api_started = True
+                try:
+                    with open(self.resp_path, "r") as rf:
+                        resp = json.load(rf)
+                    if resp:
+                        server_stat = resp.get("server", "")
+                        if server_stat == "started":
+                            if not self.api_started:
+                                self.api_started = True
+                                api_srv_btn.btn_icon = "stop"
+                                api_srv_btn.btn_txt = "Stop Server"
+                                api_srv_btn.md_bg_color = "orange"
+                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
+                        elif server_stat == "stopped":
+                            if self.api_started:
+                                self.api_started = False
+                                api_srv_btn.btn_icon = "play"
+                                api_srv_btn.btn_txt = "Start Server"
+                                api_srv_btn.md_bg_color = "green"
+                                Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
+                except Exception as e:
+                    print(f"Error while reading resp: {e}")
             time.sleep(2)
 
     def write_request(self):
@@ -148,7 +176,11 @@ class OpenSmsApp(MDApp):
         if not self.api_started:
             self.req_template["server"] = "start"
             self.write_request()
+        else:
+            self.req_template["server"] = "stop"
+            self.write_request()
 
+    ## App or UI related things
     def acquire_wakelock(self):
         if self.wake_lock:
             return  # already acquired
@@ -173,7 +205,40 @@ class OpenSmsApp(MDApp):
             self.wake_lock = None
             print("WakeLock released")
 
-    ## run on app exit
+    def show_toast_msg(self, message, is_error=False, duration=3):
+        from kivymd.uix.snackbar import MDSnackbar, MDSnackbarText, MDSnackbarSupportingText
+        bg_color = (0.2, 0.6, 0.2, 1) if not is_error else (0.8, 0.2, 0.2, 1)
+        MDSnackbar(
+            MDSnackbarText(
+                text=message,
+            ),
+            y=dp(24),
+            orientation="horizontal",
+            pos_hint={"center_x": 0.5},
+            background_color=bg_color,
+        ).open()
+
+    def show_text_dialog(self, title, text="", buttons=[]):
+        self.txt_dialog = MDDialog(
+            title=title,
+            text=text,
+            buttons=buttons
+        )
+        self.txt_dialog.open()
+
+    def txt_dialog_closer(self, instance):
+        if self.txt_dialog:
+            self.txt_dialog.dismiss()
+
+    # UI bar colour
+    def set_bars_colors(self):
+        set_bars_colors(
+            self.theme_cls.primary_palette,  # status bar color
+            self.theme_cls.primary_palette,  # navigation bar color
+            "Light",                         # icons color of status bar
+        )
+
+    # run on app exit
     def on_stop(self):
         print("Exiting the app...")
         if platform == "android":

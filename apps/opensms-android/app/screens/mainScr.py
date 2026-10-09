@@ -3,10 +3,19 @@ from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 
 from kivy.lang import Builder
 from kivy.uix.widget import Widget
-from kivy.properties import StringProperty, NumericProperty, ObjectProperty
+from kivy.properties import StringProperty, NumericProperty, ObjectProperty, ColorProperty
 from kivy.metrics import dp, sp
 
 Builder.load_string('''
+<ButtonControl>
+    pos_hint: {"center_x": .5}
+    theme_bg_color: "Custom"
+    md_bg_color: self.btn_colour
+    MDButtonIcon:
+        icon: root.btn_icon
+    MDButtonText:
+        text: root.btn_txt
+
 <AppHomeBox>:
     orientation: 'vertical'
     #md_bg_color: '#7643a8'
@@ -14,19 +23,14 @@ Builder.load_string('''
     padding: 8, 0, 8, 0
 
     MDLabel:
-        id: 'api_srv_lbl'
+        id: api_srv_lbl
         text: "Hello"
         adaptive_height: True
 
-    MDButton:
-        id: 'api_server_btn'
+    ButtonControl:
+        id: api_srv_btn
         style: "filled"
-        pos_hint: {"center_x": .5}
-        md_bg_color: '#7643a8'
-        MDButtonIcon:
-            icon: "play"
-        MDButtonText:
-            text: "Start Server"
+        on_release: app.api_server_mgr(self)
 
     Widget:
         size_hint_y: 1
@@ -35,3 +39,10 @@ Builder.load_string('''
 
 class AppHomeBox(MDBoxLayout):
     pass
+
+class ButtonControl(MDButton):
+    btn_icon = StringProperty("play")
+    btn_txt = StringProperty("Start Server")
+    btn_colour = "green"
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
