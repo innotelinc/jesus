@@ -17,18 +17,22 @@ MDScreen:
 
         MDTopAppBar:
             type: "small"
-            md_bg_color: '#7643a8'
+            theme_bg_color: "Custom"
+            md_bg_color: '#0a3580'
             pos_hint: {"top": 1}
 
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "menu"
+                    color: "white"
                     on_release: nav_drawer.set_state("toggle")
             MDTopAppBarTitle:
                 text: "OpenSMS"
+                color: "white"
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "dots-vertical"
+                    color: "white"
 
         MDFloatLayout:
 
@@ -40,7 +44,7 @@ MDScreen:
                     MDScreen:
                         name: "SMS"
                         AppHomeBox:
-                            id: 'home_scr'
+                            id: home_scr
 
                     MDScreen:
                         name: "Settings"

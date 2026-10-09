@@ -79,7 +79,7 @@ def app_service_thread():
     global api_started
 
     write_resp() # blank the old file
-    api_server_control("start") # api server starts automatically
+    #api_server_control("start") # api server starts automatically
 
     # keep alive the service & check for requests
     while True:
