@@ -23,7 +23,7 @@ app = FastAPI()
 # api server class with callback function
 class PosiApiServer:
 
-    def __init__(self, host="0.0.0.0", port=8089):
+    def __init__(self, host="0.0.0.0", port=9292):
         self.host = host
         self.port = port
         self.kivyCallback = None
