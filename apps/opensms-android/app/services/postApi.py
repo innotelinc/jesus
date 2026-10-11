@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import uvicorn
 from threading import Thread
 import asyncio
-from functools import partial
+#from functools import partial
 
 # local imports
 from services.smsApi import send_sms
@@ -16,6 +16,8 @@ class SmsData(BaseModel):
 
 class ControlData(BaseModel):
     api: str
+
+# debug
 
 # FastAPI app
 app = FastAPI()
