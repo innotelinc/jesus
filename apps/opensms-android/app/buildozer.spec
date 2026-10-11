@@ -59,22 +59,22 @@ requirements = python3,
     pillow, 
     plyer==2.1.0, 
     Pygments, 
-    requests, 
-    flask
-#annotated-doc==0.0.4, 
-#annotated-types==0.7.0, 
-#pydantic-core, 
-#pydantic==2.12.3, 
-#idna==3.11, 
-#anyio==4.12.1, 
-#starlette==0.52.1, 
-#typing-extensions==4.15.0, 
-#typing-inspection==0.4.2, 
-#fastapi==0.129.0, 
-#click==8.3.1, 
-#h11==0.16.0, 
-#uvicorn==0.42.0
-# pydantic==2.12.3, opentelemetry-api, fastapi==0.143.0
+    requests,
+    annotated-doc, 
+    annotated-types, 
+    pydantic-core,
+    pydantic==2.12.3,
+    idna,
+    anyio,
+    starlette,
+    typing-extensions,
+    typing-inspection,
+    opentelemetry-api,
+    fastapi,
+    click,
+    h11,
+    uvicorn
+# pydantic==2.12.3, opentelemetry-api, fastapi==0.143.0, flask
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -135,7 +135,7 @@ icon.adaptive_background.filename = %(source.dir)s/data/images/icon_bg.png
 
 # (list) Permissions
 # (See https://python-for-android.readthedocs.io/en/latest/buildoptions.html for all the supported syntaxes and properties)
-android.permissions = android.permission.SEND_SMS, android.permission.WAKE_LOCK, android.permission.FOREGROUND_SERVICE, android.permission.FOREGROUND_SERVICE_DATA_SYNC, android.permission.POST_NOTIFICATIONS
+android.permissions = android.permission.INTERNET, android.permission.SEND_SMS, android.permission.WAKE_LOCK, android.permission.FOREGROUND_SERVICE, android.permission.FOREGROUND_SERVICE_DATA_SYNC, android.permission.POST_NOTIFICATIONS
 
 # (list) features (adds uses-feature -tags to manifest)
 #android.features = android.hardware.usb.host
