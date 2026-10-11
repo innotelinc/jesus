@@ -61,12 +61,14 @@ def api_server_control(api_stat: str):
     """ Turns API server on/off """
     global api_started
     global resp_template
+    global req_data
+    print(req_data)
     if api_stat == "stop":
         app_api_server.stop()
         api_started = False
         resp_template["server"] = "stopped"
     elif api_stat == "start":
-        app_api_server.start()
+        app_api_server.start(req_data["port"])
         api_started = True
         resp_template["server"] = "started"
     Thread(target=write_resp, daemon=True).start()

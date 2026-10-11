@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 import uvicorn
-from kivy.clock import Clock
 from threading import Thread
 import asyncio
 from functools import partial
@@ -46,11 +45,11 @@ class PosiApiServer:
     # ----------------------------
     # Internal server runner
     # ----------------------------
-    def _run(self):
+    def _run(self, port=None):
         config = uvicorn.Config(
             app,
             host=self.host,
-            port=self.port,
+            port=port if port else self.port,
             log_level="info",
             loop="asyncio"
         )
@@ -61,11 +60,17 @@ class PosiApiServer:
     # ----------------------------
     # Public start
     # ----------------------------
-    def start(self):
+    def start(self, port=None):
         if self.thread and self.thread.is_alive():
             print("Server already running")
             return
-        self.thread = Thread(target=self._run, daemon=True)
+        self.thread = Thread(
+            target=self._run,
+            kwargs={
+                "port": port
+            },
+            daemon=True
+        )
         self.thread.start()
         print("FastAPI started")
 
@@ -105,9 +110,6 @@ async def process_nav_notification(item: SmsData, request: Request):
 @app.post("/control/")
 async def internal_control(item: ControlData, request: Request):
     server: PosiApiServer = request.app.state.server
-
-    if server.controlCallback:
-        Clock.schedule_once(partial(server.controlCallback, item))
 
     return item
 
