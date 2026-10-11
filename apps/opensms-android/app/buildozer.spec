@@ -27,7 +27,7 @@ source.include_exts = py,png,jpg,kv,atlas,json,java,ttf
 #source.exclude_exts = spec
 
 # (list) List of directory to exclude (leave empty to not exclude anything)
-source.exclude_dirs = tests, logs, bin, venv, build, dist, patches, .venv, venv, env, .env, p4a_local_recipes, hookers
+source.exclude_dirs = tests, logs, bin, venv, build, dist, patches, .venv, venv, env, .env, p4a_local_recipes, hookers, __pycache__, config
 
 # (list) List of exclusions using pattern matching
 # Do not prefix with './'
@@ -42,7 +42,38 @@ version.filename = %(source.dir)s/main.py
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3, kivy, kivymd, materialyoucolor==3.0.3, materialshapes, pycairo, pillow, exceptiongroup, asyncgui, asynckivy, pyjnius, android, docutils, filetype, pillow, plyer==2.1.0, Pygments, requests, annotated-doc, annotated-types, pydantic-core, pydantic==2.12.5, idna, anyio, starlette, typing-extensions, typing-inspection, opentelemetry-api, fastapi, click, h11, uvicorn
+requirements = python3, 
+    kivy, 
+    kivymd, 
+    materialyoucolor==3.0.3, 
+    materialshapes, 
+    pycairo, 
+    pillow, 
+    exceptiongroup, 
+    asyncgui, 
+    asynckivy, 
+    pyjnius, 
+    android, 
+    docutils, 
+    filetype, 
+    pillow, 
+    plyer==2.1.0, 
+    Pygments, 
+    requests, 
+    annotated-doc, 
+    annotated-types, 
+    pydantic-core, 
+    pydantic, 
+    idna, 
+    anyio, 
+    starlette, 
+    typing-extensions, 
+    typing-inspection, 
+    opentelemetry-api, 
+    fastapi, 
+    click, 
+    h11, 
+    uvicorn
 # pydantic==2.12.5, fastapi==0.129.0
 
 # (str) Custom source folders for requirements

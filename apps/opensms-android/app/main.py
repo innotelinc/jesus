@@ -22,7 +22,7 @@ from kivymd.utils.set_bars_colors import set_bars_colors
 
 # import screens (else pyinstaller may ignore it)
 from screens.mainScr import ButtonControl
-from screens.settings import SettingsScroll
+from screens.settings import SettingsBox
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -75,11 +75,11 @@ class OpenSmsApp(MDApp):
         self.wake_lock = None
         self.api_started = False
         self.config_template = {
-            "port": 8089,
+            "port": 9292,
             "boot": False,
         }
         self.req_template = {
-            "port": 8089,
+            "port": 9292,
             "server": "stop",
         }
 
@@ -107,7 +107,7 @@ class OpenSmsApp(MDApp):
                 print(f"Could not check the android SDK version: {e}")
                 #self.show_toast_msg(f"Error checking SDK: {e}", is_error=True)
             self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.POST_NOTIFICATIONS]
-            request_permissions(self.total_permissions)
+            request_permissions(self.android_permissions)
             self.internal_storage = app_storage_path()
             self.config_dir = os.path.join(self.internal_storage, 'config')
             os.makedirs(self.config_dir, exist_ok=True)
@@ -130,16 +130,23 @@ class OpenSmsApp(MDApp):
             Thread(target=app_service_thread, daemon=True).start()
         # All generic things
         self.app_config = os.path.join(self.config_dir, "config.json")
+        auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
+        port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
         if os.path.exists(self.app_config):
             with open(self.app_config, "r") as cf:
                 self.config_template = json.load(cf)
+            print(f"start config check: {self.config_template}")
             self.req_template["port"] = int(self.config_template["port"])
             start_on_launch = self.config_template["boot"]
             if start_on_launch:
                 self.req_template["server"] = "start"
+                auto_start_sw.active = True
                 Thread(target=self.write_request, daemon=True).start()
+            else:
+                auto_start_sw.active = False
         else:
             self.write_app_conf()
+        port_no_inp.text = str(self.config_template["port"])
         Thread(target=self.resp_check_loop, daemon=True).start()
         print("Init success...")
 
@@ -162,6 +169,7 @@ class OpenSmsApp(MDApp):
     def resp_check_loop(self):
         import time
         api_srv_btn = self.root.ids.home_scr.ids.api_srv_btn
+        api_srv_lbl = self.root.ids.home_scr.ids.api_srv_lbl
         while True:
             resp = None
             if os.path.exists(self.resp_path):
@@ -173,6 +181,7 @@ class OpenSmsApp(MDApp):
                         if server_stat == "started":
                             if not self.api_started:
                                 self.api_started = True
+                                api_srv_lbl.text = f"API Server running on port: {self.req_template["port"]}"
                                 api_srv_btn.btn_icon = "stop"
                                 api_srv_btn.btn_txt = "Stop Server"
                                 api_srv_btn.md_bg_color = "orange"
@@ -180,6 +189,7 @@ class OpenSmsApp(MDApp):
                         elif server_stat == "stopped":
                             if self.api_started:
                                 self.api_started = False
+                                api_srv_lbl.text = "API Server is not running"
                                 api_srv_btn.btn_icon = "play"
                                 api_srv_btn.btn_txt = "Start Server"
                                 api_srv_btn.md_bg_color = "green"
@@ -205,8 +215,42 @@ class OpenSmsApp(MDApp):
             self.write_request()
 
     ## Settings sections
-    def save_settings(self, instance=None):
-        pass
+    def save_settings(self, instance=None, control_txt="none"):
+        port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
+        flag = False
+        if control_txt == "switch":
+            if self.config_template["boot"]:
+                self.config_template["boot"] = False
+                flag = True
+            else:
+                self.config_template["boot"] = True
+                flag = True
+        if port_no_inp.text != "":
+            port_no = int(port_no_inp.text)
+            if port_no >= 1025:
+                self.config_template["port"] = port_no
+                self.req_template["port"] = port_no
+        print(f"Service on start: {self.config_template["boot"]}, port: {self.config_template["port"]}")
+        Thread(target=self.write_app_conf, daemon=True).start()
+
+    def refresh_settings_view(self):
+        auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
+        port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
+        if self.config_template["boot"]:
+            auto_start_sw.active = True
+        else:
+            auto_start_sw.active = False
+        port_no_inp.text = str(self.config_template["port"])
+
+    def reset_settings(self, instance=None):
+        self.config_template = {
+            "port": 9292,
+            "boot": False,
+        }
+        self.req_template["port"] = 9292
+        print("Settings reset has been done!")
+        self.refresh_settings_view()
+        Thread(target=self.write_app_conf, daemon=True).start()
 
     ## App or UI related things
     def acquire_wakelock(self):

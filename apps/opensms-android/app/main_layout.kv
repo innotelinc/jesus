@@ -1,6 +1,6 @@
 #:import parse_color kivy.parser.parse_color
 #:import AppHomeBox screens.mainScr.AppHomeBox
-#:import SettingsScroll screens.settings.SettingsScroll
+#:import SettingsBox screens.settings.SettingsBox
 
 <BaseMDNavigationItem>
     MDNavigationItemIcon:
@@ -49,7 +49,7 @@ MDScreen:
 
                     MDScreen:
                         name: "Settings"
-                        SettingsScroll:
+                        SettingsBox:
                             id: settings_scr
 
                 MDNavigationDrawer:

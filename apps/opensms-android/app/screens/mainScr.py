@@ -20,11 +20,12 @@ Builder.load_string('''
     orientation: 'vertical'
     #md_bg_color: '#7643a8'
     spacing: dp(8)
-    padding: 8, 0, 8, 0
+    padding: 8, 4, 8, 4
 
     MDLabel:
         id: api_srv_lbl
-        text: "Hello"
+        text: "API Server is not running"
+        halign: "center"
         adaptive_height: True
 
     ButtonControl:
