@@ -8,7 +8,7 @@ import time
 import sys
 
 # local imports
-from services.postApi import PosiApiServer
+from services.postFlask import PosiApiServer
 
 ## OS specific setups
 # for android

@@ -18,7 +18,6 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 from kivymd.uix.label import MDLabel
 from kivymd.uix.dialog import MDDialog
-from kivymd.utils.set_bars_colors import set_bars_colors
 
 # import screens (else pyinstaller may ignore it)
 from screens.mainScr import ButtonControl
@@ -86,7 +85,6 @@ class OpenSmsApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.accent_palette = "Orange"
-        self.set_bars_colors()
         return Builder.load_file(kv_file_path)
 
     ## App logics
@@ -153,7 +151,7 @@ class OpenSmsApp(MDApp):
     def start_service(self):
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
         mActivity = PythonActivity.mActivity
-        service = autoclass('in.daslearning.autocharge.ServiceOpensmssvc')
+        service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
         #argument = ''
         argument = os.environ.get('PYTHON_SERVICE_ARGUMENT', '')
         print(f"PYTHON_SERVICE_ARGUMENT: {argument}")
@@ -161,7 +159,7 @@ class OpenSmsApp(MDApp):
         service.start(mActivity, 'icon', 'OpenSMS API', 'Service Running' , argument)
 
     def stop_service(self):
-        service = autoclass('in.daslearning.autocharge.ServiceOpensmssvc')
+        service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
         PythonActivity = autoclass('org.kivy.android.PythonActivity')
         mActivity = PythonActivity.mActivity
         service.stop(mActivity)
@@ -170,6 +168,7 @@ class OpenSmsApp(MDApp):
         import time
         api_srv_btn = self.root.ids.home_scr.ids.api_srv_btn
         api_srv_lbl = self.root.ids.home_scr.ids.api_srv_lbl
+        time.sleep(0.5) # A delay for the android service to kick in
         while True:
             resp = None
             if os.path.exists(self.resp_path):
@@ -302,13 +301,7 @@ class OpenSmsApp(MDApp):
         if self.txt_dialog:
             self.txt_dialog.dismiss()
 
-    # UI bar colour
-    def set_bars_colors(self):
-        set_bars_colors(
-            self.theme_cls.primary_palette,  # status bar color
-            self.theme_cls.primary_palette,  # navigation bar color
-            "Light",                         # icons color of status bar
-        )
+    # UI bar colou
 
     # run on app exit
     def on_stop(self):
