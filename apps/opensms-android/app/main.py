@@ -20,6 +20,10 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.dialog import MDDialog
 from kivymd.utils.set_bars_colors import set_bars_colors
 
+# import screens (else pyinstaller may ignore it)
+from screens.mainScr import ButtonControl
+from screens.settings import SettingsScroll
+
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
 
@@ -70,7 +74,12 @@ class OpenSmsApp(MDApp):
         self.txt_dialog = None
         self.wake_lock = None
         self.api_started = False
+        self.config_template = {
+            "port": 8089,
+            "boot": False,
+        }
         self.req_template = {
+            "port": 8089,
             "server": "stop",
         }
 
@@ -80,6 +89,7 @@ class OpenSmsApp(MDApp):
         self.set_bars_colors()
         return Builder.load_file(kv_file_path)
 
+    ## App logics
     def on_start(self):
         # paths setup
         file_m_height = 1
@@ -119,8 +129,18 @@ class OpenSmsApp(MDApp):
             self.write_request()
             Thread(target=app_service_thread, daemon=True).start()
         # All generic things
+        self.app_config = os.path.join(self.config_dir, "config.json")
+        if os.path.exists(self.app_config):
+            with open(self.app_config, "r") as cf:
+                self.config_template = json.load(cf)
+            self.req_template["port"] = int(self.config_template["port"])
+            start_on_launch = self.config_template["boot"]
+            if start_on_launch:
+                self.req_template["server"] = "start"
+                Thread(target=self.write_request, daemon=True).start()
+        else:
+            self.write_app_conf()
         Thread(target=self.resp_check_loop, daemon=True).start()
-        print(self.root.ids)
         print("Init success...")
 
     def start_service(self):
@@ -168,9 +188,13 @@ class OpenSmsApp(MDApp):
                     print(f"Error while reading resp: {e}")
             time.sleep(2)
 
+    def write_app_conf(self):
+        with open(self.app_config, "w") as cf:
+            json.dump(self.config_template, cf)
+
     def write_request(self):
-        with open(self.request_path, "w") as cf:
-            json.dump(self.req_template, cf)
+        with open(self.request_path, "w") as rf:
+            json.dump(self.req_template, rf)
 
     def api_server_mgr(self, instance=None):
         if not self.api_started:
@@ -179,6 +203,10 @@ class OpenSmsApp(MDApp):
         else:
             self.req_template["server"] = "stop"
             self.write_request()
+
+    ## Settings sections
+    def save_settings(self, instance=None):
+        pass
 
     ## App or UI related things
     def acquire_wakelock(self):
