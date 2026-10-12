@@ -1,4 +1,6 @@
-
+#:import parse_color kivy.parser.parse_color
+#:import AppHomeBox screens.mainScr.AppHomeBox
+#:import SettingsBox screens.settings.SettingsBox
 
 <BaseMDNavigationItem>
     MDNavigationItemIcon:
@@ -10,24 +12,32 @@ MDScreen:
     md_bg_color: self.theme_cls.backgroundColor
 
     MainScreenBox: # main container
+        id: main_scr_box
         orientation: 'vertical'
+        #padding: 0 , self.top_pad, 0, 0
         #spacing: dp(4)
 
         MDTopAppBar:
             type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: '#0a3580'
             pos_hint: {"top": 1}
 
             MDTopAppBarLeadingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "menu"
+                    color: "white"
                     on_release: nav_drawer.set_state("toggle")
             MDTopAppBarTitle:
                 text: "OpenSMS"
+                color: "white"
             MDTopAppBarTrailingButtonContainer:
                 MDActionTopAppBarButton:
                     icon: "dots-vertical"
+                    color: "white"
 
         MDFloatLayout:
+            padding: 0, 0, 0, main_scr_box.bottom_pad
 
             MDNavigationLayout:
 
@@ -36,13 +46,13 @@ MDScreen:
 
                     MDScreen:
                         name: "SMS"
-                        MDLabel:
-                            text: "Hello"
+                        AppHomeBox:
+                            id: home_scr
 
                     MDScreen:
                         name: "Settings"
-                        MDLabel:
-                            text: "Again"
+                        SettingsBox:
+                            id: settings_scr
 
                 MDNavigationDrawer:
                     id: nav_drawer
