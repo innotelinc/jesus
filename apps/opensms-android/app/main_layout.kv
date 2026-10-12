@@ -12,8 +12,9 @@ MDScreen:
     md_bg_color: self.theme_cls.backgroundColor
 
     MainScreenBox: # main container
+        id: main_scr_box
         orientation: 'vertical'
-        padding: 0, self.top_pad, 0, self.bottom_pad
+        #padding: 0 , self.top_pad, 0, 0
         #spacing: dp(4)
 
         MDTopAppBar:
@@ -36,6 +37,7 @@ MDScreen:
                     color: "white"
 
         MDFloatLayout:
+            padding: 0, 0, 0, main_scr_box.bottom_pad
 
             MDNavigationLayout:
 

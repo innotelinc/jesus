@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException #, Depends
+#from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import uvicorn
 from threading import Thread
@@ -91,10 +92,29 @@ class PosiApiServer:
 
 # handle post requests
 @app.post("/sms/")
-async def process_nav_notification(item: SmsData, request: Request):
+async def process_sms_req(
+    item: SmsData,
+    request: Request,
+):
     server: PosiApiServer = request.app.state.server
-    stat = send_sms(item.number, item.text)
 
+    auth_header = request.headers.get("Authorization")
+    auth_flag_err = False
+    if not auth_header or not auth_header.startswith("Bearer "):
+        auth_flag_err = True
+    else:
+        token = auth_header.split(" ", 1)[1].strip()
+        if token != "opensms-secret": # will be from internal db
+            auth_flag_err = True
+    if auth_flag_err:
+        print(f"Unauthorized user req for sms!")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    stat = send_sms(item.number, item.text)
     if stat:
         print(f"SMS successfully sent to: {item.number}")
 

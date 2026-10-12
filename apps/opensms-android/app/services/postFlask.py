@@ -94,7 +94,7 @@ class PosiApiServer:
 # Handle POST requests
 # ----------------------------
 @app.post("/sms/")
-def process_nav_notification():
+def process_sms_req():
     server: PosiApiServer = app.extensions[
         "posi_api_server"
     ]
