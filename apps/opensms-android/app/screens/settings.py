@@ -1,6 +1,8 @@
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
+from kivymd.uix.textfield import MDTextField, MDTextFieldTrailingIcon
 
 from kivy.lang import Builder
 from kivy.uix.widget import Widget
@@ -8,6 +10,13 @@ from kivy.properties import StringProperty, NumericProperty, ObjectProperty, Col
 from kivy.metrics import dp, sp
 
 Builder.load_string('''
+
+<ApiKeyTxtbox>:
+    mode: "outlined"
+    readonly: True
+    #MDTextFieldTrailingIcon:
+    #    icon: "content-copy"
+    #    on_release: app.copy_api_key()
 
 <SettingsBox>:
     orientation: "vertical"
@@ -25,7 +34,7 @@ Builder.load_string('''
             md_bg_color: "green"
             on_release: app.save_settings(self)
             MDButtonIcon:
-                icon: "file"
+                icon: "floppy"
                 color: "white"
             MDButtonText:
                 text: "Save"
@@ -52,11 +61,11 @@ Builder.load_string('''
 
             MDListItem:
                 MDListItemLeadingIcon:
-                    icon: "android"
+                    icon: "rocket-launch"
                 MDListItemHeadlineText:
                     text: "Auto Start API Server"
                 MDListItemSupportingText:
-                    text: "API server starts as soon as app is launched"
+                    text: "Starts when app is launched"
                 #MDListItemTertiaryText:
                 #    text: "Tertiary text"
                 MDSwitch:
@@ -75,7 +84,7 @@ Builder.load_string('''
                 MDListItemHeadlineText:
                     text: "Port Number"
                 MDListItemSupportingText:
-                    text: "Restart API server after saving"
+                    text: "Needs a Stop-Start"
                 MDListItemTertiaryText:
                     text: "Should be > 1024"
                 MDTextField:
@@ -83,8 +92,27 @@ Builder.load_string('''
                     mode: "filled"
                     input_filter: 'int'
 
+            MDListItem:
+                MDListItemLeadingIcon:
+                    icon: "key"
+                MDListItemHeadlineText:
+                    text: "API Key"
+                MDListItemSupportingText:
+                    text: "Generate New API Key"
+                MDListItemTertiaryText:
+                    text: "Old key will not work"
+                MDFabButton:
+                    icon: "autorenew"
+                    style: "small"
+                    theme_bg_color: "Custom"
+                    md_bg_color: "orange"
+                    pos_hint: {'center_y': 0.5}
+                    on_release: app.new_api_key_pop()
+
 ''')
 
 class SettingsBox(MDBoxLayout):
     pass
 
+class ApiKeyTxtbox(MDTextField):
+    pass

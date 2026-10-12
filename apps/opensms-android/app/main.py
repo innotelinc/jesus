@@ -4,6 +4,8 @@ import sys
 import json
 from threading import Thread
 
+from kivy.uix.widget import Widget
+from kivy.core.clipboard import Clipboard
 from kivy.lang import Builder
 from kivy.core.window import Window
 from kivy.utils import platform
@@ -11,17 +13,21 @@ from kivy.metrics import dp, sp
 from kivy.clock import Clock
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty, ColorProperty
 
+from kivymd.uix.widget import MDWidget
 from kivymd.app import MDApp
 from kivymd.uix.navigationbar import MDNavigationBar, MDNavigationItem
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
-from kivymd.uix.label import MDLabel
-from kivymd.uix.dialog import MDDialog
+#from kivymd.uix.label import MDLabel
+from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupportingText, MDDialogButtonContainer, MDDialogContentContainer
 
 # import screens (else pyinstaller may ignore it)
 from screens.mainScr import ButtonControl
-from screens.settings import SettingsBox
+from screens.settings import SettingsBox, ApiKeyTxtbox
+
+# import services
+from services.postApi import get_api_keys, set_config_path, generate_new_api_key
 
 # IMPORTANT: Set this property for keyboard behavior
 Window.softinput_mode = "below_target"
@@ -73,6 +79,8 @@ class OpenSmsApp(MDApp):
         self.txt_dialog = None
         self.wake_lock = None
         self.api_started = False
+        self.key_exists = False
+        self.api_key = None
         self.config_template = {
             "port": 9292,
             "boot": False,
@@ -129,6 +137,7 @@ class OpenSmsApp(MDApp):
             self.write_request()
             Thread(target=app_service_thread, daemon=True).start()
         # All generic things
+        set_config_path(self.config_dir)
         self.app_config = os.path.join(self.config_dir, "config.json")
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
@@ -147,6 +156,9 @@ class OpenSmsApp(MDApp):
         else:
             self.write_app_conf()
         port_no_inp.text = str(self.config_template["port"])
+        api_keys = get_api_keys()
+        if len(api_keys) >= 1:
+            self.key_exists = True
         Thread(target=self.resp_check_loop, daemon=True).start()
         print("Init success...")
 
@@ -208,12 +220,97 @@ class OpenSmsApp(MDApp):
             json.dump(self.req_template, rf)
 
     def api_server_mgr(self, instance=None):
-        if not self.api_started:
-            self.req_template["server"] = "start"
-            self.write_request()
+        key_ok = self.check_if_key_exists()
+        if key_ok:
+            if not self.api_started:
+                self.req_template["server"] = "start"
+                self.write_request()
+            else:
+                self.req_template["server"] = "stop"
+                self.write_request()
         else:
-            self.req_template["server"] = "stop"
-            self.write_request()
+            self.new_api_key_pop()
+
+    def check_if_key_exists(self):
+        api_keys = get_api_keys()
+        if len(api_keys) >= 1:
+            self.key_exists = True
+        else:
+            self.key_exists = False
+        return self.key_exists
+
+    def new_api_key_pop(self):
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(
+                MDButtonText(
+                    text="Cancel"
+                ),
+                style="text",
+                on_release=self.txt_dialog_closer
+            ),
+            MDButton(
+                MDButtonText(
+                    text="Generate",
+                    theme_text_color= "Custom",
+                    text_color= "green"
+                ),
+                style="text",
+                on_release=self.create_new_api_key
+            ),
+            spacing="8dp",
+        )
+        self.show_text_dialog(
+            "Generate API Key",
+            "Do you want to generate the a new API key? This will make old keys invalid.",
+            None,
+            buttons
+        )
+
+    def create_new_api_key(self, instance=None):
+        self.txt_dialog_closer()
+        self.api_key = generate_new_api_key()
+        if self.api_key:
+            Clipboard.copy(self.api_key)
+            custom = MDDialogContentContainer(
+                ApiKeyTxtbox(
+                    text = self.api_key
+                )
+            )
+            buttons = MDDialogButtonContainer(
+                Widget(),
+                MDButton(
+                    MDButtonText(
+                        text="Cancel"
+                    ),
+                    style="text",
+                    on_release=self.txt_dialog_closer
+                ),
+                MDButton(
+                    MDButtonText(
+                        text="Copy",
+                        theme_text_color= "Custom",
+                        text_color= "green"
+                    ),
+                    style="text",
+                    on_release=self.copy_api_key
+                ),
+                spacing="8dp",
+            )
+            self.show_text_dialog(
+                "Your New API Key",
+                "The key is already copied, you can paste anywhere. This screen appears only once, make sure you copy the key securely!",
+                custom,
+                buttons
+            )
+        else:
+            Clock.schedule_once(lambda dt: self.show_toast_msg("Failed to generate API key, try again!", is_error=True))
+
+    def copy_api_key(self, instance=None):
+        if self.api_key:
+            Clipboard.copy(self.api_key)
+        self.txt_dialog_closer()
+        Clock.schedule_once(lambda dt: self.show_toast_msg("API Key has been copied, store it securely."))
 
     ## Settings sections
     def save_settings(self, instance=None, control_txt="none"):
@@ -293,19 +390,35 @@ class OpenSmsApp(MDApp):
             background_color=bg_color,
         ).open()
 
-    def show_text_dialog(self, title, text="", buttons=[]):
+    def show_text_dialog(
+            self, 
+            title, 
+            text="", 
+            custom_content:MDDialogContentContainer|None = None, 
+            buttons:MDDialogButtonContainer|None = None
+        ):
         self.txt_dialog = MDDialog(
-            title=title,
-            text=text,
-            buttons=buttons
+            MDDialogHeadlineText(
+                text = title
+            ),
+            MDDialogSupportingText(
+                text = text
+            ),
+            custom_content,
+            buttons
         )
         self.txt_dialog.open()
 
-    def txt_dialog_closer(self, instance):
+    def txt_dialog_closer(self, instance=None):
         if self.txt_dialog:
             self.txt_dialog.dismiss()
 
-    # UI bar colou
+    def goto_app_settings(self, instance=None):
+        self.txt_dialog_closer()
+        self.go_to_screen("Settings")
+
+    def go_to_screen(self, screen:str):
+        self.root.ids.screen_manager.current = screen
 
     # run on app exit
     def on_stop(self):
