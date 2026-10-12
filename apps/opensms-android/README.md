@@ -6,7 +6,7 @@ An open-source app which can turn your `Android` phone into a `SMS API Server`.
 ```bash
 curl -i -X POST 'http://127.0.0.1:9292/sms/' \
     -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer opensms-secret' \
+    -H 'Authorization: Bearer my-secret-api-key' \
     -d '{"number": "+1234567890", "text": "Hello from OpenSMS API!"}'
 ```
 
