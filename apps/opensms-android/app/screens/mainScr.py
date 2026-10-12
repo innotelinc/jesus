@@ -5,6 +5,7 @@ from kivy.lang import Builder
 from kivy.uix.widget import Widget
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, ColorProperty
 from kivy.metrics import dp, sp
+from kivy.utils import platform
 
 Builder.load_string('''
 <ButtonControl>
@@ -20,7 +21,7 @@ Builder.load_string('''
     orientation: 'vertical'
     #md_bg_color: '#7643a8'
     spacing: dp(8)
-    padding: 8, 4, 8, 4
+    padding: 8, 2, 8, 2
 
     MDLabel:
         id: api_srv_lbl
@@ -44,6 +45,17 @@ class AppHomeBox(MDBoxLayout):
 class ButtonControl(MDButton):
     btn_icon = StringProperty("play")
     btn_txt = StringProperty("Start Server")
+    top_pad = NumericProperty(0)
+    bottom_pad = NumericProperty(0)
     btn_colour = "green"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        if platform == "android":
+            try:
+                from android.display_cutout import get_height_of_bar
+                self.top_pad = int(get_height_of_bar('status'))
+                self.bottom_pad = int(get_height_of_bar('navigation'))
+            except Exception as e:
+                print(f"Failed android 15 padding: {e}")
+                self.top_pad = 32
+                self.bottom_pad = 48
