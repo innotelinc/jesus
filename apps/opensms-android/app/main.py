@@ -111,7 +111,9 @@ class OpenSmsApp(MDApp):
             os.makedirs(self.config_dir, exist_ok=True)
             self.request_path = os.path.join(self.config_dir, "request.json")
             self.resp_path = os.path.join(self.config_dir, "resp.json")
-            self.write_request()
+            if os.path.exists(self.resp_path):
+                os.remove(self.resp_path) # cleans the resp
+            self.write_request() # cleans the request file
             # start the listner service on Android
             try:
                 self.start_service()
@@ -231,6 +233,7 @@ class OpenSmsApp(MDApp):
                 self.req_template["port"] = port_no
         print(f"Service on start: {self.config_template["boot"]}, port: {self.config_template["port"]}")
         Thread(target=self.write_app_conf, daemon=True).start()
+        Clock.schedule_once(lambda dt: self.show_toast_msg("Settings has been saved."))
 
     def refresh_settings_view(self):
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
@@ -250,6 +253,7 @@ class OpenSmsApp(MDApp):
         print("Settings reset has been done!")
         self.refresh_settings_view()
         Thread(target=self.write_app_conf, daemon=True).start()
+        Clock.schedule_once(lambda dt: self.show_toast_msg("Settings reset has been done!"))
 
     ## App or UI related things
     def acquire_wakelock(self):
