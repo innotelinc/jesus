@@ -1,15 +1,66 @@
 import hashlib
 import secrets
+import asyncio
+from threading import Thread
+import sys
+from os.path import dirname, abspath, join, exists
+import json
+#from functools import partial
+
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import uvicorn
-from threading import Thread
-import asyncio
-#from functools import partial
 
 # local imports
 from services.smsApi import send_sms
+
+## global vars / obj
+
+# Set the path
+if getattr(sys, 'frozen', False):
+    # Running as a PyInstaller bundle
+    base_path = sys._MEIPASS
+else:
+    # Running in a normal Python environment
+    base_path = dirname(abspath(__file__))
+config_dir = join(base_path, 'config')
+
+## Functions
+
+def set_config_path(config_path:str):
+    global config_dir
+    config_dir = config_path
+
+def hash_api_key(raw_key: str) -> str:
+    """Hash the raw key using SHA-256."""
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+def generate_new_api_key() -> str:
+    # Generate a high-entropy secret token
+    new_raw_key = secrets.token_urlsafe(32)
+    new_raw_key = f"osms_{new_raw_key}"
+    # Hash and store in your DB
+    new_hashed_key = hash_api_key(new_raw_key)
+    app_api_keys = {
+        new_hashed_key: {
+            "name": "opensms",
+            "scopes": ["sms:write"]
+        }
+    }
+    keys_path = join(config_dir, "keys.json")
+    with open(keys_path, "w") as kf:
+        json.dump(app_api_keys, kf)
+    print("Created/updated the API key")
+    return new_raw_key
+
+def get_api_keys() -> dict:
+    keys_path = join(config_dir, "keys.json")
+    api_keys = {}
+    if exists(keys_path):
+        with open(keys_path, "r") as kf:
+            api_keys = json.load(kf)
+    return api_keys
 
 # data formatting for request
 class SmsData(BaseModel):
@@ -19,8 +70,6 @@ class SmsData(BaseModel):
 
 class ControlData(BaseModel):
     api: str
-
-# debug
 
 # FastAPI app
 app = FastAPI()
@@ -93,17 +142,7 @@ class PosiApiServer:
         self.thread = None
         print("FastAPI stopped")
 
-STORED_API_KEYS = {
-    # SHA-256 hash of "my-secret-api-key"
-    "325ededd6c3b9988f623c7f964abb9b016b76b0f8b3474df0f7d7c23b941381f": {
-        "client_name": "DasLearning",
-        "scopes": ["sms:write"],
-    }
-}
-
-def hash_api_key(raw_key: str) -> str:
-    """Hash the raw key using SHA-256."""
-    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+# handle post requests
 
 async def verify_api_key(
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -112,7 +151,8 @@ async def verify_api_key(
     hashed_token = hash_api_key(raw_token)
 
     # 1. Lookup candidate in DB by hash
-    client_info = STORED_API_KEYS.get(hashed_token)
+    app_api_keys = get_api_keys()
+    client_info = app_api_keys.get(hashed_token)
 
     # 2. Timing-safe comparison against stored hash
     if not client_info or not secrets.compare_digest(
@@ -125,7 +165,6 @@ async def verify_api_key(
         )
     return client_info
 
-# handle post requests
 @app.post("/sms/")
 async def process_sms_req(
     item: SmsData,
@@ -153,16 +192,6 @@ async def process_sms_req(
 async def internal_control(item: ControlData, request: Request):
     server: PosiApiServer = request.app.state.server
     return item
-
-def generate_new_api_key():
-    # Generate a high-entropy secret token
-    new_raw_key = secrets.token_urlsafe(32)
-
-    # Hash and store in your DB
-    new_hashed_key = hashlib.sha256(new_raw_key.encode("utf-8")).hexdigest()
-
-    print(f"Give this to the client (once): {new_raw_key}")
-    print(f"Save this in your database:     {new_hashed_key}")
 
 # test locally
 if __name__ == "__main__":

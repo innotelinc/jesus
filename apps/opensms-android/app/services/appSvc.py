@@ -8,7 +8,7 @@ import time
 import sys
 
 # local imports
-from services.postApi import PosiApiServer
+from services.postApi import PosiApiServer, set_config_path
 
 ## OS specific setups
 # for android
@@ -29,6 +29,7 @@ config_dir = join(base_path, 'config')
 if not exists(config_dir):
     import os
     os.makedirs(config_dir, exist_ok=True)
+set_config_path(config_dir)
 req_file = join(config_dir, "request.json")
 resp_file = join(config_dir, "resp.json")
 
