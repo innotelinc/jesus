@@ -1,5 +1,7 @@
-from fastapi import FastAPI, Request, HTTPException #, Depends
-#from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import hashlib
+import secrets
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import uvicorn
 from threading import Thread
@@ -22,6 +24,7 @@ class ControlData(BaseModel):
 
 # FastAPI app
 app = FastAPI()
+security = HTTPBearer()
 
 # api server class with callback function
 class PosiApiServer:
@@ -90,29 +93,46 @@ class PosiApiServer:
         self.thread = None
         print("FastAPI stopped")
 
+STORED_API_KEYS = {
+    # SHA-256 hash of "my-secret-api-key"
+    "325ededd6c3b9988f623c7f964abb9b016b76b0f8b3474df0f7d7c23b941381f": {
+        "client_name": "DasLearning",
+        "scopes": ["sms:write"],
+    }
+}
+
+def hash_api_key(raw_key: str) -> str:
+    """Hash the raw key using SHA-256."""
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+async def verify_api_key(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    raw_token = credentials.credentials
+    hashed_token = hash_api_key(raw_token)
+
+    # 1. Lookup candidate in DB by hash
+    client_info = STORED_API_KEYS.get(hashed_token)
+
+    # 2. Timing-safe comparison against stored hash
+    if not client_info or not secrets.compare_digest(
+        hashed_token,
+        hash_api_key(raw_token)
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired API key",
+        )
+    return client_info
+
 # handle post requests
 @app.post("/sms/")
 async def process_sms_req(
     item: SmsData,
     request: Request,
+    client: dict = Depends(verify_api_key)
 ):
     server: PosiApiServer = request.app.state.server
-
-    auth_header = request.headers.get("Authorization")
-    auth_flag_err = False
-    if not auth_header or not auth_header.startswith("Bearer "):
-        auth_flag_err = True
-    else:
-        token = auth_header.split(" ", 1)[1].strip()
-        if token != "opensms-secret": # will be from internal db
-            auth_flag_err = True
-    if auth_flag_err:
-        print(f"Unauthorized user req for sms!")
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
     stat = send_sms(item.number, item.text)
     if stat:
@@ -132,8 +152,17 @@ async def process_sms_req(
 @app.post("/control/")
 async def internal_control(item: ControlData, request: Request):
     server: PosiApiServer = request.app.state.server
-
     return item
+
+def generate_new_api_key():
+    # Generate a high-entropy secret token
+    new_raw_key = secrets.token_urlsafe(32)
+
+    # Hash and store in your DB
+    new_hashed_key = hashlib.sha256(new_raw_key.encode("utf-8")).hexdigest()
+
+    print(f"Give this to the client (once): {new_raw_key}")
+    print(f"Save this in your database:     {new_hashed_key}")
 
 # test locally
 if __name__ == "__main__":
