@@ -3,6 +3,80 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.21 — Piper is the local voice
+
+Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to
+Piper, chosen on a measurement rather than a preference.
+
+### Piper is ~2.5× faster than Kokoro on this host, and needs no second container
+
+- **Measured, same host, both engines healthy, `response_format=pcm`, 3 runs of
+  the same sentence:** Piper RTF **0.27 / 0.35 / 0.28**, Kokoro **0.70 / 0.84 /
+  0.80**. Piper's voice is an ONNX model loaded in-process by `tts-shim`, so it
+  costs no extra container — the reason the move also helps the memory posture
+  the host-move runbook documents (`kokoro-fastapi` boots ~4 GiB and crash-loops
+  inside a 5.5 GiB cap).
+- **New default:** `TTS_SHIM_DEFAULT_ENGINE=piper` (compose default and
+  `.env.example`), `TTS_SHIM_ENGINES=piper`,
+  `TTS_SHIM_PIPER_VOICE=en_US-amy-medium.onnx`. With the Piper voice absent the
+  default engine still falls back to the first *available* engine rather than
+  503ing, so a deployment that has not fetched a voice keeps answering.
+- **The live organization was re-pointed, not just the defaults.** dograh's
+  model configuration had `tts.settings.model = kokoro`; it is now `piper`
+  (`PATCH /api/v1/model-connections/model-configurations/{uuid}`, revision
+  2 → 3). Verified through the shim: a request naming no engine returns
+  `X-TTS-Engine: piper`, and `GET /health` reports `"default_engine":"piper"`.
+- **`scripts/dograh_wire.py` names Piper.** `DEFAULT_TTS_MODEL=piper`,
+  `DEFAULT_TTS_VOICE=en_US-amy-medium`; `KOKORO_TTS_PROVIDER`,
+  `kokoro_tts_problem` and `with_kokoro_tts` are renamed `SHIM_TTS_PROVIDER`,
+  `shim_tts_problem`, `with_shim_tts` (the engine is a configuration choice, not
+  the shim's identity), and the test moved to
+  `scripts/tests/test_dograh_wire_tts.py`.
+### Kokoro is retired, and the shim can no longer answer as it
+
+- **The container is stopped and behind a profile.** `kokoro-fastapi` is
+  `Exited (0)` and the compose service now carries `profiles: ["kokoro"]`, so a
+  plain `up` does not start it; the host unit's `ExecStart` service list no
+  longer names it either, so a reboot cannot bring it back. Start it only to A/B:
+  `docker compose --profile kokoro up -d kokoro`.
+- **`TTS_SHIM_ENGINES` now decides which engines exist.** The shim registered
+  Kokoro unconditionally before, so retiring the service would have left
+  `/v1/models` advertising an engine whose upstream was down. It now registers
+  only the engines the list names, and a request for a *retired* engine (`kokoro`
+  left out) gets **503**, not another engine's audio — otherwise "kokoro" would
+  keep working as a silent alias for Piper and hide the misconfiguration. A
+  genuinely unknown model string still falls back, as before.
+- **`scripts/smoke-test.sh` and `scripts/gen_loops.py` moved off it.** The smoke
+  test's TTS round-trip now drives the shim (PCM + `X-TTS-Engine: piper`) and
+  wraps that PCM into a WAV for the STT half; `gen_loops.py` reads the shim's
+  PCM and builds the 24 kHz WAV itself. Measured: one track generated end to end
+  (6.07 MB, 126.5 s).
+
+### The voice reconcile works again — and now against the API the server serves
+
+- **`dograh_wire.py` was reading a retired endpoint.** It called
+  `…/organizations/model-configurations/v2` (the byok shape), which the deployed
+  API no longer serves, so step 3c reported `model configuration unreadable` and
+  wrote nothing. It now uses the `model-connections` API the server actually
+  exposes: `GET /model-connections/provider-connections`, `GET
+  /model-connections/default` → `GET/PATCH
+  /model-connections/model-configurations/{uuid}` (shape v3, where a role names
+  a provider *connection* and the address lives on that connection). The pure
+  helpers were reshaped to match — `shim_connection` picks the shim's connection
+  by address (the 24 kHz STT connection is the same provider), and
+  `shim_tts_problem`/`with_shim_tts` check and write the v3 role.
+- **Verified live, both directions:** `--check` reports `PASS TTS is piper
+  through the local shim`; and with the configuration deliberately set back to
+  `kokoro`, a real run re-pointed it — `PASS TTS re-pointed at piper … — was
+  TTS model is 'kokoro', not 'piper'` (revision 4 → 5).
+- **Zeus reads the same API now.** `lib/dograh.ts`'s `getVoiceStack()` posted to
+  the removed v2 endpoint too; it now calls `POST
+  /api/v1/model-connections/resolve` (no override) and maps the resolved
+  services to the same flat shape, so the Voice screens and `/api/health`
+  describe the voice in force again. Verified against the live engine: `state:
+  ok`, `tts: {provider: speaches, model: piper, voice: en_US-amy-medium}`,
+  `llm: {provider: openai, base_url: http://192.168.1.71:20128/v1}`.
+
 ## v3.20 — SIP registration bans, a PBX that stops burning a core, and a backup for the host move
 
 Work landed after the `v3.19` tag: host-side SIP registration bans for a PBX
@@ -12,6 +86,31 @@ Agents page that stopped paying one PBX round trip per agent, per row, a portal
 link that pointed at a container this stack does not start, and a voice stack
 whose running images had not all caught up with this repo's patches — the UI had
 none of them, and the API was one behind.
+
+### The ONNX Kokoro is installable, and the shim can dial it
+
+- **New: `scripts/install-onnx-kokoro.sh`.** The stack had no way to install the
+  ONNX Kokoro TTS model, so the only local TTS runtime was the `kokoro` service's
+  PyTorch build — the one whose boot spike OOMs on a small host. The script
+  fetches `speaches-ai/Kokoro-82M-v1.0-ONNX` into `speaches` (onnxruntime 1.22,
+  already on `speaches_models`), then *proves* it by synthesizing a sentence;
+  `--check` reports without changing anything. Measured on this host: installed,
+  synthesized 83968 bytes of PCM, exit 0.
+- **The claim that kokoro-fastapi "owns the ONNX runtime" was wrong.**
+  `ghcr.io/remsky/kokoro-fastapi-cpu:v0.9.0` is PyTorch-only — no
+  `onnxruntime`, no ONNX inference path, model `kokoro-v1_0.pth`, loader
+  `kokoro.KModel` — so installing onnxruntime into it would be inert. The
+  compose comment and the tts-shim README now say so, and name `speaches` as
+  the ONNX host instead.
+- **New: `TTS_SHIM_KOKORO_MODEL`.** The shim hard-coded `"model": "kokoro"`
+  upstream, which is fine for kokoro-fastapi (it serves one model and ignores
+  the id) but not for a host that serves several: `speaches` rejects `kokoro`
+  and needs the full id. Setting `TTS_SHIM_KOKORO_URL=http://speaches:8000` +
+  `TTS_SHIM_KOKORO_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX` moves TTS onto
+  onnxruntime; the default (`http://kokoro-fastapi:8880`, `kokoro`) is
+  unchanged, so an existing deployment keeps the torch engine until it opts in.
+  Verified both ways: the default shim still answers (200, 106598 PCM bytes),
+  and an ONNX-configured copy answers through `speaches` (200, 82944 bytes).
 
 ### The portal link points at Zeus, and the dashboard's lint is real
 

@@ -292,14 +292,13 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════
 if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
   section "Main stack — containers"
-  for svc in postgres redis minio dograh-api dograh-ui kokoro speaches omniroute n8n grist \
+  for svc in postgres redis minio dograh-api dograh-ui speaches omniroute n8n grist \
              otel-collector prometheus grafana tts-shim dashboard-api dashboard; do
     check_container "$COMPOSE_MAIN" "$svc"
   done
   check_exit_code "$COMPOSE_MAIN" n8n-import
 
   section "Main stack — HTTP endpoints"
-  check_http "Kokoro TTS /health"       200 "http://127.0.0.1:8880/health"
   check_http "Speaches STT /health"     200 "http://127.0.0.1:8001/health"
   check_http "Dograh API /health"       200 "http://127.0.0.1:8000/api/v1/health"
   check_http "Dograh UI :3010"          200 "http://127.0.0.1:3010/" -L
@@ -362,17 +361,33 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "main" ]]; then
 
   section "Main stack — round-trips"
 
-  # 1. Kokoro TTS → WAV
+  # 1. Local TTS → PCM through the shim (Piper is the voice; Kokoro is retired
+  # and behind the `kokoro` profile). The shim streams PCM only — no WAV — so
+  # the round-trip checks the bytes and the engine header, then wraps the PCM
+  # into a WAV for the STT half, which needs a container.
+  TTS_PCM="$(mktemp --suffix=.pcm)"
+  TTS_HDR="$(mktemp)"
   TTS_WAV="$(mktemp --suffix=.wav)"
-  tts_code=$(curl -sS -o "$TTS_WAV" -w '%{http_code}' --max-time 60 \
-    http://127.0.0.1:8880/v1/audio/speech \
+  tts_code=$(curl -sS -o "$TTS_PCM" -D "$TTS_HDR" -w '%{http_code}' --max-time 60 \
+    http://127.0.0.1:8881/v1/audio/speech \
     -H 'Content-Type: application/json' \
-    -d '{"model":"kokoro","input":"Welcome to your technical interview.","voice":"af_heart","response_format":"wav"}' 2>/dev/null)
-  if [[ "$tts_code" == "200" ]] && [[ -s "$TTS_WAV" ]] && [[ "$(head -c 4 "$TTS_WAV")" == "RIFF" ]]; then
-    pass "Kokoro TTS round-trip → ${C_BOLD}$(wc -c < "$TTS_WAV") bytes${C_NC} WAV"
+    -d '{"model":"piper","input":"Welcome to your technical interview.","response_format":"pcm"}' 2>/dev/null)
+  tts_engine=$(tr -d '\r' < "$TTS_HDR" | awk 'tolower($1)=="x-tts-engine:"{print $2}')
+  if [[ "$tts_code" == "200" ]] && [[ -s "$TTS_PCM" ]] && [[ "$tts_engine" == "piper" ]]; then
+    pass "Local TTS (Piper) round-trip → ${C_BOLD}$(wc -c < "$TTS_PCM") bytes${C_NC} PCM at 24 kHz"
   else
-    fail "Kokoro TTS round-trip → HTTP '$tts_code', file $(wc -c < "$TTS_WAV" 2>/dev/null || echo 0) bytes"
+    fail "Local TTS round-trip → HTTP '$tts_code', engine '$tts_engine', $(wc -c < "$TTS_PCM" 2>/dev/null || echo 0) bytes"
   fi
+  python3 - "$TTS_PCM" "$TTS_WAV" <<'PY'
+import sys, wave
+with open(sys.argv[1], "rb") as src:
+    pcm = src.read()
+with wave.open(sys.argv[2], "wb") as wav:
+    wav.setnchannels(1)
+    wav.setsampwidth(2)
+    wav.setframerate(24000)
+    wav.writeframes(pcm)
+PY
 
   # 2. Speaches STT ← same WAV
   stt_body=$(mktemp)

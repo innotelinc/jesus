@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate candidate answer loops for each interview track via Kokoro TTS.
+"""Generate candidate answer loops for each interview track via the local TTS shim.
 
 Produces <out_dir>/candidate-{it,devops,sql}.wav — a single WAV of the
 candidate's lines with a 4s silence gap between each answer, so the loop
@@ -9,7 +9,7 @@ Then copies each loop into the PBX container's sounds dir
 (/var/lib/asterisk/sounds/en) and web root (/var/www/html) so Asterisk can
 play it via ARI `sound:` media and serve it over HTTP.
 
-Key gotcha baked in: Kokoro emits 24 kHz WAVs, but Asterisk's `sound:`
+Key gotcha baked in: the shim emits 24 kHz PCM, but Asterisk's `sound:`
 playback expects 8 kHz — so we downsample with ffmpeg before copying.
 
 Usage:
@@ -26,8 +26,15 @@ import sys
 import tempfile
 import urllib.request
 
-KOKORO_URL = "http://127.0.0.1:8880/v1/audio/speech"
-VOICE = "am_michael"  # male voice for candidate
+# The local TTS shim (Piper is the voice; Kokoro is retired and behind the
+# `kokoro` compose profile). The shim streams s16le mono PCM at 24 kHz and
+# answers `response_format: pcm` only — it does not emit a WAV container — so
+# this reads raw PCM and builds the WAV itself.
+TTS_URL = "http://127.0.0.1:8881/v1/audio/speech"
+MODEL = "piper"
+VOICE = ""  # ignored by Piper; kept so the request carries the field
+SAMPLE_RATE = 24000  # the shim's target rate
+BYTES_PER_SAMPLE = 2  # s16le
 
 # Extension → track routing (matches [dograh-inbound] in extensions_custom.conf)
 TRACKS = {
@@ -70,78 +77,46 @@ GAP_SECONDS = 4  # silence between candidate answers (agent speaks in between)
 
 
 def tts_line(text: str) -> bytes:
-    """Call Kokoro TTS → WAV bytes (24 kHz mono 16-bit)."""
+    """Call the local TTS shim → raw PCM bytes (24 kHz mono 16-bit)."""
     body = json.dumps({
         "input": text,
-        "model": "kokoro",
+        "model": MODEL,
         "voice": VOICE,
-        "response_format": "wav",
+        "response_format": "pcm",
     }).encode()
     req = urllib.request.Request(
-        KOKORO_URL, data=body, headers={"Content-Type": "application/json"}
+        TTS_URL, data=body, headers={"Content-Type": "application/json"}
     )
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
 
-def wav_params(raw: bytes) -> tuple[int, int, int]:
-    """Return (channels, sample_width, framerate) from a WAV header."""
-    # fmt chunk (starts at offset 20): audio format, channels, rate,
-    # byterate, block align, bits per sample.
-    afmt, channels, rate, _, _, bits = struct.unpack_from("<HHIIHH", raw, 20)
-    return channels, bits // 8, rate
-
-
-def data_chunk(raw: bytes) -> bytes:
-    """Return the PCM bytes of the RIFF 'data' chunk.
-
-    Kokoro WAVs carry a LIST/INFO metadata chunk between the fmt and data
-    chunks, so the PCM does NOT start at the fixed 44-byte offset. Walk the
-    chunk list to find the real data chunk instead.
-    """
-    pos = 12  # skip RIFF header + WAVE id
-    while pos + 8 <= len(raw):
-        cid = raw[pos:pos + 4]
-        size = struct.unpack_from("<I", raw, pos + 4)[0]
-        if cid == b"data":
-            return raw[pos + 8:pos + 8 + size]
-        pos += 8 + size + (size & 1)  # chunks are word-aligned
-    return raw[44:]  # fallback: plain 44-byte header WAV
-
-
 def compose_loop(track: str, lines: list[str], out_dir: str, gap: float = GAP_SECONDS) -> str:
     """Generate each line, concatenate with silence gaps, write a single WAV."""
-    chunks: list[bytes] = []
-    nch = sw = rate = None
+    pcm = bytearray()
     for i, line in enumerate(lines):
         print(f"  [{track}] line {i+1}/{len(lines)}: {line[:55]}...")
-        wav = tts_line(line)
-        chunks.append(wav)
-        nch, sw, rate = wav_params(wav)
+        pcm += tts_line(line)
         # Silence gap (agent speaks in between candidate answers). The gap is
         # the interviewer's floor: if the interviewer's TTS response is longer
         # than the gap, the next candidate line cuts it off mid-sentence —
         # widen it with --gap if you hear the interviewer being cut off.
-        chunks.append(b"\x00" * int(rate * sw * nch * gap))
+        pcm += b"\x00" * int(SAMPLE_RATE * BYTES_PER_SAMPLE * gap)
 
-    # Concatenate raw PCM (strip each WAV header, skipping any LIST chunk)
-    all_pcm = bytearray()
-    for chunk in chunks:
-        all_pcm += data_chunk(chunk)
-
-    data_size = len(all_pcm)
+    data_size = len(pcm)
     header = struct.pack(
         "<4sI4s4sIHHIIHH4sI",
         b"RIFF", 36 + data_size,
         b"WAVE", b"fmt ", 16,
-        1, nch, rate, rate * nch * sw, nch * sw, sw * 8,
+        1, 1, SAMPLE_RATE, SAMPLE_RATE * BYTES_PER_SAMPLE,
+        BYTES_PER_SAMPLE, BYTES_PER_SAMPLE * 8,
         b"data", data_size,
     )
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"candidate-{track}.wav")
     with open(out_path, "wb") as f:
-        f.write(header + all_pcm)
-    print(f"    → wrote {out_path} ({data_size} bytes PCM, {rate} Hz)")
+        f.write(header + bytes(pcm))
+    print(f"    → wrote {out_path} ({data_size} bytes PCM, {SAMPLE_RATE} Hz)")
     return out_path
 
 

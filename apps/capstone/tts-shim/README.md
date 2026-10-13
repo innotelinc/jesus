@@ -27,8 +27,11 @@ Three things sit behind the door, and only the first is about the model:
    at the process that actually knows it. See
    [`../grafana/dashboards/pipeline-latency.json`](../grafana/dashboards/pipeline-latency.json).
 
-No GPU: the engines wired in below (Kokoro-82M, Piper) are the two that hold
-real-time factor on CPU. Anything larger belongs to the GPU phase.
+No GPU: the engines wired in below (Piper, Kokoro-82M) are the two that hold
+real-time factor on CPU. Anything larger belongs to the GPU phase. **Piper is
+the engine; Kokoro is retired** — its service is behind the `kokoro` compose
+profile and the shim only registers it when it is named in `TTS_SHIM_ENGINES`,
+so a default deployment neither starts it nor advertises it.
 
 ## Endpoints
 
@@ -36,7 +39,7 @@ real-time factor on CPU. Anything larger belongs to the GPU phase.
 |---|---|
 | `POST /v1/audio/speech` | The OpenAI-compatible synthesis call. Body: `{input, model, voice, response_format, speed?}`; `response_format` must be `pcm`, `s16le` or `raw` (anything else is a 400 — this shim streams PCM only). |
 | `GET /v1/models` | The loaded engines, as OpenAI model ids. |
-| `GET /health` | `status`, loaded engines, default engine, sample rate, cache flag, and the Kokoro upstream's own health. |
+| `GET /health` | `status`, loaded engines, default engine, sample rate, cache flag, and — when that engine is enabled — the Kokoro upstream's own health. |
 | `GET /metrics` | Prometheus text format (see *Metrics*). |
 | `POST /v1/audio/speech/cache/clear` | Drops every cached clip. Handy after changing voice packs. Returns `{"removed": N}`. |
 
@@ -49,15 +52,17 @@ served it), `X-TTS-Cache` (`hit`/`miss`) and `X-Sample-Rate` (`24000`). Bodies a
 An engine that is *known but unavailable* — `piper` with no voice model
 configured — returns **503 rather than silently falling back**, because a
 fallback would make an A/B test look like it worked when both arms were the same
-engine. With no hint at all, `TTS_SHIM_DEFAULT_ENGINE` decides, else the first
-entry of `TTS_SHIM_ENGINES` that is available.
+engine. A *retired* engine (`kokoro` left out of `TTS_SHIM_ENGINES`) is a 503
+too, so it cannot keep answering as an alias for the default and hide the
+misconfiguration. With no hint at all, `TTS_SHIM_DEFAULT_ENGINE` decides, else
+the first entry of `TTS_SHIM_ENGINES` that is available.
 
 ## Engines
 
 | Engine | What it is | Notes |
 |---|---|---|
-| `kokoro` | Kokoro-82M over `kokoro-fastapi` | A **proxy**, not a model host: kokoro-fastapi owns the model, the ONNX runtime and the streaming, and the `kokoro` compose service is already tuned for CPU (OMP/MKL thread settings). Voices are Kokoro's own ids (`af_heart`, `am_michael`, …); a piper-style voice name falls back to `TTS_SHIM_KOKORO_VOICE`. |
-| `piper` | Local ONNX voices, in-process | The low-latency fast path, and **optional**: it registers only when the package imports *and* a voice model is configured. Voice packs live on the `tts_piper_voices` volume, not in the image, so adding a voice is a data decision rather than a rebuild. |
+| `kokoro` | Kokoro-82M over an OpenAI-compatible upstream | **Retired** — not registered unless `TTS_SHIM_ENGINES` names it, and its service is behind the `kokoro` compose profile. Kept for A/B against Piper. A **proxy**, not a model host: the upstream owns the model, the runtime and the streaming. Two upstreams fit. `kokoro-fastapi` (the default upstream) is a **PyTorch** CPU service — its image v0.9.0 has no `onnxruntime` and no ONNX path — so it needs the `kokoro` service's memory headroom (OMP/MKL thread settings in `docker-compose.yml`). `speaches` is the **onnxruntime** one: point `TTS_SHIM_KOKORO_URL` at `http://speaches:8000` and set `TTS_SHIM_KOKORO_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX`, installed with `scripts/install-onnx-kokoro.sh`. Voices are Kokoro's own ids (`af_heart`, `am_michael`, …); a piper-style voice name falls back to `TTS_SHIM_KOKORO_VOICE`. |
+| `piper` | Local ONNX voices, in-process | The **default engine** and the low-latency fast path — measured on this host at RTF ~0.3 against ~0.8 for Kokoro. **Optional**: it registers only when the package imports *and* a voice model is configured. Voice packs live on the `tts_piper_voices` volume, not in the image, so adding a voice is a data decision rather than a rebuild. |
 
 Piper is deliberately in-process. The obvious implementation shells out to the
 `piper` CLI per request, and that is what this started as — measured, it was
@@ -78,9 +83,10 @@ only need setting when you change the behaviour.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TTS_SHIM_ENGINES` *(compose)* | `kokoro` | Comma-separated engine list. The first available entry is the default when `TTS_SHIM_DEFAULT_ENGINE` is empty. |
-| `TTS_SHIM_DEFAULT_ENGINE` *(compose)* | *(empty)* | Engine used when a request names none. |
-| `TTS_SHIM_KOKORO_URL` *(compose)* | `http://kokoro-fastapi:8880` | Kokoro upstream — a compose service name on `interview-net`. |
+| `TTS_SHIM_ENGINES` *(compose)* | `piper` | Comma-separated engine list. **Only these register**: an engine left out is neither advertised by `/v1/models` nor selectable, and a request naming it gets a 503 rather than another engine's audio. The first available entry is the default when `TTS_SHIM_DEFAULT_ENGINE` is empty. |
+| `TTS_SHIM_DEFAULT_ENGINE` *(compose)* | `piper` | Engine used when a request names none. Falls back to the first *available* engine when the named one is not loaded (e.g. `piper` with no voice model), so a fresh deployment without the voice still answers with Kokoro. |
+| `TTS_SHIM_KOKORO_URL` *(compose)* | `http://kokoro-fastapi:8880` | Kokoro upstream — a compose service name on `interview-net`. Read only when `kokoro` is in `TTS_SHIM_ENGINES`. Set it to `http://speaches:8000` for the ONNX path. |
+| `TTS_SHIM_KOKORO_MODEL` *(compose)* | `kokoro` | Model id sent to the upstream. `kokoro-fastapi` ignores it; a multi-model upstream does not — the ONNX Kokoro needs `speaches-ai/Kokoro-82M-v1.0-ONNX`. |
 | `TTS_SHIM_KOKORO_VOICE` | `af_heart` | Voice when the request sends none (or a non-Kokoro id). |
 | `TTS_SHIM_PIPER_VOICE` *(compose)* | *(empty)* | Piper voice file or id; empty disables the engine. |
 | `TTS_SHIM_PIPER_VOICE_DIR` | `/opt/piper-voices` | Where voice packs are mounted. |
@@ -105,10 +111,10 @@ docker compose logs -f tts-shim
 curl -s http://127.0.0.1:8881/health         # host mode: the shim is on 8881
 ```
 
-The container listens on **8880** (the port `kokoro-fastapi` uses upstream, so
+The container listens on **8880** (the port `kokoro-fastapi` used upstream, so
 the same client code works against either) and the compose mapping publishes it
-on **127.0.0.1:8881** so the two can coexist. Loopback-only, like every other
-door in this stack.
+on **127.0.0.1:8881** — the address dograh dials. Loopback-only, like every
+other door in this stack.
 
 Piper, with a voice fetch — the voice lands on the `tts_piper_voices` volume:
 
@@ -135,8 +141,8 @@ TTS settings):
 ```
 provider  = speaches
 base_url  = http://127.0.0.1:8881/v1     # host mode; http://tts-shim:8880/v1 from a container on interview-net
-model     = kokoro                       # or: piper — this is what selects the engine
-voice     = af_heart                     # any Kokoro voice; ignored/fallback for piper
+model     = piper                        # or: kokoro — this is what selects the engine
+voice     = en_US-amy-medium             # Piper voice file; ignored/fallback for Kokoro
 ```
 
 Nothing else changes: the request/response contract is the same one

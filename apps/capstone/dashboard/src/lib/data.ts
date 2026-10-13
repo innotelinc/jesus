@@ -301,7 +301,7 @@ export const services: Service[] = [
       errorRate: 0.0,
       availability: 99.98,
       status: 'healthy',
-      dependencies: ['kokoro'],
+      dependencies: [],
     },
   },
   {
@@ -516,7 +516,7 @@ export const healthData: HealthMatrixEntry[] = [
   { service: 'Grafana', health: 96, availability: 99.99, latencyMs: 18, errorRate: 0.0, dependencies: ['prometheus'], lastCheck: '2026-09-17T14:00:00Z', status: 'healthy' },
   { service: 'Prometheus', health: 95, availability: 99.99, latencyMs: 9, errorRate: 0.0, dependencies: [], lastCheck: '2026-09-17T14:00:00Z', status: 'healthy' },
   { service: 'OTel Collector', health: 93, availability: 99.99, latencyMs: 5, errorRate: 0.0, dependencies: ['prometheus'], lastCheck: '2026-09-17T14:00:00Z', status: 'healthy' },
-  { service: 'TTS Shim', health: 92, availability: 99.98, latencyMs: 3, errorRate: 0.0, dependencies: ['kokoro'], lastCheck: '2026-09-17T14:00:00Z', status: 'healthy' },
+  { service: 'TTS Shim', health: 92, availability: 99.98, latencyMs: 3, errorRate: 0.0, dependencies: [], lastCheck: '2026-09-17T14:00:00Z', status: 'healthy' },
   { service: 'Speaches STT/TTS', health: 96, availability: 99.92, latencyMs: 152, errorRate: 0.3, dependencies: [], lastCheck: '2026-08-31T16:42:00Z', status: 'healthy' },
   { service: 'OmniRoute UI', health: 93, availability: 99.92, latencyMs: 22, errorRate: 0.2, dependencies: ['omniroute'], lastCheck: '2026-08-31T16:42:00Z', status: 'healthy' },
   { service: 'Sandbox API', health: 0, availability: 0, latencyMs: 0, errorRate: 0, dependencies: [], lastCheck: '2026-08-31T16:42:00Z', status: 'offline' },

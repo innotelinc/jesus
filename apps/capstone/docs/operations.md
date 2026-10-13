@@ -1129,7 +1129,7 @@ the workflow itself:
 ```
 
 Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh UI
-(`:3010`)**, Kokoro TTS, Speaches Whisper transcription, OmniRoute completions, n8n, Grist,
+(`:3010`)**, the local TTS shim (Piper), Speaches Whisper transcription, OmniRoute completions, n8n, Grist,
 the observability containers (Grafana, Prometheus, OTel ingest), ARI, the Dograh dialplan, the media WebSocket wiring, and — when
 `DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent
 workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions
@@ -1312,7 +1312,7 @@ This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the 
 archives into `dist/docker-images-v2/`. Point `install-capstone.sh` at the result
 (`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of
 pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO,
-Coturn, Dograh API, FreePBX/PBX Portal, Kokoro TTS, Speaches STT, OmniRoute, and the
+Coturn, Dograh API, FreePBX/PBX Portal, the TTS shim (Piper), Speaches STT, OmniRoute, and the
 instrumented n8n image.
 
 ## Release automation notes

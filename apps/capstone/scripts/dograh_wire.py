@@ -17,13 +17,15 @@ What it does:
                    enough) is reactivated here — parking is one-way upstream,
                    so nothing else ever clears it and calls routed into the
                    Stasis app keep hanging up.
-  3c. tts        — point the agents' voice at Kokoro: the organization's model
-                   configuration is re-pointed at the local TTS shim (the
-                   ``speaches`` provider pipecat dials, with Kokoro behind it).
-                   Only the ``tts`` section is written — the LLM and STT halves
-                   are re-sent exactly as stored — and the write is validated
-                   by dograh against the endpoint, so a shim that is down is
-                   reported here rather than discovered on a live call.
+  3c. tts        — point the agents' voice at the local Piper engine: the
+                   organization's model configuration is re-pointed at the
+                   local TTS shim (the ``speaches`` provider pipecat dials,
+                   with Piper behind it).
+                   Only the ``tts`` role is written — every other role is
+                   carried over as stored, and each names its own provider
+                   connection — and the write is validated by dograh against
+                   the endpoint, so a shim that is down is reported here
+                   rather than discovered on a live call.
   4. extensions  — register extensions 8000/8001/8002 as phone numbers on that
                    config, each bound to its interview workflow for inbound
                    calls
@@ -41,9 +43,9 @@ Environment variables (falls back to --env-file, then defaults):
   DOGRAH_ARI_APP_NAME     Stasis app name          (dograh)
   DOGRAH_WS_CLIENT_NAME   media WS client name     (dograh)
   DOGRAH_CONFIG_NAME      telephony config name    (Asterisk ARI (dograh))
-  DOGRAH_TTS_BASE_URL     Kokoro TTS endpoint      (http://127.0.0.1:8881/v1)
-  DOGRAH_TTS_MODEL        TTS model name           (kokoro)
-  DOGRAH_TTS_VOICE        Kokoro voice id          (af_heart)
+  DOGRAH_TTS_BASE_URL     local TTS shim endpoint  (http://127.0.0.1:8881/v1)
+  DOGRAH_TTS_MODEL        TTS engine name          (piper)
+  DOGRAH_TTS_VOICE        Piper voice id           (en_US-amy-medium)
 
 Usage (from the repo root):
 
@@ -136,13 +138,16 @@ def parked_reason(config: dict) -> str:
 
 
 # The voice the agents speak with. `speaches` is the provider pipecat dials for
-# an OpenAI-compatible TTS endpoint; the tts-shim in front of Kokoro speaks that
-# same contract, which is why using Kokoro here is a model-configuration change
-# and not a patch to the dograh fork.
-KOKORO_TTS_PROVIDER = "speaches"
+# an OpenAI-compatible TTS endpoint; the tts-shim in front of the engine speaks
+# that same contract, which is why selecting an engine here is a
+# model-configuration change and not a patch to the dograh fork. Piper is the
+# default: measured on this host it synthesizes a sentence at RTF ~0.3 against
+# ~0.8 for Kokoro, and its voice is loaded in-process so it needs no second
+# container. Kokoro stays selectable in the shim for A/B.
+SHIM_TTS_PROVIDER = "speaches"
 DEFAULT_TTS_BASE_URL = "http://127.0.0.1:8881/v1"
-DEFAULT_TTS_MODEL = "kokoro"
-DEFAULT_TTS_VOICE = "af_heart"
+DEFAULT_TTS_MODEL = "piper"
+DEFAULT_TTS_VOICE = "en_US-amy-medium"
 
 
 class ApiError(RuntimeError):
@@ -151,12 +156,21 @@ class ApiError(RuntimeError):
         self.status = status
 
 
-def _stored_tts(configuration: dict | None) -> dict:
-    """The ``tts`` section of a stored v2 configuration, or ``{}``."""
-    byok = (configuration or {}).get("byok") or {}
-    pipeline = byok.get("pipeline") or {}
-    tts = pipeline.get("tts") or {}
-    return tts if isinstance(tts, dict) else {}
+def _role(configuration: dict | None, role: str) -> dict:
+    """One role's section of a stored model configuration, or ``{}``."""
+    section = (configuration or {}).get(role)
+    return section if isinstance(section, dict) else {}
+
+
+def shim_connection(connections: list[dict] | None, base_url: str) -> dict | None:
+    """The provider connection that points at the local shim, or ``None``."""
+    for connection in connections or []:
+        if connection.get("provider") != SHIM_TTS_PROVIDER:
+            continue
+        settings = connection.get("connection_settings") or {}
+        if _same_url(settings.get("base_url"), base_url):
+            return connection
+    return None
 
 
 def _same_url(left: Any, right: Any) -> bool:
@@ -164,34 +178,47 @@ def _same_url(left: Any, right: Any) -> bool:
     return str(left or "").rstrip("/") == str(right or "").rstrip("/")
 
 
-def kokoro_tts_problem(
-    configuration: dict | None, base_url: str, model: str, voice: str
+def shim_tts_problem(
+    configuration: dict | None,
+    connection: dict | None,
+    base_url: str,
+    model: str,
+    voice: str,
 ) -> str:
-    """Why the agents do not speak with Kokoro, or ``""`` when they do.
+    """Why the agents do not speak with the local engine, or ``""`` when they do.
 
     Pure, so the decision is testable without a dograh server. It reads the
-    stored v2 configuration rather than the effective one: this is what the wire
-    script is about to rewrite, and "already right" has to mean the *stored*
+    *stored* configuration rather than the effective one: this is what the wire
+    script is about to rewrite, and "already right" has to mean the stored
     value, or a re-run would rewrite the same thing on every pass.
+
+    Since model-configuration v3 a role names a provider *connection* rather
+    than carrying its own ``base_url``, so the connection is checked too — that
+    is where the shim's address actually lives now.
     """
-    tts = _stored_tts(configuration)
+    tts = _role(configuration, "tts")
     if not tts:
         return (
             "no TTS engine is configured for the organization — the agents have "
             "nothing to speak with, which is what a caller hears as an agent "
             "that never responds"
         )
-    if tts.get("provider") != KOKORO_TTS_PROVIDER:
+    if connection is None:
         return (
-            f"TTS provider is '{tts.get('provider')}', not "
-            f"'{KOKORO_TTS_PROVIDER}' (the local shim in front of Kokoro)"
+            f"no provider connection points at the local TTS shim "
+            f"({SHIM_TTS_PROVIDER} at {base_url})"
         )
-    if not _same_url(tts.get("base_url"), base_url):
-        return f"TTS base_url is '{tts.get('base_url')}', not '{base_url}'"
-    if tts.get("model") != model:
-        return f"TTS model is '{tts.get('model')}', not '{model}'"
-    if tts.get("voice") != voice:
-        return f"TTS voice is '{tts.get('voice')}', not '{voice}'"
+    if tts.get("provider_connection_uuid") != connection.get("uuid"):
+        return (
+            f"TTS is bound to provider connection "
+            f"'{tts.get('provider_connection_uuid')}', not the local shim's "
+            f"'{connection.get('uuid')}' ({base_url})"
+        )
+    settings = tts.get("settings") or {}
+    if settings.get("model") != model:
+        return f"TTS model is '{settings.get('model')}', not '{model}'"
+    if voice and settings.get("voice") != voice:
+        return f"TTS voice is '{settings.get('voice')}', not '{voice}'"
     return ""
 
 
@@ -201,31 +228,24 @@ def shim_health_url(base_url: str) -> str:
     return (base[:-3] if base.endswith("/v1") else base) + "/health"
 
 
-def with_kokoro_tts(
-    configuration: dict, base_url: str, model: str, voice: str
+def with_shim_tts(
+    configuration: dict, connection: dict, model: str, voice: str
 ) -> dict:
-    """The same configuration with only its ``tts`` section pointed at Kokoro.
+    """The same configuration with only its ``tts`` role pointed at the shim.
 
-    llm and stt are carried over untouched — including their masked secrets,
-    which dograh resolves against the stored values on save — so re-pointing the
-    voice cannot disturb the rest of the pipeline.
+    Every other role — llm, stt, embeddings, realtime and the fallback policy —
+    is carried over byte-for-byte, so re-pointing the voice cannot disturb the
+    rest of the pipeline. A configured ``speed`` is preserved.
     """
     body = json.loads(json.dumps(configuration))  # deep copy, JSON-safe
-    byok = body.setdefault("byok", {})
-    pipeline = byok.setdefault("pipeline", {})
-    previous = _stored_tts(configuration)
-    tts: dict[str, Any] = {
-        "provider": KOKORO_TTS_PROVIDER,
-        # Self-hosted endpoints do not authenticate; dograh substitutes "none"
-        # for an empty key on this provider anyway.
-        "api_key": "none",
-        "base_url": base_url,
-        "model": model,
-        "voice": voice,
-    }
+    previous = _role(configuration, "tts").get("settings") or {}
+    settings: dict[str, Any] = {"model": model, "voice": voice}
     if previous.get("speed") is not None:
-        tts["speed"] = previous["speed"]
-    pipeline["tts"] = tts
+        settings["speed"] = previous["speed"]
+    body["tts"] = {
+        "settings": settings,
+        "provider_connection_uuid": connection["uuid"],
+    }
     return body
 
 
@@ -384,20 +404,57 @@ class Dograh:
             },
         }
 
-    # ── the voice (model configuration) ──────────────────────────────────────
-    def model_configuration_v2(self) -> dict:
-        """The organization's model configuration: stored v2, effective, source.
+    # ── the voice (model configuration, shape v3) ────────────────────────────
+    # The organization's model configuration moved off
+    # `…/organizations/model-configurations/v2` (byok, one blob per role) to the
+    # `model-connections` API: each role names a provider *connection* uuid and
+    # carries only its own settings. These are the endpoints the server serves
+    # today, so the reconcile can actually enforce the voice instead of erroring.
+    def provider_connections(self) -> list[dict]:
+        """The organization's provider connections (credentials stay masked)."""
+        res = self.request("GET", "/api/v1/model-connections/provider-connections")
+        return res if isinstance(res, list) else []
 
-        Secrets come back masked, which is fine for a read-modify-write: dograh
-        resolves a masked key against the stored one on save.
-        """
-        return self.request("GET", "/api/v1/organizations/model-configurations/v2") or {}
-
-    def save_model_configuration_v2(self, body: dict) -> dict:
-        """Write the v2 configuration. dograh validates it against the endpoints."""
+    def create_provider_connection(
+        self, name: str, provider: str, connection_settings: dict
+    ) -> dict:
+        """Register a provider connection; returns the created row."""
         return (
             self.request(
-                "PUT", "/api/v1/organizations/model-configurations/v2", body
+                "POST",
+                "/api/v1/model-connections/provider-connections",
+                {
+                    "name": name,
+                    "provider": provider,
+                    "connection_settings": connection_settings,
+                },
+            )
+            or {}
+        )
+
+    def default_model_configuration_uuid(self) -> Any:
+        """The uuid of the organization's default model configuration."""
+        res = self.request("GET", "/api/v1/model-connections/default") or {}
+        return res.get("model_configuration_uuid")
+
+    def model_configuration(self, uuid: str) -> dict:
+        """A named model configuration: ``configuration`` (v3) plus ``revision``."""
+        return (
+            self.request(
+                "GET", f"/api/v1/model-connections/model-configurations/{uuid}"
+            )
+            or {}
+        )
+
+    def save_model_configuration(
+        self, uuid: str, configuration: dict, revision: Any
+    ) -> dict:
+        """Write the v3 configuration. dograh validates it against the endpoints."""
+        return (
+            self.request(
+                "PATCH",
+                f"/api/v1/model-connections/model-configurations/{uuid}",
+                {"configuration": configuration, "revision": revision},
             )
             or {}
         )
@@ -721,62 +778,73 @@ def main() -> int:
         print("WARN stasis_app_name not exposed by the API — the PBX dialplan "
               "must route into app_name instead")
 
-    # ── 3c. the voice: Kokoro, through the local shim ────────────────────────
+    # ── 3c. the voice: Piper, through the local shim ─────────────────────────
     # An organization left on a cloud or managed TTS provider does not merely
     # sound wrong: with no reachable key the synthesis call fails, and the caller
     # hears an agent that never responds. The intended voice for this stack is
-    # the local one — Kokoro behind the tts-shim — so point the agents at it and
+    # the local one — Piper behind the tts-shim — so point the agents at it and
     # let dograh's own validator prove the endpoint answers.
     tts_base_url = cfg(args, "DOGRAH_TTS_BASE_URL", DEFAULT_TTS_BASE_URL)
     tts_model = cfg(args, "DOGRAH_TTS_MODEL", DEFAULT_TTS_MODEL)
     tts_voice = cfg(args, "DOGRAH_TTS_VOICE", DEFAULT_TTS_VOICE)
     voice_label = f"{tts_model}/{tts_voice} at {tts_base_url}"
     # Read either way — `--check` only skips the write.
-    model_config: dict = {}
+    config_uuid: Any = None
+    stored: dict = {}
+    connection: dict | None = None
     try:
-        model_config = api.model_configuration_v2()
+        connections = api.provider_connections()
+        config_uuid = api.default_model_configuration_uuid()
+        if not config_uuid:
+            raise ApiError(
+                404, "no default model configuration is set for the organization"
+            )
+        stored = api.model_configuration(str(config_uuid))
+        connection = shim_connection(connections, tts_base_url)
     except ApiError as e:
         problems.append(f"model configuration: {e}")
         print(f"FAIL model configuration unreadable: {e}")
 
-    stored = model_config.get("configuration")
-    if model_config and stored is None:
-        # Nothing in the v2 shape to rewrite. The organization may still be on
-        # the legacy per-user configuration, or on dograh's managed service, and
-        # either way there is no stored llm/stt to re-send — inventing them would
-        # be worse than saying so.
-        effective_tts = (model_config.get("effective_configuration") or {}).get("tts")
-        effective_problem = kokoro_tts_problem(
-            {"byok": {"pipeline": {"tts": effective_tts}}},
-            tts_base_url,
-            tts_model,
-            tts_voice,
-        )
-        if not effective_problem:
-            print(f"PASS TTS is Kokoro ({voice_label})")
-        else:
-            msg = (
-                f"TTS is not Kokoro ({effective_problem}) and the configuration is "
-                f"stored as '{model_config.get('source')}', not v2 — set it once in "
-                "the dograh UI (Model Configurations): provider="
-                f"{KOKORO_TTS_PROVIDER}, base_url={tts_base_url}, "
-                f"model={tts_model}, voice={tts_voice}"
+    if stored and connection is None and not args.check:
+        # No connection points at the shim yet (a fresh organization, or one
+        # wired by hand before this script existed). Register it, so the TTS
+        # write below has somewhere to point.
+        try:
+            connection = api.create_provider_connection(
+                f"{SHIM_TTS_PROVIDER} (tts-shim)",
+                SHIM_TTS_PROVIDER,
+                {"base_url": tts_base_url},
             )
-            problems.append(msg)
-            print(f"FAIL {msg}")
-    elif model_config:
-        tts_problem = kokoro_tts_problem(stored, tts_base_url, tts_model, tts_voice)
+            print(
+                f"PASS registered the local TTS provider connection "
+                f"'{connection.get('name')}' → {tts_base_url}"
+            )
+        except ApiError as e:
+            problems.append(f"TTS provider connection: {e}")
+            print(f"FAIL could not register the local TTS provider connection: {e}")
+
+    if stored:
+        tts_problem = shim_tts_problem(
+            stored.get("configuration"), connection, tts_base_url, tts_model, tts_voice
+        )
         if not tts_problem:
-            print(f"PASS TTS is Kokoro ({voice_label})")
-        elif args.check:
-            problems.append(f"TTS not Kokoro: {tts_problem}")
-            print(f"FAIL TTS not Kokoro: {tts_problem}")
+            print(f"PASS TTS is {tts_model} through the local shim ({voice_label})")
+        elif args.check or connection is None:
+            problems.append(f"TTS not on the local shim: {tts_problem}")
+            print(f"FAIL TTS not on the local shim: {tts_problem}")
         else:
             try:
-                api.save_model_configuration_v2(
-                    with_kokoro_tts(stored, tts_base_url, tts_model, tts_voice)
+                api.save_model_configuration(
+                    str(config_uuid),
+                    with_shim_tts(
+                        stored["configuration"], connection, tts_model, tts_voice
+                    ),
+                    stored.get("revision"),
                 )
-                print(f"PASS TTS re-pointed at Kokoro ({voice_label}) — was {tts_problem}")
+                print(
+                    f"PASS TTS re-pointed at {tts_model} ({voice_label}) — "
+                    f"was {tts_problem}"
+                )
             except ApiError as e:
                 problems.append(f"TTS not re-pointed: {e}")
                 print(f"FAIL TTS not re-pointed: {e}")

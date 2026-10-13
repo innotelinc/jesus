@@ -59,7 +59,7 @@ behind the existing `MINIO_*` contract in a dedicated release.
 |---|---|---|
 | 🗣️ **Voice AI agents** | Prebuilt phone agents (receptionist, outreach, job interview, survey, GOTV poll) plus mock-interview agents for IT Help Desk, DevOps, and SQL | 
 | 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
-| 🧠 **Local intelligence** | Kokoro TTS, Speaches Whisper STT, and OmniRoute LLM gateway via Zeus (OpenAI-compatible) — nothing leaves the box | 
+| 🧠 **Local intelligence** | Piper TTS, Speaches Whisper STT, and OmniRoute LLM gateway via Zeus (OpenAI-compatible) — nothing leaves the box | 
 | ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
 | 🔐 **Cerulean SSO** | Shared identity through Cerulean's Authentik at `auth.capstone.innotel.us` — one login for every surface, and the Control Center is gated behind it | 
 | 📊 **Control Center** | Live ops dashboard: services, health, ports, alerts, secrets inventory, users, host monitoring, and an in-browser softphone | 
@@ -118,7 +118,7 @@ sudo systemctl enable --now capstone.service
 | Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
 | Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |
 | Identity | Cerulean Authentik — `auth.cerulean.innotel.us` | SSO, authentication, user management (shared via Cerulean; no local Authentik instance) |
-| Local TTS | Kokoro-82M (`kokoro-fastapi`) — `:8880` | On-prem speech generation |
+| Local TTS | Piper (in-process ONNX) behind `tts-shim` — `:8881`. Kokoro-82M (`kokoro-fastapi`) is retired and opt-in behind the `kokoro` compose profile | On-prem speech generation |
 | Local STT | Speaches (faster-whisper) — `:8001` | On-prem transcription |
 | LLM Router | OmniRoute — `:20128`, reached on `:20128` | OpenAI-compatible gateway to local/free models; `20128` is loopback/docker0 only, the `:20128` proxy in front of it is the LAN door for `/v1` |
 | Workflow | n8n (Community Edition) | Session webhooks on hang-up → grading |
@@ -245,6 +245,7 @@ per-panel metric map: [docs/operations.md](docs/operations.md#observability).
 | [docs/operations.md](docs/operations.md) | Control Center, PBX/Asterisk, VoIP.ms trunk, TURN/WebRTC, NPM proxy hosts, troubleshooting, verification, live/install USB + offline bundle |
 | [docs/networking.md](docs/networking.md) | Ports, host networking, and firewall guidance |
 | [docs/legacy-dependencies.md](docs/legacy-dependencies.md) | Legacy component inventory + modernization plan |
+| [docs/host-move.md](docs/host-move.md) | Where the stack runs, the sizing it needs, and the runbook that moves it — the other half of `scripts/backup-capstone.sh` |
 | [CHANGELOG.md](CHANGELOG.md) | Full release history (v2.x → v3.x) |
 
 ## 📦 Releases & offline install

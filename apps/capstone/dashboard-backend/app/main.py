@@ -226,7 +226,7 @@ SERVICE_META: dict[str, dict[str, Any]] = {
     "tts-shim": {
         "name": "TTS Shim", "owner": "Voice",
         "description": "One OpenAI-compatible TTS door in front of the engines: audio cache, engine A/B, and its own TTFB/synthesis metrics.",
-        "tags": ["speech", "tts", "cache"], "deps": ["kokoro"],
+        "tags": ["speech", "tts", "cache"], "deps": [],
     },
     "speaches": {
         "name": "Speaches STT/TTS", "owner": "Voice",
@@ -234,8 +234,8 @@ SERVICE_META: dict[str, dict[str, Any]] = {
         "tags": ["speech", "stt", "tts"], "deps": [],
     },
     "kokoro": {
-        "name": "Kokoro TTS", "owner": "Voice",
-        "description": "Local neural speech synthesis serving the voice agents.",
+        "name": "Kokoro TTS (retired)", "owner": "Voice",
+        "description": "Retired neural TTS, behind the `kokoro` compose profile for A/B only. Piper in tts-shim is the voice.",
         "tags": ["speech", "tts"], "deps": [],
     },
     "sandbox-api": {
@@ -308,7 +308,6 @@ LATENCY_PROBES: dict[str, tuple[str, float]] = {
     "tts-shim": ("http://tts-shim:8880/health", 0.6),
     "n8n": ("http://n8n:5678/healthz", 0.6),
     "omniroute": _gateway_probe(),
-    "kokoro-fastapi": ("http://kokoro-fastapi:8880/health", 0.6),
     "speaches": ("http://speaches:8000/health", 0.6),
     "workflow-studio": ("http://workflow-studio:8090/", 0.6),
 }
@@ -333,7 +332,7 @@ ONE_SHOT = {"sandbox-certs", "n8n-import"}
 
 # List of compose service labels we consider "apps" (used for active-session
 # stand-in and to exclude infra-only noise from some tallies).
-APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "grafana", "speaches", "kokoro-fastapi", "freepbx", "workflow-studio", "coturn"}
+APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "grafana", "speaches", "freepbx", "workflow-studio", "coturn"}
 
 # Static documentation / repository / support links (real URLs; unaffected by
 # Docker state).

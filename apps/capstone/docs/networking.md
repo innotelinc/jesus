@@ -140,7 +140,7 @@ that is the address the dialler actually uses.
 | `5432` | postgres |
 | `6379` | redis |
 | `9000` / `9001` | minio API / console |
-| `8880` | kokoro TTS |
+| `8881` | tts-shim (local TTS — Piper) |
 | `8001` | speaches STT (host `8001` → container `8000`) |
 | `4317` / `4318` | OTel gRPC / HTTP ingest |
 | `8888` / `8889` | otel-collector metrics |

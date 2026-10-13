@@ -69,13 +69,30 @@ CHUNK_BYTES = int(os.getenv("TTS_SHIM_CHUNK_BYTES", "8192"))
 
 KOKORO_URL = os.getenv("TTS_SHIM_KOKORO_URL", "http://kokoro-fastapi:8880").rstrip("/")
 KOKORO_DEFAULT_VOICE = os.getenv("TTS_SHIM_KOKORO_VOICE", "af_heart")
+# The model id the upstream expects. kokoro-fastapi ignores it (it serves one
+# model and answers to any value), but an OpenAI-compatible upstream that hosts
+# several does not — speaches' ONNX Kokoro is addressed as
+# `speaches-ai/Kokoro-82M-v1.0-ONNX`, and it rejects the bare `kokoro`.
+KOKORO_MODEL = os.getenv("TTS_SHIM_KOKORO_MODEL", "kokoro").strip() or "kokoro"
 
 # Piper is optional: the engine only registers when the package imports AND a
 # voice model is configured. A shim with no Piper is still a working shim.
 PIPER_VOICE = os.getenv("TTS_SHIM_PIPER_VOICE", "").strip()
 PIPER_VOICE_DIR = Path(os.getenv("TTS_SHIM_PIPER_VOICE_DIR", "/opt/piper-voices"))
 
-_ENGINES_RAW = os.getenv("TTS_SHIM_ENGINES", "kokoro")
+# The engines the shim is allowed to offer. Only these register: an engine left
+# out is neither advertised by /v1/models nor selectable, so retiring one (say
+# Kokoro, once Piper is the voice) is an env change rather than a shim that
+# still lists a dead upstream.
+_ENGINES_RAW = os.getenv("TTS_SHIM_ENGINES", "piper")
+ENABLED_ENGINES = frozenset(
+    name.strip().lower() for name in _ENGINES_RAW.split(",") if name.strip()
+)
+# Every engine this shim knows how to build, enabled or not. A name here that is
+# not in ENABLED_ENGINES is *retired*, not unknown — a request for it must fail
+# rather than quietly serve the default engine, or "Kokoro" would keep working
+# as an alias for Piper and hide the misconfiguration it means.
+KNOWN_ENGINES = frozenset({"kokoro", "piper"})
 DEFAULT_ENGINE = os.getenv("TTS_SHIM_DEFAULT_ENGINE", "").strip()
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
@@ -140,18 +157,27 @@ class Engine:
 
 
 class KokoroEngine(Engine):
-    """Kokoro-82M over kokoro-fastapi (already an OpenAI-compatible service).
+    """Kokoro-82M over any OpenAI-compatible speech endpoint.
 
-    The shim is a proxy on this path, not a model host: kokoro-fastapi owns the
-    model, the ONNX runtime and the streaming, and it is already tuned for CPU
-    (see the ``kokoro`` service's OMP/MKL thread settings in docker-compose.yml).
+    The shim is a proxy on this path, not a model host: the upstream owns the
+    model, the runtime and the streaming. Two upstreams are known to fit:
+
+    * ``kokoro-fastapi`` (the default, ``TTS_SHIM_KOKORO_URL``) — a PyTorch CPU
+      build. It is *not* an ONNX build: its image v0.9.0 has no onnxruntime and
+      no ONNX inference path, so it needs the ``kokoro`` service's memory
+      headroom (OMP/MKL thread settings in docker-compose.yml).
+    * ``speaches`` — an onnxruntime service that also serves Kokoro, addressed
+      with the full model id. Point ``TTS_SHIM_KOKORO_URL`` at it and set
+      ``TTS_SHIM_KOKORO_MODEL=speaches-ai/Kokoro-82M-v1.0-ONNX``; install the
+      model into it with ``scripts/install-onnx-kokoro.sh``.
     """
 
     name = "kokoro"
 
-    def __init__(self, url: str, default_voice: str) -> None:
+    def __init__(self, url: str, default_voice: str, model: str) -> None:
         self.url = url
         self.default_voice = default_voice
+        self.model = model
         self._client: httpx.AsyncClient | None = None
 
     async def startup(self) -> None:
@@ -174,7 +200,7 @@ class KokoroEngine(Engine):
         if self._client is None:
             raise EngineUnavailable("kokoro engine not started")
         payload = {
-            "model": "kokoro",
+            "model": self.model,
             "input": text,
             # Kokoro's own voice ids (af_heart, am_michael, …). A caller that
             # sends piper-style ids falls back to the configured default.
@@ -400,10 +426,18 @@ class Registry:
             engine = self._engines.get(head)
             if engine is not None and engine.available():
                 return head, engine
-            # An unknown engine must not silently fall back: that would make an
-            # A/B test look like it worked when both arms were the same engine.
+            # An engine must not silently fall back: that would make an A/B test
+            # look like it worked when both arms were the same engine, and a
+            # retired engine (known but not in TTS_SHIM_ENGINES) look like it
+            # still answered. Both raise; only a genuinely unknown model string
+            # falls through to the default.
             if head in self._engines:
                 raise EngineUnavailable(f"engine '{head}' is not available")
+            if head in KNOWN_ENGINES:
+                raise EngineUnavailable(
+                    f"engine '{head}' is not enabled on this shim (TTS_SHIM_ENGINES="
+                    f"{_ENGINES_RAW})"
+                )
         name = self.default
         return name, self._engines[name]
 
@@ -469,8 +503,10 @@ def evict() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    REGISTRY.add(KokoroEngine(KOKORO_URL, KOKORO_DEFAULT_VOICE))
-    REGISTRY.add(PiperEngine(PIPER_VOICE, PIPER_VOICE_DIR))
+    if "kokoro" in ENABLED_ENGINES:
+        REGISTRY.add(KokoroEngine(KOKORO_URL, KOKORO_DEFAULT_VOICE, KOKORO_MODEL))
+    if "piper" in ENABLED_ENGINES:
+        REGISTRY.add(PiperEngine(PIPER_VOICE, PIPER_VOICE_DIR))
     await REGISTRY.startup()
     evict()
     yield
