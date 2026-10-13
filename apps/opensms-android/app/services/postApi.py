@@ -145,8 +145,10 @@ class PosiApiServer:
 # handle post requests
 
 async def verify_api_key(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
+    client_ip = request.client.host if request.client else "unknown"
     raw_token = credentials.credentials
     hashed_token = hash_api_key(raw_token)
 
@@ -159,6 +161,7 @@ async def verify_api_key(
         hashed_token,
         hash_api_key(raw_token)
     ):
+        print(f"Authentication failed from IP: {client_ip}")
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired API key",
@@ -172,10 +175,14 @@ async def process_sms_req(
     client: dict = Depends(verify_api_key)
 ):
     server: PosiApiServer = request.app.state.server
+    client_ip = request.client.host if request.client else "unknown"
+    print(f"Authenticated request from: {client_ip}")
 
     stat = send_sms(item.number, item.text)
     if stat:
         print(f"SMS successfully sent to: {item.number}")
+    else:
+        print(f"SMS failed to: {item.number}")
 
     if server.kivyCallback:
         Thread(
