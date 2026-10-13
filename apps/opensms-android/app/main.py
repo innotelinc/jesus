@@ -60,7 +60,7 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.0.1" # App version
+__version__ = "0.0.2" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -76,6 +76,7 @@ class OpenSmsApp(MDApp):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        Window.bind(on_keyboard=self.events)
         self.txt_dialog = None
         self.wake_lock = None
         self.api_started = False
@@ -419,6 +420,27 @@ class OpenSmsApp(MDApp):
 
     def go_to_screen(self, screen:str):
         self.root.ids.screen_manager.current = screen
+
+    def on_main_screen_entry(self, instance=None):
+        self.root.ids.top_back_btn.opacity = 0
+        self.root.ids.top_back_btn.disabled = True
+
+    def on_settings_entry(self, instance=None):
+        self.root.ids.top_back_btn.opacity = 1
+        self.root.ids.top_back_btn.disabled = False
+
+    def back_button_action(self, instance=None):
+        if self.root.ids.screen_manager.current == "Settings":
+           self.go_to_screen("SMS")
+
+    def events(self, instance, keyboard, keycode, text, modifiers):
+        """Handle mobile device button presses (e.g., Android back button)."""
+        if keyboard in (1001, 27):
+            if self.root.ids.screen_manager.current == "Settings":
+               self.go_to_screen("SMS")
+               return True
+        # exits from app
+        return False
 
     # run on app exit
     def on_stop(self):

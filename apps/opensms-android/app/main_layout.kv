@@ -28,6 +28,13 @@ MDScreen:
                     icon: "menu"
                     color: "white"
                     on_release: nav_drawer.set_state("toggle")
+                MDActionTopAppBarButton:
+                    id: top_back_btn
+                    icon: "arrow-left"
+                    color: "white"
+                    opacity: 0
+                    disabled: True
+                    on_release: app.back_button_action()
             MDTopAppBarTitle:
                 text: "OpenSMS"
                 color: "white"
@@ -35,24 +42,29 @@ MDScreen:
                 MDActionTopAppBarButton:
                     icon: "dots-vertical"
                     color: "white"
+                    opacity: 0
+                    disabled: True
 
         MDFloatLayout:
 
             MDNavigationLayout:
-                padding: 0, 0, 0, main_scr_box.bottom_pad
 
                 MDScreenManager:
                     id: screen_manager
 
                     MDScreen:
                         name: "SMS"
+                        on_enter: app.on_main_screen_entry()
                         AppHomeBox:
                             id: home_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
                     MDScreen:
                         name: "Settings"
+                        on_enter: app.on_settings_entry()
                         SettingsBox:
                             id: settings_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
                 MDNavigationDrawer:
                     id: nav_drawer
@@ -71,6 +83,8 @@ MDScreen:
                         MDNavigationDrawerDivider:
 
             MDNavigationBar:
+                id: btm_nav_bar
+                pos: 0, main_scr_box.bottom_pad
                 on_switch_tabs: app.on_switch_tabs(*args)
 
                 BaseMDNavigationItem
