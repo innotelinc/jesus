@@ -1,6 +1,7 @@
 #:import parse_color kivy.parser.parse_color
 #:import AppHomeBox screens.mainScr.AppHomeBox
 #:import SettingsBox screens.settings.SettingsBox
+#:import LogBox screens.logs.LogBox
 
 <BaseMDNavigationItem>
     MDNavigationItemIcon:
@@ -66,6 +67,13 @@ MDScreen:
                             id: settings_scr
                             padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
+                    MDScreen:
+                        name: "Logs"
+                        on_enter: log_scr.log_show()
+                        LogBox:
+                            id: log_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+
                 MDNavigationDrawer:
                     id: nav_drawer
                     radius: 0, dp(16), dp(16), 0
@@ -74,12 +82,13 @@ MDScreen:
                         MDNavigationDrawerLabel:
                             text: "Operations"
                         MDNavigationDrawerItem:
+                            on_release: app.goto_logs_screen()
                             MDNavigationDrawerItemLeadingIcon:
                                 icon: "file"
                             MDNavigationDrawerItemText:
                                 text: "Logs"
-                            MDNavigationDrawerItemTrailingText:
-                                text: "24"
+                            #MDNavigationDrawerItemTrailingText:
+                            #    text: "24"
                         MDNavigationDrawerDivider:
 
             MDNavigationBar:

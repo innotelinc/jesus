@@ -8,7 +8,16 @@ import time
 import sys
 
 # local imports
-from services.postApi import PosiApiServer, set_config_path
+from services.postApi import PosiApiServer, set_config_path, set_api_os, set_api_logger
+from services.logSvc import LogService
+
+# global vars
+app_name = "opensms"
+resp_template = {
+    "server": "none",
+}
+req_data = {}
+api_started = False
 
 ## OS specific setups
 # for android
@@ -18,28 +27,21 @@ if platform == "android":
     base_path = app_storage_path()
 #for other platforms like windows or linux
 else:
-    if getattr(sys, 'frozen', False):
-        # Running as a PyInstaller bundle
-        base_path = sys._MEIPASS
-    else:
-        # Running in a normal Python environment
-        base_path = dirname(abspath(__file__))
+    from services.pathMgr import get_user_data_dir
+    base_path = get_user_data_dir(app_name)
 
 config_dir = join(base_path, 'config')
 if not exists(config_dir):
     import os
     os.makedirs(config_dir, exist_ok=True)
 set_config_path(config_dir)
+set_api_os(platform)
+set_api_logger()
 req_file = join(config_dir, "request.json")
 resp_file = join(config_dir, "resp.json")
 
-## globals flags / vars / obj
+## global obj
 app_api_server = PosiApiServer()
-resp_template = {
-    "server": "none",
-}
-req_data = {}
-api_started = False
 
 ## functions
 def write_resp():
