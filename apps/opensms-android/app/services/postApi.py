@@ -14,16 +14,16 @@ import uvicorn
 
 # local imports
 from services.smsApi import send_sms
+from services.pathMgr import get_user_data_dir
+from services.logSvc import LogService
 
 ## global vars / obj
+app_name = "opensms"
+platform = "linux"
+logger = None
 
 # Set the path
-if getattr(sys, 'frozen', False):
-    # Running as a PyInstaller bundle
-    base_path = sys._MEIPASS
-else:
-    # Running in a normal Python environment
-    base_path = dirname(abspath(__file__))
+base_path = get_user_data_dir(app_name)
 config_dir = join(base_path, 'config')
 
 ## Functions
@@ -31,6 +31,24 @@ config_dir = join(base_path, 'config')
 def set_config_path(config_path:str):
     global config_dir
     config_dir = config_path
+
+def set_api_os(os_flavour:str):
+    global platform
+    platform = os_flavour
+
+def set_api_logger():
+    global logger
+    logger = LogService(app_name, platform)
+
+def log_activities(message:str):
+    if logger:
+        Thread(
+            target=logger.write_log,
+            kwargs={
+                "message": message
+            },
+            daemon=True
+        ).start()
 
 def hash_api_key(raw_key: str) -> str:
     """Hash the raw key using SHA-256."""
@@ -52,6 +70,7 @@ def generate_new_api_key() -> str:
     with open(keys_path, "w") as kf:
         json.dump(app_api_keys, kf)
     print("Created/updated the API key")
+    log_activities("Created/updated the API key")
     return new_raw_key
 
 def get_api_keys() -> dict:
@@ -162,6 +181,7 @@ async def verify_api_key(
         hash_api_key(raw_token)
     ):
         print(f"Authentication failed from IP: {client_ip}")
+        log_activities(f"Authentication failed from IP: {client_ip}")
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired API key",
@@ -177,12 +197,14 @@ async def process_sms_req(
     server: PosiApiServer = request.app.state.server
     client_ip = request.client.host if request.client else "unknown"
     print(f"Authenticated request from: {client_ip}")
-
+    log_activities(f"Authenticated request from: {client_ip}")
     stat = send_sms(item.number, item.text)
     if stat:
         print(f"SMS successfully sent to: {item.number}")
+        log_activities(f"SMS successfully sent to: {item.number}")
     else:
         print(f"SMS failed to: {item.number}")
+        log_activities(f"SMS failed to: {item.number}")
 
     if server.kivyCallback:
         Thread(

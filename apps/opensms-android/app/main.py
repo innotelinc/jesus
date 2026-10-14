@@ -38,6 +38,7 @@ if platform == "android":
     from android.permissions import check_permission, request_permissions, Permission
 else:
     from services.appSvc import app_service_thread
+    from services.pathMgr import get_user_data_dir
 
 # Local classes
 class BaseMDNavigationItem(MDNavigationItem):
@@ -83,6 +84,7 @@ class OpenSmsApp(MDApp):
         self.key_exists = False
         self.api_key = None
         self.config_template = {
+            "app": "opensms",
             "port": 9292,
             "boot": False,
         }
@@ -130,8 +132,8 @@ class OpenSmsApp(MDApp):
                 print(f"Error while starting android service: {e}")
         # non android platforms
         else:
-            self.internal_storage = self.user_data_dir
-            self.config_dir = os.path.join(base_path, 'services', 'config')
+            self.internal_storage = get_user_data_dir(self.config_template["app"])
+            self.config_dir = os.path.join(self.internal_storage, 'config')
             os.makedirs(self.config_dir, exist_ok=True)
             self.request_path = os.path.join(self.config_dir, "request.json")
             self.resp_path = os.path.join(self.config_dir, "resp.json")
@@ -144,7 +146,9 @@ class OpenSmsApp(MDApp):
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
         if os.path.exists(self.app_config):
             with open(self.app_config, "r") as cf:
-                self.config_template = json.load(cf)
+                saved_config = json.load(cf)
+            self.config_template["port"] = int(saved_config["port"])
+            self.config_template["boot"] = saved_config["boot"]
             print(f"start config check: {self.config_template}")
             self.req_template["port"] = int(self.config_template["port"])
             start_on_launch = self.config_template["boot"]
@@ -495,6 +499,9 @@ class OpenSmsApp(MDApp):
     def goto_app_settings(self, instance=None):
         self.txt_dialog_closer()
         self.go_to_screen("Settings")
+
+    def goto_logs_screen(self, instance=None):
+        self.go_to_screen("Logs")
 
     def go_to_screen(self, screen:str):
         self.root.ids.screen_manager.current = screen
