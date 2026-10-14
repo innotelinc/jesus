@@ -1,4 +1,5 @@
 from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 
 from kivy.lang import Builder
@@ -38,6 +39,12 @@ class LogBox(MDBoxLayout):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.app_name = "opensms"
+        self.top_menu_items = {
+            "Clear Logs": {
+                "icon": "broom",
+                "action": "clear-logs",
+            }
+        }
         self.logger = LogService(self.app_name, platform)
 
     def log_show(self, instance=None):
@@ -49,3 +56,21 @@ class LogBox(MDBoxLayout):
             if clean_line:
                 text_log = text_log + f"{clean_line}\n"
         container.text = text_log
+        # hamburger menu
+        menu_items = [
+            {
+                "text": menu_key,
+                "leading_icon": self.top_menu_items[menu_key]["icon"],
+                "on_release": lambda x=menu_key: self.top_menu_callback(x),
+                "font_size": sp(36)
+            } for menu_key in self.top_menu_items
+        ]
+        self.top_menu = MDDropdownMenu(
+            items=menu_items,
+        )
+
+    def top_menu_callback(self, text_item):
+        self.top_menu.dismiss()
+
+    def clear_logs(self, instance=None):
+        pass
