@@ -8,6 +8,7 @@ from kivy.lang import Builder
 from kivy.uix.widget import Widget
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, ColorProperty
 from kivy.metrics import dp, sp
+from kivy.utils import platform
 
 Builder.load_string('''
 
@@ -20,7 +21,6 @@ Builder.load_string('''
 
 <SettingsBox>:
     orientation: "vertical"
-    padding: dp(4)
 
     MDBoxLayout:
         orientation: "horizontal"

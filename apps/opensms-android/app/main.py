@@ -38,6 +38,7 @@ if platform == "android":
     from android.permissions import check_permission, request_permissions, Permission
 else:
     from services.appSvc import app_service_thread
+    from services.pathMgr import get_user_data_dir
 
 # Local classes
 class BaseMDNavigationItem(MDNavigationItem):
@@ -60,7 +61,7 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.0.1" # App version
+__version__ = "0.1.0" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
@@ -76,12 +77,14 @@ class OpenSmsApp(MDApp):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        Window.bind(on_keyboard=self.events)
         self.txt_dialog = None
         self.wake_lock = None
         self.api_started = False
         self.key_exists = False
         self.api_key = None
         self.config_template = {
+            "app": "opensms",
             "port": 9292,
             "boot": False,
         }
@@ -129,8 +132,8 @@ class OpenSmsApp(MDApp):
                 print(f"Error while starting android service: {e}")
         # non android platforms
         else:
-            self.internal_storage = self.user_data_dir
-            self.config_dir = os.path.join(base_path, 'services', 'config')
+            self.internal_storage = get_user_data_dir(self.config_template["app"])
+            self.config_dir = os.path.join(self.internal_storage, 'config')
             os.makedirs(self.config_dir, exist_ok=True)
             self.request_path = os.path.join(self.config_dir, "request.json")
             self.resp_path = os.path.join(self.config_dir, "resp.json")
@@ -143,7 +146,9 @@ class OpenSmsApp(MDApp):
         port_no_inp = self.root.ids.settings_scr.ids.port_no_inp
         if os.path.exists(self.app_config):
             with open(self.app_config, "r") as cf:
-                self.config_template = json.load(cf)
+                saved_config = json.load(cf)
+            self.config_template["port"] = int(saved_config["port"])
+            self.config_template["boot"] = saved_config["boot"]
             print(f"start config check: {self.config_template}")
             self.req_template["port"] = int(self.config_template["port"])
             start_on_launch = self.config_template["boot"]
@@ -220,6 +225,9 @@ class OpenSmsApp(MDApp):
             json.dump(self.req_template, rf)
 
     def api_server_mgr(self, instance=None):
+        permissions_ok = self.check_request_android_permission()
+        if not permissions_ok:
+            return
         key_ok = self.check_if_key_exists()
         if key_ok:
             if not self.api_started:
@@ -230,6 +238,81 @@ class OpenSmsApp(MDApp):
                 self.write_request()
         else:
             self.new_api_key_pop()
+
+    def check_request_android_permission(self):
+        if platform == "android":
+            permission_flag = True
+            for permission in self.android_permissions:
+                tmp_flag = check_permission(permission)
+                if not tmp_flag:
+                    permission_flag = False
+                    break
+            if not permission_flag:
+                request_permissions(self.android_permissions, self.permission_callback)
+            return permission_flag
+        else:
+            return True
+
+    def permission_callback(self, permissions, results):
+        # results is a list of booleans corresponding to requested permissions
+        usr_deny_flag = False
+        if False in results:
+            # the user checked "Don't ask again" or denied it twice.
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            current_activity = PythonActivity.mActivity
+            # Check rationale status via Android API
+            for permission in permissions:
+                should_show = current_activity.shouldShowRequestPermissionRationale(permission)
+                if not should_show:
+                    usr_deny_flag = True
+                    break
+            if usr_deny_flag:
+                # User denied twice / blocked permanently! Show redirect popup.
+                print("Permission is denied by user!")
+                Clock.schedule_once(lambda dt: self.show_settings_popup())
+
+    def show_settings_popup(self):
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(
+                MDButtonText(
+                    text="Cancel"
+                ),
+                style="text",
+                on_release=self.txt_dialog_closer
+            ),
+            MDButton(
+                MDButtonText(
+                    text="Open Settings",
+                    theme_text_color= "Custom",
+                    text_color= "orange"
+                ),
+                style="text",
+                on_release=self.open_android_settings
+            ),
+            spacing="8dp",
+        )
+        self.show_text_dialog(
+            "Permissions Missing",
+            "You need to grant the SMS & Notifications permissions from Settings.",
+            None,
+            buttons
+        )
+
+    def open_android_settings(self, instance=None):
+        self.txt_dialog_closer()
+        # Target Android Native Intents
+        Intent = autoclass('android.content.Intent')
+        Settings = autoclass('android.provider.Settings')
+        Uri = autoclass('android.net.Uri')
+        PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        # Create intent to open this specific app's settings details
+        activity = PythonActivity.mActivity
+        intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        uri = Uri.fromParts("package", activity.getPackageName(), None)
+        intent.setData(uri)
+        # Launch settings
+        activity.startActivity(intent)
 
     def check_if_key_exists(self):
         api_keys = get_api_keys()
@@ -417,8 +500,32 @@ class OpenSmsApp(MDApp):
         self.txt_dialog_closer()
         self.go_to_screen("Settings")
 
+    def goto_logs_screen(self, instance=None):
+        self.root.ids.nav_drawer.set_state("close")
+        self.go_to_screen("Logs")
+
     def go_to_screen(self, screen:str):
         self.root.ids.screen_manager.current = screen
+
+    def on_main_screen_entry(self, instance=None):
+        self.root.ids.top_back_btn.opacity = 0
+        self.root.ids.top_back_btn.disabled = True
+
+    def on_settings_entry(self, instance=None):
+        self.root.ids.top_back_btn.opacity = 1
+        self.root.ids.top_back_btn.disabled = False
+
+    def back_button_action(self, instance=None):
+        if self.root.ids.screen_manager.current in ["Settings", "Logs"]:
+           self.go_to_screen("SMS")
+
+    def events(self, instance, keyboard, keycode, text, modifiers):
+        """Handle mobile device button presses (e.g., Android back button)."""
+        if keyboard in (1001, 27):
+            self.back_button_action()
+            return True
+        # exits from app
+        return False
 
     # run on app exit
     def on_stop(self):

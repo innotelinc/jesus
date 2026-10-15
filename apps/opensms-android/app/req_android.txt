@@ -1,6 +1,6 @@
-kivymd==2.0.0
+https://github.com/kivymd/KivyMD/archive/master.zip # 2.0.1.dev0
 kivy[base]==2.3.1
-https://github.com/daslearning-org/buildozer-unofficial/archive/develop.zip
+buildozer
 Cython==0.29.36
 fastapi
 uvicorn
