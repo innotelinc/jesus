@@ -501,6 +501,7 @@ class OpenSmsApp(MDApp):
         self.go_to_screen("Settings")
 
     def goto_logs_screen(self, instance=None):
+        self.root.ids.nav_drawer.set_state("close")
         self.go_to_screen("Logs")
 
     def go_to_screen(self, screen:str):
