@@ -21,7 +21,7 @@ provides, and explicitly does not own.
 
 ## Provides
 
-- Voice AI agent platform for the ecosystem
+- Voice AI agent platform for the ecosystem (including OnTrak)
 
 ## Consumes
 
