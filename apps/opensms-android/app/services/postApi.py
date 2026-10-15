@@ -23,8 +23,7 @@ platform = "linux"
 logger = None
 
 # Set the path
-base_path = get_user_data_dir(app_name)
-config_dir = join(base_path, 'config')
+config_dir = "./config"
 
 ## Functions
 
@@ -36,9 +35,9 @@ def set_api_os(os_flavour:str):
     global platform
     platform = os_flavour
 
-def set_api_logger():
+def set_api_logger(log_obj:LogService):
     global logger
-    logger = LogService(app_name, platform)
+    logger = log_obj
 
 def log_activities(message:str):
     if logger:
