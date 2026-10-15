@@ -1,9 +1,12 @@
+from threading import Thread
+
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDButton, MDButtonIcon, MDButtonText
 
 from kivy.lang import Builder
 from kivy.uix.widget import Widget
+from kivy.core.clipboard import Clipboard
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, ColorProperty
 from kivy.metrics import dp, sp
 from kivy.utils import platform
@@ -40,6 +43,14 @@ class LogBox(MDBoxLayout):
         super().__init__(**kwargs)
         self.app_name = "opensms"
         self.top_menu_items = {
+            "Refresh": {
+                "icon": "refresh",
+                "action": "refresh",
+            },
+            "Copy Logs": {
+                "icon": "content-copy",
+                "action": "copy-logs",
+            },
             "Clear Logs": {
                 "icon": "broom",
                 "action": "clear-logs",
@@ -56,21 +67,51 @@ class LogBox(MDBoxLayout):
             if clean_line:
                 text_log = text_log + f"{clean_line}\n"
         container.text = text_log
-        # hamburger menu
-        menu_items = [
-            {
-                "text": menu_key,
-                "leading_icon": self.top_menu_items[menu_key]["icon"],
-                "on_release": lambda x=menu_key: self.top_menu_callback(x),
-                "font_size": sp(36)
-            } for menu_key in self.top_menu_items
-        ]
-        self.top_menu = MDDropdownMenu(
-            items=menu_items,
-        )
 
-    def top_menu_callback(self, text_item):
+        if instance:
+            # hamburger menu
+            instance.opacity = 1
+            instance.disabled = False
+            menu_items = [
+                {
+                    "text": menu_key,
+                    "leading_icon": self.top_menu_items[menu_key]["icon"],
+                    "on_release": lambda x=menu_key: self.top_menu_callback(x),
+                    "font_size": sp(36)
+                } for menu_key in self.top_menu_items
+            ]
+            self.top_menu = MDDropdownMenu(
+                items=menu_items,
+                caller=instance
+            )
+            instance.on_release = self.show_top_menu
+
+    def show_top_menu(self, instance=None):
+        self.top_menu.open()
+
+    def top_menu_callback(self, text_item:str):
         self.top_menu.dismiss()
+        menu = self.top_menu_items.get(text_item)
+        action = menu.get("action", None)
+        if action:
+            if action == "clear-logs":
+                self.clear_logs()
+            elif action == "copy-logs":
+                self.copy_logs()
+            elif action == "refresh":
+                self.log_show()
+
+    def copy_logs(self):
+        container = self.ids.log_container
+        Clipboard.copy(container.text)
 
     def clear_logs(self, instance=None):
-        pass
+        container = self.ids.log_container
+        container.text = ""
+        Thread(target=self.logger.clear_logs(), daemon=True).start()
+
+    def on_log_scr_exit(self, instance=None):
+        if instance:
+            # hamburger menu
+            instance.opacity = 0
+            instance.disabled = True
