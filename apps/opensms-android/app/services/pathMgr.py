@@ -25,6 +25,10 @@ def get_user_data_dir(app_name: str) -> Path:
         else:
             data_dir = home / ".local" / "share" / app_name
 
-    # Safely create the folder
-    data_dir.mkdir(parents=True, exist_ok=True)
+    # Safely create the folder with parents
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"Error while creating app dir: {e}")
+
     return data_dir

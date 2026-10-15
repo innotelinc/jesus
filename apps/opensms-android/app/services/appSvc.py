@@ -18,6 +18,7 @@ resp_template = {
 }
 req_data = {}
 api_started = False
+log_obj = LogService(app_name, platform)
 
 ## OS specific setups
 # for android
@@ -36,7 +37,7 @@ if not exists(config_dir):
     os.makedirs(config_dir, exist_ok=True)
 set_config_path(config_dir)
 set_api_os(platform)
-set_api_logger()
+set_api_logger(log_obj)
 req_file = join(config_dir, "request.json")
 resp_file = join(config_dir, "resp.json")
 

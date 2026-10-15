@@ -58,7 +58,7 @@ class LogBox(MDBoxLayout):
         }
         self.logger = LogService(self.app_name, platform)
 
-    def log_show(self, instance=None):
+    def log_show(self, instance=None, top_back_btn=None):
         text_log = ""
         container = self.ids.log_container
         logs = self.logger.get_api_logs()
@@ -69,6 +69,9 @@ class LogBox(MDBoxLayout):
         container.text = text_log
 
         if instance:
+            if top_back_btn:
+                top_back_btn.opacity = 1
+                top_back_btn.disabled = False
             # hamburger menu
             instance.opacity = 1
             instance.disabled = False
