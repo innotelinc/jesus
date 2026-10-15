@@ -36,6 +36,21 @@ curl -i -X POST 'http://127.0.0.1:9292/sms/' \
     -d '{"number": "+1234567890", "text": "Hello from OpenSMS API!"}'
 ```
 
+## 📚 Tech Stack Used
+
+### Python stack
+It works on `Android` and will bring this to `Linux` & `Windows` too.
+- [FastAPI](https://github.com/fastapi/fastapi) for the API layer.
+- [KivyMD](https://github.com/kivymd/kivymd) and few [Kivy](https://github.com/kivy) components for the UI and building the app.
+
+### 📋 Future plans
+
+1. Bring this SMS API option to Desktop platforms. We will leverage [Quectel EC200U](https://www.quectel.com/product/lte-ec200u-series/) based USB development boards to send SMS.
+
+-----
+
+## 🧩 Building your app from code
+
 ### 📱 Build Android App
 A Linux environment is recommended for the app development. If you are on Windows, you may use `WSL` or any `Virtual Machine`.
 
