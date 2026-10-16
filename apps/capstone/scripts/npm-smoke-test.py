@@ -402,8 +402,9 @@ def main() -> int:
     parser.add_argument("--upstream-host", default=None,
                         help="host running the stack — classifies a 5xx as a stopped upstream vs a "
                              "broken host (env NPM_UPSTREAM_HOST, fallback PJSIP_MEDIA_ADDRESS)")
-    parser.add_argument("--zeus-upstream-host", default=None,
-                        help="host serving subscribe.<domain> (env ZEUS_UPSTREAM_HOST)")
+    parser.add_argument("--subscribe-upstream-host", default=None,
+                        help="host serving subscribe.<domain> (env SUBSCRIBE_UPSTREAM_HOST, "
+                             "or its older name ZEUS_UPSTREAM_HOST)")
     args = parser.parse_args()
     env = load_env_file(Path(args.env_file))
 
@@ -413,7 +414,13 @@ def main() -> int:
     # the note stays generic — see classify_5xx.
     upstream_host = (args.upstream_host or env.get("NPM_UPSTREAM_HOST")
                      or env.get("PJSIP_MEDIA_ADDRESS") or "").strip()
-    zeus_upstream = (args.zeus_upstream_host or env.get("ZEUS_UPSTREAM_HOST") or "").strip()
+    # The hosts behind the two rows that are not this stack's box (see HOSTS in
+    # npm-proxy-hosts.py): the shared Cerulean Authentik, and the estate's
+    # subscribe portal. Both are used only to explain a 5xx — see classify_5xx.
+    subscribe_upstream = (args.subscribe_upstream_host
+                          or env.get("SUBSCRIBE_UPSTREAM_HOST")
+                          or env.get("ZEUS_UPSTREAM_HOST") or "").strip()
+    authentik_upstream = (env.get("AUTHENTIK_UPSTREAM_HOST") or "").strip()
 
     # A runner with no route to the stack cannot test it. Exit 2 (skip) — the
     # same convention scripts/ci/sso-smoke.py uses — so a hosted CI runner that
@@ -453,7 +460,10 @@ def main() -> int:
         sub = h["sub"]
         domain = base_domain if sub is None else f"{sub}.{base_domain}"
         gated = bool(h.get("gated"))
-        host_up = zeus_upstream if h.get("host_key") == "ZEUS_UPSTREAM_HOST" else upstream_host
+        host_up = {
+            "SUBSCRIBE_UPSTREAM_HOST": subscribe_upstream,
+            "AUTHENTIK_UPSTREAM_HOST": authentik_upstream,
+        }.get(h.get("host_key") or "", upstream_host)
         upstream = (host_up, h["port"]) if host_up else None
         verdict, note = check_host(domain, gated, signin_base, args.timeout, upstream)
         print(f"{domain:45} {verdict} ({note})")

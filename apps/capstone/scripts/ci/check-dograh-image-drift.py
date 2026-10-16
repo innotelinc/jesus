@@ -126,10 +126,22 @@ SYNC_BASE = "upstream/main"
 CODE_PREFIXES = ("api/", "ui/", "pipecat/")
 
 
-def touched_paths() -> dict[str, list[str]]:
-    """{repo-relative path: [commit subject, ...]} for every file our delta touches."""
+def delta_paths() -> tuple[dict[str, list[str]], list[str], list[str]]:
+    """Our delta against upstream/main, split by what can actually be compared.
+
+    Returns (files to compare, paths our commits removed, paths upstream added
+    since our clone's base).
+
+    Deletions are not candidate files: the tree does not have them, so there is
+    nothing to hash — and hashing one anyway is what CRASHED this check on
+    `api/alembic/versions/c82d4f6a9b10_…` (a file upstream added a week after
+    our clone's base, which `upstream/main..HEAD` therefore reports as a
+    deletion of ours; 31 such paths, measured on 16 Oct 2026). The merge-base
+    separates the two cases: a removed path that existed at the base is ours and
+    the images must NOT carry it, one that did not exist was upstream's.
+    """
     if not (UPSTREAM / ".git").is_dir():
-        return {}
+        return {}, [], []
 
     def git(*args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -149,7 +161,7 @@ def touched_paths() -> dict[str, list[str]]:
         # Without a base there is no delta to compare, and returning {} here made
         # the caller report PASS while hashing nothing -- a false pass on the one
         # check whose whole job is to notice a mismatch.
-        return {}
+        return {}, [], []
 
     revs = [f"{base}..HEAD"]
     if base == SYNC_BASE:
@@ -158,13 +170,41 @@ def touched_paths() -> dict[str, list[str]]:
         revs.append(f"{SYNC_BASE}..origin/main")
 
     touched: dict[str, list[str]] = {}
+    removed: set[str] = set()
     for rev in revs:
-        out = git("diff", "--name-only", rev).stdout
+        out = git("diff", "--name-status", rev).stdout
         for line in out.splitlines():
-            path = line.strip()
-            if path.startswith(CODE_PREFIXES):
+            status, _, path = line.partition("\t")
+            path = path.strip()
+            if not path.startswith(CODE_PREFIXES):
+                continue
+            if status.strip().startswith("D"):
+                removed.add(path)
+            else:
                 touched.setdefault(path, []).append("our delta")
-    return touched
+
+    # A removed path has to be judged against where the two lines DIVERGED, not
+    # against the moving ref: `upstream/main` keeps gaining files, and every one
+    # of them is a deletion in `upstream/main..HEAD` that our tree never held.
+    # (Measured 16 Oct 2026: 21 of the 31, all added by upstream's #883/#886
+    # after the merge-base — the reason this check crashed instead of answering.)
+    divergence = git("merge-base", base, "HEAD").stdout.strip() or base
+    ours_removed = sorted(
+        p for p in removed if git("cat-file", "-e", f"{divergence}:{p}").returncode == 0
+    )
+    upstream_new = sorted(p for p in removed if p not in set(ours_removed))
+    return touched, ours_removed, upstream_new
+
+
+def exec_missing(container: str, paths: list[str]) -> set[str]:
+    """The subset of `paths` the image does NOT have (they were removed)."""
+    if not paths:
+        return set()
+    script = "for p in " + " ".join(f"'{p}'" for p in paths) + "; do [ -e \"$p\" ] || echo \"$p\"; done"
+    out = docker(["exec", container, "sh", "-lc", script])
+    if out is None:
+        return set()
+    return {line.strip() for line in out.stdout.splitlines() if line.strip()}
 
 
 def sha256_file(path: pathlib.Path) -> str:
@@ -219,7 +259,7 @@ def main() -> int:
     ).stdout.strip()
     print(f"comparing against dograh/upstream @ {head or 'unknown'}")
 
-    touched = touched_paths()
+    touched, ours_removed, upstream_new = delta_paths()
     if not touched:
         # An empty delta means we could not work out what our customizations are,
         # so there is nothing to compare. Reporting PASS here would be the exact
@@ -281,6 +321,27 @@ def main() -> int:
                    else f"{got[:12]}… != {want[:12]}…")
             print(f"  DRIFT {API_CONTAINER}:{dest}  ({labels}) — {why}", file=sys.stderr)
             drift += 1
+
+    # ── files our delta REMOVED: the images must not carry them ──────────────
+    # api/** only: those map onto /app/<path> one-for-one. pipecat is installed
+    # as a package (a removed source file would be absent from the installed
+    # one too) and ui/** has no source mapping at all, so both are reported
+    # rather than asserted.
+    removed_api = [f"{API_APP_ROOT}/{p}" for p in ours_removed if p.startswith("api/")]
+    still_present = exec_missing(API_CONTAINER, removed_api) if removed_api else set()
+    for dest in removed_api:
+        path = dest[len(API_APP_ROOT) + 1:]
+        if dest in still_present:
+            print(f"  DRIFT {API_CONTAINER}:{dest} — our delta removes this file and the image "
+                  "still carries it (a build from a tree that predates the removal)", file=sys.stderr)
+            drift += 1
+        else:
+            print(f"  ok    {API_CONTAINER}:{dest}  (removed by our delta, absent as built)")
+    for path in [p for p in ours_removed if not p.startswith("api/")]:
+        print(f"  note  {path} is removed by our delta; not asserted (no image mapping)")
+    if upstream_new:
+        print(f"  note  {len(upstream_new)} file(s) upstream added after our clone's base "
+              f"({upstream_new[0]}…) are not part of our delta — not compared")
 
     # ── dograh-ui: the compiled artifacts patch 0001 changes ─────────────────
     home = exec_read(UI_CONTAINER, UI_HOME_ARTIFACT)

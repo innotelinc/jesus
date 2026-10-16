@@ -11,12 +11,22 @@ What it does:
   2. sync      — for every service in the README "NPM proxy hosts" table,
                  create-or-update its proxy host under NPM_BASE_DOMAIN
                  (forward host/port from the compose port map)
-  3. ssl       — when NPM_LETSENCRYPT_EMAIL is set, create-or-reuse a Let's
-                 Encrypt certificate per host and force HTTPS. With
-                 --wildcard + DNS provider credentials (NPM_DNS_PROVIDER /
-                 NPM_DNS_PROVIDER_CREDENTIALS), ONE wildcard certificate
-                 covering "*.base + base" is issued via DNS-01 and
-                 auto-attached to every proxy host instead.
+  3. ssl       — when NPM_LETSENCRYPT_EMAIL is set, reuse the certificate a
+                 host already carries, and create one only when it has none;
+                 force HTTPS either way. With --wildcard + DNS provider
+                 credentials (NPM_DNS_PROVIDER / NPM_DNS_PROVIDER_CREDENTIALS),
+                 ONE wildcard certificate covering "*.base + base" is issued
+                 via DNS-01 and attached to every proxy host instead.
+
+                 Reuse is the common case and it is deliberate: Cerulean (the
+                 estate's TrustOps platform) issues one wildcard per zone
+                 against the shared BIND and *exports* it into NPM, where it is
+                 recorded under the apex alone (`domain_names == [base]`) even
+                 though its certificate also names `*.base`. A sync that
+                 insisted on finding the `*.base` name in that list reported
+                 every host as having no certificate, and one that re-issued
+                 would have replaced the zone's shared certificate with a dozen
+                 per-host ones. See zone_wildcard_cert().
 
 Optional services (portal) are skipped unless listed in
 --include-optional / NPM_INCLUDE_OPTIONAL — they only exist when their
@@ -38,8 +48,15 @@ Environment variables (real env wins, then the capstone .env, then defaults):
   NPM_BASE_DOMAIN         base domain, e.g. capstone.innotel.us  (required)
   NPM_UPSTREAM_HOST       Docker host IP NPM forwards to
                           (default: PJSIP_MEDIA_ADDRESS from .env)
-  ZEUS_UPSTREAM_HOST      Docker host IP for the shared Zeus subscribe portal
-                          (required for subscribe.<domain>; not the Capstone host)
+  AUTHENTIK_UPSTREAM_HOST host serving Authentik — what `auth.<domain>`
+                          forwards to (default: NPM_UPSTREAM_HOST, i.e. this
+                          stack runs its own IdP; a deployment that uses the
+                          shared Cerulean Authentik sets it to that host)
+  SUBSCRIBE_UPSTREAM_HOST host serving subscribe.<domain> — the estate's
+                          subscribe portal (the box behind subscribe.innotel.us),
+                          required, and never this stack's own upstream. The
+                          older name ZEUS_UPSTREAM_HOST is still read as a
+                          fallback.
   NPM_LETSENCRYPT_EMAIL   email for Let's Encrypt certs
                           (default: GRIST_ADMIN_EMAIL; empty → hosts without SSL)
   NPM_INCLUDE_OPTIONAL    comma list of optional hosts: nocodb,portal (or "all")
@@ -98,10 +115,12 @@ import argparse
 import json
 import os
 import socket
+import ssl
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -126,7 +145,13 @@ HOSTS: list[dict[str, Any]] = [
     {"key": "apex",      "sub": None,        "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (apex origin)"},
     {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": True,  "name": "Capstone Voice API"},
     {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
-    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": True,  "name": "Authentik (SSO / user management)"},
+    # auth.<domain> is the IdP that every other host's gate points at, and it is
+    # not necessarily this stack's host: the shared deployment runs ONE
+    # Authentik for the whole estate (Cerulean's, on 192.168.1.71 here) and this
+    # stack runs none, so AUTHENTIK_UPSTREAM_HOST names the box that does.
+    # Unset → NPM_UPSTREAM_HOST, which is right for a stack with its own IdP.
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": True,
+     "host_key": "AUTHENTIK_UPSTREAM_HOST", "name": "Authentik (SSO / user management)"},
     {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)"},
     {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center"},
     # dashboard.<domain> is the Control Center's canonical name: the Authentik
@@ -161,13 +186,17 @@ HOSTS: list[dict[str, Any]] = [
     # gateway), so the name changed but nothing about the forward did.
     {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "gated": True, "name": "Grafana — via SSO gateway"},
     {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "gated": True, "name": "Workflow Studio — via SSO gateway"},
-    # subscribe.<domain> is served by the Zeus portal, not the retired shared
-    # :3040 nginx. Keep this row in the cross-stack smoke inventory, but resolve
-    # its host independently: the normal NPM_UPSTREAM_HOST is the Capstone/Dograh
-    # box and forwarding this name there produced the 502 fixed on 24 Sep 2026.
-    {"key": "subscribe", "sub": "subscribe", "scheme": "http", "port": 3001,
-     "websocket": True, "host_key": "ZEUS_UPSTREAM_HOST",
-     "name": "Zeus subscribe portal (pricing / checkout)"},
+    # subscribe.<domain> is the estate's subscribe portal: the pricing/checkout
+    # page behind subscribe.innotel.us, which renders the per-zone page from the
+    # Host header and reads each price live from Magnate. It is neither this
+    # stack's box nor this stack's portal — every zone in the estate points at
+    # the same host — and forwarding this name at the Capstone/Dograh box is
+    # what produced the 502 fixed on 24 Sep 2026. So its host comes from
+    # SUBSCRIBE_UPSTREAM_HOST (ZEUS_UPSTREAM_HOST is the older name for it), and
+    # websocket stays off because it serves an ordinary page.
+    {"key": "subscribe", "sub": "subscribe", "scheme": "http", "port": 3040,
+     "websocket": False, "host_key": "SUBSCRIBE_UPSTREAM_HOST",
+     "name": "Subscribe portal (pricing / checkout)"},
     {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
 ]
 
@@ -391,29 +420,136 @@ def build_payload(domain: str, h: dict, forward_host: str,
     }
 
 
+def covering_cert(certs_by_domain: dict[str, int], domain: str) -> int | None:
+    """A certificate whose *recorded* names cover `domain`, or None.
+
+    Exact first, then one wildcard label. A wildcard matches exactly ONE label,
+    so drop exactly the first: auth.capstone.innotel.us →
+    *.capstone.innotel.us (NOT *.innotel.us), and a four-label name is not
+    covered by its zone's wildcard at all.
+    """
+    cid = certs_by_domain.get(domain.lower())
+    if cid is not None:
+        return cid
+    labels = domain.split(".")
+    if len(labels) > 2:
+        return certs_by_domain.get("*." + ".".join(labels[1:]))
+    return None
+
+
+def wildcard_covers(name: str, zone: str) -> bool:
+    """Whether `*.zone` (+ the apex) covers `name` — one label, never two."""
+    name, zone = name.lower().strip("."), zone.lower().strip(".")
+    return name == zone or name.count(".") == zone.count(".") + 1 and name.endswith("." + zone)
+
+
+def edge_cert_names(host: str, port: int = 443, timeout: float = 8.0) -> set[str] | None:
+    """The DNS names the edge's certificate for `host` carries, or None.
+
+    Read out of a handshake that was verified against the system trust store,
+    exactly as a browser verifies it: a non-empty result means this host's HTTPS
+    is genuine and these are the names its certificate covers. An empty set
+    means the edge answered with a certificate that does not cover `host`. None
+    means the probe could not run from here (no DNS, no route) — a fact about
+    this runner, not about the certificate, and never read as "absent".
+    """
+    try:
+        socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return None
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as raw:
+            context = ssl.create_default_context()
+            with context.wrap_socket(raw, server_hostname=host) as tls:
+                peer = tls.getpeercert()
+    except ssl.SSLCertVerificationError:
+        return set()
+    except (ssl.SSLError, OSError):
+        return None
+    return {value for kind, value in peer.get("subjectAltName", ()) if kind == "DNS"}
+
+
+def zone_wildcard_cert(certs_by_domain: dict[str, int], zone: str) -> int | None:
+    """The zone's wildcard certificate as NPM records it, or None.
+
+    Cerulean issues ONE wildcard per zone (`*.zone` + the apex) via DNS-01
+    against the shared BIND and exports it into NPM, where it is recorded under
+    the apex alone — `domain_names == [zone]` — even though its certificate
+    names every subdomain too. A name lookup cannot see it, which is how every
+    host in a zone came to be reported as having no certificate while serving
+    that very certificate. So ask the edge what it actually presents for the
+    apex and accept the certificate NPM holds only when its SANs really do carry
+    `*.zone`; an apex-only certificate is not this, and is left alone.
+    """
+    cid = certs_by_domain.get(zone.lower())
+    if cid is None:
+        return None
+    names = edge_cert_names(zone)
+    if names is None:
+        # No route from here: the certificate NPM holds for the apex is the one
+        # the zone's hosts serve, so that is the one to reuse.
+        return cid
+    return cid if f"*.{zone.lower()}" in {n.lower() for n in names} else None
+
+
+def cert_lapsed(certs_by_id: dict[int, dict], cid: int) -> str:
+    """The certificate's expiry when it has already passed, else "".
+
+    Returning the timestamp rather than a bool keeps the FAIL message useful:
+    a certificate can lapse, or be replaced with an unrelated renewed one that
+    no longer carries the name.
+    """
+    raw = str((certs_by_id.get(cid) or {}).get("expires_on") or "")
+    try:
+        when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return raw if when < datetime.now(timezone.utc) else ""
+
+
 def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
                 dns_provider: str, dns_credentials: str,
                 check: bool, certs_by_domain: dict[str, int],
-                failed: list[str]) -> int | None:
-    """Return the cert id covering `domains`, creating it when missing.
+                failed: list[str], certs_by_id: dict[int, dict] | None = None,
+                attached_id: int = 0, zone: str = "",
+                zone_cert: int | None = None) -> int | None:
+    """Return the cert id covering `domains`, creating one only when it must.
 
-    With DNS provider credentials set, issues the cert via DNS-01 (required
-    for wildcard names); otherwise uses the default HTTP-01 challenge. In
-    --check mode never writes: reports the missing cert as a FAIL instead.
+    Reuse comes before issuance, in this order:
+
+      1. a certificate whose recorded names cover the name;
+      2. the zone's wildcard (see zone_wildcard_cert), for a host under it;
+      3. the certificate the host already carries — and a sync has no business
+         replacing a working certificate with a fresh per-host one, which is
+         exactly what the exported wildcard above would otherwise invite;
+      4. create one (HTTP-01, or DNS-01 with provider credentials).
+
+    In --check mode step 4 never writes: a certificate that is missing is a
+    FAIL, and so is one that is attached but has already lapsed. With DNS
+    provider credentials set, issues via DNS-01 (required for wildcard names);
+    otherwise uses the default HTTP-01 challenge.
     """
     for d in domains:
-        cid = certs_by_domain.get(d.lower())
+        cid = covering_cert(certs_by_domain, d)
         if cid is not None:
             return cid
-        # Reuse a wildcard certificate covering this name (*.capstone.… —
-        # Cerulean attaches one to every host; never re-issue per-host certs).
-        # A wildcard matches exactly ONE label, so drop exactly the first:
-        # auth.capstone.innotel.us → *.capstone.innotel.us (NOT *.innotel.us).
-        labels = d.split(".")
-        if len(labels) > 2:
-            wild = certs_by_domain.get("*." + ".".join(labels[1:]))
-            if wild is not None:
-                return wild
+    # The zone's wildcard covers a one-label subdomain of the zone and the zone
+    # itself — everything every row in HOSTS asks about except `backend.api.…`,
+    # which has a certificate of its own and matched above.
+    if zone_cert is not None and zone and all(wildcard_covers(d, zone) for d in domains):
+        return zone_cert
+    if attached_id and certs_by_id is not None:
+        lapsed = cert_lapsed(certs_by_id, attached_id)
+        if not lapsed:
+            return attached_id
+        print(f"FAIL the certificate {domains[0]} serves lapsed on {lapsed} — renew it "
+              f"(Cerulean exports the zone's wildcard; `npm-proxy-hosts.py` will not "
+              f"re-issue a certificate this deployment already has)", file=sys.stderr)
+        failed.append(domains[0])
+        if check:
+            return None
     label = ", ".join(domains)
     if check:
         print(f"FAIL no Let's Encrypt certificate for {label}")
@@ -550,8 +686,12 @@ def main() -> int:
     parser.add_argument("--api-token", default=None, help="persistent NPM API token (env NPM_API_TOKEN)")
     parser.add_argument("--base-domain", default=None, help="base domain, e.g. capstone.innotel.us (env NPM_BASE_DOMAIN)")
     parser.add_argument("--upstream-host", default=None, help="Docker host IP NPM forwards to (env NPM_UPSTREAM_HOST)")
-    parser.add_argument("--zeus-upstream-host", default=None,
-                        help="Docker host IP for the shared Zeus subscribe portal (env ZEUS_UPSTREAM_HOST)")
+    parser.add_argument("--authentik-upstream-host", default=None,
+                        help="host serving Authentik for auth.<domain> (env AUTHENTIK_UPSTREAM_HOST; "
+                             "default NPM_UPSTREAM_HOST)")
+    parser.add_argument("--subscribe-upstream-host", default=None,
+                        help="host serving subscribe.<domain> — the estate's subscribe portal "
+                             "(env SUBSCRIBE_UPSTREAM_HOST, or the older ZEUS_UPSTREAM_HOST)")
     parser.add_argument("--letsencrypt-email", default=None, help="email for Let's Encrypt certs (env NPM_LETSENCRYPT_EMAIL)")
     parser.add_argument("--wildcard", action="store_true",
                         help="issue ONE wildcard cert (*.base + base) via DNS-01 and attach it to every host (env NPM_WILDCARD_CERT)")
@@ -590,7 +730,16 @@ def main() -> int:
     # else the PBX media address from .env.
     explicit_upstream = args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
     upstream = explicit_upstream or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
-    zeus_upstream = args.zeus_upstream_host or cfg(args, "ZEUS_UPSTREAM_HOST", "")
+    # Rows whose upstream is not this box name it here (see HOSTS): the shared
+    # Cerulean Authentik behind `auth.<domain>`, and the estate's subscribe
+    # portal behind `subscribe.<domain>`. SUBSCRIBE_UPSTREAM_HOST's older name
+    # is still honoured so an existing deployment (and the CI workflow that
+    # passes it) keeps working through the rename.
+    authentik_upstream = (args.authentik_upstream_host
+                          or cfg(args, "AUTHENTIK_UPSTREAM_HOST", "")).strip()
+    subscribe_upstream = (args.subscribe_upstream_host
+                          or cfg(args, "SUBSCRIBE_UPSTREAM_HOST", "")
+                          or cfg(args, "ZEUS_UPSTREAM_HOST", "")).strip()
     if upstream and not explicit_upstream:
         # Say it out loud. That fallback is THIS process's LAN address, which is
         # only the right forward target when the stack runs here — run the sync
@@ -611,9 +760,16 @@ def main() -> int:
     if not upstream:
         print("FAIL NPM_UPSTREAM_HOST (or PJSIP_MEDIA_ADDRESS) is empty — set the Docker host IP in .env", file=sys.stderr)
         return 1
-    if not zeus_upstream:
-        print("FAIL ZEUS_UPSTREAM_HOST is empty — subscribe.<domain> serves the Zeus portal and must not use the Capstone upstream", file=sys.stderr)
+    if not subscribe_upstream:
+        print("FAIL SUBSCRIBE_UPSTREAM_HOST is empty (ZEUS_UPSTREAM_HOST is read as its older "
+              "name) — subscribe.<domain> is the estate's subscribe portal, the box behind "
+              "subscribe.innotel.us, and never this stack's own upstream", file=sys.stderr)
         return 1
+    if subscribe_upstream == upstream:
+        print(f"WARN SUBSCRIBE_UPSTREAM_HOST={subscribe_upstream} is this stack's own "
+              f"NPM_UPSTREAM_HOST — subscribe.<domain> is a public pricing/checkout page "
+              f"served by the estate's portal elsewhere; pointing it at this box is what "
+              f"produced the 502 fixed on 24 Sep 2026", file=sys.stderr)
 
     optional = {s.strip() for s in include_raw.split(",") if s.strip()}
     if "all" in optional:
@@ -636,8 +792,14 @@ def main() -> int:
                 else oidc_handoff_location(canonical, upstream)
             )
             h.setdefault("locations", []).append(location)
-        if h.get("host_key") == "ZEUS_UPSTREAM_HOST":
-            h["forward_host"] = zeus_upstream
+        # A row may resolve its upstream from the environment rather than this
+        # box (see the auth and subscribe rows in HOSTS). An unset
+        # AUTHENTIK_UPSTREAM_HOST means this stack runs its own identity
+        # provider, which is where NPM already forwards `auth.<domain>`.
+        if h.get("host_key") == "AUTHENTIK_UPSTREAM_HOST":
+            h["forward_host"] = authentik_upstream or upstream
+        elif h.get("host_key") == "SUBSCRIBE_UPSTREAM_HOST":
+            h["forward_host"] = subscribe_upstream
     if args.ws_scheme is not None or args.ws_port is not None:
         for h in hosts:
             if h["key"] == "voice":
@@ -680,10 +842,14 @@ def main() -> int:
         for d in eh.get("domain_names") or []:
             by_domain.setdefault(d.lower(), eh)
 
-    # Certificates: reuse a cert that already covers our domain.
+    # Certificates: reuse a cert that already covers our domain. Indexed both
+    # ways — by the names NPM records, and by id, so a host's own certificate
+    # (and its expiry) can be read back.
     certs_by_domain: dict[str, int] = {}
+    certs_by_id: dict[int, dict] = {}
     try:
         for c in api.certificates():
+            certs_by_id[c["id"]] = c
             for d in c.get("domain_names") or []:
                 certs_by_domain.setdefault(d.lower(), c["id"])
     except (NpmError, urllib.error.URLError, OSError) as e:
@@ -693,33 +859,38 @@ def main() -> int:
     if not ssl and not args.no_ssl:
         print("WARN NPM_LETSENCRYPT_EMAIL not set — creating hosts without SSL (pass --no-ssl to silence)")
 
-    # Wildcard mode: ONE cert covering "*.base + base" issued via DNS-01 and
-    # auto-attached to every host. Requires DNS provider credentials saved in
-    # NPM — without them we fall back to the per-host HTTP-01 certs below.
+    # Wildcard mode: ONE cert covering "*.base + base" (issued via DNS-01 when
+    # DNS provider credentials are saved in NPM) and attached to every host. When
+    # the zone's wildcard is already in NPM — Cerulean exports one per zone —
+    # that is the certificate reused, and nothing is requested from Let's
+    # Encrypt at all: the credentials are only needed to ISSUE one.
     wildcard = args.wildcard or cfg(args, "NPM_WILDCARD_CERT", "").lower() in {"1", "true", "yes", "on"}
     dns_provider = args.dns_provider or cfg(args, "NPM_DNS_PROVIDER", "")
     dns_credentials = args.dns_credentials or cfg(args, "NPM_DNS_PROVIDER_CREDENTIALS", "")
-    if wildcard and ssl and not (dns_provider and dns_credentials):
-        print("WARN wildcard requested but NPM_DNS_PROVIDER / NPM_DNS_PROVIDER_CREDENTIALS unset — "
-              "falling back to per-host HTTP-01 certificates", file=sys.stderr)
-        wildcard = False
     if wildcard and not ssl:
         wildcard = False
+
+    # The certificate the zone serves under, when NPM holds it recorded as the
+    # apex (see zone_wildcard_cert) — every host below reuses it.
+    zone_cert = zone_wildcard_cert(certs_by_domain, base_domain) if ssl else None
 
     created = updated = ok = pruned = 0
     failed: list[str] = []
     managed_domains: set[str] = set()
 
-    # Issue the single wildcard cert up front; every host then reuses it.
+    # The single wildcard cert: reuse the one the zone already has, else issue
+    # one when DNS provider credentials are saved in NPM. A certificate missing
+    # per host is caught in the loop below, host by host, which is the verdict
+    # that matters — this block only decides whether to ASK Let's Encrypt.
     if wildcard:
         wc_id = ensure_cert(api, [f"*.{base_domain}", base_domain], le_email,
                             dns_provider, dns_credentials, args.check,
-                            certs_by_domain, failed)
-        if wc_id is None:
-            if args.check:
-                print("FAIL wildcard certificate missing — proxy hosts out of sync", file=sys.stderr)
-                return 1
-            print("WARN wildcard certificate could not be issued — continuing per host", file=sys.stderr)
+                            certs_by_domain, failed, certs_by_id=certs_by_id)
+        if wc_id is None and not (dns_provider and dns_credentials):
+            print("WARN wildcard requested but NPM_DNS_PROVIDER / "
+                  "NPM_DNS_PROVIDER_CREDENTIALS unset and NPM holds no wildcard "
+                  "certificate for this zone — falling back to per-host HTTP-01 "
+                  "certificates", file=sys.stderr)
 
     for h in hosts:
         domain = base_domain if h["sub"] is None else f"{h['sub']}.{base_domain}"
@@ -727,12 +898,15 @@ def main() -> int:
         label = h["name"]
         existing = by_domain.get(domain.lower())
 
-        # Ensure a certificate for this domain (reuses the wildcard cert when
-        # it covers the name).
+        # Ensure a certificate for this domain. Reuse first: a recorded name,
+        # the zone's wildcard, or the certificate this host already carries.
         cert_id = None
         if ssl:
             cert_id = ensure_cert(api, [domain], le_email, dns_provider, dns_credentials,
-                                  args.check, certs_by_domain, failed)
+                                  args.check, certs_by_domain, failed,
+                                  certs_by_id=certs_by_id, zone=base_domain,
+                                  zone_cert=zone_cert,
+                                  attached_id=int((existing or {}).get("certificate_id") or 0))
             if cert_id is None:
                 if not args.check:
                     continue

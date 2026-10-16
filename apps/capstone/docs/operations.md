@@ -377,12 +377,13 @@ and handles renewal):
 |---|---|---|
 | `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
 | `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
-| `auth.<domain>` | `http://<host>:9000` | Authentik SSO / user management |
+| `auth.<domain>` | `http://<AUTHENTIK_UPSTREAM_HOST>:9000` | Authentik SSO / user management — the IdP every other gate points at. This stack runs none of its own: the shared Cerulean Authentik serves it, named by `AUTHENTIK_UPSTREAM_HOST` (unset = a stack with its own IdP, i.e. `<host>`) |
 | `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
 | `dashboard.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`; the OIDC-bound name) |
 | `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (alias) |
 | `pbx.<domain>` | `http://<host>:14014` | FreePBX GUI (+ AvantFAX at `/fax`) — via the `pbx-sso` gateway; the GUI's own `:8083` is loopback-only |
 | `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
+| `subscribe.<domain>` | `http://<SUBSCRIBE_UPSTREAM_HOST>:3040` | The estate's subscribe portal — the box behind `subscribe.innotel.us`, which renders this zone's pricing/checkout page from the `Host` header and reads each price live from Magnate. It is **not** this stack's box; a sync must never point it here (that is the 502 fixed on 24 Sep 2026) |
 | `n8n.<domain>` | `http://<host>:14010` | n8n workflows — via the `n8n-sso` gateway; webhooks (`/webhook/*`) are exempt, the editor is not |
 | `grist.<domain>` | `http://<host>:14011` | Grist documents — via the `grist-sso` gateway; nothing is exempt, its API runs in single-identity mode |
 | `grafana.<domain>` | `http://<host>:14012` | Grafana dashboards (provisioned from this repo) — via the `grafana-sso` gateway; it holds the port the SigNoz UI had |
@@ -420,12 +421,22 @@ names. The same model covers `*.magnate.innotel.us` and `*.cerulean.innotel.us`.
 records for every subdomain live in the shared `innotel.us` BIND zone (managed through
 Cerulean), not in per-platform providers.
 
+NPM records that exported certificate under the **apex alone** (`domain_names ==
+[capstone.innotel.us]`) even though its SANs carry `*.capstone.innotel.us` — so a lookup by
+name cannot see the wildcard in it. `scripts/npm-proxy-hosts.py` therefore asks the edge
+what it actually presents (`zone_wildcard_cert`: a verified handshake against the apex,
+whose certificate's SANs must name the wildcard) and reuses the certificate each host
+already carries; a certificate that has lapsed is a `FAIL`, never a silent re-issue. That
+is why `--check` here reports no missing certificate and a plain run writes nothing at all.
+
 ### Automate proxy-host creation via the NPM API
 
 `scripts/npm-proxy-hosts.py` creates/updates every row above through NPM's REST API — no UI
 clicks. It logs in (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD` or a minted `NPM_API_TOKEN`),
-requests Let's Encrypt certificates (`NPM_LETSENCRYPT_EMAIL`; one **wildcard** cert for all
-hosts when `NPM_WILDCARD_CERT=1` + DNS credentials are set), and prunes stale `*.<domain>`
+reuses the certificate a host already carries and only issues one when it must
+(`NPM_LETSENCRYPT_EMAIL`; one **wildcard** cert for all hosts when `NPM_WILDCARD_CERT=1` +
+DNS credentials are set — and with no credentials it reuses the zone's exported wildcard
+instead of asking for per-host certs), and prunes stale `*.<domain>`
 hosts. Idempotent: GET-first, writes only when state differs; scoped to the base domain so
 unrelated NPM hosts are never touched.
 
@@ -782,19 +793,24 @@ CI runs it as the `npm-smoke` job on the nightly schedule, on top of push and PR
 ### Guard the images against drift
 
 Configuration cannot tell whether the stack is serving this repo's build: `dograh/upstream`
-is gitignored and its fixes live in `dograh/patches/`, so an image pulled from
-`ghcr.io/innotelinc/dograh-*` — or one built without `./scripts/apply-dograh-patches.sh` —
-passes every config check and still renders the pre-patch dead end. `npm-smoke-test.py`
-sees that once, through the edge; `scripts/ci/check-dograh-image-drift.py` sees all of it,
-at the images themselves. It hashes the patched `api/**` and `pipecat/**` files in the
-running `dograh-api` against the patched upstream tree, and asks `dograh-ui` for the two
+is a gitignored clone of the fork, which carries our customizations as commits on top of
+`upstream/main`, so any image built from a different tree — a registry tag, or a build made
+before the last sync — passes every config check and still renders the pre-patch dead end.
+`npm-smoke-test.py` sees that once, through the edge; `scripts/ci/check-dograh-image-drift.py`
+sees all of it, at the images themselves. It hashes the `api/**` and `pipecat/**` files our
+delta touches in the running `dograh-api` against the tree (a path our delta *removes* must
+be absent from the image; a path upstream added after this clone's base is not our delta and
+is reported as such rather than compared), and asks `dograh-ui` for the two
 things patch `0001` changes in its **compiled** output (the home page's OIDC branch, and
 the workflow page's removed dead end — `.next/` holds a build, so a source hash cannot be
 compared there):
 
 ```bash
-./scripts/apply-dograh-patches.sh                    # make upstream the patched tree
 python3 scripts/ci/check-dograh-image-drift.py       # 0 = match, 1 = drift, 2 = cannot look
+# this deployment runs the voice platform as its own project (project `dograh`), where the
+# containers are <project>-<service>-1:
+DOGRAH_API_CONTAINER=dograh-api-1 DOGRAH_UI_CONTAINER=dograh-ui-1 \
+  python3 scripts/ci/check-dograh-image-drift.py
 ```
 
 Same exit-code convention as above: 2 means no clone, no docker, or the containers are not

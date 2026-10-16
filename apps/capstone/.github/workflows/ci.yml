@@ -500,6 +500,12 @@ jobs:
         env:
           NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'capstone.innotel.us' }}
           NPM_UPSTREAM_HOST: ${{ vars.NPM_UPSTREAM_HOST }}
+          # The two rows that are not this stack's box: the shared Cerulean
+          # Authentik, and the estate's subscribe portal. They are only used to
+          # explain a 5xx here (a wrong value changes a note, not a verdict),
+          # but a stale one misreports which upstream is down.
+          AUTHENTIK_UPSTREAM_HOST: ${{ vars.AUTHENTIK_UPSTREAM_HOST }}
+          SUBSCRIBE_UPSTREAM_HOST: ${{ vars.SUBSCRIBE_UPSTREAM_HOST || vars.ZEUS_UPSTREAM_HOST }}
           ZEUS_UPSTREAM_HOST: ${{ vars.ZEUS_UPSTREAM_HOST }}
         run: |
           set -uo pipefail
