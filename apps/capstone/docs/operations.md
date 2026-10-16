@@ -802,6 +802,90 @@ running on this host, which the `dograh-image-drift` CI job reports as a skip (a
 runner cannot reach the stack); a runner with a route to it turns the job into a gate.
 `DOGRAH_API_CONTAINER` / `DOGRAH_UI_CONTAINER` override the compose service names.
 
+## Boot (the `capstone.service` unit)
+
+`systemd/capstone.service` is a thin wrapper: the sequence itself is
+`scripts/boot-stack.sh`. That split is deliberate — which services the unit may
+start depends on how the host is laid out, and the two layouts need different
+commands:
+
+| Layout | What boot does |
+|---|---|
+| **Split** (the usual deployment here) | `dograh/upstream` is present, so the voice platform is started first as its **own** compose project (`dograh`, with `data/.env.dograh` + `docker-compose.dograh-capstone.yml`), and the capstone run then names only the services no other project claims: `tts-shim dashboard dashboard-api pbx-sso prometheus grafana grafana-sso otel-collector searxng sandbox-api sandbox-runner-1 n8n-sso grist-sso workflow-sso workflow-studio`. |
+| **Standalone** (no checkout) | One project: the capstone run starts the whole file. |
+
+Naming `postgres`, `redis`, `minio`, `dograh-api`, `dograh-ui`, `speaches` or
+`grist` in the capstone run makes compose abort on a container-name or host-port
+collision **before it reaches any service** — which is what a broken boot looks
+like, with nothing named and no service started. The list is load-bearing rather
+than tidiness, and a host can replace it with `CAPSTONE_BOOT_SERVICES`
+(space-separated, in the environment or in `/etc/capstone/boot.env`).
+
+Both runs pass `--pull=never`: a boot must not depend on registry access, and a
+tag that no longer exists has to fail loudly here instead of quietly changing
+which build a service runs. That is why every `*_IMAGE` override in `.env` has
+to be a *published* tag (`.env.example` documents the pair that is; the stale
+`minio/minio:latest` and `dograh-local/*` values this stack once carried are what
+the pull failure in that failure mode was).
+
+The capstone run ends in `up -d --wait`, so the unit's exit status is the health
+of the stack: non-zero unless every service with a healthcheck is healthy and
+every `depends_on` condition is met. The one-shots (`sandbox-certs`,
+`healthprobe`) are dependencies of listed services, exit 0, and do not decide
+the unit's fate.
+
+The app doors matter as much as the apps: `n8n.<domain>`, `grist.<domain>` and
+`workflow.<domain>` are routed by the edge to their `*-sso` gateways on
+14010/14011/14013, the apps behind them are loopback-only, and `n8n`/`grist`
+themselves are the voice project's — so a boot that starts the apps but not the
+gateways leaves those three names answering 502 at the edge.
+
+Two env files, and the difference matters:
+
+- `data/.env.resolved` is what the unit hands to compose. It is **generated**
+  from `.env` by `scripts/compose-vault.sh` (`scripts/setup.sh` and
+  `scripts/redeploy-dashboard.sh` run it too) so `vault://` references are
+  already values when a service reads them. Anything added to that file by hand
+  is **wiped on the next resolve**, so host-specific values belong in `.env`:
+  that is where `OTEL_GRPC_PORT`/`OTEL_HTTP_PORT`/`OTEL_INTERNAL_METRICS_PORT`/
+  `OTEL_SPAN_METRICS_PORT` and `GRAFANA_HTTP_PORT` live on this box, which is how
+  Capstone's collector and Grafana sit beside the voice stack's SigNoz on
+  4317/4318/8888/8889 and 3301.
+- `data/.env.dograh` is the voice platform's own env file, for its project. It is
+  **complete by construction**: every variable the upstream compose and
+  `docker-compose.dograh-capstone.yml` interpolate is set in it explicitly, so a
+  boot cannot silently fall back to a default buried in the upstream file (a
+  missing key renders as an empty string, which compose does not report). Two
+  things in it are load-bearing rather than cosmetic: the `api`/`ui` image pins
+  have to be the pair this database's schema revision belongs to (pin both or
+  neither — see "A patch only helps if the image that ships it is the one
+  running"), and the credentials at the bottom are the values the existing
+  volumes and services were created with, not fresh secrets — read the notes
+  there before rotating one.
+
+Check a change to either file without a reboot — the render itself is the check:
+
+```bash
+docker compose --project-directory dograh/upstream -p dograh \
+  -f dograh/upstream/docker-compose.yaml -f docker-compose.dograh-capstone.yml \
+  --env-file data/.env.dograh --profile tunnel config --format json \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["services"]), "services render")'
+```
+
+Compare that render against the running containers (`docker inspect … .Config.Env`)
+when you need to know whether the file still describes what is deployed: every
+compose-declared key has to match, and anything only in the container is baked
+into its image.
+
+And check the boot path without a reboot — `--dry-run` prints both compose runs and
+changes nothing:
+
+```bash
+scripts/boot-stack.sh --dry-run
+# after a real boot: active (exited), both compose runs SUCCESS
+systemctl status capstone.service
+```
+
 ## Observability
 
 Three containers and no trace store. The collector ingests OTLP, converts each
@@ -810,10 +894,33 @@ charts them from dashboards that live in this repo.
 
 | Container | Loopback port(s) | Role |
 |---|---|---|
-| `otel-collector` | `4317` gRPC, `4318` HTTP, `8888` own metrics, `8889` span metrics | OTLP ingest for dograh and n8n; `spanmetrics` connector |
+| `otel-collector` | `4317` gRPC, `4318` HTTP, `8888` own metrics, `8889` span metrics, `13133` health | OTLP ingest for dograh and n8n; `spanmetrics` connector |
 | `prometheus` | `9090` | the metrics store; scrapes `otel-collector:8889`, `otel-collector:8888`, `tts-shim:8880`, itself |
 | `grafana` | `3301` | charts `grafana/dashboards/*.json`; public door `grafana.<domain>` → `grafana-sso` (`14012`) |
 | `tts-shim` | `8881` | serves its own `tts_shim_*` metrics on `/metrics` |
+
+### How the distroless containers get a healthcheck
+
+`otel-collector` and every SSO gateway run single-binary distroless images — no
+shell, no libc, no `wget` — so a Docker healthcheck had nothing to execute
+inside them. The daemon reported them as `running` with no health signal, which
+the Control Center reads as **Warning** (see `status_and_score()` in
+`dashboard-backend/app/main.py`). A one-shot `healthprobe` service fixes that
+without touching the app images: it is
+`gcr.io/distroless/static-debian12:debug`, whose busybox is static by
+construction (it runs in a libc-less image), and it copies that binary into the
+`probe-bin` volume. Each of those services mounts the volume read-only at
+`/probe` and probes its own loopback endpoint with it:
+
+| Service | Probe | Answers |
+|---|---|---|
+| `grafana-sso`, `pbx-sso`, … | `/probe/busybox wget -q http://127.0.0.1:4180/ping` | `200 OK` from oauth2-proxy's own liveness endpoint — no upstream call, no session-store access |
+| `otel-collector` | `/probe/busybox wget -q http://127.0.0.1:13133/` | `200` from the collector's `health_check` extension while it is serving; `503` when its own health fails |
+
+Both are **liveness only**: an upstream that answers 500 does not make the
+gateway unhealthy, and only the collector's own health gates its row. The
+one-shot exits 0, so it is hidden from the Control Center like the other
+one-shots (`ONE_SHOT` in `dashboard-backend/app/main.py`).
 
 Port `3301` is deliberately the port the SigNoz UI held: the NPM proxy host, the
 Control Center's catalog and any firewall rule keep pointing at the same number,

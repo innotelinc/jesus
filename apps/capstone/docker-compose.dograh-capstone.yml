@@ -1,0 +1,138 @@
+# Capstone-side override for the upstream voice stack.
+#
+# The running voice platform is the upstream stack in dograh/upstream/
+# (docker-compose.yaml), deployed from a since-deleted /tmp/dograh checkout as
+# compose project `dograh`. This override is what lets the repo manage it
+# instead. It does four jobs:
+#
+#   1. `name: dograh` — pin the compose project name. Without it Compose derives
+#      the project from the checkout directory, orphans every running container
+#      and re-creates them against fresh (empty) volumes. With it, the existing
+#      containers, the `dograh_*` volumes and the `dograh_app-network` bridge are
+#      all adopted, so the agents, workflow runs and recordings are preserved.
+#
+#   2. Attach `api` to the Capstone `interview-net` bridge as well as the stack's
+#      own `app-network`. The voice agent's TTS provider connection points at the
+#      Capstone `tts-shim` by service name (http://tts-shim:8880/v1) because the
+#      upstream `api` service is bridge-networked, not host-networked, and so
+#      cannot reach the shim on the host's 127.0.0.1. Without this attachment a
+#      call is answered but the agent cannot speak — the caller just hears
+#      ringback. The provider URL is stored in the voice app's own configuration,
+#      written by scripts/dograh_wire.py; that script's input, DOGRAH_TTS_BASE_URL,
+#      is a Capstone `.env` value (the host-side shim address it translates into
+#      `http://tts-shim:8880/v1`). Nothing in data/.env.dograh sets it.
+#
+#   3. Default `api`/`ui` to the innotelinc fork images. The fork carries the
+#      telephony/TTS customizations this deployment depends on — most visibly the
+#      call-duration ceiling below. The stock `dograhai/*` images do not.
+#
+#      These are defaults. The pins the deployment actually runs live in
+#      data/.env.dograh (`DOGRAH_API_IMAGE` / `DOGRAH_UI_IMAGE`), which this run
+#      passes as `--env-file`; today they point at the stock pair, deliberately.
+#      The API that migrated this database is the stock build (revision
+#      b3c1d9e4f7a2), the published fork api image predates that revision — 100
+#      migrations, no b3c1d9e4f7a2 — so pinning the fork here stops the API at
+#      startup. Repoint after rebuilding both images from the current
+#      `dograh/upstream` checkout.
+#
+#      Pin the pair together. An API built from one source behind a UI from
+#      another renders "Authentication required. Please refresh the page." for
+#      every signed-in user — see docs/operations.md, "A patch only helps if the
+#      image that ships it is the one running".
+#
+#   4. Allow unlimited-length calls. The interview workflows ship
+#      workflow_configurations.max_call_duration = 0 ("no limit"); the schema
+#      only accepts 0 when the deployment ceiling MAX_CALL_DURATION_SECONDS is
+#      itself 0. Without these the write is rejected with HTTP 422 ("Input
+#      should be greater than 0") and the interviews are capped.
+#
+#   5. Publish `ui` on the LAN. Upstream binds the UI to loopback
+#      (127.0.0.1:3010) because it expects an in-project nginx, under a profile,
+#      to front it on the docker network. This deployment runs no such nginx: the
+#      edge (Nginx Proxy Manager, on another host) is the only front door and it
+#      reaches the UI at <this host>:3010, so the bind has to be on the LAN —
+#      which is what the standalone layout's dograh-ui does (docker-compose.yml,
+#      `0.0.0.0:3010:3010`). With the loopback bind the apex, app.<domain> and
+#      dograh.<domain> all answer 502 from the edge.
+#
+#   6. Publish MinIO on the LAN at 9200 as well as upstream's loopback 9000/9001.
+#      The edge's `/voice-audio/` route (scripts/npm-proxy-hosts.py MEDIA_*, one
+#      per app origin) forwards to the *host's* LAN address on 9200 and refuses
+#      writes there, so the bucket has to be reachable on that port — the
+#      standalone layout's minio does exactly this
+#      (`${PJSIP_MEDIA_ADDRESS}:9200:9000`, docker-compose.yml). Upstream's own
+#      9000/9001 loopback publishes are left in place: the console and the
+#      host-side scripts use them.
+#
+#   7. Attach `n8n` and `grist` to `interview-net`, for the reason note 2 gives
+#      for `api`: their doors are the Capstone SSO gateways (`n8n-sso` → 14010,
+#      `grist-sso` → 14011), those gateways live on `interview-net`, and a
+#      container is only resolvable by name on networks it is attached to — so
+#      without this the doors answer 502 with `no such host n8n` in the gateway
+#      log, while the apps themselves are perfectly healthy on app-network.
+#
+# The upstream file itself is deliberately NOT edited — it is the fork's source
+# tree and the base for the api/ui image builds. Run the two together (this is
+# what scripts/boot-stack.sh runs for the voice platform, with --pull=never so a
+# boot cannot depend on registry access or silently change which build a service
+# runs):
+#
+#   docker compose --project-directory dograh/upstream -p dograh \
+#     -f dograh/upstream/docker-compose.yaml \
+#     -f docker-compose.dograh-capstone.yml \
+#     --env-file data/.env.dograh --profile tunnel up -d --pull=never
+#
+name: dograh
+
+services:
+  api:
+    # Fork image by default (see note 3). What this deployment runs is pinned in
+    # data/.env.dograh.
+    image: ${DOGRAH_API_IMAGE:-ghcr.io/innotelinc/dograh-api:latest}
+    environment:
+      # ── Unlimited call length (see note 4) ─────────────────────────────
+      # 0 = no ceiling, so a workflow may ask for max_call_duration=0.
+      MAX_CALL_DURATION_SECONDS: "${MAX_CALL_DURATION_SECONDS:-0}"
+      # Cap for workflows that don't set their own.
+      DEFAULT_MAX_CALL_DURATION_SECONDS: "${DEFAULT_MAX_CALL_DURATION_SECONDS:-300}"
+      # The concurrency rate limiter's slot age-out. Must stay >= the longest
+      # call you allow, or a live call's slot is purged and the org limit
+      # under-counts.
+      STALE_CALL_TIMEOUT_SECONDS: "${STALE_CALL_TIMEOUT_SECONDS:-7200}"
+    networks:
+      - app-network
+      - interview-net
+
+  ui:
+    # Fork image by default, for the same reason as api (see note 3), and pinned
+    # in the same place.
+    image: ${DOGRAH_UI_IMAGE:-ghcr.io/innotelinc/dograh-ui:latest}
+    # See note 5. `!override` replaces upstream's list rather than appending to
+    # it: two bindings of 3010 (loopback and LAN) collide at start.
+    ports: !override
+      - "0.0.0.0:3010:3010"
+
+  # See note 6. `ports` is a merged list: this appends 9200 to upstream's two
+  # loopback publishes rather than replacing them.
+  minio:
+    ports:
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:9200:9000"
+
+  # See note 7. `networks` merges by key, so app-network (upstream's own) stays
+  # and interview-net is added.
+  n8n:
+    networks:
+      - app-network
+      - interview-net
+
+  grist:
+    networks:
+      - app-network
+      - interview-net
+
+networks:
+  # Owned by the Capstone compose project (its `interview-net`), where tts-shim
+  # and the Control Center live. External: this project only joins it.
+  interview-net:
+    external: true
+    name: interview-net
