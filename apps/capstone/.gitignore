@@ -48,3 +48,7 @@ data/vault/token/
 data/vault/init/
 data/vault/file/
 data/.env.resolved
+# Backups of the resolved copy hold the same live credentials as the file they
+# back up, and are made by hand (compose-vault.sh writes atomically, no backup).
+# Ignored so a careless `git add data/` cannot stage one into the tree.
+data/.env.resolved.bak*

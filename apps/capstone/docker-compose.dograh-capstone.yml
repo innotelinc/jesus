@@ -29,12 +29,15 @@
 #
 #      These are defaults. The pins the deployment actually runs live in
 #      data/.env.dograh (`DOGRAH_API_IMAGE` / `DOGRAH_UI_IMAGE`), which this run
-#      passes as `--env-file`, and they name builds of THIS tree: the api image is
-#      a local build of `dograh/upstream` (its files hash equal to the checkout,
-#      104 migrations including b3c1d9e4f7a2 — the revision this database is at)
-#      and the ui image is the fork's published build, whose compiled profile
-#      carries the OIDC session handling (`/auth/callback`, the home page's
-#      provider branch, no workflow dead end).
+#      passes as `--env-file`, and both name builds of THIS tree
+#      (`dograh-local/dograh-api:capstone`, `dograh-local/dograh-ui:capstone`):
+#      the api's files hash equal to the checkout (104 migrations including
+#      b3c1d9e4f7a2 — the revision this database is at) and the ui is built here
+#      too, so its compiled profile carries the OIDC session handling
+#      (`/auth/callback`, the home page's provider branch, no workflow dead end)
+#      rather than whatever a registry tag was built from. Both build on the
+#      Capstone host — see docker-compose.dograh-build.yml for the measured
+#      command and timings.
 #
 #      Do NOT repoint api at ghcr.io/innotelinc/dograh-api — the published fork
 #      api predates revision b3c1d9e4f7a2 (100 migrations, no such revision) and

@@ -3,6 +3,74 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
+## v3.22 — The running stack is the tree again, and the voice plane is up
+
+Work landed after `v3.21`: both dograh images are builds of this checkout, the
+PBX the `voice.` door needs is running again (which also un-broke the ARI
+recovery timer), and a stale resolved env can no longer decide what a boot
+interpolates.
+
+### The stack was stopped, rebuilt from this tree, and restarted on it
+
+- **Both dograh images are builds of `dograh/upstream` as it stands.**
+  `DOGRAH_UI_IMAGE` was the fork's published 3 Oct build; it is now
+  `dograh-local/dograh-ui:capstone`, built here. The api pin was already
+  `dograh-local/dograh-api:capstone`, and its rebuild reproduced that image byte
+  for byte (4 s, every layer cached — nothing in the tree had changed since it
+  was built).
+- **The UI builds on the Capstone host, which the docs said it could not.**
+  Measured on .30 (2 cores / 13 GiB) with the stack stopped:
+  `build --build-arg NODE_BUILD_HEAP_MB=2048 dograh-ui` → `npm ci` 92 s, `next
+  build` ~3 min, 285 MB image, **6 min 05 s** end to end, exit 0. The old failure
+  (exit 137 at ~117 s with the host's memory free) was webpack's persistent
+  cache: `NEXT_BUILD_FS_CACHE=0` in `ui/Dockerfile` is the fix, so there is
+  nothing to build on another host or ship.
+- **Verified against the rebuilt pair**: `check-dograh-image-drift.py` PASS (77
+  api/pipecat files hashed plus the compiled UI markers), `npm-smoke-test.py`
+  15/15 hosts, `doctor-signin.sh` every gate (the running container holds the
+  48-char secret, `AUTH_PROVIDER=oidc`), `sso-smoke.py` exit 0, 139 + 43 + 296
+  unit tests, ShellCheck over all 30 tracked scripts, secret-scan clean.
+
+### The `voice.` door 502'd because the PBX was not running
+
+- **Found**: `zeus-freepbx`, `pbx-coturn` and `zeus-portal` (compose project
+  `zeus`) had been stopped, so nothing listened on `192.168.1.30:8089` — the
+  address the edge's `voice.<domain>` row forwards to. `scripts/boot-stack.sh`
+  deliberately does not start that project (it is Zeus's, not this stack's), so
+  the door stays 502 until the PBX is up. Started with
+  `scripts/compose-vault.sh -f docker-compose.full.yml up -d`; the door answers
+  again and the smoke test's voice probe went from FAIL to PASS.
+- **A second fault hid behind it: ARI was off, and the timer had been saying
+  so.** `capstone-dograh-ari.timer` was failing (its recovery exits 1 while the
+  Stasis app is unregistered). The cause was not dograh: Asterisk's `ari.conf`
+  had **no `[general]` block**, so FreePBX's `#include ari_general_additional.conf`
+  / `ari_additional_custom.conf` plumbing was gone — no `/ari/...` URI in `http
+  show status`, no `[dograh]` user, and the `ari-404` that parks dograh's
+  telephony configuration. Zeus's guard (`pbx/ari_conf_guard.py`, run by
+  `scripts/zeus-pbx-sync.sh`) exists for exactly this; its apply path restored the
+  include block and reloaded Asterisk. After that
+  `scripts/dograh-ari-recover.sh recover` un-parked the config and the Stasis app
+  registered (`dograh_1ee64844fda0`).
+
+### A stale `data/.env.resolved` can no longer decide a boot
+
+- **The boot read the wrong env file.** `scripts/boot-stack.sh` preferred
+  `data/.env.resolved` whenever it was non-empty, and it was a four-hour-old copy
+  of `.env` carrying a **different** `AUTHENTIK_CLIENT_SECRET` — so the value in
+  `.env` never reached the interpolation at all. That copy exists to stand in for
+  `vault://` references, so it is now used **only while `.env` still holds them**:
+  with none, `.env` is the source and a leftover copy is named in the log instead
+  of read. (`docker compose config` renders identically for both files here,
+  which is why this stayed invisible.)
+- **`data/.env.resolved.bak*` is ignored**, like the `data/.env.resolved` it
+  backs up: it holds the same live credentials, and a careless `git add data/`
+  could otherwise stage one into the tree.
+- **`doctor-signin.sh` finds the running api by itself.** It defaulted to the
+  standalone layout's container name (`dograh-api`) and silently skipped the
+  in-container credential check on this deployment, where the split project names
+  it `dograh-api-1` — the one check that catches a `vault://` reference reaching
+  the container. It now resolves through the image when the plain name is absent.
+
 ## v3.21 — Piper is the local voice
 
 Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to

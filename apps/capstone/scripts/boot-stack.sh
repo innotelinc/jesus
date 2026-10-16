@@ -85,16 +85,32 @@ done
 # as `KEY: "${KEY:-}"` otherwise receives the literal reference string as its
 # credential and dies (zeus-freepbx crash-looped on FREEPBX_AMI_SECRET exactly
 # this way). scripts/compose-vault.sh and scripts/setup.sh both write it.
-if [ -s "$REPO/data/.env.resolved" ]; then
-    ENV_FILE="$REPO/data/.env.resolved"
-elif grep -q 'vault://' "$REPO/.env" 2>/dev/null; then
-    die ".env holds vault:// references but data/.env.resolved is missing — run \
-scripts/compose-vault.sh (or scripts/setup.sh) once before booting"
+#
+# The resolved copy exists to stand in for those references, so it is the source
+# only while `.env` still holds them. A copy that outlives them is a stale
+# snapshot of an older `.env`, and it wins silently — measured on this host: a
+# `.env` whose references had all been replaced by their values booted from a
+# four-hour-old `data/.env.resolved` carrying a *different*
+# AUTHENTIK_CLIENT_SECRET, so nothing the operator edited took effect until the
+# file was noticed.
+REFS="$(grep -c 'vault://' "$REPO/.env" 2>/dev/null || true)"
+if [ "${REFS:-0}" -gt 0 ]; then
+    if [ -s "$REPO/data/.env.resolved" ]; then
+        ENV_FILE="$REPO/data/.env.resolved"
+        log "env: data/.env.resolved ($REFS vault:// reference(s) in .env)"
+    else
+        die ".env holds $REFS vault:// reference(s) but data/.env.resolved is missing — \
+run scripts/compose-vault.sh (or scripts/setup.sh) once before booting"
+    fi
+    if [ "$REPO/.env" -nt "$ENV_FILE" ]; then
+        log "note: .env is newer than $(basename "$ENV_FILE") — re-run scripts/compose-vault.sh to pick the change up"
+    fi
 else
     ENV_FILE="$REPO/.env"
-fi
-if [ -f "$REPO/.env" ] && [ "$REPO/.env" -nt "$ENV_FILE" ]; then
-    log "note: .env is newer than $(basename "$ENV_FILE") — re-run scripts/compose-vault.sh to pick the change up"
+    if [ -e "$REPO/data/.env.resolved" ]; then
+        log "note: .env has no vault:// references, so it is the interpolation source; \
+data/.env.resolved is a leftover snapshot of an older .env — move it aside if it is not wanted"
+    fi
 fi
 
 if [ "$STOP" = 1 ]; then

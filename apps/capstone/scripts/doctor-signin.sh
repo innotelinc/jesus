@@ -56,6 +56,31 @@ else
   pass "AUTHENTIK_CLIENT_SECRET is a concrete value in $ENV_FILE"
 fi
 
+# The layout decides the container's name: the standalone compose runs a service
+# named `dograh-api` (container `dograh-api`), while this deployment runs the
+# voice platform as its own project, where compose suffixes the replica
+# (`dograh-api-1`). Resolve by compose label so the gate below runs against the
+# container the stack is actually serving from — otherwise it silently skips
+# the one check that can only be made from inside, and a stripped credential
+# passes the doctor while the browser still cannot sign in.
+DOGRAH_SERVICE="$DOGRAH_CONTAINER"
+if ! docker inspect "$DOGRAH_CONTAINER" >/dev/null 2>&1; then
+  # `dograh-api-1` first (the split project's replica suffix), then whatever
+  # running container carries a `dograh-api` image — the compose label cannot
+  # help here: upstream names the service `api`, so the label is `api` in both
+  # layouts while the container name is the one that changes.
+  by_image="$(docker ps --format '{{.Names}}\t{{.Image}}' 2>/dev/null \
+    | awk -v s="$DOGRAH_SERVICE" '$2 ~ s {print $1; exit}')"
+  for cand in "${DOGRAH_SERVICE}-1" "$by_image"; do
+    [ -n "$cand" ] || continue
+    if docker inspect "$cand" >/dev/null 2>&1; then
+      DOGRAH_CONTAINER="$cand"
+      info "resolved '$DOGRAH_SERVICE' to the running container '$cand'"
+      break
+    fi
+  done
+fi
+
 if docker inspect "$DOGRAH_CONTAINER" >/dev/null 2>&1; then
   # What the container actually received — never trust .env alone. Print a
   # prefix and a digest, never the secret itself.

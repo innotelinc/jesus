@@ -298,6 +298,34 @@ python3 scripts/dograh_wire.py --env-file .env   # un-park + re-assert the app n
 docker exec pbx-freepbx asterisk -rx "ari show apps"   # expect: dograh_<hex>
 ```
 
+#### The same banner when ARI is disabled outright: no `/ari/...` at all
+
+dograh's own message for this one is `ari-404`, and it **parks** the telephony
+configuration when it sees it (see above) — so the repair is two steps, and the
+first is not dograh's. The 404 is ARI being *off*: Asterisk's `ari.conf` had lost
+its `[general]` block, so the includes that pull in `ari_general_additional.conf`
+(where `enabled=yes` lives) and `ari_additional_custom.conf` (where the `[dograh]`
+ARI user lives) were gone. Two commands show it:
+
+```bash
+# nothing under /ari/... means ARI is disabled, whatever dograh's error says
+docker exec <freepbx-container> asterisk -rx "http show status" | grep -A2 "Enabled URI"
+docker exec <freepbx-container> asterisk -rx "ari show users"     # want a `dograh` row
+```
+
+FreePBX's own `arimanager` maintenance rewrites that file, which is why Zeus ships
+a guard for it — `pbx/ari_conf_guard.py` (read-only `--check`, narrow `--repair`)
+run by `scripts/zeus-pbx-sync.sh`, whose apply path repairs the file and reloads
+Asterisk before the recovery above is worth re-running. A clobbered `ari.conf` is
+never dograh's fault and never a credential problem, so re-running
+`dograh_wire.py` alone cannot clear it:
+
+```bash
+systemctl start zeus-pbx-sync.service        # check -> restore ari.conf -> reload
+./scripts/dograh-ari-recover.sh recover      # un-park dograh's config, wait for the app
+docker exec <freepbx-container> asterisk -rx "ari show apps"   # expect dograh_<hex>
+```
+
 #### A second way the same banner appears: a `#` in `DOGRAH_ARI_PASSWORD`
 
 dograh builds its ARI WebSocket URL by string interpolation —
@@ -549,7 +577,18 @@ scripts/compose-vault.sh up -d dograh-api dograh-ui
 
 A plain `docker compose up` regresses this silently. Note `--env-file` *replaces* `.env` as
 the interpolation source, which is why the wrapper writes a complete copy rather than a
-fragment. Confirm what the container actually holds — never trust the `.env`:
+fragment.
+
+The resolved copy is the interpolation source **only while `.env` still holds `vault://`
+references** — that is the whole reason it exists. `scripts/boot-stack.sh` now enforces that:
+with no references left in `.env` it boots from `.env` and *names* any leftover resolved copy
+instead of reading it. Measured on 16 Oct, and the reason for the change: the stack had been
+booted from a four-hour-old `data/.env.resolved` that carried a **different**
+`AUTHENTIK_CLIENT_SECRET` than `.env`, so the value in `.env` never reached the boot at all
+(`docker compose config` renders identically for both files here, which is what made it
+invisible — the difference surfaces the moment a key only `.env` has becomes interpolated).
+
+Confirm what the container actually holds — never trust the `.env`:
 
 ```bash
 docker exec dograh-api python3 -c "import os,hashlib;\
@@ -599,8 +638,9 @@ the sign-in to the API whatever UI is behind it.
 `DOGRAH_UI_IMAGE` are independent pins, so a `.env` that points the API at a locally built
 `dograh-local/dograh-api:capstone` while leaving the UI on the registry's `:latest` runs a
 patched API behind an unpatched proxy — exactly the split the edge route above exists to
-survive. Pin both, and follow `docker-compose.dograh-build.yml` for the build-and-ship
-procedure (the UI cannot be built on the Capstone host).
+survive. Pin both, and follow `docker-compose.dograh-build.yml`: **both images build on the
+Capstone host** (`NEXT_BUILD_FS_CACHE=0` plus `--build-arg NODE_BUILD_HEAP_MB=2048`, ~6 min),
+so the pin is a build of this checkout instead of whatever a registry tag happens to be.
 
 **A pin is only as good as the image behind it.** Which image is running is one
 `docker inspect` away, and whether it carries a patch is one `md5sum` — the cheapest way
@@ -646,6 +686,12 @@ right after "Creating an optimized production build"). `dograh/patches/0007` tur
 off for image builds (`NEXT_BUILD_FS_CACHE=0` in `ui/Dockerfile`), which is what brings the
 build under the cap; cap the heap with `--build-arg NODE_BUILD_HEAP_MB=2048` and nothing else
 on the stack has to be stopped for it.
+
+The Capstone host builds it too, and no longer needs anything shipped to it: re-measured on
+16 Oct with the stack stopped, `next build` finished at a 2048 MB heap in **6 min 05 s** end
+to end (285 MB image, exit 0) — the same build had been killed at ~117 s on that host before
+`NEXT_BUILD_FS_CACHE=0` reached the image. Build the api and the ui **one at a time**: a
+13 GiB host does not want both under way while it also serves the stack.
 
 **The state cookie has to reach the host that finishes the sign-in.** It is written when
 the browser starts the flow and read back at the provider's registered `redirect_uri`, and
