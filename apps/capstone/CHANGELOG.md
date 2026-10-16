@@ -3,9 +3,41 @@
 Release history for the Capstone — Voice AI Agent Platform. The README is the
 product landing page; this file keeps the per-release detail.
 
-## v3.22 — The running stack is the tree again, and the voice plane is up
+## Release numbering: these sections and the release tags
 
-Work landed after `v3.21`: both dograh images are builds of this checkout, the
+Two things here number themselves, and they do not move at the same speed, so
+the relationship is worth stating rather than leaving you to reconstruct it.
+
+- **The tags are cut by automation.** `.github/workflows/sync-and-release.yml`
+runs daily, syncs the dograh fork, and when upstream has moved it cuts the next
+release from the last one on GitHub — a minor bump for an upstream minor, a major
+bump for an upstream major — after which `.github/workflows/release.yml` builds
+the images and attaches the release artifacts. It has cut a release on most days
+since 2026-10-04, so **the tag series runs ahead of this file**: the newest
+release is `v3.31`, while the newest hand-written section below is the one that
+follows it.
+- **A section is written when work lands**, titled with the number it is prepared
+as and opening with the release it follows — the line reads "Work landed after
+`v3.31`…". A tag cut from a sync that brought nothing worth a section gets no
+section — which is exactly how the two series drift apart.
+
+So a number that is a released tag may have no section here, and the section
+carrying a piece of work is not always the tag that shipped it. The last stretch
+of that gap, and the sections without a release of their own:
+
+| tag | cut | where its work is described here |
+|---|---|---|
+| `v3.12`, `v3.13` | 02–03 Sep | the rebrand follow-up and the ShellCheck hygiene pass — covered by the `v3.11` section and its neighbours |
+| `v3.16`–`v3.18` | never cut | **sections with no release**: the automation went `v3.15` → `v3.19`, so the work in those three sections shipped in `v3.19` |
+| `v3.22` | 04 Oct | "Take our dograh fixes from the fork's commits, not from patches". The section below was titled `v3.22` for a day, and is retitled `v3.32`: its content is the 2026-10-16 work, which no tag carries yet |
+| `v3.23`–`v3.27` | 05–12 Oct | the UI-check sandbox, backup-stamp and store-persistence commits — no section |
+| `v3.28`, `v3.29` | 13–14 Oct | the Piper change, described by the section titled `v3.21` |
+| `v3.30`, `v3.31` | 15–16 Oct | OnTrak in the platform stack references — no section |
+| `v3.32` | next cut | the section below |
+
+## v3.32 — The running stack is the tree again, and the voice plane is up
+
+Work landed after `v3.31`: both dograh images are builds of this checkout, the
 PBX the `voice.` door needs is running again (which also un-broke the ARI
 recovery timer), and a stale resolved env can no longer decide what a boot
 interpolates.
