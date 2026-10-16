@@ -878,7 +878,11 @@ compose-declared key has to match, and anything only in the container is baked
 into its image.
 
 And check the boot path without a reboot — `--dry-run` prints both compose runs and
-changes nothing:
+changes nothing. Its exit status is only meaningful on a host that is already up: with
+the containers stopped, compose refuses to simulate starting their dependencies and
+exits 1 (`dependency failed to start: container … exited (0)`), which reads as a broken
+boot path when nothing is wrong. A cold boot is verified by the real thing —
+`systemctl start capstone.service`, which is exit 0 when the stack is healthy.
 
 ```bash
 scripts/boot-stack.sh --dry-run
