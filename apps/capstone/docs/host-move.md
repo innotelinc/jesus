@@ -164,7 +164,7 @@ need verifying, not editing:
 Then check the stack, not just the container:
 
 ```sh
-systemctl status capstone.service                  # the curated 21-service start
+systemctl status capstone.service                  # scripts/boot-stack.sh, both runs SUCCESS
 docker compose --env-file data/.env.resolved -f docker-compose.yml ps
 ./scripts/smoke-test.sh                            # the repo's own smoke test
 docker exec zeus-freepbx asterisk -rx "ari show apps"          # → dograh_<hex>
@@ -190,11 +190,16 @@ app registered** are what this move is for.
 3. `innotel-platform-stack/docs/container-placement.md` — the i2 row states
    `capstone 5.84 GiB (6 GiB)`; the cap becomes **7.3 GiB**, and i4's section
    should note that the container it was never listed under has left.
-4. The **on-box** `systemd/capstone.service` comment ("this host: i4 has 2 cores
+4. ~~The **on-box** `systemd/capstone.service` comment ("this host: i4 has 2 cores
    and 7.3 GiB total") must be rewritten for i2 (8 cores / 13.1 GiB), or the
-   sizing rationale moved somewhere a host move cannot strand it. It is the same
-   failure mode the placement page's *Open items* describes for the CPU caps:
-   a value set for the host a container *was* on travels with the rootfs.
+   sizing rationale moved somewhere a host move cannot strand it.~~ **Done:** the
+   unit is now a thin wrapper around `scripts/boot-stack.sh`, where the service
+   list and the sizing rationale behind it live in the repository — so the note
+   that used to travel with the rootfs is gone, and the only host-specific
+   values left are in gitignored `data/.env`/`.env`
+   (`CAPSTONE_BOOT_SERVICES`, the `OTEL_*_PORT`/`GRAFANA_HTTP_PORT` remaps). It
+   was the same failure mode the placement page's *Open items* describes for the
+   CPU caps: a value set for the host a container *was* on travels with the rootfs.
 
 ## 8. Open findings this work surfaced
 

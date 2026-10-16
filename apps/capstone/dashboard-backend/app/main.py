@@ -328,7 +328,7 @@ LINK_PORTS: dict[str, dict[str, str]] = {
 }
 
 # One-shot bootstrap/helper containers (restart: no) that aren't services.
-ONE_SHOT = {"sandbox-certs", "n8n-import"}
+ONE_SHOT = {"sandbox-certs", "n8n-import", "healthprobe"}
 
 # List of compose service labels we consider "apps" (used for active-session
 # stand-in and to exclude infra-only noise from some tallies).

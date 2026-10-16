@@ -172,7 +172,7 @@ fi
 # WAIT FOR HEALTH
 # ═══════════════════════════════════════════════════════════════════════════
 section "Wait for health (max ~6 min)"
-# NOTE: otel-collector / dograh-api have NO healthcheck, so they report
+# NOTE: dograh-api runs in host mode, so it has NO healthcheck and reports
 # "running" (never "healthy"). "healthy" OR "running" both count.
 MAIN_SERVICES="postgres redis minio dograh-api kokoro speaches omniroute n8n grist \
                otel-collector prometheus grafana tts-shim"

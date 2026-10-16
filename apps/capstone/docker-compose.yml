@@ -101,6 +101,24 @@ x-sso-gateway: &sso-gateway
   restart: unless-stopped
   logging:
     driver: json-file
+  # Liveness. This image is distroless — one binary, no shell, no wget — so
+  # there is nothing *inside* the container a healthcheck could execute: Docker
+  # could only report the gateway as running with no health signal, and the
+  # Control Center reads that as Warning. The probe is the static busybox the
+  # `healthprobe` one-shot unpacks into `probe-bin`, and `/ping` is
+  # oauth2-proxy's own unauthenticated liveness endpoint: it answers 200 "OK"
+  # without touching the upstream or the session store.
+  volumes:
+    - probe-bin:/probe:ro
+  depends_on:
+    healthprobe:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "/probe/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4180/ping"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
   environment: &sso-gateway-env
     OAUTH2_PROXY_PROVIDER: oidc
     # Endpoints are explicit (no discovery). The issuer is the APP-SCOPED one,
@@ -152,6 +170,28 @@ x-sso-gateway: &sso-gateway
     - "host.docker.internal:host-gateway"
 
 services:
+  # ── Probe tools for the distroless services ───────────────────────────────
+  # The SSO gateways (oauth2-proxy) and `otel-collector` run single-binary
+  # distroless images: no sh, no libc, no wget — a healthcheck had nothing to
+  # run in them, so the daemon could only report them as running with no health
+  # signal and the Control Center showed them Warning. This one-shot unpacks a
+  # *static* busybox into the `probe-bin` volume (the same
+  # one-shot-into-a-volume pattern as `sandbox-certs` → `sandbox-tls`); each
+  # consumer mounts it read-only at /probe and wgets its own loopback health
+  # endpoint. It runs, copies, exits 0 — so it is excluded from the Control
+  # Center like the other one-shots (dashboard-backend/app/main.py ONE_SHOT).
+  healthprobe:
+    # The :debug flavour of distroless is where that static busybox lives (the
+    # runtime flavour has no files at all), and it is static by construction:
+    # it runs in a libc-less image, which is exactly what the consumers are.
+    image: ${HEALTHPROBE_IMAGE:-gcr.io/distroless/static-debian12:debug}
+    container_name: capstone-healthprobe
+    restart: "no"
+    entrypoint: ["/busybox/busybox", "cp", "/busybox/busybox", "/probe/busybox"]
+    volumes:
+      - probe-bin:/probe
+    networks: [interview-net]
+
   # ── dograh core ──────────────────────────────────────────────────────────
   postgres:
     # dograh-api blocks on all three of postgres/redis/minio; without a restart
@@ -532,15 +572,15 @@ services:
       # is only registered when listed here — with `piper` alone the shim does
       # not advertise or serve a Kokoro engine at all. To A/B, start the profile
       # and set this to `kokoro,piper`.
-      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-piper}"
-      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-piper}"
+      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-piper,kokoro}"
+      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-kokoro}"
       # Only read when `kokoro` is in TTS_SHIM_ENGINES (see scripts/install-onnx-kokoro.sh).
-      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://kokoro-fastapi:8880}"
+      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://speaches:8000}"
       # The model id the kokoro upstream is asked for. kokoro-fastapi ignores it;
       # an upstream that hosts more than one model does not — the ONNX Kokoro
       # lives in `speaches` and answers to `speaches-ai/Kokoro-82M-v1.0-ONNX`, so
       # pair it with TTS_SHIM_KOKORO_URL=http://speaches:8000.
-      TTS_SHIM_KOKORO_MODEL: "${TTS_SHIM_KOKORO_MODEL:-kokoro}"
+      TTS_SHIM_KOKORO_MODEL: "${TTS_SHIM_KOKORO_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}"
       TTS_SHIM_PIPER_VOICE: "${TTS_SHIM_PIPER_VOICE:-}"
       TTS_SHIM_CACHE_ENABLED: "${TTS_SHIM_CACHE_ENABLED:-true}"
       TTS_SHIM_CACHE_MAX_BYTES: "${TTS_SHIM_CACHE_MAX_BYTES:-536870912}"
@@ -977,15 +1017,38 @@ services:
     memswap_limit: 512m
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     ports:
-      - "127.0.0.1:4317:4317"   # OTLP gRPC — loopback only (dograh host mode → 127.0.0.1:4317)
-      - "127.0.0.1:4318:4318"   # OTLP HTTP — loopback only (dograh host mode → 127.0.0.1:4318)
-      - "127.0.0.1:8888:8888"   # collector internal metrics — loopback only
-      - "127.0.0.1:8889:8889"   # span metrics, in Prometheus format — loopback only
+      # Host ports are env-driven because this box also runs the voice stack's
+      # SigNoz collector, which already owns 4317/4318/8888/8889 on loopback.
+      # .env remaps these so both collectors can run at once — and they have to
+      # live in .env, never in data/.env.resolved, which is regenerated from
+      # .env on every resolve and silently drops anything added to it (a
+      # recreate then dies on `Bind for 127.0.0.1:4317 failed`).
+      # In-stack consumers are unaffected either way: they dial by service name
+      # (otel-collector:4318, otel-collector:8889 for prometheus' scrape).
+      - "127.0.0.1:${OTEL_GRPC_PORT:-4317}:4317"   # OTLP gRPC — loopback only (dograh host mode → 127.0.0.1:4317)
+      - "127.0.0.1:${OTEL_HTTP_PORT:-4318}:4318"   # OTLP HTTP — loopback only
+      - "127.0.0.1:${OTEL_INTERNAL_METRICS_PORT:-8888}:8888"   # collector internal metrics — loopback only
+      - "127.0.0.1:${OTEL_SPAN_METRICS_PORT:-8889}:8889"   # span metrics, in Prometheus format — loopback only
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
-    # No healthcheck: this image is distroless — no shell and no wget to probe
-    # with. It fails closed regardless: a bad config exits 1 and the restart
-    # policy surfaces it as `Restarting`, which is what the Control Center reads.
+      - probe-bin:/probe:ro
+    depends_on:
+      healthprobe:
+        condition: service_completed_successfully
+    # Health is the collector's own `health_check` extension, the :13133
+    # endpoint otel-collector-config.yaml names as this service's healthcheck
+    # target. This image is distroless too (no shell, no wget), so the probe is
+    # the static busybox `healthprobe` unpacks into `probe-bin` — the same
+    # reason the SSO gateways above use it. A config the collector refuses to
+    # load still exits 1 and surfaces as `Restarting`; this catches the other
+    # half, where the process is up but its own health is failing, which
+    # otherwise looked identical to healthy from outside.
+    healthcheck:
+      test: ["CMD", "/probe/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:13133/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks: [interview-net]
 
   prometheus:
@@ -1037,7 +1100,12 @@ services:
       # 3301 is deliberately the port the SigNoz UI held: the NPM proxy host,
       # the dashboard catalog and any firewall rule keep pointing at the same
       # number, and only the upstream behind it changed.
-      - "127.0.0.1:3301:3000"   # loopback only; public door is grafana.<domain> → grafana-sso (14012)
+      # On THIS box, however, the voice stack's SigNoz UI is live on 3301, so
+      # the host port is env-driven and GRAFANA_HTTP_PORT (in .env — see the note
+      # on the collector's ports above) puts Grafana on 3302. The public door is
+      # unchanged: grafana.<domain> → grafana-sso
+      # (14012), which reaches grafana:3000 over the compose network.
+      - "127.0.0.1:${GRAFANA_HTTP_PORT:-3301}:3000"   # loopback only; public door is grafana.<domain> → grafana-sso (14012)
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -1499,6 +1567,11 @@ services:
 
 
 volumes:
+  # Probe tools for the distroless services — populated by the `healthprobe`
+  # one-shot (see its comment), mounted read-only at /probe by the SSO gateways
+  # and otel-collector. No binaries are committed; the busybox comes from the
+  # image above.
+  probe-bin:
   postgres_data:
   redis_data:
   minio-data:
