@@ -24,16 +24,22 @@
 #
 #   3. Default `api`/`ui` to the innotelinc fork images. The fork carries the
 #      telephony/TTS customizations this deployment depends on — most visibly the
-#      call-duration ceiling below. The stock `dograhai/*` images do not.
+#      call-duration ceiling below, and Cerulean sign-in (note 8). The stock
+#      `dograhai/*` images carry neither.
 #
 #      These are defaults. The pins the deployment actually runs live in
 #      data/.env.dograh (`DOGRAH_API_IMAGE` / `DOGRAH_UI_IMAGE`), which this run
-#      passes as `--env-file`; today they point at the stock pair, deliberately.
-#      The API that migrated this database is the stock build (revision
-#      b3c1d9e4f7a2), the published fork api image predates that revision — 100
-#      migrations, no b3c1d9e4f7a2 — so pinning the fork here stops the API at
-#      startup. Repoint after rebuilding both images from the current
-#      `dograh/upstream` checkout.
+#      passes as `--env-file`, and they name builds of THIS tree: the api image is
+#      a local build of `dograh/upstream` (its files hash equal to the checkout,
+#      104 migrations including b3c1d9e4f7a2 — the revision this database is at)
+#      and the ui image is the fork's published build, whose compiled profile
+#      carries the OIDC session handling (`/auth/callback`, the home page's
+#      provider branch, no workflow dead end).
+#
+#      Do NOT repoint api at ghcr.io/innotelinc/dograh-api — the published fork
+#      api predates revision b3c1d9e4f7a2 (100 migrations, no such revision) and
+#      the API stops at startup on this database. Rebuild both images from the
+#      current checkout before moving the pair (docker-compose.dograh-build.yml).
 #
 #      Pin the pair together. An API built from one source behind a UI from
 #      another renders "Authentication required. Please refresh the page." for
@@ -71,6 +77,22 @@
 #      without this the doors answer 502 with `no such host n8n` in the gateway
 #      log, while the apps themselves are perfectly healthy on app-network.
 #
+#   8. Give `api` Cerulean's Authentik as its identity provider. Upstream's own
+#      compose passes none of these, so api/constants.py's default
+#      `AUTH_PROVIDER=local` wins and every `/api/v1/auth/oidc/*` route answers
+#      404 — the sign-in the edge is written around (npm-proxy-hosts.py OIDC_*)
+#      simply does not exist. The values live in data/.env.dograh and mirror the
+#      Capstone `.env`, because it is the same app and the same Authentik
+#      provider: the Dograh provider registers the apex callback
+#      (`https://capstone.innotel.us/api/v1/auth/oidc/callback`) and the older
+#      `dograh.` name, the edge sends `app.`/`dograh.` sign-ins to the apex first
+#      (OIDC_CANONICAL_SUB), and the state/PKCE cookie is host-only by design
+#      there — so `AUTHENTIK_REDIRECT_URI` and the edge's canonical host have to
+#      name the same host or every sign-in dies at the callback.
+#
+#      This is inert on the stock images (they have no OIDC code at all — see
+#      note 3, which is why the pair pins a fork build).
+#
 # The upstream file itself is deliberately NOT edited — it is the fork's source
 # tree and the base for the api/ui image builds. Run the two together (this is
 # what scripts/boot-stack.sh runs for the voice platform, with --pull=never so a
@@ -99,6 +121,21 @@ services:
       # call you allow, or a live call's slot is purged and the org limit
       # under-counts.
       STALE_CALL_TIMEOUT_SECONDS: "${STALE_CALL_TIMEOUT_SECONDS:-7200}"
+      # ── Cerulean (Authentik) sign-in (see note 8) ─────────────────────────
+      # Without these the API runs AUTH_PROVIDER=local and the whole
+      # /api/v1/auth/oidc surface is a 404. Values come from data/.env.dograh,
+      # which mirrors the Capstone .env for this provider.
+      AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
+      AUTHENTIK_POST_LOGIN_REDIRECT: "${AUTHENTIK_POST_LOGIN_REDIRECT:-}"
+      AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
+      # Admission by group membership (the 'groups' claim): an identity outside
+      # AUTHENTIK_ALLOWED_GROUPS completes the handshake and is then refused.
+      AUTHENTIK_ALLOWED_GROUPS: "${AUTHENTIK_ALLOWED_GROUPS:-}"
+      AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-oidc-shared}"
     networks:
       - app-network
       - interview-net
