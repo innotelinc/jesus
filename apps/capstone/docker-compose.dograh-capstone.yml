@@ -96,6 +96,29 @@
 #      This is inert on the stock images (they have no OIDC code at all — see
 #      note 3, which is why the pair pins a fork build).
 #
+#
+#   9. Health checks for the two services upstream ships without one. Both ran
+#      as plain `Up`, so nothing could tell a wedged collector or a tunnel that
+#      had lost its edge connections from a working one:
+#
+#        - signoz-otel-collector: upstream publishes the OTLP HTTP receiver on
+#          4318, and its config declares no `health_check` extension, so there
+#          is no /health endpoint to poll. The image is Debian-based (it has
+#          bash) but carries no curl/wget/nc, so the check is a bash /dev/tcp
+#          HTTP probe of the receiver itself: any HTTP/1.x status line coming
+#          back proves the collector is accepting and parsing OTLP. A bodyless
+#          POST answers 415, which is a healthy answer.
+#        - cloudflared: the image is distroless and has no shell at all, so the
+#          probe has to be the container's own binary. `cloudflared tunnel
+#          --metrics 127.0.0.1:2000 ready` calls /ready on the metrics listener
+#          that the compose command already binds (0.0.0.0:2000) and exits
+#          non-zero when the tunnel has no edge connection -- exactly the
+#          failure this needs to catch.
+#
+#      Adding a health check recreates both containers, so the quick tunnel
+#      comes back with a NEW *.trycloudflare.com URL. Nothing pins that URL:
+#      BACKEND_API_ENDPOINT is the edge domain, and api/utils/tunnel.py re-reads
+#      the tunnel host from the metrics endpoint every time it is asked.
 # The upstream file itself is deliberately NOT edited — it is the fork's source
 # tree and the base for the api/ui image builds. Run the two together (this is
 # what scripts/boot-stack.sh runs for the voice platform, with --pull=never so a
@@ -169,6 +192,33 @@ services:
     networks:
       - app-network
       - interview-net
+
+  # See note 9. Upstream declares no health check for either of these.
+  signoz-otel-collector:
+    healthcheck:
+      # `CMD` (not `CMD-SHELL`): the image's /bin/sh is dash, which has no
+      # /dev/tcp. bash is present, so the probe is spelled out and exec'd.
+      test:
+        - CMD
+        - bash
+        - -c
+        # `$$line` is a compose escape: compose would otherwise interpolate
+        # `$line` away at parse time and hand bash an empty string.
+        - 'exec 3<>/dev/tcp/127.0.0.1/4318 || exit 1; printf "POST /v1/traces HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" >&3; IFS= read -r -t 5 line <&3 || exit 1; case "$$line" in HTTP/1.*) exit 0;; esac; exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  cloudflared:
+    healthcheck:
+      # The one command the distroless image can run: /ready on its own
+      # metrics listener, non-zero when the tunnel has no edge connection.
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 networks:
   # Owned by the Capstone compose project (its `interview-net`), where tts-shim
