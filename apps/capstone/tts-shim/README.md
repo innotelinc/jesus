@@ -33,6 +33,13 @@ the engine; Kokoro is retired** — its service is behind the `kokoro` compose
 profile and the shim only registers it when it is named in `TTS_SHIM_ENGINES`,
 so a default deployment neither starts it nor advertises it.
 
+Piper is in-process; Kokoro is a **proxy**, so enabling it is two facts and not
+one: the name in `TTS_SHIM_KOKORO_URL` has to resolve from this container, and
+the upstream has to actually hold the model. A registered engine whose upstream
+is unreachable is *worse* than a retired one — measured: the request answers
+`200` with a zero-byte body instead of the `503` an unlisted engine gives, which
+reads as success to every caller that only checks the status code.
+
 ## Endpoints
 
 | Endpoint | Purpose |
@@ -85,7 +92,7 @@ only need setting when you change the behaviour.
 |---|---|---|
 | `TTS_SHIM_ENGINES` *(compose)* | `piper` | Comma-separated engine list. **Only these register**: an engine left out is neither advertised by `/v1/models` nor selectable, and a request naming it gets a 503 rather than another engine's audio. The first available entry is the default when `TTS_SHIM_DEFAULT_ENGINE` is empty. |
 | `TTS_SHIM_DEFAULT_ENGINE` *(compose)* | `piper` | Engine used when a request names none. Falls back to the first *available* engine when the named one is not loaded (e.g. `piper` with no voice model), so a fresh deployment without the voice still answers with Kokoro. |
-| `TTS_SHIM_KOKORO_URL` *(compose)* | `http://kokoro-fastapi:8880` | Kokoro upstream — a compose service name on `interview-net`. Read only when `kokoro` is in `TTS_SHIM_ENGINES`. Set it to `http://speaches:8000` for the ONNX path. |
+| `TTS_SHIM_KOKORO_URL` *(compose)* | `http://kokoro-fastapi:8880` | Kokoro upstream — a name the **shim** can resolve, i.e. a service on a network the shim is attached to. In the standalone layout both upstreams are services in this compose file (`interview-net`), so the bare name works; when the voice platform runs as its own project its `kokoro-fastapi`/`speaches` sit on that project's network and *neither* name resolves from here (`Temporary failure in name resolution`), so the engine has to be left out of `TTS_SHIM_ENGINES` until the upstream shares a network with the shim. Read only when `kokoro` is in `TTS_SHIM_ENGINES`. Set it to `http://speaches:8000` for the ONNX path. |
 | `TTS_SHIM_KOKORO_MODEL` *(compose)* | `kokoro` | Model id sent to the upstream. `kokoro-fastapi` ignores it; a multi-model upstream does not — the ONNX Kokoro needs `speaches-ai/Kokoro-82M-v1.0-ONNX`. |
 | `TTS_SHIM_KOKORO_VOICE` | `af_heart` | Voice when the request sends none (or a non-Kokoro id). |
 | `TTS_SHIM_PIPER_VOICE` *(compose)* | *(empty)* | Piper voice file or id; empty disables the engine. |

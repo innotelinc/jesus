@@ -71,6 +71,48 @@ interpolates.
   it `dograh-api-1` — the one check that catches a `vault://` reference reaching
   the container. It now resolves through the image when the plain name is absent.
 
+### The Kokoro-on-speaches default could not work here, and a silent default is worse than none
+
+- **Reverted, with the measurement that says why.** The 16 Oct change that made
+  the shim default to Kokoro over the ONNX model in `speaches`
+  (`TTS_SHIM_DEFAULT_ENGINE=kokoro`, `TTS_SHIM_KOKORO_URL=http://speaches:8000`)
+  cannot serve audio on this deployment, for two independent reasons: `tts-shim`
+  is on `interview-net` while `speaches` is the voice project's container on
+  `dograh_app-network`, so the shim cannot resolve the name at all
+  (`httpx.ConnectError: [Errno -3] Temporary failure in name resolution` in its
+  log); and `speaches` holds **no model** (`GET 127.0.0.1:8001/v1/models` →
+  `{"data": []}`), so there is no ONNX Kokoro to answer even with a route.
+- **What made it a defect rather than a misconfiguration:** a request that named
+  no engine — the default path — answered **HTTP 200 with a zero-byte body**
+  (`X-TTS-Engine: kokoro`), so a caller saw success and got no speech. Measured
+  in the same minute through the shim: Piper served the same sentence as
+  172,200 bytes (3.59 s of audio) with `X-TTS-Engine: piper`.
+- **The shipped default is Piper again** (`docker-compose.yml`, `.env.example`
+  and the live `.env`), with Kokoro **not** listed in `TTS_SHIM_ENGINES`: an
+  engine left out is a 503 rather than an alias or an empty body, which is the
+  shim's documented contract. Making the ONNX Kokoro the voice is a two-part
+  change — join the upstream to a network the shim shares (`interview-net`, the
+  same attachment `api`/`n8n`/`grist` already carry) *and* install the model
+  (`scripts/install-onnx-kokoro.sh`). Flipping `TTS_SHIM_DEFAULT_ENGINE` alone
+  reproduces the empty-audio default.
+- **The live voice path carried the same flip, which is what made it audible as
+  silence.** `.env` also held `DOGRAH_TTS_MODEL=kokoro` and
+  `DOGRAH_TTS_VOICE=af_heart`, so dograh's own organization configuration asked
+  the shim for the engine that cannot answer — and `scripts/dograh_wire.py
+  --check` still printed `PASS TTS is kokoro through the local shim`, because that
+  check asserts the *configuration* (provider, base URL, model, voice) and never
+  synthesizes. It was re-pointed with the script itself, which probes the endpoint
+  before storing: `PASS TTS re-pointed at piper (piper/en_US-amy-medium at
+  http://127.0.0.1:8881/v1) — was TTS model is 'kokoro', not 'piper'`. Both
+  `DOGRAH_TTS_*` values are on Piper again, and a request naming no engine now
+  answers with audio rather than with an empty 200.
+- **`tts-shim/README.md` no longer reads as if the upstream were one name away.**
+  Its variable table called the Kokoro upstream "a compose service name on
+  `interview-net`" — true of the standalone layout, and the reason the flip
+  looked like a one-line change here. It now says the name has to resolve *from
+  the shim*, which is the fact that decides it on a box where the voice platform
+  is its own project.
+
 ## v3.21 — Piper is the local voice
 
 Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to

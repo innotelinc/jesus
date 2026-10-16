@@ -571,16 +571,25 @@ services:
       # Piper is the voice. Kokoro is retired (behind the `kokoro` profile) and
       # is only registered when listed here — with `piper` alone the shim does
       # not advertise or serve a Kokoro engine at all. To A/B, start the profile
-      # and set this to `kokoro,piper`.
-      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-piper,kokoro}"
-      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-kokoro}"
+      # and set this to `kokoro,piper` **and** give the shim a Kokoro upstream it
+      # can resolve (see TTS_SHIM_KOKORO_URL below): a registered engine whose
+      # upstream is unreachable used to answer 200 with an empty body, which is
+      # worse than the 503 an unlisted engine gives.
+      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-piper}"
+      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-piper}"
       # Only read when `kokoro` is in TTS_SHIM_ENGINES (see scripts/install-onnx-kokoro.sh).
-      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://speaches:8000}"
+      # The name has to resolve FROM THE SHIM: these two services are on this
+      # compose file's network in the standalone layout, and on the voice
+      # platform's own project network when that runs as a separate project —
+      # where `speaches`/`kokoro-fastapi` do not resolve from here ("Temporary
+      # failure in name resolution" in the shim log) and the engine cannot work.
+      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://kokoro-fastapi:8880}"
       # The model id the kokoro upstream is asked for. kokoro-fastapi ignores it;
       # an upstream that hosts more than one model does not — the ONNX Kokoro
       # lives in `speaches` and answers to `speaches-ai/Kokoro-82M-v1.0-ONNX`, so
-      # pair it with TTS_SHIM_KOKORO_URL=http://speaches:8000.
-      TTS_SHIM_KOKORO_MODEL: "${TTS_SHIM_KOKORO_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}"
+      # pair it with TTS_SHIM_KOKORO_URL=http://speaches:8000 (and that model has
+      # to be installed there: an empty /v1/models is not an upstream).
+      TTS_SHIM_KOKORO_MODEL: "${TTS_SHIM_KOKORO_MODEL:-kokoro}"
       TTS_SHIM_PIPER_VOICE: "${TTS_SHIM_PIPER_VOICE:-}"
       TTS_SHIM_CACHE_ENABLED: "${TTS_SHIM_CACHE_ENABLED:-true}"
       TTS_SHIM_CACHE_MAX_BYTES: "${TTS_SHIM_CACHE_MAX_BYTES:-536870912}"
