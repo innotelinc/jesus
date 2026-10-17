@@ -58,3 +58,6 @@ data/backups/
 # back up, and are made by hand (compose-vault.sh writes atomically, no backup).
 # Ignored so a careless `git add data/` cannot stage one into the tree.
 data/.env.resolved.bak*
+# Control Center runtime state (e.g. the saved SMS transport) — host state,
+# not repo state.
+data/capstone/

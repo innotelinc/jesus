@@ -42,6 +42,7 @@ from . import agents
 from . import grading
 from . import hosts
 from . import interviews
+from . import sms_transport
 from . import stack_access
 from . import workflows
 from .auth import (
@@ -3159,6 +3160,50 @@ def deploy_mode_set(body: dict, user: dict = Depends(require_session)):
     return {**_deploy_mode_state(), "applied": True, "previous": previous,
             "persisted": persisted, "warnings": warnings,
             "command": None if persisted else f"bash scripts/deploy-mode.sh {target}"}
+
+
+# --------------------------------------------------------------------------
+# SMS transport — provider (Zeus) vs local (OpenSMS phone)
+# --------------------------------------------------------------------------
+# The choice lives in a file, not `.env`, so the Settings card can change it
+# without recreating a container; `scripts/opensms_client.py` reads the same
+# file for the dograh tool and the send_sms CLI. `.env` still seeds it.
+
+@app.get("/sms-transport")
+def sms_transport_get(user: dict = Depends(require_session)):
+    """The transport in force, where it came from, and what is configured."""
+    return sms_transport.snapshot()
+
+
+@app.post("/sms-transport")
+def sms_transport_set(body: dict, user: dict = Depends(require_session)):
+    """Record provider/local/auto for every agent and script on this host."""
+    try:
+        return sms_transport.save(body.get("transport"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/sms-gateway")
+def sms_gateway_health(user: dict = Depends(require_session)):
+    """Whether the local gateway can actually send (modem, SIM, signal).
+
+    Separate from `/sms-transport` on purpose: the choice is a file read, while
+    this calls the gateway, and a dead gateway must not delay the card.
+    """
+    url = sms_transport.cfg("OPENSMS_URL").strip()
+    if not url:
+        return {
+            "configured": False,
+            "url": "",
+            "health": {"ok": False, "backend": None,
+                       "detail": "OPENSMS_URL is not set"},
+        }
+    return {
+        "configured": bool(sms_transport.cfg("OPENSMS_API_KEY").strip()),
+        "url": url,
+        "health": sms_transport.gateway_health(url),
+    }
 
 
 # ── FreePBX side of an agent (mirrors sync_dograh_routes; both modes) ────────

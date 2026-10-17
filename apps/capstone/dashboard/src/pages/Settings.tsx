@@ -6,6 +6,13 @@ import { exportJSON } from '../lib/export';
 import Input from '../components/Input';
 import Select from '../components/Select';
 import {
+  api,
+  type SmsGatewayHealth,
+  type SmsTransport,
+  type SmsTransportChoice,
+  type SmsTransportState,
+} from '../lib/api';
+import {
   NOTIFY_ON_OPTIONS,
   settingsStore,
   type AccessSettings,
@@ -80,6 +87,19 @@ function SaveRow({
   );
 }
 
+function smsChoice(transport: SmsTransport): SmsTransportChoice {
+  if (transport === 'opensms') return 'local';
+  if (transport === 'auto') return 'auto';
+  return 'provider';
+}
+
+const SMS_SOURCE_LABEL: Record<SmsTransportState['source'], string> = {
+  env: 'container environment override',
+  state: 'saved here',
+  dotenv: '.env default',
+  default: 'built-in default',
+};
+
 export default function Settings() {
   const { theme, setTheme } = useResolvedTheme();
 
@@ -99,6 +119,66 @@ export default function Settings() {
     settingsStore.loadProfile,
     settingsStore.saveProfile,
   );
+
+  // Server-side SMS transport: not a browser preference. The choice is written
+  // to the host state file the agent tools read, so it must come from the API.
+  const [sms, setSms] = useState<SmsTransportState | null>(null);
+  const [smsPick, setSmsPick] = useState<SmsTransportChoice>('provider');
+  const [smsStatus, setSmsStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>('loading');
+  const [smsError, setSmsError] = useState('');
+  // Separate call: "configured" (URL + key) does not mean "ready" (a modem
+  // with a SIM), and a dead gateway must not hold up the card.
+  const [gateway, setGateway] = useState<SmsGatewayHealth | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.smsGateway()
+      .then(state => { if (live) setGateway(state); })
+      .catch(() => {
+        if (!live) return;
+        setGateway({
+          configured: false,
+          url: '',
+          health: { ok: false, detail: 'gateway status unavailable' },
+        });
+      });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    api.smsTransport()
+      .then(state => {
+        if (!live) return;
+        setSms(state);
+        setSmsPick(smsChoice(state.transport));
+        setSmsStatus('ready');
+      })
+      .catch((err: unknown) => {
+        if (!live) return;
+        setSmsError(err instanceof Error ? err.message : 'Could not load SMS settings');
+        setSmsStatus('error');
+      });
+    return () => { live = false; };
+  }, []);
+
+  const saveSms = async () => {
+    setSmsStatus('saving');
+    setSmsError('');
+    try {
+      const state = await api.setSmsTransport(smsPick);
+      setSms(state);
+      setSmsPick(smsChoice(state.transport));
+      setSmsStatus('saved');
+      api.smsGateway().then(setGateway).catch(() => {});
+      window.setTimeout(() => setSmsStatus(current => (current === 'saved' ? 'ready' : current)), 4000);
+    } catch (err: unknown) {
+      setSmsError(err instanceof Error ? err.message : 'Could not save the SMS transport');
+      setSmsStatus('error');
+    }
+  };
+
+  const smsDirty = !!sms && smsPick !== smsChoice(sms.transport);
 
   const downloadLocalSettings = () => exportJSON({
     exportedAt: new Date().toISOString(),
@@ -293,6 +373,91 @@ export default function Settings() {
             onSave={profile.save}
             label="Save profile"
           />
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">SMS delivery</h2>
+          <p className="text-xs text-muted-foreground">
+            Where agent and script SMS leaves from. Saved on the host and read by the dograh
+            <code className="mx-1 rounded bg-muted px-1">sms</code> tool and
+            <code className="mx-1 rounded bg-muted px-1">scripts/send_sms.py</code>.
+            A value in the container environment overrides this card; otherwise the saved
+            choice overrides the <code className="mx-1 rounded bg-muted px-1">.env</code> default.
+          </p>
+          <div>
+            <label className="text-sm font-medium">Send SMS via</label>
+            <Select
+              value={smsPick}
+              options={[
+                { value: 'provider', label: 'Provider — Zeus portal' },
+                { value: 'local', label: 'Local — OpenSMS phone' },
+                { value: 'auto', label: 'Auto — local, then provider' },
+              ]}
+              onChange={v => setSmsPick(v as SmsTransportChoice)}
+              disabled={smsStatus === 'loading' || smsStatus === 'saving'}
+              className="mt-1"
+            />
+          </div>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span>OpenSMS gateway</span>
+              <span className={sms?.opensms.configured ? 'text-success' : 'text-warning'}>
+                {sms?.opensms.configured ? sms.opensms.url : 'not configured'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Gateway modem</span>
+              <span className={gateway?.health.ok ? 'text-success' : 'text-warning'}>
+                {gateway === null
+                  ? 'checking…'
+                  : gateway.health.ok
+                    ? `ready — ${gateway.health.backend ?? 'modem'}${
+                        typeof gateway.health.signal === 'number' ? ` (${gateway.health.signal}%)` : ''
+                      }`
+                    : gateway.health.detail || 'not ready'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Zeus portal</span>
+              <span className={sms?.zeus.configured ? 'text-success' : 'text-warning'}>
+                {sms?.zeus.configured ? sms.zeus.url : 'not configured'}
+              </span>
+            </div>
+            {sms && (
+              <p>
+                In force: <span className="text-foreground">{sms.transport}</span>{' '}
+                ({SMS_SOURCE_LABEL[sms.source]})
+              </p>
+            )}
+            {sms && !sms.opensms.configured && (
+              <p className="text-warning">
+                Local sends fail until OPENSMS_URL and OPENSMS_API_KEY are set on the host.
+              </p>
+            )}
+            {sms?.opensms.configured && gateway && !gateway.health.ok
+              && (smsPick === 'local' || smsPick === 'auto') && (
+              <p className="text-warning">
+                Local sends are unavailable right now — {gateway.health.detail || 'no modem'}.
+              </p>
+            )}
+            {sms?.source === 'env' && smsDirty && (
+              <p className="text-warning">
+                SMS_PROVIDER is set in the container environment and overrides this card.
+              </p>
+            )}
+            {smsError && <p className="text-danger">{smsError}</p>}
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span
+              className={cn('text-xs transition-opacity', smsStatus === 'saved' ? 'text-success opacity-100' : 'opacity-0')}
+              role="status"
+            >
+              Settings saved.
+            </span>
+            <Button size="sm" onClick={saveSms} disabled={!smsDirty || smsStatus === 'saving'}>
+              Save SMS transport
+            </Button>
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">

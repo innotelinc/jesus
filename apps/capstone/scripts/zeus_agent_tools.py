@@ -10,8 +10,10 @@ What each tool does (contract = zeus repo docs/portal-api.md):
   resolve     transfer tool `destination_source: dynamic` resolver —
               resolves "who do you need" → {transfer_context:{destination,
               custom_message?}} (POST /api/agent/transfer-resolve)
-  sms         send an SMS through the account's Zeus DIDs
-              (POST /api/messages/send)
+  sms         send an SMS — through the account's Zeus DIDs
+              (POST /api/messages/send), or directly through a local
+              OpenSMS Android gateway. `transport` picks per call:
+              provider | local | auto (default = the saved/SMS_PROVIDER choice)
   fax         send a fax (POST /api/fax/send)
   voicemails  list the account's voicemails + AI summaries
               (GET /api/voicemail) — agents read them for personal-assistant
@@ -31,10 +33,13 @@ re-reads ZEUS_* config from the environment/.env, so tokens rotate without a
 restart. In zeus add-on mode the same host also serves the transfer resolver
 the dograh tool config expects (§G3).
 
-Environment (see .env.example §Zeus):
+Environment (see .env.example §Zeus and §SMS transport):
     ZEUS_API_URL          Zeus portal origin (default https://api.zeus.innotel.us)
     ZEUS_SESSION_TOKEN    the account's pbx_session cookie value
     ZEUS_BEARER           optional Bearer for the transfer resolver
+    SMS_PROVIDER          zeus (default) | opensms | auto  (sms tool only)
+    OPENSMS_URL / OPENSMS_API_KEY / OPENSMS_TIMEOUT_MS
+                          local OpenSMS gateway (outbound only)
 
 Only stdlib — run with:  python3 scripts/zeus_agent_tools.py --help
 """
@@ -49,6 +54,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import zeus_client  # noqa: E402  (same dir)
+import opensms_client  # noqa: E402
 
 
 def _client() -> "zeus_client.ZeusClient":
@@ -83,13 +89,34 @@ def tool_send_sms(payload: dict) -> dict:
     to = str(payload.get("to") or payload.get("to_number") or "").strip()
     did = str(payload.get("did_id") or payload.get("from_did_id") or "").strip()
     body = str(payload.get("body") or payload.get("message") or "").strip()
-    if not (to and did and body):
-        return {"error": "sms needs 'to', 'did_id' and 'body'"}
+
+    requested = str(payload.get("transport") or "").strip()
+    selected = opensms_client.provider() if not requested else opensms_client.normalize_choice(requested)
+    if not selected:
+        return {"error": "transport must be 'provider', 'local' or 'auto'"}
+    if selected == "opensms" and not opensms_client.configured():
+        return {"error": "SMS_PROVIDER=opensms but OPENSMS_URL / OPENSMS_API_KEY are not set"}
+    # OpenSMS sends from the phone's own SIM, so no DID is involved. Every
+    # other transport still needs the account DID to originate from.
+    use_opensms = selected in ("opensms", "auto") and opensms_client.configured()
+    if not to or not body or (not use_opensms and not did):
+        needed = "'to' and 'body'" if use_opensms else "'to', 'did_id' and 'body'"
+        return {"error": f"sms needs {needed}"}
+
+    if use_opensms:
+        try:
+            data = opensms_client.send_sms(to, body)
+            return {"sent": True, "transport": "opensms", "response": data}
+        except opensms_client.OpenSMSError as e:
+            if selected == "opensms":
+                return {"error": f"SMS send failed (OpenSMS): {e}"}
+            print(f"OpenSMS send failed ({e}); falling back to Zeus", file=sys.stderr)
+
     try:
         status, data = _client().send_sms(to, did, body)
     except zeus_client.ZeusError as e:
         return {"error": f"SMS send failed: {e}"}
-    return {"sent": status in (200, 201, 202), "response": data}
+    return {"sent": status in (200, 201, 202), "transport": "zeus", "response": data}
 
 
 def tool_send_fax(payload: dict) -> dict:

@@ -272,6 +272,34 @@ export interface DeployModeState {
   detail?: string;
 }
 
+export type SmsTransport = 'zeus' | 'opensms' | 'auto';
+export type SmsTransportChoice = 'provider' | 'local' | 'auto';
+
+/** Provider vs local SMS, and what this host has configured for each. */
+export interface SmsTransportState {
+  transport: SmsTransport;
+  /** Where the choice came from: env > state (this card) > .env default. */
+  source: 'env' | 'state' | 'dotenv' | 'default';
+  statePath: string;
+  choices: SmsTransport[];
+  opensms: { configured: boolean; url: string };
+  zeus: { configured: boolean; url: string };
+  saved?: boolean;
+}
+
+/** Whether the local gateway can actually send right now (modem, SIM, signal). */
+export interface SmsGatewayHealth {
+  configured: boolean;
+  url: string;
+  health: {
+    ok: boolean;
+    backend?: string | null;
+    detail?: string;
+    signal?: number | null;
+    operator?: string | null;
+  };
+}
+
 export interface AgentsResponse {
   mode: DeployMode;
   configured: boolean;
@@ -401,6 +429,12 @@ export const api = {
   /** Which PBX this deployment reads and writes (standalone vs Zeus add-on). */
   deployMode: () => getJSON<DeployModeState>('/deploy-mode'),
   setDeployMode: (mode: DeployMode) => postJSON<DeployModeState>('/deploy-mode', { mode }),
+  /** Provider (Zeus) vs local (OpenSMS) SMS for every agent and script. */
+  smsTransport: () => getJSON<SmsTransportState>('/sms-transport'),
+  /** Live modem status from the local gateway (separate so it never blocks). */
+  smsGateway: () => getJSON<SmsGatewayHealth>('/sms-gateway'),
+  setSmsTransport: (transport: SmsTransportChoice) =>
+    postJSON<SmsTransportState>('/sms-transport', { transport }),
   workflows: () => getJSON<AgentWorkflow[]>('/workflows'),
   workflow: (id: number) => getJSON<Workflow>(`/workflows/${id}`),
   createWorkflow: (body: WorkflowCreate) => postJSON<Workflow>('/workflows', body),

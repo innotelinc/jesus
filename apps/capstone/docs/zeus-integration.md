@@ -187,6 +187,42 @@ Pointing `DOGRAH_ARI_*` / `DOGRAH_WS_URI` at the Zeus PBX remains the only switc
 > `ZEUS_BEARER` in `.env`. dograh agent tools can shell out to it or import
 > its `ZeusClient` — Phase 2 wiring.
 
+### 4.1 SMS transports
+
+`scripts/send_sms.py` (CLI) and the dograh `sms` tool
+(`scripts/zeus_agent_tools.py`) share one outbound transport choice,
+`SMS_PROVIDER`:
+
+| `SMS_PROVIDER` | Path | Use when |
+| --- | --- | --- |
+| `zeus` (default) | `POST /api/messages/send` → Zeus's own `SMS_PROVIDER` (trunk or OpenSMS) | Add-on mode — the DID, thread and inbound replies all live in Zeus |
+| `opensms` | `POST http://<gateway>:9292/sms/` directly (`scripts/opensms_client.py`) | Standalone box whose SMS is carried by a local gateway — the OpenSMS Android app, or Zeus's Linux `smsgateway/` (USB modem / AT-capable phone) |
+| `auto` | OpenSMS first, Zeus on a gateway failure | A phone that may be off the charger |
+
+The choice is changeable in two places without a container recreate:
+
+- **Control Center → Settings → SMS delivery** records it in
+  `data/capstone/sms-transport` on the host (mounted at `/state` in the
+  dashboard-api). `.env`'s `SMS_PROVIDER` only seeds the default; the saved
+  choice overrides it, and a value in the *real* container environment is an
+  explicit operator override that wins over both.
+- **Per call**: `send_sms.py --transport provider|local|auto` and the dograh
+  `sms` tool's `transport` field override the saved choice once, without
+  touching it. `provider` maps to Zeus and `local` to OpenSMS.
+
+OpenSMS ([daslearning-org/OpenSMS](https://github.com/daslearning-org/OpenSMS))
+sends from the phone's own SIM, has no inbound surface and no delivery receipt.
+Zeus's `smsgateway/` speaks the same API over a USB modem and is installed
+with `zeus/scripts/install-smsgateway.sh --apt` (see
+`zeus/smsgateway/README.md`); either one works here, and a `stat:false`
+answer's `error` is carried through to the caller. `{"stat": true}` only means
+the gateway handed the message to the carrier. Zeus
+remains the only place inbound SMS, threads and history are recorded, so in
+add-on mode leave this provider on `zeus` and select OpenSMS inside Zeus
+(`SMS_PROVIDER` in the Zeus `.env`) instead — Capstone then keeps one transport
+and one message store. The direct path exists for the standalone topology and
+for an operator script on a box with no portal.
+
 | Zeus provides | Capstone consumes | Meeting point |
 |---|---|---|
 | DIDs + inbound routes | Agent inbound (`8000`–`8007` / dograh phone numbers) | FreePBX inbound route → `[dograh-inbound]` → `Stasis` |
@@ -399,11 +435,12 @@ Interview* mismatch remains unreconciled.
   so the fallback is inert until a mailbox is actually provisioned.
 - **G5 — Outbound caller ID.** Campaigns need caller IDs from the Zeus
   number inventory, with per-campaign selection and plan/entitlement checks.
-- **G6 — SMS/fax for agents.** Later phase: letting agents send/receive SMS
-  (VoIP.ms) and fax receipts is a natural extension of the same DID routes.
-  The portal API contract to build against is now published (Zeus repo
-  `docs/portal-api.md` — `POST /api/messages/send`, `POST /api/fax/send`, fax
-  history/download, voicemail list + AI summary).
+- **G6 — SMS/fax for agents.** Send is implemented: the dograh `sms` tool
+  (`scripts/zeus_agent_tools.py`) and `scripts/send_sms.py` use the portal
+  contract (`POST /api/messages/send`) or a local OpenSMS gateway, selected by
+  `SMS_PROVIDER` (see §4.1). Receiving SMS on an agent extension and fax
+  receipts remain open — inbound stays on Zeus's VoIP.ms webhook, because
+  OpenSMS cannot receive.
 - **G7 — Entitlement-gated route writing (RESOLVED).** `scripts/sync_dograh_routes.py`
   now enforces the gate at write time. With `MAGNATE_PUBLIC_URL` +
   `MAGNATE_AGENT_PLAN` configured it calls Magnate's v2.1 `/api/entitlements`

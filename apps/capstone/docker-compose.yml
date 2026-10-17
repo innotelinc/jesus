@@ -1403,6 +1403,10 @@ services:
       # (docker exec). addon: Zeus shared PBX — dashboard only manages dograh;
       # the shared box applies the *_custom.conf moniker on sync.
       CAPSTONE_DEPLOY_MODE: "${CAPSTONE_DEPLOY_MODE:-standalone}"
+      # Provider (Zeus) vs local (OpenSMS) SMS for agents and scripts. The
+      # Settings card writes this file; scripts/opensms_client.py reads the same
+      # host path through the ./data/capstone mount below. `.env` seeds it.
+      CAPSTONE_SMS_TRANSPORT_STATE: "/state/sms-transport"
       # PBX self-healing (standalone mode only). The bundled freepbx sits behind
       # profiles: ["standalone"], so a profile-less `docker compose up -d` stops
       # it; the API starts it on the next PBX action and a background watchdog
@@ -1432,6 +1436,10 @@ services:
       - /etc/passwd:/etc/host-passwd:ro
       - /etc/group:/etc/host-groupfile:ro
       - /:/host:ro   # whole-host proc/disk for /metrics + /snapshot
+      # The saved SMS transport. Host-side scripts read the same file at
+      # data/capstone/sms-transport, so the Settings card reaches the dograh
+      # tool and send_sms.py without a container recreate.
+      - ./data/capstone:/state
     extra_hosts:
       # dograh-api is host-mode — resolve its host address from the bridge
       # (used by the Agents page / DOGRAH_API_ENDPOINT above).

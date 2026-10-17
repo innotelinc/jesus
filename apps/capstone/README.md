@@ -59,6 +59,7 @@ behind the existing `MINIO_*` contract in a dedicated release.
 |---|---|---|
 | 🗣️ **Voice AI agents** | Prebuilt phone agents (receptionist, outreach, job interview, survey, GOTV poll) plus mock-interview agents for IT Help Desk, DevOps, and SQL | 
 | 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
+| 📨 **SMS delivery** | Agent and script SMS go through Zeus's DID path, or straight through a local OpenSMS Android gateway — one `SMS_PROVIDER` switch, with `auto` falling back to Zeus | |
 | 🧠 **Local intelligence** | Piper TTS, Speaches Whisper STT, and OmniRoute LLM gateway via Zeus (OpenAI-compatible) — nothing leaves the box | 
 | ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
 | 🔐 **Cerulean SSO** | Shared identity through Cerulean's Authentik at `auth.capstone.innotel.us` — one login for every surface, and the Control Center is gated behind it | 
@@ -279,7 +280,7 @@ pbx/                            # ARI configs + entrypoint wrapper + PBX runbook
 tts-shim/                       # OpenAI-compatible TTS door (engine A/B + audio cache, :8881)
 grafana/ + prometheus/          # provisioned dashboards + scrape config
 dograh/                         # interview workflow JSON + SDK import script
-scripts/                        # setup, wiring, smoke, ISO/bundle builders
+scripts/                        # setup, wiring, SMS transport, smoke, ISO/bundle builders
 docs/                           # operations, networking, legacy dependencies
 systemd/capstone.service        # auto-start the stack on boot
 .env.example                    # every compose variable + secret hints

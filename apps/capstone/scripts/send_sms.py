@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Send an SMS from the Capstone AI agent stack.
 
-Thin wrapper over zeus_client.py. Reads config from the stack .env (or
-OS-level env), validates the recipient, and hands off to Zeus's SMS portal
-endpoint. Designed to be called both by the dograh tool layer and directly
-from the CLI.
+Reads config from the stack .env (or OS-level env), validates the recipient,
+and hands the message to the transport `SMS_PROVIDER` selects: Zeus's SMS
+portal endpoint (default), or a local OpenSMS Android gateway directly
+(`opensms`, with `auto` falling back to Zeus). Designed to be called both by
+the dograh tool layer and directly from the CLI.
 
 Usage:
     python3 scripts/send_sms.py "+12223334444" "Your appointment is at 3pm."
@@ -33,6 +34,7 @@ from typing import Any
 _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR.parent))
 import zeus_client as zc  # noqa: E402
+import opensms_client  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +108,7 @@ def send_sms(
     text: str,
     *,
     from_number: str | None = None,
+    transport: str | None = None,
     json_out: bool = False,
 ) -> dict[str, Any] | None:
     """Send *text* to *to* through Zeus's SMS portal.
@@ -118,13 +121,57 @@ def send_sms(
     if not text:
         raise ValueError("SMS body must not be empty")
 
+    # Per-call override: 'provider' (Zeus) or 'local' (OpenSMS), with 'auto'
+    # keeping the fallback. Unset = the saved/.env default.
+    selected = opensms_client.provider()
+    if transport:
+        selected = opensms_client.normalize_choice(transport)
+        if not selected:
+            raise ValueError("transport must be 'provider', 'local' or 'auto'")
+
+    # Direct OpenSMS gateway — no Zeus/DID involved. The phone's own SIM is the
+    # sender, so `from_number` is irrelevant on this path (the caller's `to`
+    # still gets a normalised E.164-ish number).
+    if selected in ("opensms", "auto"):
+        if opensms_client.configured():
+            if from_number:
+                print(
+                    "note: OpenSMS sends from the phone's SIM; --from is ignored",
+                    file=sys.stderr,
+                )
+            try:
+                opensms_client.send_sms(to, text)
+                return _maybe_json(
+                    {"ok": True, "to": to, "transport": "opensms", "status": "sent"},
+                    json_out,
+                    0,
+                )
+            except opensms_client.OpenSMSError as exc:
+                if selected == "opensms":
+                    return _maybe_json(
+                        {"error": f"OpenSMS send failed: {exc}", "to": to, "transport": "opensms"},
+                        json_out,
+                        1,
+                    )
+                print(f"OpenSMS send failed ({exc}); falling back to Zeus", file=sys.stderr)
+        elif selected == "opensms":
+            return _maybe_json(
+                {
+                    "error": "SMS_PROVIDER=opensms but OPENSMS_URL / OPENSMS_API_KEY are not set",
+                    "to": to,
+                    "transport": "opensms",
+                },
+                json_out,
+                1,
+            )
+
     base = _zeus_base_url()
     # zeus_client's send_sms(to_number, from_did_id, body) — note the
     # from_did_id is the DID identifier, not a raw phone number. We map our
     # from_number through the listed DIDs when possible so the caller gets a
     # stable API instead of needing to know DID internals.
     try:
-        client = zc.ZeusClient(base=base)
+        client = zc.ZeusClient(base_url=base)
     except Exception as exc:
         msg = f"Cannot reach Zeus SMS portal at {base}: {exc}"
         return _maybe_json({"error": msg, "to": to}, json_out, 1)
@@ -159,6 +206,7 @@ def send_sms(
         {
             "ok": True,
             "to": to,
+            "transport": "zeus",
             "message_id": resp.get("message_id") if isinstance(resp, dict) else None,
             "status": resp.get("status") if isinstance(resp, dict) else "queued",
         },
@@ -175,7 +223,7 @@ def list_numbers() -> list[dict[str, Any]]:
     """
     base = _zeus_base_url()
     try:
-        client = zc.ZeusClient(base=base)
+        client = zc.ZeusClient(base_url=base)
         numbers = getattr(client, "list_sms_numbers", lambda: [])()
         if isinstance(numbers, list):
             return _normalise_number_list(numbers)
@@ -236,12 +284,21 @@ def _maybe_json(payload: dict[str, Any], json_out: bool, exit_code: int) -> dict
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
         prog="send_sms",
-        description="Send an SMS via the configured Zeus SMS portal.",
+        description=(
+            "Send an SMS via the configured transport — the Zeus SMS portal "
+            "or a local OpenSMS Android gateway (SMS_PROVIDER)."
+        ),
     )
     ap.add_argument("to", nargs="?", help="Recipient phone number (E.164-ish).")
     ap.add_argument("text", nargs="?", help="SMS body text.")
     ap.add_argument("--json", action="store_true", help="Emit machine-readable JSON to stdout.")
     ap.add_argument("--from", dest="from_number", help="Optional sender/number to originate from.")
+    ap.add_argument(
+        "--transport",
+        choices=["provider", "local", "auto"],
+        help="Override the saved SMS transport for this send: provider (Zeus), "
+             "local (OpenSMS phone) or auto.",
+    )
     ap.add_argument(
         "--list",
         action="store_true",
@@ -265,7 +322,13 @@ def main(argv: list[str] | None = None) -> None:
         ap.error("usage: send_sms.py <to> <text> [--json] [--from <sender>]")
 
     try:
-        send_sms(args.to, args.text, from_number=args.from_number, json_out=args.json)
+        send_sms(
+            args.to,
+            args.text,
+            from_number=args.from_number,
+            transport=args.transport,
+            json_out=args.json,
+        )
     except ValueError as exc:
         payload = {"error": str(exc), "to": args.to}
         _maybe_json(payload, args.json, 2)
