@@ -613,8 +613,10 @@ Two independent things stand between that and the browser:
 * `scripts/npm-proxy-hosts.py` puts a `location /api/v1/auth/oidc` on every app origin
   (`OIDC_PATH`), so the OIDC legs reach the API on port 8000 without entering the UI proxy
   at all. This is the one that does not depend on an image being current;
-* `dograh/patches/0001-…patch` (`redirect: "manual"`) fixes the UI proxy itself, for any
-  other route that answers 3xx. If the running UI predates it, rebuild the image.
+* the UI proxy's own `redirect: "manual"` change fixes any other route that answers 3xx.
+  If the running UI predates it, rebuild the image. (The `000N` labels in this file are the
+  old patch numbers: those fixes are commits in `dograh/upstream` now and `dograh/patches/`
+  no longer exists, but the changelog and the smoke tests still name them that way.)
 
 Check the entry point an operator actually opens, not just the API's own host: every name
 the app answers on reaches the API through the same UI proxy, so the apex can fail where
@@ -853,16 +855,20 @@ compared there):
 
 ```bash
 python3 scripts/ci/check-dograh-image-drift.py       # 0 = match, 1 = drift, 2 = cannot look
-# this deployment runs the voice platform as its own project (project `dograh`), where the
-# containers are <project>-<service>-1:
-DOGRAH_API_CONTAINER=dograh-api-1 DOGRAH_UI_CONTAINER=dograh-ui-1 \
-  python3 scripts/ci/check-dograh-image-drift.py
 ```
 
 Same exit-code convention as above: 2 means no clone, no docker, or the containers are not
 running on this host, which the `dograh-image-drift` CI job reports as a skip (a hosted
 runner cannot reach the stack); a runner with a route to it turns the job into a gate.
-`DOGRAH_API_CONTAINER` / `DOGRAH_UI_CONTAINER` override the compose service names.
+
+The file names a compose *service* (`dograh-api`, `dograh-ui`), and which container that
+became depends on the layout: `dograh-api` where the compose file sets `container_name`,
+`dograh-api-1` where the voice platform runs as its own project. The check resolves it the
+way `scripts/doctor-signin.sh` does — the name, then `<name>-1`, then whatever running
+container carries an image of that name — and prints the container it inspected, so this
+host no longer SKIPs a check that could have run. `DOGRAH_API_CONTAINER` /
+`DOGRAH_UI_CONTAINER` still override the resolution and are taken as given, so a typo in
+one of them SKIPs rather than inspecting a different container.
 
 ## Boot (the `capstone.service` unit)
 

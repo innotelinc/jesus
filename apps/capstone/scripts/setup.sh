@@ -781,8 +781,8 @@ fi
 # A local user row is keyed on the provider subject, and Authentik derives that
 # sub as sha256("{user_id}-{install_id}") — so rebuilding or restoring the
 # identity provider moves EVERY subject at once. Sign-in survives that now
-# (dograh/patches/0004 refuses only the address instead of aborting), but the
-# person then lands on a new row: their account id, workflows and agents stay
+# (the fork's adoption change refuses only the address instead of aborting), but
+# the person then lands on a new row: their account id, workflows and agents stay
 # behind on the old one, and nothing about the sign-in looks wrong.
 #
 # Running the reconcile report here is the difference between an operator

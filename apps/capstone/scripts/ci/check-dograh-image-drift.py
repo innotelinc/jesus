@@ -4,22 +4,22 @@
 dograh/upstream is a gitignored clone of innotelinc/dograh, which carries our
 customizations as commits. Nothing stops the stack from running
 something else, and the incident this guards against is exactly that: a stack
-serving the registry's ghcr.io images — which carry none of the patches — while
-every file in the repo says otherwise. The configuration reads the same either
-way, so the images themselves are the only thing that can answer.
+serving the registry's ghcr.io images — which carry none of those commits —
+while every file in the repo says otherwise. The configuration reads the same
+either way, so the images themselves are the only thing that can answer.
 
 What is compared, and why it is not uniform:
 
   • api/** and pipecat/** are plain files in dograh-api (the API image copies
     the tree to /app and pip-installs pipecat from the submodule), so their
-    sha256 in the running container must equal the sha256 of the patched
-    upstream tree — an exact comparison.
+    sha256 in the running container must equal the sha256 of the fork's tree in
+    dograh/upstream — an exact comparison.
 
   • ui/** is compiled into .next/, so there is no source to hash. The UI image
-    is asked instead for the two things patch 0001 changes in its *compiled*
+    is asked instead for the two things the OIDC fix changes in its *compiled*
     output: the home page carries the new OIDC branch, and the workflow page no
-    longer renders the pre-patch dead end. (0007 is a build-only change — a cap
-    on webpack's in-memory cache — with no runtime artifact to look for.)
+    longer renders the pre-fix dead end. (The build-only cache cap leaves no
+    runtime artifact to look for.)
 
 Exit codes, matching scripts/ci/sso-smoke.py: 0 = the images carry our tree,
 1 = drift, 2 = cannot run (no clone, no docker, or the containers are not
@@ -27,8 +27,12 @@ running here) — which is a SKIP, not a pass.
 
     python3 scripts/ci/check-dograh-image-drift.py
 
-The container names are the compose service names; override them with
-DOGRAH_API_CONTAINER / DOGRAH_UI_CONTAINER when the stack is named otherwise.
+What is inspected is a compose *service* name, and which container that became
+depends on the layout: `dograh-api` where the compose file sets container_name,
+`dograh-api-1` where the voice platform runs as its own project. The name is
+resolved here (see locate()) so a split-project host does not SKIP a check that
+could have run. Override with DOGRAH_API_CONTAINER / DOGRAH_UI_CONTAINER, which
+are taken as given.
 """
 
 from __future__ import annotations
@@ -41,28 +45,31 @@ import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 UPSTREAM = REPO / "dograh" / "upstream"
-PATCH_DIR = REPO / "dograh" / "patches"
-PATCH_SCRIPT = REPO / "scripts" / "apply-dograh-patches.sh"
 
-API_CONTAINER = os.environ.get("DOGRAH_API_CONTAINER", "dograh-api")
-UI_CONTAINER = os.environ.get("DOGRAH_UI_CONTAINER", "dograh-ui")
+# The compose service names this check wants. main() resolves each to the
+# container it became, so these are not what should be inspected.
+API_SERVICE = os.environ.get("DOGRAH_API_CONTAINER", "dograh-api")
+UI_SERVICE = os.environ.get("DOGRAH_UI_CONTAINER", "dograh-ui")
+API_CONTAINER = API_SERVICE  # replaced by the resolved name in main()
+UI_CONTAINER = UI_SERVICE
 
-# The API image's WORKDIR; the repo is copied in whole, so a patch path is
-# /app/<path>. pipecat is installed as a package instead, so its root is asked
-# of the interpreter that actually holds it rather than assumed.
+# The API image's WORKDIR; the repo is copied in whole, so a path our delta
+# touches is /app/<path>. pipecat is installed as a package instead, so its root
+# is asked of the interpreter that actually holds it rather than assumed.
 API_APP_ROOT = "/app"
 PIPECAT_TOP = "pipecat/"
 PIPECAT_PACKAGE = "pipecat"
 # Inside the pipecat submodule the importable package is ``src/pipecat``, which
 # the API image installs as the ``pipecat`` package — so that subpath is dropped
-# when mapping a patch path onto the installed one.
+# when mapping one of our paths onto the installed one.
 PIPECAT_PACKAGE_SUBPATH = "src/pipecat/"
 
-# Patch 0001, as it survives into the compiled UI the image serves. The markers
-# are the compiled form of the patch's own lines: the home page's new branch
-# (ui/src/app/page.tsx) and the workflow page's removed dead end
-# (ui/src/app/workflow/page.tsx). A source hash cannot reach either — .next/
-# holds a build, not the sources — so the image is asked about its output.
+# The OIDC fix (patch 0001 in the old series, a fork commit now), as it survives
+# into the compiled UI the image serves. The markers are the compiled form of
+# its own lines: the home page's new branch (ui/src/app/page.tsx) and the
+# workflow page's removed dead end (ui/src/app/workflow/page.tsx). A source hash
+# cannot reach either — .next/ holds a build, not the sources — so the image is
+# asked about its output.
 UI_HOME_ARTIFACT = "/app/.next/server/app/page.js"
 UI_HOME_MARKER = "[HomePage] Local/OIDC provider detected"
 UI_WORKFLOW_ARTIFACT = "/app/.next/server/app/workflow/page.js"
@@ -81,6 +88,41 @@ def container_running(name: str) -> bool:
     """True only when `name` is a running container this host can inspect."""
     out = docker(["inspect", "-f", "{{.State.Running}}", name])
     return out is not None and out.returncode == 0 and out.stdout.strip() == "true"
+
+
+def resolve_container(service: str) -> str:
+    """The running container `service` became, or "" when there is none.
+
+    Standalone compose sets container_name, so the container is `dograh-api`;
+    this deployment runs the voice platform as its own project, where compose
+    appends the replica suffix and it is `dograh-api-1`. The compose service
+    label cannot answer this: upstream names its services `api` and `ui`, so the
+    label reads the same in both layouts while the container name is what
+    changes (scripts/doctor-signin.sh makes the same note). Last resort is the
+    image a service builds, which is named after the service.
+    """
+    for candidate in (service, f"{service}-1"):
+        if container_running(candidate):
+            return candidate
+    out = docker(["ps", "--format", "{{.Names}}\t{{.Image}}"])
+    if out is None or out.returncode != 0:
+        return ""
+    for line in out.stdout.splitlines():
+        name, _, image = line.strip().partition("\t")
+        if image.rsplit("/", 1)[-1].split(":", 1)[0] == service and container_running(name):
+            return name
+    return ""
+
+
+def locate(service: str, override: str | None) -> str:
+    """What this check should inspect for `service`.
+
+    An explicit override is taken as given: a typo then SKIPs loudly rather than
+    quietly inspecting a container the operator did not ask about.
+    """
+    if override:
+        return override
+    return resolve_container(service) or service
 
 
 def resolve_pipecat_root(container: str) -> str:
@@ -105,13 +147,12 @@ def resolve_pipecat_root(container: str) -> str:
     return lines[-1] if lines else ""
 
 
-# The fork carries our customizations as commits on main, not as patches. The
-# files to compare are whatever those commits changed relative to the upstream
-# they sit on top of, which is the same question the patches used to answer by
-# reading `+++ b/` lines.
+# The fork carries our customizations as commits on main. The files to compare
+# are whatever those commits changed relative to the upstream they sit on top
+# of, which is the same question the old patch files answered by reading
+# `+++ b/` lines.
 #
 #   dograh/upstream            <- the fork's clone
-#   dograh/patches/            <- gone; the delta is in git history now
 #   upstream/main              <- the author's tree we rebase onto
 #
 # Comparing against `upstream/main` rather than the merge-base keeps this correct
@@ -237,8 +278,8 @@ def exec_read(container: str, path: str) -> str | None:
     return out.stdout
 
 
-def patch_labels(names: list[str]) -> str:
-    """The patch numbers that touch a file, for the report: [0004, 0006] → `0004, 0006`."""
+def delta_labels(names: list[str]) -> str:
+    """Where a file's change comes from, for the report — currently always our delta."""
     return ", ".join(name.split("-", 1)[0] for name in sorted(set(names)))
 
 
@@ -274,11 +315,21 @@ def main() -> int:
     ui_files = {p: n for p, n in touched.items() if p.split("/", 1)[0] == "ui"}
     unknown = {p: n for p, n in touched.items() if p not in api_files and p not in ui_files}
     if unknown:
-        print("SKIP: the patch set touches files this check has no image mapping for: "
+        print("SKIP: our delta touches files this check has no image mapping for: "
               + ", ".join(sorted(unknown))
               + " — teach scripts/ci/check-dograh-image-drift.py where the image carries them",
               file=sys.stderr)
         return 2
+
+    # Resolve the service names before anything is inspected: on a split-project
+    # host the containers are `-1` replicas, and SKIPping there is what made this
+    # check look like a pass that never ran.
+    global API_CONTAINER, UI_CONTAINER
+    API_CONTAINER = locate(API_SERVICE, os.environ.get("DOGRAH_API_CONTAINER"))
+    UI_CONTAINER = locate(UI_SERVICE, os.environ.get("DOGRAH_UI_CONTAINER"))
+    for service, container in ((API_SERVICE, API_CONTAINER), (UI_SERVICE, UI_CONTAINER)):
+        if container != service:
+            print(f"  note  {service} resolved to the container '{container}'")
 
     if not (container_running(API_CONTAINER) and container_running(UI_CONTAINER)):
         print(f"SKIP: cannot inspect the running images ({API_CONTAINER} / {UI_CONTAINER} are "
@@ -313,7 +364,7 @@ def main() -> int:
     for dest, path in sorted(destinations.items(), key=lambda kv: kv[1]):
         want = sha256_file(UPSTREAM / path)
         got = in_image.get(dest)
-        labels = patch_labels(api_files[path])
+        labels = delta_labels(api_files[path])
         if got == want:
             print(f"  ok    {API_CONTAINER}:{dest}  ({labels})")
         else:
@@ -343,17 +394,18 @@ def main() -> int:
         print(f"  note  {len(upstream_new)} file(s) upstream added after our clone's base "
               f"({upstream_new[0]}…) are not part of our delta — not compared")
 
-    # ── dograh-ui: the compiled artifacts patch 0001 changes ─────────────────
+    # ── dograh-ui: the compiled artifacts the OIDC fix changes ───────────────
     home = exec_read(UI_CONTAINER, UI_HOME_ARTIFACT)
     if home is None:
         print(f"  DRIFT {UI_CONTAINER}:{UI_HOME_ARTIFACT} — not in the image (the compiled "
-              "home page patch 0001 changes)", file=sys.stderr)
+              "home page, which the OIDC fix changes)", file=sys.stderr)
         drift += 1
     elif UI_HOME_MARKER in home:
-        print(f"  ok    {UI_CONTAINER}:{UI_HOME_ARTIFACT}  (0001)")
+        print(f"  ok    {UI_CONTAINER}:{UI_HOME_ARTIFACT}  (the OIDC fix)")
     else:
-        print(f"  DRIFT {UI_CONTAINER}:{UI_HOME_ARTIFACT} — the pre-0001 home page: this image "
-              "predates dograh/patches/0001 (a registry tag cannot carry it)", file=sys.stderr)
+        print(f"  DRIFT {UI_CONTAINER}:{UI_HOME_ARTIFACT} — the pre-fix home page: this image "
+              "was built from a tree without the fork's OIDC commit (a registry tag cannot "
+              "carry it)", file=sys.stderr)
         drift += 1
 
     workflow = exec_read(UI_CONTAINER, UI_WORKFLOW_ARTIFACT)
@@ -362,20 +414,20 @@ def main() -> int:
               "page the smoke test probes)", file=sys.stderr)
         drift += 1
     elif UI_WORKFLOW_DEAD_END in workflow:
-        print(f"  DRIFT {UI_CONTAINER}:{UI_WORKFLOW_ARTIFACT} — still renders the pre-0001 dead "
+        print(f"  DRIFT {UI_CONTAINER}:{UI_WORKFLOW_ARTIFACT} — still renders the pre-fix dead "
               f"end ({UI_WORKFLOW_DEAD_END!r})", file=sys.stderr)
         drift += 1
     else:
-        print(f"  ok    {UI_CONTAINER}:{UI_WORKFLOW_ARTIFACT}  (0001)")
+        print(f"  ok    {UI_CONTAINER}:{UI_WORKFLOW_ARTIFACT}  (the OIDC fix)")
 
     print()
     if drift:
-        print(f"FAIL: {drift} patched artifact(s) in the running images do not match the tree "
-              "they were built from — rebuild and re-ship (docker-compose.dograh-build.yml)",
+        print(f"FAIL: {drift} artifact(s) in the running images do not match the tree they "
+              "were built from — rebuild and re-ship (docker-compose.dograh-build.yml)",
               file=sys.stderr)
         return 1
-    print(f"PASS the running dograh images carry the patched tree "
-          f"({len(destinations)} file(s) hashed + the compiled UI patch-0001 markers)")
+    print(f"PASS the running dograh images carry the fork's tree "
+          f"({len(destinations)} file(s) hashed + the compiled UI markers)")
     return 0
 
 

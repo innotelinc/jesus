@@ -145,6 +145,30 @@ interpolates.
   the shim*, which is the fact that decides it on a box where the voice platform
   is its own project.
 
+### The image-drift check finds the containers by itself
+
+- **It SKIPped on this host, which reads like nothing to look at.**
+  `scripts/ci/check-dograh-image-drift.py` defaulted to the standalone layout's
+  container names (`dograh-api`, `dograh-ui`) and exited 2 here, where the voice
+  platform is its own project and the containers are `dograh-api-1` /
+  `dograh-ui-1` — so the one check that can tell a fork build from a registry tag
+  never ran, and a skip in the CI job is a notice. It now resolves each compose
+  service the way `doctor-signin.sh` does (the name, then `<name>-1`, then the
+  running container whose image is named after the service) and names the
+  container it inspected. A `DOGRAH_*_CONTAINER` override is still taken as
+  given, so a typo SKIPs instead of quietly inspecting something else.
+- **Verified both ways**: with no overrides set it now prints `PASS … (77 file(s)
+  hashed + the compiled UI markers)`, rc 0; with the `-1` names passed
+  explicitly, the same. An override naming a container that does not exist still
+  exits 2.
+- **The retired patch references are gone from the places that read as live.**
+  The check's own `PATCH_DIR` / `PATCH_SCRIPT` constants named a directory and a
+  script deleted in `cdf3204`, its messages said "patch 0001" for what is a fork
+  commit, and the `ci.yml` job comment, `dograh-api.thin.Dockerfile`'s build
+  instructions and one `setup.sh` comment still pointed at them.
+  `docs/operations.md` keeps the `000N` shorthand the changelog and the smoke
+  tests use, and now says once that those numbers are the old patch series.
+
 ## v3.21 — Piper is the local voice
 
 Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to

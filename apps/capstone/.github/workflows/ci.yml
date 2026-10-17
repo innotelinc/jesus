@@ -153,12 +153,12 @@ jobs:
           esac
 
   # The running stack can drift from this repo in a way no static check sees:
-  # dograh/upstream is gitignored and this repo's fixes to it live in
-  # dograh/patches/, applied at build time. An image built from the registry's
-  # ghcr.io tag — or one built without apply-dograh-patches.sh — answers every
-  # config check in this file and still renders the pre-patch dead end. This job
-  # hashes the patched files in the running dograh-api against the patched
-  # upstream tree, and asks dograh-ui for the compiled output of patch 0001.
+  # dograh/upstream is gitignored and this repo's fixes to it are commits on the
+  # fork. An image built from the registry's ghcr.io tag — or one built before
+  # the last sync — answers every config check in this file and still renders
+  # the pre-fix dead end. This job hashes the files our delta touches in the
+  # running dograh-api against the fork's tree, and asks dograh-ui for the
+  # compiled output of the OIDC fix.
   #
   # It exits 2 when it cannot look — no clone, no docker, or the containers are
   # not running here — reported as a skip, not a pass, exactly like the SSO job
@@ -169,15 +169,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Compare the running images against the patched upstream tree
+      - name: Compare the running images against the fork's tree
         run: |
           set -uo pipefail
           rc=0
           python3 scripts/ci/check-dograh-image-drift.py || rc=$?
           case "$rc" in
-            0) echo "::notice::the running dograh images carry the patched tree" ;;
-            2) echo "::notice::skipped — no patched clone, no docker, or the containers do not run on this runner" ;;
-            *) echo "::error::a running dograh image drifted from the patched tree — see the log above"; exit "$rc" ;;
+            0) echo "::notice::the running dograh images carry the fork's tree" ;;
+            2) echo "::notice::skipped — no fork clone, no docker, or the containers do not run on this runner" ;;
+            *) echo "::error::a running dograh image drifted from the fork's tree — see the log above"; exit "$rc" ;;
           esac
 
   # Every hostname in this estate is reached through the NPM edge, and the edge
