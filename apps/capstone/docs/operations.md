@@ -241,6 +241,36 @@ python3 scripts/sync_dograh_routes.py --check    # verify only
 python3 scripts/sync_dograh_routes.py --no-prune # keep entries for removed numbers
 ```
 
+### Switching between standalone and Add-on (shared Zeus PBX)
+
+The mode says which Asterisk the Control Center provisions: Capstone's own bundled
+`pbx-freepbx`, or the shared `zeus-freepbx` that Zeus owns. It is a switch, not a rebuild —
+the same writers run against whichever container the mode names (`_pbx_container`), and the
+Agents page applies them on load and on every create/edit/delete in **both** modes. In
+add-on mode that means the page itself converges `extensions_custom_dograh.conf` onto the
+shared PBX; it does not wait for the 12-hour reconcile, which stays a safety net.
+
+From the Control Center, the **Standalone / Add-on (Zeus)** switch at the top of the Agents
+page converts the box in place: it starts or stops the bundled FreePBX, points the dashboard
+at the new PBX, regenerates the dialplan include there, reloads it, and records the choice so
+later requests use it (`.env` still seeds the mode a container boots in).
+
+From a shell:
+
+```bash
+./scripts/deploy-mode.sh              # report the mode and what the two containers are doing
+./scripts/deploy-mode.sh standalone   # create/start the bundled FreePBX (compose profile `standalone`)
+./scripts/deploy-mode.sh addon        # stop the bundled FreePBX; point at zeus-freepbx
+./scripts/deploy-mode.sh addon --dry-run
+```
+
+The script is the only thing that can *create* a container compose has never brought up, so
+`--profile standalone` is its business. When the Control Center's switch is asked to reach a
+PBX that has no container on the host, it answers **409** naming that command rather than
+pretending to have applied it. Switching to add-on stops the bundled FreePBX on purpose: two
+Asterisks must not both be serving this host's calls. Switching back keeps the stopped
+container, so the switch can start it again without compose.
+
 ### FreePBX web-UI healthcheck + auto-recovery
 
 The freepbx container's own Docker healthcheck probes **Asterisk**, not the web UI — so a

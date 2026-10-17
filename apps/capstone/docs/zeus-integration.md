@@ -48,6 +48,19 @@ step 2). The shared box runs the converge tool once per product with
 `--owner capstone` / `--owner zeus`, and each product only ever rewrites its
 own dialplan contexts and ARI users.
 
+The Control Center makes that pointer changeable at run time: the Agents page
+carries a **Standalone / Add-on (Zeus)** switch, backed by
+`GET`/`POST /deploy-mode`, which starts or stops the bundled FreePBX, applies
+`extensions_custom_dograh.conf` to the PBX the new mode names, reloads it and
+records the choice — see `docs/operations.md`, "Switching between standalone
+and Add-on". `scripts/deploy-mode.sh` does the same from a shell, and is the
+only path that can *create* the bundled container (compose profile
+`standalone`); the switch answers 409 with that command when it is missing.
+In add-on mode the dashboard no longer defers the shared box's reconcile: it
+applies the include itself on load and on every agent change, so the Agents
+page's status is read back from `zeus-freepbx` instead of a "pending-sync"
+placeholder.
+
 ## 2. Current state (as of this writing)
 
 ### Zeus owns

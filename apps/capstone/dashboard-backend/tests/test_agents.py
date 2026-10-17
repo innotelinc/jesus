@@ -14,6 +14,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 import urllib.error
 import urllib.request
@@ -62,6 +63,28 @@ class DeployModeTest(unittest.TestCase):
     def test_standalone_default(self):
         os.environ.pop("CAPSTONE_DEPLOY_MODE", None)
         self.assertEqual(agents.deploy_mode(), "standalone")
+
+    def test_switch_mode_wins_over_the_env_and_the_file_wins_over_a_restart(self):
+        """The Control Center's switch has to mean something before the next
+        recreate: this process first, then the recorded choice, then .env."""
+        with tempfile.TemporaryDirectory() as td:
+            os.environ["CAPSTONE_DEPLOY_MODE_STATE"] = os.path.join(td, "deploy-mode")
+            self.addCleanup(os.environ.pop, "CAPSTONE_DEPLOY_MODE_STATE", None)
+            os.environ["CAPSTONE_DEPLOY_MODE"] = "addon"
+            self.addCleanup(os.environ.pop, "CAPSTONE_DEPLOY_MODE", None)
+            self.addCleanup(agents.reset_mode_override)
+            agents.reset_mode_override()
+
+            self.assertEqual(agents.deploy_mode(), "addon")
+            self.assertTrue(agents.store_mode("standalone"))
+            self.assertEqual(agents.deploy_mode(), "standalone", "the recorded mode must win")
+
+            agents.set_mode_override("addon")
+            self.assertEqual(agents.deploy_mode(), "addon", "the switch must apply immediately")
+
+            agents.reset_mode_override()
+            self.assertEqual(agents.stored_mode(), "standalone")
+            self.assertEqual(agents.deploy_mode(), "standalone", "a restart reads the file")
 
     def test_addon_aliases(self):
         for raw in ("addon", "add-on", "zeus", "shared", "  ADDON  "):
@@ -353,9 +376,13 @@ class FreePbxBuildersTest(unittest.TestCase):
         sql = agents.refresh_custom_dest_description_sql("kvstore_Customappsreg", "8", "O'Brien")
         self.assertIn("O''Brien", sql)
 
-    def test_delete_custom_extension_targets_ext_only(self):
+    def test_delete_custom_extension_removes_only_our_row(self):
+        # The number is not ownership: on a shared PBX another product's
+        # registry row can carry 8008, and deleting it with ours is not ours.
         sql = agents.delete_custom_extension_sql("8008")
         self.assertIn("DELETE FROM `custom_extensions` WHERE `custom_exten`='8008'", sql)
+        self.assertIn("`description` LIKE '%Dograh Voice Agent%'", sql)
+        self.assertIn("`notes` LIKE '%dograh-managed%'", sql)
 
     def test_custom_dest_json_shape(self):
         dest = agents.custom_dest_json(12, "dograh-inbound,8008,1", "desc")

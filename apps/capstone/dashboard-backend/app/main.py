@@ -1796,11 +1796,56 @@ def _start_cache_warmer() -> None:
     logger.info("cache warmer started (every %.0fs)", interval)
 
 
+def _pbx_containers():
+    """(shared Zeus PBX, this deployment's own bundled PBX) — either may be None.
+
+    Both compose files give the PBX the same service label (`freepbx`), so the
+    project is what tells them apart: `zeus` owns the shared box, Capstone owns
+    the bundled one. Both can be on the host at once — a hand-off leaves them
+    side by side — which is why the mode, not the label match order, decides
+    which one is read and written.
+    """
+    cli = get_client()
+    if cli is None:
+        return None, None
+    try:
+        matches = [
+            c for c in cli.containers.list(all=True)
+            if (((c.attrs.get("Config") or {}).get("Labels") or {})
+                .get("com.docker.compose.service")) == PBX_SERVICE_ID
+        ]
+    except Exception:
+        return None, None
+
+    def is_shared(container) -> bool:
+        labels = ((container.attrs.get("Config") or {}).get("Labels") or {})
+        blob = f"{container.name or ''} {labels.get('com.docker.compose.project') or ''}".lower()
+        return "zeus" in blob
+
+    shared = next((c for c in matches if is_shared(c)), None)
+    bundled = next((c for c in matches if not is_shared(c)), None)
+    return shared, bundled
+
+
+def _pbx_container():
+    """The PBX this deployment is in, chosen by mode.
+
+    Standalone reads and writes the bundled FreePBX; addon reads and writes the
+    shared Zeus one. A container that is stopped is still returned — `_pbx_exec`
+    starts it, and answering with the other PBX instead would silently provision
+    a box no call reaches.
+    """
+    shared, bundled = _pbx_containers()
+    if agents.deploy_mode() == "standalone":
+        return bundled or shared
+    return shared or bundled
+
+
 def _pbx_exec(cmd: list[str], stdin_text: str | None = None) -> tuple[int, str]:
     """Run a command inside the PBX container, starting it first if stopped.
 
     Returns (exit_code, output)."""
-    container = container_for_service(PBX_SERVICE_ID)
+    container = _pbx_container()
     if container is None:
         raise HTTPException(status_code=503, detail="PBX container not running")
     container = _ensure_pbx_running(container)
@@ -2486,9 +2531,11 @@ def extension_routes_delete(did: str, user: dict = Depends(require_session)):
 # calls to its number are answered by the dograh AI pipeline. The FreePBX
 # wiring lives in app/agents.py as pure SQL/conf builders mirroring
 # scripts/sync_dograh_routes.py; this section executes them against the live
-# PBX (docker exec) in standalone mode, and reports "pending-sync" instead
-# in addon mode (Zeus shared PBX — the shared box applies the
-# *_custom.conf moniker itself).
+# PBX (docker exec) in both layouts — the bundled container in standalone, and
+# the shared Zeus PBX in addon (_pbx_container picks it). Addon used to defer to
+# the shared box's 12-hour reconcile and print "pending-sync" until it ran; it
+# now applies the *_custom.conf moniker itself and reads the rows back, so the
+# badge is the PBX's answer instead of a timer's.
 
 
 @app.get("/agents")
@@ -2510,7 +2557,7 @@ def agents_list(user: dict = Depends(require_session)):
     # The same derivation the writers use, so the status keys and the rows they
     # repair can never disagree.
     exts = [_agent_pbx_extension(a) for a in rows]
-    statuses = _agent_pbx_statuses(mode, exts)
+    statuses = _agent_pbx_statuses(exts)
     # Converge before answering — but bounded: a row that reads Partial is one
     # the writers can repair (see _repair_partial_rows), and this page is where
     # an operator meets that state; the writers' PBX round trips, though, can
@@ -2518,7 +2565,7 @@ def agents_list(user: dict = Depends(require_session)):
     # A pass that finishes inside the budget keeps the old behaviour (the page
     # answers converged); one that does not keeps running in the background and
     # the page renders the status it has now. No-op when every row is wired.
-    statuses = _repair_partial_rows_bounded(mode, rows, statuses, client)
+    statuses = _repair_partial_rows_bounded(rows, statuses, client)
     for a, ext in zip(rows, exts):
         a["pbx"] = statuses[ext]
     payload = {"mode": mode, "configured": True, "agents": rows,
@@ -2553,11 +2600,6 @@ def agents_stasis_recover(user: dict = Depends(require_session)):
         raise HTTPException(
             status_code=503,
             detail="DOGRAH_API_TOKEN not configured — run scripts/dograh_wire.py once, then set DOGRAH_API_TOKEN in .env",
-        )
-    if mode != "standalone":
-        raise HTTPException(
-            status_code=409,
-            detail="Add-on mode: ARI registration is owned by the shared PBX.",
         )
     # Parking is one-way upstream, so clear it before re-discovering the name.
     try:
@@ -2860,11 +2902,10 @@ def agents_create(body: dict, user: dict = Depends(require_session)):
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     warnings = []
-    if mode == "standalone":
-        try:
-            _provision_agent_pbx(agent, client)
-        except HTTPException as exc:
-            warnings.append(exc.detail)
+    try:
+        _provision_agent_pbx(agent, client)
+    except HTTPException as exc:
+        warnings.append(exc.detail)
     return {"agent": agent, "mode": mode, "warnings": warnings}
 
 
@@ -2892,11 +2933,10 @@ def agents_update(phone_id: int, body: dict, user: dict = Depends(require_sessio
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     warnings = []
-    if mode == "standalone":
-        try:
-            _provision_agent_pbx(agent, client)
-        except HTTPException as exc:
-            warnings.append(exc.detail)
+    try:
+        _provision_agent_pbx(agent, client)
+    except HTTPException as exc:
+        warnings.append(exc.detail)
     return {"agent": agent, "mode": mode, "warnings": warnings}
 
 
@@ -2925,11 +2965,10 @@ def agents_sync(phone_id: int, user: dict = Depends(require_session)):
     if agent is None:
         raise HTTPException(status_code=404, detail=f"no dograh agent with id {phone_id}")
     warnings = []
-    if mode == "standalone":
-        try:
-            _provision_agent_pbx(agent, client)
-        except HTTPException as exc:
-            warnings.append(exc.detail)
+    try:
+        _provision_agent_pbx(agent, client)
+    except HTTPException as exc:
+        warnings.append(exc.detail)
     return {"agent": agent, "mode": mode, "warnings": warnings}
 
 
@@ -2952,7 +2991,7 @@ def agents_delete(phone_id: int, user: dict = Depends(require_session)):
     except agents.DograhError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     warnings = []
-    if mode == "standalone" and ext:
+    if ext:
         try:
             _unprovision_agent_pbx(ext, client)
         except HTTPException as exc:
@@ -2960,7 +2999,161 @@ def agents_delete(phone_id: int, user: dict = Depends(require_session)):
     return {"status": "deleted", "id": int(phone_id), "mode": mode, "warnings": warnings}
 
 
-# ── FreePBX side of an agent (standalone mode; mirrors sync_dograh_routes) ──
+# --------------------------------------------------------------------------
+# Deployment mode switch — own the PBX, or ride a shared Zeus one
+# --------------------------------------------------------------------------
+# The mode decides which container the Agents page reads and writes
+# (`_pbx_container`) and what its banner says. It used to be a line in `.env`
+# that only a container recreate could change, which meant the box could not be
+# converted without a shell. The switch below applies it in place: it starts or
+# stops the bundled FreePBX, converges the dialplan onto the PBX the new mode
+# points at, reloads it, and records the choice for later requests. What it
+# cannot do is create a container compose has never brought up — creating one
+# needs the compose profile, which only the host has — so that answer names
+# `scripts/deploy-mode.sh` instead of pretending to have applied.
+
+_DEPLOY_MODE_START_TIMEOUT = 90.0
+
+
+def _pbx_container_state(container) -> dict[str, Any]:
+    if container is None:
+        return {"container": None, "state": "absent"}
+    name = getattr(container, "name", None)
+    try:
+        container.reload()
+    except Exception:  # noqa: BLE001 - gone is gone
+        return {"container": name, "state": "absent"}
+    return {"container": name, "state": getattr(container, "status", "") or "unknown"}
+
+
+def _deploy_mode_state() -> dict[str, Any]:
+    shared, bundled = _pbx_containers()
+    return {
+        "mode": agents.deploy_mode(),
+        "envMode": agents.normalize_mode(os.environ.get(agents.MODE_ENV)),
+        "recorded": bool(agents.stored_mode()),
+        "statePath": agents.mode_state_path(),
+        "pbx": {"shared": _pbx_container_state(shared),
+                "bundled": _pbx_container_state(bundled)},
+    }
+
+
+def _container_is_running(container, timeout: float = 0.0) -> bool:
+    """True once `container` reports running, waiting up to `timeout` seconds."""
+    deadline = time.monotonic() + max(0.0, timeout)
+    while True:
+        try:
+            container.reload()
+        except Exception:  # noqa: BLE001 - a container that went away
+            return False
+        if getattr(container, "status", "") == "running":
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(1.0)
+
+
+def _start_pbx(container) -> None:
+    """Start `container` if it is not running (a no-op when it already is)."""
+    if _container_is_running(container):
+        return
+    try:
+        container.start()
+    except Exception as exc:  # noqa: BLE001 - report it, do not guess
+        raise HTTPException(status_code=502,
+                            detail=f"could not start {getattr(container, 'name', 'the PBX')}: {exc}") from exc
+    if not _container_is_running(container, timeout=_DEPLOY_MODE_START_TIMEOUT):
+        raise HTTPException(status_code=502,
+                            detail=f"{getattr(container, 'name', 'the PBX')} did not reach running "
+                                   f"(exit code {(container.attrs.get('State') or {}).get('ExitCode')})")
+
+
+@app.get("/deploy-mode")
+def deploy_mode_get(user: dict = Depends(require_session)):
+    """The mode in force, the env default, and what the two PBX containers are doing."""
+    return _deploy_mode_state()
+
+
+@app.post("/deploy-mode")
+def deploy_mode_set(body: dict, user: dict = Depends(require_session)):
+    """Switch between addon and standalone, and apply it before answering.
+
+    `standalone` starts the bundled FreePBX and points the dashboard back at
+    it; `addon` points the dashboard at the shared Zeus PBX and stops the
+    bundled one, because as the add-on Capstone does not own a PBX and two
+    Asterisks must not both be serving this host's calls. Both then regenerate
+    the `*_custom.conf` moniker on the PBX the new mode targets and reload it.
+
+    The choice is recorded where later requests read it (and where a restart
+    keeps it); `.env` still seeds the mode a box boots in.
+    """
+    raw = str(body.get("mode") or "").strip().lower()
+    if raw not in {"standalone", "addon", "add-on", "zeus", "shared"}:
+        raise HTTPException(status_code=422, detail="mode must be 'standalone' or 'addon'")
+    target = agents.normalize_mode(raw)
+    previous = agents.deploy_mode()
+    shared, bundled = _pbx_containers()
+
+    if target == "standalone" and bundled is None:
+        raise HTTPException(status_code=409, detail={
+            "status": "host-action-required",
+            "detail": "No bundled FreePBX container on this host — compose has never created "
+                      "the standalone profile, and only the host can.",
+            "command": f"bash scripts/deploy-mode.sh {target}",
+        })
+    if target == "addon" and shared is None:
+        raise HTTPException(status_code=409, detail={
+            "status": "host-action-required",
+            "detail": "No shared Zeus PBX container on this host.",
+            "command": f"bash scripts/deploy-mode.sh {target}",
+        })
+
+    warnings: list[str] = []
+    persisted = agents.store_mode(target)
+    agents.set_mode_override(target)
+    try:
+        if target == "standalone":
+            _start_pbx(bundled)
+        else:
+            if not _container_is_running(shared):
+                raise HTTPException(status_code=502, detail={
+                    "status": "shared-pbx-down",
+                    "detail": "The shared Zeus PBX is not running — start the Zeus stack first.",
+                })
+            if bundled is not None and getattr(bundled, "status", "") == "running":
+                try:
+                    bundled.stop(timeout=30)
+                except Exception as exc:  # noqa: BLE001 - the switch already took effect
+                    warnings.append(f"could not stop the bundled PBX ({bundled.name}): {exc}")
+                else:
+                    warnings.append(f"stopped the bundled PBX ({bundled.name}) — one PBX serves this host")
+    except HTTPException:
+        agents.set_mode_override(previous)
+        if persisted:
+            agents.store_mode(previous)
+        raise
+
+    # Prove the switch on the wire: regenerate the include for the PBX the mode
+    # now targets and publish it. Without a live dialplan there is nothing for
+    # a call to reach, and the page would be reporting a mode it cannot serve.
+    client = agents.DograhClient()
+    if client.configured():
+        try:
+            _pbx_sync_dynamic_dialplan(client)
+            _pbx_reload_dograh()
+            if "dograh-inbound" not in _pbx_dialplan_text():
+                warnings.append("the PBX reloaded but reports no [dograh-inbound] context")
+        except HTTPException as exc:
+            warnings.append(f"the mode changed, but the dialplan did not apply: {exc.detail}")
+    else:
+        warnings.append("dograh is not wired (DOGRAH_API_TOKEN), so the dialplan was not regenerated")
+
+    return {**_deploy_mode_state(), "applied": True, "previous": previous,
+            "persisted": persisted, "warnings": warnings,
+            "command": None if persisted else f"bash scripts/deploy-mode.sh {target}"}
+
+
+# ── FreePBX side of an agent (mirrors sync_dograh_routes; both modes) ────────
 
 
 def _pbx_mysql(sql: str) -> str:
@@ -3162,8 +3355,6 @@ def _repair_stale_workflow_rows(client: agents.DograhClient) -> int:
     description but an unwired agent, which the Agents list already repairs (and
     which would otherwise turn this into a second, redundant provisioner).
     """
-    if agents.deploy_mode() != "standalone":
-        return 0
     if not client.configured():
         return 0
     lock = _claim_repair("workflows")
@@ -3267,9 +3458,6 @@ def _stasis_health(client: agents.DograhClient, rows: list[dict[str, Any]]) -> d
         info["expected"] = client.discovered_stasis_app_name()
     except agents.DograhError:
         info["expected"] = agents.stasis_app_name()
-    if agents.deploy_mode() != "standalone":
-        info["detail"] = "Add-on mode: ARI registration is owned by the shared PBX."
-        return info
     try:
         code, text = _pbx_exec(["asterisk", "-rx", "ari show apps"])
     except HTTPException as exc:
@@ -3416,18 +3604,20 @@ def _pbx_provisioning_counts(exts: list[str]) -> dict[str, tuple[bool, bool]]:
     return out
 
 
-def _agent_pbx_statuses(mode: str, exts: list[str]) -> dict[str, dict]:
+def _agent_pbx_statuses(exts: list[str]) -> dict[str, dict]:
     """Provisioning status per extension, in the shape the list view expects.
+
+    Read from the PBX this deployment actually provisions — the bundled one in
+    standalone, the shared Zeus box in addon (`_pbx_container`) — because that
+    is where the writers put the rows. Addon used to answer a constant
+    "pending-sync" on the theory that the shared box's reconcile would apply it
+    later, but nothing ever re-read the PBX: the badge could not resolve, and
+    it outlived the reason it existed (that reconcile is a 12-hour timer; this
+    page is open for minutes).
 
     Whole page in one PBX query plus one cached `dialplan show`: the Agents list
     probes every agent, and each probe used to be its own `docker exec`.
     """
-    if mode != "standalone":
-        return {e: {
-            "status": "pending-sync",
-            "customExtension": None, "inboundRoute": None, "dialplan": None,
-            "detail": "Add-on mode: the shared box's reconcile applies the *_custom.conf moniker (extensions_custom_dograh.conf).",
-        } for e in exts}
     try:
         counts = _pbx_provisioning_counts(exts)
         dp = _pbx_dialplan_text()
@@ -3454,7 +3644,6 @@ def _agents_repair_budget() -> float:
 
 
 def _repair_partial_rows_bounded(
-    mode: str,
     rows: list[dict[str, Any]],
     statuses: dict[str, dict],
     client: agents.DograhClient,
@@ -3469,14 +3658,14 @@ def _repair_partial_rows_bounded(
     Spawns nothing when no row is repairable — the common all-wired load costs
     exactly one threadless check.
     """
-    if not _has_repairable_rows(mode, rows, statuses):
+    if not _has_repairable_rows(rows, statuses):
         return statuses
     box: dict[str, dict] = {}
     done = threading.Event()
 
     def _run() -> None:
         try:
-            box["statuses"] = _repair_partial_rows(mode, rows, statuses, client)
+            box["statuses"] = _repair_partial_rows(rows, statuses, client)
         except Exception:  # noqa: BLE001 - best effort, exactly as the inline path
             box["statuses"] = statuses
         finally:
@@ -3491,9 +3680,7 @@ def _repair_partial_rows_bounded(
     return statuses
 
 
-def _has_repairable_rows(mode: str, rows: list[dict[str, Any]], statuses: dict[str, dict]) -> bool:
-    if mode != "standalone":
-        return False
+def _has_repairable_rows(rows: list[dict[str, Any]], statuses: dict[str, dict]) -> bool:
     return any(
         (statuses.get(_agent_pbx_extension(a)) or {}).get("status") in ("partial", "not-provisioned")
         for a in rows
@@ -3501,7 +3688,6 @@ def _has_repairable_rows(mode: str, rows: list[dict[str, Any]], statuses: dict[s
 
 
 def _repair_partial_rows(
-    mode: str,
     rows: list[dict[str, Any]],
     statuses: dict[str, dict],
     client: agents.DograhClient,
@@ -3524,14 +3710,14 @@ def _repair_partial_rows(
     `custom_extensions` table, a PBX that refuses the write — must not turn
     every page load into a write attempt, so attempts are spaced by a cooldown
     and never run concurrently. Two operator windows polling must not race two
-    reloads into one PBX config.
+    reloads into one PBX config.    Addon mode runs this too, against the shared Zeus PBX: the writers are the
+    same ones the 12-hour reconcile uses, so the page is where that sync now
+    happens instead of a timer the operator cannot see or hurry.
 
     Anything the PBX rejects leaves the original, honest status alone rather
     than failing the request: the page still has to render, and that status
     already names the missing piece.
     """
-    if mode != "standalone":
-        return statuses
     keyed = [(a, _agent_pbx_extension(a)) for a in rows]
     targets = [
         a
@@ -3560,7 +3746,7 @@ def _repair_partial_rows(
             _pbx_sync_dynamic_dialplan(client)
             _pbx_reload_dograh()
             # Converged: re-read so the page shows what is really there now.
-            return _agent_pbx_statuses(mode, [ext for _, ext in keyed])
+            return _agent_pbx_statuses([ext for _, ext in keyed])
         except Exception:  # noqa: BLE001 - best effort by design
             # The PBX refused the write, the reload died, or it went away mid
             # request. The page still has to render, and the status computed

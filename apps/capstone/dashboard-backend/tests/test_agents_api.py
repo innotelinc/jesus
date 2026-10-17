@@ -32,6 +32,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -184,6 +185,24 @@ class FakePbx:
                 if s.startswith(("INSERT", "UPDATE", "DELETE"))]
 
 
+class FakeContainer:
+    """Just enough of a docker container for the deployment-mode switch."""
+
+    def __init__(self, name, status="running"):
+        self.name = name
+        self.status = status
+        self.attrs = {"State": {"ExitCode": 0}}
+
+    def reload(self):
+        return None
+
+    def start(self):
+        self.status = "running"
+
+    def stop(self, timeout=None):  # noqa: ARG002 - docker signature
+        self.status = "exited"
+
+
 @unittest.skipUnless(_HAVE_DEPS, "fastapi/httpx not installed — skipping route tests")
 class AgentsAutoRepairTest(unittest.TestCase):
     NUMBERS = [{"id": 10, "address": "8003", "label": "Reception",
@@ -194,6 +213,13 @@ class AgentsAutoRepairTest(unittest.TestCase):
         os.environ["DOGRAH_API_ENDPOINT"] = ENDPOINT
         os.environ["DOGRAH_CONFIG_NAME"] = "Asterisk ARI (dograh)"
         os.environ.pop("CAPSTONE_DEPLOY_MODE", None)
+        # The switch records its choice in a file; keep it out of the real one.
+        self.mode_state_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.mode_state_dir.cleanup)
+        os.environ["CAPSTONE_DEPLOY_MODE_STATE"] = os.path.join(
+            self.mode_state_dir.name, "deploy-mode")
+        main.agents.reset_mode_override()
+        self.addCleanup(main.agents.reset_mode_override)
         self.dograh = FakeDograh([dict(n) for n in self.NUMBERS])
         self.urlopen = mock.patch("urllib.request.urlopen", side_effect=self.dograh)
         self.urlopen.start()
@@ -212,7 +238,7 @@ class AgentsAutoRepairTest(unittest.TestCase):
         self.deps.stop()
         self.urlopen.stop()
         for key in ("DOGRAH_API_TOKEN", "DOGRAH_API_ENDPOINT", "DOGRAH_CONFIG_NAME",
-                    "CAPSTONE_DEPLOY_MODE"):
+                    "CAPSTONE_DEPLOY_MODE", "CAPSTONE_DEPLOY_MODE_STATE"):
             os.environ.pop(key, None)
 
     def pbx(self, **kwargs):
@@ -311,13 +337,88 @@ class AgentsAutoRepairTest(unittest.TestCase):
         self.assertEqual(agent["pbx"]["status"], "partial")
         self.assertEqual(len(pbx.reloads()), 1, "a stuck lock must not be retried forever")
 
-    def test_addon_mode_reports_pending_sync_and_never_touches_the_pbx(self):
+    def test_addon_mode_applies_the_moniker_to_the_shared_pbx(self):
+        # Add-on mode is not a read-only observer any more: an un-wired row is
+        # written to the PBX the add-on serves, and the badge is read back from
+        # it rather than guessed at.
         os.environ["CAPSTONE_DEPLOY_MODE"] = "addon"
         pbx = self.pbx()
         agent = self.agent(self.client.get("/agents"))
-        self.assertEqual(agent["pbx"]["status"], "pending-sync")
-        self.assertEqual(pbx.sql, [], "add-on mode must not write to the shared PBX")
-        self.assertEqual(pbx.execs, [], "add-on mode must not exec into the shared PBX")
+        self.assertEqual(agent["pbx"]["status"], "provisioned")
+        self.assertIn("8003", pbx.routes, "the inbound route was not written to the shared PBX")
+        self.assertIn("exten => 8003",
+                      pbx.confs.get("/etc/asterisk/extensions_custom_dograh.conf", ""))
+        self.assertEqual(len(pbx.reloads()), 1, "the row and its dialplan share one reload")
+
+    def test_addon_mode_leaves_a_wired_row_alone(self):
+        os.environ["CAPSTONE_DEPLOY_MODE"] = "addon"
+        pbx = self.pbx(exts={"8003"}, routes={"8003"}, dialplan={"8003"})
+        agent = self.agent(self.client.get("/agents"))
+        self.assertEqual(agent["pbx"]["status"], "provisioned")
+        self.assertEqual(pbx.writes(), [], "a wired row must not be re-written on a shared PBX")
+        self.assertEqual(pbx.reloads(), [], "a wired row must not reload a shared PBX")
+
+    # ── the mode switch ────────────────────────────────────────────────────
+
+    def mode_switch(self, shared=None, bundled=None):
+        patcher = mock.patch.object(main, "_pbx_containers", return_value=(shared, bundled))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_deploy_mode_reports_both_containers(self):
+        self.mode_switch(FakeContainer("zeus-freepbx"), None)
+        res = self.client.get("/deploy-mode")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["pbx"]["shared"]["container"], "zeus-freepbx")
+        self.assertEqual(body["pbx"]["bundled"]["state"], "absent")
+
+    def test_switch_to_addon_stops_the_bundled_pbx_and_records_the_choice(self):
+        shared = FakeContainer("zeus-freepbx")
+        bundled = FakeContainer("pbx-freepbx")
+        self.mode_switch(shared, bundled)
+        self.pbx(dialplan={"8003"})
+
+        res = self.client.post("/deploy-mode", json={"mode": "addon"})
+
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["mode"], "addon")
+        self.assertTrue(body["applied"])
+        self.assertEqual(bundled.status, "exited", "both PBXs must not serve the host at once")
+        self.assertEqual(main.agents.stored_mode(), "addon", "the switch was not recorded")
+        self.assertEqual(main.agents.deploy_mode(), "addon")
+
+    def test_switch_to_standalone_starts_the_bundled_pbx(self):
+        bundled = FakeContainer("pbx-freepbx", status="exited")
+        self.mode_switch(FakeContainer("zeus-freepbx"), bundled)
+        self.pbx(dialplan={"8003"})
+
+        res = self.client.post("/deploy-mode", json={"mode": "standalone"})
+
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()["mode"], "standalone")
+        self.assertEqual(bundled.status, "running")
+        self.assertEqual(main.agents.stored_mode(), "standalone")
+
+    def test_switch_to_standalone_names_the_host_step_when_no_container_exists(self):
+        # Only the host can create the standalone compose profile; pretending
+        # otherwise would leave the box pointed at a PBX that is not there.
+        os.environ["CAPSTONE_DEPLOY_MODE"] = "addon"
+        self.mode_switch(FakeContainer("zeus-freepbx"), None)
+
+        res = self.client.post("/deploy-mode", json={"mode": "standalone"})
+
+        self.assertEqual(res.status_code, 409)
+        detail = res.json()["detail"]
+        self.assertEqual(detail["status"], "host-action-required")
+        self.assertIn("scripts/deploy-mode.sh standalone", detail["command"])
+        self.assertEqual(main.agents.deploy_mode(), "addon",
+                         "a refused switch must not leave the mode changed")
+
+    def test_switch_rejects_an_unknown_mode(self):
+        res = self.client.post("/deploy-mode", json={"mode": "sideways"})
+        self.assertEqual(res.status_code, 422)
 
     # ── the Workflows page's own PBX row ───────────────────────────────────
 

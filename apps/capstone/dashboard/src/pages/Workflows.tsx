@@ -208,8 +208,8 @@ export default function Workflows() {
       {configured && mode === 'addon' && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
           <span className="font-semibold">Add-on mode (Zeus shared PBX).</span>{' '}
-          Workflows are created and published in dograh here; the shared box applies the
-          PBX-side routing on its next reconcile.
+          Workflows are created and published in dograh here; the PBX rows those numbers route through are
+          re-applied on the next Workflows load, on the shared PBX this add-on serves.
         </div>
       )}
 

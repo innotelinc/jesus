@@ -9,22 +9,66 @@ import Spinner from '../components/Spinner';
 import WorkflowForm from '../components/WorkflowForm';
 import { cn } from '../lib/utils';
 
-function ModeBanner({ mode }: { mode: 'standalone' | 'addon' }) {
-  if (mode === 'addon') {
-    return (
-      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-        <span className="font-semibold">Add-on mode (Zeus shared PBX).</span>{' '}
-        Agents are managed here and on dograh; the shared box's reconcile applies the
-        <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">_custom.conf</code>
-        moniker (<code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">extensions_custom_dograh.conf</code>),
-        so agents show <span className="font-medium">pending-sync</span> until it runs.
-      </div>
-    );
-  }
+function ModeBanner({
+  mode,
+  onSwitch,
+  busy,
+}: {
+  mode: 'standalone' | 'addon';
+  onSwitch: (mode: 'standalone' | 'addon') => void;
+  busy: boolean;
+}) {
+  const addon = mode === 'addon';
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-      <span className="font-semibold">Standalone mode.</span> Adding, editing, or deleting an agent
-      wires the FreePBX side too — custom extension, inbound route, and dialplan — then reloads the PBX live.
+    <div
+      className={cn(
+        'rounded-xl border px-4 py-3 text-sm',
+        addon
+          ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+          : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="font-semibold">
+            {addon ? 'Add-on mode (Zeus shared PBX).' : 'Standalone mode (bundled FreePBX).'}
+          </span>{' '}
+          {addon ? (
+            <>
+              Agents are managed here and on dograh. This dashboard converges the{' '}
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 font-mono text-xs">extensions_custom_dograh.conf</code>{' '}
+              include onto the shared PBX itself — on load, and on every change — so the status below is what
+              that PBX holds, not a wait on the shared box&apos;s 12-hour reconcile.
+            </>
+          ) : (
+            <>
+              Adding, editing, or deleting an agent wires the FreePBX side too — custom extension, inbound
+              route, and dialplan — then reloads the PBX live.
+            </>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1 rounded-lg border border-current/20 p-0.5">
+          {(['standalone', 'addon'] as const).map(option => (
+            <button
+              key={option}
+              type="button"
+              disabled={busy || mode === option}
+              onClick={() => onSwitch(option)}
+              title={
+                option === 'standalone'
+                  ? 'Own the PBX: start the bundled FreePBX and provision agents there'
+                  : 'Ride the shared Zeus PBX: point at it and stop the bundled FreePBX'
+              }
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50',
+                mode === option ? 'bg-current/15 font-semibold' : 'hover:bg-current/10',
+              )}
+            >
+              {option === 'standalone' ? 'Standalone' : 'Add-on (Zeus)'}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -83,7 +127,6 @@ function PbxChip({ status }: { status?: NonNullable<Agent['pbx']>['status'] }) {
     provisioned: { label: 'Provisioned', cls: 'border-success/40 text-success' },
     partial: { label: 'Partial', cls: 'border-warning/40 text-warning' },
     'not-provisioned': { label: 'Not provisioned', cls: 'border-muted-foreground/30 text-muted-foreground' },
-    'pending-sync': { label: 'Pending sync', cls: 'border-info/40 text-info' },
     error: { label: 'PBX error', cls: 'border-red-500/40 text-red-500' },
   };
   const m = map[status ?? 'not-provisioned'] ?? map['not-provisioned'];
@@ -114,6 +157,8 @@ export default function Agents() {
   const [pbxAutoStart, setPbxAutoStart] = useState<{ startedAt: string; waitedSeconds: number } | null>(null);
 
   const [stasisBusy, setStasisBusy] = useState(false);
+  // The mode switch converts the box, so it is confirmed and busy-gated.
+  const [modeBusy, setModeBusy] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [newAddress, setNewAddress] = useState('');
@@ -358,10 +403,35 @@ export default function Agents() {
    * writers — no edit required.
    */
   const needsResync = (agent: Agent) =>
-    mode === 'standalone' &&
-    !!agent.pbx?.status &&
-    agent.pbx.status !== 'provisioned' &&
-    agent.pbx.status !== 'pending-sync';
+    !!agent.pbx?.status && agent.pbx.status !== 'provisioned';
+
+  /**
+   * Convert this deployment between owning the PBX and riding the shared one.
+   * The API applies it before answering — starting or stopping the bundled
+   * FreePBX, converging the dialplan onto the new target, recording the choice
+   * — so a refresh straight after reads the new mode.
+   */
+  const switchMode = async (target: 'standalone' | 'addon') => {
+    if (target === mode || modeBusy) return;
+    const confirmed = window.confirm(
+      target === 'standalone'
+        ? 'Switch to standalone? The dashboard will start the bundled FreePBX and provision agents there instead of on the shared Zeus PBX.'
+        : 'Switch to add-on? The dashboard will point at the shared Zeus PBX and stop the bundled FreePBX.',
+    );
+    if (!confirmed) return;
+    setModeBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await api.setDeployMode(target);
+      showWarnings(res.warnings, `Mode is now ${target === 'addon' ? 'add-on (Zeus)' : 'standalone'}`);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Mode switch failed');
+    } finally {
+      setModeBusy(false);
+    }
+  };
 
   const handleSync = async (agent: Agent) => {
     setBusy(String(agent.id));
@@ -480,7 +550,7 @@ export default function Agents() {
         <StasisBanner stasis={stasis} onRecover={() => void repairStasis()} busy={stasisBusy} />
       )}
 
-      {configured && <ModeBanner mode={mode} />}
+      {configured && <ModeBanner mode={mode} onSwitch={switchMode} busy={modeBusy} />}
 
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         {loading ? (
@@ -610,7 +680,7 @@ export default function Agents() {
           {agents.filter(a => a.active).length}/{agents.length} agents active. Extensions 8000–8007 live in the static
           dialplan; numbers outside that set are written to{' '}
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">extensions_custom_dograh.conf</code> automatically.
-          In standalone mode every change reloads FreePBX live; in add-on mode the shared box syncs them.
+          Both modes reload the PBX that serves this deployment; only which PBX that is changes.
         </p>
       )}
 

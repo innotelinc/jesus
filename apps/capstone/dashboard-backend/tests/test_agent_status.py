@@ -125,7 +125,7 @@ class PbxAutoStartTest(unittest.TestCase):
         c.exec_error = RuntimeError(
             "409 Client Error for http+docker://localhost/v1.56/containers/abc/exec: "
             "Conflict ('Container abc is not running')")
-        with mock.patch.object(main, "container_for_service", return_value=c):
+        with mock.patch.object(main, "_pbx_container", return_value=c):
             with self.assertRaises(main.HTTPException) as ctx:
                 main._pbx_exec(["cat", "/etc/asterisk/extensions_custom.conf"])
         self.assertEqual(ctx.exception.status_code, 503)

@@ -133,7 +133,7 @@ export interface Agent {
   workflowName?: string;
   active: boolean;
   pbx?: {
-    status: 'provisioned' | 'partial' | 'not-provisioned' | 'pending-sync' | 'error';
+    status: 'provisioned' | 'partial' | 'not-provisioned' | 'error';
     customExtension?: boolean | null;
     inboundRoute?: boolean | null;
     dialplan?: boolean | null;
@@ -246,8 +246,34 @@ export interface StasisHealth {
   detail?: string;
 }
 
+export type DeployMode = 'standalone' | 'addon';
+
+export interface DeployModePbx {
+  container: string | null;
+  /** running / exited / created / absent — `absent` means compose never made it. */
+  state: string;
+}
+
+/** The PBX this deployment is in, and what the host has to work with. */
+export interface DeployModeState {
+  mode: DeployMode;
+  /** The boot-time default from .env, which the switch overrides. */
+  envMode: DeployMode;
+  /** true when the mode came from the switch's own record, not from .env. */
+  recorded: boolean;
+  statePath: string;
+  pbx: { shared: DeployModePbx; bundled: DeployModePbx };
+  applied?: boolean;
+  previous?: DeployMode;
+  persisted?: boolean;
+  warnings?: string[];
+  /** Set when the switch needs the host (a container compose never created). */
+  command?: string | null;
+  detail?: string;
+}
+
 export interface AgentsResponse {
-  mode: 'standalone' | 'addon';
+  mode: DeployMode;
   configured: boolean;
   agents: Agent[];
   stasis?: StasisHealth;
@@ -372,6 +398,9 @@ export const api = {
     getJSON<ExtensionCall[]>(`/extensions/${encodeURIComponent(ext)}/calls`),
   agents: () => getJSON<AgentsResponse>('/agents'),
   agentWorkflows: () => getJSON<AgentWorkflow[]>('/agents/workflows'),
+  /** Which PBX this deployment reads and writes (standalone vs Zeus add-on). */
+  deployMode: () => getJSON<DeployModeState>('/deploy-mode'),
+  setDeployMode: (mode: DeployMode) => postJSON<DeployModeState>('/deploy-mode', { mode }),
   workflows: () => getJSON<AgentWorkflow[]>('/workflows'),
   workflow: (id: number) => getJSON<Workflow>(`/workflows/${id}`),
   createWorkflow: (body: WorkflowCreate) => postJSON<Workflow>('/workflows', body),

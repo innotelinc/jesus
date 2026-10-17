@@ -169,6 +169,41 @@ interpolates.
   `docs/operations.md` keeps the `000N` shorthand the changelog and the smoke
   tests use, and now says once that those numbers are the old patch series.
 
+### The add-on applies its own PBX rows, and the mode is a switch
+
+- **`pending-sync` is gone.** In add-on mode every agent carried that badge
+  unconditionally: `_agent_pbx_statuses` never asked a PBX, on the theory that the
+  shared box's 12-hour reconcile would apply the rows later. Nothing ever re-read
+  the PBX, so the badge could not resolve, and it outlived the reason it existed
+  (the page is open for minutes; the reconcile is a timer). The add-on now reads
+  and writes `zeus-freepbx` through the same idempotent writers the standalone
+  box uses, on load and on every create/edit/delete, and the reconcile stays what
+  it should have been — a safety net.
+- **The mode is a switch, not an `.env` line.** `GET`/`POST /deploy-mode` backs a
+  **Standalone / Add-on (Zeus)** control at the top of the Agents page. It starts
+  or stops the bundled FreePBX, points the dashboard at the PBX the new mode
+  names, regenerates and reloads the `extensions_custom_dograh.conf` include
+  there, and records the choice — this process first, then a state file, then
+  `.env` — so it applies before the next recreate rather than at it.
+- **`scripts/deploy-mode.sh` is the host-side counterpart**, and the only path
+  that can *create* the bundled container (`--profile standalone`). When the
+  switch is asked to reach a PBX that has no container, it answers 409 naming
+  that command instead of pretending. Switching to add-on stops the bundled
+  FreePBX on purpose (two Asterisks must not serve this host), and switching back
+  keeps the stopped container so the switch can start it without compose.
+- **The deletes are scoped to what Capstone owns.** `delete_custom_extension_sql`
+  dropped a row by extension number alone; on a shared PBX another product's
+  registry row can carry the same number. It now carries the same
+  "Dograh Voice Agent" / "dograh-managed" guard the count and the inbound-route
+  delete already had.
+- **Verified**: the route suite (303 tests, run in the `dashboard-api` image)
+  covers add-on apply-on-load, an add-on wired row left untouched, both switch
+  directions, the 409, and the mode precedence; `tsc --noEmit` and
+  `npm run build` pass with `dashboard/dist` rebuilt from the new source;
+  `scripts/deploy-mode.sh` is shellcheck-clean and `--dry-run` names every
+  command it would run (its live `standalone` path was not executed here — this
+  host has no bundled FreePBX container to convert to).
+
 ## v3.21 — Piper is the local voice
 
 Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to

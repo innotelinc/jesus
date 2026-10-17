@@ -14,11 +14,13 @@ Deployment modes (``CAPSTONE_DEPLOY_MODE``):
 
   addon
       Capstone runs as a Zeus add-on on a shared FreePBX/Asterisk. The
-      dashboard only manages the dograh side (the source of truth); the
-      shared box's reconcile/sync applies the ``*_custom.conf`` moniker —
-      ``extensions_custom_dograh.conf`` converged with ``--owner capstone``
-      (see ``pbx/asterisk_converge.py``) — so local provisioning is never
-      attempted and agents report a "pending-sync" PBX status.
+      dashboard still owns both sides: the dograh rows are the source of
+      truth, and the ``*_custom.conf`` moniker — ``extensions_custom_dograh.conf``
+      with ``--owner capstone`` semantics (see ``pbx/asterisk_converge.py``) —
+      is applied to the *shared* PBX as soon as an agent changes or the page
+      loads, rather than waiting for the 12-hour reconcile. Every writer is
+      idempotent and touches only rows carrying the markers below, so a
+      reconcile that runs later finds nothing left to do.
 
 Mirrors ``scripts/sync_dograh_routes.py`` and ``pbx/bootstrap_dograh_route.py``
 so the dashboard and the sync tool stay byte-consistent on the FreePBX side.
@@ -65,12 +67,72 @@ DIALPLAN_CONF = "extensions_custom_dograh.conf"
 DIALPLAN_PATH = f"/etc/asterisk/{DIALPLAN_CONF}"
 
 
-def deploy_mode() -> str:
-    """'standalone' (bundled FreePBX) or 'addon' (Zeus shared PBX)."""
-    raw = (os.environ.get("CAPSTONE_DEPLOY_MODE") or "").strip().lower()
-    if raw in {"addon", "add-on", "zeus", "shared"}:
+MODE_ENV = "CAPSTONE_DEPLOY_MODE"
+# Where the Control Center's own switch records its choice. `.env` seeds the
+# mode; this overrides it, so flipping the switch takes effect on the next
+# request instead of the next container recreate. Host state, not repo state —
+# and overridable so tests never read a real one.
+MODE_STATE_ENV = "CAPSTONE_DEPLOY_MODE_STATE"
+DEFAULT_MODE_STATE = "/var/lib/capstone/deploy-mode"
+
+_MODE_OVERRIDE = ""
+
+
+def normalize_mode(raw: str | None) -> str:
+    """'addon' or 'standalone', accepting the aliases the env has always allowed."""
+    value = (raw or "").strip().lower()
+    if value in {"addon", "add-on", "zeus", "shared"}:
         return "addon"
     return "standalone"
+
+
+def mode_state_path() -> str:
+    return os.environ.get(MODE_STATE_ENV) or DEFAULT_MODE_STATE
+
+
+def stored_mode() -> str:
+    """The mode a switch recorded, or '' when nothing has been recorded."""
+    try:
+        with open(mode_state_path(), encoding="utf-8") as fh:
+            raw = fh.read().strip()
+    except OSError:
+        return ""
+    return normalize_mode(raw) if raw else ""
+
+
+def store_mode(mode: str) -> bool:
+    """Record `mode` for later requests; False when the path is not writable."""
+    path = mode_state_path()
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(normalize_mode(mode) + "\n")
+        return True
+    except OSError:
+        return False
+
+
+def set_mode_override(mode: str) -> None:
+    """Apply `mode` to this process now, whether or not it could be written."""
+    global _MODE_OVERRIDE
+    _MODE_OVERRIDE = normalize_mode(mode)
+
+
+def reset_mode_override() -> None:
+    """Forget the in-process choice (tests, and nothing else)."""
+    global _MODE_OVERRIDE
+    _MODE_OVERRIDE = ""
+
+
+def deploy_mode() -> str:
+    """'standalone' (bundled FreePBX) or 'addon' (Zeus shared PBX).
+
+    The Control Center's switch wins over ``CAPSTONE_DEPLOY_MODE``: this process
+    first, then the recorded file, then the env var, which seeds the mode a box
+    boots in. Without that order the switch would have to wait for a container
+    recreate to mean anything.
+    """
+    return _MODE_OVERRIDE or stored_mode() or normalize_mode(os.environ.get(MODE_ENV))
 
 
 def extension_from_address(address: str) -> str:
@@ -440,7 +502,18 @@ def upsert_custom_extension_sql(ext: str, label: str, workflow_name: str = "") -
 
 
 def delete_custom_extension_sql(ext: str) -> str:
-    return f"DELETE FROM `custom_extensions` WHERE `custom_exten`='{_sql(ext)}'"
+    """Delete the registry row this product created for `ext` — and nothing else.
+
+    The extension number is not ownership: on a shared PBX another product's
+    row can carry the same number, and an unscoped DELETE takes it with us.
+    Only rows the writers marked are ours to remove (the same guard
+    ``count_custom_extension_sql`` reads, so a row cannot count as provisioned
+    and still fail to delete).
+    """
+    return (
+        f"DELETE FROM `custom_extensions` WHERE `custom_exten`='{_sql(ext)}' "
+        f"AND (`description` LIKE '%{DESC_MARKER}%' OR `notes` LIKE '%{NOTES_MARKER}%')"
+    )
 
 
 def custom_dest_json(dest_id: int, target: str, description: str) -> dict[str, Any]:
