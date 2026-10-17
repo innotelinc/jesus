@@ -1,5 +1,7 @@
 import os
 os.environ['KIVY_GL_BACKEND'] = 'sdl2'
+from kivy.config import Config
+Config.set("graphics", "multisamples", "0")
 import sys
 import json
 from threading import Thread
@@ -12,6 +14,12 @@ from kivy.utils import platform
 from kivy.metrics import dp, sp
 from kivy.clock import Clock
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, BooleanProperty, ColorProperty
+
+# debug
+from kivy.graphics.opengl import glGetString, GL_VENDOR, GL_RENDERER, GL_VERSION
+print("GL_VENDOR:", glGetString(GL_VENDOR))
+print("GL_RENDERER:", glGetString(GL_RENDERER))
+print("GL_VERSION:", glGetString(GL_VERSION))
 
 from kivymd.uix.widget import MDWidget
 from kivymd.app import MDApp
@@ -36,6 +44,11 @@ Window.softinput_mode = "below_target"
 if platform == "android":
     from jnius import autoclass, cast
     from android.permissions import check_permission, request_permissions, Permission
+    from screens.kivymd_patch import disable_gpu_ripple, disable_hover
+    from services.android_env import on_android
+    disable_gpu_ripple()
+    if on_android():
+        disable_hover()
 else:
     from services.appSvc import app_service_thread
     from services.pathMgr import get_user_data_dir
@@ -61,7 +74,7 @@ class MainScreenBox(MDBoxLayout):
                 self.bottom_pad = 48
 
 ## Global definitions
-__version__ = "0.1.0" # App version
+__version__ = "0.1.1" # App version
 
 # Determine the base path for your application's resources
 if getattr(sys, 'frozen', False):
