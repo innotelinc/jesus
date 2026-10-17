@@ -267,8 +267,11 @@ interpolates.
   `:latest`, so another host pulls the release instead of rebuilding it. The push
   happens after the containers are live and skips (exit 0) without credentials,
   so it can never block a deploy; `--no-push` on `redeploy-dashboard.sh` turns it
-  off and `--require` makes a missing login fatal. The packages are private — a
-  pulling host needs the GHCR token from the vault.
+  off and `--require` makes a missing login fatal. Both packages are **public**:
+  an anonymous `docker pull` with an empty `DOCKER_CONFIG` succeeds for
+  `:442e514` and `:latest`, so a new host needs no credential at all. (An
+  unauthenticated request straight to `/v2/…/manifests/…` answers 401 until an
+  anonymous pull token is exchanged — that is not a private package.)
 - **Bases prefer upstream again.** `local-bases.sh` now resolves the canonical
   tag first (`python:3.12-slim` / `node:20-alpine` / `nginx:1.27-alpine`), reusing
   it when it is on the host and pulling it otherwise, and only falls back to the

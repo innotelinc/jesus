@@ -1306,7 +1306,20 @@ from `GHCR_USERNAME`/`GHCR_TOKEN` or, failing that, from the Vault path
 `cerulean/capstone/docker` (keys `GHCR_USERNAME`, `GHCR_TOKEN`; the Docker Hub
 login is kept beside them as `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`). No
 credentials is a printed skip, never a failed deploy, and `--no-push` suppresses
-the step. The packages are **private**: a pulling host needs that GHCR token.
+the step.
+
+Both packages are **public**, so a host can pull them without any credential —
+verified by an anonymous `docker pull` with an empty `DOCKER_CONFIG`. Publishing
+still needs the GHCR login. To check visibility, pull anonymously rather than
+probing `/v2/…` directly: an unauthenticated manifest request answers 401 until
+an anonymous pull token is exchanged, which looks like a private package but is
+not.
+
+```bash
+tmp=$(mktemp -d)
+DOCKER_CONFIG=$tmp docker pull ghcr.io/innotelinc/capstone/capstone-dashboard:latest
+rm -rf $tmp
+```
 
 ```bash
 scripts/publish-dashboard.sh --dry-run   # show the tags it would push
