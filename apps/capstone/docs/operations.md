@@ -262,7 +262,15 @@ From a shell:
 ./scripts/deploy-mode.sh standalone   # create/start the bundled FreePBX (compose profile `standalone`)
 ./scripts/deploy-mode.sh addon        # stop the bundled FreePBX; point at zeus-freepbx
 ./scripts/deploy-mode.sh addon --dry-run
+./scripts/deploy-mode.sh standalone --force   # convert even with the port conflict
 ```
+
+The two PBXs publish the same host ports (`5060/udp`, `5061`, `8083`, `8088`, `8089`,
+`10000`, `10101-10120/udp`), so converting to standalone while the Zeus stack runs cannot
+work: compose creates `pbx-freepbx` and then Docker refuses the bind (`port is already
+allocated`). The script checks that first and refuses before touching `.env`; `--force`
+skips the check, and a conversion that fails after `.env` was written restores it, so the
+box is never left claiming a mode it is not in.
 
 The script is the only thing that can *create* a container compose has never brought up, so
 `--profile standalone` is its business. When the Control Center's switch is asked to reach a

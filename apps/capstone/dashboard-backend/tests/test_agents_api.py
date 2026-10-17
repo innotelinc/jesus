@@ -413,6 +413,8 @@ class AgentsAutoRepairTest(unittest.TestCase):
         detail = res.json()["detail"]
         self.assertEqual(detail["status"], "host-action-required")
         self.assertIn("scripts/deploy-mode.sh standalone", detail["command"])
+        self.assertIn("5060", detail["note"],
+                      "the shared PBX's ports are the second reason this cannot work")
         self.assertEqual(main.agents.deploy_mode(), "addon",
                          "a refused switch must not leave the mode changed")
 

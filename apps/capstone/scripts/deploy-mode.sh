@@ -29,6 +29,10 @@ COMPOSE_FILE="${COMPOSE_FILE:-$REPO/docker-compose.yml}"
 BUNDLED_PBX="${BUNDLED_PBX:-pbx-freepbx}"
 SHARED_PBX="${SHARED_PBX:-zeus-freepbx}"
 DRY_RUN=0
+FORCE=0
+# The ports the bundled FreePBX publishes. The shared Zeus PBX publishes the
+# same set, so on a host running both stacks only one can hold them.
+CONFLICT_PORTS="5060/udp, 5061, 8083, 8088, 8089, 10000, 10101-10120/udp"
 
 pass() { printf '\033[32m✓\033[0m %s\n' "$1"; }
 warn() { printf '\033[33m!\033[0m %s\n' "$1"; }
@@ -43,6 +47,7 @@ usage: scripts/deploy-mode.sh [standalone|addon] [--dry-run]
   standalone   own the PBX: create/start the bundled FreePBX and point the dashboard at it
   addon        ride the shared Zeus PBX: stop the bundled FreePBX and point the dashboard at Zeus
   --dry-run    print the commands instead of running them
+  --force      convert even when the shared PBX still holds the ports the bundled one needs
 
 env: ENV_FILE (default ./.env), COMPOSE_FILE, BUNDLED_PBX, SHARED_PBX
 USAGE
@@ -52,6 +57,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
         --dry-run) DRY_RUN=1 ;;
+        --force) FORCE=1 ;;
         standalone|addon) MODE="$1" ;;
         *) fail "unknown argument: $1"; usage; exit 2 ;;
     esac
@@ -136,6 +142,40 @@ verify_dialplan() {
 report
 [ -n "$MODE" ] || { echo; info "pass 'standalone' or 'addon' to convert"; exit 0; }
 
+# A conversion that fails half-way must not leave .env claiming a mode the box
+# is not in, so the two keys are restored to what they were.
+ORIG_MODE="$(env_value CAPSTONE_DEPLOY_MODE)"
+ORIG_PBX="$(env_value CAPSTONE_PBX)"
+
+unset_env() {  # unset_env <KEY> — drop the line entirely (it was not there before)
+    [ "$DRY_RUN" = 1 ] && return 0
+    python3 - "$ENV_FILE" "$1" <<'PY'
+import pathlib, re, sys
+path, key = pathlib.Path(sys.argv[1]), sys.argv[2]
+lines = [l for l in path.read_text().splitlines()
+         if not re.match(rf"^{re.escape(key)}=", l)]
+path.write_text("\n".join(lines) + "\n")
+PY
+}
+
+revert_env() {
+    [ "$DRY_RUN" = 1 ] && return 0
+    if [ -n "$ORIG_MODE" ]; then set_env CAPSTONE_DEPLOY_MODE "$ORIG_MODE"; else unset_env CAPSTONE_DEPLOY_MODE; fi
+    if [ -n "$ORIG_PBX" ]; then set_env CAPSTONE_PBX "$ORIG_PBX"; else unset_env CAPSTONE_PBX; fi
+    warn "restored CAPSTONE_DEPLOY_MODE=${ORIG_MODE:-<unset>} — the box is still in the mode it was"
+}
+
+# Both PBXs publish the same host ports, so converting to standalone while the
+# shared stack runs cannot work: docker will refuse to bind 5060 and the new
+# container exits. Say so before touching .env, and let --force try anyway.
+if [ "$MODE" = "standalone" ] && [ "$FORCE" != 1 ] && running "$SHARED_PBX"; then
+    echo
+    fail "$SHARED_PBX is running and holds the ports the bundled FreePBX publishes"
+    info "ports in conflict: $CONFLICT_PORTS"
+    info "stop the Zeus stack first, or re-run with --force to try anyway"
+    exit 1
+fi
+
 echo
 echo "── converting to $MODE ──"
 set_env CAPSTONE_DEPLOY_MODE "$MODE"
@@ -148,6 +188,8 @@ if [ "$MODE" = "standalone" ]; then
         [ "$DRY_RUN" = 1 ] || pass "bundled FreePBX up (profile standalone)"
     else
         fail "could not bring up the bundled FreePBX — see the compose output above"
+        info "when the error names 'port is already allocated', the shared PBX above is holding it"
+        revert_env
         exit 1
     fi
     target="$BUNDLED_PBX"
@@ -164,6 +206,7 @@ else
     fi
     if ! running "$SHARED_PBX"; then
         fail "$SHARED_PBX is not running — start the Zeus stack first"
+        revert_env
         exit 1
     fi
     target="$SHARED_PBX"

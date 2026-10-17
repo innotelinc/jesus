@@ -3095,11 +3095,19 @@ def deploy_mode_set(body: dict, user: dict = Depends(require_session)):
     shared, bundled = _pbx_containers()
 
     if target == "standalone" and bundled is None:
+        # Name the second obstacle too: creating the container is not enough
+        # while the shared PBX is up, because both publish the same ports.
+        note = None
+        if shared is not None and _container_is_running(shared):
+            note = (f"{shared.name} is running and holds the ports the bundled FreePBX publishes "
+                    "(5060/udp, 5061, 8083, 8088, 8089, 10000, 10101-10120/udp) — stop the Zeus "
+                    "stack before converting")
         raise HTTPException(status_code=409, detail={
             "status": "host-action-required",
             "detail": "No bundled FreePBX container on this host — compose has never created "
                       "the standalone profile, and only the host can.",
             "command": f"bash scripts/deploy-mode.sh {target}",
+            "note": note,
         })
     if target == "addon" and shared is None:
         raise HTTPException(status_code=409, detail={
