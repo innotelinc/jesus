@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# local-bases.sh — the base images the Control Center builds FROM, cached here.
+#
+# `python:3.12-slim`, `node:20-alpine` and `nginx:1.27-alpine` are docker.io
+# tags, and docker.io answers this host with 429 Too Many Requests often enough
+# that a deploy failed on it four times in a row. A build does not need the
+# registry once the image is on the host — but BuildKit resolves a tag's
+# metadata even then — so the durable fix is to stop naming a docker.io tag:
+# this script pins a stable local name (`capstone-base/<role>:local`) to
+# whichever image the host actually has, and both Dockerfiles take that name as
+# a build arg.
+#
+#   ./scripts/local-bases.sh            # ensure the tags, then print the refs
+#   ./scripts/local-bases.sh --print    # print the refs, create nothing
+#
+# Output (build args, one per line):
+#   PYTHON_IMAGE=capstone-base/python:local
+#   NODE_IMAGE=capstone-base/node:local
+#   NGINX_IMAGE=capstone-base/nginx:local
+#
+# A substitute base is named on stderr, because "3.13 built this" is something
+# an operator should be able to see. The nginx role will reuse an existing
+# `capstone-dashboard` image: it is nginx 1.27 plus this repo's config, and the
+# build overwrites both the config and the static files.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+PREFIX="${CAPSTONE_BASE_PREFIX:-capstone-base}"
+PULL_TIMEOUT="${CAPSTONE_BASE_PULL_TIMEOUT:-90}"
+PRINT_ONLY=0
+
+case "${1:-}" in
+    --print) PRINT_ONLY=1 ;;
+    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+    "") ;;
+    *) printf 'local-bases: unknown argument: %s\n' "$1" >&2; exit 2 ;;
+esac
+
+note() { printf 'local-bases: %s\n' "$*" >&2; }
+fail() { printf 'local-bases: %s\n' "$*" >&2; exit 1; }
+
+have() { docker image inspect "$1" >/dev/null 2>&1; }
+
+# ensure <role> <candidate>... — the local ref for <role>, creating the tag if
+# a candidate is already present (or can be pulled).
+ensure() {
+    local role="$1"; shift
+    local target="$PREFIX/$role:local" cand
+    if have "$target"; then
+        printf '%s\n' "$target"
+        return 0
+    fi
+    if [ "$PRINT_ONLY" = "1" ]; then
+        printf '%s\n' "$target"
+        return 0
+    fi
+    for cand in "$@"; do
+        if have "$cand"; then
+            docker tag "$cand" "$target" || fail "could not tag $cand as $target"
+            note "$role <- $cand (already on this host)"
+            printf '%s\n' "$target"
+            return 0
+        fi
+    done
+    for cand in "$@"; do
+        if timeout "$PULL_TIMEOUT" docker pull "$cand" >/dev/null 2>&1; then
+            docker tag "$cand" "$target" || fail "could not tag $cand as $target"
+            note "$role <- $cand (pulled)"
+            printf '%s\n' "$target"
+            return 0
+        fi
+    done
+    return 1
+}
+
+python_ref="$(ensure python python:3.12-slim python:3.13-slim python:3.12 python:3.13)" \
+    || fail "no python base here, and docker.io would not give one (rate limited?)"
+node_ref="$(ensure node node:20-alpine node:22-alpine node:22-slim node:20-slim)" \
+    || fail "no node base here, and docker.io would not give one (rate limited?)"
+nginx_ref="$(ensure nginx nginx:1.27-alpine nginx:1.27 nginx:alpine capstone-dashboard:local)" \
+    || fail "no nginx base here, and docker.io would not give one (rate limited?)"
+
+printf 'PYTHON_IMAGE=%s\n' "$python_ref"
+printf 'NODE_IMAGE=%s\n' "$node_ref"
+printf 'NGINX_IMAGE=%s\n' "$nginx_ref"

@@ -1,7 +1,15 @@
 # Capstone Control Center — build the Vite SPA, serve via nginx. The built
 # app points at the aggregator through the same-origin `/api` path, which the
 # nginx server block below reverse-proxies to the `dashboard-api` service.
-FROM node:20-alpine AS build
+# Both bases are parameters so a host can build from images it already has
+# (scripts/local-bases.sh) instead of needing docker.io at build time. The
+# defaults stay the upstream tags.
+# Both ARGs are declared before the first FROM so each is global: an ARG
+# declared inside a stage is invisible to the next `FROM`, which is what made
+# the nginx base resolve to an empty string.
+ARG NODE_IMAGE=node:20-alpine
+ARG NGINX_IMAGE=nginx:1.27-alpine
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 # Cap the Node heap so the build survives small/loaded hosts. Left uncapped,
@@ -29,7 +37,7 @@ ENV VITE_DASHBOARD_BASE_URL=$VITE_DASHBOARD_BASE_URL
 
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM ${NGINX_IMAGE}
 COPY --from=build /app/dist /usr/share/nginx/html
 # DASHBOARD_PBX_WSS_HOST names the PBX for the /ws upstream at RUNTIME (the
 # zeus add-on's shared PBX is only reachable from a network joined at

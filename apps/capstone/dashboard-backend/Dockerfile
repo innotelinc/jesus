@@ -7,7 +7,11 @@
 #   - .env mounted read-only at /config/.env (secrets inventory + link base URL)
 #   - host /etc/passwd + /etc/group mounted read-only for the real user list
 #     (and optionally host root at /host for whole-host CPU/disk/network stats)
-FROM python:3.12-slim
+# The base is a parameter so a host can build from an image it already has
+# (scripts/local-bases.sh) instead of needing docker.io at build time. The
+# default stays the upstream tag.
+ARG PYTHON_IMAGE=python:3.12-slim
+FROM ${PYTHON_IMAGE}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

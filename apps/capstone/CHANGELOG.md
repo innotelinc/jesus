@@ -204,6 +204,31 @@ interpolates.
   command it would run (its live `standalone` path was not executed here — this
   host has no bundled FreePBX container to convert to).
 
+### The dashboard build needs no registry, and every build keeps its version
+
+- **docker.io could stop a deploy, and did** — four attempts in a row died on
+  `429 Too Many Requests` resolving `python:3.12-slim` / `nginx:1.27-alpine`,
+  leaving both containers on the previous image while the repo claimed the change
+  had shipped. The bases are now build args, and `scripts/local-bases.sh` pins
+  `capstone-base/{python,node,nginx}:local` to images this host already has
+  (python 3.13, node 22, and the existing dashboard image — nginx 1.27 plus this
+  repo's config — as the nginx base). A build reads no registry at all, and the
+  substituted base is printed.
+- **Only the image that changed is rebuilt.** The two images are hashed
+  separately, so a backend change no longer churns the UI image (and a UI change
+  no longer rebuilds the API), while the combined stamp still answers
+  `--check` for CI.
+- **Each build keeps its version.** A successful deploy also tags both images
+  with the checkout's short SHA (`capstone-dashboard-api:970d6f8`), so the build
+  that ran a release is still addressable after `:local` moves on;
+  `data/.dashboard-redeploy.stamp.images` records the hashes and the version.
+- **Verified live on .30**: `redeploy-dashboard.sh --force` built both images from
+  the local bases (python 3.13.16 runtime, no pull), recreated both containers
+  healthy, `/deploy-mode` is registered and answers 401 without a session, the UI
+  bundle carries the switch, and a second `--check` reports nothing to deploy. The
+  add-on then converged the shared PBX: all eight agents read `provisioned` and
+  `[dograh-inbound]` is served from `extensions_custom_dograh.conf`.
+
 ## v3.21 — Piper is the local voice
 
 Work landed after `v3.20`: the stack's default TTS engine moved from Kokoro to

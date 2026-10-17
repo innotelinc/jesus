@@ -1267,6 +1267,29 @@ deploy and touches no Docker when they match. `install-capstone.sh` enables
 `capstone-dashboard-redeploy.timer`, which runs it every 5 minutes, so the
 running API does not lag the repo.
 
+**Bases are local.** The images build `FROM` three docker.io tags, and docker.io
+answers this host with `429 Too Many Requests` often enough that a deploy failed
+on it four times in a row — which is why the Dockerfiles take their base as a
+build arg and `scripts/local-bases.sh` pins `capstone-base/{python,node,nginx}:local`
+to images already on the host (python 3.13, node 22, and the existing dashboard
+image as the nginx base). A deploy therefore needs no registry at all; the
+substituted base is printed, because "3.13 built this" is worth knowing:
+
+```bash
+./scripts/local-bases.sh            # ensure + print the BUILD ARGS
+./scripts/local-bases.sh --print    # print only
+```
+
+**One image at a time.** The two images are hashed separately, so a
+backend-only change rebuilds only `dashboard-api` and a UI-only change only
+`dashboard` — the other keeps running untouched.
+
+**Our own version tags.** Each build is also tagged with the checkout's short
+SHA (`capstone-dashboard-api:970d6f8`, `capstone-dashboard:970d6f8`) beside the
+moving `:local` tag, so the image a given release ran is still addressable after
+the next deploy moves `:local`. `data/.dashboard-redeploy.stamp.images` records
+the two hashes and that version.
+
 ### Interview (or any call) cut off at a fixed time
 
 Upstream dograh ends a call at **300 s** unless the workflow sets
