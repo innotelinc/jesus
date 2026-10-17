@@ -1267,25 +1267,25 @@ deploy and touches no Docker when they match. `install-capstone.sh` enables
 `capstone-dashboard-redeploy.timer`, which runs it every 5 minutes, so the
 running API does not lag the repo.
 
-**Bases are local.** The images build `FROM` three docker.io tags, and docker.io
-answers this host with `429 Too Many Requests` often enough that a deploy failed
-on it four times in a row — which is why the Dockerfiles take their base as a
-build arg and `scripts/local-bases.sh` pins `capstone-base/{python,node,nginx}:local`
-to images already on the host (python 3.13, node 22). The nginx base is this
-repo's own: `dashboard/nginx-base.Dockerfile` builds it from `alpine` with nginx,
-`envsubst` and the template-rendering entrypoint, so it does not depend on the
-previous Control Center image still existing. That base carries a label holding
-the hash of the files it was built from, so editing `dashboard/nginx-base/*`
-rebuilds it on the next deploy instead of silently reusing the old one. A deploy
-therefore needs no registry at all; the substituted base is printed, because
-"3.13 built this" is worth knowing. If a base is missing and docker.io refuses
-the pull (a 429), the same tag is fetched from `mirror.gcr.io` or
-`public.ecr.aws` instead — same image id and digest, so what ships is unchanged;
-`CAPSTONE_BASE_MIRRORS` overrides the list:
+**Bases: upstream first, pinned fallback.** Both Dockerfiles take their base as
+a build arg, and `scripts/local-bases.sh` resolves it. The canonical upstream tag
+(`python:3.12-slim`, `node:20-alpine`, `nginx:1.27-alpine`) is preferred, pulled
+with the host's Docker Hub login and retagged as `capstone-base/<role>:local`; a
+tag already on the host is reused, so a repeat build makes no registry call. If
+upstream cannot be obtained the previously pinned image is used and named on
+stderr ("python <- capstone-base/python:local (pinned fallback…)"), so a 429 can
+never block a deploy. When docker.io refuses the pull, the same tag is requested
+from `mirror.gcr.io` or `public.ecr.aws` — verified identical id and digest —
+with `CAPSTONE_BASE_MIRRORS` overriding the list.
+
+The nginx fallback is this repo's own image: `dashboard/nginx-base.Dockerfile`
+builds it from `alpine` with nginx, `envsubst` and the template-rendering
+entrypoint, labelled with the hash of those files so editing
+`dashboard/nginx-base/*` rebuilds it instead of reusing a stale base.
 
 ```bash
-./scripts/local-bases.sh            # ensure + print the BUILD ARGS
-./scripts/local-bases.sh --print    # print only
+./scripts/local-bases.sh            # resolve + print the BUILD ARGS
+./scripts/local-bases.sh --print    # print the names only (CI; no Docker)
 ```
 
 **One image at a time.** The two images are hashed separately, so a
@@ -1297,6 +1297,21 @@ SHA (`capstone-dashboard-api:970d6f8`, `capstone-dashboard:970d6f8`) beside the
 moving `:local` tag, so the image a given release ran is still addressable after
 the next deploy moves `:local`. `data/.dashboard-redeploy.stamp.images` records
 the two hashes and that version.
+
+**Images are published to GHCR.** A successful deploy also runs
+`scripts/publish-dashboard.sh`, which pushes both images to
+`ghcr.io/innotelinc/capstone/capstone-dashboard{,-api}:<sha>` and `:latest`, so
+another host can pull the release instead of rebuilding it. Credentials come
+from `GHCR_USERNAME`/`GHCR_TOKEN` or, failing that, from the Vault path
+`cerulean/capstone/docker` (keys `GHCR_USERNAME`, `GHCR_TOKEN`; the Docker Hub
+login is kept beside them as `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`). No
+credentials is a printed skip, never a failed deploy, and `--no-push` suppresses
+the step. The packages are **private**: a pulling host needs that GHCR token.
+
+```bash
+scripts/publish-dashboard.sh --dry-run   # show the tags it would push
+scripts/publish-dashboard.sh --require   # fail when it cannot publish
+```
 
 ### Interview (or any call) cut off at a fixed time
 

@@ -27,6 +27,12 @@
 #   scripts/redeploy-dashboard.sh --force    # always rebuild + restart
 #   scripts/redeploy-dashboard.sh --check    # report drift, exit 1, deploy nothing
 #   scripts/redeploy-dashboard.sh --dry-run  # print the commands, run nothing
+#   scripts/redeploy-dashboard.sh --no-push  # do not publish the images to GHCR
+#
+# A successful deploy also publishes both images to GHCR
+# (scripts/publish-dashboard.sh, credentials from Vault), so another host can
+# pull the release instead of rebuilding it. Without credentials that step is a
+# printed skip, never a failed deploy.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,12 +45,13 @@ STAMP="${CAPSTONE_DASHBOARD_STAMP:-$ROOT/data/.dashboard-redeploy.stamp}"
 # missing baseline is not drift: --check reports it and passes.
 BASELINE="${CAPSTONE_DASHBOARD_BASELINE:-}"
 
-FORCE=0; CHECK=0; DRY_RUN=0; WRITE_BASELINE=0
+FORCE=0; CHECK=0; DRY_RUN=0; WRITE_BASELINE=0; PUSH_IMAGES=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --force)          FORCE=1 ;;
     --check)          CHECK=1 ;;
     --dry-run)        DRY_RUN=1 ;;
+    --no-push)        PUSH_IMAGES=0 ;;
     --baseline)       BASELINE="${2:-}"; shift; [ -n "$BASELINE" ] || { printf 'redeploy-dashboard: --baseline needs a path\n' >&2; exit 2; } ;;
     --write-baseline) WRITE_BASELINE=1 ;;
     -h|--help)        sed -n '2,30p' "$0"; exit 0 ;;
@@ -215,4 +222,10 @@ if [ "$DRY_RUN" != "1" ]; then
   printf '%s\n' "$current_hash" > "$STAMP"
   printf 'api=%s\nui=%s\nversion=%s\n' "$api_hash" "$ui_hash" "$version" > "$side_file"
   log "deployed ${current_hash:0:12} as version $version (${targets[*]})"
+  # Publish after the deploy is live, so a registry problem can never block it:
+  # the script skips (exit 0) when there are no credentials, and reports a
+  # failed push without undoing the deploy.
+  if [ "$PUSH_IMAGES" = "1" ] && [ -x "$ROOT/scripts/publish-dashboard.sh" ]; then
+    "$ROOT/scripts/publish-dashboard.sh" || log "image publish failed — the deploy is live regardless"
+  fi
 fi

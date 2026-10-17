@@ -253,6 +253,30 @@ interpolates.
   handshake, not a 502), the rendered config keeps `proxy_set_header Host $host`
   and resolves `DASHBOARD_PBX_WSS_HOST` to `https://zeus-freepbx:8089`, and the
   error log is clean.
+- **The registry logins are in the vault now, and the images are published.**
+  The 429s turned out to be the *anonymous* Docker Hub quota: this host already
+  held Hub (`innotel`) and GHCR (`innotelinc`) logins in
+  `/root/.docker/config.json`, and with them `alpine:3.20/3.21`,
+  `python:3.12-slim`, `node:20-alpine` and `nginx:1.27-alpine` all pull. Those four
+  credentials are now stored at `cerulean/capstone/docker` — the path the estate
+  keeps registry logins in, which until now existed with **no versions at all**.
+  The vault's `capstone` policy can read and write it, so a rebuild on another
+  host gets its login from the vault instead of from a copied config file.
+- **New: `scripts/publish-dashboard.sh`.** A successful deploy now pushes both
+  images to `ghcr.io/innotelinc/capstone/capstone-dashboard{,-api}:<sha>` and
+  `:latest`, so another host pulls the release instead of rebuilding it. The push
+  happens after the containers are live and skips (exit 0) without credentials,
+  so it can never block a deploy; `--no-push` on `redeploy-dashboard.sh` turns it
+  off and `--require` makes a missing login fatal. The packages are private — a
+  pulling host needs the GHCR token from the vault.
+- **Bases prefer upstream again.** `local-bases.sh` now resolves the canonical
+  tag first (`python:3.12-slim` / `node:20-alpine` / `nginx:1.27-alpine`), reusing
+  it when it is on the host and pulling it otherwise, and only falls back to the
+  pinned image when upstream cannot be obtained — the 429 path is now the
+  exception rather than the default. The deployed images were rebuilt on those
+  bases and verified: **Python 3.12.15**, **nginx 1.27.5**, both containers
+  healthy, `/` 200, `/api/healthz` 200, `/api/deploy-mode` 401, `/ws` still
+  forwarding, and `:db5e619` manifests present in GHCR for both images.
 
 ## v3.21 — Piper is the local voice
 

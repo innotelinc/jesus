@@ -4,12 +4,12 @@
 #
 # `python:3.12-slim`, `node:20-alpine` and `nginx:1.27-alpine` are docker.io
 # tags, and docker.io answers this host with 429 Too Many Requests often enough
-# that a deploy failed on it four times in a row. A build does not need the
-# registry once the image is on the host — but BuildKit resolves a tag's
-# metadata even then — so the durable fix is to stop naming a docker.io tag:
-# this script pins a stable local name (`capstone-base/<role>:local`) to
-# whichever image the host actually has, and both Dockerfiles take that name as
-# a build arg.
+# that a deploy failed on it four times in a row. Both Dockerfiles therefore take
+# their base as a build arg, and this script resolves that arg: it prefers the
+# canonical upstream tag (pulled with the host's Docker Hub login, so the base is
+# the version the Dockerfiles name), retags it as a stable local name
+# (`capstone-base/<role>:local`) and only falls back to the previously pinned
+# image when upstream cannot be obtained.
 #
 #   ./scripts/local-bases.sh            # ensure the tags, then print the refs
 #   ./scripts/local-bases.sh --print    # print the refs, create nothing
@@ -22,11 +22,12 @@
 # When docker.io refuses a pull outright, the same tag is requested from a Hub
 # mirror (mirror.gcr.io, public.ecr.aws — CAPSTONE_BASE_MIRRORS overrides), so a
 # 429 delays nothing. A substitute base is named on stderr, because "3.13 built
-# this" is something an operator should be able to see. The nginx role cannot be
-# substituted by a tag alone: when no nginx image is on the host, this builds one
-# from `alpine` with dashboard/nginx-base.Dockerfile (nginx + envsubst + the
-# template-rendering entrypoint), so the Control Center's base is its own image
-# rather than the previous Control Center image.
+# this" is something an operator should be able to see. If neither upstream nor
+# mirror answers, the pinned image is used and the substitution is printed. When
+# no nginx image has ever been on the host, the fallback is built from `alpine`
+# with dashboard/nginx-base.Dockerfile (nginx + envsubst + the template-rendering
+# entrypoint), so the Control Center's base never has to be another image in this
+# stack.
 # ═══════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 
@@ -53,37 +54,16 @@ fail() { printf 'local-bases: %s\n' "$*" >&2; exit 1; }
 
 have() { docker image inspect "$1" >/dev/null 2>&1; }
 
-# ensure <role> <candidate>... — the local ref for <role>, creating the tag if
-# a candidate is already present (or can be pulled).
-ensure() {
-    local role="$1"; shift
-    local target="$PREFIX/$role:local" cand
-    if have "$target"; then
-        printf '%s\n' "$target"
-        return 0
-    fi
-    if [ "$PRINT_ONLY" = "1" ]; then
-        printf '%s\n' "$target"
-        return 0
-    fi
-    for cand in "$@"; do
-        if have "$cand"; then
-            docker tag "$cand" "$target" || fail "could not tag $cand as $target"
-            note "$role <- $cand (already on this host)"
-            printf '%s\n' "$target"
-            return 0
-        fi
-    done
+# pull_cand <candidate>... — pull the first reachable tag, directly then from a
+# docker.io mirror; echoes the ref that worked.
+pull_cand() {
+    local cand name tag mirror
     for cand in "$@"; do
         if timeout "$PULL_TIMEOUT" docker pull "$cand" >/dev/null 2>&1; then
-            docker tag "$cand" "$target" || fail "could not tag $cand as $target"
-            note "$role <- $cand (pulled)"
-            printf '%s\n' "$target"
+            printf '%s\n' "$cand"
             return 0
         fi
     done
-    # docker.io refused (typically 429): try the same tag from a mirror.
-    local name tag mirror
     for cand in "$@"; do
         case "$cand" in
             *:*) name="${cand%:*}"; tag="${cand##*:}" ;;
@@ -91,14 +71,47 @@ ensure() {
         esac
         for mirror in $MIRRORS; do
             if timeout "$PULL_TIMEOUT" docker pull "$mirror/$name:$tag" >/dev/null 2>&1; then
-                docker tag "$mirror/$name:$tag" "$target" \
-                    || fail "could not tag $mirror/$name:$tag as $target"
-                note "$role <- $mirror/$name:$tag (docker.io refused; pulled via mirror)"
-                printf '%s\n' "$target"
+                printf '%s\n' "$mirror/$name:$tag"
                 return 0
             fi
         done
     done
+    return 1
+}
+
+# ensure <role> <upstream tag>... — the local ref for <role>.
+#
+# Upstream is preferred while it can be obtained: the host holds a Docker Hub
+# login now, so the canonical base (python:3.12-slim, node:20-alpine) is what
+# builds — the pins are a fallback for the 429 case, not the default. A tag
+# already on the host is reused without a registry call, so repeat builds stay
+# offline.
+ensure() {
+    local role="$1"; shift
+    local target="$PREFIX/$role:local" cand pulled
+    if [ "$PRINT_ONLY" = "1" ]; then
+        printf '%s\n' "$target"
+        return 0
+    fi
+    for cand in "$@"; do
+        if have "$cand"; then
+            docker tag "$cand" "$target" || fail "could not tag $cand as $target"
+            note "$role <- $cand (upstream tag, on this host)"
+            printf '%s\n' "$target"
+            return 0
+        fi
+    done
+    if pulled="$(pull_cand "$@")" && [ -n "$pulled" ]; then
+        docker tag "$pulled" "$target" || fail "could not tag $pulled as $target"
+        note "$role <- $pulled (pulled)"
+        printf '%s\n' "$target"
+        return 0
+    fi
+    if have "$target"; then
+        note "$role <- $target (pinned fallback: upstream unreachable)"
+        printf '%s\n' "$target"
+        return 0
+    fi
     return 1
 }
 
@@ -130,24 +143,32 @@ if [ "$PRINT_ONLY" = "1" ]; then
     # Print the name only: CI must not need Docker, and the hash includes the
     # build args, so resolving real images here would move the deploy hash.
     nginx_ref="$PREFIX/nginx:local"
-elif have "$PREFIX/nginx:local" && \
-     { [ -z "$nginx_built_hash" ] || [ "$nginx_built_hash" = "$nginx_hash" ]; }; then
-    nginx_ref="$PREFIX/nginx:local"
-    [ -n "$nginx_built_hash" ] \
-        && note "nginx <- $PREFIX/nginx:local (built by this script, up to date)"
-elif have "$PREFIX/nginx:local"; then
-    note "nginx <- $PREFIX/nginx:local is stale (dashboard/nginx-base changed) — rebuilding"
 else
-    # No local base yet: adopt one of the host's nginx images if there is one.
+    # Upstream nginx first (same preference as python/node), then our own base.
+    upstream_nginx=""
     for cand in nginx:1.27-alpine nginx:1.27 nginx:alpine; do
-        if have "$cand"; then
-            docker tag "$cand" "$PREFIX/nginx:local" \
-                || fail "could not tag $cand as $PREFIX/nginx:local"
-            note "nginx <- $cand (already on this host)"
-            nginx_ref="$PREFIX/nginx:local"
-            break
-        fi
+        if have "$cand"; then upstream_nginx="$cand"; break; fi
     done
+    [ -n "$upstream_nginx" ] \
+        || upstream_nginx="$(pull_cand nginx:1.27-alpine nginx:1.27 nginx:alpine)"
+    if [ -n "$upstream_nginx" ]; then
+        docker tag "$upstream_nginx" "$PREFIX/nginx:local" \
+            || fail "could not tag $upstream_nginx as $PREFIX/nginx:local"
+        note "nginx <- $upstream_nginx (upstream tag)"
+        nginx_ref="$PREFIX/nginx:local"
+    fi
+fi
+if [ -z "$nginx_ref" ] && [ "$PRINT_ONLY" != "1" ]; then
+    if have "$PREFIX/nginx:local" && \
+       { [ -z "$nginx_built_hash" ] || [ "$nginx_built_hash" = "$nginx_hash" ]; }; then
+        nginx_ref="$PREFIX/nginx:local"
+        [ -n "$nginx_built_hash" ] \
+            && note "nginx <- $PREFIX/nginx:local (built by this script, up to date)"
+    fi
+    if have "$PREFIX/nginx:local" && [ "$nginx_built_hash" != "$nginx_hash" ] \
+       && [ -n "$nginx_built_hash" ]; then
+        note "nginx <- $PREFIX/nginx:local is stale (dashboard/nginx-base changed) — rebuilding"
+    fi
 fi
 if [ -z "$nginx_ref" ]; then
     alpine_ref="$(ensure alpine alpine:3.20 alpine:3.21 alpine:latest)" \
