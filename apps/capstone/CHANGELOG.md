@@ -225,6 +225,14 @@ interpolates.
   itself carries a `capstone.nginx-base.src` label — the hash of the files it was
   built from — so a change there rebuilds the base too, instead of the UI being
   rebuilt on top of a stale one.
+- **A 429 no longer stops a base from being fetched.** When docker.io refuses a
+  pull, `scripts/local-bases.sh` asks `mirror.gcr.io` then `public.ecr.aws` for
+  the same tag (`CAPSTONE_BASE_MIRRORS` overrides). The mirror's `alpine:3.20`
+  was verified to be the same image — id and digest
+  `sha256:d9e853e8…` — and the shipped base was rebuilt from it:
+  `alpine-minirootfs-3.20.10` + `apk add nginx gettext`, nginx 1.26.3, with both
+  containers healthy and `/`, `/api/healthz`, `/api/deploy-mode` answering
+  200/200/401 through it.
 - **Only the image that changed is rebuilt.** The two images are hashed
   separately, so a backend change no longer churns the UI image (and a UI change
   no longer rebuilds the API), while the combined stamp still answers

@@ -1278,7 +1278,10 @@ previous Control Center image still existing. That base carries a label holding
 the hash of the files it was built from, so editing `dashboard/nginx-base/*`
 rebuilds it on the next deploy instead of silently reusing the old one. A deploy
 therefore needs no registry at all; the substituted base is printed, because
-"3.13 built this" is worth knowing:
+"3.13 built this" is worth knowing. If a base is missing and docker.io refuses
+the pull (a 429), the same tag is fetched from `mirror.gcr.io` or
+`public.ecr.aws` instead — same image id and digest, so what ships is unchanged;
+`CAPSTONE_BASE_MIRRORS` overrides the list:
 
 ```bash
 ./scripts/local-bases.sh            # ensure + print the BUILD ARGS

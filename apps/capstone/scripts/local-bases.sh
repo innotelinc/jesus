@@ -19,8 +19,10 @@
 #   NODE_IMAGE=capstone-base/node:local
 #   NGINX_IMAGE=capstone-base/nginx:local
 #
-# A substitute base is named on stderr, because "3.13 built this" is something
-# an operator should be able to see. The nginx role is the one that cannot be
+# When docker.io refuses a pull outright, the same tag is requested from a Hub
+# mirror (mirror.gcr.io, public.ecr.aws — CAPSTONE_BASE_MIRRORS overrides), so a
+# 429 delays nothing. A substitute base is named on stderr, because "3.13 built
+# this" is something an operator should be able to see. The nginx role cannot be
 # substituted by a tag alone: when no nginx image is on the host, this builds one
 # from `alpine` with dashboard/nginx-base.Dockerfile (nginx + envsubst + the
 # template-rendering entrypoint), so the Control Center's base is its own image
@@ -31,6 +33,12 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PREFIX="${CAPSTONE_BASE_PREFIX:-capstone-base}"
 PULL_TIMEOUT="${CAPSTONE_BASE_PULL_TIMEOUT:-90}"
+# docker.io applies a per-IP anonymous pull quota and this host hits it (429)
+# often enough that it blocked a deploy four times. These are mirrors of the
+# same Hub images (verified: identical image id and digest for alpine:3.20), so
+# the second half of the pull path asks one of them instead of giving up.
+# Space-separated path prefixes; override to add your own.
+MIRRORS="${CAPSTONE_BASE_MIRRORS:-mirror.gcr.io/library public.ecr.aws/docker/library}"
 PRINT_ONLY=0
 
 case "${1:-}" in
@@ -73,6 +81,23 @@ ensure() {
             printf '%s\n' "$target"
             return 0
         fi
+    done
+    # docker.io refused (typically 429): try the same tag from a mirror.
+    local name tag mirror
+    for cand in "$@"; do
+        case "$cand" in
+            *:*) name="${cand%:*}"; tag="${cand##*:}" ;;
+            *)   name="$cand"; tag="latest" ;;
+        esac
+        for mirror in $MIRRORS; do
+            if timeout "$PULL_TIMEOUT" docker pull "$mirror/$name:$tag" >/dev/null 2>&1; then
+                docker tag "$mirror/$name:$tag" "$target" \
+                    || fail "could not tag $mirror/$name:$tag as $target"
+                note "$role <- $mirror/$name:$tag (docker.io refused; pulled via mirror)"
+                printf '%s\n' "$target"
+                return 0
+            fi
+        done
     done
     return 1
 }
