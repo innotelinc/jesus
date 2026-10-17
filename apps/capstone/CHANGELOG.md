@@ -211,9 +211,17 @@ interpolates.
   leaving both containers on the previous image while the repo claimed the change
   had shipped. The bases are now build args, and `scripts/local-bases.sh` pins
   `capstone-base/{python,node,nginx}:local` to images this host already has
-  (python 3.13, node 22, and the existing dashboard image — nginx 1.27 plus this
-  repo's config — as the nginx base). A build reads no registry at all, and the
-  substituted base is printed.
+  (python 3.13, node 22). A build reads no registry at all, and the substituted
+  base is printed.
+- **The nginx base is our own image, not the last Control Center image.**
+  Borrowing the previous dashboard image as the nginx base worked but tied the
+  next rebuild to an artifact this project only happens to have: delete it and
+  the build fell back to a docker.io tag — the same 429. It is now built from
+  `alpine` with `dashboard/nginx-base.Dockerfile` (nginx, `envsubst`, and a
+  start-up hook that renders `/etc/nginx/templates/*.template` into `conf.d/`,
+  substituting only names actually in the environment so nginx's `$host` /
+  `$remote_addr` survive). `dashboard/nginx-base/` holds that config and hook,
+  and both are in the UI image's hash, so editing them rebuilds the UI.
 - **Only the image that changed is rebuilt.** The two images are hashed
   separately, so a backend change no longer churns the UI image (and a UI change
   no longer rebuilds the API), while the combined stamp still answers
@@ -228,6 +236,12 @@ interpolates.
   bundle carries the switch, and a second `--check` reports nothing to deploy. The
   add-on then converged the shared PBX: all eight agents read `provisioned` and
   `[dograh-inbound]` is served from `extensions_custom_dograh.conf`.
+- **Verified on the alpine-built nginx base**: both containers healthy on the
+  rebuilt images, `GET /` and `GET /api/healthz` answer 200 through nginx,
+  `/ws` carries the upgrade to the shared PBX (400 from Asterisk for a bare
+  handshake, not a 502), the rendered config keeps `proxy_set_header Host $host`
+  and resolves `DASHBOARD_PBX_WSS_HOST` to `https://zeus-freepbx:8089`, and the
+  error log is clean.
 
 ## v3.21 — Piper is the local voice
 

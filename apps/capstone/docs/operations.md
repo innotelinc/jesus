@@ -1271,9 +1271,12 @@ running API does not lag the repo.
 answers this host with `429 Too Many Requests` often enough that a deploy failed
 on it four times in a row — which is why the Dockerfiles take their base as a
 build arg and `scripts/local-bases.sh` pins `capstone-base/{python,node,nginx}:local`
-to images already on the host (python 3.13, node 22, and the existing dashboard
-image as the nginx base). A deploy therefore needs no registry at all; the
-substituted base is printed, because "3.13 built this" is worth knowing:
+to images already on the host (python 3.13, node 22). The nginx base is this
+repo's own: `dashboard/nginx-base.Dockerfile` builds it from `alpine` with nginx,
+`envsubst` and the template-rendering entrypoint, so it does not depend on the
+previous Control Center image still existing. A deploy therefore needs no
+registry at all; the substituted base is printed, because "3.13 built this" is
+worth knowing:
 
 ```bash
 ./scripts/local-bases.sh            # ensure + print the BUILD ARGS

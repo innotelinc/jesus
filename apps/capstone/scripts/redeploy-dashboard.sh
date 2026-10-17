@@ -76,9 +76,11 @@ ui_file_list() {
   find "$ROOT/dashboard/src" -type f 2>/dev/null
   find "$ROOT/dashboard/public" -type f 2>/dev/null
   local f
+  find "$ROOT/dashboard/nginx-base" -type f 2>/dev/null
   for f in "$ROOT/dashboard/package.json" \
            "$ROOT/dashboard/package-lock.json" \
            "$ROOT/dashboard/Dockerfile" \
+           "$ROOT/dashboard/nginx-base.Dockerfile" \
            "$ROOT/dashboard/nginx.conf" \
            "$ROOT/dashboard/index.html" \
            "$ROOT/dashboard/vite.config.ts" \

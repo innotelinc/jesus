@@ -20,12 +20,15 @@
 #   NGINX_IMAGE=capstone-base/nginx:local
 #
 # A substitute base is named on stderr, because "3.13 built this" is something
-# an operator should be able to see. The nginx role will reuse an existing
-# `capstone-dashboard` image: it is nginx 1.27 plus this repo's config, and the
-# build overwrites both the config and the static files.
+# an operator should be able to see. The nginx role is the one that cannot be
+# substituted by a tag alone: when no nginx image is on the host, this builds one
+# from `alpine` with dashboard/nginx-base.Dockerfile (nginx + envsubst + the
+# template-rendering entrypoint), so the Control Center's base is its own image
+# rather than the previous Control Center image.
 # ═══════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PREFIX="${CAPSTONE_BASE_PREFIX:-capstone-base}"
 PULL_TIMEOUT="${CAPSTONE_BASE_PULL_TIMEOUT:-90}"
 PRINT_ONLY=0
@@ -78,8 +81,37 @@ python_ref="$(ensure python python:3.12-slim python:3.13-slim python:3.12 python
     || fail "no python base here, and docker.io would not give one (rate limited?)"
 node_ref="$(ensure node node:20-alpine node:22-alpine node:22-slim node:20-slim)" \
     || fail "no node base here, and docker.io would not give one (rate limited?)"
-nginx_ref="$(ensure nginx nginx:1.27-alpine nginx:1.27 nginx:alpine capstone-dashboard:local)" \
-    || fail "no nginx base here, and docker.io would not give one (rate limited?)"
+# nginx: one of its own tags if the host has them, otherwise built from alpine
+# — its own image, not the previous dashboard image, and no registry pull on the
+# 429 path (alpine is local, so this build costs seconds).
+nginx_ref=""
+if have "$PREFIX/nginx:local"; then
+    nginx_ref="$PREFIX/nginx:local"
+elif [ "$PRINT_ONLY" = "1" ]; then
+    nginx_ref="$PREFIX/nginx:local"
+else
+    for cand in nginx:1.27-alpine nginx:1.27 nginx:alpine; do
+        if have "$cand"; then
+            docker tag "$cand" "$PREFIX/nginx:local" \
+                || fail "could not tag $cand as $PREFIX/nginx:local"
+            note "nginx <- $cand (already on this host)"
+            nginx_ref="$PREFIX/nginx:local"
+            break
+        fi
+    done
+    if [ -z "$nginx_ref" ]; then
+        alpine_ref="$(ensure alpine alpine:3.20 alpine:3.21 alpine:latest)" \
+            || fail "no nginx image and no alpine image to build one from"
+        note "nginx <- built from $alpine_ref (dashboard/nginx-base.Dockerfile)"
+        docker build -q \
+            -f "$REPO/dashboard/nginx-base.Dockerfile" \
+            --build-arg "ALPINE_IMAGE=$alpine_ref" \
+            -t "$PREFIX/nginx:local" \
+            "$REPO/dashboard" >/dev/null \
+            || fail "could not build the local nginx base"
+        nginx_ref="$PREFIX/nginx:local"
+    fi
+fi
 
 printf 'PYTHON_IMAGE=%s\n' "$python_ref"
 printf 'NODE_IMAGE=%s\n' "$node_ref"
