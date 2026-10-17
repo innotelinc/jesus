@@ -84,12 +84,36 @@ node_ref="$(ensure node node:20-alpine node:22-alpine node:22-slim node:20-slim)
 # nginx: one of its own tags if the host has them, otherwise built from alpine
 # — its own image, not the previous dashboard image, and no registry pull on the
 # 429 path (alpine is local, so this build costs seconds).
+#
+# A base this script built carries a label with the hash of the files it was
+# built FROM. Without it, editing dashboard/nginx-base/* would move the UI
+# image's hash but the build would reuse the stale base tag, so the edit would
+# deploy and change nothing. A base tagged from an upstream nginx image has no
+# such label and is left alone.
+nginx_src_hash() {
+    { cat "$REPO/dashboard/nginx-base.Dockerfile"
+      find "$REPO/dashboard/nginx-base" -type f | LC_ALL=C sort | while IFS= read -r f; do
+          printf '%s\n' "$f" && cat "$f"
+      done
+    } | sha256sum | awk '{print $1}'
+}
 nginx_ref=""
-if have "$PREFIX/nginx:local"; then
+nginx_hash="$(nginx_src_hash)"
+nginx_built_hash="$(docker image inspect "$PREFIX/nginx:local" \
+    --format '{{index .Config.Labels "capstone.nginx-base.src"}}' 2>/dev/null || true)"
+if [ "$PRINT_ONLY" = "1" ]; then
+    # Print the name only: CI must not need Docker, and the hash includes the
+    # build args, so resolving real images here would move the deploy hash.
     nginx_ref="$PREFIX/nginx:local"
-elif [ "$PRINT_ONLY" = "1" ]; then
+elif have "$PREFIX/nginx:local" && \
+     { [ -z "$nginx_built_hash" ] || [ "$nginx_built_hash" = "$nginx_hash" ]; }; then
     nginx_ref="$PREFIX/nginx:local"
+    [ -n "$nginx_built_hash" ] \
+        && note "nginx <- $PREFIX/nginx:local (built by this script, up to date)"
+elif have "$PREFIX/nginx:local"; then
+    note "nginx <- $PREFIX/nginx:local is stale (dashboard/nginx-base changed) — rebuilding"
 else
+    # No local base yet: adopt one of the host's nginx images if there is one.
     for cand in nginx:1.27-alpine nginx:1.27 nginx:alpine; do
         if have "$cand"; then
             docker tag "$cand" "$PREFIX/nginx:local" \
@@ -99,18 +123,19 @@ else
             break
         fi
     done
-    if [ -z "$nginx_ref" ]; then
-        alpine_ref="$(ensure alpine alpine:3.20 alpine:3.21 alpine:latest)" \
-            || fail "no nginx image and no alpine image to build one from"
-        note "nginx <- built from $alpine_ref (dashboard/nginx-base.Dockerfile)"
-        docker build -q \
-            -f "$REPO/dashboard/nginx-base.Dockerfile" \
-            --build-arg "ALPINE_IMAGE=$alpine_ref" \
-            -t "$PREFIX/nginx:local" \
-            "$REPO/dashboard" >/dev/null \
-            || fail "could not build the local nginx base"
-        nginx_ref="$PREFIX/nginx:local"
-    fi
+fi
+if [ -z "$nginx_ref" ]; then
+    alpine_ref="$(ensure alpine alpine:3.20 alpine:3.21 alpine:latest)" \
+        || fail "no nginx image and no alpine image to build one from"
+    note "nginx <- built from $alpine_ref (dashboard/nginx-base.Dockerfile)"
+    docker build -q \
+        -f "$REPO/dashboard/nginx-base.Dockerfile" \
+        --build-arg "ALPINE_IMAGE=$alpine_ref" \
+        --label "capstone.nginx-base.src=$nginx_hash" \
+        -t "$PREFIX/nginx:local" \
+        "$REPO/dashboard" >/dev/null \
+        || fail "could not build the local nginx base"
+    nginx_ref="$PREFIX/nginx:local"
 fi
 
 printf 'PYTHON_IMAGE=%s\n' "$python_ref"

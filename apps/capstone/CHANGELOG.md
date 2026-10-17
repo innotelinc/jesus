@@ -221,7 +221,10 @@ interpolates.
   start-up hook that renders `/etc/nginx/templates/*.template` into `conf.d/`,
   substituting only names actually in the environment so nginx's `$host` /
   `$remote_addr` survive). `dashboard/nginx-base/` holds that config and hook,
-  and both are in the UI image's hash, so editing them rebuilds the UI.
+  and both are in the UI image's hash, so editing them rebuilds the UI. The base
+  itself carries a `capstone.nginx-base.src` label — the hash of the files it was
+  built from — so a change there rebuilds the base too, instead of the UI being
+  rebuilt on top of a stale one.
 - **Only the image that changed is rebuilt.** The two images are hashed
   separately, so a backend change no longer churns the UI image (and a UI change
   no longer rebuilds the API), while the combined stamp still answers
