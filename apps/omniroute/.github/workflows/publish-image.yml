@@ -165,10 +165,15 @@ jobs:
       - name: Report the verified digest
         env:
           VERSION: ${{ steps.version.outputs.version }}
+        # Reporting only. Deliberately NOT `set -e`: the image is already pushed
+        # by this point, so a transient failure reading the manifest back (auth
+        # or network) must not mark a successful publish as a failed run. The
+        # steps that decide whether we publish keep `set -euo pipefail`.
         run: |
-          set -euo pipefail
+          set -uo pipefail
           DIGEST=$(docker buildx imagetools inspect "$IMAGE:$VERSION" \
-            --format '{{json .Manifest}}' | sed -n 's/.*"digest":"\(sha256:[a-f0-9]*\)".*/\1/p' | head -1)
+            --format '{{json .Manifest}}' 2>/dev/null \
+            | sed -n 's/.*"digest":"\(sha256:[a-f0-9]*\)".*/\1/p' | head -1) || true
           {
             echo "### $IMAGE:$VERSION"
             echo
