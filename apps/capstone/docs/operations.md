@@ -133,6 +133,14 @@ no loopback leg and everything that dials ARI (dograh, the edge proxy, the host-
 dials the LAN IP. The Dograh ARI user and inbound dialplan are injected during PBX startup.
 The AMI on `5038` follows the same rule.
 
+Hold music is generated, not licensed: `pbx/asterisk/hold_music.py` writes four 32 s, 8 kHz
+mono WAV tracks into `/var/lib/asterisk/moh/capstone` (fixed seed, ~5 s, no ffmpeg), and
+`pbx/entrypoint-dograh.sh` re-runs it on every boot because `/var/lib/asterisk/moh` is not a
+volume. `[dograh-inbound]` sets `CHANNEL(musicclass)=capstone` and, if Stasis returns without
+the agent taking the call, answers and plays `MusicOnHold(capstone,60)` before the voicemail
+fallback or hangup — so a failed hand-off is music, not a busy tone. Details in
+`pbx/README.md`.
+
 The PBX is a service in the main compose file, so one command brings up the entire stack:
 
 ```bash
@@ -240,6 +248,48 @@ python3 scripts/sync_dograh_routes.py            # create/update + prune removed
 python3 scripts/sync_dograh_routes.py --check    # verify only
 python3 scripts/sync_dograh_routes.py --no-prune # keep entries for removed numbers
 ```
+
+### Voice models: where the LLM, STT, TTS and embeddings actually come from
+
+A call is only as good as the four services behind it, and on a self-hosted box they must
+not silently depend on a hosted account. The organization's model configuration in dograh
+(v3: each role names a provider *connection*, never a raw key) is set to this split:
+
+| Role | Provider connection | Model | Why this one |
+|---|---|---|---|
+| **LLM** | OmniRoute gateway, `provider=openai`, `base_url=http://192.168.1.71:20128/v1` | `gemini/gemini-3-flash-preview` | Measured **1.55–1.65 s** time-to-first-token with **zero reasoning tokens** on an interview-shaped prompt. The reasoning-heavy models on the same gateway (`agy/*`) spend the whole `max_tokens` budget on hidden reasoning and return no text at all, which reaches the caller as silence. |
+| **LLM fallback** | same connection | `auto/cheap` | Two rules: `error`, and `no_output after_ms=4000`. A stalled primary is abandoned mid-turn instead of leaving the caller listening to nothing. |
+| **STT** | local Speaches, `provider=speaches`, `base_url=http://speaches:8000/v1` | `Systran/faster-whisper-small` | Free, in-house, and the model is already on the `dograh_speaches_models` volume. |
+| **TTS** | local shim, `provider=speaches`, `base_url=http://tts-shim:8880/v1` | `kokoro`, voice `af_heart` (this host); `piper`, voice `en_US-amy-medium` (the fast fallback) | Free and local. Measured on 2 vCPU: **piper** 0.33–0.60 s to first audio, RTF 0.32–0.35; **kokoro af_heart** 2.8–6.3 s, RTF 0.92–1.00; either on a cache hit ~0.02 s. af_heart is chosen here for the voice, not the speed — see `tts-shim/README.md` for the trade-off and the two-variable revert. |
+| **Embeddings** | OmniRoute gateway, `provider=openai`, same `base_url` | `gemini/gemini-embedding-001` | Answered in ~0.57 s; only used by knowledge-base work, not on the call path. |
+
+**Why the whole list is not simply "everything through OmniRoute":** the gateway's only STT
+route is `openrouter/openai/whisper-*`, and that upstream answers `429 All accounts rate
+limited` (and `402 Insufficient credits` for the embeddings sibling), while its TTS route has
+no provider credentials at all (`400 No credentials for provider: openai`). Local Whisper and
+the local TTS engines are free, already warm, and faster than anything the gateway could reach
+for those two roles. Leave them local.
+
+**TTS engine choice is a latency decision, measured, not a taste one.** The shim picks the
+engine from the `model` field, so `TTS_SHIM_ENGINES`, `TTS_SHIM_DEFAULT_ENGINE`,
+`DOGRAH_TTS_MODEL` and `DOGRAH_TTS_VOICE` have to move together. On this host Kokoro
+`af_heart` is deliberately the voice even though Piper is ~3× faster to the first word: Kokoro
+sits at RTF ≈ 1.0, i.e. it synthesizes no faster than the caller hears it, so anything else
+competing for the box (STT, the LLM hop, dograh itself) eats into that and the audio gaps. The
+shim's startup warm-up (`TTS_SHIM_WARMUP`) removes the ~7 s first-synthesis stall from the
+first caller, and the audio cache makes repeated lines (the script's fixed lines, goodbyes)
+near-instant — which is why the cache matters more with af_heart than with Piper.
+
+**The addresses are container names on purpose.** Every one of them is dialled *by
+`dograh-api`*, from inside its own container: `127.0.0.1:8881` is the shim as seen from the
+host, and resolves to the dograh container itself — the symptom is a TTS connection error on
+the first word of the call. `scripts/dograh_wire.py` writes the TTS role from
+`DOGRAH_TTS_BASE_URL`, and `.env` carries `http://tts-shim:8880/v1` for that reason.
+
+`DEPLOYMENT_MODE=oss` still runs the managed-service credit check whenever a role names the
+`dograh` provider. On a self-hosted box that check is the reason calls die (see the
+"user busy" entry under Troubleshooting) — no role in the model configuration may reference
+it.
 
 ### Switching between standalone and Add-on (shared Zeus PBX)
 
@@ -766,6 +816,43 @@ docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
   "SELECT u.email FROM authentik_core_user u JOIN authentik_core_user_groups gu ON gu.user_id=u.id \
     JOIN authentik_core_group g ON g.group_uuid=gu.group_id WHERE g.name='cerulean-platform';"
 ```
+
+**3b. “Already signed in” is a property of the ORIGIN, not of the estate.** Authentik sets
+`authentik_session` host-only, so two names for the same instance are two cookie jars. Every
+app in this stack therefore uses **one** origin — `auth.cerulean.innotel.us` — for the
+Control Center (`DASHBOARD_AUTHENTIK_ISSUER_URL`), dograh (`AUTHENTIK_ISSUER_URL`) and the
+oauth2-proxy gateways (`SSO_AUTHENTIK_BASE`). A second app opened in the same browser gets a
+code back without a login form:
+
+```bash
+# one sign-in, then authorize another app with the same cookie jar
+curl -si "https://auth.cerulean.innotel.us/application/o/authorize/?client_id=capstone-dashboard&…" \
+  | grep -i '^location'   # want: …/api/auth/callback?code=…
+```
+
+The session lifetime is the login stage's `session_duration` (a session cookie when it is
+`seconds=0`). It is `days=30` here, set through the API:
+
+```bash
+curl -s -H "Authorization: Bearer $AUTHENTIK_TOKEN" \
+  https://auth.capstone.innotel.us/api/v3/stages/user_login/<uuid>/ | jq -r .session_duration
+```
+
+Apps whose issuer is a *different* Authentik host (`auth.zeus`, `auth.monarch`,
+`auth.innotel`, …) share that session too, because the Authentik **server** sets
+`AUTHENTIK_COOKIE_DOMAIN=.innotel.us` (Cerulean's compose on .71; both the `authentik-server`
+and `authentik-worker` services carry it). It is an environment setting on the IdP host, not
+something the API can write, so a recreated IdP must keep it:
+
+```bash
+docker exec cerulean-authentik python -c "import os,django; \
+  os.environ.setdefault('DJANGO_SETTINGS_MODULE','authentik.root.settings'); django.setup(); \
+  from django.conf import settings; print(settings.SESSION_COOKIE_DOMAIN)"   # want .innotel.us
+```
+
+One sign-in then authorizes an app on any of those names — the cookie is `Domain=.innotel.us`,
+not host-only. A browser that still holds an older host-only cookie keeps working and picks up
+the shared one at its next sign-in.
 
 **4. Provisioning can fail *after* admission succeeds.** The callback inserts a local row
 keyed on the provider subject and then writes the address onto it. The address carries a
@@ -1325,6 +1412,33 @@ rm -rf $tmp
 scripts/publish-dashboard.sh --dry-run   # show the tags it would push
 scripts/publish-dashboard.sh --require   # fail when it cannot publish
 ```
+
+### A caller hears "user busy" and no interview starts
+
+Symptom, from the outside: the DID answers with a busy tone (or a single click) instead of the
+agent's greeting. From the inside there is **no workflow run at all**, or a run that is
+created and completed in the same second with `call_duration_seconds: 0`.
+
+Cause: the organization's model configuration had `llm`, `stt` and `embeddings` bound to the
+managed `dograh` provider, so every call start performs a credit check against
+`MPS_API_URL`. That URL is deliberately unreachable on this box (`http://127.0.0.1:9` —
+services.dograh.com is not used here), the check raised
+`Could not verify Dograh credits. Please try again.` as a **fatal** `call_start` error, and
+dograh deleted the channel immediately, which the carrier reports to the caller as busy.
+
+Confirm it in the run's own log rather than in the container log (the container line is a
+one-liner and scrolls away):
+
+```bash
+docker exec dograh-postgres-1 psql -U postgres -d postgres -c \
+  "select id, logs from workflow_runs order by id desc limit 1" | grep -i credit
+# {"type": "rtf-pipeline-error", "payload": {"error": "Could not verify Dograh credits.
+#  Please try again.", "fatal": true, "processor": "call_start"}, ...}
+```
+
+Fix: point `llm`/`stt`/`embeddings` at local or gateway connections (see "Voice models"
+above), never at `dograh`. The check is skipped entirely once no role names that provider, so
+calls start without any hosted round-trip.
 
 ### Interview (or any call) cut off at a fixed time
 

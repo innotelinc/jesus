@@ -102,6 +102,9 @@ only need setting when you change the behaviour.
 | `TTS_SHIM_CACHE_DIR` | `/var/cache/tts-shim` | Where clips land (`<2 hex>/<sha256>.pcm`). |
 | `TTS_SHIM_SAMPLE_RATE` *(compose)* | `24000` | Output rate; matches what pipecat constructs the service with. |
 | `TTS_SHIM_CHUNK_BYTES` | `8192` | Streaming chunk size. |
+| `TTS_SHIM_WARMUP` | `true` | Synthesize `TTS_SHIM_WARMUP_TEXT` once at startup, off the readiness path, so voice-pack/torch load does not land on the first caller. |
+| `TTS_SHIM_WARMUP_TEXT` | `Hello. This is the voice agent speaking.` | The warm-up line. Empty disables warm-up even when `TTS_SHIM_WARMUP` is true. |
+| `TTS_SHIM_WARMUP_TIMEOUT_S` | `120` | Give up (and log a warning) rather than warming forever. |
 
 Two knobs are worth knowing about the cache: `CACHE_VERSION` in `app.py` is part
 of every key, so bumping it invalidates the whole cache after a format change,
@@ -162,6 +165,25 @@ Kokoro can still be dialled directly on `127.0.0.1:8880` for a comparison run;
 what you give up is the cache, the metrics and the second engine, and what you
 keep is one less hop.
 
+### Which engine can actually be the voice
+
+Measured on the 2-vCPU host this stack runs on (`bench_tts.py --cold`, 24 kHz
+s16le, median of 3):
+
+| Engine / voice | Time to first audio | Real-time factor |
+|---|---|---|
+| Piper `en_US-amy-medium` (in-process ONNX) | 0.33–0.60 s | **0.32–0.35** |
+| Kokoro `af_heart` (torch, `kokoro-fastapi`) | 2.8–6.3 s | **0.92–1.00** |
+| Kokoro `af_heart` (ONNX in `speaches`) | 12–20 s | 2.5–5.5 |
+| either, on a cache hit | ~0.02 s | ~0.02 |
+
+RTF ≥ 1 cannot keep up with playback: the caller hears gaps, and every other
+consumer on the box (STT, the LLM proxy, dograh itself) steals the headroom it
+needs. `af_heart` is a **quality** choice, not a speed one — `.env` on this host
+selects it deliberately, and reverting to the fast voice is two variables
+(`TTS_SHIM_DEFAULT_ENGINE=piper`, `DOGRAH_TTS_MODEL`/`_VOICE` = Piper's) plus a
+`tts-shim` restart.
+
 ## Metrics
 
 Scraped by the `prometheus` service (`tts-shim:8880`) and charted in the
@@ -181,6 +203,7 @@ pipeline-latency dashboard:
 
 | File | What it is |
 |---|---|
-| `app.py` | The whole shim: engines, cache, endpoints, metrics. |
+| `app.py` | The whole shim: engines, cache, warm-up, endpoints, metrics. |
+| `bench_tts.py` | Latency harness: time-to-first-audio, wall time and real-time factor per engine for short/medium/greeting lines. Runs inside the image (`docker exec tts-shim python bench_tts.py --target kokoro --voice af_heart`); `--cold` defeats the cache so the numbers describe synthesis. |
 | `Dockerfile` | CPU-only image; Piper is installed best-effort and can be skipped with `WITH_PIPER=0`. |
 | `requirements.txt` | Deliberately short: FastAPI/uvicorn, httpx, prometheus-client, numpy, soxr. Lower bounds rather than pins — the stack builds this image locally, and a stale hard pin fails a build for no benefit. |

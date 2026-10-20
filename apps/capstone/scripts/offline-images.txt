@@ -23,3 +23,10 @@ docker.io/library/redis:7-alpine
 capstone-n8n-otel:local
 capstone-dashboard:local
 capstone-dashboard-api:local
+
+# `healthprobe` copies busybox out of this image into the `probe-bin` volume that
+# the oauth2-proxy healthchecks execute. The compose file runs with --pull=never,
+# so a host that does not already have it fails the whole boot on
+# `No such image: gcr.io/distroless/static-debian12:debug` — and that failure
+# used to loop forever under Restart=on-failure.
+gcr.io/distroless/static-debian12:debug

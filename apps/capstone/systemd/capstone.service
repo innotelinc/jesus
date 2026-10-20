@@ -3,6 +3,15 @@ Description=Capstone Voice AI Agent Platform
 Documentation=https://capstone.innotel.us
 Requires=docker.service
 After=docker.service network-online.target
+
+# A failure no retry can fix must not become a restart loop. Each cycle
+# re-runs `docker compose up -d`, which restarts the n8n importer too —
+# its CLI holds a full core for ~25 s. OBSERVED 2026-10-20: a missing
+# healthprobe image looped for hours and halved TTS synthesis speed.
+# Give up after five attempts in five minutes (both go in [Unit]:
+# StartLimitIntervalSec is read from [Unit] only).
+StartLimitIntervalSec=300
+StartLimitBurst=5
 Wants=network-online.target
 
 [Service]
@@ -40,6 +49,16 @@ ExecStop=/usr/bin/env bash scripts/boot-stack.sh --stop
 # are left alone, only dead ones are recreated.
 Restart=on-failure
 RestartSec=15s
+
+# A failure that no retry can fix must not turn into a 15-second loop. Each
+# cycle below re-runs `docker compose up -d`, which restarts every one-shot in
+# the stack — and the n8n importer, whose `n8n import:workflow` CLI runs for ~25 s
+# at a full core, is one of them. OBSERVED 2026-10-20: `healthprobe`'s image
+# (`gcr.io/distroless/static-debian12:debug`) was missing, every boot failed on
+# it, and the loop ran for hours on a 2-vCPU box — it held one core permanently
+# and roughly halved TTS synthesis speed. Give up after five attempts in five
+# minutes so `systemctl status` shows the failure instead of hiding it in a
+# spinning journal.
 
 # Generous: a cold boot ends in `up -d --wait`, and FreePBX alone has
 # start_period=60s plus a final `core restart now` that can push its first

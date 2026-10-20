@@ -35,6 +35,234 @@ of that gap, and the sections without a release of their own:
 | `v3.30`, `v3.31` | 15–16 Oct | OnTrak in the platform stack references — no section |
 | `v3.32` | next cut | the section below |
 
+## v3.34 — Calls answer again, on our own models
+
+Work landed after `v3.33`: an inbound call to the interview line was ending in a
+carrier busy tone, and the cause had nothing to do with the PBX. The
+organization's dograh model configuration still named the managed `dograh`
+provider for LLM, STT and embeddings, so every `call_start` performed a credit
+check against `MPS_API_URL` — which this stack points at `http://127.0.0.1:9`
+on purpose. The check failed *fatally* (`Could not verify Dograh credits`),
+dograh deleted the channel before the first word, and the carrier rendered that
+as "user busy". The route, the Stasis app and the ARI connection were all
+healthy the whole time; that is why it read as a telephony fault.
+
+**The models are now ours, end to end.** `scripts/dograh_local_models.py` is
+the enforce-or-check step (`--check` exits 1 on drift) and `.env` carries the
+pairing:
+
+| role | connection | model | why this one |
+|---|---|---|---|
+| LLM | OmniRoute gateway (`openai` + `base_url`) | `gemini/gemini-3-flash-preview` | 1.55–1.65 s to first token, and **no reasoning tokens** |
+| LLM fallback | same | `auto/cheap` | on `error`, and on `no_output` after 4 s |
+| STT | local Speaches | `Systran/faster-whisper-small` | free, in-house, ~1 s per utterance |
+| TTS | local shim | `piper` / `en_US-amy-medium` | 0.33 s to first audio |
+| embeddings | OmniRoute gateway | `gemini/gemini-embedding-001` | 0.57 s |
+
+Two measurements decided the LLM, and both matter more than the leaderboard:
+`agy/gemini-3.5-flash-lite` answered sooner (1.69 s) but spent 1 141 characters
+on hidden reasoning — on the interview's 3 021-token prompt it exhausted the
+token budget on reasoning and returned **no spoken text**, which a caller hears
+as silence. The gateway's own STT route is an OpenRouter whisper that is
+rate-limited or out of credits, and it has no TTS provider credentials at all,
+so "everything through OmniRoute" would have been a quieter outage. Addresses
+in the configuration are container names (`speaches`, `tts-shim`):
+`127.0.0.1:8881` is the shim as seen *from the host* and made the first word of
+every call a connection error.
+
+**AVA is out of the call path.** `ZEUS_RETURN_ENABLED=false`, the
+`[dograh-inbound]` dialplan no longer stamps `AI_CALL_ID` / `AI_CONTEXT_TOKEN`,
+and the ARI manager only reads that envelope when the flag is on (one fewer ARI
+round-trip and one fewer 404 per call). A DID now goes DID →
+`[dograh-inbound]` → `Stasis(dograh_<hex>)` → the workflow bound to the number.
+Re-enabling the hand-off is a deliberate opt-in, documented as such in
+`docs/zeus-integration.md`.
+
+**A failed hand-off is now hold music, not a busy tone.** `pbx/asterisk/hold_music.py`
+synthesises four 32 s, 8 kHz mono tracks (fixed seed, no ffmpeg, licence-free by
+construction) into the `[capstone]` MOH class, and the entrypoint regenerates
+them each boot because `/var/lib/asterisk/moh` is not a volume. If Stasis
+returns without the agent taking the call, the dialplan answers and plays
+`MusicOnHold(capstone,60)` before the voicemail fallback. Verified with the API
+stopped: the caller channel went `Up` on `MusicOnHold capstone,60` instead of
+receiving congestion.
+
+**Two routing traps closed.** `extensions_custom_dograh.conf` still held
+entries for 8000–8007 and, because Asterisk takes the first matching `exten`,
+shadowed the curated block — so a dialplan edit appeared to do nothing. The
+file is now generated only for numbers the static file does not define, and the
+stale copy plus its `#include` were removed. `VOIPMS_DIDS` mapped `7745057135`
+to `8000` (IT Help Desk) while the live route went to `8005` (Job Interview);
+both now say `8005`.
+
+**The Control Center wears Unity.** `dashboard/src/theme/` carries the
+byte-identical `unity-theme.css` / `unity-theme.js` from ontrak-genie plus a
+generated bridge that maps Unity's semantic tokens (`--canvas`, `--ink`,
+`--brand`, …) onto the HSL triples the Tailwind config already consumes — all
+six states (desk/operations/soc × light/dark), with the explicit dark rule after
+the `@media` one so a chosen mode wins over the machine's. The head snippet sets
+`UNITY_DEFAULT_SCHEME='operations'` and paints the `dark` class before first
+paint, the provider now follows `ontrak.mode`/`ontrak.scheme` instead of keeping
+a second copy, a pre-Unity `theme` key is migrated once, and the header gains a
+scheme picker beside the light/dark toggle.
+
+**A rebuilt image, and the TTS timeout that hid behind it.** `dograh-api` now
+runs a build of `dograh/upstream` taken after the ARI gating landed — until this
+rebuild that change was source-only — and the container was recreated from it.
+The verification call surfaced a separate, pre-existing defect. pipecat's
+`TTSService` judged an audio context with a single 3 s timeout, which governed
+not only the gap *between* chunks but also the wait for the **first** one. The
+local Piper shim needs 2.3–5 s to synthesize a cold line (measured over 59 cache
+misses: 4.7 s mean, 37% above 3 s), so roughly a third of first utterances —
+always including a call's greeting — were declared "completed with no audio" and
+the caller heard silence while the audio arrived late and was dropped.
+`_handle_audio_context` now waits `first_audio_timeout_s` (default 10 s) for the
+first chunk and applies the 3 s idle timeout only once audio has started.
+Verified on the same call that failed before, with the shim's cache cleared: the
+greeting synthesized cold and played — zero `[src=tts]` failures, +439 KB of PCM
+at the shim, where the previous run's greeting had died at +2.8 s. It was a
+working-tree edit in the `pipecat` submodule at the time; it is now a commit on
+the fork's pipecat branch (`capstone/1.49-first-audio-timeout`), which the fork
+pins, so `git submodule update` no longer throws it away.
+
+## v3.35 — af_heart, and the boot loop that was eating a core
+
+Work landed after `v3.34`, in three parts that turned out to be one story: the
+voice was changed to Kokoro `af_heart` as asked, and the latency complaint was
+then traced — measured — to the host, not to TTS.
+
+### The voice is Kokoro `af_heart`
+
+`.env` moves the engine: `TTS_SHIM_ENGINES=kokoro,piper`,
+`TTS_SHIM_DEFAULT_ENGINE=kokoro`, `TTS_SHIM_KOKORO_URL=http://kokoro-fastapi:8880`,
+`TTS_SHIM_KOKORO_VOICE=af_heart`, and dograh's role becomes `model=kokoro` /
+`voice=af_heart`. Both engines stay registered, so reverting is two variables and
+a `tts-shim` restart — not a rebuild.
+
+The upstream `kokoro` service only joined the dograh project's own network, so
+the shim could not resolve it (`Temporary failure in name resolution`, the
+engine would answer 503). `docker-compose.dograh-capstone.yml` puts it on
+`interview-net` as well — the same override pattern `grist`/`n8n` already use —
+and the shim now reports `{"engines":["kokoro","piper"],"upstream":{"kokoro":true}}`.
+
+**What that costs, measured** (`tts-shim/bench_tts.py --cold`, 24 kHz s16le,
+median of 3, on this 2-vCPU host):
+
+| engine / voice | to first audio | real-time factor |
+|---|---|---|
+| Piper `en_US-amy-medium`, in-process ONNX | 0.33–0.60 s | **0.32–0.35** |
+| Kokoro `af_heart`, torch via `kokoro-fastapi` | 2.8–6.3 s | **0.92–1.00** |
+| Kokoro `af_heart`, ONNX via `speaches` | 12–20 s | 2.5–5.5 |
+| either engine, cache hit | ~0.02 s | ~0.02 |
+
+RTF ≥ 1 cannot keep up with playback, so af_heart is a voice decision, not a
+speed one; the ONNX path is not a candidate at all on this box. The two numbers
+that do buy speed with af_heart are in the shim: a **startup warm-up**
+(`TTS_SHIM_WARMUP`) that synthesizes one line off the readiness path — the first
+Kokoro line after a container start measured **7.32 s**, which used to land on
+the first caller — and the audio cache, which is what makes the script's fixed
+lines effectively free.
+
+### The latency was a crash-loop, not the model
+
+`capstone.service` had been failing every 15 s for hours:
+
+```
+service:healthprobe:1 Error response from daemon: No such image:
+  gcr.io/distroless/static-debian12:debug
+```
+
+`Restart=on-failure` re-ran `scripts/boot-stack.sh`, and each run's
+`docker compose up -d` restarted the `n8n-import` one-shot, whose
+`n8n import:workflow` / `update:workflow` CLI held **~100 % of one of the two
+available cores** for ~25 s at a time, forever. With the image pulled
+(`docker pull gcr.io/distroless/static-debian12:debug`, which `--pull=never`
+boot deliberately does not do) the unit reaches `active (exited)` and the churn
+stops. Same command, same voice, before and after:
+
+| | Piper cold, before | after |
+|---|---|---|
+| time to first audio | 0.85–1.26 s | **0.33–0.60 s** |
+| real-time factor | 0.74–0.78 | **0.32–0.35** |
+
+`ID=0%` on `vmstat` went from ~20 % idle to ~60–70 %. Nothing in the TTS path
+changed to get that — the host had been running the voice on half a core.
+
+### dograh 1.49.0, replayed onto the fork
+
+Upstream moved `b121f43e → b677cac4` (25 commits, dograh **1.49.0**: Sarvam
+Bulbul v4, MiniMax over WebSocket, greeting-on-transfer, WhatsApp calling). The
+fork's Capstone delta (75 files) was replayed onto it with a per-file 3-way
+merge: files upstream did not touch keep the fork's version, files only upstream
+touched take upstream's, and the three shared files — `ari_manager.py`, the ARI
+strategies, `run_pipeline.py` — merged cleanly with both sides' work intact.
+`CHANGELOG.md` is fork-owned and keeps the fork's copy.
+
+The pipecat pin had to move with it: 1.49 imports `MiniMaxTTSService`, which the
+old submodule does not have, and the API died on import
+(`cannot import name 'MiniMaxTTSService'`). The submodule is now at upstream's
+`20f53b93c` with the first-audio fix cherry-picked on top
+(`801442089`), and the fork pins that. Settings that carry state — `.env`,
+`data/.env.dograh`, the compose files and a `pg_dump` — were saved to
+`/var/backups/capstone/20261020-reinstall/` before anything moved, together with
+git bundles of both trees.
+
+## v3.33 — One sign-in opens every app
+
+Work landed after `v3.32`: the estate already had a single Authentik, but the
+apps were talking to different *names* for it and its session died with the
+browser, so an operator who was already signed in kept being asked for
+credentials.
+
+### A signed-in browser is never asked twice
+
+- **The IdP session was per-origin and browser-lifetime.** Authentik sets
+  `authentik_session` host-only and the login stage's `session_duration` was
+  `seconds=0`, so a session cookie died with the browser. Measured before the
+  fix: the cookie carried `domain=auth.cerulean.innotel.us` and no expiry.
+- **Two names for one IdP.** `auth.capstone.innotel.us`, `auth.cerulean…` and
+  `auth.innotel.us` are the *same* Authentik instance (same `brand_uuid`
+  `71c79c14…`), but a cookie is per host. dograh and the oauth2-proxy gateways
+  used `auth.cerulean`; the Control Center used `auth.capstone`, so it was a
+  second cookie jar and asked for the password on every visit.
+- **Fixed**: the `default-authentication-login` stage now sets
+  `session_duration=days=30` through the Authentik API; the Control Center's
+  `AUTHENTIK_ISSUER_URL` is `auth.cerulean.innotel.us/application/o/capstone-dashboard/`,
+  matching dograh and every gateway; the README and landing page now advertise
+  that origin instead of `auth.capstone`.
+- **Measured after**: one credential entry at `auth.cerulean` yields an
+  `authentik_session` valid for 30 days; with only that cookie, `authorize` for
+  `dograh`, `capstone-dashboard` and `innotel-app-gateway` (n8n, Grist, Grafana,
+  PBX, Workflow Studio) answers with a code and no login form. The Control
+  Center chain was driven end to end — `/api/auth/login` → Authentik → callback →
+  `capstone_session` → `GET /api/auth/me` **200** — and its next app opened with
+  no prompt.
+- **Now one session for every name the IdP answers on.** `AUTHENTIK_COOKIE_DOMAIN=.innotel.us`
+  is set on the `authentik-server` and `authentik-worker` services in Cerulean's
+  compose on .71 (a timestamped backup sits next to it) and the pair was
+  recreated: `SESSION_COOKIE_DOMAIN` is now `.innotel.us`, and the login cookie
+  carries `Domain=.innotel.us`. Measured with **one** sign-in: `authorize`
+  returns a code and no login form at `auth.cerulean` (dograh, Control Center),
+  `auth.capstone` (Control Center), `auth.innotel` (monit, mail),
+  `auth.monarch` (monarch) and `auth.zeus` (zeus-portal). Browsers holding a
+  host-only cookie from before keep working and replace it with the shared one
+  at their next sign-in. Incus (i1–i4) was left untouched.
+- **`admin@innotel.us`** was admitted to `cerulean-platform` (the dograh and
+  gateway group), and — because the Control Center enforces two further gates —
+  to `default` (the `CERULEAN_TENANT` gate) and `Capstone` (the application's
+  group binding), plus the shared `AUTHENTIK_ADMIN_EMAILS` allowlist. Without
+  those it authenticated successfully and was then bounced with
+  `?auth_error=not_authorized` / `no_tenant`, which reads as another login.
+
+### dograh no longer talks to `services.dograh.com`
+
+- `MPS_API_URL` is now `http://127.0.0.1:9` (the local discard port) in the
+  split-layout compose override, the standalone compose files and both env
+  files. The organization's managed-service bootstrap is already `completed`,
+  so nothing calls it today; the setting makes any future accidental call fail
+  on this host instead of reaching a third party. The last 429s in the log were
+  the empty SSO organization, removed with the org merge.
+
 ## v3.32 — The running stack is the tree again, and the voice plane is up
 
 Work landed after `v3.31`: both dograh images are builds of this checkout, the
@@ -280,6 +508,35 @@ interpolates.
   bases and verified: **Python 3.12.15**, **nginx 1.27.5**, both containers
   healthy, `/` 200, `/api/healthz` 200, `/api/deploy-mode` 401, `/ws` still
   forwarding, and `:db5e619` manifests present in GHCR for both images.
+
+### SSO users were landing in an empty organization, and the repair is a script
+
+- **The symptom was an empty platform.** `dhunter@innotel.us` signed in through
+  Authentik and saw no agents, no workflows, nothing — while the eight agents,
+  two telephony configurations, eight phone numbers and one model configuration
+  were all there. The data lived in the organization the local admin's first
+  sign-in created (`org_oss_…`); dograh's OIDC callback is hard-wired to put
+  every SSO identity into the organization named by
+  `AUTHENTIK_ORGANIZATION_PROVIDER_ID` (`oidc-shared`) and had created a second,
+  **empty**, tenant for them. The app was doing exactly what it was told; the
+  two halves of the deployment disagreed about which organization is the shared
+  one, and the disagreement is invisible until someone signs in.
+- **Repaired in place, not by moving data.** The empty tenant was dropped (it
+  held no rows in any of the 20 organization-scoped tables — only the membership
+  row), its user joined the data-owning organization, and that organization took
+  the `oidc-shared` provider id, so the next sign-in lands where the data is.
+  A `pg_dump` of `organizations`/`organization_users`/`users`/`workflows` was
+  taken first. Verified with a JWT for the affected account: `workflow/count`
+  → `{"total": 8}` and `workflow/fetch` returns the eight agents by name.
+- **New: `scripts/dograh-merge-orgs.py`.** The same repair, idempotent and
+  guarded, so a restored database or a reseeded one cannot recreate the silent
+  empty tenant: it counts every table carrying an `organization_id` (membership
+  excluded — that is what a merge moves), acts only when exactly one organization
+  holds data, and refuses with a report when more than one does. `--apply`
+  backs the three tables it can write up first and then re-reads the result
+  instead of trusting the write. `scripts/setup.sh` runs it as step 6a, right
+  after the agents are wired and before the first SSO sign-in; the planner is
+  covered by `scripts/tests/test_dograh_merge_orgs.py`.
 
 ## v3.21 — Piper is the local voice
 

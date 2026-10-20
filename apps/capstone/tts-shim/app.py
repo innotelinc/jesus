@@ -37,7 +37,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import os
+import re
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -55,6 +57,11 @@ from prometheus_client import (
     Histogram,
     generate_latest,
 )
+
+# `uvicorn.error` rather than a private logger: uvicorn configures that one
+# with a handler and INFO level, so warm-up/engine warnings reach `docker logs`
+# instead of being dropped by an unconfigured root logger.
+logger = logging.getLogger("uvicorn.error")
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -74,6 +81,18 @@ KOKORO_DEFAULT_VOICE = os.getenv("TTS_SHIM_KOKORO_VOICE", "af_heart")
 # several does not — speaches' ONNX Kokoro is addressed as
 # `speaches-ai/Kokoro-82M-v1.0-ONNX`, and it rejects the bare `kokoro`.
 KOKORO_MODEL = os.getenv("TTS_SHIM_KOKORO_MODEL", "kokoro").strip() or "kokoro"
+# kokoro-fastapi synthesizes the whole request before it sends a single byte
+# ("produced 1 chunks"), so its time-to-first-audio is the *entire* line. A
+# greeting of ~13 s therefore arrives after ~13 s — past pipecat's first-audio
+# timeout, which ends the context as silent (observed on run 22). Splitting on
+# sentence boundaries and speaking the pieces in order makes the wait the first
+# sentence instead of the whole paragraph, and the caller hears the greeting
+# start in a second or two.
+# ~60 characters is roughly 3-4 s of speech at Kokoro's pace, i.e. the wait a
+# caller actually experiences for the first words. Larger (220) left the whole
+# greeting in one request, which is exactly the 13 s stall this fixes.
+KOKORO_CHUNK_CHARS = int(os.getenv("TTS_SHIM_KOKORO_CHUNK_CHARS", "60"))
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 
 # Piper is optional: the engine only registers when the package imports AND a
 # voice model is configured. A shim with no Piper is still a working shim.
@@ -127,7 +146,19 @@ AUDIO_BYTES = Counter(
 CACHE_BYTES = Gauge("tts_shim_cache_bytes", "Bytes currently held in the audio cache.")
 INFLIGHT = Gauge("tts_shim_inflight", "TTS requests currently being synthesized.")
 
-CACHE_VERSION = "v1"  # bump to invalidate every entry after a format change
+# Warm the default engine once at startup. The first synthesis after a
+# container start pays for everything that is loaded lazily — Piper's voice and
+# espeak data, Kokoro's voice pack and torch/ONNX kernels — and that bill lands
+# on the first caller (measured on this host: ~8.5 s for the first Kokoro line
+# against ~2.5 s once warm, for a 2-3 s sentence). Warming with one short line
+# moves that cost to boot, where nothing is waiting for it.
+WARMUP_ENABLED = os.getenv("TTS_SHIM_WARMUP", "true").lower() != "false"
+WARMUP_TEXT = os.getenv(
+    "TTS_SHIM_WARMUP_TEXT", "Hello. This is the voice agent speaking."
+).strip()
+WARMUP_TIMEOUT_S = float(os.getenv("TTS_SHIM_WARMUP_TIMEOUT_S", "120"))
+
+CACHE_VERSION = "v2"  # bump to invalidate every entry after a format change
 
 # One loaded Piper voice, one synthesis at a time: the ONNX session is not
 # documented as thread-safe, and serializing is cheap next to reloading it.
@@ -199,26 +230,65 @@ class KokoroEngine(Engine):
     async def stream(self, text: str, voice: str, speed: float) -> AsyncIterator[bytes]:
         if self._client is None:
             raise EngineUnavailable("kokoro engine not started")
-        payload = {
-            "model": self.model,
-            "input": text,
-            # Kokoro's own voice ids (af_heart, am_michael, …). A caller that
-            # sends piper-style ids falls back to the configured default.
-            "voice": voice or self.default_voice,
-            "response_format": "pcm",
-            "speed": speed or 1.0,
-        }
-        async with self._client.stream(
-            "POST", f"{self.url}/v1/audio/speech", json=payload
-        ) as response:
-            if response.status_code != 200:
-                body = (await response.aread())[:400]
-                raise EngineUnavailable(
-                    f"kokoro upstream {response.status_code}: {body!r}"
-                )
-            async for chunk in response.aiter_bytes():
-                if chunk:
-                    yield chunk
+        for part in split_for_tts(text, KOKORO_CHUNK_CHARS):
+            payload = {
+                "model": self.model,
+                "input": part,
+                # Kokoro's own voice ids (af_heart, am_michael, …). A caller that
+                # sends piper-style ids falls back to the configured default.
+                "voice": voice or self.default_voice,
+                "response_format": "pcm",
+                "speed": speed or 1.0,
+            }
+            async with self._client.stream(
+                "POST", f"{self.url}/v1/audio/speech", json=payload
+            ) as response:
+                if response.status_code != 200:
+                    body = (await response.aread())[:400]
+                    raise EngineUnavailable(
+                        f"kokoro upstream {response.status_code}: {body!r}"
+                    )
+                async for chunk in response.aiter_bytes():
+                    if chunk:
+                        yield chunk
+
+
+def split_for_tts(text: str, max_chars: int) -> list[str]:
+    """Split ``text`` into sentence-sized pieces for a non-streaming engine.
+
+    Sentences are kept whole where they fit under ``max_chars`` (so prosody stays
+    natural and short lines are one request, unchanged); a sentence longer than
+    the limit is cut at a comma or space, never in the middle of a word. The
+    return value is never empty for non-empty input.
+    """
+    text = text.strip()
+    if not text:
+        return []
+    parts = [p.strip() for p in _SENTENCE_END.split(text) if p.strip()]
+    out: list[str] = []
+    buf = ""
+    for part in parts:
+        while len(part) > max_chars:
+            cut = part.rfind(",", 0, max_chars)
+            if cut < max_chars // 3:
+                cut = part.rfind(" ", 0, max_chars)
+            if cut < max_chars // 3:
+                cut = max_chars
+            if buf:
+                out.append(buf)
+                buf = ""
+            out.append(part[: cut + 1].strip())
+            part = part[cut + 1 :].strip()
+        if not part:
+            continue
+        if buf and len(buf) + 1 + len(part) > max_chars:
+            out.append(buf)
+            buf = part
+        else:
+            buf = f"{buf} {part}".strip()
+    if buf:
+        out.append(buf)
+    return out or [text]
 
 
 class PiperEngine(Engine):
@@ -509,7 +579,16 @@ async def lifespan(app: FastAPI):
         REGISTRY.add(PiperEngine(PIPER_VOICE, PIPER_VOICE_DIR))
     await REGISTRY.startup()
     evict()
-    yield
+    warmup = None
+    if WARMUP_ENABLED and WARMUP_TEXT and REGISTRY.names():
+        # Off the event loop's critical path: /health must answer while the
+        # engine is still loading, or the container never comes up healthy.
+        warmup = asyncio.create_task(_warmup())
+    try:
+        yield
+    finally:
+        if warmup is not None and not warmup.done():
+            warmup.cancel()
 
 
 app = FastAPI(title="Capstone TTS shim", version="1.0.0", lifespan=lifespan)
@@ -520,6 +599,30 @@ def _float(value, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+async def _warmup() -> None:
+    """Synthesize one short line so the default engine is loaded before a call."""
+    try:
+        name, engine = REGISTRY.resolve(DEFAULT_ENGINE or None)
+    except EngineUnavailable:
+        return
+    started = time.perf_counter()
+    total = 0
+    try:
+        async with asyncio.timeout(WARMUP_TIMEOUT_S):
+            # Empty voice: the engine substitutes its own default, which is the
+            # voice a caller will hear — warming a different one warms nothing.
+            async for chunk in engine.stream(WARMUP_TEXT, "", 1.0):
+                total += len(chunk)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:  # a failed warm-up must never fail the service
+        logger.warning("tts-shim warm-up failed on %s: %s", name, exc)
+        return
+    logger.info(
+        "tts-shim warm-up: %s %.2fs, %d bytes", name, time.perf_counter() - started, total
+    )
 
 
 async def _stream_response(path: Path, engine_name: str) -> AsyncIterator[bytes]:

@@ -162,6 +162,24 @@ services:
       # AUTHENTIK_ALLOWED_GROUPS completes the handshake and is then refused.
       AUTHENTIK_ALLOWED_GROUPS: "${AUTHENTIK_ALLOWED_GROUPS:-}"
       AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-oidc-shared}"
+      # ── Dograh's hosted model service (MPS) is not used here ──────────────
+      # Upstream defaults MPS_API_URL to https://services.dograh.com and mints a
+      # managed service key + Cloudonix SIP allocation per organization on the
+      # first authenticated request. This stack runs its own models (OmniRoute,
+      # Piper, Speaches), its own Asterisk/ARI telephony and its own service
+      # keys, so that call can only ever be a 429 and a warning in the log.
+      # Pointing it at the local discard port removes the third-party dependency
+      # and makes any future accidental call fail instantly, on this host,
+      # instead of reaching out. See scripts/dograh_wire.py for the local model
+      # configuration that replaces it.
+      MPS_API_URL: "${MPS_API_URL:-http://127.0.0.1:9}"
+      # ── AVA is not in this call path ──────────────────────────────────────
+      # The Zeus/AVA hand-off ("return the same channel to the operator when
+      # the interview ends") is off: these calls are dograh's alone, and the
+      # dialplan no longer stamps the AI_CONTEXT_TOKEN envelope it needs. The
+      # flag also gates the ARI manager's envelope read, so leaving it false
+      # removes one ARI round-trip (and a 404 warning) from every call.
+      ZEUS_RETURN_ENABLED: "${ZEUS_RETURN_ENABLED:-false}"
     networks:
       - app-network
       - interview-net
@@ -190,6 +208,18 @@ services:
 
   grist:
     networks:
+      - app-network
+      - interview-net
+
+  # Same reason as grist/n8n, and it is what makes the TTS voice work: the shim
+  # (`tts-shim`, in the Capstone project) lives on `interview-net` alone, so a
+  # Kokoro upstream on `app-network` alone is a name it cannot resolve —
+  # "Temporary failure in name resolution" in the shim log, and the engine
+  # answers 503. Joining this network puts `kokoro-fastapi` on the shim's DNS.
+  # `!override` drops upstream's single-network list rather than merging keys;
+  # the container keeps its app-network address for this project's own clients.
+  kokoro:
+    networks: !override
       - app-network
       - interview-net
 
