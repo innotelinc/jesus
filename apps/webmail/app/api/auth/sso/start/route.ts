@@ -52,12 +52,18 @@ export async function POST(request: NextRequest) {
       mobile_state: rawMobileState,
       purpose: rawPurpose,
       slot: rawSlot,
+      add_account: rawAddAccount,
     } = await request.json();
 
     // `reauth` drives the step-up flow for device pairing: it forces a fresh
     // IdP login (prompt=login) and the /reauth/sso/complete handler sets the
     // short-lived pairing re-auth proof instead of logging the user in again.
     const isReauth = rawPurpose === 'reauth';
+    // "+ Add Account" must not come back as the account the browser already
+    // holds a session for. select_account makes providers with an account
+    // picker show it; login is the only prompt Authentik honours, so ask for
+    // both - it intersects the set with what it supports.
+    const isAddAccount = rawAddAccount === true;
 
     if (!redirect_uri || typeof redirect_uri !== 'string') {
       return NextResponse.json({ error: 'Missing redirect_uri' }, { status: 400 });
@@ -159,6 +165,8 @@ export async function POST(request: NextRequest) {
     // back to login forever, and nothing on our side reads auth_time.
     if (isReauth) {
       authUrl.searchParams.set('prompt', 'login');
+    } else if (isAddAccount) {
+      authUrl.searchParams.set('prompt', 'select_account login');
     }
 
     return NextResponse.json({
