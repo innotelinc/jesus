@@ -481,6 +481,12 @@ function LoginPageContent() {
           sessionStorage.setItem("mobile_state", mobileState);
         } catch { /* sessionStorage unavailable */ }
       }
+      // Record the slot this login is meant for before the round trip. The
+      // callback reads it back, so a second tab adding an account cannot have
+      // its slot taken over by whichever slot is free when /sso/complete runs.
+      try {
+        sessionStorage.setItem("oauth_cookie_slot", useAccountStore.getState().getNextCookieSlot().toString());
+      } catch { /* sessionStorage unavailable */ }
       const res = await apiFetch('/api/auth/sso/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -489,6 +495,7 @@ function LoginPageContent() {
           redirect_uri: redirectUri,
           locale: params.locale,
           server_id: selectedServer?.id,
+          add_account: isAddAccountMode,
           ...(isMobileHandoff
             ? { mobile_redirect_uri: mobileRedirectUri, mobile_state: mobileState }
             : {}),
@@ -518,7 +525,7 @@ function LoginPageContent() {
     } catch {
       setOauthLoading(false);
     }
-  }, [params.locale, selectedServer?.id, isMobileHandoff, mobileRedirectUri, mobileState]);
+  }, [params.locale, selectedServer?.id, isAddAccountMode, isMobileHandoff, mobileRedirectUri, mobileState]);
 
   useEffect(() => {
     // After signing out, show the login page rather than signing straight
@@ -716,7 +723,11 @@ function LoginPageContent() {
     authUrl.searchParams.set("code_challenge_method", "S256");
     authUrl.searchParams.set("login_hint", account);
     if (isAddAccountMode) {
-      authUrl.searchParams.set("prompt", "select_account");
+      // Some providers (PocketID, Zitadel) only show their account picker for
+      // select_account; others (Authentik) ignore that value and only honour
+      // login. Asking for both makes "+ Add Account" leave the IdP's current
+      // session instead of silently returning the account already signed in.
+      authUrl.searchParams.set("prompt", "select_account login");
     }
 
     window.location.href = authUrl.toString();
@@ -805,7 +816,11 @@ function LoginPageContent() {
     authUrl.searchParams.set("code_challenge", challenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
     if (isAddAccountMode) {
-      authUrl.searchParams.set("prompt", "select_account");
+      // Some providers (PocketID, Zitadel) only show their account picker for
+      // select_account; others (Authentik) ignore that value and only honour
+      // login. Asking for both makes "+ Add Account" leave the IdP's current
+      // session instead of silently returning the account already signed in.
+      authUrl.searchParams.set("prompt", "select_account login");
     }
 
     window.location.href = authUrl.toString();
