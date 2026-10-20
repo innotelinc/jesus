@@ -1,0 +1,42 @@
+# Runtime image for the Innotel deployment.
+#
+# The build context is NOT this directory: it is the assembled standalone
+# bundle produced by `next build`, laid out as
+#
+#   .next/standalone/   server.js, node_modules, .next/server
+#   .next/static/       client chunks
+#   public/             static assets
+#
+# See README.md for the exact assembly and build commands. This split exists
+# because the mail container's 1 GiB memory cap used to OOM the full
+# multi-stage Dockerfile; the standalone output is now built separately and
+# this file only packages it.
+FROM node:24-alpine
+
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=unknown
+
+LABEL org.opencontainers.image.title="Bulwark Webmail"
+LABEL org.opencontainers.image.description="Modern webmail client for Stalwart Mail Server"
+LABEL org.opencontainers.image.source="https://github.com/innotelinc/webmail"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
+LABEL org.opencontainers.image.version="$APP_VERSION"
+LABEL org.opencontainers.image.revision="$GIT_COMMIT"
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN apk upgrade --no-cache && \
+    npm uninstall -g npm && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npx && \
+    addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+COPY public ./public
+COPY .next/standalone ./
+COPY .next/static ./.next/static
+RUN mkdir -p /app/data/settings /app/data/admin /app/data/admin-state /app/data/telemetry && chown -R nextjs:nodejs /app/data
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]
