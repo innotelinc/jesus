@@ -8,7 +8,7 @@ import DOMPurify from 'dompurify';
  */
 export const EMAIL_SANITIZE_CONFIG = {
   ADD_TAGS: [],
-  // data-quoted-html is Bulwark's own reply-quote marker (see
+  // data-quoted-html is Loomix's own reply-quote marker (see
   // components/email/quoted-html.ts). Explicitly whitelisted despite
   // ALLOW_DATA_ATTR:false so the viewer can detect and collapse the quoted
   // original (lib/quote-collapse.ts); it's inert otherwise.

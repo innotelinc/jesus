@@ -6,7 +6,7 @@ import { fitsSetCookieBudget } from '@/lib/oauth/set-cookie-budget';
 /*
  * RP-initiated logout (OpenID Connect RP-Initiated Logout 1.0), #905.
  *
- * Revoking the refresh token ends Bulwark's grant, but not the login session
+ * Revoking the refresh token ends Loomix's grant, but not the login session
  * the identity provider keeps in its own cookies: with that session alive,
  * "Sign in with SSO" silently signs the same person back in. Signing out
  * therefore finishes with a top-level navigation to the provider's

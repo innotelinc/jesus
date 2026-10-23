@@ -18,7 +18,7 @@
 // Order matters only for readability - document order decides which marker
 // wins when several are present (querySelector on the comma-joined list).
 const CONTAINER_SELECTORS = [
-  // Bulwark's own reply/forward island (see components/email/quoted-html.ts).
+  // Loomix's own reply/forward island (see components/email/quoted-html.ts).
   // The attribute survives sanitization via an explicit ADD_ATTR entry.
   'div[data-quoted-html]',
   // Gmail: gmail_quote_container (2023+) wraps gmail_attr + gmail_quote.
@@ -80,7 +80,7 @@ function hasVisibleContent(body: HTMLElement, marker: Element, side: 'before' | 
 
 /**
  * Fallback for replies whose quote is a bare <blockquote> (no type/class -
- * e.g. Bulwark's own reply to a plain-text original, and various mobile
+ * e.g. Loomix's own reply to a plain-text original, and various mobile
  * clients): an outermost blockquote directly preceded by an attribution line.
  * Attribution is sniffed language-agnostically as the nearest preceding text
  * ending with a colon ("On …, X wrote:", "Am … schrieb X:", "… a écrit :").

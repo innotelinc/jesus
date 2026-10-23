@@ -33,8 +33,8 @@ const CONTENT_WIDTH = Math.round(OG_WIDTH * 0.66);
 const CONTENT_HEIGHT = Math.round(OG_HEIGHT * 0.55);
 
 // Bundled lettering logos, used when a deployment has no branding configured.
-const DEFAULT_LOGO_ON_LIGHT = '/branding/Bulwark_Logo_with_Lettering_Dark_and_Color.png';
-const DEFAULT_LOGO_ON_DARK = '/branding/Bulwark_Logo_with_Lettering_White_and_Color.png';
+const DEFAULT_LOGO_ON_LIGHT = '/branding/Loomix_Logo_with_Lettering_Dark_and_Color.png';
+const DEFAULT_LOGO_ON_DARK = '/branding/Loomix_Logo_with_Lettering_White_and_Color.png';
 
 type Rgb = { r: number; g: number; b: number };
 

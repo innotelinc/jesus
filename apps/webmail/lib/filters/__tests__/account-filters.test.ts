@@ -50,7 +50,7 @@ describe('updateAccountFilters', () => {
     expect(change!.previous.content).toBe(bulwarkScript([rule('old')]));
   });
 
-  it('keeps external blocks verbatim after the Bulwark section', async () => {
+  it('keeps external blocks verbatim after the Loomix section', async () => {
     const account = mockSieveAccount('b', [{ name: 'filters', content: bulwarkScript([rule('old')], true), isActive: true }]);
 
     await updateAccountFilters(account.client, 'b', (rules) => insertRuleAtTop(rules, rule('new')));

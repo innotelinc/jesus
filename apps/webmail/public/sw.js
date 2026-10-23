@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 
-// Bulwark service worker.
+// Loomix service worker.
 //
 // This SW does two jobs:
 //   1. Satisfy the PWA installability requirement (network-only fetch handler,
@@ -445,8 +445,8 @@ async function handleOpenMailtoInClient(event) {
 
 async function showMailtoFocusNotification(state) {
   try {
-    await self.registration.showNotification(state.focusNotificationTitle || "Bulwark", {
-      body: state.focusNotificationBody || "The request was opened in Bulwark. Click to bring it to the front.",
+    await self.registration.showNotification(state.focusNotificationTitle || "Loomix", {
+      body: state.focusNotificationBody || "The request was opened in Loomix. Click to bring it to the front.",
       tag: "bulwark-mailto-focus",
       icon: `${BASE_PATH}/api/pwa-icon/192`,
       badge: `${BASE_PATH}/api/pwa-icon/192`,

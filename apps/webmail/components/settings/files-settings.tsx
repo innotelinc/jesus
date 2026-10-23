@@ -23,7 +23,7 @@ const SAMPLE_FILES: SampleFile[] = [
   { name: "Photos", isFolder: true, size: 0, modified: "2026-03-14" },
   { name: "report.pdf", isFolder: false, size: 245000, modified: "2026-03-15" },
   { name: "notes.md", isFolder: false, size: 1200, modified: "2026-03-12" },
-  { name: "vacation.jpg", isFolder: false, size: 3400000, modified: "2026-03-08", thumbnailUrl: "/branding/Bulwark_Logo_Color.png" },
+  { name: "vacation.jpg", isFolder: false, size: 3400000, modified: "2026-03-08", thumbnailUrl: "/branding/Loomix_Icon_Color.png" },
   { name: "song.mp3", isFolder: false, size: 5200000, modified: "2026-03-01" },
   { name: ".config", isFolder: false, size: 340, modified: "2026-02-20", hidden: true },
 ];
@@ -61,7 +61,7 @@ function FilesSettingsPreview({ settings }: { settings: FilesSettings }) {
   // The sample thumbnail shows the configured logo on a branded deployment,
   // the bundled one otherwise. (#1160)
   const { appLogoLightUrl, appLogoDarkUrl } = useConfig();
-  const thumbnailUrl = appLogoLightUrl || appLogoDarkUrl || "/branding/Bulwark_Logo_Color.png";
+  const thumbnailUrl = appLogoLightUrl || appLogoDarkUrl || "/branding/Loomix_Icon_Color.png";
   const sortedFiles = useMemo(() => {
     let files = SAMPLE_FILES.map((f) => (f.thumbnailUrl ? { ...f, thumbnailUrl } : f)).filter((f) => {
       if (!settings.showHiddenFiles && f.hidden) return false;

@@ -63,7 +63,7 @@ describe('setupQuoteCollapse', () => {
     expect(document.body.textContent).toContain('Jane wrote:');
   });
 
-  it('collapses Bulwark\'s own data-quoted-html reply island', () => {
+  it('collapses Loomix\'s own data-quoted-html reply island', () => {
     document.body.innerHTML = `
       <p>my answer</p>
       <div>On Jul 20, John &lt;j@example.com&gt; wrote:</div>
@@ -139,7 +139,7 @@ describe('setupQuoteCollapse', () => {
   });
 
   it('collapses a bare blockquote preceded by an attribution line ending in a colon', () => {
-    // Shape of a Bulwark reply to a plain-text original (issue #480 follow-up):
+    // Shape of a Loomix reply to a plain-text original (issue #480 follow-up):
     // no type/class on the blockquote, attribution in the preceding <p>.
     document.body.innerHTML = `
       <div>

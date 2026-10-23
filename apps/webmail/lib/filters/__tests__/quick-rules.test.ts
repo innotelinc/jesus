@@ -184,7 +184,7 @@ describe('applyQuickRule', () => {
     actions: [{ type: 'move', value: 'X', mailboxId }],
   });
 
-  it('puts a new rule at the top of the Bulwark rules', () => {
+  it('puts a new rule at the top of the Loomix rules', () => {
     const existing = [rule({ id: 'a', conditions: [{ field: 'subject', comparator: 'contains', value: 'x' }] })];
     const outcome = applyQuickRule(existing, candidate('anna@acme.com'));
     expect(outcome.kind).toBe('created');

@@ -303,7 +303,7 @@ export function FilterSettings() {
     typeof redirectLimit === "number" && redirectLimit > 0 && worstCaseForwards(runOrder) > redirectLimit;
   // A limit of 0: the server runs no redirect, so the rules' forwards do nothing.
   const forwardsIgnored = redirectLimit === 0 && worstCaseForwards(rules) > 0;
-  // The edited rule where it is; a new one goes below Bulwark's own rules.
+  // The edited rule where it is; a new one goes below Loomix's own rules.
   const editedIndex = editingRule ? rules.findIndex((r) => r.id === editingRule.id) : -1;
   const forwardsOfEdited = forwardsAround(
     runOrder,

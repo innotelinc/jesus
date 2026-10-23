@@ -75,9 +75,9 @@ describe('checkPluginManifest', () => {
     expect(warnings.join()).toMatch(/\*\.com/);
   });
 
-  it('refuses a plugin that needs a newer Bulwark', () => {
+  it('refuses a plugin that needs a newer Loomix', () => {
     expect(checkPluginManifest({ ...BASE, minAppVersion: '9.0.0' }, { appVersion: '1.9.2' }).errors.join())
-      .toMatch(/Needs Bulwark 9\.0\.0/);
+      .toMatch(/Needs Loomix 9\.0\.0/);
   });
 
   it('refuses a privileged plugin without crypto:full', () => {

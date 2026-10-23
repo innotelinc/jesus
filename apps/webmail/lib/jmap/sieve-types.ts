@@ -38,7 +38,7 @@ export type FilterComparator =
   //                joanna@acme.com)
   //   domain_is  → the domain part equals `value` (acme.com, but neither
   //                sub.acme.com nor acme.com.evil)
-  // Older Bulwark versions read these as `header :contains`, so a script
+  // Older Loomix versions read these as `header :contains`, so a script
   // they save keeps working, only less strictly.
   | 'address_is' | 'domain_is'
   // For field === 'all': any message at all.

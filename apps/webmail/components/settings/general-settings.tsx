@@ -12,7 +12,7 @@ import { IS_LITE } from '@/lib/lite';
 
 /**
  * The General page: language and time, which links the browser hands to
- * Bulwark (the former Default apps tab; its handler routes do not exist in
+ * Loomix (the former Default apps tab; its handler routes do not exist in
  * the static Lite build), and the getting-started tour.
  */
 export function GeneralSettings({ supportsCalendar }: { supportsCalendar: boolean }) {

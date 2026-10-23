@@ -209,7 +209,7 @@ export interface AuditEntry {
 
 /** Config keys that map to environment variables */
 export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: string; fileKey?: string; type: 'string' | 'boolean' | 'url' | 'enum' | 'json'; defaultValue: unknown; enumValues?: string[] }> = {
-  appName: { envVar: 'APP_NAME', type: 'string', defaultValue: 'Webmail' },
+  appName: { envVar: 'APP_NAME', type: 'string', defaultValue: 'Loomix Mail' },
   appShortName: { envVar: 'APP_SHORT_NAME', type: 'string', defaultValue: '' },
   appDescription: { envVar: 'APP_DESCRIPTION', type: 'string', defaultValue: '' },
   searchEngineIndexing: { envVar: 'SEARCH_ENGINE_INDEXING', type: 'boolean', defaultValue: false },
@@ -221,16 +221,16 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   stalwartJmapPassthroughEnabled: { envVar: 'STALWART_JMAP_PASSTHROUGH_ENABLED', type: 'boolean', defaultValue: true },
   demoMode: { envVar: 'DEMO_MODE', type: 'boolean', defaultValue: false },
   devMode: { envVar: 'DEV_MOCK_JMAP', type: 'boolean', defaultValue: false },
-  faviconUrl: { envVar: 'FAVICON_URL', type: 'url', defaultValue: '/branding/Bulwark_Favicon.svg' },
+  faviconUrl: { envVar: 'FAVICON_URL', type: 'url', defaultValue: '/branding/Loomix_Favicon.svg' },
   pwaIconUrl: { envVar: 'PWA_ICON_URL', type: 'url', defaultValue: '' },
   pwaScreenshotMobileUrl: { envVar: 'PWA_SCREENSHOT_MOBILE_URL', type: 'url', defaultValue: '' },
   pwaScreenshotDesktopUrl: { envVar: 'PWA_SCREENSHOT_DESKTOP_URL', type: 'url', defaultValue: '' },
-  pwaThemeColor: { envVar: 'PWA_THEME_COLOR', type: 'string', defaultValue: '#ffffff' },
+  pwaThemeColor: { envVar: 'PWA_THEME_COLOR', type: 'string', defaultValue: '#4f46e5' },
   pwaBackgroundColor: { envVar: 'PWA_BACKGROUND_COLOR', type: 'string', defaultValue: '#ffffff' },
   appLogoLightUrl: { envVar: 'APP_LOGO_LIGHT_URL', type: 'url', defaultValue: '' },
   appLogoDarkUrl: { envVar: 'APP_LOGO_DARK_URL', type: 'url', defaultValue: '' },
-  loginLogoLightUrl: { envVar: 'LOGIN_LOGO_LIGHT_URL', type: 'url', defaultValue: '/branding/Bulwark_Logo_Color.svg' },
-  loginLogoDarkUrl: { envVar: 'LOGIN_LOGO_DARK_URL', type: 'url', defaultValue: '/branding/Bulwark_Logo_White.svg' },
+  loginLogoLightUrl: { envVar: 'LOGIN_LOGO_LIGHT_URL', type: 'url', defaultValue: '/branding/Loomix_Mark.svg' },
+  loginLogoDarkUrl: { envVar: 'LOGIN_LOGO_DARK_URL', type: 'url', defaultValue: '/branding/Loomix_Mark.svg' },
   loginCompanyName: { envVar: 'LOGIN_COMPANY_NAME', type: 'string', defaultValue: '' },
   loginImprintUrl: { envVar: 'LOGIN_IMPRINT_URL', type: 'url', defaultValue: '' },
   loginPrivacyPolicyUrl: { envVar: 'LOGIN_PRIVACY_POLICY_URL', type: 'url', defaultValue: '' },
@@ -290,13 +290,13 @@ export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: strin
   // is sent and the provider shows its own signed-out page.
   oauthPostLogoutRedirectUri: { envVar: 'OAUTH_POST_LOGOUT_REDIRECT_URI', type: 'url', defaultValue: '' },
   allowCustomJmapEndpoint: { envVar: 'ALLOW_CUSTOM_JMAP_ENDPOINT', type: 'boolean', defaultValue: false },
-  // What being a Stalwart admin grants inside the Bulwark admin dashboard (#870).
+  // What being a Stalwart admin grants inside the Loomix admin dashboard (#870).
   //   auto     - Stalwart admins see the shield and are signed into /admin
-  //              without the Bulwark admin password (legacy behaviour).
-  //   password - Stalwart admins see the shield, but must enter the Bulwark
+  //              without the Loomix admin password (legacy behaviour).
+  //   password - Stalwart admins see the shield, but must enter the Loomix
   //              admin password like everyone else.
   //   off      - Stalwart admin status is ignored; /admin is reachable only
-  //              via /admin/login with the Bulwark admin password.
+  //              via /admin/login with the Loomix admin password.
   // "password" and "off" require an admin password to be configured, or the
   // dashboard would become unreachable.
   stalwartAdminAccess: { envVar: 'STALWART_ADMIN_ACCESS', type: 'enum', defaultValue: 'auto', enumValues: ['auto', 'password', 'off'] },

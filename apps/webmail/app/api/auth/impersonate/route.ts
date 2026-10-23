@@ -36,7 +36,7 @@ function impersonationCookieOptions() {
  * GET /api/auth/impersonate?token=<jwt>
  *
  * Master-user impersonation via signed JWT. The token carries the target
- * mailbox; Bulwark verifies the signature, resolves the configured Stalwart
+ * mailbox; Loomix verifies the signature, resolves the configured Stalwart
  * master credentials from env, then mints the same session cookies the
  * password-login path produces. The browser is redirected to "/?impersonated=1" (see
  * ImpersonationReconciler, GH #646) and the SPA hydrates as if the user had

@@ -690,7 +690,7 @@ export async function enableWebPush(
   //   - a different deviceClientId: could be another live device or the mobile
   //     app on this account. Ask the relay whether it's still alive and only
   //     reap the ones it confirms are dead. Anything live - or anything the
-  //     relay can't vouch for (a different relay, a non-Bulwark client, a
+  //     relay can't vouch for (a different relay, a non-Loomix client, a
   //     network blip) - is left untouched.
   for (const s of existingSubs) {
     if (s.id === storedServerId) continue;
@@ -795,7 +795,7 @@ export interface PushDevice {
  * Stalwart hides a subscription's url and verified state from clients, so
  * deviceClientId is the only handle we get. That's enough to spot our own
  * registration and to ask the relay about the rest - but registrations made
- * against a different relay, or by a non-Bulwark client, come back `unknown`
+ * against a different relay, or by a non-Loomix client, come back `unknown`
  * rather than dead, and the UI must present them as revocable-but-unclassified.
  */
 export async function listPushDevices(params: {

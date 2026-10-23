@@ -18,7 +18,7 @@ const intlMiddleware = createIntlMiddleware(routing);
 /**
  * next-intl uses best-fit locale matching, which can rank `zh` ahead of
  * `zh-TW` for regional Traditional Chinese tags such as `zh-HK`. Collapse a
- * Chinese Accept-Language list to the exact locale selected by Bulwark's
+ * Chinese Accept-Language list to the exact locale selected by Loomix's
  * script/region-aware matcher before handing the request to next-intl. URL
  * prefixes and the NEXT_LOCALE cookie still keep their higher precedence.
  */

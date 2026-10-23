@@ -104,7 +104,7 @@ describe('config API route', () => {
     expect(config.loginImprintUrl).toBe('');
     expect(config.loginPrivacyPolicyUrl).toBe('');
     expect(config.loginWebsiteUrl).toBe('');
-    expect(config.faviconUrl).toBe('/branding/Bulwark_Favicon.svg');
+    expect(config.faviconUrl).toBe('/branding/Loomix_Favicon.svg');
     expect(config.appLogoLightUrl).toBe('');
     expect(config.appLogoDarkUrl).toBe('');
     expect(config.sourceCodeUrl).toBe('');

@@ -478,7 +478,7 @@ describe('pair/create password step-up', () => {
     const [method, args] = (JSON.parse(setCall!.body) as { methodCalls: [string, Record<string, unknown>][] }).methodCalls[0];
     expect(method).toBe('x:AppPassword/set');
     const created = (args.create as Record<string, Record<string, unknown>>).imp;
-    expect(created.description).toMatch(/^Bulwark mobile \(paired \d{4}-\d{2}-\d{2}\)$/);
+    expect(created.description).toMatch(/^Loomix mobile \(paired \d{4}-\d{2}-\d{2}\)$/);
     expect(created).not.toHaveProperty('expiresAt');
 
     const redeemed = await redeem(res.body.pairing_code);

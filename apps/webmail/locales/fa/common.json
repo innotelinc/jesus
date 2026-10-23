@@ -61,8 +61,8 @@
     "demo_tagline": "تجربه یک سرویس ایمیل کامل. بدون نیاز به حساب کاربری.",
     "demo_no_signup": "نیازی به ثبت‌نام نیست - آزادانه با داده‌های نمونه کاوش کنید",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "برنامه‌های پیش‌فرض",
-    "description": "انتخاب کنید لینک‌های ایمیل و تقویم در Bulwark باز شوند.",
+    "description": "انتخاب کنید لینک‌های ایمیل و تقویم در Loomix باز شوند.",
     "unsupported": "این مرورگر از ثبت دستی پروتکل پشتیبانی نمی‌کند.",
     "mailto_label": "لینک‌های ایمیل",
-    "mailto_description": "باز کردن لینک‌های mailto: در Bulwark",
+    "mailto_description": "باز کردن لینک‌های mailto: در Loomix",
     "protocol_open_mode_label": "هنگام باز کردن لینک‌های پروتکل",
     "protocol_open_mode_description": "انتخاب کنید لینک‌ها در تب جدید باز شوند یا نشست فعال.",
     "protocol_open_mode_active_session": "باز کردن در نشست فعال",
     "protocol_open_mode_new_tab": "همیشه در تب جدید",
-    "focus_notification_title": "باز کردن Bulwark",
-    "focus_notification_body": "لینک در Bulwark باز شد.",
+    "focus_notification_title": "باز کردن Loomix",
+    "focus_notification_body": "لینک در Loomix باز شد.",
     "webcal_label": "لینک‌های تقویم",
-    "webcal_description": "باز کردن لینک‌های webcal: در Bulwark",
+    "webcal_description": "باز کردن لینک‌های webcal: در Loomix",
     "register_mailto": "ثبت برنامه ایمیل",
     "register_webcal": "ثبت برنامه تقویم",
     "mailto_registered": "ثبت مدیریت ایمیل درخواست شد",
@@ -869,9 +869,9 @@
     "app_title": "ایمیل تحت وب",
     "reconnecting": "ارتباط قطع شد. در حال تلاش برای اتصال مجدد…",
     "rate_limited_title": "احراز هویت سرور موقتاً محدود شده است.",
-    "rate_limited_detail": "Bulwark درخواست‌های پس‌زمینه را متوقف کرده است. تلاش مجدد در {seconds} ثانیه.",
+    "rate_limited_detail": "Loomix درخواست‌های پس‌زمینه را متوقف کرده است. تلاش مجدد در {seconds} ثانیه.",
     "rate_limited_action_title": "درخواست برای جلوگیری از قفل متوقف شد.",
-    "rate_limited_action_detail": "Bulwark منتظر پایان زمان انتظار سرور است. در {seconds} ثانیه دوباره تلاش کنید.",
+    "rate_limited_action_detail": "Loomix منتظر پایان زمان انتظار سرور است. در {seconds} ثانیه دوباره تلاش کنید.",
     "pull_to_refresh": "برای تازه‌سازی بکشید",
     "release_to_refresh": "برای تازه‌سازی رها کنید",
     "refreshing": "در حال تازه‌سازی…"
@@ -1296,13 +1296,13 @@
         "title": "اعلان‌های پس‌زمینه",
         "description": "دریافت اعلان‌های سیستم برای ایمیل جدید",
         "relay_label": "رله push",
-        "relay_desc": "پیش‌فرض رله میزبانی شده Bulwark",
+        "relay_desc": "پیش‌فرض رله میزبانی شده Loomix",
         "relay_locked": "تنظیم شده توسط مدیر",
         "relay_locked_desc": "قابل تغییر نیست",
         "status_active": "فعال روی این دستگاه",
         "status_inactive": "فعال نشده",
         "status_unsupported": "مرورگر پشتیبانی نمی‌کند",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "در حال کار…",
         "enable": "فعال کردن",
         "reenable": "ثبت مجدد",
@@ -1878,10 +1878,10 @@
       },
       "link_device": {
         "title": "اتصال موبایل",
-        "description": "بدون وارد کردن رمز عبور در گوشی، به برنامه Bulwark Mail وارد شوید. گوشی شما ورود جداگانه‌ای دریافت می‌کند، بنابراین خروج از اینجا باعث خروج آن نمی‌شود.",
+        "description": "بدون وارد کردن رمز عبور در گوشی، به برنامه Loomix Mail وارد شوید. گوشی شما ورود جداگانه‌ای دریافت می‌کند، بنابراین خروج از اینجا باعث خروج آن نمی‌شود.",
         "generate": "نمایش QR",
         "regenerate": "کد جدید",
-        "instructions": "برنامه Bulwark Mail را باز کنید و در صفحه ورود روی \"Scan a sign-in code\" بزنید (یا اگر از قبل وارد شده‌اید، \"Add account\" → \"Scan a sign-in code\")، سپس دوربین را به این سمت بگیرید.",
+        "instructions": "برنامه Loomix Mail را باز کنید و در صفحه ورود روی \"Scan a sign-in code\" بزنید (یا اگر از قبل وارد شده‌اید، \"Add account\" → \"Scan a sign-in code\")، سپس دوربین را به این سمت بگیرید.",
         "expires_in": "منقضی در {seconds} ثانیه",
         "expired": "منقضی شده",
         "error": "خطا",
@@ -2128,7 +2128,7 @@
         "button": "وارد کردن"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "کد منبع"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "مدیریت قانون‌ها",
       "senders_count": "{count, plural, one {# فرستنده} other {# فرستنده}}",
       "cross_account": "پیام‌هایی از یک حساب انتخاب کنید",
-      "opaque_hint": "فیلترهای شما دستی ویرایش شده‌اند. تنظیمات فیلترها را باز کنید",
+      "opaque_hint": "فیلترهای شما دستی ویرایش شده‌اند. تنظیمات فیلترها را باز کنید"
+,
       "loading": "در حال بارگذاری قوانین…",
       "load_failed": "بارگذاری قوانین ممکن نشد",
       "none": "هنوز قانونی وجود ندارد",
@@ -3771,7 +3772,7 @@
     "start_tour": "شروع تور"
   },
   "demo_welcome": {
-    "title": "به Bulwark Mail خوش آمدید",
+    "title": "به Loomix Mail خوش آمدید",
     "description": "یک سرویس ایمیل کامل را در مرورگر خود کاوش کنید.",
     "feature_email": "خواندن و نوشتن ایمیل",
     "feature_organize": "برچسب‌ها، ستاره‌ها و پوشه‌ها",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "استفاده از حساب‌هایی که متصل می‌کنید",
-        "body": "ارسال درخواست از طریق سرور Bulwark با حساب یا کلیدی که شما یا مدیرتان راه‌اندازی کرده‌اید. افزونه هرگز گذرواژه را نمی‌بیند، اما می‌تواند هر کاری را که آن حساب روی سرور خودش می‌تواند انجام دهد، انجام دهد."
+        "body": "ارسال درخواست از طریق سرور Loomix با حساب یا کلیدی که شما یا مدیرتان راه‌اندازی کرده‌اید. افزونه هرگز گذرواژه را نمی‌بیند، اما می‌تواند هر کاری را که آن حساب روی سرور خودش می‌تواند انجام دهد، انجام دهد."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "اتصال {label}",
-      "intro_password": "{name} می‌خواهد از حساب {label} شما استفاده کند. Bulwark گذرواژه را روی سرور خودش نگه می‌دارد و فقط آن را به {host} می‌فرستد. افزونه هرگز آن را نمی‌بیند.",
-      "intro_password_any": "{name} می‌خواهد از حساب {label} شما استفاده کند. Bulwark گذرواژه را روی سرور خودش نگه می‌دارد و فقط آن را به سروری که اینجا وارد می‌کنید می‌فرستد. افزونه هرگز آن را نمی‌بیند.",
-      "intro_signin": "{name} می‌خواهد به حساب {label} شما وارد شود. سرور را اینجا وارد کنید، سپس در صفحهٔ خود آن سرور وارد شوید. Bulwark دسترسی‌ای را که می‌گیرد روی سرور خودش نگه می‌دارد؛ افزونه هرگز آن را نمی‌بیند.",
+      "intro_password": "{name} می‌خواهد از حساب {label} شما استفاده کند. Loomix گذرواژه را روی سرور خودش نگه می‌دارد و فقط آن را به {host} می‌فرستد. افزونه هرگز آن را نمی‌بیند.",
+      "intro_password_any": "{name} می‌خواهد از حساب {label} شما استفاده کند. Loomix گذرواژه را روی سرور خودش نگه می‌دارد و فقط آن را به سروری که اینجا وارد می‌کنید می‌فرستد. افزونه هرگز آن را نمی‌بیند.",
+      "intro_signin": "{name} می‌خواهد به حساب {label} شما وارد شود. سرور را اینجا وارد کنید، سپس در صفحهٔ خود آن سرور وارد شوید. Loomix دسترسی‌ای را که می‌گیرد روی سرور خودش نگه می‌دارد؛ افزونه هرگز آن را نمی‌بیند.",
       "server": "آدرس سرور",
       "server_hint": "cloud.example.com",
       "username": "نام کاربری",

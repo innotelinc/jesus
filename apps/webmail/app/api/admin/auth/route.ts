@@ -17,7 +17,7 @@ import { getStalwartAdminAccessMode, type StalwartAdminAccessMode } from '@/lib/
  *
  * `x:Tenant/query` requires `sysTenantQuery`, which Stalwart's default roles
  * grant to the server-wide superuser only. The dashboard configures the
- * whole instance, and Bulwark has no notion of tenants, so an admin of one
+ * whole instance, and Loomix has no notion of tenants, so an admin of one
  * tenant must not pass: `x:Account/query` (the probe this replaced) also
  * answers for tenant admins, whose role carries `sysAccount*`
  * (GHSA-v6hr). A result means superuser; a method error (typically
@@ -42,9 +42,9 @@ async function fetchWithTimeout(url: string, init: Parameters<typeof fetch>[1]):
 }
 
 async function checkStalwartAdmin(request: NextRequest, mode: StalwartAdminAccessMode): Promise<boolean> {
-  // Operators who keep Stalwart and Bulwark administration separate (#870)
+  // Operators who keep Stalwart and Loomix administration separate (#870)
   // turn the check off entirely: no shield, no auto-login, and nothing
-  // about the Stalwart account influences the Bulwark admin dashboard.
+  // about the Stalwart account influences the Loomix admin dashboard.
   if (mode === 'off') return false;
 
   // When users may connect to arbitrary JMAP servers, the cookie-stored

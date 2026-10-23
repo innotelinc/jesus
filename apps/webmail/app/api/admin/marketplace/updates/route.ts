@@ -29,7 +29,7 @@ const EMPTY: UpdatesAnswer = { updates: [], yanked: [], deprecated: [], suspende
  * GET /api/admin/marketplace/updates
  *
  * Asks the directory about every installed extension that came from it (or
- * predates the record of where it came from): newer versions this Bulwark
+ * predates the record of where it came from): newer versions this Loomix
  * can run, versions the publisher withdrew, deprecations, suspensions and
  * security advisories. Also lists what is installed, so the marketplace can
  * show the "Installed" view from one request.

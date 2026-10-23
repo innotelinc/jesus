@@ -35,7 +35,7 @@ const METADATA_END = '@metadata:end */';
 const NEXTCLOUD_BLOCK_MARKER = "### Nextcloud Mail: Filters ### DON'T EDIT ###";
 
 const BULWARK_EXTERNAL_HEADER_RE =
-  /^[ \t]*#[ \t]*---[ \t]*External rules \(managed outside Bulwark\)[ \t]*---[ \t]*\r?\n/m;
+  /^[ \t]*#[ \t]*---[ \t]*External rules \(managed outside Loomix\)[ \t]*---[ \t]*\r?\n/m;
 
 const FIELD_FROM_HEADER: Record<string, FilterConditionField> = {
   from: 'from',
@@ -868,7 +868,7 @@ export function parseScript(content: string): ParseResult {
     }
 
     // Scan the portion AFTER the metadata block for external rules. A prior
-    // Bulwark save may have emitted its "External rules" header here; strip
+    // Loomix save may have emitted its "External rules" header here; strip
     // it so it does not get re-attached to the first external rule's rawBlock
     // and written out twice on the next save.
     const afterMetadata = stripBulwarkExternalHeader(
@@ -890,7 +890,7 @@ export function parseScript(content: string): ParseResult {
     // Drop any external "rules" that are really the bulwark-managed if-blocks or vacation.
     // Recognizable by the leading comment "# Rule: <name>" or "# Vacation auto-reply".
     // This applies regardless of whether the block parsed as a structured rule or
-    // fell back to opaque - a Bulwark-emitted block may fail to round-trip cleanly
+    // fell back to opaque - a Loomix-emitted block may fail to round-trip cleanly
     // (e.g. a value with literal braces) but the `# Rule: <name>` marker still
     // identifies it as ours.
     const filteredExternal = external.rules.filter(r => {
@@ -907,7 +907,7 @@ export function parseScript(content: string): ParseResult {
       }
       if (/#\s*Vacation auto-reply/i.test(raw)) return false;
       // The generator writes the forwarding block from the metadata again.
-      // Only written while switched on, so only then is such a block Bulwark's.
+      // Only written while switched on, so only then is such a block Loomix's.
       if (metadata.vacationForward?.enabled && VACATION_FORWARD_MARKER_RE.test(raw)) return false;
       return true;
     });

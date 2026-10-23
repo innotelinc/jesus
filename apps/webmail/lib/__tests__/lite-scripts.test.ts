@@ -112,7 +112,7 @@ describe('lite build helpers', () => {
     expect(applyLiteConfig(empty).allowCustomJmapEndpoint).toBe(true);
     expect(empty.rememberMeEnabled).toBe(true);
     expect(empty.demoMode).toBe(false);
-    expect(empty.appName).toBe('Bulwark Webmail');
+    expect(empty.appName).toBe('Loomix Mail');
 
     const fixed = buildLiteConfig({ LITE_JMAP_SERVER_URL: 'https://mail.example.com/', LITE_APP_NAME: 'Acme', LITE_DEMO_MODE: 'true', LITE_REMEMBER_ME: 'false' });
     expect(fixed.jmapServerUrl).toBe('https://mail.example.com');
@@ -226,7 +226,7 @@ describe('lite build helpers', () => {
     expect(buildCaddyExample({ basePath: '', connectSrc: 'https://m.example' })).toMatch(/Content-Security-Policy "[^"]*connect-src 'self' https:\/\/m\.example/);
     expect(buildReadme({ version: '1.10.0', commit: 'abc1234', basePath: '/w', locales: ['en'] })).toContain('unzip into `<web root>/w`');
     const readme = buildReadme({ version: '1.10.0', commit: 'abc1234', basePath: '/w', locales: ['en'], jmapServerUrl: 'https://m.example', demoMode: true });
-    expect(readme).toContain('# Bulwark Lite 1.10.0 (abc1234)');
+    expect(readme).toContain('# Loomix Lite 1.10.0 (abc1234)');
     expect(readme).toContain('Demo mode is ON');
     expect(readme).toContain('permissive-cors = true');
     expect(readme).toContain('currently `https://m.example`');
@@ -493,7 +493,7 @@ describe('Stalwart target: entry document logic (runs in the browser)', () => {
 
   it('points a prerendered shell at the mount, in markup and in the inline RSC payload', () => {
     const shell = '<!DOCTYPE html><html><head><link rel="stylesheet" href="/_next/static/chunks/a.css"/>'
-      + '<link rel="manifest" href="/manifest.webmanifest"/><link rel="icon" href="/branding/Bulwark_Favicon.svg"/>'
+      + '<link rel="manifest" href="/manifest.webmanifest"/><link rel="icon" href="/branding/Loomix_Favicon.svg"/>'
       + '<script src="/_next/static/chunks/b.js" async=""></script></head><body>'
       + '<script>self.__next_f.push([1,"2:I[1,[\\"/_next/static/chunks/c.js\\"],\\"default\\"]\\n"])</script></body></html>';
     const out = rewriteShellForMount(shell, '/webmail', 'b 1', '<script>BOOT</script>');
@@ -502,7 +502,7 @@ describe('Stalwart target: entry document logic (runs in the browser)', () => {
     expect(out).toContain('src="/webmail/_next/static/chunks/b.js"');
     expect(out).toContain('\\"/webmail/_next/static/chunks/c.js\\"');
     expect(out).toContain('href="/webmail/manifest.json?v=b%201"');
-    expect(out).toContain('href="/webmail/branding/Bulwark_Favicon.svg"');
+    expect(out).toContain('href="/webmail/branding/Loomix_Favicon.svg"');
     expect(out).not.toMatch(/"\/_next\//);
     // At the site root nothing moves, the boot script still goes in.
     expect(rewriteShellForMount('<head></head>', '', 'b', 'X')).toBe('<head>X</head>');

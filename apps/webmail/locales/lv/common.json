@@ -61,8 +61,8 @@
     "demo_tagline": "Izmēģiniet pilnvērtīgu e-pasta klientu bez konta izveides.",
     "demo_no_signup": "Reģistrācija nav nepieciešama - brīvi pētiet paraugdatus",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Noklusējuma lietotnes",
-    "description": "Izvēlieties, vai e-pasta un kalendāra saites atvērt Bulwark. Tehniski Bulwark reģistrējas kā protokola apstrādātājs mailto: un webcal: saitēm.",
+    "description": "Izvēlieties, vai e-pasta un kalendāra saites atvērt Loomix. Tehniski Loomix reģistrējas kā protokola apstrādātājs mailto: un webcal: saitēm.",
     "unsupported": "Šī pārlūkprogramma vai savienojums neatbalsta manuālu protokola apstrādātāja reģistrāciju. Iespējams, instalēto PWA joprojām var izmantot pārlūkprogrammas vai sistēmas iestatījumos.",
     "mailto_label": "E-pasta saites",
-    "mailto_description": "Atver mailto: saites Bulwark ar iepriekš aizpildītu ziņojuma redaktoru.",
+    "mailto_description": "Atver mailto: saites Loomix ar iepriekš aizpildītu ziņojuma redaktoru.",
     "protocol_open_mode_label": "Atverot protokola saites",
-    "protocol_open_mode_description": "Izvēlieties, vai Bulwark atver mailto: un webcal: saites jaunā cilnē vai atkārtoti izmanto atvērtu sesiju. Aktīvās sesijas opcijai nepieciešama paziņojumu atļauja, lai jūs varētu noklikšķināt uz rezerves paziņojuma un izcelt Bulwark priekšplānā, ja pārlūkprogramma bloķē fokusu.",
+    "protocol_open_mode_description": "Izvēlieties, vai Loomix atver mailto: un webcal: saites jaunā cilnē vai atkārtoti izmanto atvērtu sesiju. Aktīvās sesijas opcijai nepieciešama paziņojumu atļauja, lai jūs varētu noklikšķināt uz rezerves paziņojuma un izcelt Loomix priekšplānā, ja pārlūkprogramma bloķē fokusu.",
     "protocol_open_mode_active_session": "Ja iespējams, atvērt aktīvajā sesijā",
     "protocol_open_mode_new_tab": "Vienmēr atvērt jaunu cilni",
-    "focus_notification_title": "Atvērt Bulwark",
-    "focus_notification_body": "Saite tika atvērta Bulwark. Noklikšķiniet, lai izceltu logu priekšplānā.",
+    "focus_notification_title": "Atvērt Loomix",
+    "focus_notification_body": "Saite tika atvērta Loomix. Noklikšķiniet, lai izceltu logu priekšplānā.",
     "webcal_label": "Kalendāra saites",
-    "webcal_description": "Atver webcal: saites Bulwark ar iepriekš aizpildītu kalendāra abonēšanas dialogu.",
+    "webcal_description": "Atver webcal: saites Loomix ar iepriekš aizpildītu kalendāra abonēšanas dialogu.",
     "register_mailto": "Reģistrēt e-pasta lietotni",
     "register_webcal": "Reģistrēt kalendāra lietotni",
     "mailto_registered": "E-pasta apstrādātāja reģistrācija pieprasīta",
@@ -196,7 +196,7 @@
     "registration_failed": "Protokola apstrādātāja reģistrācija neizdevās",
     "opening_mailto": "Tiek atvērts redaktors...",
     "opening_webcal": "Tiek atvērts kalendārs...",
-    "browser_note": "Pārlūkprogramma vai operētājsistēma var lūgt apstiprinājumu un var prasīt, lai Bulwark būtu instalēts, pirms to var izvēlēties kā noklusējuma lietotni.",
+    "browser_note": "Pārlūkprogramma vai operētājsistēma var lūgt apstiprinājumu un var prasīt, lai Loomix būtu instalēts, pirms to var izvēlēties kā noklusējuma lietotni.",
     "select_account_title": "Izvēlieties kontu",
     "select_mailto_account": "Izvēlieties, kurā kontā atvērt šo e-pasta saiti.",
     "select_webcal_account": "Izvēlieties, kurā kontā atvērt šo kalendāra saiti.",
@@ -869,9 +869,9 @@
     "app_title": "Tīmekļa pasts",
     "reconnecting": "Savienojums pārtraukts. Mēģina izveidot savienojumu...",
     "rate_limited_title": "Autentifikācija serverī ir īslaicīgi ierobežota.",
-    "rate_limited_detail": "Bulwark ir apturējis fonā veiktos pieprasījumus, lai izvairītos no bloķēšanas. Mēģinās vēlreiz pēc {seconds} s.",
+    "rate_limited_detail": "Loomix ir apturējis fonā veiktos pieprasījumus, lai izvairītos no bloķēšanas. Mēģinās vēlreiz pēc {seconds} s.",
     "rate_limited_action_title": "Pieprasījums apturēts, lai izvairītos no bloķēšanas.",
-    "rate_limited_action_detail": "Bulwark gaida servera noildzes beigas pirms jaunu autentificētu pieprasījumu sūtīšanas. Mēģiniet vēlreiz pēc {seconds} s.",
+    "rate_limited_action_detail": "Loomix gaida servera noildzes beigas pirms jaunu autentificētu pieprasījumu sūtīšanas. Mēģiniet vēlreiz pēc {seconds} s.",
     "pull_to_refresh": "Velciet, lai atsvaidzinātu",
     "release_to_refresh": "Atlaidiet, lai atsvaidzinātu",
     "refreshing": "Atsvaidzina…"
@@ -1328,13 +1328,13 @@
       "push": {
         "confirm_disable_message": "Šī ierīce vairs nesaņems brīdinājumus, kad vietne būs aizvērta.",
         "confirm_disable_title": "Atspējot fona paziņojumus?",
-        "description": "Saņem sistēmas paziņojumus par jaunu pastu, kad šī vietne ir aizvērta. Piegādāts caur Bulwark push releju; relejs nekad neredz pasta saturu.",
+        "description": "Saņem sistēmas paziņojumus par jaunu pastu, kad šī vietne ir aizvērta. Piegādāts caur Loomix push releju; relejs nekad neredz pasta saturu.",
         "disable": "Atspējot",
         "enable": "Iespējot",
         "dismiss_aria": "Aizvērt paziņojumu uzaicinājumu",
         "ios_hint": "Operētājsistēmā iOS vispirms instalējiet vietni sākuma ekrānā – Safari piegādā Web Push tikai instalētajām PWA.",
         "reenable": "Reģistrēt vēlreiz",
-        "relay_desc": "Pēc noklusējuma izmanto izmitināto Bulwark releju. Mainiet tikai tad, ja izmitināt pats.",
+        "relay_desc": "Pēc noklusējuma izmanto izmitināto Loomix releju. Mainiet tikai tad, ja izmitināt pats.",
         "relay_label": "Push relejs",
         "relay_locked": "Iestatījis administrators",
         "relay_locked_desc": "Push releja URL ir iestatījis administrators, un to nevar mainīt.",
@@ -1342,7 +1342,7 @@
         "status_busy": "Notiek darbs…",
         "status_inactive": "Nav iespējots šajā ierīcē",
         "status_unsupported": "Šī pārlūkprogramma neatbalsta Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "title": "Fona paziņojumi",
         "devices_title": "Reģistrētās ierīces",
         "devices_desc": "Visas ierīces, kas reģistrētas šī konta fona paziņojumu saņemšanai. Atsaucot ierīci, tā nekavējoties pārstāj tās saņemt.",
@@ -1871,10 +1871,10 @@
       },
       "link_device": {
         "title": "Saistīt mobilo lietotni",
-        "description": "Pierakstieties Bulwark Mail lietotnē savā tālrunī, tur neievadot paroli. Tālrunis saņem savu pierakstīšanos, tāpēc izrakstīšanās šeit to neizraksta.",
+        "description": "Pierakstieties Loomix Mail lietotnē savā tālrunī, tur neievadot paroli. Tālrunis saņem savu pierakstīšanos, tāpēc izrakstīšanās šeit to neizraksta.",
         "generate": "Rādīt QR kodu",
         "regenerate": "Rādīt jaunu kodu",
-        "instructions": "Atveriet Bulwark Mail lietotni un pierakstīšanās ekrānā pieskarieties \"Scan a sign-in code\" (vai \"Add account\" → \"Scan a sign-in code\", ja jau esat pierakstījies), pēc tam pavērsiet kameru šeit.",
+        "instructions": "Atveriet Loomix Mail lietotni un pierakstīšanās ekrānā pieskarieties \"Scan a sign-in code\" (vai \"Add account\" → \"Scan a sign-in code\", ja jau esat pierakstījies), pēc tam pavērsiet kameru šeit.",
         "expires_in": "Šī koda derīgums beigsies pēc {seconds} sekundēm. To var izmantot tikai vienu reizi.",
         "expired": "Šī koda derīgums ir beidzies.",
         "error": "Neizdevās izveidot pārošanas kodu. Lūdzu, mēģiniet vēlreiz.",
@@ -2121,7 +2121,7 @@
         "contacts_description": "Kontaktu sinhronizācija, adrešu grāmatu darbības un uzticamie sūtītāji"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "Pirmkods"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "Pārvaldīt noteikumus",
       "senders_count": "{count, plural, zero {# sūtītājiem} one {# sūtītāja} other {# sūtītājiem}}",
       "cross_account": "Izvēlieties vēstules no viena konta",
-      "opaque_hint": "Jūsu filtri ir rediģēti manuāli. Atveriet filtru iestatījumus",
+      "opaque_hint": "Jūsu filtri ir rediģēti manuāli. Atveriet filtru iestatījumus"
+,
       "loading": "Ielādē kārtulas…",
       "load_failed": "Neizdevās ielādēt kārtulas",
       "none": "Vēl nav kārtulu",
@@ -3729,7 +3730,7 @@
     "start_tour": "Sākt ekskursiju"
   },
   "demo_welcome": {
-    "title": "Laipni lūdzam Bulwark Mail",
+    "title": "Laipni lūdzam Loomix Mail",
     "description": "Atklājiet pilnvērtīgu tīmekļa e-pasta klientu tieši pārlūkā. Visi dati tiek glabāti jūsu ierīcē.",
     "feature_email": "Vēstuļu lasīšana un rakstīšana",
     "feature_organize": "Etiķetes, zvaigznītes un mapes",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "Izmantot jūsu savienotos kontus",
-        "body": "Sūtīt pieprasījumus caur Bulwark serveri ar kontu vai atslēgu, ko iestatījāt jūs vai jūsu administrators. Spraudnis nekad neredz paroli, taču tas var darīt visu, ko šis konts var darīt savā serverī."
+        "body": "Sūtīt pieprasījumus caur Loomix serveri ar kontu vai atslēgu, ko iestatījāt jūs vai jūsu administrators. Spraudnis nekad neredz paroli, taču tas var darīt visu, ko šis konts var darīt savā serverī."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "Savienot {label}",
-      "intro_password": "{name} vēlas izmantot jūsu {label} kontu. Bulwark glabā paroli savā serverī un sūta to tikai uz {host}. Spraudnis to nekad neredz.",
-      "intro_password_any": "{name} vēlas izmantot jūsu {label} kontu. Bulwark glabā paroli savā serverī un sūta to tikai uz serveri, ko šeit ievadāt. Spraudnis to nekad neredz.",
-      "intro_signin": "{name} vēlas pierakstīties jūsu {label} kontā. Ievadiet šeit serveri un pēc tam pierakstieties šī servera lapā. Bulwark glabā iegūto piekļuvi savā serverī; spraudnis to nekad neredz.",
+      "intro_password": "{name} vēlas izmantot jūsu {label} kontu. Loomix glabā paroli savā serverī un sūta to tikai uz {host}. Spraudnis to nekad neredz.",
+      "intro_password_any": "{name} vēlas izmantot jūsu {label} kontu. Loomix glabā paroli savā serverī un sūta to tikai uz serveri, ko šeit ievadāt. Spraudnis to nekad neredz.",
+      "intro_signin": "{name} vēlas pierakstīties jūsu {label} kontā. Ievadiet šeit serveri un pēc tam pierakstieties šī servera lapā. Loomix glabā iegūto piekļuvi savā serverī; spraudnis to nekad neredz.",
       "server": "Servera adrese",
       "server_hint": "cloud.example.com",
       "username": "Lietotājvārds",

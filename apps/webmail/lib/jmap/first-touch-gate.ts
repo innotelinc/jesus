@@ -10,7 +10,7 @@
  * a default - leaving the user with two identical "Personal" calendars, one of
  * which is flagged `isDefault` and can't be removed from the UI (#907).
  *
- * Bulwark's login fans out `Calendar/get`, `CalendarEvent/query` (and
+ * Loomix's login fans out `Calendar/get`, `CalendarEvent/query` (and
  * `AddressBook/get`, `ContactCard/query`) within a few milliseconds of each
  * other, which makes that race trivially winnable. This gate holds every later
  * request on a (collection, account) pair until the first one has settled -

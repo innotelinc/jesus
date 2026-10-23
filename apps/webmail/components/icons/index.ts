@@ -1,4 +1,4 @@
-// Bulwark's icon set. Every icon the UI draws is imported from here, so the
+// Loomix's icon set. Every icon the UI draws is imported from here, so the
 // pack behind it is a one-file decision. The export names are the app's own
 // (they started out as Lucide names); the glyphs come from Tabler Icons (MIT).
 //

@@ -133,7 +133,7 @@ export function VersionTab() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">Version</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hourly check against the Bulwark version server. Severity is decided server-side and
+            Hourly check against the Loomix version server. Severity is decided server-side and
             disable with <code>BULWARK_UPDATE_CHECK=off</code>.
           </p>
         </div>

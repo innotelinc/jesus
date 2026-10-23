@@ -15,7 +15,7 @@ export const VACATION_FORWARD_MARKER = '# Vacation forwarding';
  */
 export const VACATION_FORWARD_MARKER_RE = /^[ \t]*# Vacation forwarding[ \t]*$/m;
 
-/** Whether `value` is forwarding Bulwark can write back as it reads. */
+/** Whether `value` is forwarding Loomix can write back as it reads. */
 export function isValidVacationForward(value: unknown): value is VacationForward {
   if (!value || typeof value !== 'object') return false;
   const f = value as Record<string, unknown>;
@@ -43,7 +43,7 @@ export function withVacationPeriod(
   };
 }
 
-/** The fields Bulwark stores, in a fixed order. */
+/** The fields Loomix stores, in a fixed order. */
 export function normalizeVacationForward(forward: VacationForward): VacationForward {
   return {
     enabled: forward.enabled,

@@ -129,7 +129,7 @@ describe('renderBadgedFavicon', () => {
     // artwork the white ring separates the badge; against pale artwork the ring
     // vanishes but the deep fill is the edge. Digit contrast (white on the
     // fill) is fixed and independent of the artwork. Neither half may be
-    // dropped: a bare coloured badge was invisible on Bulwark's own red icon,
+    // dropped: a bare coloured badge was invisible on Loomix's own red icon,
     // and the flat white band that replaced it read as a sticker over the logo.
     const svg = decode(renderBadgedFavicon(BASE_SVG, 3)!);
     expect(svg).toMatch(new RegExp(`<rect[^>]*fill="${RING}"`));

@@ -3,7 +3,7 @@ import { JMAPClient } from '../jmap/client';
 
 /**
  * #907: Stalwart lazily creates an account's default calendar / address book on
- * the first request that touches the collection. When Bulwark's login burst
+ * the first request that touches the collection. When Loomix's login burst
  * fires Calendar/get and CalendarEvent/query concurrently against a clustered
  * server, each node can create its own default - duplicating the "Personal"
  * calendar. The client must therefore not put a second calendar (or contacts)

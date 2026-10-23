@@ -127,13 +127,13 @@ const emails: MockEmail[] = [
     id: 'email-001', threadId: 'thread-001', mailboxIds: { 'mb-inbox': true }, keywords: {}, size: 4200, receivedAt: daysAgo(0),
     from: [{ name: 'Sophie Müller', email: 'sophie@eurotech.example' }],
     to: [{ name: 'Dev User', email: 'dev@localhost' }], cc: [],
-    subject: 'Willkommen bei Bulwark Webmail!',
-    preview: 'Hallo! Welcome to Bulwark - a modern, open-source webmail client for Stalwart Mail Server, built fresh on JMAP.',
+    subject: 'Willkommen bei Loomix Mail!',
+    preview: 'Hallo! Welcome to Loomix - a modern, open-source webmail client for Stalwart Mail Server, built fresh on JMAP.',
     hasAttachment: false,
     textBody: [{ partId: 'p1', blobId: 'blob-001', size: 2200, type: 'text/plain' }],
     htmlBody: [],
     bodyValues: {
-      p1: { value: 'Hallo!\n\nWelcome to Bulwark - a modern, open-source webmail client for Stalwart Mail Server, built fresh on the JMAP protocol. No PHP, no 2008 architecture, no plugin-of-plugins archaeology; just clean TypeScript and Next.js, instant push, and a UI that feels like a native app instead of a Gmail polyfill.\n\nWhy JMAP matters: one TLS connection instead of long-polling, push notifications the moment new mail arrives, batched mutations so a click never waits on three round-trips, and threading stitched on the server rather than reassembled in the browser. The result is a webmail that feels quick on a flaky train Wi-Fi and quicker on fibre.\n\nMail, calendar, contacts, and files - everything Stalwart already serves, surfaced through a single window. Threaded inbox with full-text search and Sieve filters. Month, week, day and agenda views with recurring events and iMIP invitations. Multiple address books with vCard import and export. File previews backed by Stalwart\'s JMAP FileNode storage. S/MIME, templates, keyboard shortcuts, dark mode, dozens of languages - the boring stuff that should just work, working.\n\nTwo containers behind your reverse proxy of choice is all it takes to host it yourself: Stalwart for the server side, Bulwark for the client. Caddy, Traefik, nginx - pick one, there are working examples for each. Stalwart stays the source of truth, Bulwark is what you point your browser at, and the setup wizard handles the parts that would otherwise live in a config file.\n\nIt is AGPL, the codebase is small enough to read in an afternoon, and the extension directory already hosts a growing collection of plugins and themes. If something is missing, you can fork it, file an issue, or send a patch - a person will read it.\n\nBeste Grüße,\nSophie' },
+      p1: { value: 'Hallo!\n\nWelcome to Loomix - a modern, open-source webmail client for Stalwart Mail Server, built fresh on the JMAP protocol. No PHP, no 2008 architecture, no plugin-of-plugins archaeology; just clean TypeScript and Next.js, instant push, and a UI that feels like a native app instead of a Gmail polyfill.\n\nWhy JMAP matters: one TLS connection instead of long-polling, push notifications the moment new mail arrives, batched mutations so a click never waits on three round-trips, and threading stitched on the server rather than reassembled in the browser. The result is a webmail that feels quick on a flaky train Wi-Fi and quicker on fibre.\n\nMail, calendar, contacts, and files - everything Stalwart already serves, surfaced through a single window. Threaded inbox with full-text search and Sieve filters. Month, week, day and agenda views with recurring events and iMIP invitations. Multiple address books with vCard import and export. File previews backed by Stalwart\'s JMAP FileNode storage. S/MIME, templates, keyboard shortcuts, dark mode, dozens of languages - the boring stuff that should just work, working.\n\nTwo containers behind your reverse proxy of choice is all it takes to host it yourself: Stalwart for the server side, Loomix for the client. Caddy, Traefik, nginx - pick one, there are working examples for each. Stalwart stays the source of truth, Loomix is what you point your browser at, and the setup wizard handles the parts that would otherwise live in a config file.\n\nIt is AGPL, the codebase is small enough to read in an afternoon, and the extension directory already hosts a growing collection of plugins and themes. If something is missing, you can fork it, file an issue, or send a patch - a person will read it.\n\nBeste Grüße,\nSophie' },
     },
   },
   {
@@ -1039,7 +1039,7 @@ const IDENTITIES: MockIdentity[] = [
     replyTo: null,
     bcc: null,
     textSignature: 'Dev User\nBulwark Webmail Developer',
-    htmlSignature: '<p>Dev User<br><em>Bulwark Webmail Developer</em></p>',
+    htmlSignature: '<p>Dev User<br><em>Loomix Mail Developer</em></p>',
     mayDelete: false,
   },
 ];

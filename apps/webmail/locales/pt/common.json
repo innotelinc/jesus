@@ -61,8 +61,8 @@
     "demo_tagline": "Experimente um cliente de e-mail completo. Sem necessidade de conta.",
     "demo_no_signup": "Sem registo - explore livremente com dados de exemplo",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Aplicativos padrão",
-    "description": "Escolha se links de e-mail e calendário devem abrir no Bulwark. Tecnicamente, o Bulwark se registra como manipulador de protocolo para links mailto: e webcal:.",
+    "description": "Escolha se links de e-mail e calendário devem abrir no Loomix. Tecnicamente, o Loomix se registra como manipulador de protocolo para links mailto: e webcal:.",
     "unsupported": "Este navegador ou esta conexão não oferece suporte ao registro manual de manipuladores de protocolo. Talvez você ainda consiga usar o PWA instalado pelas configurações do navegador ou do sistema.",
     "mailto_label": "Links de e-mail",
-    "mailto_description": "Abre links mailto: no Bulwark com o editor preenchido previamente.",
+    "mailto_description": "Abre links mailto: no Loomix com o editor preenchido previamente.",
     "protocol_open_mode_label": "Ao abrir links de protocolo",
-    "protocol_open_mode_description": "Escolha se o Bulwark abre links mailto: e webcal: em uma nova guia ou reutiliza uma sessão aberta. A opção de sessão ativa precisa da permissão de notificações para que você possa clicar em uma notificação alternativa e trazer o Bulwark para a frente se o navegador bloquear o foco.",
+    "protocol_open_mode_description": "Escolha se o Loomix abre links mailto: e webcal: em uma nova guia ou reutiliza uma sessão aberta. A opção de sessão ativa precisa da permissão de notificações para que você possa clicar em uma notificação alternativa e trazer o Loomix para a frente se o navegador bloquear o foco.",
     "protocol_open_mode_active_session": "Abrir na sessão ativa se possível",
     "protocol_open_mode_new_tab": "Sempre abrir uma nova guia",
-    "focus_notification_title": "Abrir Bulwark",
-    "focus_notification_body": "O link foi aberto no Bulwark. Clique para trazer a janela para a frente.",
+    "focus_notification_title": "Abrir Loomix",
+    "focus_notification_body": "O link foi aberto no Loomix. Clique para trazer a janela para a frente.",
     "webcal_label": "Links de calendário",
-    "webcal_description": "Abre links webcal: no Bulwark com uma janela de assinatura de calendário preenchida previamente.",
+    "webcal_description": "Abre links webcal: no Loomix com uma janela de assinatura de calendário preenchida previamente.",
     "register_mailto": "Registrar aplicativo de e-mail",
     "register_webcal": "Registrar aplicativo de calendário",
     "mailto_registered": "Registro do manipulador de e-mail solicitado",
@@ -196,7 +196,7 @@
     "registration_failed": "Falha ao registrar manipulador de protocolo",
     "opening_mailto": "Abrindo editor...",
     "opening_webcal": "Abrindo calendário...",
-    "browser_note": "Seu navegador ou sistema operacional pode pedir confirmação e pode exigir que o Bulwark esteja instalado antes de poder ser selecionado como aplicativo padrão.",
+    "browser_note": "Seu navegador ou sistema operacional pode pedir confirmação e pode exigir que o Loomix esteja instalado antes de poder ser selecionado como aplicativo padrão.",
     "select_account_title": "Escolher conta",
     "select_mailto_account": "Escolha qual conta deve abrir este link de e-mail.",
     "select_webcal_account": "Escolha qual conta deve abrir este link de calendário.",
@@ -869,9 +869,9 @@
     "app_title": "Webmail",
     "reconnecting": "Conexão perdida. Tentando reconectar…",
     "rate_limited_title": "A autenticação do servidor está temporariamente limitada.",
-    "rate_limited_detail": "O Bulwark pausou as solicitações em segundo plano para evitar bloqueio. Nova tentativa em {seconds}s.",
+    "rate_limited_detail": "O Loomix pausou as solicitações em segundo plano para evitar bloqueio. Nova tentativa em {seconds}s.",
     "rate_limited_action_title": "Solicitação pausada para evitar bloqueio.",
-    "rate_limited_action_detail": "O Bulwark está aguardando o fim do cooldown do servidor antes de enviar mais solicitações autenticadas. Tente novamente em {seconds}s.",
+    "rate_limited_action_detail": "O Loomix está aguardando o fim do cooldown do servidor antes de enviar mais solicitações autenticadas. Tente novamente em {seconds}s.",
     "pull_to_refresh": "Puxe para atualizar",
     "release_to_refresh": "Solte para atualizar",
     "refreshing": "Atualizando…"
@@ -1328,13 +1328,13 @@
       "push": {
         "confirm_disable_message": "Este dispositivo deixará de receber alertas quando o site estiver fechado.",
         "confirm_disable_title": "Desativar notificações em segundo plano?",
-        "description": "Receba notificações do sistema para novas mensagens quando este site estiver fechado. Entregue através do relay push do Bulwark; o relay nunca vê o conteúdo da mensagem.",
+        "description": "Receba notificações do sistema para novas mensagens quando este site estiver fechado. Entregue através do relay push do Loomix; o relay nunca vê o conteúdo da mensagem.",
         "disable": "Desativar",
         "enable": "Ativar",
         "dismiss_aria": "Dispensar aviso de notificações",
         "ios_hint": "No iOS, instale o site primeiro na tela inicial – o Safari só entrega Web Push para PWAs instalados.",
         "reenable": "Registrar novamente",
-        "relay_desc": "Usa o relay Bulwark hospedado por padrão. Altere apenas se você hospedar.",
+        "relay_desc": "Usa o relay Loomix hospedado por padrão. Altere apenas se você hospedar.",
         "relay_label": "Relay push",
         "relay_locked": "Definido pelo administrador",
         "relay_locked_desc": "A URL do relay push foi definida pelo seu administrador e não pode ser alterada.",
@@ -1342,7 +1342,7 @@
         "status_busy": "Processando…",
         "status_inactive": "Não ativado neste dispositivo",
         "status_unsupported": "Este navegador não oferece suporte a Web Push",
-        "status_lite": "O Web Push não está disponível no Bulwark Lite; ele requer o servidor do Bulwark.",
+        "status_lite": "O Web Push não está disponível no Loomix Lite; ele requer o servidor do Loomix.",
         "title": "Notificações em segundo plano",
         "devices_title": "Dispositivos registrados",
         "devices_desc": "Todos os dispositivos registrados para receber notificações em segundo plano desta conta. Revogar um deles interrompe o recebimento imediatamente.",
@@ -1871,10 +1871,10 @@
       },
       "link_device": {
         "title": "Vincular aplicativo móvel",
-        "description": "Entre no aplicativo Bulwark Mail no seu celular sem digitar sua senha nele. Seu celular recebe um acesso próprio, então sair aqui não o desconecta.",
+        "description": "Entre no aplicativo Loomix Mail no seu celular sem digitar sua senha nele. Seu celular recebe um acesso próprio, então sair aqui não o desconecta.",
         "generate": "Mostrar código QR",
         "regenerate": "Mostrar um novo código",
-        "instructions": "Abra o aplicativo Bulwark Mail e toque em \"Scan a sign-in code\" na tela de login (ou em \"Add account\" → \"Scan a sign-in code\" se você já estiver conectado) e aponte a câmera para cá.",
+        "instructions": "Abra o aplicativo Loomix Mail e toque em \"Scan a sign-in code\" na tela de login (ou em \"Add account\" → \"Scan a sign-in code\" se você já estiver conectado) e aponte a câmera para cá.",
         "expires_in": "Este código expira em {seconds} segundos. Ele só pode ser usado uma vez.",
         "expired": "Este código expirou.",
         "error": "Não foi possível criar um código de pareamento. Tente novamente.",
@@ -2121,7 +2121,7 @@
         "button": "Importar"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "Código-fonte"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "Gerenciar regras",
       "senders_count": "{count, plural, one {# remetente} other {# remetentes}}",
       "cross_account": "Selecione mensagens de uma única conta",
-      "opaque_hint": "Seus filtros foram editados manualmente. Abra as configurações de filtros",
+      "opaque_hint": "Seus filtros foram editados manualmente. Abra as configurações de filtros"
+,
       "loading": "A carregar regras…",
       "load_failed": "Não foi possível carregar as regras",
       "none": "Ainda não há regras",
@@ -3729,7 +3730,7 @@
     "start_tour": "Iniciar tour"
   },
   "demo_welcome": {
-    "title": "Bem-vindo ao Bulwark Mail",
+    "title": "Bem-vindo ao Loomix Mail",
     "description": "Explore um cliente de webmail completo - diretamente no seu navegador. Todos os dados ficam no seu dispositivo, então teste tudo.",
     "feature_email": "Ler e escrever e-mails",
     "feature_organize": "Tags, estrelas e pastas",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "Usar contas que você conecta",
-        "body": "Enviar solicitações pelo servidor do Bulwark com uma conta ou chave configurada por você ou pelo seu administrador. O plugin nunca vê a senha, mas pode fazer tudo o que essa conta pode fazer no próprio servidor."
+        "body": "Enviar solicitações pelo servidor do Loomix com uma conta ou chave configurada por você ou pelo seu administrador. O plugin nunca vê a senha, mas pode fazer tudo o que essa conta pode fazer no próprio servidor."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "Conectar {label}",
-      "intro_password": "{name} quer usar sua conta {label}. O Bulwark guarda a senha no servidor dele e só a envia para {host}. O plugin nunca a vê.",
-      "intro_password_any": "{name} quer usar sua conta {label}. O Bulwark guarda a senha no servidor dele e só a envia para o servidor que você informar aqui. O plugin nunca a vê.",
-      "intro_signin": "{name} quer entrar na sua conta {label}. Informe o servidor aqui e depois entre na página dele. O Bulwark guarda no servidor dele o acesso que recebe; o plugin nunca o vê.",
+      "intro_password": "{name} quer usar sua conta {label}. O Loomix guarda a senha no servidor dele e só a envia para {host}. O plugin nunca a vê.",
+      "intro_password_any": "{name} quer usar sua conta {label}. O Loomix guarda a senha no servidor dele e só a envia para o servidor que você informar aqui. O plugin nunca a vê.",
+      "intro_signin": "{name} quer entrar na sua conta {label}. Informe o servidor aqui e depois entre na página dele. O Loomix guarda no servidor dele o acesso que recebe; o plugin nunca o vê.",
       "server": "Endereço do servidor",
       "server_hint": "cloud.example.com",
       "username": "Nome de usuário",

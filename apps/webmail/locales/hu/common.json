@@ -61,8 +61,8 @@
     "demo_tagline": "Tapasztalj meg egy teljes értékű e-mail klienst. Nincs szükség fiókra.",
     "demo_no_signup": "Nincs szükség regisztrációra - fedezd fel szabadon mintaadatokkal",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Alapértelmezett alkalmazások",
-    "description": "Válaszd ki, hogy az e-mail és naptár hivatkozások a Bulwarkban nyíljanak meg. Technikailag a Bulwark protokollkezelőként regisztrálja magát a mailto: és webcal: hivatkozásokhoz.",
+    "description": "Válaszd ki, hogy az e-mail és naptár hivatkozások a Loomix nyíljanak meg. Technikailag a Loomix protokollkezelőként regisztrálja magát a mailto: és webcal: hivatkozásokhoz.",
     "unsupported": "Ez a böngésző vagy kapcsolat nem támogatja a kézi protokollkezelő regisztrációt. Lehetőség lehet a telepített PWA használatára a böngésző vagy operációs rendszer beállításain keresztül.",
     "mailto_label": "E-mail hivatkozások",
-    "mailto_description": "Mailto: hivatkozások megnyitása a Bulwarkban egy előre kitöltött szerkesztővel.",
+    "mailto_description": "Mailto: hivatkozások megnyitása a Loomix egy előre kitöltött szerkesztővel.",
     "protocol_open_mode_label": "Protokoll hivatkozások megnyitásakor",
-    "protocol_open_mode_description": "Válaszd ki, hogy a Bulwark a mailto: és webcal: hivatkozásokat új lapon vagy a meglévő munkamenetben nyissa meg. Az aktív munkamenet opcióhoz értesítési engedély szükséges, hogy egy értesítésre kattintva előtérbe hozd a Bulwarkot, ha a böngésző blokkolja a fókuszt.",
+    "protocol_open_mode_description": "Válaszd ki, hogy a Loomix a mailto: és webcal: hivatkozásokat új lapon vagy a meglévő munkamenetben nyissa meg. Az aktív munkamenet opcióhoz értesítési engedély szükséges, hogy egy értesítésre kattintva előtérbe hozd a Loomix, ha a böngésző blokkolja a fókuszt.",
     "protocol_open_mode_active_session": "Megnyitás aktív munkamenetben, ha lehetséges",
     "protocol_open_mode_new_tab": "Mindig új lapon nyisson",
-    "focus_notification_title": "Bulwark megnyitása",
-    "focus_notification_body": "A hivatkozás megnyílt a Bulwarkban. Kattints az ablak előtérbe hozásához.",
+    "focus_notification_title": "Loomix megnyitása",
+    "focus_notification_body": "A hivatkozás megnyílt a Loomix. Kattints az ablak előtérbe hozásához.",
     "webcal_label": "Naptár hivatkozások",
-    "webcal_description": "Webcal: hivatkozások megnyitása a Bulwarkban egy előre kitöltött naptárfeliratkozási párbeszédpanellel.",
+    "webcal_description": "Webcal: hivatkozások megnyitása a Loomix egy előre kitöltött naptárfeliratkozási párbeszédpanellel.",
     "register_mailto": "E-mail alkalmazás regisztrálása",
     "register_webcal": "Naptár alkalmazás regisztrálása",
     "mailto_registered": "E-mail kezelő regisztráció kérve",
@@ -196,7 +196,7 @@
     "registration_failed": "Protokollkezelő regisztráció sikertelen",
     "opening_mailto": "Szerkesztő megnyitása...",
     "opening_webcal": "Naptár megnyitása...",
-    "browser_note": "A böngésző vagy operációs rendszered megerősítést kérhet, és előfordulhat, hogy a Bulwarkot telepíteni kell, mielőtt alapértelmezett alkalmazásként kiválasztható.",
+    "browser_note": "A böngésző vagy operációs rendszered megerősítést kérhet, és előfordulhat, hogy a Loomix telepíteni kell, mielőtt alapértelmezett alkalmazásként kiválasztható.",
     "select_account_title": "Fiók kiválasztása",
     "select_mailto_account": "Válaszd ki, melyik fiók nyissa meg ezt az e-mail hivatkozást.",
     "select_webcal_account": "Válaszd ki, melyik fiók nyissa meg ezt a naptár hivatkozást.",
@@ -869,9 +869,9 @@
     "app_title": "Webmail",
     "reconnecting": "Kapcsolat megszakadt. Újracsatlakozás...",
     "rate_limited_title": "A szerver hitelesítés átmenetileg korlátozva van.",
-    "rate_limited_detail": "A Bulwark szüneteltette a háttérkéréseket a lezárás elkerülése érdekében. Újrapróbálkozás {seconds} másodperc múlva.",
+    "rate_limited_detail": "A Loomix szüneteltette a háttérkéréseket a lezárás elkerülése érdekében. Újrapróbálkozás {seconds} másodperc múlva.",
     "rate_limited_action_title": "Kérés szüneteltetve a lezárás elkerülése érdekében.",
-    "rate_limited_action_detail": "A Bulwark várja a szerver lehűlését, mielőtt további hitelesített kéréseket küldene. Próbáld újra {seconds} másodperc múlva.",
+    "rate_limited_action_detail": "A Loomix várja a szerver lehűlését, mielőtt további hitelesített kéréseket küldene. Próbáld újra {seconds} másodperc múlva.",
     "pull_to_refresh": "Húzza le a frissítéshez",
     "release_to_refresh": "Engedje el a frissítéshez",
     "refreshing": "Frissítés…"
@@ -1294,15 +1294,15 @@
       },
       "push": {
         "title": "Háttérértesítések",
-        "description": "Rendszerértesítések fogadása új levelekről, amikor ez az oldal be van zárva. A Bulwark push relén keresztül kézbesítve; a relay soha nem látja a levél tartalmát.",
+        "description": "Rendszerértesítések fogadása új levelekről, amikor ez az oldal be van zárva. A Loomix push relén keresztül kézbesítve; a relay soha nem látja a levél tartalmát.",
         "relay_label": "Push relé",
-        "relay_desc": "Alapértelmezés szerint a tárolt Bulwark relay. Csak akkor módosítsd, ha sajátot üzemeltetsz.",
+        "relay_desc": "Alapértelmezés szerint a tárolt Loomix relay. Csak akkor módosítsd, ha sajátot üzemeltetsz.",
         "relay_locked": "Rendszergazda által beállítva",
         "relay_locked_desc": "A push relay URL-t a rendszergazda állította be, és nem módosítható.",
         "status_active": "Aktív ezen az eszközön",
         "status_inactive": "Nincs engedélyezve ezen az eszközön",
         "status_unsupported": "Ez a böngésző nem támogatja a Web Push-t",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "Munka...",
         "enable": "Engedélyezés",
         "reenable": "Újraregisztráció",
@@ -1874,10 +1874,10 @@
       },
       "link_device": {
         "title": "Mobilalkalmazás összekapcsolása",
-        "description": "Jelentkezz be a telefonodon a Bulwark Mail alkalmazásba anélkül, hogy ott beírnád a jelszavad. A telefonod saját bejelentkezést kap, így ha itt kijelentkezel, a telefon bejelentkezve marad.",
+        "description": "Jelentkezz be a telefonodon a Loomix Mail alkalmazásba anélkül, hogy ott beírnád a jelszavad. A telefonod saját bejelentkezést kap, így ha itt kijelentkezel, a telefon bejelentkezve marad.",
         "generate": "QR-kód megjelenítése",
         "regenerate": "Új kód megjelenítése",
-        "instructions": "Nyisd meg a Bulwark Mail alkalmazást, és a bejelentkezési képernyőn koppints a \"Scan a sign-in code\" lehetőségre (vagy az \"Add account\" → \"Scan a sign-in code\" lehetőségre, ha már be vagy jelentkezve), majd irányítsd ide a kamerát.",
+        "instructions": "Nyisd meg a Loomix Mail alkalmazást, és a bejelentkezési képernyőn koppints a \"Scan a sign-in code\" lehetőségre (vagy az \"Add account\" → \"Scan a sign-in code\" lehetőségre, ha már be vagy jelentkezve), majd irányítsd ide a kamerát.",
         "expires_in": "Ez a kód {seconds} másodperc múlva lejár. Csak egyszer használható.",
         "expired": "Ez a kód lejárt.",
         "error": "Nem sikerült párosítási kódot létrehozni. Próbáld újra.",
@@ -2124,7 +2124,7 @@
         "button": "Importálás"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "Forráskód"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "Szabályok kezelése",
       "senders_count": "{count, plural, one {# feladó} other {# feladó}}",
       "cross_account": "Egyetlen fiók üzeneteit válaszd ki",
-      "opaque_hint": "A szűrőidet kézzel szerkesztették. Nyisd meg a szűrőbeállításokat",
+      "opaque_hint": "A szűrőidet kézzel szerkesztették. Nyisd meg a szűrőbeállításokat"
+,
       "loading": "Szabályok betöltése…",
       "load_failed": "Nem sikerült betölteni a szabályokat",
       "none": "Még nincsenek szabályok",
@@ -3771,7 +3772,7 @@
     "start_tour": "Bemutató indítása"
   },
   "demo_welcome": {
-    "title": "Üdvözlünk a Bulwark Mail-ben",
+    "title": "Üdvözlünk a Loomix Mail-ben",
     "description": "Fedezz fel egy teljes funkciókkal rendelkező webmail klienst - közvetlenül a böngésződben. Az összes adat az eszközödön marad, nyugodtan tesztelj mindent.",
     "feature_email": "E-mailek olvasása és írása",
     "feature_organize": "Címkék, csillagok és mappák",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "Az általad csatlakoztatott fiókok használata",
-        "body": "Kéréseket küld a Bulwark szerverén keresztül egy olyan fiókkal vagy kulccsal, amelyet te vagy a rendszergazdád állított be. A bővítmény soha nem látja a jelszót, de bármit megtehet, amit az a fiók a saját szerverén megtehet."
+        "body": "Kéréseket küld a Loomix szerverén keresztül egy olyan fiókkal vagy kulccsal, amelyet te vagy a rendszergazdád állított be. A bővítmény soha nem látja a jelszót, de bármit megtehet, amit az a fiók a saját szerverén megtehet."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "{label} csatlakoztatása",
-      "intro_password": "A(z) {name} bővítmény használni szeretné a(z) {label} fiókodat. A Bulwark a saját szerverén tárolja a jelszót, és csak ide küldi el: {host}. A bővítmény soha nem látja.",
-      "intro_password_any": "A(z) {name} bővítmény használni szeretné a(z) {label} fiókodat. A Bulwark a saját szerverén tárolja a jelszót, és csak az itt megadott szervernek küldi el. A bővítmény soha nem látja.",
-      "intro_signin": "A(z) {name} bővítmény be szeretne jelentkezni a(z) {label} fiókodba. Add meg itt a szervert, majd jelentkezz be a szerver saját oldalán. A Bulwark a saját szerverén tárolja a kapott hozzáférést; a bővítmény soha nem látja.",
+      "intro_password": "A(z) {name} bővítmény használni szeretné a(z) {label} fiókodat. A Loomix a saját szerverén tárolja a jelszót, és csak ide küldi el: {host}. A bővítmény soha nem látja.",
+      "intro_password_any": "A(z) {name} bővítmény használni szeretné a(z) {label} fiókodat. A Loomix a saját szerverén tárolja a jelszót, és csak az itt megadott szervernek küldi el. A bővítmény soha nem látja.",
+      "intro_signin": "A(z) {name} bővítmény be szeretne jelentkezni a(z) {label} fiókodba. Add meg itt a szervert, majd jelentkezz be a szerver saját oldalán. A Loomix a saját szerverén tárolja a kapott hozzáférést; a bővítmény soha nem látja.",
       "server": "Szervercím",
       "server_hint": "cloud.example.com",
       "username": "Felhasználónév",

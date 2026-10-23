@@ -49,14 +49,14 @@ export const BASE_TOUR_STEPS: TourStep[] = [
     descriptionKey: "tour.email_viewer_desc",
     placement: "left",
     beforeAction: () => {
-      // Click the "Welcome to Bulwark Mail!" email (or the first email) to open the viewer
+      // Click the "Welcome to Loomix Mail!" email (or the first email) to open the viewer
       const emailList = document.querySelector('[data-tour="email-list"]');
       if (!emailList) return;
       // Try to find the welcome email by subject text
       const items = emailList.querySelectorAll('.cursor-pointer');
       let target: HTMLElement | null = null;
       for (const item of items) {
-        if (item.textContent?.includes("Welcome to Bulwark Mail")) {
+        if (item.textContent?.includes("Welcome to Loomix Mail")) {
           target = item as HTMLElement;
           break;
         }

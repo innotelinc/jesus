@@ -59,10 +59,10 @@ export function ConnectorClient({ target }: { target: string }) {
   if (result.kind === 'unknown-target') {
     return (
       <Shell>
-        <h1 className="text-xl font-medium text-foreground">This link is newer than this Bulwark</h1>
+        <h1 className="text-xl font-medium text-foreground">This link is newer than this Loomix</h1>
         <p className="mt-3 text-sm text-muted-foreground">
           It opens something {APP_VERSION ? `version ${APP_VERSION} ` : 'this version '}
-          does not know about. Updating Bulwark should teach it.
+          does not know about. Updating Loomix should teach it.
         </p>
         <Actions />
       </Shell>
@@ -90,7 +90,7 @@ function Actions() {
         href={appPath('/mail')}
         className="inline-flex h-9 items-center rounded-sm border border-border px-4 text-sm hover:bg-muted"
       >
-        Open Bulwark
+        Open Loomix
       </a>
     </p>
   );

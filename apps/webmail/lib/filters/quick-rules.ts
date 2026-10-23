@@ -291,7 +291,7 @@ export function isBulwarkRule(rule: FilterRule): boolean {
  * New rules made from a message go first, so an older, broader rule does not
  * catch the mail before them. The generator writes the vacation block and the
  * external/opaque blocks where they always go, so the front of the list is
- * the top of Bulwark's own section.
+ * the top of Loomix's own section.
  */
 export function insertRuleAtTop(rules: FilterRule[], rule: FilterRule): FilterRule[] {
   return [rule, ...rules];
@@ -350,7 +350,7 @@ export type QuickRuleOutcome =
 
 /**
  * Save a one-click rule without piling up near-duplicates: an enabled
- * Bulwark rule with a single condition of the same kind and the same actions
+ * Loomix rule with a single condition of the same kind and the same actions
  * takes the new values into its value list and keeps its name and place. A
  * rule with a period only acts within it, and the new values would too, so
  * it is never the one.

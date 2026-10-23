@@ -17,7 +17,7 @@ import { createAppPassword, deleteAppPassword } from '@/lib/impersonation/app-pa
 //      the phone renews it directly. If the server insists on a registered
 //      client, the webmail's own client (as the password+TOTP login uses).
 //   2. No structured login, but a Stalwart account: an app password the user
-//      can see and delete ("Bulwark mobile (paired <date>)").
+//      can see and delete ("Loomix mobile (paired <date>)").
 //   3. Neither (not Stalwart): the verified account password, which is what
 //      the login page's mobile handoff has always passed to the app.
 
@@ -117,7 +117,7 @@ function verdict(result: StalwartPasswordLoginResult): PasswordGrantResult | nul
 }
 
 function pairedDescription(now: Date): string {
-  return `Bulwark mobile (paired ${now.toISOString().slice(0, 10)})`;
+  return `Loomix mobile (paired ${now.toISOString().slice(0, 10)})`;
 }
 
 export async function mintGrantWithPassword(opts: PasswordGrantOptions): Promise<PasswordGrantResult> {

@@ -10,8 +10,8 @@ describe('applyLiteConfig (config.json for the static build)', () => {
     expect(config.rememberMeEnabled).toBe(true);
     expect(config.loginShowRememberMe).toBe(false);
     expect(config.loginShowTotp).toBe(true);
-    expect(config.faviconUrl).toBe('/branding/Bulwark_Favicon.svg');
-    expect(config.loginLogoLightUrl).toBe('/branding/Bulwark_Logo_Color.svg');
+    expect(config.faviconUrl).toBe('/branding/Loomix_Favicon.svg');
+    expect(config.loginLogoLightUrl).toBe('/branding/Loomix_Mark.svg');
     expect(config.jmapServers).toEqual([]);
     expect(config.demoMode).toBe(false);
   });

@@ -222,7 +222,7 @@ export function MarketplaceTab() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Marketplace</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Plugins and themes from the extension directory, installed for every user of this Bulwark
+            Plugins and themes from the extension directory, installed for every user of this Loomix
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -758,7 +758,7 @@ function ExtensionCard({
         ) : !offered ? (
           <span
             className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 text-xs font-medium"
-            title={`No published version runs on Bulwark v${CURRENT_APP_VERSION}. Open the details to see what the newest version needs.`}
+            title={`No published version runs on Loomix v${CURRENT_APP_VERSION}. Open the details to see what the newest version needs.`}
           >
             <AlertTriangle className="w-3 h-3" />
             Not for v{CURRENT_APP_VERSION}
