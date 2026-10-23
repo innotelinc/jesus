@@ -68,7 +68,7 @@ export function SettingsDialog({
               onClick={() => choosePreset(preset)}
             >
               <strong>{PROVIDERS[preset].label}</strong>
-              <span>{preset === 'custom' ? 'OpenAI-compatible' : 'Proxied locally'}</span>
+              <span>{preset === 'custom' ? 'OpenAI-compatible' : 'Proxied'}</span>
             </button>
           ))}
         </div>
@@ -128,8 +128,9 @@ export function SettingsDialog({
         <span className="field-label">Request endpoint</span>
         <code>{endpoint || '—'}</code>
         <span className="field-hint">
-          OpenRouter and OpenAI requests go through this dev server's proxy. Custom endpoints are
-          called directly, so they must allow browser (CORS) requests.
+          Requests for these providers go through Soulforge's same-origin proxy (the Vite dev
+          server locally, a Worker on the hosted demo). Custom endpoints are called directly, so
+          they must allow browser (CORS) requests.
         </span>
       </div>
 

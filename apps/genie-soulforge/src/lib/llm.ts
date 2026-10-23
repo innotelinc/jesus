@@ -15,21 +15,21 @@ export const PROVIDERS: Record<
 > = {
   openrouter: {
     label: 'OpenRouter',
-    blurb: 'One key, many models. Browser requests work through the local proxy.',
+    blurb: 'One key, many models. Browser requests work through the Soulforge proxy.',
     baseUrl: 'https://openrouter.ai/api/v1',
     model: 'openai/gpt-4o-mini',
     keyHint: 'sk-or-v1-…',
   },
   omniroute: {
     label: 'OmniRoute',
-    blurb: 'Innotel OmniRoute gateway — many upstream models behind one key. Proxied locally.',
+    blurb: 'Innotel OmniRoute gateway — many upstream models behind one key. Proxied by Soulforge.',
     baseUrl: 'https://gateway.innotel.us/v1',
     model: 'auto/best-chat',
     keyHint: 'sk-…',
   },
   openai: {
     label: 'OpenAI',
-    blurb: 'Proxied locally so the browser can reach the API.',
+    blurb: 'Proxied by Soulforge so the browser can reach the API.',
     baseUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
     keyHint: 'sk-…',

@@ -1,5 +1,7 @@
 # Soulforge
 
+**Live demo: <https://site-11db63820dbd4e04aa6e99418b1db6b6.freebuff.page>**
+
 A local-first editor for AI agent **souls** and their **system prompts**, with a streaming playground for testing the result against a live model.
 
 - **Soul editor** — identity, mission, audience, four voice dials, principles, boundaries, operating rules, response style, capabilities, freeform context, and per-soul temperature / max tokens.
@@ -25,6 +27,8 @@ npm test        # unit tests (prompt compiler, normalization, SSE parser)
 npm run build   # typecheck + production build
 ```
 
+The build output in `dist/` is deployed with [deploy.json](deploy.json) and [worker/index.js](worker/index.js): the Worker serves the static build and proxies `/llm/*`, so no separate server is needed. It rejects requests whose `Origin` does not match the site, and it never stores a key.
+
 ## Model connection
 
 Open the sliders icon in the header and pick a provider:
@@ -38,13 +42,17 @@ Open the sliders icon in the header and pick a provider:
 
 The API key is stored in `localStorage` under `soulforge.settings.v1` and sent only to the configured endpoint. It is never written into the project. Avoid saving a key on a shared machine.
 
-OpenRouter, OpenAI and OmniRoute requests go through the Vite dev proxy (`/llm/...` → provider) so the browser is not blocked by missing CORS headers. The proxy is defined in [vite.config.ts](vite.config.ts) for both `vite dev` and `vite preview`. Custom endpoints are called directly.
+OpenRouter, OpenAI and OmniRoute requests go through a same-origin proxy (`/llm/...` → provider) so the browser is not blocked by missing CORS headers. Locally that proxy is the Vite dev server ([vite.config.ts](vite.config.ts), for both `vite dev` and `vite preview`); on the hosted demo it is the Worker in [worker/index.js](worker/index.js). Custom endpoints are called directly.
+
+The hosted demo has no server-side key: open the sliders icon and paste your own. Keys stay in your browser and are relayed only to the provider you chose.
 
 ## Layout
 
 ```
 src/
   App.tsx                  app shell, library state, snapshots, import/export
+deploy.json                hosted deployment manifest (stage `dist/`, run the Worker)
+worker/index.js            static assets + same-origin `/llm/*` proxy for the hosted demo
   components/
     Sidebar.tsx            soul library rail
     SoulEditor.tsx         structured soul form
