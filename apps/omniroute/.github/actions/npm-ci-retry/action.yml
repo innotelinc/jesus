@@ -5,7 +5,16 @@ runs:
   steps:
     - shell: bash
       run: |
-        set -euo pipefail
+        # No `set -e` here: the whole job of this script is to look at npm ci's exit
+        # status, and `set -e` would end it on the first failure.
+        #
+        # The wrapper used to read the status as `exit_code=$?` *after* an
+        # `if npm ci; then ... fi`, which is the status of the `if` compound — 0 when
+        # its condition failed and no branch ran. So every failed install reported
+        # success, and 2026-10-23's main run was thirteen red jobs whose build steps
+        # died on a missing `tsx` (ERR_MODULE_NOT_FOUND) while the step that should
+        # have failed reported green. Capture the status where it means something.
+        set -uo pipefail
 
         max_attempts=3
         delay_seconds=20
@@ -15,11 +24,33 @@ runs:
             echo "npm ci attempt $attempt/$max_attempts after transient failure"
           fi
 
-          if npm ci; then
+          log_file=$(mktemp)
+          npm ci 2>&1 | tee "$log_file"
+          exit_code=${PIPESTATUS[0]}
+
+          if [ "$exit_code" -eq 0 ]; then
+            # An install that exits 0 but leaves out a tool CI runs is the other half
+            # of the same outage: the drift surfaces later, in a different job, as an
+            # unrelated-looking module-not-found. Fail here, where the cause is.
+            if [ ! -x node_modules/.bin/tsx ]; then
+              echo "::error::npm ci exited 0 but node_modules/.bin/tsx is missing; the dependency tree did not install."
+              rm -f "$log_file"
+              exit 1
+            fi
+            rm -f "$log_file"
             exit 0
           fi
 
-          exit_code=$?
+          # A lockfile that disagrees with package.json, or a dependency conflict, is
+          # deterministic: three attempts and 60 seconds of sleep cannot fix it, and
+          # retrying buries the real message under three copies of it.
+          if grep -qE 'npm error code (EUSAGE|ERESOLVE)' "$log_file"; then
+            echo "::error::npm ci cannot succeed without a change (lockfile out of sync or dependency conflict); not retrying."
+            rm -f "$log_file"
+            exit "$exit_code"
+          fi
+          rm -f "$log_file"
+
           if [ "$attempt" -eq "$max_attempts" ]; then
             exit "$exit_code"
           fi
