@@ -626,6 +626,23 @@ jobs:
       cancel-in-progress: false
     if: ${{ github.event_name != 'pull_request' || (needs.changes.outputs.code == 'true' && github.event.pull_request.draft == false) }}
     steps:
+      # Swap BEFORE the build, because Turbopack's memory peak is native (Rust)
+      # allocation that --max-old-space-size cannot bound. Without it this job was
+      # killed during `Collecting page data` on both 2026-10-23 attempts — 8m22s
+      # and 5m24s in, the step ending as "The operation was canceled." with no
+      # build error — while build.yml's Fast Production Build passed the same
+      # commit in 18m with this exact provisioning. quality.yml's advisory Build
+      # documents the same failure (exit 143 at ~3.5 min) and fixed it the same
+      # way; this job kept the 7 GB default and kept dying.
+      - name: Expand virtual memory (10 GB swap)
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 10G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=10240
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -650,6 +667,10 @@ jobs:
       - run: npm run build
         env:
           OMNIROUTE_USE_TURBOPACK: "1"
+          # Same ceiling build.yml builds under: the native peak is what needs
+          # the headroom, and the heap flag keeps V8 from collecting under it.
+          NODE_OPTIONS: "--max-old-space-size=12288"
+          OMNIROUTE_BUILD_MEMORY_MB: "12288"
       - name: Archive Next.js build for downstream jobs
         # Use tar so the archive preserves paths relative to CWD (.build/next/...).
         # upload-artifact path-stripping is ambiguous when exclude patterns are used;
