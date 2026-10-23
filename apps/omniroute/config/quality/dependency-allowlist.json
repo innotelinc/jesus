@@ -110,6 +110,7 @@
     "pino-abstract-transport",
     "pino-pretty",
     "playwright",
+    "playwright-core",
     "playwright-ctrf-json-reporter",
     "prettier",
     "promptfoo",
