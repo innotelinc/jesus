@@ -54,7 +54,7 @@ function versionRow(v: DirectoryVersion) {
  *
  * `version` picks the version to preview - an install link from the
  * directory names one. Without it, or when the directory no longer has it,
- * the newest version this Bulwark can run is previewed.
+ * the newest version this Loomix can run is previewed.
  */
 export async function GET(
   request: NextRequest,

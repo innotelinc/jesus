@@ -10,7 +10,7 @@ import { logger } from '@/lib/logger';
 import { locales as ALL_LOCALES } from '@/i18n/routing';
 
 const CLIENT_ID = 'bulwark-webmail';
-const CLIENT_DESCRIPTION = 'Bulwark Webmail (auto-configured)';
+const CLIENT_DESCRIPTION = 'Loomix Mail (auto-configured)';
 const JMAP_TIMEOUT_MS = 10_000;
 
 interface JmapMethodCall {

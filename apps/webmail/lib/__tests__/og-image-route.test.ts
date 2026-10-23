@@ -70,7 +70,7 @@ describe('/api/og-image', () => {
     const res = await GET(request());
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('image/png');
-    expect(renderedFrom()).toBe('/branding/Bulwark_Logo_with_Lettering_Dark_and_Color.png');
+    expect(renderedFrom()).toBe('/branding/Loomix_Logo_with_Lettering_Dark_and_Color.png');
 
     const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
     expect(meta.format).toBe('png');

@@ -1,5 +1,5 @@
 /**
- * Bulwark Lite: the static build of this repo (`npm run build:lite`).
+ * Loomix Lite: the static build of this repo (`npm run build:lite`).
  *
  * Lite is the same client shell exported with `output: "export"`: mail,
  * calendar, contacts and files talk to the JMAP server straight from the

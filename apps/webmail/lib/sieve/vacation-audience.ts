@@ -4,7 +4,7 @@ import type { VacationAudience } from '@/lib/jmap/sieve-types';
 // and inner hyphens, at least two of them.
 const DOMAIN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 
-/** Whether `value` is an audience Bulwark can write back as it reads. */
+/** Whether `value` is an audience Loomix can write back as it reads. */
 export function isValidVacationAudience(value: unknown): value is VacationAudience {
   if (!value || typeof value !== 'object') return false;
   const a = value as Record<string, unknown>;
@@ -13,7 +13,7 @@ export function isValidVacationAudience(value: unknown): value is VacationAudien
     && a.domains.every((d) => typeof d === 'string' && DOMAIN.test(d));
 }
 
-/** The fields Bulwark stores, in a fixed order. */
+/** The fields Loomix stores, in a fixed order. */
 export function normalizeVacationAudience(audience: VacationAudience): VacationAudience {
   return { only: audience.only, domains: audience.domains };
 }

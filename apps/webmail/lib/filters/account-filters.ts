@@ -18,7 +18,7 @@ import type { FilterRuleView } from '@/lib/plugin-types';
 /** The account's filters as the server has them right now. */
 export interface AccountFilters {
   accountId: string;
-  /** The script Bulwark writes: the active non-vacation script, else the first one. */
+  /** The script Loomix writes: the active non-vacation script, else the first one. */
   script: SieveScript | null;
   /** The script's content, byte for byte ('' when there is no script). */
   content: string;

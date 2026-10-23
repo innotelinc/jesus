@@ -3,7 +3,7 @@ type SupportedLocales = readonly string[];
 const TRADITIONAL_CHINESE_REGIONS = new Set(['tw', 'hk', 'mo']);
 
 /**
- * Match a BCP-47 language tag to one of the locales shipped by Bulwark.
+ * Match a BCP-47 language tag to one of the locales shipped by Loomix.
  * Chinese needs script/region-aware matching so Traditional Chinese does not
  * silently fall back to the Simplified Chinese catalog.
  */

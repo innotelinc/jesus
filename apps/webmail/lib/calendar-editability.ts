@@ -14,7 +14,7 @@ export interface EditabilityContext {
 
 /**
  * Whether new events may be created in / moved into this calendar: writable and
- * not a (read-only) iCal subscription. Bulwark subscriptions are real Stalwart
+ * not a (read-only) iCal subscription. Loomix subscriptions are real Stalwart
  * calendars with writable myRights, so the flag must be checked too (issue #762).
  */
 export function canCreateEventsIn(

@@ -86,7 +86,7 @@ const BEFORE: Record<string, { args: [FilterRule[], VacationSieveConfig | undefi
       'vacation :subject "Weg" "Bin weg";',
       '',
       ...RULE_BLOCKS,
-      '# --- External rules (managed outside Bulwark) ---',
+      '# --- External rules (managed outside Loomix) ---',
       '# Hand',
       'if header :contains "subject" "hand" {',
       '    keep;',

@@ -54,7 +54,7 @@ export function countKeywordUses(script: string, id: string): number {
  * `rules` with every `add_label` action naming `oldId` rewritten to `newId`.
  *
  * Disabled rules are rewritten too: leaving one behind would have it tag under
- * the old id the moment it is switched back on. An external rule - one Bulwark
+ * the old id the moment it is switched back on. An external rule - one Loomix
  * did not write, re-emitted from its `rawBlock` verbatim - has that block
  * rewritten as well, since its parsed actions never reach the generated script.
  * Only the operand of an `addflag` is touched there: a test comparing some

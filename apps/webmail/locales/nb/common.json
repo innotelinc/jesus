@@ -61,8 +61,8 @@
     "demo_tagline": "Prøv en fullverdig e-postklient. Du trenger ingen konto.",
     "demo_no_signup": "Ingen registrering nødvendig – utforsk fritt med eksempeldata",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Standardapper",
-    "description": "Velg om e-post- og kalenderlenker skal åpnes i Bulwark. Teknisk sett registrerer Bulwark seg som protokollbehandler for mailto:- og webcal:-lenker.",
+    "description": "Velg om e-post- og kalenderlenker skal åpnes i Loomix. Teknisk sett registrerer Loomix seg som protokollbehandler for mailto:- og webcal:-lenker.",
     "unsupported": "Denne nettleseren eller tilkoblingen støtter ikke manuell registrering av protokollbehandlere. Det kan hende du likevel kan velge den installerte PWA-en i innstillingene for nettleseren eller operativsystemet.",
     "mailto_label": "E-postlenker",
-    "mailto_description": "Åpne mailto:-lenker i Bulwark med et forhåndsutfylt meldingsvindu.",
+    "mailto_description": "Åpne mailto:-lenker i Loomix med et forhåndsutfylt meldingsvindu.",
     "protocol_open_mode_label": "Når mailto:- og webcal:-lenker åpnes",
-    "protocol_open_mode_description": "Velg om Bulwark skal åpne mailto:- og webcal:-lenker i en ny fane eller bruke en økt som allerede er åpen. Alternativet for aktiv økt krever tillatelse til varsler. Hvis nettleseren hindrer Bulwark i å få fokus, kan du klikke på et varsel for å vise vinduet.",
+    "protocol_open_mode_description": "Velg om Loomix skal åpne mailto:- og webcal:-lenker i en ny fane eller bruke en økt som allerede er åpen. Alternativet for aktiv økt krever tillatelse til varsler. Hvis nettleseren hindrer Loomix i å få fokus, kan du klikke på et varsel for å vise vinduet.",
     "protocol_open_mode_active_session": "Åpne i aktiv økt hvis mulig",
     "protocol_open_mode_new_tab": "Åpne alltid en ny fane",
-    "focus_notification_title": "Åpne Bulwark",
-    "focus_notification_body": "Lenken ble åpnet i Bulwark. Klikk for å vise vinduet.",
+    "focus_notification_title": "Åpne Loomix",
+    "focus_notification_body": "Lenken ble åpnet i Loomix. Klikk for å vise vinduet.",
     "webcal_label": "Kalenderlenker",
-    "webcal_description": "Åpne webcal:-lenker i Bulwark med en forhåndsutfylt dialog for kalenderabonnement.",
+    "webcal_description": "Åpne webcal:-lenker i Loomix med en forhåndsutfylt dialog for kalenderabonnement.",
     "register_mailto": "Registrer e-postprogram",
     "register_webcal": "Registrer kalenderprogram",
     "mailto_registered": "Forespørsel om registrering av e-postprogram er sendt",
@@ -196,7 +196,7 @@
     "registration_failed": "Registrering av protokollbehandler mislyktes",
     "opening_mailto": "Åpner meldingsvinduet...",
     "opening_webcal": "Åpner kalenderen...",
-    "browser_note": "Nettleseren eller operativsystemet kan be deg bekrefte dette. Det kan også hende at Bulwark må installeres før programmet kan velges som standardapp.",
+    "browser_note": "Nettleseren eller operativsystemet kan be deg bekrefte dette. Det kan også hende at Loomix må installeres før programmet kan velges som standardapp.",
     "select_account_title": "Velg konto",
     "select_mailto_account": "Velg hvilken konto som skal åpne denne e-postlenken.",
     "select_webcal_account": "Velg hvilken konto som skal åpne denne kalenderlenken.",
@@ -869,9 +869,9 @@
     "app_title": "Nettpost",
     "reconnecting": "Tilkoblingen ble brutt. Forsøker å koble til på nytt...",
     "rate_limited_title": "Serveren begrenser midlertidig antall autentiseringsforsøk.",
-    "rate_limited_detail": "Bulwark har satt bakgrunnsforespørsler på pause for å unngå at kontoen blir låst. Prøver på nytt om {seconds} sekunder.",
+    "rate_limited_detail": "Loomix har satt bakgrunnsforespørsler på pause for å unngå at kontoen blir låst. Prøver på nytt om {seconds} sekunder.",
     "rate_limited_action_title": "Forespørselen er satt på pause for å unngå at kontoen blir låst.",
-    "rate_limited_action_detail": "Bulwark venter til sperreperioden på serveren er over før flere autentiserte forespørsler sendes. Prøv igjen om {seconds} sekunder.",
+    "rate_limited_action_detail": "Loomix venter til sperreperioden på serveren er over før flere autentiserte forespørsler sendes. Prøv igjen om {seconds} sekunder.",
     "pull_to_refresh": "Dra ned for å oppdatere",
     "release_to_refresh": "Slipp for å oppdatere",
     "refreshing": "Oppdaterer..."
@@ -1294,21 +1294,21 @@
       },
       "push": {
         "title": "Bakgrunnsvarsler",
-        "description": "Motta systemvarsler om ny e-post selv når denne siden ikke er åpen. Varslene leveres via Bulwarks push-relé, som aldri ser innholdet i e-posten.",
+        "description": "Motta systemvarsler om ny e-post selv når denne siden ikke er åpen. Varslene leveres via Loomix push-relé, som aldri ser innholdet i e-posten.",
         "relay_label": "Push-relé",
-        "relay_desc": "Reléet som driftes av Bulwark, brukes som standard. Endre dette bare hvis du drifter et eget relé.",
+        "relay_desc": "Reléet som driftes av Loomix, brukes som standard. Endre dette bare hvis du drifter et eget relé.",
         "relay_locked": "Angitt av administrator",
         "relay_locked_desc": "URL-en til push-reléet er angitt av administratoren og kan ikke endres.",
         "status_active": "Aktiv på denne enheten",
         "status_inactive": "Ikke aktivert på denne enheten",
         "status_unsupported": "Denne nettleseren støtter ikke Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "Behandler...",
         "enable": "Aktiver",
         "reenable": "Registrer på nytt",
         "disable": "Deaktiver",
         "confirm_disable_title": "Vil du deaktivere bakgrunnsvarsler?",
-        "confirm_disable_message": "Denne enheten slutter å motta varsler når Bulwark ikke er åpent.",
+        "confirm_disable_message": "Denne enheten slutter å motta varsler når Loomix ikke er åpent.",
         "dismiss_aria": "Lukk forespørselen om varsler",
         "ios_hint": "På iOS må du først installere nettstedet på startskjermen – Safari leverer bare Web Push til installerte PWA-er.",
         "devices_title": "Registrerte enheter",
@@ -1505,7 +1505,7 @@
       },
       "auto_select_reply_identity": {
         "label": "Svar fra mottatt adresse",
-        "description": "Når du svarer, bruker Bulwark adressen meldingen opprinnelig ble sendt til. Programmet ser først etter en samsvarende identitet. For meldinger til et oppsamlingsdomene brukes aliaset i Fra-feltet, mens sendingen går gjennom hovedidentiteten din."
+        "description": "Når du svarer, bruker Loomix adressen meldingen opprinnelig ble sendt til. Programmet ser først etter en samsvarende identitet. For meldinger til et oppsamlingsdomene brukes aliaset i Fra-feltet, mens sendingen går gjennom hovedidentiteten din."
       },
       "reply_identity_match": {
         "label": "Samsvar for mottaksadresse",
@@ -1885,10 +1885,10 @@
       },
       "link_device": {
         "title": "Koble til mobilappen",
-        "description": "Logg på Bulwark Mail-appen på telefonen uten å skrive inn passordet der. Telefonen får sin egen pålogging, så den forblir pålogget når du logger av her.",
+        "description": "Logg på Loomix Mail-appen på telefonen uten å skrive inn passordet der. Telefonen får sin egen pålogging, så den forblir pålogget når du logger av her.",
         "generate": "Vis QR-kode",
         "regenerate": "Vis en ny kode",
-        "instructions": "Åpne Bulwark Mail-appen og trykk på «Scan a sign-in code» på påloggingsskjermen (eller «Add account» → «Scan a sign-in code» hvis du allerede er pålogget), og rett deretter kameraet hit.",
+        "instructions": "Åpne Loomix Mail-appen og trykk på «Scan a sign-in code» på påloggingsskjermen (eller «Add account» → «Scan a sign-in code» hvis du allerede er pålogget), og rett deretter kameraet hit.",
         "expires_in": "Denne koden utløper om {seconds} sekunder. Den kan bare brukes én gang.",
         "expired": "Denne koden er utløpt.",
         "error": "Kunne ikke opprette en sammenkoblingskode. Prøv igjen.",
@@ -2128,7 +2128,7 @@
         "button": "Importer"
       },
       "about": {
-        "title": "Bulwark nettpost",
+        "title": "Loomix nettpost",
         "source_code": "Kildekode"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "Administrer regler",
       "senders_count": "{count, plural, one {# avsender} other {# avsendere}}",
       "cross_account": "Velg meldinger fra én konto",
-      "opaque_hint": "Filtrene dine er redigert for hånd. Åpne filterinnstillingene",
+      "opaque_hint": "Filtrene dine er redigert for hånd. Åpne filterinnstillingene"
+,
       "loading": "Laster inn regler…",
       "load_failed": "Kunne ikke laste inn reglene",
       "none": "Ingen regler ennå",
@@ -3771,7 +3772,7 @@
     "start_tour": "Start omvisningen"
   },
   "demo_welcome": {
-    "title": "Velkommen til Bulwark Mail",
+    "title": "Velkommen til Loomix Mail",
     "description": "Utforsk en fullverdig nettpostklient – rett i nettleseren. Alle data forblir på enheten din, så du kan gjerne prøve alt.",
     "feature_email": "Les og skriv e-post",
     "feature_organize": "Etiketter, stjerner og mapper",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "Bruke kontoer du kobler til",
-        "body": "Sende forespørsler via Bulwarks server med en konto eller nøkkel som du eller administratoren din har satt opp. Tillegget ser aldri passordet, men det kan gjøre alt den kontoen kan gjøre på sin egen server."
+        "body": "Sende forespørsler via Loomix server med en konto eller nøkkel som du eller administratoren din har satt opp. Tillegget ser aldri passordet, men det kan gjøre alt den kontoen kan gjøre på sin egen server."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "Koble til {label}",
-      "intro_password": "{name} vil bruke kontoen din hos {label}. Bulwark lagrer passordet på sin server og sender det bare til {host}. Tillegget ser det aldri.",
-      "intro_password_any": "{name} vil bruke kontoen din hos {label}. Bulwark lagrer passordet på sin server og sender det bare til serveren du skriver inn her. Tillegget ser det aldri.",
-      "intro_signin": "{name} vil logge på kontoen din hos {label}. Skriv inn serveren her, og logg deretter på via serverens egen side. Bulwark lagrer tilgangen det får, på sin server; tillegget ser den aldri.",
+      "intro_password": "{name} vil bruke kontoen din hos {label}. Loomix lagrer passordet på sin server og sender det bare til {host}. Tillegget ser det aldri.",
+      "intro_password_any": "{name} vil bruke kontoen din hos {label}. Loomix lagrer passordet på sin server og sender det bare til serveren du skriver inn her. Tillegget ser det aldri.",
+      "intro_signin": "{name} vil logge på kontoen din hos {label}. Skriv inn serveren her, og logg deretter på via serverens egen side. Loomix lagrer tilgangen det får, på sin server; tillegget ser den aldri.",
       "server": "Serveradresse",
       "server_hint": "cloud.example.com",
       "username": "Brukernavn",

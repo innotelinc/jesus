@@ -34,12 +34,12 @@ RUN rm -rf "app/api/dev-jmap" && \
 
 FROM node:24-alpine AS runner
 
-LABEL org.opencontainers.image.title="Bulwark Webmail"
-LABEL org.opencontainers.image.description="Modern webmail client built with Next.js and the JMAP protocol"
-LABEL org.opencontainers.image.source="https://github.com/bulwarkmail/webmail"
-LABEL org.opencontainers.image.url="https://github.com/bulwarkmail/webmail"
+LABEL org.opencontainers.image.title="Loomix Mail"
+LABEL org.opencontainers.image.description="Loomix Mail — email, calendars, contacts and files for Stalwart Mail Server"
+LABEL org.opencontainers.image.source="https://github.com/innotelinc/webmail"
+LABEL org.opencontainers.image.url="https://oasis.innotel.us"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
-LABEL org.opencontainers.image.vendor="rbm.systems"
+LABEL org.opencontainers.image.vendor="Innotel"
 
 WORKDIR /app
 ENV NODE_ENV=production

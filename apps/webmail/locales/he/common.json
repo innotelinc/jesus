@@ -58,8 +58,8 @@
     "demo_tagline": "התנסה בלקוח דוא\"ל מלא. אין צורך בחשבון.",
     "demo_no_signup": "אין צורך בהרשמה - חקור בחופשיות עם נתונים לדוגמה",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -834,9 +834,9 @@
     "app_title": "Webmail",
     "reconnecting": "החיבור אבד. מנסה להתחבר מחדש...",
     "rate_limited_title": "אימות השרת מוגבל באופן זמני בקצב.",
-    "rate_limited_detail": "Bulwark השהתה בקשות ברקע כדי למנוע נעילה. מנסה שוב ב-{seconds}s.",
+    "rate_limited_detail": "Loomix השהתה בקשות ברקע כדי למנוע נעילה. מנסה שוב ב-{seconds}s.",
     "rate_limited_action_title": "הבקשה הושהתה כדי למנוע נעילה.",
-    "rate_limited_action_detail": "Bulwark ממתין עד שקירור השרת יסתיים לפני שליחת בקשות מאומתות יותר. נסה שוב ב-{seconds}s.",
+    "rate_limited_action_detail": "Loomix ממתין עד שקירור השרת יסתיים לפני שליחת בקשות מאומתות יותר. נסה שוב ב-{seconds}s.",
     "pull_to_refresh": "משוך לרענון",
     "release_to_refresh": "שחרר לרענון",
     "refreshing": "מרענן…"
@@ -1292,15 +1292,15 @@
       },
       "push": {
         "title": "התראות בדפדפן",
-        "description": "קבל עדכונים מערכת עבור דוא״ל חדש כאשר אתר זה סגור. מסופק דרך ממסר Bulwark; הממסר לא רואה תוכן דוא״ל.",
+        "description": "קבל עדכונים מערכת עבור דוא״ל חדש כאשר אתר זה סגור. מסופק דרך ממסר Loomix; הממסר לא רואה תוכן דוא״ל.",
         "relay_label": "ממסר דחיפה",
-        "relay_desc": "ברירת מחדל של ממסר Bulwark המתורח. שנה רק אם אתה מארח בעצמך.",
+        "relay_desc": "ברירת מחדל של ממסר Loomix המתורח. שנה רק אם אתה מארח בעצמך.",
         "relay_locked": "הוגדר על ידי מנהל",
         "relay_locked_desc": "כתובת ממסר הדחיפה הוגדרה על ידי מנהל שלך ולא ניתן לשנות אותה.",
         "status_active": "פעיל בהתקן זה",
         "status_inactive": "לא מופעל בהתקן זה",
         "status_unsupported": "דפדפן זה אינו תומך בדחיפה ברשת",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "עובד…",
         "enable": "הפעל",
         "reenable": "רשום מחדש",
@@ -1836,10 +1836,10 @@
       },
       "link_device": {
         "title": "הקשר יישום נייד",
-        "description": "התחבר לאפליקציית Bulwark Mail בטלפון בלי להקליד שם את הסיסמה. הטלפון מקבל התחברות משלו, כך שהתנתקות כאן לא מנתקת אותו.",
+        "description": "התחבר לאפליקציית Loomix Mail בטלפון בלי להקליד שם את הסיסמה. הטלפון מקבל התחברות משלו, כך שהתנתקות כאן לא מנתקת אותו.",
         "generate": "הצג קוד QR",
         "regenerate": "הצג קוד חדש",
-        "instructions": "פתח את אפליקציית Bulwark Mail והקש על \"Scan a sign-in code\" במסך ההתחברות (או \"Add account\" → \"Scan a sign-in code\" אם כבר התחברת), ואז כוון את המצלמה לכאן.",
+        "instructions": "פתח את אפליקציית Loomix Mail והקש על \"Scan a sign-in code\" במסך ההתחברות (או \"Add account\" → \"Scan a sign-in code\" אם כבר התחברת), ואז כוון את המצלמה לכאן.",
         "expires_in": "קוד זה פוקע בעוד {seconds} שניות. ניתן להשתמש בו רק פעם אחת.",
         "expired": "קוד זה פקע.",
         "error": "לא היה ניתן ליצור קוד זיווג. אנא נסה שוב.",
@@ -2083,7 +2083,7 @@
         "button": "ייבוא"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "קוד מקור"
       },
       "spam_siege": {
@@ -2549,7 +2549,8 @@
       "manage": "ניהול כללים",
       "senders_count": "{count, plural, one {שולח אחד} other {# שולחים}}",
       "cross_account": "בחר הודעות מחשבון אחד",
-      "opaque_hint": "המסננים שלך נערכו ידנית. פתח את הגדרות המסננים",
+      "opaque_hint": "המסננים שלך נערכו ידנית. פתח את הגדרות המסננים"
+,
       "loading": "טוען כללים…",
       "load_failed": "לא ניתן לטעון את הכללים",
       "none": "אין עדיין כללים",
@@ -3926,18 +3927,18 @@
   "meta_description": "לקוח webmail מינימליסטי באמצעות פרוטוקול JMAP",
   "protocol_handlers": {
     "title": "יישומים ברירת מחדל",
-    "description": "בחר אם קישורי דוא״ל ולוח שנה ייפתחו ב־Bulwark. מבחינה טכנית, Bulwark רשום כטיפול בפרוטוקול עבור קישורי mailto: ו־webcal:.",
+    "description": "בחר אם קישורי דוא״ל ולוח שנה ייפתחו ב־Loomix. מבחינה טכנית, Loomix רשום כטיפול בפרוטוקול עבור קישורי mailto: ו־webcal:.",
     "unsupported": "דפדפן זה או חיבור זה לא תומך בהרשמה ידנית של טיפול בפרוטוקול. ייתכן שעדיין תוכל להשתמש ב־PWA המותקנת דרך הדפדפן או הגדרות מערכת ההפעלה.",
     "mailto_label": "קישורי דוא״ל",
-    "mailto_description": "פתח קישורי mailto: ב־Bulwark עם מחבר שמלא מראש.",
+    "mailto_description": "פתח קישורי mailto: ב־Loomix עם מחבר שמלא מראש.",
     "protocol_open_mode_label": "בעת פתיחת קישורי פרוטוקול",
-    "protocol_open_mode_description": "בחר אם Bulwark יפתח קישורי mailto: ו־webcal: בלשונית חדשה או ישתמש בחיבור פתוח. אפשרות הישיבה הפעילה דורשת הרשאת עדכון כדי שתוכל ללחוץ על עדכון נופל כדי להביא את Bulwark לחזית אם הדפדפן חוסם מיקוד.",
+    "protocol_open_mode_description": "בחר אם Loomix יפתח קישורי mailto: ו־webcal: בלשונית חדשה או ישתמש בחיבור פתוח. אפשרות הישיבה הפעילה דורשת הרשאת עדכון כדי שתוכל ללחוץ על עדכון נופל כדי להביא את Loomix לחזית אם הדפדפן חוסם מיקוד.",
     "protocol_open_mode_active_session": "פתח בישיבה פעילה אם אפשר",
     "protocol_open_mode_new_tab": "פתח תמיד לשונית חדשה",
-    "focus_notification_title": "פתח את Bulwark",
-    "focus_notification_body": "הקישור נפתח ב־Bulwark. לחץ כדי להביא את החלון לחזית.",
+    "focus_notification_title": "פתח את Loomix",
+    "focus_notification_body": "הקישור נפתח ב־Loomix. לחץ כדי להביא את החלון לחזית.",
     "webcal_label": "קישורי לוח שנה",
-    "webcal_description": "פתח קישורי webcal: ב־Bulwark עם תיבת דו־שיח מלא מראש להרשמה ללוח שנה.",
+    "webcal_description": "פתח קישורי webcal: ב־Loomix עם תיבת דו־שיח מלא מראש להרשמה ללוח שנה.",
     "register_mailto": "רשום יישום דוא״ל",
     "register_webcal": "רשום יישום לוח שנה",
     "mailto_registered": "בקש הרשמה של מטפל דוא״ל",
@@ -3945,7 +3946,7 @@
     "registration_failed": "הרשמת טיפול בפרוטוקול נכשלה",
     "opening_mailto": "פתיחת מחבר…",
     "opening_webcal": "פתיחת לוח שנה…",
-    "browser_note": "הדפדפן או מערכת ההפעלה שלך עשויים לבקש ממך לאשר זאת ועשויים לדרוש שBulwark יותקן לפני שניתן לבחור אותו כיישום ברירת המחדל.",
+    "browser_note": "הדפדפן או מערכת ההפעלה שלך עשויים לבקש ממך לאשר זאת ועשויים לדרוש שOasis יותקן לפני שניתן לבחור אותו כיישום ברירת המחדל.",
     "select_account_title": "בחר חשבון",
     "select_mailto_account": "בחר איזה חשבון צריך לפתוח קישור דוא״ל זה.",
     "select_webcal_account": "בחר איזה חשבון צריך לפתוח קישור לוח שנה זה.",
@@ -4408,7 +4409,7 @@
       },
       "http_proxy": {
         "title": "שימוש בחשבונות שאתם מחברים",
-        "body": "שליחת בקשות דרך השרת של Bulwark עם חשבון או מפתח שהוגדרו על ידיכם או על ידי מנהל המערכת. התוסף אף פעם לא רואה את הסיסמה, אבל הוא יכול לעשות כל מה שהחשבון הזה יכול לעשות בשרת שלו."
+        "body": "שליחת בקשות דרך השרת של Loomix עם חשבון או מפתח שהוגדרו על ידיכם או על ידי מנהל המערכת. התוסף אף פעם לא רואה את הסיסמה, אבל הוא יכול לעשות כל מה שהחשבון הזה יכול לעשות בשרת שלו."
       }
     },
     "dialog": {
@@ -4425,9 +4426,9 @@
     },
     "connect": {
       "title": "חיבור {label}",
-      "intro_password": "{name} רוצה להשתמש בחשבון {label} שלכם. Bulwark שומר את הסיסמה בשרת שלו ושולח אותה רק אל {host}. התוסף אף פעם לא רואה אותה.",
-      "intro_password_any": "{name} רוצה להשתמש בחשבון {label} שלכם. Bulwark שומר את הסיסמה בשרת שלו ושולח אותה רק לשרת שתזינו כאן. התוסף אף פעם לא רואה אותה.",
-      "intro_signin": "{name} רוצה להתחבר לחשבון {label} שלכם. הזינו כאן את השרת, ואז התחברו בדף של השרת עצמו. Bulwark שומר בשרת שלו את הגישה שהוא מקבל; התוסף אף פעם לא רואה אותה.",
+      "intro_password": "{name} רוצה להשתמש בחשבון {label} שלכם. Loomix שומר את הסיסמה בשרת שלו ושולח אותה רק אל {host}. התוסף אף פעם לא רואה אותה.",
+      "intro_password_any": "{name} רוצה להשתמש בחשבון {label} שלכם. Loomix שומר את הסיסמה בשרת שלו ושולח אותה רק לשרת שתזינו כאן. התוסף אף פעם לא רואה אותה.",
+      "intro_signin": "{name} רוצה להתחבר לחשבון {label} שלכם. הזינו כאן את השרת, ואז התחברו בדף של השרת עצמו. Loomix שומר בשרת שלו את הגישה שהוא מקבל; התוסף אף פעם לא רואה אותה.",
       "server": "כתובת השרת",
       "server_hint": "cloud.example.com",
       "username": "שם משתמש",

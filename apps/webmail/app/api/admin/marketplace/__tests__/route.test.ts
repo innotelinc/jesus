@@ -128,7 +128,7 @@ describe('POST /api/admin/marketplace', () => {
     expect(registry.has('pretty-dates')).toBe(true);
   });
 
-  it('refuses a version this Bulwark is too new or too old for', async () => {
+  it('refuses a version this Loomix is too new or too old for', async () => {
     const bytes = await bundle({ ...MANIFEST, id: 'pretty-dates' });
     directory(bytes, { maxAppVersion: '1.14.0' });
     const tooNew = await install({ slug: 'pretty-dates', version: '1.0.0', type: 'plugin' });
@@ -138,7 +138,7 @@ describe('POST /api/admin/marketplace', () => {
     directory(bytes, { minAppVersion: '2.0.0' });
     const tooOld = await install({ slug: 'pretty-dates', version: '1.0.0', type: 'plugin' });
     expect(tooOld.status).toBe(400);
-    expect((await tooOld.json()).error).toMatch(/Needs Bulwark 2\.0\.0/);
+    expect((await tooOld.json()).error).toMatch(/Needs Loomix 2\.0\.0/);
     expect(registry.size).toBe(0);
   });
 

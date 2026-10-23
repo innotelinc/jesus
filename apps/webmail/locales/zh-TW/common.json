@@ -61,8 +61,8 @@
     "demo_tagline": "體驗功能完整的電子郵件用戶端，不需要帳號。",
     "demo_no_signup": "不需要註冊，使用範例資料自由探索",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "預設應用程式",
-    "description": "選擇電子郵件與行事曆連結是否要在 Bulwark 開啟。Bulwark 會註冊為 mailto: 與 webcal: 連結的通訊協定處理常式。",
+    "description": "選擇電子郵件與行事曆連結是否要在 Loomix 開啟。Loomix 會註冊為 mailto: 與 webcal: 連結的通訊協定處理常式。",
     "unsupported": "此瀏覽器或連線不支援手動註冊通訊協定處理常式。您仍可嘗試透過瀏覽器或作業系統設定，使用已安裝的 PWA。",
     "mailto_label": "電子郵件連結",
-    "mailto_description": "使用預先填入的撰寫視窗，在 Bulwark 開啟 mailto: 連結。",
+    "mailto_description": "使用預先填入的撰寫視窗，在 Loomix 開啟 mailto: 連結。",
     "protocol_open_mode_label": "開啟通訊協定連結時",
-    "protocol_open_mode_description": "選擇 Bulwark 要在新分頁開啟 mailto: 與 webcal: 連結，或使用現有的工作階段。現有工作階段選項需要通知權限；若瀏覽器阻止視窗取得焦點，您可以點擊備用通知，將 Bulwark 移到最上層。",
+    "protocol_open_mode_description": "選擇 Loomix 要在新分頁開啟 mailto: 與 webcal: 連結，或使用現有的工作階段。現有工作階段選項需要通知權限；若瀏覽器阻止視窗取得焦點，您可以點擊備用通知，將 Loomix 移到最上層。",
     "protocol_open_mode_active_session": "盡可能在現有工作階段開啟",
     "protocol_open_mode_new_tab": "一律開啟新分頁",
-    "focus_notification_title": "開啟 Bulwark",
-    "focus_notification_body": "連結已在 Bulwark 開啟。點擊即可將視窗移到最上層。",
+    "focus_notification_title": "開啟 Loomix",
+    "focus_notification_body": "連結已在 Loomix 開啟。點擊即可將視窗移到最上層。",
     "webcal_label": "行事曆連結",
-    "webcal_description": "使用預先填入的行事曆訂閱對話方塊，在 Bulwark 開啟 webcal: 連結。",
+    "webcal_description": "使用預先填入的行事曆訂閱對話方塊，在 Loomix 開啟 webcal: 連結。",
     "register_mailto": "註冊電子郵件應用程式",
     "register_webcal": "註冊行事曆應用程式",
     "mailto_registered": "已要求註冊電子郵件處理常式",
@@ -196,7 +196,7 @@
     "registration_failed": "通訊協定處理常式註冊失敗",
     "opening_mailto": "正在開啟撰寫視窗…",
     "opening_webcal": "正在開啟行事曆…",
-    "browser_note": "您的瀏覽器或作業系統可能會要求您確認，而且可能必須先安裝 Bulwark，才能選為預設應用程式。",
+    "browser_note": "您的瀏覽器或作業系統可能會要求您確認，而且可能必須先安裝 Loomix，才能選為預設應用程式。",
     "select_account_title": "選擇帳號",
     "select_mailto_account": "選擇用於開啟此電子郵件連結的帳號。",
     "select_webcal_account": "選擇用於開啟此行事曆連結的帳號。",
@@ -869,9 +869,9 @@
     "app_title": "網頁郵件",
     "reconnecting": "連線中斷，正在嘗試重新連線…",
     "rate_limited_title": "伺服器驗證目前受到速率限制。",
-    "rate_limited_detail": "Bulwark 已暫停背景請求，以免帳號遭鎖定。將在 {seconds} 秒後重試。",
+    "rate_limited_detail": "Loomix 已暫停背景請求，以免帳號遭鎖定。將在 {seconds} 秒後重試。",
     "rate_limited_action_title": "已暫停請求，以免帳號遭鎖定。",
-    "rate_limited_action_detail": "Bulwark 正在等待伺服器的冷卻時間結束，再傳送更多需要驗證的請求。請在 {seconds} 秒後重試。",
+    "rate_limited_action_detail": "Loomix 正在等待伺服器的冷卻時間結束，再傳送更多需要驗證的請求。請在 {seconds} 秒後重試。",
     "pull_to_refresh": "下拉重新整理",
     "release_to_refresh": "鬆開重新整理",
     "refreshing": "正在重新整理…"
@@ -1294,7 +1294,7 @@
       },
       "push": {
         "title": "背景通知",
-        "description": "網站關閉時仍可接收新郵件的系統通知。通知會透過 Bulwark 推送中繼傳送；中繼不會看到郵件內容。",
+        "description": "網站關閉時仍可接收新郵件的系統通知。通知會透過 Loomix 推送中繼傳送；中繼不會看到郵件內容。",
         "relay_label": "推送中繼",
         "relay_desc": "用來傳送通知的伺服器。請從管理員提供的中繼中選擇。",
         "relay_locked": "由管理員設定",
@@ -1302,7 +1302,7 @@
         "status_active": "已在此裝置上啟用",
         "status_inactive": "在此裝置上未啟用",
         "status_unsupported": "此瀏覽器不支援 Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "工作中…",
         "enable": "啟用",
         "reenable": "重新註冊",
@@ -1885,10 +1885,10 @@
       },
       "link_device": {
         "title": "連結行動應用程式",
-        "description": "不需在手機上輸入密碼，即可登入手機上的 Bulwark Mail 應用程式。手機會取得獨立的登入狀態，因此在這裡登出不會讓手機登出。",
+        "description": "不需在手機上輸入密碼，即可登入手機上的 Loomix Mail 應用程式。手機會取得獨立的登入狀態，因此在這裡登出不會讓手機登出。",
         "generate": "顯示 QR Code",
         "regenerate": "顯示新的 QR Code",
-        "instructions": "開啟 Bulwark Mail 應用程式，在登入畫面點選「Scan a sign-in code」（如果已經登入，請點選「Add account」→「Scan a sign-in code」），再將相機對準這裡。",
+        "instructions": "開啟 Loomix Mail 應用程式，在登入畫面點選「Scan a sign-in code」（如果已經登入，請點選「Add account」→「Scan a sign-in code」），再將相機對準這裡。",
         "expires_in": "此 QR Code 將在 {seconds} 秒後到期，且只能使用一次。",
         "expired": "此 QR Code 已到期。",
         "error": "無法建立配對碼。請再試一次。",
@@ -2128,7 +2128,7 @@
         "button": "匯入"
       },
       "about": {
-        "title": "Bulwark 網頁郵件",
+        "title": "Loomix 網頁郵件",
         "source_code": "原始碼"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "管理規則",
       "senders_count": "{count, plural, other {# 位寄件者}}",
       "cross_account": "請選取同一個帳號中的郵件",
-      "opaque_hint": "你的篩選規則曾被手動編輯。請開啟篩選規則設定",
+      "opaque_hint": "你的篩選規則曾被手動編輯。請開啟篩選規則設定"
+,
       "loading": "正在載入規則…",
       "load_failed": "無法載入規則",
       "none": "尚無規則",
@@ -3771,7 +3772,7 @@
     "start_tour": "開始功能導覽"
   },
   "demo_welcome": {
-    "title": "歡迎使用 Bulwark Mail",
+    "title": "歡迎使用 Loomix Mail",
     "description": "直接在瀏覽器中探索功能完整的網頁郵件用戶端。所有資料都保留在您的裝置上，請自由測試各項功能。",
     "feature_email": "閱讀與撰寫郵件",
     "feature_organize": "標籤、星號與信件匣",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "使用您連線的帳號",
-        "body": "使用您或管理員設定的帳號或金鑰，透過 Bulwark 的伺服器傳送要求。外掛程式永遠看不到密碼，但可以在該帳號所屬的伺服器上執行該帳號能做的任何動作。"
+        "body": "使用您或管理員設定的帳號或金鑰，透過 Loomix 的伺服器傳送要求。外掛程式永遠看不到密碼，但可以在該帳號所屬的伺服器上執行該帳號能做的任何動作。"
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "連線至 {label}",
-      "intro_password": "{name} 想使用您的 {label} 帳號。Bulwark 會將密碼保存在自己的伺服器上，只會傳送給 {host}。外掛程式永遠看不到密碼。",
-      "intro_password_any": "{name} 想使用您的 {label} 帳號。Bulwark 會將密碼保存在自己的伺服器上，只會傳送給您在此輸入的伺服器。外掛程式永遠看不到密碼。",
-      "intro_signin": "{name} 想登入您的 {label} 帳號。請在此輸入伺服器，然後在該伺服器自己的頁面上登入。Bulwark 會將取得的存取權保存在自己的伺服器上；外掛程式永遠看不到它。",
+      "intro_password": "{name} 想使用您的 {label} 帳號。Loomix 會將密碼保存在自己的伺服器上，只會傳送給 {host}。外掛程式永遠看不到密碼。",
+      "intro_password_any": "{name} 想使用您的 {label} 帳號。Loomix 會將密碼保存在自己的伺服器上，只會傳送給您在此輸入的伺服器。外掛程式永遠看不到密碼。",
+      "intro_signin": "{name} 想登入您的 {label} 帳號。請在此輸入伺服器，然後在該伺服器自己的頁面上登入。Loomix 會將取得的存取權保存在自己的伺服器上；外掛程式永遠看不到它。",
       "server": "伺服器位址",
       "server_hint": "cloud.example.com",
       "username": "使用者名稱",

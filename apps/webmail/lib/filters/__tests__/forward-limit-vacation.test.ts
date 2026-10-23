@@ -50,7 +50,7 @@ describe('the out of office forwarding in the run order', () => {
   });
 
   it('adds its forward to every rule only when it keeps a copy', () => {
-    // A new rule goes behind Bulwark's rules, here behind the one rule.
+    // A new rule goes behind Loomix's rules, here behind the one rule.
     expect(forwardsAround(inRunOrder(rules, vacationForward(true)), 2, false)).toEqual({ before: 2, after: 0 });
     expect(forwardsAround(inRunOrder(rules, vacationForward(false)), 2, false)).toEqual({ before: 1, after: 0 });
     expect(worstCaseForwards(inRunOrder(rules, vacationForward(true)))).toBe(2);

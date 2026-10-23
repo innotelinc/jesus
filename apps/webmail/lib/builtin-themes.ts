@@ -377,7 +377,7 @@ const elasticCSS = `
   --color-chart-3: #ffd452;
   --color-chart-4: #ff5552;
   --color-chart-5: #9b59b6;
-  /* Elastic is a 14px Roboto skin with tighter list rows than Bulwark's default */
+  /* Elastic is a 14px Roboto skin with tighter list rows than Loomix's default */
   --font-size-base: 14px;
   --list-item-height: 40px;
 }
@@ -393,7 +393,7 @@ const elasticCSS = `
   --color-secondary-foreground: #ffffff;
   --color-muted: #2c373a;
   /* Roundcube keeps most text near the bright font colour, only true hints
-     dim out. Bulwark applies muted-foreground far more widely, so brighten it
+     dim out. Loomix applies muted-foreground far more widely, so brighten it
      toward @color-dark-font (#c5d1d3) to match Elastic's overall brightness. */
   --color-muted-foreground: #b3bec1;
   --color-accent: #374549;
@@ -465,7 +465,7 @@ body[data-theme-skin="builtin-roundcube-elastic"] .w-14.bg-secondary .text-prima
   color: #37beff !important;
 }
 
-/* ── Flatten Bulwark's soft radii to Elastic's Bootstrap-flat look ── */
+/* ── Flatten Loomix's soft radii to Elastic's Bootstrap-flat look ── */
 /* Elastic uses ~4px corners on buttons/inputs/cards; rounded-full (pills,
    avatars, toggles) is intentionally left alone. */
 body[data-theme-skin="builtin-roundcube-elastic"] .rounded-md,
@@ -481,7 +481,7 @@ body[data-theme-skin="builtin-roundcube-elastic"] button:not(.rounded-full) {
 
 /* ── Unify panel backgrounds like Roundcube ───────────────────── */
 /* In Elastic the folder list, message list and content pane all share one
-   canvas (white / dark); only the narrow task rail is dark. Bulwark's folder
+   canvas (white / dark); only the narrow task rail is dark. Loomix's folder
    sidebar uses \`bg-secondary\` (a grey panel), so repaint it with the main
    background. The folder sidebar carries the \`border-r\` class; the dark task
    rail uses \`bg-secondary\` WITHOUT it (inline-styled border), so this
@@ -597,7 +597,7 @@ body[data-theme-skin="builtin-roundcube-elastic"] [role="menu"] [role="menuitem"
 
 /* ── Elastic folder list: unread count as a rounded pill ─────── */
 /* Roundcube shows the unread count in a small grey pill on the right, and no
-   badge at all when a folder has nothing unread. Bulwark renders plain
+   badge at all when a folder has nothing unread. Loomix renders plain
    "unread / total" text; the counts container is
    span.ml-2.flex-shrink-0.gap-1.items-baseline holding an unread span
    (.font-semibold), an optional "/" (.text-muted-foreground/60) and the total

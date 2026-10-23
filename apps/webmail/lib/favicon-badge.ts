@@ -4,7 +4,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // thin white keyline ring. Two designs preceded it, and the ring is what
 // reconciles their failures:
 //
-//   - A bare red pill: invisible on Bulwark's own icon, which is itself
+//   - A bare red pill: invisible on Loomix's own icon, which is itself
 //     rgb(219,45,84). `faviconUrl` is admin-overridable, so no fill colour can
 //     ever be guaranteed to differ from the artwork behind it.
 //   - A flat white band with black digits (Gmail-measured geometry): contrast
@@ -18,7 +18,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // covers every base icon, so neither half may be dropped. Digit contrast is
 // fixed (white on the fill) and independent of the artwork entirely.
 //
-// The fill is the Bulwark brand red darkened to ~40% lightness: dark enough to
+// The fill is the Loomix brand red darkened to ~40% lightness: dark enough to
 // read as a distinct badge on the brand icon itself (with the ring between
 // them), and ~6.9:1 against the white digits.
 const BADGE_FILL = '#af1d3f';
@@ -130,7 +130,7 @@ export function renderBadgedFavicon(baseSvgSource: string, count: number): strin
     // any badge maths. Sizing the badge off min(width, height) double-penalised
     // a non-square base: a 100x20 wordmark produced a ~2px-tall smudge on a
     // 16px icon. Squaring first sizes the badge against the box the icon is
-    // actually painted into. It is a no-op for a square viewBox (Bulwark's own
+    // actually painted into. It is a no-op for a square viewBox (Loomix's own
     // is 0 0 1000 1000). Caveat: a base that pairs a non-square viewBox with
     // preserveAspectRatio="none" will now letterbox rather than stretch — an
     // acceptable, arguably better, trade for a favicon, which is always square.

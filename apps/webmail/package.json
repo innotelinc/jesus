@@ -1,8 +1,8 @@
 {
-  "name": "bulwark-webmail",
-  "version": "1.16.0",
-  "description": "Bulwark Webmail - a modern webmail client built for Stalwart Mail Server",
-  "author": "Bulwark Mail <dev@bulwarkmail.org>",
+  "name": "loomix-mail",
+  "version": "1.17.0",
+  "description": "Loomix Mail — webmail, calendar, contacts and files for Stalwart Mail Server",
+  "author": "Innotel / Loomix Mail",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",

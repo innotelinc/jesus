@@ -61,8 +61,8 @@
     "demo_tagline": "Descoperiți un client de e-mail cu funcționalități complete. Nu este necesar un cont.",
     "demo_no_signup": "Nu este necesară înregistrarea – explorați liber cu date de exemplu",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Aplicații implicite",
-    "description": "Alegeți dacă linkurile către e-mail și calendar se deschid în Bulwark. Din punct de vedere tehnic, Bulwark se înregistrează ca gestionar de protocol pentru linkurile de tip mailto: și webcal:.",
+    "description": "Alegeți dacă linkurile către e-mail și calendar se deschid în Loomix. Din punct de vedere tehnic, Loomix se înregistrează ca gestionar de protocol pentru linkurile de tip mailto: și webcal:.",
     "unsupported": "Acest browser sau această conexiune nu acceptă înregistrarea manuală a gestionarului de protocoale. Este posibil să puteți utiliza totuși aplicația PWA instalată prin setările browserului sau ale sistemului de operare.",
     "mailto_label": "Linkuri din e-mail",
-    "mailto_description": "Deschideți linkurile „mailto:” în Bulwark cu o fereastră de redactare precompletată.",
+    "mailto_description": "Deschideți linkurile „mailto:” în Loomix cu o fereastră de redactare precompletată.",
     "protocol_open_mode_label": "La deschiderea linkurilor de protocol",
-    "protocol_open_mode_description": "Alegeți dacă Bulwark deschide linkurile mailto: și webcal: într-o filă nouă sau reutilizează o sesiune deschisă. Opțiunea „sesiune activă” necesită permisiunea de notificare, astfel încât să puteți face clic pe o notificare de rezervă pentru a aduce Bulwark în prim-plan dacă browserul blochează focalizarea.",
+    "protocol_open_mode_description": "Alegeți dacă Loomix deschide linkurile mailto: și webcal: într-o filă nouă sau reutilizează o sesiune deschisă. Opțiunea „sesiune activă” necesită permisiunea de notificare, astfel încât să puteți face clic pe o notificare de rezervă pentru a aduce Loomix în prim-plan dacă browserul blochează focalizarea.",
     "protocol_open_mode_active_session": "Deschideți într-o sesiune activă, dacă este posibil",
     "protocol_open_mode_new_tab": "Deschideți întotdeauna o filă nouă",
-    "focus_notification_title": "Deschideți Bulwark",
-    "focus_notification_body": "Linkul a fost deschis în Bulwark. Faceți clic pentru a aduce fereastra în prim-plan.",
+    "focus_notification_title": "Deschideți Loomix",
+    "focus_notification_body": "Linkul a fost deschis în Loomix. Faceți clic pentru a aduce fereastra în prim-plan.",
     "webcal_label": "Linkuri către calendar",
-    "webcal_description": "Deschideți linkurile webcal: din Bulwark cu o fereastră de dialog de abonare la calendar completată în prealabil.",
+    "webcal_description": "Deschideți linkurile webcal: din Loomix cu o fereastră de dialog de abonare la calendar completată în prealabil.",
     "register_mailto": "Înregistrați aplicația de e-mail",
     "register_webcal": "Înregistrați aplicația de calendar",
     "mailto_registered": "S-a solicitat înregistrarea unui gestionar de e-mail",
@@ -196,7 +196,7 @@
     "registration_failed": "Înregistrarea gestionarului de protocol a eșuat",
     "opening_mailto": "Se deschide fereastra de redactare...",
     "opening_webcal": "Se deschide calendarul...",
-    "browser_note": "Este posibil ca browserul sau sistemul de operare să vă solicite confirmarea acestei acțiuni și să necesite instalareBulwarkului înainte de a putea fi selectat ca aplicație implicită.",
+    "browser_note": "Este posibil ca browserul sau sistemul de operare să vă solicite confirmarea acestei acțiuni și să necesite instalareOasis înainte de a putea fi selectat ca aplicație implicită.",
     "select_account_title": "Alegeți contul",
     "select_mailto_account": "Alegeți contul în care să se deschidă acest link de e-mail.",
     "select_webcal_account": "Alegeți contul care ar trebui să deschidă acest link către calendar.",
@@ -869,9 +869,9 @@
     "app_title": "Webmail",
     "reconnecting": "Conexiune pierdută. Se încearcă reconectarea…",
     "rate_limited_title": "Autentificarea pe server este temporar limitată ca frecvență.",
-    "rate_limited_detail": "Bulwark A suspendat solicitările de fundal pentru a evita blocarea. Se va încerca din nou în câteva {seconds} s.",
+    "rate_limited_detail": "Loomix A suspendat solicitările de fundal pentru a evita blocarea. Se va încerca din nou în câteva {seconds} s.",
     "rate_limited_action_title": "Solicitarea a fost pusă în așteptare pentru a evita blocarea contului.",
-    "rate_limited_action_detail": "Bulwark Așteaptă încheierea perioadei de așteptare a serverului înainte de a trimite alte cereri autentificate. Încercați din nou în câteva {seconds}.",
+    "rate_limited_action_detail": "Loomix Așteaptă încheierea perioadei de așteptare a serverului înainte de a trimite alte cereri autentificate. Încercați din nou în câteva {seconds}.",
     "pull_to_refresh": "Trageți pentru a reîmprospăta",
     "release_to_refresh": "Eliberați pentru a reîmprospăta",
     "refreshing": "Se reîmprospătează…"
@@ -1294,15 +1294,15 @@
       },
       "push": {
         "title": "Notificări în fundal",
-        "description": "Primiți notificări de sistem pentru e-mailuri noi chiar și atunci când acest site este închis. Notificările sunt transmise prin intermediul serverului de push Bulwark; serverul nu vede niciodată conținutul e-mailurilor.",
+        "description": "Primiți notificări de sistem pentru e-mailuri noi chiar și atunci când acest site este închis. Notificările sunt transmise prin intermediul serverului de push Loomix; serverul nu vede niciodată conținutul e-mailurilor.",
         "relay_label": "Relay push",
-        "relay_desc": "Implicit este setat serverul de retransmitere găzduit Bulwark. Modificați această setare numai dacă utilizați un server propriu.",
+        "relay_desc": "Implicit este setat serverul de retransmitere găzduit Loomix. Modificați această setare numai dacă utilizați un server propriu.",
         "relay_locked": "Configurat de administrator",
         "relay_locked_desc": "Relay-ul push URL a fost configurat de administratorul dvs. și nu poate fi modificat.",
         "status_active": "Activ pe acest dispozitiv",
         "status_inactive": "Nu este activat pe acest dispozitiv",
         "status_unsupported": "Acest browser nu acceptă Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "status_busy": "Se lucrează…",
         "enable": "Activați",
         "reenable": "Reînregistrează-te",
@@ -1878,10 +1878,10 @@
       },
       "link_device": {
         "title": "Aplicație mobilă",
-        "description": "Conectați-vă la aplicația Bulwark Mail de pe telefon fără să introduceți parola acolo. Telefonul primește propria conectare, așa că deconectarea de aici nu îl deconectează.",
+        "description": "Conectați-vă la aplicația Loomix Mail de pe telefon fără să introduceți parola acolo. Telefonul primește propria conectare, așa că deconectarea de aici nu îl deconectează.",
         "generate": "Afișați codul QR",
         "regenerate": "Afișați un cod nou",
-        "instructions": "Deschideți aplicația Bulwark Mail și atingeți „Scan a sign-in code” pe ecranul de conectare (sau „Add account” → „Scan a sign-in code” dacă sunteți deja conectat), apoi îndreptați camera spre acest ecran.",
+        "instructions": "Deschideți aplicația Loomix Mail și atingeți „Scan a sign-in code” pe ecranul de conectare (sau „Add account” → „Scan a sign-in code” dacă sunteți deja conectat), apoi îndreptați camera spre acest ecran.",
         "expires_in": "Acest cod expiră în {seconds} secunde. Poate fi utilizat o singură dată.",
         "expired": "Acest cod a expirat.",
         "error": "Nu s-a putut crea un cod de asociere. Vă rugăm să încercați din nou.",
@@ -2128,7 +2128,7 @@
         "button": "Import"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "Cod sursă"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "Gestionați regulile",
       "senders_count": "{count, plural, one {# expeditor} few {# expeditori} other {# de expeditori}}",
       "cross_account": "Selectați mesaje dintr-un singur cont",
-      "opaque_hint": "Filtrele dvs. au fost editate manual. Deschideți setările filtrelor",
+      "opaque_hint": "Filtrele dvs. au fost editate manual. Deschideți setările filtrelor"
+,
       "loading": "Se încarcă regulile…",
       "load_failed": "Regulile nu au putut fi încărcate",
       "none": "Nicio regulă încă",
@@ -3771,7 +3772,7 @@
     "start_tour": "Începe turul"
   },
   "demo_welcome": {
-    "title": "Bine ați venit la Bulwark Mail",
+    "title": "Bine ați venit la Loomix Mail",
     "description": "Explorați un client de e-mail web cu funcționalități complete – direct în browserul dvs. Toate datele rămân pe dispozitivul dvs., așa că nu ezitați să testați totul.",
     "feature_email": "Citiți și redactați e-mailuri",
     "feature_organize": "Etichete, stele și dosare",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "Folosirea conturilor pe care le conectați",
-        "body": "Trimite cereri prin serverul Bulwark cu un cont sau o cheie configurate de dvs. sau de administratorul dvs. Pluginul nu vede niciodată parola, dar poate face tot ce poate face acel cont pe serverul său."
+        "body": "Trimite cereri prin serverul Loomix cu un cont sau o cheie configurate de dvs. sau de administratorul dvs. Pluginul nu vede niciodată parola, dar poate face tot ce poate face acel cont pe serverul său."
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "Conectați {label}",
-      "intro_password": "{name} vrea să folosească contul dvs. {label}. Bulwark păstrează parola pe serverul său și o trimite doar către {host}. Pluginul nu o vede niciodată.",
-      "intro_password_any": "{name} vrea să folosească contul dvs. {label}. Bulwark păstrează parola pe serverul său și o trimite doar către serverul pe care îl introduceți aici. Pluginul nu o vede niciodată.",
-      "intro_signin": "{name} vrea să se conecteze la contul dvs. {label}. Introduceți aici serverul, apoi conectați-vă pe pagina acestuia. Bulwark păstrează pe serverul său accesul obținut; pluginul nu îl vede niciodată.",
+      "intro_password": "{name} vrea să folosească contul dvs. {label}. Loomix păstrează parola pe serverul său și o trimite doar către {host}. Pluginul nu o vede niciodată.",
+      "intro_password_any": "{name} vrea să folosească contul dvs. {label}. Loomix păstrează parola pe serverul său și o trimite doar către serverul pe care îl introduceți aici. Pluginul nu o vede niciodată.",
+      "intro_signin": "{name} vrea să se conecteze la contul dvs. {label}. Introduceți aici serverul, apoi conectați-vă pe pagina acestuia. Loomix păstrează pe serverul său accesul obținut; pluginul nu îl vede niciodată.",
       "server": "Adresa serverului",
       "server_hint": "cloud.example.com",
       "username": "Nume de utilizator",

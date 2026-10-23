@@ -109,7 +109,7 @@ export function ThemesSettings({ embedded }: { embedded?: boolean } = {}) {
               <ThemeCard
                 key="default"
                 name={t('default_name')}
-                author="Bulwark"
+                author="Loomix"
                 isDefaultTheme
                 variants={['light', 'dark']}
                 isDark={isDark}

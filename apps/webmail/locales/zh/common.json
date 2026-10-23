@@ -61,8 +61,8 @@
     "demo_tagline": "体验功能完整的邮件客户端，无需账号。",
     "demo_no_signup": "无需注册，直接使用示例数据体验",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "默认应用",
-    "description": "选择是否在 Bulwark 中打开电子邮件和日历链接。从技术上讲，Bulwark 会注册为 mailto: 和 webcal: 链接的协议处理程序。",
+    "description": "选择是否在 Loomix 中打开电子邮件和日历链接。从技术上讲，Loomix 会注册为 mailto: 和 webcal: 链接的协议处理程序。",
     "unsupported": "此浏览器或连接不支持手动注册协议处理程序。你仍可尝试通过浏览器或系统设置使用已安装的 PWA。",
     "mailto_label": "电子邮件链接",
-    "mailto_description": "在 Bulwark 中打开 mailto: 链接，并预先填好撰写窗口。",
+    "mailto_description": "在 Loomix 中打开 mailto: 链接，并预先填好撰写窗口。",
     "protocol_open_mode_label": "打开协议链接时",
-    "protocol_open_mode_description": "选择 Bulwark 是在新标签页中打开 mailto: 和 webcal: 链接，还是复用已打开的会话。活动会话选项需要通知权限，这样当浏览器阻止聚焦时，你可以点击备用通知将 Bulwark 窗口带到前台。",
+    "protocol_open_mode_description": "选择 Loomix 是在新标签页中打开 mailto: 和 webcal: 链接，还是复用已打开的会话。活动会话选项需要通知权限，这样当浏览器阻止聚焦时，你可以点击备用通知将 Loomix 窗口带到前台。",
     "protocol_open_mode_active_session": "尽可能在活动会话中打开",
     "protocol_open_mode_new_tab": "始终打开新标签页",
-    "focus_notification_title": "打开 Bulwark",
-    "focus_notification_body": "链接已在 Bulwark 中打开。点击可将窗口带到前台。",
+    "focus_notification_title": "打开 Loomix",
+    "focus_notification_body": "链接已在 Loomix 中打开。点击可将窗口带到前台。",
     "webcal_label": "日历链接",
-    "webcal_description": "在 Bulwark 中打开 webcal: 链接，并预先填好日历订阅对话框。",
+    "webcal_description": "在 Loomix 中打开 webcal: 链接，并预先填好日历订阅对话框。",
     "register_mailto": "注册电子邮件应用",
     "register_webcal": "注册日历应用",
     "mailto_registered": "已请求注册电子邮件处理程序",
@@ -196,7 +196,7 @@
     "registration_failed": "协议处理程序注册失败",
     "opening_mailto": "正在打开撰写窗口...",
     "opening_webcal": "正在打开日历...",
-    "browser_note": "你的浏览器或操作系统可能会要求确认，并且可能需要先安装 Bulwark，才能将其选为默认应用。",
+    "browser_note": "你的浏览器或操作系统可能会要求确认，并且可能需要先安装 Loomix，才能将其选为默认应用。",
     "select_account_title": "选择账户",
     "select_mailto_account": "选择用于打开此电子邮件链接的账户。",
     "select_webcal_account": "选择用于打开此日历链接的账户。",
@@ -869,9 +869,9 @@
     "app_title": "网页邮箱",
     "reconnecting": "连接已断开，正在尝试重连…",
     "rate_limited_title": "服务器身份验证暂时受到速率限制。",
-    "rate_limited_detail": "Bulwark 已暂停后台请求以避免账户被锁定。将在 {seconds} 秒后重试。",
+    "rate_limited_detail": "Loomix 已暂停后台请求以避免账户被锁定。将在 {seconds} 秒后重试。",
     "rate_limited_action_title": "请求已暂停以避免账户被锁定。",
-    "rate_limited_action_detail": "Bulwark 正在等待服务器冷却，然后再发送更多请求。请在 {seconds} 秒后重试。",
+    "rate_limited_action_detail": "Loomix 正在等待服务器冷却，然后再发送更多请求。请在 {seconds} 秒后重试。",
     "pull_to_refresh": "下拉刷新",
     "release_to_refresh": "松开刷新",
     "refreshing": "正在刷新…"
@@ -1328,13 +1328,13 @@
       "push": {
         "confirm_disable_message": "当网站关闭时，此设备将停止接收提醒。",
         "confirm_disable_title": "禁用后台通知？",
-        "description": "在此网站关闭时接收新邮件的系统通知。通过 Bulwark 推送中继传送；中继永远不会看到邮件内容。",
+        "description": "在此网站关闭时接收新邮件的系统通知。通过 Loomix 推送中继传送；中继永远不会看到邮件内容。",
         "disable": "禁用",
         "enable": "启用",
         "dismiss_aria": "关闭通知提示",
         "ios_hint": "在 iOS 上，请先将网站安装到主屏幕 – Safari 仅向已安装的 PWA 发送 Web Push。",
         "reenable": "重新注册",
-        "relay_desc": "默认使用托管的 Bulwark 中继。仅当您自托管时才更改。",
+        "relay_desc": "默认使用托管的 Loomix 中继。仅当您自托管时才更改。",
         "relay_label": "推送中继",
         "relay_locked": "由管理员设置",
         "relay_locked_desc": "推送中继 URL 已由您的管理员设置，无法更改。",
@@ -1342,7 +1342,7 @@
         "status_busy": "工作中…",
         "status_inactive": "在此设备上未启用",
         "status_unsupported": "此浏览器不支持 Web Push",
-        "status_lite": "Web Push is not available in Bulwark Lite; it needs the Bulwark server.",
+        "status_lite": "Web Push is not available in Loomix Lite; it needs the Loomix server.",
         "title": "后台通知",
         "devices_title": "已注册的设备",
         "devices_desc": "已注册接收此账户后台通知的所有设备。撤销后，该设备会立即停止接收。",
@@ -1871,10 +1871,10 @@
       },
       "link_device": {
         "title": "关联移动应用",
-        "description": "无需在手机上输入密码即可登录手机上的 Bulwark Mail 应用。手机会获得独立的登录状态，因此在此处退出登录不会让手机退出。",
+        "description": "无需在手机上输入密码即可登录手机上的 Loomix Mail 应用。手机会获得独立的登录状态，因此在此处退出登录不会让手机退出。",
         "generate": "显示二维码",
         "regenerate": "显示新的二维码",
-        "instructions": "打开 Bulwark Mail 应用，在登录界面点按“Scan a sign-in code”（如果已登录，则点按“Add account”→“Scan a sign-in code”），然后将相机对准此处。",
+        "instructions": "打开 Loomix Mail 应用，在登录界面点按“Scan a sign-in code”（如果已登录，则点按“Add account”→“Scan a sign-in code”），然后将相机对准此处。",
         "expires_in": "此二维码将在 {seconds} 秒后过期，且只能使用一次。",
         "expired": "此二维码已过期。",
         "error": "无法创建配对码。请重试。",
@@ -2121,7 +2121,7 @@
         "button": "导入"
       },
       "about": {
-        "title": "Bulwark 网页邮箱",
+        "title": "Loomix 网页邮箱",
         "source_code": "源代码"
       },
       "spam_siege": {
@@ -2583,7 +2583,8 @@
       "manage": "管理规则",
       "senders_count": "{count, plural, other {# 个发件人}}",
       "cross_account": "请选择同一账户中的邮件",
-      "opaque_hint": "你的过滤器已被手动编辑。请打开过滤器设置",
+      "opaque_hint": "你的过滤器已被手动编辑。请打开过滤器设置"
+,
       "loading": "正在加载规则…",
       "load_failed": "无法加载规则",
       "none": "暂无规则",
@@ -3729,7 +3730,7 @@
     "start_tour": "开始导览"
   },
   "demo_welcome": {
-    "title": "欢迎使用 Bulwark Mail",
+    "title": "欢迎使用 Loomix Mail",
     "description": "探索功能齐全的网页邮件客户端--就在您的浏览器中。所有数据都保留在您的设备上，请随意体验所有功能。",
     "feature_email": "阅读和撰写邮件",
     "feature_organize": "标签、星标和文件夹",
@@ -4407,7 +4408,7 @@
       },
       "http_proxy": {
         "title": "使用您连接的账户",
-        "body": "使用您或管理员设置的账户或密钥，通过 Bulwark 的服务器发送请求。插件永远看不到密码，但可以在该账户所属的服务器上执行该账户能做的任何操作。"
+        "body": "使用您或管理员设置的账户或密钥，通过 Loomix 的服务器发送请求。插件永远看不到密码，但可以在该账户所属的服务器上执行该账户能做的任何操作。"
       }
     },
     "dialog": {
@@ -4424,9 +4425,9 @@
     },
     "connect": {
       "title": "连接 {label}",
-      "intro_password": "{name} 想使用您的 {label} 账户。Bulwark 将密码保存在自己的服务器上，只会发送给 {host}。插件永远看不到密码。",
-      "intro_password_any": "{name} 想使用您的 {label} 账户。Bulwark 将密码保存在自己的服务器上，只会发送给您在此处输入的服务器。插件永远看不到密码。",
-      "intro_signin": "{name} 想登录您的 {label} 账户。请在此处输入服务器，然后在该服务器自己的页面上登录。Bulwark 将获得的访问权限保存在自己的服务器上；插件永远看不到它。",
+      "intro_password": "{name} 想使用您的 {label} 账户。Loomix 将密码保存在自己的服务器上，只会发送给 {host}。插件永远看不到密码。",
+      "intro_password_any": "{name} 想使用您的 {label} 账户。Loomix 将密码保存在自己的服务器上，只会发送给您在此处输入的服务器。插件永远看不到密码。",
+      "intro_signin": "{name} 想登录您的 {label} 账户。请在此处输入服务器，然后在该服务器自己的页面上登录。Loomix 将获得的访问权限保存在自己的服务器上；插件永远看不到它。",
       "server": "服务器地址",
       "server_hint": "cloud.example.com",
       "username": "用户名",

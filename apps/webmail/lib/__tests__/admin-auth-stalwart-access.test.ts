@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // /api/admin/auth under the three `stalwartAdminAccess` modes (#870):
 //   auto     - Stalwart admins are auto-signed-in (legacy behaviour)
-//   password - shield stays, but the Bulwark admin password is required
+//   password - shield stays, but the Loomix admin password is required
 //   off      - Stalwart admin status is ignored entirely
 
 vi.mock('next/server', () => ({

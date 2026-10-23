@@ -7,7 +7,7 @@ import { TARGET_NAMES } from '@/lib/connector/registry';
  *
  * Someone adding this instance at connector.bulwarkmail.org gets a request
  * here, from their own browser, straight to their own server, with no
- * credentials. It answers two questions: is this really a Bulwark, and which
+ * credentials. It answers two questions: is this really a Loomix, and which
  * connector links can it resolve - so a link to a target this version does not
  * have can warn before it opens instead of after.
  *
@@ -21,7 +21,7 @@ import { TARGET_NAMES } from '@/lib/connector/registry';
  * `appName` can be a customer's own branding, so the whole endpoint is gated
  * on `connectorEnabled` for deployments that would rather disclose nothing.
  *
- * Bulwark Lite has no route handlers; scripts/lite/postbuild.mjs writes the
+ * Loomix Lite has no route handlers; scripts/lite/postbuild.mjs writes the
  * same document to /connector.json, and the connector tries this first and
  * falls back to that.
  */
@@ -36,7 +36,7 @@ export async function GET() {
     {
       product: 'bulwark-webmail',
       appName:
-        configManager.get<string>('appName', '') || process.env.NEXT_PUBLIC_APP_NAME || 'Bulwark',
+        configManager.get<string>('appName', '') || process.env.NEXT_PUBLIC_APP_NAME || 'Loomix',
       version: configManager.get<boolean>('loginShowVersion', true)
         ? process.env.NEXT_PUBLIC_APP_VERSION || null
         : null,

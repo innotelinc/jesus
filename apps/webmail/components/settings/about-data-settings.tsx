@@ -60,10 +60,10 @@ export function AboutFooter() {
   const t = useTranslations('settings.advanced');
   const { sourceCodeUrl, appName, appLogoLightUrl, appLogoDarkUrl } = useConfig();
   // A branded deployment (APP_NAME / APP_LOGO_*) shows its own name and logo
-  // here; without them the card keeps the Bulwark mark and title. (#1160)
+  // here; without them the card keeps the Loomix mark and title. (#1160)
   const branded = appName && appName !== 'Webmail';
-  const logoLight = withBasePath(appLogoLightUrl || appLogoDarkUrl) || `${getPathPrefix()}/branding/Bulwark_Logo_Color.svg`;
-  const logoDark = withBasePath(appLogoDarkUrl || appLogoLightUrl) || `${getPathPrefix()}/branding/Bulwark_Logo_White.svg`;
+  const logoLight = withBasePath(appLogoLightUrl || appLogoDarkUrl) || `${getPathPrefix()}/branding/Loomix_Mark.svg`;
+  const logoDark = withBasePath(appLogoDarkUrl || appLogoLightUrl) || `${getPathPrefix()}/branding/Loomix_Mark.svg`;
   const [showGame, setShowGame] = useState(false);
   const logoClickCount = useRef(0);
   const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,12 +86,12 @@ export function AboutFooter() {
         <button onClick={handleLogoClick} className="flex items-center gap-3 flex-1 min-w-0 text-start focus:outline-none group/about cursor-pointer" aria-label="About">
           <img
             src={logoLight}
-            alt={branded ? appName : 'Bulwark'}
+            alt={branded ? appName : 'Loomix'}
             className="w-7 h-7 shrink-0 object-contain dark:hidden group-active/about:scale-95 transition-transform"
           />
           <img
             src={logoDark}
-            alt={branded ? appName : 'Bulwark'}
+            alt={branded ? appName : 'Loomix'}
             className="w-7 h-7 shrink-0 object-contain hidden dark:block group-active/about:scale-95 transition-transform"
           />
           <div className="min-w-0">

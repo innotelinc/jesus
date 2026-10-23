@@ -254,8 +254,8 @@ function stripRuleForMetadata(r: FilterRule): Omit<FilterRule, 'origin' | 'origi
 
 export interface GenerateOptions {
   /**
-   * Require extensions used by external (non-Bulwark) rules that we must
-   * preserve in the top-level `require` directive. Duplicates with Bulwark's
+   * Require extensions used by external (non-Loomix) rules that we must
+   * preserve in the top-level `require` directive. Duplicates with Loomix's
    * own requires are deduplicated.
    */
   externalRequires?: string[];
@@ -365,7 +365,7 @@ export function generateScript(
   }
 
   if (options.includeVacation) {
-    // The "# Vacation auto-reply" comment marks the block as Bulwark's, so
+    // The "# Vacation auto-reply" comment marks the block as Loomix's, so
     // the parser does not re-import it as an external rule.
     lines.push('');
     lines.push('# Vacation auto-reply');
@@ -473,7 +473,7 @@ export function generateScript(
   // own leading comments and trailing whitespace from the source script.
   if (externalRules.length > 0) {
     lines.push('');
-    lines.push('# --- External rules (managed outside Bulwark) ---');
+    lines.push('# --- External rules (managed outside Loomix) ---');
     for (const ext of externalRules) {
       if (!ext.rawBlock) continue;
       lines.push(ext.rawBlock.replace(/\s+$/, ''));

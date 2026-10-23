@@ -66,7 +66,7 @@ const SENDERS: Record<Kind, readonly Sender[]> = {
     { name: "Payroll Update", address: "hr@payro11-portal.example" },
     { name: "Mailbox Quota", address: "admin@mail-quota.example" },
     { name: "Parcel Service", address: "redeliver@parce1-track.example" },
-    { name: "Bulwark Support", address: "verify@bulvvark-mail.example" },
+    { name: "Loomix Support", address: "verify@bulvvark-mail.example" },
   ],
   legit: [
     { name: "Alice Johnson", address: "alice.johnson@example.com" },

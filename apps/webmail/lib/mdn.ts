@@ -28,7 +28,7 @@ export interface MdnOptions {
   originalRecipient?: string;
   /** true => automatic-action (setting "always"); false => manual-action (user clicked send). */
   automatic?: boolean;
-  /** Reporting-UA value, e.g. "mail.dornig.de; Bulwark Webmail". */
+  /** Reporting-UA value, e.g. "mail.dornig.de; Loomix Mail". */
   reportingUa?: string;
   /** Localized full Subject line. Defaults to "Read: <originalSubject>". */
   subject?: string;
@@ -141,7 +141,7 @@ export function buildMdnMessage(opts: MdnOptions): string {
     ? "automatic-action/MDN-sent-automatically; displayed"
     : "manual-action/MDN-sent-manually; displayed";
 
-  const reportingUa = stripHeaderControls(opts.reportingUa || "") || `${domain}; Bulwark Webmail`;
+  const reportingUa = stripHeaderControls(opts.reportingUa || "") || `${domain}; Loomix Mail`;
 
   // Human-readable part. Caller passes a localized humanText; fall back to
   // English. Encoded as UTF-8/base64 below so any language survives.

@@ -11,7 +11,7 @@ vi.mock('next-intl', () => ({
   useFormatter: () => ({ relativeTime: () => 'just now' }),
   useLocale: () => 'en',
 }));
-vi.mock('@/hooks/use-config', () => ({ useConfig: () => ({ appName: 'Bulwark' }) }));
+vi.mock('@/hooks/use-config', () => ({ useConfig: () => ({ appName: 'Loomix' }) }));
 vi.mock('@/hooks/use-stalwart-admin', () => ({ useStalwartAdmin: () => false }));
 vi.mock('@/components/layout/account-switcher', () => ({ AccountSwitcher: () => null }));
 vi.mock('@/components/plugins/plugin-slot', () => ({ PluginSlot: () => null }));
@@ -62,7 +62,7 @@ describe('notification bell', () => {
     expect(items[0]).toHaveTextContent('3 new posts');
     expect(items[0]).toHaveTextContent('RSS Reader');
     expect(items[1]).toHaveTextContent('Could not send');
-    expect(items[1]).toHaveTextContent('Bulwark');
+    expect(items[1]).toHaveTextContent('Loomix');
     expect(items[1]).toHaveTextContent('level_error');
   });
 

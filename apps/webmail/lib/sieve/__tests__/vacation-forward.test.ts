@@ -150,7 +150,7 @@ describe('vacation forwarding (parser)', () => {
     const handWritten = '# Vacation forwarding\nif true {\n    redirect "x@example.com";\n}\n';
     const parsed = parseScript(`${generate(null)}\n${handWritten}`);
     expect(parsed.vacationForward).toBeUndefined();
-    // Kept as someone else's block (it reads as neither rule nor Bulwark's).
+    // Kept as someone else's block (it reads as neither rule nor Loomix's).
     expect(parsed.rules.some((r) => r.origin === 'opaque' && r.rawBlock?.includes('redirect "x@example.com"'))).toBe(true);
   });
 
@@ -161,7 +161,7 @@ describe('vacation forwarding (parser)', () => {
       parseScript(script).rules.some((r) => r.origin !== undefined && r.origin !== 'bulwark' && r.rawBlock?.includes(raw));
     // A comment that only begins like the marker, while forwarding is on.
     expect(kept(`${generate(forward())}\n${team}`, 'archive@example.com')).toBe(true);
-    // The exact marker while forwarding is off: Bulwark wrote no block then.
+    // The exact marker while forwarding is off: Loomix wrote no block then.
     expect(kept(`${generate(forward({ enabled: false }))}\n${exact}`, 'x@example.com')).toBe(true);
     // Its own block it still takes back, and writes once.
     const own = parseScript(generate(forward()));

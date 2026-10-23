@@ -47,8 +47,8 @@ export function OAuthStatusCard({
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
 
   // Same logo resolution order as the admin layout: app logo first, then the
-  // login logo (which has Bulwark defaults), so an unbranded instance still
-  // shows the Bulwark mark.
+  // login logo (which has Loomix defaults), so an unbranded instance still
+  // shows the Loomix mark.
   const logoUrl = withBasePath(
     resolvedTheme === "dark"
       ? appLogoDarkUrl || appLogoLightUrl || loginLogoDarkUrl

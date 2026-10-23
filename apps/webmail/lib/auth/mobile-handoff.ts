@@ -1,5 +1,5 @@
 /**
- * The browser-login handoff to the Bulwark mobile app.
+ * The browser-login handoff to the Loomix mobile app.
  *
  * The app opens `/login?mobile_redirect_uri=…&mobile_state=…` in the system
  * browser; once the user has signed in, the page navigates to that URI with

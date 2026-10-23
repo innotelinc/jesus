@@ -10,7 +10,7 @@ const pkg = JSON.parse(
   readFileSync(`${process.cwd()}/package.json`, "utf-8")
 );
 const current: string = pkg.version ?? "0.0.0";
-console.info(`Bulwark Webmail v${current}`);
+console.info(`Loomix Webmail v${current}`);
 
 // Initialize admin config and password bootstrap. Migration runs first so
 // existing v1 layouts are split before anything reads admin.json.

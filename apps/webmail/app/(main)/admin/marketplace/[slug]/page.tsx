@@ -106,7 +106,7 @@ const RISKY_PERMISSIONS = new Set([
   'admin',
 ]);
 
-/** Whether this Bulwark can run a version, given what the directory says it needs. */
+/** Whether this Loomix can run a version, given what the directory says it needs. */
 function fits(v: { minAppVersion: string | null; maxAppVersion: string | null }): boolean {
   if (!isVersionSatisfied(CURRENT_APP_VERSION, v.minAppVersion)) return false;
   if (v.maxAppVersion && compareVersions(CURRENT_APP_VERSION, v.maxAppVersion) > 0) return false;
@@ -402,7 +402,7 @@ export default function MarketplacePreviewPage() {
               onClick={() => handleInstall(preview.version)}
               disabled={!!busy || !canInstallPreview}
               title={!previewFits
-                ? `v${preview.version} needs Bulwark ${preview.minAppVersion ?? 'any'}${preview.maxAppVersion ? ` to ${preview.maxAppVersion}` : ' or later'}. You are running v${CURRENT_APP_VERSION}.`
+                ? `v${preview.version} needs Loomix ${preview.minAppVersion ?? 'any'}${preview.maxAppVersion ? ` to ${preview.maxAppVersion}` : ' or later'}. You are running v${CURRENT_APP_VERSION}.`
                 : preview.yanked ? 'This version was withdrawn by its publisher; you will be asked to confirm.' : undefined}
               className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
                 previewIsInstalled
@@ -490,16 +490,16 @@ export default function MarketplacePreviewPage() {
         </Notice>
       )}
       {preview && !previewFits && (
-        <Notice tone="warning" title={preview.maxAppVersion && compareVersions(CURRENT_APP_VERSION, preview.maxAppVersion) > 0 ? 'This version is for an older Bulwark' : 'Update Bulwark to install this version'}>
-          v{preview.version} needs Bulwark {preview.minAppVersion ?? 'any version'}{preview.maxAppVersion ? ` up to ${preview.maxAppVersion}` : ' or later'}. You are running v{CURRENT_APP_VERSION}.
+        <Notice tone="warning" title={preview.maxAppVersion && compareVersions(CURRENT_APP_VERSION, preview.maxAppVersion) > 0 ? 'This version is for an older Loomix' : 'Update Loomix to install this version'}>
+          v{preview.version} needs Loomix {preview.minAppVersion ?? 'any version'}{preview.maxAppVersion ? ` up to ${preview.maxAppVersion}` : ' or later'}. You are running v{CURRENT_APP_VERSION}.
           {!preview.yanked && ext.latest && ext.latest.version !== preview.version && (
             <> <button className="underline" onClick={() => pick(ext.latest!.version)}>v{ext.latest.version}</button> runs here.</>
           )}
         </Notice>
       )}
       {!ext.latest && !preview && (
-        <Notice tone="warning" title="No version runs on this Bulwark">
-          {ext.newestVersion ? `The newest, v${ext.newestVersion}, needs Bulwark ${ext.newestMinAppVersion ?? 'a newer version'}.` : 'Nothing has been published yet.'}
+        <Notice tone="warning" title="No version runs on this Loomix">
+          {ext.newestVersion ? `The newest, v${ext.newestVersion}, needs Loomix ${ext.newestMinAppVersion ?? 'a newer version'}.` : 'Nothing has been published yet.'}
         </Notice>
       )}
       {bundle.error && (
@@ -568,7 +568,7 @@ export default function MarketplacePreviewPage() {
               <tr className="border-b border-border">
                 <th className="text-start font-medium px-4 py-2">Version</th>
                 <th className="text-start font-medium px-4 py-2">Released</th>
-                <th className="text-start font-medium px-4 py-2">Needs Bulwark</th>
+                <th className="text-start font-medium px-4 py-2">Needs Loomix</th>
                 <th className="text-start font-medium px-4 py-2">Size</th>
                 <th className="text-start font-medium px-4 py-2">Status</th>
                 <th className="text-end font-medium px-4 py-2"><span className="sr-only">Actions</span></th>

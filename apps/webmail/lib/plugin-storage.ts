@@ -46,7 +46,7 @@ function openDB(): Promise<IDBDatabase> {
     request.onblocked = () =>
       reject(
         new Error(
-          'Plugin storage database is blocked by another open tab. Close other Bulwark tabs and try again.',
+          'Plugin storage database is blocked by another open tab. Close other Loomix tabs and try again.',
         ),
       );
   });

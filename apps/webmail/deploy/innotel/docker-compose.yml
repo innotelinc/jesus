@@ -1,15 +1,16 @@
-# Innotel Bulwark deployment (mail.innotel.us).
+# Oasis Mail deployment (mail.innotel.us).
 #
 # Installed at /opt/bulwark/docker-compose.yml inside the `mail` Incus
 # container. Secrets and deployment-specific values live in .env.local next to
 # this file and are never committed; see .env.local.example for the keys.
 #
-# The image is built from the innotelinc/webmail fork (1.16.0 plus the
-# multi-account SSO fix) and published privately to GHCR, so the host must be
-# logged in (`docker login ghcr.io`) before `docker compose pull`.
+# The image is built from the innotelinc/webmail fork and published privately
+# to GHCR, so the host must be logged in (`docker login ghcr.io`) before
+# `docker compose pull`. 1.17.0 carries the Oasis brand; the host may also load
+# a locally built `oasis/webmail:1.17.0` with `docker load`.
 services:
   bulwark:
-    image: ghcr.io/innotelinc/webmail:1.16.0-sso
+    image: ${OASIS_MAIL_IMAGE:-ghcr.io/innotelinc/webmail:1.17.0-sso}
     container_name: bulwark
     env_file:
       - .env.local

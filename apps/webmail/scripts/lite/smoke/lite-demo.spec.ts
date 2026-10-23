@@ -30,7 +30,7 @@ async function loginAsDemo(page: Page, origin = "") {
   await page.waitForURL(/\/en\/?(mail\/?.*)?(\?.*)?$/, { timeout: 30_000 });
 }
 
-test.describe("Bulwark Lite demo export", () => {
+test.describe("Loomix Lite demo export", () => {
   let apiRequests: string[];
 
   test.beforeEach(async ({ page }) => {

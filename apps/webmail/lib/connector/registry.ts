@@ -91,7 +91,7 @@ export interface Target {
 export const TARGETS: readonly Target[] = [
   {
     name: 'app',
-    label: 'Bulwark',
+    label: 'Loomix',
     resolve: () => ({ path: '/mail' }),
   },
   {
@@ -145,7 +145,7 @@ export const TARGETS: readonly Target[] = [
     name: 'admin_extension',
     label: 'an extension in the marketplace',
     // `version` picks the version the page offers to install; without it the
-    // page offers the newest one this Bulwark can run. The marketplace page
+    // page offers the newest one this Loomix can run. The marketplace page
     // reads it from the query string, and `safeAdminNext` lets exactly this
     // query through the admin login.
     params: { slug: { type: 'slug', required: true }, version: { type: 'version' } },

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.17.0 (2026-10-23)
+
+Loomix Mail. This release turns the Innotel build into the Loomix client: the
+product name, login, browser tab, PWA manifest, About card, share card, icons
+and shipped branding are Loomix throughout, with the new palm-and-water mark.
+Deployments set `APP_NAME=Loomix Mail`; the bundled branding assets are renamed
+`Loomix_*` and replace the Bulwark artwork in the image.
+
+The upstream Bulwark documentation and attribution remain in `LICENSE`,
+`NOTICE` and the README's attribution section.
+
 ## 1.16.0 (2026-10-19)
 
 1.16.0 regroups the settings into fewer pages with an Advanced switch for the power-user options, shows the message list as columns on request, turns @mentions into contact chips, and opens the company directory in contacts and the composer. The marketplace can install any version of an extension and roll back to a replaced one, admins get policies for the colour mode, archiving and the provider sign-out, and the Estonian locale arrives. A security audit of the whole app fixed cross-account actions on repeated message ids and about thirty smaller findings.

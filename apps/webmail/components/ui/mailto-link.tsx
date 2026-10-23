@@ -12,7 +12,7 @@ interface MailtoLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 
 /**
  * An address in the app's own chrome (contact cards, sidebars, contact
  * details). Handing a `mailto:` URL to the OS mail handler goes nowhere in a
- * webmail client - unless the user happened to register Bulwark as their
+ * webmail client - unless the user happened to register Loomix as their
  * system handler - so the click opens the built-in composer instead.
  *
  * Deliberately still an anchor with a real href: right-click "Copy email

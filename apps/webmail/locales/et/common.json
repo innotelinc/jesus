@@ -61,8 +61,8 @@
     "demo_tagline": "Proovi täisfunktsionaalset e-posti klienti. Kontot pole vaja.",
     "demo_no_signup": "Registreerimist pole vaja - tutvu vabalt näidisandmetega",
     "mobile_handoff": {
-      "title": "Open the Bulwark mobile app?",
-      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Bulwark link. Continue only if you started this from the Bulwark mobile app.",
+      "title": "Open the Loomix mobile app?",
+      "description": "This sign-in page was opened by an app on this device. Your sign-in for {username} will be handed to the app that registered the Loomix link. Continue only if you started this from the Loomix mobile app.",
       "confirm": "Hand over to the app",
       "cancel": "Stay in the webmail"
     },
@@ -177,18 +177,18 @@
   },
   "protocol_handlers": {
     "title": "Vaikerakendused",
-    "description": "Vali, kas e-posti ja kalendri lingid avanevad Bulwarkis. Tehniliselt registreerib Bulwark end mailto: ja webcal: linkide protokollikäsitlejana.",
+    "description": "Vali, kas e-posti ja kalendri lingid avanevad Loomix. Tehniliselt registreerib Loomix end mailto: ja webcal: linkide protokollikäsitlejana.",
     "unsupported": "See brauser või ühendus ei toeta protokollikäsitleja käsitsi registreerimist. Paigaldatud PWA-d saad siiski kasutada brauseri või operatsioonisüsteemi seadete kaudu.",
     "mailto_label": "E-posti lingid",
-    "mailto_description": "Ava mailto: lingid Bulwarkis koos eeltäidetud kirja koostamise aknaga.",
+    "mailto_description": "Ava mailto: lingid Loomix koos eeltäidetud kirja koostamise aknaga.",
     "protocol_open_mode_label": "Protokollilinkide avamisel",
-    "protocol_open_mode_description": "Vali, kas Bulwark avab mailto: ja webcal: lingid uuel vahekaardil või kasutab olemasolevat sessiooni. Aktiivse sessiooni valik vajab teavituste õigust, et saaksid vajadusel klõpsata varuteavitusel, mis toob Bulwarki esiplaanile, kui brauser blokeerib fookuse liikumise.",
+    "protocol_open_mode_description": "Vali, kas Loomix avab mailto: ja webcal: lingid uuel vahekaardil või kasutab olemasolevat sessiooni. Aktiivse sessiooni valik vajab teavituste õigust, et saaksid vajadusel klõpsata varuteavitusel, mis toob Loomix esiplaanile, kui brauser blokeerib fookuse liikumise.",
     "protocol_open_mode_active_session": "Ava võimalusel aktiivses sessioonis",
     "protocol_open_mode_new_tab": "Ava alati uuel vahekaardil",
-    "focus_notification_title": "Ava Bulwark",
-    "focus_notification_body": "Link avati Bulwarkis. Klõpsa, et tuua aken esiplaanile.",
+    "focus_notification_title": "Ava Loomix",
+    "focus_notification_body": "Link avati Loomix. Klõpsa, et tuua aken esiplaanile.",
     "webcal_label": "Kalendri lingid",
-    "webcal_description": "Ava webcal: lingid Bulwarkis koos eeltäidetud kalendri tellimise dialoogiga.",
+    "webcal_description": "Ava webcal: lingid Loomix koos eeltäidetud kalendri tellimise dialoogiga.",
     "register_mailto": "Registreeri e-posti rakendus",
     "register_webcal": "Registreeri kalendrirakendus",
     "mailto_registered": "E-posti käsitleja registreerimist taotleti",
@@ -196,7 +196,7 @@
     "registration_failed": "Protokollikäsitleja registreerimine ebaõnnestus",
     "opening_mailto": "Kirja koostamise akna avamine...",
     "opening_webcal": "Kalendri avamine...",
-    "browser_note": "Sinu brauser või operatsioonisüsteem võib paluda seda kinnitada ning enne vaikerakenduseks valimist võib nõuda Bulwarki paigaldamist.",
+    "browser_note": "Sinu brauser või operatsioonisüsteem võib paluda seda kinnitada ning enne vaikerakenduseks valimist võib nõuda Loomix paigaldamist.",
     "select_account_title": "Vali konto",
     "select_mailto_account": "Vali, milline konto peaks selle e-posti lingi avama.",
     "select_webcal_account": "Vali, milline konto peaks selle kalendrilingi avama.",
@@ -869,9 +869,9 @@
     "app_title": "Webmail",
     "reconnecting": "Ühendus katkes. Proovime uuesti ühenduda…",
     "rate_limited_title": "Serveri autentimine on ajutiselt piiratud.",
-    "rate_limited_detail": "Bulwark on taustapäringud lukustumise vältimiseks peatanud. Proovime uuesti {seconds}s pärast.",
+    "rate_limited_detail": "Loomix on taustapäringud lukustumise vältimiseks peatanud. Proovime uuesti {seconds}s pärast.",
     "rate_limited_action_title": "Päring peatati lukustumise vältimiseks.",
-    "rate_limited_action_detail": "Bulwark ootab serveri jahtumisaja lõppu, enne kui saadab rohkem autenditud päringuid. Proovi uuesti {seconds}s pärast.",
+    "rate_limited_action_detail": "Loomix ootab serveri jahtumisaja lõppu, enne kui saadab rohkem autenditud päringuid. Proovi uuesti {seconds}s pärast.",
     "pull_to_refresh": "Värskendamiseks tõmba alla",
     "release_to_refresh": "Värskendamiseks vabasta",
     "refreshing": "Värskendamine…"
@@ -1294,7 +1294,7 @@
       },
       "push": {
         "title": "Taustateavitused",
-        "description": "Saa süsteemseid teavitusi uutest kirjadest ka siis, kui see sait on suletud. Edastatakse Bulwarki push-releele; relee ei näe kirjade sisu kunagi.",
+        "description": "Saa süsteemseid teavitusi uutest kirjadest ka siis, kui see sait on suletud. Edastatakse Loomix push-releele; relee ei näe kirjade sisu kunagi.",
         "relay_label": "Push-relee",
         "relay_desc": "Server, mis edastab su teavitusi. Vali administraatori pakutavate releede hulgast.",
         "relay_locked": "Määratud administraatori poolt",
@@ -1302,7 +1302,7 @@
         "status_active": "Aktiivne selles seadmes",
         "status_inactive": "Selles seadmes pole lubatud",
         "status_unsupported": "See brauser ei toeta Web Pushi",
-        "status_lite": "Veebi-tõukemärguanded pole Bulwark Lite'is saadaval; need vajavad Bulwarki serverit.",
+        "status_lite": "Veebi-tõukemärguanded pole Loomix Lite'is saadaval; need vajavad Loomix serverit.",
         "status_busy": "Töötleb…",
         "enable": "Luba",
         "reenable": "Registreeri uuesti",
@@ -1885,10 +1885,10 @@
       },
       "link_device": {
         "title": "Ühenda mobiilirakendus",
-        "description": "Logi Bulwark Mail mobiilirakendusse sisse ilma midagi sisestamata. Genereeri siin QR-kood ja skaneeri see rakenduse sisselogimisekraanilt.",
+        "description": "Logi Loomix Mail mobiilirakendusse sisse ilma midagi sisestamata. Genereeri siin QR-kood ja skaneeri see rakenduse sisselogimisekraanilt.",
         "generate": "Kuva QR-kood",
         "regenerate": "Kuva uus kood",
-        "instructions": "Ava Bulwark Mail rakendus, puuduta sisselogimisekraanil „Skaneeri QR-kood“ ja suuna kaamera siia.",
+        "instructions": "Ava Loomix Mail rakendus, puuduta sisselogimisekraanil „Skaneeri QR-kood“ ja suuna kaamera siia.",
         "expires_in": "See kood aegub {seconds} sekundi pärast. Seda saab kasutada ainult üks kord.",
         "expired": "See kood on aegunud.",
         "error": "Sidumiskoodi loomine ebaõnnestus. Palun proovi uuesti.",
@@ -2128,7 +2128,7 @@
         "button": "Impordi"
       },
       "about": {
-        "title": "Bulwark Webmail",
+        "title": "Loomix Mail",
         "source_code": "Lähtekood"
       },
       "spam_siege": {
@@ -3771,7 +3771,7 @@
     "start_tour": "Alusta tutvustust"
   },
   "demo_welcome": {
-    "title": "Tere tulemast Bulwark Maili juurde",
+    "title": "Tere tulemast Loomix Maili juurde",
     "description": "Tutvu täisfunktsionaalse veebipostiga - otse oma brauseris. Kõik andmed jäävad sinu seadmesse, seega võid vabalt kõike proovida.",
     "feature_email": "Loe ja kirjuta e-kirju",
     "feature_organize": "Märgid, tähed ja kaustad",
@@ -4391,7 +4391,7 @@
       },
       "http_proxy": {
         "title": "Kasuta sinu ühendatud kontosid",
-        "body": "Saata päringuid läbi Bulwarki serveri kontoga või võtmega, mille sina või sinu administraator seadistas. Pistikprogramm ei näe kunagi parooli, kuid saab teha kõike, mida see konto oma serveris teha saab."
+        "body": "Saata päringuid läbi Loomix serveri kontoga või võtmega, mille sina või sinu administraator seadistas. Pistikprogramm ei näe kunagi parooli, kuid saab teha kõike, mida see konto oma serveris teha saab."
       },
       "compose_open": {
         "title": "Ava kirjakoostaja sinu eest",
@@ -4424,9 +4424,9 @@
     },
     "connect": {
       "title": "Ühenda {label}",
-      "intro_password": "{name} soovib kasutada sinu kontot {label}. Bulwark hoiab parooli oma serveris ja saadab selle ainult hostile {host}. Pistikprogramm ei näe seda kunagi.",
-      "intro_password_any": "{name} soovib kasutada sinu kontot {label}. Bulwark hoiab parooli oma serveris ja saadab selle ainult serverisse, mille siia sisestad. Pistikprogramm ei näe seda kunagi.",
-      "intro_signin": "{name} soovib sinu kontole {label} sisse logida. Sisesta siia server ja logi siis sisse selle enda lehel. Bulwark hoiab saadud juurdepääsu oma serveris; pistikprogramm ei näe seda kunagi.",
+      "intro_password": "{name} soovib kasutada sinu kontot {label}. Loomix hoiab parooli oma serveris ja saadab selle ainult hostile {host}. Pistikprogramm ei näe seda kunagi.",
+      "intro_password_any": "{name} soovib kasutada sinu kontot {label}. Loomix hoiab parooli oma serveris ja saadab selle ainult serverisse, mille siia sisestad. Pistikprogramm ei näe seda kunagi.",
+      "intro_signin": "{name} soovib sinu kontole {label} sisse logida. Sisesta siia server ja logi siis sisse selle enda lehel. Loomix hoiab saadud juurdepääsu oma serveris; pistikprogramm ei näe seda kunagi.",
       "server": "Serveri aadress",
       "server_hint": "cloud.example.com",
       "username": "Kasutajanimi",

@@ -118,7 +118,7 @@ export function TelemetryTab() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold">Anonymous Usage Stats</h1>
         <p className="text-sm text-muted-foreground">
-          Bulwark can send one anonymous heartbeat per day so we can see how many instances are
+          Loomix can send one anonymous heartbeat per day so we can see how many instances are
           running, on what platforms, and which features they use. It&apos;s <strong>off by
           default</strong>; one click below enables it and helps us make the product better. No
           email addresses, no hostnames, no IPs are sent.{' '}

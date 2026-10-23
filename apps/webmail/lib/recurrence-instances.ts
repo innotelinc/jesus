@@ -7,7 +7,7 @@
  * update on a synthetic id writes a `recurrenceOverrides` entry for that one
  * occurrence, a destroy excludes it. Older servers reject both with
  * `invalidProperties` ("… synthetic ids is not yet supported."), in which
- * case Bulwark keeps expanding recurrences in the browser
+ * case Loomix keeps expanding recurrences in the browser
  * (lib/recurrence-expansion.ts) and patches the base event itself.
  *
  * What an expanded occurrence looks like (verified against 0.16.19):

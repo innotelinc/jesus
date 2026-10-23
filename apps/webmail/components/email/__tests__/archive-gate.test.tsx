@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Email, Mailbox } from '@/lib/jmap/types';
 
-// The admin policy's archiveActionEnabled gate (#1257): off, Bulwark offers no
+// The admin policy's archiveActionEnabled gate (#1257): off, Loomix offers no
 // Archive action anywhere. vitest.setup.ts renders labels as their raw keys.
 
 vi.mock('@/components/plugins/plugin-slot', () => ({ PluginSlot: () => null }));

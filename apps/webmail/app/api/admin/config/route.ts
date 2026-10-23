@@ -110,7 +110,7 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // Turning off Stalwart admin auto-login without a Bulwark admin password
+    // Turning off Stalwart admin auto-login without a Loomix admin password
     // would leave the dashboard with no way in at all (#870).
     if ('stalwartAdminAccess' in updates && updates.stalwartAdminAccess !== 'auto') {
       await initAdminPassword();

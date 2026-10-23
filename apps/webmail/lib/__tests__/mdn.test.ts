@@ -33,7 +33,7 @@ describe('buildMdnMessage — structure', () => {
     expect(msg).toContain('Disposition: manual-action/MDN-sent-manually; displayed');
     expect(msg).toContain('Final-Recipient: rfc822;me@example.com');
     expect(msg).not.toContain('Original-Recipient:');
-    expect(msg).toContain('Reporting-UA: example.com; Bulwark Webmail');
+    expect(msg).toContain('Reporting-UA: example.com; Loomix Mail');
   });
 
   it('uses CRLF line endings everywhere', () => {
@@ -80,7 +80,7 @@ describe('buildMdnMessage — header encoding & normalisation', () => {
   it('falls back to the localhost domain when fromEmail has no @', () => {
     const msg = buildMdnMessage({ to: base.to, fromEmail: 'invalid' });
     expect(msg).toMatch(/^Message-ID: <mdn\.[0-9a-z]+\.i@localhost>$/m);
-    expect(msg).toContain('Reporting-UA: localhost; Bulwark Webmail');
+    expect(msg).toContain('Reporting-UA: localhost; Loomix Mail');
   });
 });
 

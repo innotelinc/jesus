@@ -222,7 +222,7 @@ export function mentionHref(email: string): string {
 
 /**
  * The mention a link stands for: a mailto: link whose whole text is
- * "@Name". That is what a sent mention is, from Bulwark or from Outlook,
+ * "@Name". That is what a sent mention is, from Loomix or from Outlook,
  * so a reopened draft or a pasted mention becomes a chip again.
  */
 export function mentionFromLink(element: HTMLElement): { label: string; email: string } | null {

@@ -484,7 +484,7 @@ describe('AccountSecuritySettings link-device visibility', () => {
     expect(screen.getByText('link_device.title')).toBeInTheDocument();
   });
 
-  it('hides the linker in Bulwark Lite', () => {
+  it('hides the linker in Loomix Lite', () => {
     mocks.lite.value = true;
     useAccountSecurityStore.setState({ isStalwart: false, isProbing: false });
     render(<AccountSecuritySettings />);

@@ -437,7 +437,7 @@ export function checkPluginManifest(m: Record<string, unknown>, opts: { appVersi
         permissions = permissions.filter((p) => !DEPRECATED_PERMISSIONS.includes(p));
       }
       const unknown = permissions.filter((p) => !KNOWN_PERMISSIONS.has(p));
-      if (unknown.length > 0) errors.push(`Unknown permissions: ${unknown.join(', ')} (this Bulwark version does not offer them)`);
+      if (unknown.length > 0) errors.push(`Unknown permissions: ${unknown.join(', ')} (this Loomix version does not offer them)`);
     }
   }
   if (tier === 'privileged' && !permissions.includes('crypto:full')) {
@@ -447,7 +447,7 @@ export function checkPluginManifest(m: Record<string, unknown>, opts: { appVersi
   const minAppVersion = optionalString(m, 'minAppVersion', errors, 32);
   if (minAppVersion !== undefined && !VERSION_RE.test(minAppVersion)) errors.push('"minAppVersion" must look like 1.2.3');
   if (minAppVersion && opts.appVersion && VERSION_RE.test(opts.appVersion) && compareVersions(opts.appVersion, minAppVersion) < 0) {
-    errors.push(`Needs Bulwark ${minAppVersion} or later (this is ${opts.appVersion})`);
+    errors.push(`Needs Loomix ${minAppVersion} or later (this is ${opts.appVersion})`);
   }
 
   const settingsSchema = validateSettingsSchema(m.settingsSchema, errors);
