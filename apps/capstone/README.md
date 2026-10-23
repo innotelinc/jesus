@@ -68,6 +68,10 @@ behind the existing `MINIO_*` contract in a dedicated release.
 | 📡 **Observability** | OpenTelemetry → Prometheus → Grafana: pipeline latency (STT → LLM → TTS) per call, provisioned dashboards | 
 | 💾 **Offline + live USB** | Deployment payload, Docker image bundle, and a BIOS+UEFI live/install ISO — install with no internet | 
 
+> An Android phone makes an excellent **two-way SMS node** — the Control Center's
+> SMS Inbox shows replies as they arrive and sends answers back through the same
+> SIM. See [`docs/phone-node.md`](docs/phone-node.md) and [`phone-node/`](phone-node/).
+
 ## 🚀 Quick start
 
 ```bash

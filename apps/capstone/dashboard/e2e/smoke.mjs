@@ -61,6 +61,9 @@ const PAGES = [
   { path: '/agents', name: 'agents', marker: 'Dograh AI voice agents' },
   { path: '/health', name: 'health', marker: 'Health & Status' },
   { path: '/monitoring', name: 'monitoring', marker: 'Monitoring' },
+  // The marker must be body text: "SMS Inbox" is also the sidebar label, which
+  // would pass on any page.
+  { path: '/messages', name: 'sms-inbox', marker: 'Replies the phone received' },
 ];
 
 // ── stub payloads (default mode) ────────────────────────────────────────────
@@ -112,6 +115,15 @@ const STUBS = [
     networkIn: 0, networkOut: 0, requestRate: 0, errorRate: 0, activeSessions: 0,
   })],
   [/^\/(services|ports|secrets|alerts|users|links|health|incidents|policies|audit)$/, () => []],
+  [/^\/sms-inbound$/, () => ({
+    enabled: true,
+    token_set: true,
+    count: 1,
+    messages: [{
+      id: 'smoke-1', direction: 'in', from: '+15551234567',
+      body: 'smoke reply', received_at: '2026-10-20 10:00:00', sim: 0,
+    }],
+  })],
 ];
 
 function stubBody(pathname) {

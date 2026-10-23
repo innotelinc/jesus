@@ -131,6 +131,7 @@ const SECTION_LABELS: [string, string][] = [
   ['/secrets', 'Secrets Vault'],
   ['/password', 'Password Generator'],
   ['/softphone', 'Softphone'],
+  ['/messages', 'SMS Inbox'],
   ['/links', 'Links & Resources'],
   ['/alerts', 'Alerts'],
   ['/config', 'Configuration'],
