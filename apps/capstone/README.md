@@ -68,9 +68,12 @@ behind the existing `MINIO_*` contract in a dedicated release.
 | 📡 **Observability** | OpenTelemetry → Prometheus → Grafana: pipeline latency (STT → LLM → TTS) per call, provisioned dashboards | 
 | 💾 **Offline + live USB** | Deployment payload, Docker image bundle, and a BIOS+UEFI live/install ISO — install with no internet | 
 
-> An Android phone makes an excellent **two-way SMS node** — the Control Center's
-> SMS Inbox shows replies as they arrive and sends answers back through the same
-> SIM. See [`docs/phone-node.md`](docs/phone-node.md) and [`phone-node/`](phone-node/).
+> Running on ARM or on an Android phone? Capstone's full stack needs an
+> x86_64 Docker host, but a phone makes an excellent **two-way SMS node** — see
+> [`docs/phone-node.md`](docs/phone-node.md) and [`phone-node/`](phone-node/).
+> Measured arm64 image availability and the memory ceiling are in
+> [`docs/arm64.md`](docs/arm64.md); host sizing and the bring-up checklist are in
+> [`docs/host-bringup.md`](docs/host-bringup.md).
 
 ## 🚀 Quick start
 
