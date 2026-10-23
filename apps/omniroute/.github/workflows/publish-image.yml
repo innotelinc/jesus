@@ -55,6 +55,16 @@ on:
         required: false
         type: boolean
         default: false
+      source_repository:
+        description: "Repository to build from (defaults to this mirror)"
+        required: false
+        type: string
+        default: ""
+      source_ref:
+        description: "Branch or tag to build (defaults to the v<version> tag)"
+        required: false
+        type: string
+        default: ""
   push:
     tags:
       - "v*"
@@ -86,7 +96,10 @@ jobs:
         with:
           persist-credentials: false
           # A dispatch builds the requested tag; a tag push/release builds itself.
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
+          # source_repository/source_ref let a release branch be built before its
+          # tag exists, and let a fork be built without mirroring it first.
+          repository: ${{ inputs.source_repository || github.repository }}
+          ref: ${{ inputs.source_ref || (github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '') }}
           fetch-depth: 0
 
       - name: Resolve the image version
