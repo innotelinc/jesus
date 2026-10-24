@@ -640,7 +640,8 @@
     },
     "mv_position": "{index} z {total}",
     "plugin_panel_show": "Pokaż panel wtyczki",
-    "plugin_panel_hide": "Ukryj panel wtyczki"
+    "plugin_panel_hide": "Ukryj panel wtyczki",
+    "copy": "Kopiuj"
   },
   "email_composer": {
     "select_from_directory": "Wybierz z katalogu",
@@ -843,7 +844,9 @@
     },
     "send_filing_warning": "Wysłano - ale późniejsze porządkowanie nie powiodło się, może pozostać nieaktualna wersja robocza.",
     "pop_out": "Otwórz odpowiedź w oknie",
-    "send_guard_failed": "Nie wysłano - wtyczka sprawdzająca wiadomości przed wysłaniem zawiodła lub nie odpowiedziała."
+    "send_guard_failed": "Nie wysłano - wtyczka sprawdzająca wiadomości przed wysłaniem zawiodła lub nie odpowiedziała.",
+    "cut": "Wytnij",
+    "copy": "Kopiuj"
   },
   "confirm_dialog": {
     "confirm": "Potwierdź",
@@ -2583,8 +2586,7 @@
       "manage": "Zarządzaj regułami",
       "senders_count": "{count, plural, one {# nadawcy} few {# nadawców} many {# nadawców} other {# nadawcy}}",
       "cross_account": "Wybierz wiadomości z jednego konta",
-      "opaque_hint": "Twoje filtry zostały edytowane ręcznie. Otwórz ustawienia filtrów"
-,
+      "opaque_hint": "Twoje filtry zostały edytowane ręcznie. Otwórz ustawienia filtrów",
       "loading": "Wczytywanie reguł…",
       "load_failed": "Nie udało się wczytać reguł",
       "none": "Brak reguł",

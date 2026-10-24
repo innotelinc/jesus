@@ -102,11 +102,23 @@ describe('root layout generateMetadata - link preview', () => {
   });
 
   it('keeps a non-default forwarded port, drops the default one', async () => {
-    withHeaders({ 'x-forwarded-proto': 'http', 'x-forwarded-host': 'localhost', 'x-forwarded-port': '3000' });
-    expect((await generateMetadata()).metadataBase?.toString()).toBe('http://localhost:3000/');
+    withHeaders({ 'x-forwarded-proto': 'http', 'x-forwarded-host': 'localhost', 'x-forwarded-port': '8080' });
+    expect((await generateMetadata()).metadataBase?.toString()).toBe('http://localhost:8080/');
 
     withHeaders({ 'x-forwarded-proto': 'https', 'x-forwarded-host': 'mail.example.com', 'x-forwarded-port': '443' });
     expect((await generateMetadata()).metadataBase?.toString()).toBe('https://mail.example.com/');
+  });
+
+  it('drops the port this process listens on, which is what a portless proxy leaves behind', async () => {
+    const previous = process.env.PORT;
+    process.env.PORT = '3000';
+    try {
+      withHeaders({ 'x-forwarded-proto': 'https', 'x-forwarded-host': 'loomix.art', 'x-forwarded-port': '3000' });
+      expect((await generateMetadata()).metadataBase?.toString()).toBe('https://loomix.art/');
+    } finally {
+      if (previous === undefined) delete process.env.PORT;
+      else process.env.PORT = previous;
+    }
   });
 
   it('omits metadataBase rather than guessing when no host header is usable', async () => {

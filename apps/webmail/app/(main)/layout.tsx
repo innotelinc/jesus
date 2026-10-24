@@ -99,11 +99,16 @@ async function requestOrigin(): Promise<URL | null> {
   const proto = forwardedProto === "http" || forwardedProto === "https" ? forwardedProto : "https";
 
   // A proxy (and Next's own dev server) may carry the port separately, leaving
-  // X-Forwarded-Host portless. Re-attach it unless it's the default for the scheme.
+  // X-Forwarded-Host portless. Re-attach it unless it's the default for the scheme,
+  // or it is the port this process listens on: Next itself fills X-Forwarded-Port
+  // with that port for a request no proxy fronted, and behind a proxy that sends
+  // no port of its own (NPM) it would otherwise put the container's 3000 into
+  // every absolute URL and link preview.
   if (!authority.includes(":")) {
     const port = first("x-forwarded-port");
     const isDefaultPort = (proto === "https" && port === "443") || (proto === "http" && port === "80");
-    if (/^\d+$/.test(port) && !isDefaultPort) authority += `:${port}`;
+    const isInternalPort = port === (process.env.PORT || "3000");
+    if (/^\d+$/.test(port) && !isDefaultPort && !isInternalPort) authority += `:${port}`;
   }
 
   try {

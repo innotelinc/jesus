@@ -4,6 +4,11 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# The webpack build peaks above Node's default heap on a small builder, where the
+# kernel kills it instead of letting V8 collect. Dispatch passes a cap sized to
+# the builder; empty keeps Node's default.
+ARG NODE_OPTIONS=
+ENV NODE_OPTIONS=$NODE_OPTIONS
 # Optional: serve under a subpath like /webmail. Baked into emitted asset URLs
 # at build time, so it cannot be changed without rebuilding.
 ARG NEXT_PUBLIC_BASE_PATH=
@@ -37,7 +42,7 @@ FROM node:24-alpine AS runner
 LABEL org.opencontainers.image.title="Loomix Mail"
 LABEL org.opencontainers.image.description="Loomix Mail — email, calendars, contacts and files for Stalwart Mail Server"
 LABEL org.opencontainers.image.source="https://github.com/innotelinc/webmail"
-LABEL org.opencontainers.image.url="https://oasis.innotel.us"
+LABEL org.opencontainers.image.url="https://loomix.art"
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 LABEL org.opencontainers.image.vendor="Innotel"
 
