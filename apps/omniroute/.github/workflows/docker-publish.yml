@@ -176,7 +176,9 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
           set -uo pipefail
-          for attempt in $(seq 1 20); do
+          # Probe sparingly: each probe is itself a pull, and two jobs polling every
+          # minute would spend 120 of the 200 hourly pulls just waiting.
+          for delay in 60 120 180 300 300 300; do
             TOKEN=$(curl -fsS -u "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" \
               "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull" \
               | jq -r '.token // empty')
@@ -185,11 +187,11 @@ jobs:
               -H 'Accept: application/vnd.oci.image.index.v1+json' \
               "https://registry-1.docker.io/v2/library/node/manifests/26-trixie-slim")
             if [ "$CODE" != "429" ]; then
-              echo "Docker Hub pulls available (HTTP $CODE) on attempt $attempt."
+              echo "Docker Hub pulls available (HTTP $CODE)."
               exit 0
             fi
-            echo "::warning::Docker Hub pull quota exhausted (200/hour); attempt $attempt/20, waiting 60s"
-            sleep 60
+            echo "::warning::Docker Hub pull quota exhausted (200/hour); waiting ${delay}s"
+            sleep "$delay"
           done
           echo "::error::Docker Hub still answering 429 after 20 minutes. The account's hourly pull budget is spent by other publishes; re-run later or split the build."
           exit 1
