@@ -640,7 +640,8 @@
     },
     "mv_position": "{index} di {total}",
     "plugin_panel_show": "Mostra il pannello del plugin",
-    "plugin_panel_hide": "Nascondi il pannello del plugin"
+    "plugin_panel_hide": "Nascondi il pannello del plugin",
+    "copy": "Copia"
   },
   "email_composer": {
     "select_from_directory": "Seleziona dalla rubrica aziendale",
@@ -843,7 +844,9 @@
     },
     "send_filing_warning": "Inviato - ma la pulizia successiva non è riuscita, potrebbe restare una bozza obsoleta.",
     "pop_out": "Apri la risposta in una finestra",
-    "send_guard_failed": "Non inviato - un plugin che controlla i messaggi prima dell'invio non è riuscito o non ha risposto."
+    "send_guard_failed": "Non inviato - un plugin che controlla i messaggi prima dell'invio non è riuscito o non ha risposto.",
+    "cut": "Taglia",
+    "copy": "Copia"
   },
   "confirm_dialog": {
     "confirm": "Conferma",
@@ -2583,8 +2586,7 @@
       "manage": "Gestisci regole",
       "senders_count": "{count, plural, one {# mittente} other {# mittenti}}",
       "cross_account": "Seleziona messaggi di un solo account",
-      "opaque_hint": "I tuoi filtri sono stati modificati a mano. Apri le impostazioni dei filtri"
-,
+      "opaque_hint": "I tuoi filtri sono stati modificati a mano. Apri le impostazioni dei filtri",
       "loading": "Caricamento delle regole…",
       "load_failed": "Impossibile caricare le regole",
       "none": "Nessuna regola",

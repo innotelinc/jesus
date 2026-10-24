@@ -640,7 +640,8 @@
     },
     "mv_position": "第 {index} 封，共 {total} 封",
     "plugin_panel_show": "显示插件面板",
-    "plugin_panel_hide": "隐藏插件面板"
+    "plugin_panel_hide": "隐藏插件面板",
+    "copy": "复制"
   },
   "email_composer": {
     "select_from_directory": "从目录中选择",
@@ -843,7 +844,9 @@
     },
     "send_filing_warning": "已发送，但发送后的清理失败，可能会残留旧草稿。",
     "pop_out": "在单独窗口中打开回复",
-    "send_guard_failed": "未发送 - 发送前检查邮件的插件出错或没有响应。"
+    "send_guard_failed": "未发送 - 发送前检查邮件的插件出错或没有响应。",
+    "cut": "剪切",
+    "copy": "复制"
   },
   "confirm_dialog": {
     "confirm": "确认",
@@ -2583,8 +2586,7 @@
       "manage": "管理规则",
       "senders_count": "{count, plural, other {# 个发件人}}",
       "cross_account": "请选择同一账户中的邮件",
-      "opaque_hint": "你的过滤器已被手动编辑。请打开过滤器设置"
-,
+      "opaque_hint": "你的过滤器已被手动编辑。请打开过滤器设置",
       "loading": "正在加载规则…",
       "load_failed": "无法加载规则",
       "none": "暂无规则",

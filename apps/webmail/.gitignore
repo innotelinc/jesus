@@ -35,7 +35,6 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.dev.example
-!deploy/innotel/.env.local.example
 
 # vercel
 .vercel

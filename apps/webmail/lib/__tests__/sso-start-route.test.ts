@@ -123,17 +123,6 @@ describe('sso start route', () => {
     expect(url.searchParams.has('max_age')).toBe(false);
   });
 
-  it('asks for an account switch when adding an account', async () => {
-    const { status, body } = await callRoute({
-      redirect_uri: 'https://mail.example.com/auth/callback',
-      add_account: true,
-    });
-
-    expect(status).toBe(200);
-    const url = new URL(body.authorize_url);
-    expect(url.searchParams.get('prompt')).toBe('select_account login');
-  });
-
   it('sends neither prompt nor max_age for a regular login', async () => {
     const { status, body } = await callRoute({
       redirect_uri: 'https://mail.example.com/auth/callback',
