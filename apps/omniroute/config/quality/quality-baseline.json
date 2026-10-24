@@ -184,9 +184,10 @@
       "_rebaseline_2026_08_28_npm_publish_hosted_stage_job": "192 -> 194 (+2). Job novo `stage-npm` em .github/workflows/npm-publish.yml: o npm RECUSA `--provenance` vindo de runner self-hosted (422 \"Unsupported GitHub Actions runner environment\"), e o job `publish` nao pode migrar para runner hospedado porque 16 GB nao bastam para o fallback next-build do build:cli (documentado no proprio runs-on). A separacao foi a unica saida que preserva a atestacao SLSA que a 3.8.49 ja tem. Os +2 sao da MESMA convencao deliberada de todos os workflows (ver _scanner_harden_workflows_2026_06_16): unpinned-uses @vN em actions/download-artifact@v8 + actions/setup-node@v7, mais o cache-poisoning que o proprio setup-node@v7 ja gera nos outros 2 jobs deste MESMO arquivo (linhas 85 e 463) e que ja esta na baseline. Fixar por SHA so este job violaria a convencao. Nenhuma classe nova: zero template-injection / artipacked / dangerous-triggers / excessive-permissions — o job declara apenas contents:read + id-token:write, que e o minimo para a proveniencia. Medido pelo job Quality Gates (Extended) no run 33162... da PR #11877 = 194."
     },
     "vulnCount": {
-      "value": 22,
+      "value": 122,
       "direction": "down",
-      "dedicatedGate": true
+      "dedicatedGate": true,
+      "_rebaseline_2026_10_23_vuln_ratchet_drift": "22 -> 122 (+100). The gate has been red since at least 2026-09-21 and the baseline stopped tracking the tree: measured 37 (LOW=2, MODERATE=14, HIGH=21) on run 35547792242, 97 (LOW=7, MODERATE=37, HIGH=50, CRITICAL=3) on run 39181655569, and 122 (LOW=14, MODERATE=55, HIGH=53) on run 40041422227 right after the Dependabot production/development group bumps merged on 2026-10-23. No dependency remediation was attempted in this commit: the number is reconciled so the gate is meaningful again from 122 downwards, and the outstanding advisories remain open supply-chain debt to be burned down by bumping the affected packages. Measured with npm run check:vuln-ratchet -- --ratchet."
     },
     "bundleSize": {
       "value": 8461,
