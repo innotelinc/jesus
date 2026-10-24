@@ -1,0 +1,218 @@
+name: Dependency Refresh
+
+# The vulnerability ratchet is only as honest as the lockfile it measures. Between
+# 2026-09-21 and 2026-10-23 the tree drifted 22 -> 37 -> 97 -> 122 advisories while
+# nothing re-resolved a dependency, and the gate sat red until somebody went looking.
+# This job is the clock on that loop: once a week it re-resolves every dependency
+# inside the ranges package.json already declares, re-measures with the same pinned
+# osv-scanner the ratchet uses, and opens ONE pull request carrying the refreshed
+# lockfile plus the measurement that goes with it.
+#
+# It deliberately never edits config/quality/quality-baseline.json. A new count is a
+# decision ("these are the advisories we accept, and here is why"), so it belongs in
+# the reviewed diff of the PR that earns it — not in an unattended bot commit.
+# The last step runs the ratchet itself, so an advisory count that went UP inside the
+# refresh turns this run red instead of quietly landing in the PR.
+
+on:
+  schedule:
+    # Mondays 05:23 UTC — its own slot among the nightlies (06:47 compat, etc.).
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-refresh
+  cancel-in-progress: false
+
+env:
+  CI_NODE_VERSION: "24"
+  # Pinned: the ratchet compares counts across runs, so the scanner that measured the
+  # baseline must be the scanner that measures the refresh.
+  OSV_SCANNER_VERSION: v2.3.8
+  REFRESH_BRANCH: ci/dependency-refresh
+
+jobs:
+  refresh:
+    name: Refresh lockfile, re-measure advisories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The push below authenticates with an explicit http.extraheader instead, so
+          # the token never lands in .git/config where a later step could leak it.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.CI_NODE_VERSION }}
+          cache: npm
+
+      - name: Install security scanners (osv)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p "$HOME/.local/bin" /tmp/osv
+          # gh release download is authenticated (5000 req/hr); curl to api.github.com
+          # is throttled to 60/hr and silently no-ops when it is.
+          gh release download "$OSV_SCANNER_VERSION" --repo google/osv-scanner --pattern '*linux_amd64' --dir /tmp/osv
+          install -m 0755 /tmp/osv/*linux_amd64 "$HOME/.local/bin/osv-scanner"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/osv-scanner" --version || true
+
+      - name: Re-resolve every dependency inside the declared ranges
+        run: npm update --package-lock-only --no-audit --no-fund
+
+      - name: Verify the refreshed lockfile still installs
+        # --ignore-scripts: the prepare hook (husky) is not needed to prove the tree
+        # resolves, and running it would depend on the install that has not happened.
+        run: npm ci --dry-run --ignore-scripts --no-audit --no-fund
+
+      - name: Did the refresh change anything?
+        id: delta
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package-lock.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "changed=false"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "changed=true"
+            git diff --numstat -- package-lock.json
+          fi
+
+      - name: Measure advisories
+        id: advisories
+        run: |
+          set -uo pipefail
+          # --json prints the raw scanner output and stops; the count itself comes from
+          # the ratchet script below so this report can never disagree with the gate.
+          node scripts/check/check-vuln-ratchet.mjs --json > osv.json || true
+          BASELINE=$(node -p "require('./config/quality/quality-baseline.json').metrics.vulnCount.value")
+          echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
+
+          node --input-type=module - > advisories.md <<'NODE'
+          import fs from "node:fs";
+
+          const json = JSON.parse(fs.readFileSync("osv.json", "utf8"));
+          const rows = [];
+          const bySeverity = {};
+
+          for (const result of json.results ?? []) {
+            for (const pkg of result.packages ?? []) {
+              const vulns = pkg.vulnerabilities ?? [];
+              if (vulns.length === 0) continue;
+              const severities = vulns.map((v) => v.database_specific?.severity ?? "UNKNOWN");
+              for (const severity of severities) {
+                bySeverity[severity] = (bySeverity[severity] ?? 0) + 1;
+              }
+              const worst = ["CRITICAL", "HIGH", "MODERATE", "LOW"]
+                .find((s) => severities.includes(s)) ?? "UNKNOWN";
+              rows.push(
+                `| \`${pkg.package.name}@${pkg.package.version}\` | ${worst} | ${vulns.map((v) => `\`${v.id}\``).join(", ")} |`,
+              );
+            }
+          }
+
+          const order = ["CRITICAL", "HIGH", "MODERATE", "LOW", "UNKNOWN"];
+          const summary = order
+            .filter((s) => bySeverity[s])
+            .map((s) => `${s} ${bySeverity[s]}`)
+            .join(" · ");
+          // Keep the PR body readable no matter how bad the week was; the artifact
+          // carries the full scanner output.
+          const CAP = 40;
+
+          const out = [];
+          out.push(`**Measured with osv-scanner against the refreshed lockfile:** ${rows.length} affected package entr${rows.length === 1 ? "y" : "ies"}${summary ? ` (${summary})` : ""}.`);
+          out.push("");
+          if (rows.length > 0) {
+            out.push("| Package | Worst severity | Advisories |");
+            out.push("| --- | --- | --- |");
+            out.push(...rows.slice(0, CAP));
+            if (rows.length > CAP) {
+              out.push(`| … | | ${rows.length - CAP} more — see the run artifact |`);
+            }
+          } else {
+            out.push("No advisories reported.");
+          }
+          fs.writeFileSync("advisories.md", out.join("\n") + "\n");
+          NODE
+
+          cat advisories.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the scanner output for the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: advisory-report
+          path: |
+            osv.json
+            advisories.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Open or update the refresh PR
+        if: steps.delta.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$REFRESH_BRANCH"
+          git add package-lock.json
+          git commit -m "chore(deps): refresh the lockfile inside the declared ranges"
+
+          # Token goes in a header, not in the remote URL: nothing is written to disk.
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.extraheader="AUTHORIZATION: basic $AUTH" \
+            push --force "https://github.com/${GITHUB_REPOSITORY}.git" "$REFRESH_BRANCH"
+
+          {
+            echo "Weekly re-resolution of every dependency inside the ranges \`package.json\`"
+            echo "already declares. No manifest change: only \`package-lock.json\` moves."
+            echo ""
+            echo "Verified before pushing: \`npm ci --dry-run --ignore-scripts\` accepts the new"
+            echo "lockfile, and no baseline was touched — \`config/quality/quality-baseline.json\`"
+            echo "still records the count this PR has to be judged against."
+            echo ""
+            cat advisories.md
+            echo ""
+            echo "**Run:** ${RUN_URL}"
+          } > pr-body.md
+
+          EXISTING=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$REFRESH_BRANCH" \
+            --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            gh pr edit "$EXISTING" --repo "$GITHUB_REPOSITORY" --body-file pr-body.md
+            echo "Updated existing PR #$EXISTING"
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base "$DEFAULT_BRANCH" --head "$REFRESH_BRANCH" \
+              --title "chore(deps): weekly lockfile refresh" --body-file pr-body.md
+          fi
+
+      - name: Vulnerability ratchet
+        env:
+          BASELINE: ${{ steps.advisories.outputs.baseline }}
+        run: |
+          set -uo pipefail
+          node scripts/check/check-vuln-ratchet.mjs --ratchet 2>&1 | tee ratchet.log
+          STATUS=${PIPESTATUS[0]}
+          COUNT=$(grep -o 'vulnCount=[^ ]*' ratchet.log | head -1)
+          {
+            echo ""
+            echo "### Vulnerability ratchet"
+            echo ""
+            echo "\`${COUNT:-vulnCount=unknown}\` against a baseline of **${BASELINE:-unknown}**."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$STATUS"
