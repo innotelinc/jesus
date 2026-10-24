@@ -44,6 +44,12 @@ on:
 permissions:
   contents: read
 
+# One publish at a time per ref. Two overlapping runs split the same 200 pulls/hour
+# of Docker Hub quota and both fail with 429, so a queued run is the better outcome.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   prepare:
     name: Resolve Docker release metadata
@@ -158,6 +164,35 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub allows 200 authenticated pulls per rolling hour, counted across
+      # every repository that shares the account. A cold build needs a slice of it,
+      # and an exhausted budget answers the very first metadata HEAD with 429 —
+      # which buildx reports as a base-image resolution failure. Wait for the
+      # window to roll over instead of dying on it; the probe itself costs one pull.
+      - name: Wait for Docker Hub pull quota
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          for attempt in $(seq 1 20); do
+            TOKEN=$(curl -fsS -u "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" \
+              "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull" \
+              | jq -r '.token // empty')
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -I \
+              -H "Authorization: Bearer $TOKEN" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              "https://registry-1.docker.io/v2/library/node/manifests/26-trixie-slim")
+            if [ "$CODE" != "429" ]; then
+              echo "Docker Hub pulls available (HTTP $CODE) on attempt $attempt."
+              exit 0
+            fi
+            echo "::warning::Docker Hub pull quota exhausted (200/hour); attempt $attempt/20, waiting 60s"
+            sleep 60
+          done
+          echo "::error::Docker Hub still answering 429 after 20 minutes. The account's hourly pull budget is spent by other publishes; re-run later or split the build."
+          exit 1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
