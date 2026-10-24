@@ -274,7 +274,7 @@
     "@toon-format/toon": "^4.1.1",
     "@types/mdx": "^2.0.13",
     "@xyflow/react": "^12.11.3",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
     "bottleneck": "^2.19.5",
     "clsx": "^2.1.1",
@@ -294,7 +294,7 @@
     "ink-text-input": "^6.0.0",
     "ioredis": "^5.10.1",
     "jose": "^6.2.9",
-    "js-yaml": "^5.3.0",
+    "js-yaml": "^5.4.1",
     "jsonc-parser": "^3.3.1",
     "lowdb": "^7.0.1",
     "lucide-react": "^1.21.0",
@@ -324,15 +324,15 @@
     "recharts": "^3.8.1",
     "safe-regex": "^2.1.1",
     "selfsigned": "^5.5.0",
-    "sharp": "^0.35.3",
-    "smol-toml": "1.8.0",
+    "sharp": "^0.35.5",
+    "smol-toml": "1.9.0",
     "socks": "^2.8.7",
     "sql.js": "^1.14.2",
     "tailwind-merge": "^3.6.0",
     "tsx": "^4.23.12",
     "turndown": "7.2.4",
     "turndown-plugin-gfm": "1.0.2",
-    "undici": "^8.10.0",
+    "undici": "^8.12.2",
     "update-notifier": "^7.3.1",
     "uuid": "^14.0.0",
     "ws": "^8.21.3",
@@ -403,7 +403,7 @@
     "type-coverage": "^2.30.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.7",
+    "vitest": "^4.1.11",
     "wait-on": "^9.1.0",
     "wtfnode": "^0.10.1"
   },
@@ -438,41 +438,41 @@
   "overrides": {
     "onnxruntime-node": "1.24.3",
     "fast-xml-parser": "^5.10.1",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.5",
     "postcss": "^8.5.18",
-    "ip-address": "^10.3.1",
-    "qs": "^6.15.2",
+    "ip-address": "^10.7.4",
+    "qs": "^6.16.0",
     "uuid": "^14.0.0",
     "form-data": "^4.0.6",
-    "vite": "^8.0.16",
+    "vite": "^8.1.6",
     "protobufjs": "^7.6.5",
     "@babel/core": "^7.29.6",
-    "hono": "^4.12.34",
+    "hono": "^4.13.11",
     "@hono/node-server": "^2.0.5",
-    "fast-uri": "^3.1.5",
-    "body-parser": "^2.3.0",
+    "fast-uri": "^3.1.9",
+    "body-parser": "^2.4.0",
     "@yarnpkg/parsers": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
     },
     "jsdom": {
-      "undici": "^7.29.0"
+      "undici": "^7.30.1"
     },
     "node-gyp": {
-      "undici": "^6.28.0"
+      "undici": "^6.29.1"
     },
     "concurrently": {
       "shell-quote": "^1.12.0"
     },
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "promptfoo": {
-      "js-yaml": "^5.2.2",
-      "undici": "^7.29.0"
+      "js-yaml": "^5.4.1",
+      "undici": "^7.30.1"
     },
     "socket.io-parser": "^4.2.7",
     "tar": "^7.5.21",
-    "brace-expansion": "^5.0.9",
+    "brace-expansion": "^5.0.12",
     "minimatch": {
-      "brace-expansion": "^1.1.18"
+      "brace-expansion": "^1.1.21"
     },
     "libxmljs2": {
       "minimatch": {
@@ -485,21 +485,32 @@
       }
     },
     "@apidevtools/json-schema-ref-parser": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
     },
     "@eslint/eslintrc": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
     },
     "lockfile-lint": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
     },
     "xmlbuilder2": {
-      "js-yaml": "^4.3.1"
+      "js-yaml": "^4.3.2"
     },
     "nanoid": "^3.3.17",
     "monaco-editor": {
       "dompurify": "^3.4.17"
     },
-    "proxy-addr": "^2.0.8"
+    "proxy-addr": "^2.0.8",
+    "@xmldom/xmldom": "^0.9.12",
+    "@grpc/grpc-js": "^1.14.5",
+    "browserslist": "^4.28.7",
+    "follow-redirects": "^1.16.1",
+    "joi": "^18.2.9",
+    "postcss-selector-parser": "^7.1.6",
+    "source-map-js": "^1.2.2",
+    "@humanfs/node": "^0.16.8",
+    "baseline-browser-mapping": "^2.11.0",
+    "fast-copy": "^4.1.0",
+    "@vitest/mocker": "^4.1.12"
   }
 }
