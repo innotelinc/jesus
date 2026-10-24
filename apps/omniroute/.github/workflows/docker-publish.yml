@@ -6,6 +6,12 @@ name: Publish to Docker Hub
 # names changed; the build, scan and manifest logic is untouched. The Docker Hub
 # pair it logs in with is DOCKERHUB_USERNAME / DOCKERHUB_TOKEN, the same one that
 # publishes innotel/orion.
+#
+# Login runs before Set up Docker Buildx on purpose: the docker-container driver
+# copies the client's docker config into the builder when it creates it, so a
+# builder created first resolves base images anonymously and Docker Hub answers
+# "429 Too Many Requests" from the shared runner IP — while the login step that
+# runs a second later still reports success.
 
 on:
   push:
@@ -140,9 +146,6 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
           fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Login to Docker Hub
         uses: docker/login-action@v4.6.0
         with:
@@ -155,6 +158,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push platform image by digest
         id: build
@@ -325,9 +331,6 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
           fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Login to Docker Hub
         uses: docker/login-action@v4.6.0
         with:
@@ -340,6 +343,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Download base digests
         uses: actions/download-artifact@v8

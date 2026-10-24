@@ -24,6 +24,18 @@ Cerulean vault (`cerulean/data/orion`), so rotating them there and re-setting th
 secrets is a single, reviewable step. GHCR needs no secret: it logs in with
 `github.actor` and the workflow's own `GITHUB_TOKEN` (`packages: write`).
 
+## Why login comes first
+
+In both `docker-publish.yml` jobs the two login steps run *before* `Set up Docker
+Buildx`. The `docker-container` driver copies the client's docker config into the
+builder at create time, so a builder created first keeps resolving base images
+anonymously — the login that runs a second later reports success, but
+`load metadata for docker.io/library/node:26-trixie-slim` still comes back
+`429 Too Many Requests` from the runner's shared IP. Authenticating first makes the
+build pull as `innotel`, which is the account quota rather than the anonymous one.
+
+`innotel/orion` publishes the same way with the same secrets.
+
 ## Publishing on demand
 
 `workflow_dispatch` takes a `version` input and checks out `refs/tags/v<version>`, so the
@@ -44,6 +56,10 @@ the floating `main` / `next` channels are always rebuilt.
   workflow; build a ref whose lock is current.
 - **`denied: requested access to the resource is denied`** — the workflow is still
   pointing at a namespace the credentials cannot write to.
+- **`429 Too Many Requests` in `Build and push … by digest`** — Docker Hub throttled
+  base-image resolution. If this happens while `Login to Docker Hub` reports success,
+  the builder was created before the login; check that the login steps still precede
+  `Set up Docker Buildx` in both jobs.
 - **`429 Too Many Requests` from `registry-1.docker.io` in `Create Docker Hub manifest`** —
   Docker Hub throttled the burst of manifest HEADs. The images are already pushed at this
   point; the merge now retries with backoff (20s, 40s, 80s) instead of failing the run.
