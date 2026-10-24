@@ -379,6 +379,21 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Docker Hub answers a burst of manifest HEADs with 429 Too Many Requests
+          # (seen on the first full run, 2026-10-24) and buildx surfaces that as a hard
+          # error. Throttling is transient, so back off and try again instead of failing
+          # a build whose images are already pushed.
+          retry() {
+            local attempt=1 max=4 delay=20
+            until "$@"; do
+              if [ "$attempt" -ge "$max" ]; then return 1; fi
+              echo "::warning::manifest write failed (attempt ${attempt}/${max}) — retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
           create_manifest() {
             local image="$1" suffix="$2" dir="$3" optional="${4:-}"
             local tags=(-t "${image}:${VERSION}${suffix}")
@@ -397,7 +412,7 @@ jobs:
               echo "No image digests in $dir" >&2
               exit 1
             fi
-            docker buildx imagetools create "${tags[@]}" "${refs[@]}"
+            retry docker buildx imagetools create "${tags[@]}" "${refs[@]}"
           }
 
           create_manifest "${IMAGE_NAME}" "" /tmp/digests/base
@@ -409,6 +424,21 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Docker Hub answers a burst of manifest HEADs with 429 Too Many Requests
+          # (seen on the first full run, 2026-10-24) and buildx surfaces that as a hard
+          # error. Throttling is transient, so back off and try again instead of failing
+          # a build whose images are already pushed.
+          retry() {
+            local attempt=1 max=4 delay=20
+            until "$@"; do
+              if [ "$attempt" -ge "$max" ]; then return 1; fi
+              echo "::warning::manifest write failed (attempt ${attempt}/${max}) — retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
           create_manifest() {
             local image="$1" suffix="$2" dir="$3" optional="${4:-}"
             local tags=(-t "${image}:${VERSION}${suffix}")
@@ -427,7 +457,7 @@ jobs:
               echo "No image digests in $dir" >&2
               exit 1
             fi
-            docker buildx imagetools create "${tags[@]}" "${refs[@]}"
+            retry docker buildx imagetools create "${tags[@]}" "${refs[@]}"
           }
 
           create_manifest "${GHCR_IMAGE_NAME}" "" /tmp/digests/base
