@@ -44,3 +44,6 @@ the floating `main` / `next` channels are always rebuilt.
   workflow; build a ref whose lock is current.
 - **`denied: requested access to the resource is denied`** — the workflow is still
   pointing at a namespace the credentials cannot write to.
+- **`429 Too Many Requests` from `registry-1.docker.io` in `Create Docker Hub manifest`** —
+  Docker Hub throttled the burst of manifest HEADs. The images are already pushed at this
+  point; the merge now retries with backoff (20s, 40s, 80s) instead of failing the run.
