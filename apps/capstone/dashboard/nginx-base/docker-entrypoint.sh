@@ -10,7 +10,12 @@
 set -eu
 
 if [ -d /etc/nginx/templates ]; then
-    defined_envs="$(printf '${%s} ' $(env | cut -d= -f1))"
+    # Built name by name on purpose: `${NAME}` must stay literal here, and the
+    # unquoted split of `env` is the point of the loop.
+    defined_envs=""
+    for name in $(env | cut -d= -f1); do
+        defined_envs="${defined_envs}\${${name}} "
+    done
     for template in /etc/nginx/templates/*.template; do
         [ -e "$template" ] || continue
         target="/etc/nginx/conf.d/$(basename "$template" .template)"

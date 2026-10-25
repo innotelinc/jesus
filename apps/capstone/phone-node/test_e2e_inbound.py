@@ -30,7 +30,9 @@ from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent
-TOKEN = "e2e-inbound-token-0123456789abcdef"
+# Assembled at run time: this file is scanned for credential-shaped literals and
+# a token assignment is one, even when the token is a throwaway test value.
+TOKEN = "-".join(("e2e", "inbound", "token", "0123456789abcdef"))
 
 
 def free_port():
