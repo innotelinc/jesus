@@ -4,9 +4,25 @@
 
 # Loomix Mail
 
+[![CI](https://github.com/innotelinc/webmail/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/webmail/actions/workflows/ci.yml)
+[![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-brightgreen.svg)](LICENSE)
+
+
 **Loomix Mail is the browser client of Loomix: email, calendars, contacts and files on your own infrastructure.** It talks to [Stalwart Mail Server](https://stalw.art/) over JMAP, puts everything behind one sign-in, and adds the administration surface, themes, plugins and PWA install that a real deployment needs.
 
 This repository is the [Innotel](https://innotel.us) fork of [Bulwark Webmail](https://github.com/bulwarkmail/webmail), maintained as the Loomix client. Upstream code remains AGPL-3.0; the Loomix name and artwork are Innotel's.
+
+## Why Loomix Mail
+
+| Problem | Answer |
+| --- | --- |
+| Mail, calendar and contacts are separate apps. | One client over JMAP, with one sign-in and one search. |
+| A hosted client hides the administration surface. | The deployment's own admin pages, themes and plugins ship in the same app. |
+| A webmail is a second identity system. | Sign-in is the family's Cerulean SSO, and the mail server keeps the mail. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## What it does
 
