@@ -5,6 +5,10 @@
 
 # REA: Reverse Engineer Anything
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 ### One MCP for reverse engineering across binaries, applications, and runtime behavior.
 
 **See a feature you like. Understand how it works, down to the binary level.**
@@ -65,6 +69,18 @@ REA connects your agent to tools for inspecting native binaries, JavaScript and 
 Setup registers REA with your agent and installs matching workflow instructions. Native analysis can use an existing Hopper, Ghidra, or IDA installation; setup can optionally install Hopper with approval. Static JavaScript analysis needs no native analysis engine.
 
 > **[Visit the REA website](https://rea.tools/)** for setup instructions, illustrated guides, and real case studies.
+
+## Why REA
+
+| Problem | Answer |
+| --- | --- |
+| The tools live in a dozen unrelated interfaces. | One MCP surface and one CLI expose the same analysis to a person or an agent. |
+| An agent cannot drive a GUI decompiler. | The Ghidra bridge gives the agent a stable, scriptable path into the analysis. |
+| Findings are hard to reproduce. | Each run keeps the tool transcript and the artefact hashes it worked from. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Quick start
 
