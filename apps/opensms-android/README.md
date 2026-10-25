@@ -1,11 +1,27 @@
 <p align="center"><img width="20%" src="app/data/images/favicont512.png" /></p>
 
 # 📨 OpenSMS
+
+[![CI](https://github.com/innotelinc/OpenSMS-Android/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/OpenSMS-Android/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 An open-source solution to host a `SMS` API server locally.
 
 ### 🤔 Why would you choose our app? (Features)
 👉 Turns your `Android` phone into a SMS API server. <br>
 👉 Open-source, No advertisements and privacy focused.
+
+## Why OpenSMS
+
+| Problem | Answer |
+| --- | --- |
+| An SMS gateway is a monthly bill and a third party. | A phone you already own is the gateway, on your own network. |
+| Inbound messages disappear into a handset. | The API delivers them to the service that needs them. |
+| Messaging tools want a cloud account. | There is no account and no telemetry; the device is the boundary. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## 💰 Sponsor Me
 You can buy me a coffee via [this link](https://www.paypal.com/paypalme/soomnathsdas) or tap on below image. Thank you 🙏. <br>
@@ -86,3 +102,8 @@ buildozer android debug # this may take a good amount of time for the first time
 sudo apt install libcairo2-dev pkg-config python3-dev
 sudo apt-get install libjpeg-dev zlib1g-dev
 ```
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE). Copyright © 2026 Innotel Inc. and the
+upstream authors. Upstream material remains under its own licence.
