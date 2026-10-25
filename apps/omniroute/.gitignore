@@ -296,3 +296,7 @@ docker-compose.yml.bak
 
 # check:install-upgrade work trees (~12 GB, disposable)
 /.install-upgrade/
+
+# Local environment (never commit)
+.env
+.env.local
