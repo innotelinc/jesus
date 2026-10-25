@@ -49,12 +49,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          git clone "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" wiki
+          # A repository whose wiki has never been opened has no wiki git
+          # remote at all, and GitHub offers no API to create one. That is not
+          # a failure to sync — there is nothing to sync until somebody makes
+          # the first page.
+          if ! git clone "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" wiki; then
+            echo "::notice::${REPO} has no wiki yet — nothing to sync"
+            echo "WIKI_ABSENT=1" >> "$GITHUB_ENV"
+          fi
 
       - name: Sync wiki (add missing pages + cover counts)
+        if: env.WIKI_ABSENT != '1'
         run: node scripts/docs/sync-wiki.mjs --wiki-dir wiki
 
       - name: Commit & push if changed
+        if: env.WIKI_ABSENT != '1'
         run: |
           cd wiki
           if [ -n "$(git status --porcelain)" ]; then
