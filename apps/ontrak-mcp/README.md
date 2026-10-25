@@ -3,15 +3,18 @@
 [![CI](https://github.com/innotelinc/ontrak-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/ontrak-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+> **ontrak-mcp** is the Model Context Protocol **client and tool bridge** that lets an
+> agent console use tools living in another process — a reverse-engineering toolkit, a
+> database tool, a browser driver — anything that speaks MCP over stdio, with no runtime
+> dependency. It is the MCP layer from [OnTrak Genie](https://ontrak.innotel.us),
+> extracted so it can be reviewed, reused and versioned on its own, and it rides the
+> [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) for the
+> identity, secrets and trust its console already runs on.
+>
+> **Landing page:** [innotelinc.github.io/ontrak-mcp](https://innotelinc.github.io/ontrak-mcp/)
 
-A Model Context Protocol **client and tool bridge** for agent consoles, plus a
-reference **server** to try it against. No dependencies — Node's standard library
-only.
-
-This is the MCP layer from [OnTrak Genie](https://ontrak.innotel.us), extracted so
-it can be reviewed, reused and versioned on its own. It is what lets a console use
-tools that live in *another process*: a reverse-engineering toolkit, a database
-tool, a browser driver — anything that speaks MCP over stdio.
+Shipped with a reference **server** to try it against, and no dependencies — Node's
+standard library only — because the wire contract this needs is four methods wide.
 
 ## Why ontrak-mcp
 
