@@ -1,5 +1,9 @@
 # ontrak-mcp
 
+[![CI](https://github.com/innotelinc/ontrak-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/ontrak-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 A Model Context Protocol **client and tool bridge** for agent consoles, plus a
 reference **server** to try it against. No dependencies — Node's standard library
 only.
@@ -8,6 +12,18 @@ This is the MCP layer from [OnTrak Genie](https://ontrak.innotel.us), extracted 
 it can be reviewed, reused and versioned on its own. It is what lets a console use
 tools that live in *another process*: a reverse-engineering toolkit, a database
 tool, a browser driver — anything that speaks MCP over stdio.
+
+## Why ontrak-mcp
+
+| Problem | Answer |
+| --- | --- |
+| An SDK can be larger than the protocol it wraps. | Four methods implemented directly, with no runtime dependency. |
+| A tool server can die mid-call. | The call is rejected with the reason and the next call starts a fresh child. |
+| A server-initiated request can block forever. | Unknown client methods are answered, not dropped. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Why not the SDK
 
