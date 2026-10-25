@@ -61,9 +61,11 @@ describe('root layout generateViewport - theme color (#671)', () => {
     expect((await generateViewport()).themeColor).toBe('#1a1b26');
   });
 
-  it('falls back to white when nothing is configured', async () => {
+  it('falls back to the brand colour when nothing is configured', async () => {
+    // The rebrand made indigo the product default; the meta tag has to agree
+    // with the manifest's theme_color rather than stay white.
     withConfig({ pwaThemeColor: '' });
-    expect((await generateViewport()).themeColor).toBe('#ffffff');
+    expect((await generateViewport()).themeColor).toBe('#4f46e5');
   });
 
   it('keeps the viewport sizing fields intact', async () => {
