@@ -106,8 +106,9 @@ if [ -z "$ghcr_user" ] || [ -z "$ghcr_token" ]; then
     fi
   fi
 fi
-[ -n "$ghcr_user" ] && [ -n "$ghcr_token" ] \
-  || skip "no GHCR credentials (GHCR_USERNAME/GHCR_TOKEN, or the vault path)"
+if [ -z "$ghcr_user" ] || [ -z "$ghcr_token" ]; then
+  skip "no GHCR credentials (GHCR_USERNAME/GHCR_TOKEN, or the vault path)"
+fi
 
 # ── plan ────────────────────────────────────────────────────────────────────
 plan=()
