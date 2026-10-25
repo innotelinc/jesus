@@ -105,6 +105,11 @@ const ENV_VAR_ALLOWLIST = new Set([
   "OMNIROUTE_URL", // used by ad-hoc tooling, validated elsewhere
   "OMNIROUTE_KEY", // ditto
   "OPENCODE_API_KEY", // ditto
+  // GitHub Actions repository secrets for docker-publish.yml. They arrive as
+  // `${{ secrets.DOCKERHUB_* }}` inside the workflow and are documented in
+  // docs/docker-publishing.md; nothing in this repo reads them via process.env.
+  "DOCKERHUB_USERNAME",
+  "DOCKERHUB_TOKEN",
   // ── External-tool / spawn-injected / ops env vars ────────────────────────
   // Real environment variables, but they belong to an UPSTREAM CLI/tool, a
   // docker-compose/electron-build pipeline, or are injected into a spawned

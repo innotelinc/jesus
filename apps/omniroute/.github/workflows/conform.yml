@@ -14,12 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Fetch the stack repo (standard + audit script)
         uses: actions/checkout@v7
         with:
           repository: innotelinc/innotel-platform-stack
           path: .stack
+          persist-credentials: false
 
       - name: Run the conformity audit
         run: |
