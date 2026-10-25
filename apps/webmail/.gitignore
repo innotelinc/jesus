@@ -51,3 +51,7 @@ next-env.d.ts
 
 # Sibling repos
 /repos/
+
+# Local environment (never commit)
+.env
+.env.local
