@@ -69,6 +69,14 @@ function repositoryOwner(): string {
 const ALLOWED_OWNERS = new Set([UPSTREAM_OWNER, repositoryOwner()]);
 const OWNER_SCOPE = [...ALLOWED_OWNERS].join(" or ");
 
+/**
+ * Segments that follow a registry host in the registry's OWN API, not in an image
+ * reference: `docker.io/token?service=…` (the pull-token endpoint) and
+ * `registry-1.docker.io/v2/<image>/manifests/<tag>` (the v2 API). docker-publish.yml
+ * probes both when it checks the account's pull quota, and neither is a namespace.
+ */
+const REGISTRY_API_SEGMENTS = new Set(["token", "v2", "v1"]);
+
 function isForeignOwner(owner: string): boolean {
   return !ALLOWED_OWNERS.has(owner.toLowerCase());
 }
@@ -89,6 +97,7 @@ test("no workflow publishes to another owner's container registry", () => {
     // right after the registry host.
     for (const m of text.matchAll(/\b(?:ghcr\.io|(?:index\.)?docker\.io)\/([A-Za-z0-9_.-]+)/g)) {
       const owner = m[1];
+      if (REGISTRY_API_SEGMENTS.has(owner.toLowerCase())) continue;
       if (isForeignOwner(owner)) {
         offenders.push(`${path.basename(file)} → ${m[0]}`);
       }
