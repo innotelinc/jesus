@@ -3,3 +3,7 @@ dist/
 *.log
 .tmp/
 /freebuff-sites-build/
+
+# Local environment (never commit)
+.env
+.env.local

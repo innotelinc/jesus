@@ -1,5 +1,9 @@
 # Soulforge
 
+[![CI](https://github.com/innotelinc/genie-soulforge/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/genie-soulforge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 **Live demo: <https://site-11db63820dbd4e04aa6e99418b1db6b6.freebuff.page>**
 
 A local-first editor for AI agent **souls** and their **system prompts**, with a streaming playground for testing the result against a live model.
@@ -12,6 +16,18 @@ A local-first editor for AI agent **souls** and their **system prompts**, with a
 - **Library** — create, duplicate, confirmed-delete, search, JSON import/export, and Markdown export of a single soul.
 
 Everything is saved to `localStorage` in this browser. There is no account, backend, or telemetry.
+
+## Why Soulforge
+
+| Problem | Answer |
+| --- | --- |
+| Prompt engineering lives in scattered documents. | One soul per agent, with every section compiled into a prompt that can be read and exported. |
+| Testing a prompt means switching tools. | A streaming playground sends the prompt exactly as it stands to an OpenAI-compatible endpoint. |
+| Prompt changes are not reviewable. | Nameable snapshots, a line-by-line diff and a changes-only view. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Run it
 
@@ -79,3 +95,8 @@ tests/
 `compilePrompt` builds sections in a fixed order and joins the enabled ones. Empty sections are skipped, so the prompt never contains an empty heading. A manual edit sets `promptOverride`, which wins over the compiler until **Regenerate** clears it. Snapshots store both the rendered prompt and the soul fields, so restoring brings back the exact configuration rather than just the text.
 
 Token counts are estimates (characters ÷ 4, with a word-count floor), not billing numbers.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Copyright © 2026 Innotel Inc. Upstream material,
+where a directory carries its own licence, remains under that licence.
