@@ -8,6 +8,16 @@
 
 A local-first editor for AI agent **souls** and their **system prompts**, with a streaming playground for testing the result against a live model.
 
+> **About Soulforge** — the ecosystem's **CodeOps** editor for agent *souls*: one
+> record for an agent's identity, voice dials, principles and boundaries, compiled
+> live into a system prompt that can be section-toggled, snapshot-compared and
+> exported. Everything runs in the browser (`localStorage`, no account, no backend,
+> no telemetry) and streams against an OpenAI-compatible endpoint — OmniRoute's
+> gateway by default.
+> **Landing page:** [innotelinc.github.io/genie-soulforge](https://innotelinc.github.io/genie-soulforge)
+
+## What it is
+
 - **Soul editor** — identity, mission, audience, four voice dials, principles, boundaries, operating rules, response style, capabilities, freeform context, and per-soul temperature / max tokens.
 - **Compiled system prompt** — the prompt is generated live from the soul, with per-section toggles, token/word counts, manual editing (with an explicit "detached" state), copy and Markdown export.
 - **Playground** — streams replies from an OpenAI-compatible endpoint using the prompt exactly as it stands, including a collapsible "system prompt in effect" panel.
@@ -100,3 +110,8 @@ Token counts are estimates (characters ÷ 4, with a word-count floor), not billi
 
 MIT — see [LICENSE](LICENSE). Copyright © 2026 Innotel Inc. Upstream material,
 where a directory carries its own licence, remains under that licence.
+
+---
+
+*Soulforge — CodeOps. © 2026 Innotel Inc. [GitHub](https://github.com/innotelinc/genie-soulforge) ·
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)*
