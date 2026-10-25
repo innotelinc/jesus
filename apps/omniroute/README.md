@@ -7,11 +7,27 @@
 
 # 🚀 OmniRoute — The Free AI Gateway
 
+[![CI](https://github.com/innotelinc/omniroute/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/omniroute/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 <img src="./docs/diagrams/readme-hero.svg" width="100%" alt="OmniRoute — Never stop coding. Every AI tool → 352 providers — 90+ free — through one endpoint. Claude Code, Codex, Cursor, Cline, Copilot & Antigravity into FREE Claude / GPT / Gemini with auto-fallback. RTK + Caveman stacked compression saves 15–95% tokens (~89% avg) — never hit limits. 352 AI providers · 90+ free tiers · ~1.51B free tokens/mo · 19 routing strategies · $0 to start."/>
 
 </div>
 
 <div align="center">
+
+## Why OmniRoute
+
+| Problem | Answer |
+| --- | --- |
+| Every tool needs its own provider key and base URL. | One endpoint and one key reach every configured provider. |
+| A provider outage stops the work. | The fallback chain moves to a healthy model instead of failing the turn. |
+| Long prompts hit limits. | Stacked compression reduces the prompt before the provider sees it. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical
+definition of the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## 💰 ~1.51B Free Tokens / Month
 
@@ -1670,3 +1686,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 </div>
 <!-- GitHub Discussions enabled for community Q&A -->
+
+## License
+
+MIT — see [LICENSE](LICENSE). Copyright © 2026 Innotel Inc. and the
+upstream authors. Upstream material remains under its own licence.
