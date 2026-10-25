@@ -141,7 +141,7 @@ jobs:
       - name: "Walk a real sign-in: fresh identity, then its address under a new subject"
         env:
           AUTHENTIK_TOKEN: ${{ secrets.AUTHENTIK_TOKEN }}
-          DOGRAH_BASE: ${{ vars.DOGRAH_BASE || 'https://dograh.capstone.innotel.us' }}
+          DOGRAH_BASE: ${{ vars.DOGRAH_BASE || 'https://dograh.pbx.it.com' }}
         run: |
           set -uo pipefail
           rc=0
@@ -199,7 +199,12 @@ jobs:
 
       - name: Probe every proxy host through the edge
         env:
-          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'capstone.innotel.us' }}
+          # `capstone.innotel.us` is a redirect-only alias at the edge — the
+          # proxy hosts live under `pbx.it.com`, so a probe against the alias
+          # resolves DNS and then dies on the TLS handshake for every host it
+          # derives. Override with the `NPM_BASE_DOMAIN` repository variable on
+          # a deployment that serves the stack on another domain.
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'pbx.it.com' }}
         run: |
           set -uo pipefail
           log=$(mktemp)
@@ -498,7 +503,7 @@ jobs:
 
       - name: Walk every NPM proxy host through the public edge
         env:
-          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'capstone.innotel.us' }}
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'pbx.it.com' }}
           NPM_UPSTREAM_HOST: ${{ vars.NPM_UPSTREAM_HOST }}
           # The two rows that are not this stack's box: the shared Cerulean
           # Authentik, and the estate's subscribe portal. They are only used to
