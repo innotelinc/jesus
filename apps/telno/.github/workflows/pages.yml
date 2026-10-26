@@ -1,0 +1,63 @@
+# Publish the Telno landing page (web/landing/) to GitHub Pages.
+#
+#   https://innotelinc.github.io/telno/   (static landing)
+#
+# The page is hand-written HTML that vendors the estate's Unity theme
+# (unity-theme.css + unity-theme.js), so there is no build step: the folder is
+# uploaded as it stands.
+#
+# Requires Pages to be enabled once: repo Settings -> Pages -> Source:
+# "GitHub Actions". After that, every push to main that touches web/landing
+# republishes. workflow_dispatch works too.
+
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "web/landing/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+# Cancel any in-flight publish for the same ref; a Pages deploy is atomic.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: Assert the page carries the theme
+        # A landing page that lost its stylesheet renders as unstyled text and
+        # nobody notices until a customer does.
+        run: |
+          grep -q 'unity-theme.css' web/landing/index.html
+          grep -q 'unity-theme.js' web/landing/index.html
+          test -s web/landing/unity-theme.css
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/landing
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
