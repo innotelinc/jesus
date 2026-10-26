@@ -7,9 +7,13 @@
  *
  * Exits non-zero if any expectation fails.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createHmac } from 'node:crypto';
+import { rmSync } from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import WebSocket from 'ws';
 import { finalNoticeEmail, invoiceEmail, reminderEmail, suspensionEmail } from '../src/lib/mail.js';
 import { payUrlForInvoice } from '../src/lib/payments.js';
@@ -28,6 +32,16 @@ import { payUrlForInvoice } from '../src/lib/payments.js';
 const external = (process.argv[2] || process.env.BASE_URL || '').replace(/\/$/, '');
 let base = external;
 let server = null;
+// The temporary data directory this run started its own server with, if any,
+// and the switch configuration directory beside it.
+let dataDir = '';
+let configDir = '';
+
+// The account this run signs in as. When the suite starts its own server these
+// are handed to first boot, so the owner exists with a known password; when it
+// is pointed at a running instance they are whoever that instance has.
+const email = process.env.SMOKE_EMAIL || 'owner@telno.local';
+const password = process.env.SMOKE_PASSWORD || 'telno-demo-owner';
 let stripeStub = null;
 const stripeCalls = [];
 let mailjetStub = null;
@@ -109,10 +123,45 @@ if (!base) {
   });
   await new Promise((resolve) => mailjetStub.listen(0, '127.0.0.1', resolve));
   const mailjetPort = mailjetStub.address().port;
+
+  // The run owns its database. Without this the suite tested whatever
+  // `./data` happened to hold on the machine it ran on: a fresh clone bootstraps
+  // `admin@telno.local` with a generated password, so the owner sign-in below
+  // failed on precisely the machine that had never run the platform before.
+  // A temporary directory also means the suite cannot touch a developer's data.
+  dataDir = await mkdtemp(join(tmpdir(), 'telno-smoke-'));
+  configDir = join(dataDir, 'asterisk');
+
+  // The checks below assert against demo data — voicemail, call history, the
+  // connected systems, the demo accounts — so a run that starts its own server
+  // seeds its own instance rather than assuming someone ran `npm run seed`.
+  // `--force` also writes the switch configuration and, with openssl on PATH,
+  // the listener certificate the softphone checks report on.
+  const seed = spawnSync(process.execPath, ['src/seed.js', '--force'], {
+    env: {
+      ...process.env,
+      DATA_DIR: dataDir,
+      ASTERISK_CONFIG_DIR: configDir,
+      ADMIN_EMAIL: email,
+      ADMIN_PASSWORD: password,
+    },
+    encoding: 'utf8',
+  });
+  if (seed.status !== 0) {
+    console.error(`\nCould not seed a test instance\n${(seed.stdout || '') + (seed.stderr || '')}`.slice(-1500));
+    process.exit(1);
+  }
+
   server = spawn(process.execPath, ['src/index.js'], {
     env: {
       ...process.env,
       PORT: String(port),
+      // The owner this run will sign in as. Set explicitly so first boot creates
+      // the account the suite expects instead of printing a random password.
+      DATA_DIR: dataDir,
+      ASTERISK_CONFIG_DIR: configDir,
+      ADMIN_EMAIL: email,
+      ADMIN_PASSWORD: password,
       // The same origin the stub will claim is registered in Stripe, so the
       // connection test compares like with like.
       PUBLIC_URL: base,
@@ -148,6 +197,13 @@ if (!base) {
     if (server && !server.killed) server.kill();
     if (stripeStub) stripeStub.close();
     if (mailjetStub) mailjetStub.close();
+    if (dataDir) {
+      try {
+        rmSync(dataDir, { recursive: true, force: true });
+      } catch {
+        /* a leftover temp directory is not a test failure */
+      }
+    }
   };
   process.on('exit', globalThis.__smokeStopServer);
 
@@ -171,9 +227,6 @@ if (!base) {
     process.exit(1);
   }
 }
-
-const email = process.env.SMOKE_EMAIL || 'owner@telno.local';
-const password = process.env.SMOKE_PASSWORD || 'telno-demo-owner';
 
 const FIXTURE_NUMBER = '+1 415 555 0177';
 const FIXTURE_E164 = '+14155550177';
