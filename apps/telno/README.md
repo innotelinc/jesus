@@ -98,12 +98,20 @@ behaves identically.
 ## Verify it
 
 ```bash
-npm run smoke       # 237 end-to-end checks against a running instance
+npm run smoke       # 237 end-to-end checks, on an instance it starts itself
+npm run smoke http://localhost:8080   # or against an instance you already have running
 ```
 
+With no URL the suite provisions its own instance: a temporary data directory, a seeded database and
+its own switch configuration directory, so it needs no prior state and cannot touch yours. It stubs
+the payment and mail providers on loopback, so a run never reaches Stripe, Resend or Mailjet — and
+never needs a key. The temporary directory is removed when the run ends.
+
 The suite covers number normalization across 245 countries, dedupe, submission → OTP → approval,
-opt-out and reversal, API-key scopes, config generation and session invalidation. It cleans its own
-fixtures, so it can be run repeatedly.
+opt-out and reversal, API-key scopes, config generation, the softphone's TLS and recording policy,
+payments and escalation, and session invalidation. It cleans its own fixtures, so it can be run
+repeatedly. OpenSSL on `PATH` is the one external tool it expects: the switch certificate is
+generated the same way a first boot generates it.
 
 ## Directory hostnames
 
