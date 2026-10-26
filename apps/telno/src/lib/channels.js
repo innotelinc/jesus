@@ -1,0 +1,333 @@
+import { config } from '../config.js';
+import { getSecret } from './vault.js';
+
+/**
+ * Outbound mail and SMS is plug-and-play: the platform picks a provider per
+ * channel, so a mail key never affects SMS and vice versa.
+ *
+ *   send({ channel: 'email'|'sms', to, code, submission }) -> { delivered, provider }
+ *
+ * Credentials come from the vault first and the environment second. The vault
+ * is what the console writes to (Settings → Email delivery), so an operator can
+ * add or rotate a key without rebuilding the container; RESEND_API_KEY in the
+ * environment still works for a deployment that would rather set it in compose.
+ */
+
+const consoleChannel = {
+  name: 'console',
+  async send({ channel, to, code, submission }) {
+    // Deliberately explicit: this is the local/dev path, never a silent failure.
+    console.log(
+      `[verify] ${channel} -> ${to || '(no address)'} code=${code} submission=${submission?.id} name=${submission?.name}`
+    );
+    return { delivered: true, provider: 'console', simulated: true };
+  },
+};
+
+const twilioChannel = {
+  name: 'twilio',
+  async send({ channel, to }) {
+    const { twilioSid, twilioToken, twilioFrom } = config.notify;
+    if (!twilioSid || !twilioToken || !twilioFrom) {
+      return { delivered: false, provider: 'twilio', error: 'twilio_not_configured' };
+    }
+    if (channel !== 'sms') return { delivered: false, provider: 'twilio', error: 'sms_only' };
+    const body = new URLSearchParams({
+      To: to,
+      From: twilioFrom,
+      Body: `Your ${config.directory.canonical} verification code is ${code}. It expires in ${Math.round(
+        config.directory.otpTtlSeconds / 60
+      )} minutes.`,
+    });
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64'),
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+    if (!res.ok) {
+      return { delivered: false, provider: 'twilio', error: `http_${res.status}` };
+    }
+    return { delivered: true, provider: 'twilio' };
+  },
+};
+
+/* ------------------------------------------------------------------ email -- */
+
+/**
+ * Two email providers, one adapter. The operator chooses; the vault holds the
+ * credentials, so switching between Resend and Mailjet is a click in Settings
+ * rather than an image rebuild and a restart.
+ *
+ *   EMAIL_PROVIDER = 'resend' | 'mailjet'   (vault first, environment second)
+ *
+ * Choice beats presence: a stored Resend key does not win while Mailjet is the
+ * chosen provider. A chosen provider with no credentials fails loudly instead
+ * of quietly posting invoices to the container log — a customer waiting for a
+ * final notice must not be failed silently.
+ */
+
+const RESEND_KEY = 'RESEND_API_KEY';
+const MAILJET_KEY = 'MAILJET_API_KEY';
+const MAILJET_SECRET = 'MAILJET_API_SECRET';
+const PROVIDER_KEY = 'EMAIL_PROVIDER';
+
+/** Vault first, environment second. Never logged, never returned by an API. */
+const resendKey = () => getSecret(RESEND_KEY) || process.env.RESEND_API_KEY || '';
+const mailjetKey = () => getSecret(MAILJET_KEY) || process.env.MAILJET_API_KEY || '';
+const mailjetSecret = () => getSecret(MAILJET_SECRET) || process.env.MAILJET_API_SECRET || '';
+
+export const resendConfigured = () => !!resendKey();
+// Mailjet authenticates with a key *and* a secret: one without the other is not
+// a working configuration, and saying so beats a 401 from the provider.
+export const mailjetConfigured = () => !!(mailjetKey() && mailjetSecret());
+
+/** A From address can be stored too: providers reject a sender they do not own. */
+const emailFrom = () => getSecret('EMAIL_FROM') || config.notify.from;
+
+/** Where a credential came from, without disclosing it. */
+const sourceOf = (name, environment) => (getSecret(name) ? 'vault' : environment ? 'environment' : 'none');
+
+export const providerPreference = () =>
+  String(getSecret(PROVIDER_KEY) || config.notify.emailProvider || '').toLowerCase();
+
+/**
+ * Which provider actually sends right now. An explicit choice wins; with no
+ * choice the first configured provider is used, which keeps a deployment that
+ * only ever had a Resend key working exactly as it did.
+ */
+export function emailProviderName() {
+  const chosen = providerPreference();
+  if (chosen === 'resend' || chosen === 'mailjet') return chosen;
+  if (resendConfigured()) return 'resend';
+  if (mailjetConfigured()) return 'mailjet';
+  return 'console';
+}
+
+export const emailSource = () => {
+  const name = emailProviderName();
+  if (name === 'resend') return sourceOf(RESEND_KEY, process.env.RESEND_API_KEY);
+  if (name === 'mailjet') return sourceOf(MAILJET_KEY, process.env.MAILJET_API_KEY);
+  return 'none';
+};
+
+/** Resend: one POST, bearer key, JSON body. */
+async function sendViaResend({ to, subject, text, html }) {
+  const key = resendKey();
+  if (!key) return { delivered: false, provider: 'resend', error: 'resend_not_configured' };
+  let res;
+  try {
+    res = await fetch(`${config.notify.resendUrl}/emails`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      // `html` is optional: a message without markup is still sent as text, and
+      // a client that refuses HTML reads the text part.
+      body: JSON.stringify({ from: emailFrom(), to: [to], subject, text, ...(html ? { html } : {}) }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    // A wrong host or a blocked egress is a delivery failure, not a crash: the
+    // caller shows the reason and the operator can fix the key or the network.
+    return { delivered: false, provider: 'resend', error: `network: ${err.message}` };
+  }
+  if (!res.ok) return { delivered: false, provider: 'resend', error: `http_${res.status}` };
+  const body = await res.json().catch(() => ({}));
+  return { delivered: true, provider: 'resend', id: body?.id || null };
+}
+
+/**
+ * Mailjet: key + secret as Basic auth, a `Messages` array, and a 200 that can
+ * still carry a per-message failure — so the status inside the body is checked,
+ * not just the HTTP code.
+ */
+async function sendViaMailjet({ to, subject, text, html }) {
+  const key = mailjetKey();
+  const secret = mailjetSecret();
+  if (!key || !secret) {
+    return {
+      delivered: false,
+      provider: 'mailjet',
+      error: !key ? 'mailjet_not_configured' : 'mailjet_secret_missing',
+    };
+  }
+  let res;
+  try {
+    res = await fetch(`${config.notify.mailjetUrl}/v3.1/send`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${key}:${secret}`).toString('base64'),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: { Email: emailFrom(), Name: 'Telno' },
+            To: [{ Email: to }],
+            Subject: subject,
+            TextPart: text,
+            ...(html ? { HTMLPart: html } : {}),
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    return { delivered: false, provider: 'mailjet', error: `network: ${err.message}` };
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const why = body?.ErrorMessage || body?.Messages?.[0]?.Errors?.[0]?.ErrorMessage || `http_${res.status}`;
+    return { delivered: false, provider: 'mailjet', error: why };
+  }
+  const message = body?.Messages?.[0] || {};
+  if (message.Status && message.Status !== 'success') {
+    return {
+      delivered: false,
+      provider: 'mailjet',
+      error: message.Errors?.[0]?.ErrorMessage || message.Status,
+    };
+  }
+  return { delivered: true, provider: 'mailjet', id: message.To?.[0]?.MessageID || null };
+}
+
+/**
+ * One call, one message, whichever provider is chosen. Used by verification
+ * codes, invoice resend, reports and the Settings test button, so every
+ * outbound mail behaves the same way.
+ */
+export async function sendEmail({ to, subject, text, html }) {
+  const provider = emailProviderName();
+  if (provider === 'resend') return sendViaResend({ to, subject, text, html });
+  if (provider === 'mailjet') return sendViaMailjet({ to, subject, text, html });
+  return { delivered: false, provider: 'console', error: 'email_not_configured' };
+}
+
+/** The verification code, worded once so both providers send the same message. */
+const verificationMessage = ({ code, submission }) => ({
+  subject: `Verify your listing on ${config.directory.canonical}`,
+  text:
+    `Someone (hopefully you) submitted a directory listing for "${submission.name}".\n\n` +
+    `Verification code: ${code}\n\n` +
+    `It expires in ${Math.round(config.directory.otpTtlSeconds / 60)} minutes. ` +
+    `If this was not you, ignore this message — nothing is published without the code.`,
+});
+
+const resendChannel = {
+  name: 'resend',
+  async send({ channel, to, code, submission }) {
+    if (channel !== 'email') return { delivered: false, provider: 'resend', error: 'email_only' };
+    return sendViaResend({ to, ...verificationMessage({ code, submission }) });
+  },
+};
+
+const mailjetChannel = {
+  name: 'mailjet',
+  async send({ channel, to, code, submission }) {
+    if (channel !== 'email') return { delivered: false, provider: 'mailjet', error: 'email_only' };
+    return sendViaMailjet({ to, ...verificationMessage({ code, submission }) });
+  },
+};
+
+/**
+ * Which provider handles this channel right now. For email it is the operator's
+ * choice; SMS keeps its own provider, so the two cannot interfere.
+ */
+export function providerFor(channel) {
+  if (channel === 'email') {
+    const name = emailProviderName();
+    if (name === 'resend') return resendChannel;
+    if (name === 'mailjet') return mailjetChannel;
+    return consoleChannel;
+  }
+  if (config.notify.channel === 'twilio' || (config.notify.twilioSid && config.notify.twilioToken)) {
+    return twilioChannel;
+  }
+  return consoleChannel;
+}
+
+export function activeChannel(channel = 'email') {
+  return providerFor(channel);
+}
+
+export async function deliverVerification(payload) {
+  const provider = providerFor(payload.channel);
+  try {
+    const result = await provider.send(payload);
+    return { ...result, channel: provider.name };
+  } catch (err) {
+    return { delivered: false, channel: provider.name, error: err.message };
+  }
+}
+
+/**
+ * Sends an operational notice (an invoice, a reminder) through the configured
+ * channel. Same provider, different message: verification codes have their own
+ * template, so the two paths cannot accidentally cross.
+ */
+export async function deliverNotice({ to, subject, text, html }) {
+  const channel = emailProviderName();
+  try {
+    if (channel === 'resend' || channel === 'mailjet') {
+      const result = channel === 'resend'
+        ? await sendViaResend({ to, subject, text, html })
+        : await sendViaMailjet({ to, subject, text, html });
+      return { ...result, channel };
+    }
+    if (config.notify.channel === 'twilio') {
+      const { twilioSid, twilioToken, twilioFrom } = config.notify;
+      if (!twilioSid || !twilioToken || !twilioFrom) return { delivered: false, channel, error: 'twilio_not_configured' };
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64'),
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ To: to, From: twilioFrom, Body: `${subject}. ${text}`.slice(0, 300) }),
+      });
+      return res.ok
+        ? { delivered: true, channel }
+        : { delivered: false, channel, error: `http_${res.status}` };
+    }
+    // Console: the local/dev path. Delivered to the log, deliberately visible.
+    // The text part is what is logged — it is the same message the HTML shows.
+    console.log(`[notice] ${channel} -> ${to} :: ${subject}${html ? ' (html)' : ''}\n${text}`);
+    return { delivered: true, channel, simulated: true };
+  } catch (err) {
+    return { delivered: false, channel, error: err.message };
+  }
+}
+
+export const channelStatus = () => {
+  const provider = emailProviderName();
+  return {
+    active: provider,
+    available: ['console', 'twilio', 'resend', 'mailjet'],
+    devExposeCodes: config.directory.devExposeCodes,
+    email: {
+      provider,
+      configured: provider === 'resend' ? resendConfigured() : provider === 'mailjet' ? mailjetConfigured() : false,
+      // What the operator asked for, which may differ from what is delivering.
+      preference: providerPreference(),
+      source: emailSource(),
+      from: emailFrom(),
+      providers: {
+        resend: {
+          configured: resendConfigured(),
+          source: sourceOf(RESEND_KEY, process.env.RESEND_API_KEY),
+        },
+        mailjet: {
+          configured: mailjetConfigured(),
+          key: !!mailjetKey(),
+          secret: !!mailjetSecret(),
+          source: sourceOf(MAILJET_KEY, process.env.MAILJET_API_KEY),
+        },
+      },
+    },
+    sms: {
+      provider: providerFor('sms').name,
+      configured: !!(config.notify.twilioSid && config.notify.twilioToken),
+    },
+  };
+};

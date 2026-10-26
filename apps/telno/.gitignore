@@ -1,0 +1,15 @@
+node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+web/dist/
+reports-*.json
+insp-*.json
+err.txt
+*.log
+server.pid
+.tmp/
+screenshots/

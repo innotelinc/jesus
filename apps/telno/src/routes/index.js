@@ -1,0 +1,30 @@
+import authRoutes from './auth.js';
+import registryRoutes from './registry.js';
+import telephonyRoutes from './telephony.js';
+import directoryRoutes from './directory.js';
+import workspaceRoutes from './workspace.js';
+import mediaRoutes from './media.js';
+import systemsRoutes from './systems.js';
+import softphoneRoutes from './softphone.js';
+import heartbeatRoutes from './heartbeat.js';
+import systemRoutes from './system.js';
+import payRoutes from './pay.js';
+
+/** Everything under /api. */
+export async function registerRoutes(app) {
+  await app.register(authRoutes, { prefix: '/auth' });
+  await app.register(registryRoutes);
+  await app.register(telephonyRoutes);
+  await app.register(directoryRoutes);
+  await app.register(workspaceRoutes);
+  await app.register(mediaRoutes);
+  await app.register(systemsRoutes);
+  await app.register(softphoneRoutes);
+  // Devices authenticate themselves, so this sits outside the session surface.
+  await app.register(heartbeatRoutes);
+  await app.register(systemRoutes);
+  // Public invoice payment links and Stripe's webhook: no session, by design.
+  await app.register(payRoutes);
+}
+
+export default registerRoutes;

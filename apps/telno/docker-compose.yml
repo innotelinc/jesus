@@ -1,0 +1,104 @@
+name: telno
+
+services:
+  telno:
+    build: .
+    image: telno:latest
+    container_name: telno
+    restart: unless-stopped
+
+    # A readable hostname on purpose. Docker's default is a hex container id,
+    # and a SIP parser reads a digit-leading host as a broken IPv4 address —
+    # the switch would put it in Contact headers and a browser would drop the
+    # message. "telno" is also what AMI and the CLI show.
+    hostname: ${TELNO_HOSTNAME:-telno}
+
+    # Only the web/API port is published by default. AMI (5038) stays inside
+    # the container, and SIP/RTP are added below when this box terminates calls.
+    ports:
+      - "${TELNO_PORT:-8080}:8080"
+      # Browser softphone: SIP over secure WebSocket, straight to chan_pjsip.
+      # Media is DTLS-SRTP on the RTP range below, so both have to be reachable.
+      - "${SOFTPHONE_PORT:-8089}:8089"
+      # Media for the browser softphone. The WebSocket carries signalling only;
+      # DTLS-SRTP audio and video arrive on this range, so a call needs it
+      # published (or use network_mode: host below on a Linux host).
+      - "10000-10100:10000-10100/udp"
+      # - "5060:5060/udp"              # SIP signalling for desk phones/trunks
+
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # SIP domain used in From/To headers. Defaults to the PUBLIC_URL host.
+      SIP_DOMAIN: ${SIP_DOMAIN:-}
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-US}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@telno.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DIRECTORY_DOMAINS: ${DIRECTORY_DOMAINS:-telno.directory,num.directory,number.directory,directory.telno.services,directory.pbx.services,directory.pbx.technology}
+      DIRECTORY_CANONICAL: ${DIRECTORY_CANONICAL:-telno.directory}
+      NOTIFY_CHANNEL: ${NOTIFY_CHANNEL:-console}
+      NOTIFY_FROM: ${NOTIFY_FROM:-directory@telno.directory}
+      # Email provider: resend | mailjet. Keys are normally stored in the vault
+      # (Settings → Email delivery); these are for a .env-only deployment.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAILJET_API_KEY: ${MAILJET_API_KEY:-}
+      MAILJET_API_SECRET: ${MAILJET_API_SECRET:-}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      # The address a browser must use for the switch's WebSocket. Leave empty
+      # to derive it from the request host (right for a same-host deployment).
+      SOFTPHONE_WSS_URL: ${SOFTPHONE_WSS_URL:-}
+      SOFTPHONE_VIDEO: ${SOFTPHONE_VIDEO:-true}
+      SOFTPHONE_ENABLED: ${SOFTPHONE_ENABLED:-true}
+      # TURN is optional: without it, calls still work on ordinary NATs.
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+      # Address browsers actually reach this switch on. Empty derives it from
+      # PUBLIC_URL; set it when the public URL is loopback (a laptop that only
+      # exposes the container through published ports).
+      ASTERISK_EXTERNAL_ADDRESS: ${ASTERISK_EXTERNAL_ADDRESS:-}
+      # Billing automation. The defaults live in the code; these pass a .env
+      # change through to the container so the ladder and the dunning policy can
+      # be changed without editing the image.
+      REMINDER_DAYS: ${REMINDER_DAYS:-1,3,7,14,30}
+      REMINDER_GAP_HOURS: ${REMINDER_GAP_HOURS:-20}
+      ESCALATION_ENABLED: ${ESCALATION_ENABLED:-true}
+      FINAL_NOTICE_DAYS: ${FINAL_NOTICE_DAYS:-30}
+      SUSPEND_GRACE_DAYS: ${SUSPEND_GRACE_DAYS:-14}
+      # Card payment for the pay button. Both values are better kept in the
+      # vault (Settings → Vault); these are here for a .env-only deployment.
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Session, API-key and AMI secrets are generated once and stored in the
+      # data volume, so they survive restarts without being configured.
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+
+    volumes:
+      - telno-data:/data                 # SQLite database + generated secrets
+      - telno-asterisk:/etc/asterisk     # generated switch configuration
+      - telno-spool:/var/spool/asterisk  # voicemail
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+    # A slim control plane: Node is capped at 192 MB and the whole container
+    # comfortably fits in 512 MB including Asterisk.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+    # For a real switch behind a NAT, host networking avoids SDP/RTP rewriting:
+    # network_mode: host
+    # and remove `ports` above.
+
+volumes:
+  telno-data:
+  telno-asterisk:
+  telno-spool:
