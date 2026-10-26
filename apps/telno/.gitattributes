@@ -1,0 +1,8 @@
+# The artifact is a Linux container; a CRLF entrypoint.sh or config file is a
+# bug that only shows up on the deploy host. Check everything out with LF, and
+# keep binaries out of the newline contract entirely.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
