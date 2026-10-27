@@ -79,6 +79,14 @@ function Router() {
     return <Subscribe user={user} locked={status === 'unpaid' ? reason : null} />;
   }
 
+  // The first login comes before the plans, and before the console: terms,
+  // details, address, phone and a line, in that order. The server refuses every
+  // other route until then, so this is the door rather than a greeting — and a
+  // subscriber whose payment has not settled can still walk through it.
+  if (onboarding?.required) {
+    return <Onboarding />;
+  }
+
   // A valid session without a paid subscription gets the plans, not the console.
   if (status === 'unpaid') {
     return <Subscribe user={user} locked={reason} />;
@@ -106,13 +114,6 @@ function Router() {
     if (pathname === '/') return <Site />;
     navigate('/login', { replace: true });
     return <Login />;
-  }
-
-  // The first login, and it is not a suggestion: terms, details, address, phone
-  // and a line, in that order, before the console answers anything. The server
-  // refuses every other route until then, so this is the door and not a greeting.
-  if (onboarding?.required) {
-    return <Onboarding />;
   }
 
   // The softphone's own window: one document, one registration, no console
