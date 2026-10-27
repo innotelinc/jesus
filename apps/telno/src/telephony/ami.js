@@ -10,6 +10,20 @@ import { config } from '../config.js';
  * it costs a few hundred bytes of memory per connection. That is what makes the
  * control plane slim — no Node-to-Asterisk bridge, no extra daemon.
  */
+/**
+ * How often the link is proved alive, and how much silence is tolerated first.
+ *
+ * An idle Asterisk says nothing at all — it speaks when something happens — so
+ * "no bytes for N seconds" cannot mean "the peer is gone". It used to: this
+ * client called `socket.setTimeout(20000)`, which fires on idleness, and over
+ * ten hours of an idle switch it logged 609 connects against 608 disconnects.
+ * Every cycle was a second with no AMI session, which is a ring event that
+ * never arrives. Being asked a question is different from being quiet, so a
+ * Ping goes out every 15 seconds and 45 seconds of silence is real evidence.
+ */
+const HEARTBEAT_EVERY_MS = 15_000;
+const HEARTBEAT_GRACE_MS = 45_000;
+
 export class AmiClient extends EventEmitter {
   constructor(opts = {}) {
     super();
@@ -23,6 +37,9 @@ export class AmiClient extends EventEmitter {
     this.backoff = 1000;
     this.timer = null;
     this.stopped = false;
+    this.seq = 0;
+    this.lastInbound = 0;
+    this.heartbeat = null;
   }
 
   connect() {
@@ -36,13 +53,13 @@ export class AmiClient extends EventEmitter {
     this.socket = socket;
     socket.setNoDelay(true);
     socket.setKeepAlive(true, 15000);
-    socket.setTimeout(20000);
+    // No socket timeout here: idleness is not death on an event-driven
+    // protocol. Liveness is checked on purpose, in #startHeartbeat.
 
     socket.on('connect', () => {
       this.buffer = '';
     });
     socket.on('data', (chunk) => this.#onData(chunk));
-    socket.on('timeout', () => socket.destroy(new Error('ami_timeout')));
     socket.on('error', (err) => {
       this.lastError = err.message;
       socket.destroy();
@@ -55,7 +72,30 @@ export class AmiClient extends EventEmitter {
       if (wasConnected) this.emit('disconnected');
       this.#scheduleReconnect();
     });
+    this.#startHeartbeat();
     return this;
+  }
+
+  /**
+   * Prove the link is alive by asking, rather than by assuming silence is bad.
+   *
+   * A Ping every 15 seconds is a real round trip: if the switch is there it
+   * answers, which both keeps TCP warm and tells us the session still works. If
+   * nothing at all comes back for 45 seconds — two missed heartbeats — the
+   * socket is torn down and the reconnect backoff takes over.
+   */
+  #startHeartbeat() {
+    clearInterval(this.heartbeat);
+    this.heartbeat = setInterval(() => {
+      if (this.stopped || !this.connected) return;
+      if (Date.now() - this.lastInbound > HEARTBEAT_GRACE_MS) {
+        this.lastError = 'ami_unresponsive';
+        this.socket?.destroy();
+        return;
+      }
+      this.send('Ping', {});
+    }, HEARTBEAT_EVERY_MS);
+    if (this.heartbeat.unref) this.heartbeat.unref();
   }
 
   #scheduleReconnect() {
@@ -69,6 +109,7 @@ export class AmiClient extends EventEmitter {
   }
 
   #onData(chunk) {
+    this.lastInbound = Date.now();
     this.buffer += chunk.toString('utf8');
 
     // The banner is a single CRLF-terminated line, not a blank-line terminated
@@ -121,9 +162,22 @@ export class AmiClient extends EventEmitter {
   }
 
   #settle(message) {
-    const pending = this.pending.shift();
-    if (pending) pending.resolve(message);
-    else if (message.Response === 'Error') this.lastError = message.Message || 'ami_error';
+    // By ActionID when the answer carries one, otherwise the oldest question.
+    // Asterisk replies in order, but more than one action can be in flight —
+    // status() sends two, and the heartbeat adds a third — and "the first
+    // pending promise" would then be whoever asked first rather than whoever
+    // was answered.
+    const index = message.ActionID
+      ? this.pending.findIndex((entry) => entry.id === message.ActionID)
+      : this.pending.length
+        ? 0
+        : -1;
+    if (index === -1) {
+      if (message.Response === 'Error') this.lastError = message.Message || 'ami_error';
+      return;
+    }
+    const [pending] = this.pending.splice(index, 1);
+    pending.resolve(message);
   }
 
   send(name, params = {}) {
@@ -131,12 +185,18 @@ export class AmiClient extends EventEmitter {
       if (this.queue.length < 50) this.queue.push({ name, params });
       return Promise.resolve(null);
     }
-    const lines = [`Action: ${name}`, ...Object.entries(params).map(([k, v]) => `${k}: ${v}`)];
+    const id = `tl${++this.seq}`;
+    const lines = [
+      `Action: ${name}`,
+      `ActionID: ${id}`,
+      ...Object.entries(params).map(([k, v]) => `${k}: ${v}`),
+    ];
     this.socket.write(lines.join('\r\n') + '\r\n\r\n');
     return new Promise((resolve) => {
-      this.pending.push({ resolve });
+      const entry = { id, resolve };
+      this.pending.push(entry);
       setTimeout(() => {
-        const index = this.pending.findIndex((p) => p.resolve === resolve);
+        const index = this.pending.indexOf(entry);
         if (index !== -1) {
           this.pending.splice(index, 1);
           resolve(null);
@@ -182,6 +242,7 @@ export class AmiClient extends EventEmitter {
   stop() {
     this.stopped = true;
     clearTimeout(this.timer);
+    clearInterval(this.heartbeat);
     this.socket?.destroy();
     this.socket = null;
   }
