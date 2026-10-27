@@ -180,9 +180,12 @@ export default async function carrierRoutes(app) {
     }
 
     voipms.assertConfigured();
-    if (!routing && !config.voipms.routing) {
+    // The vault is asked as well as the environment: a routing target entered in
+    // Settings → Numbers from VoIP.ms is the intended way to set this without a
+    // redeploy.
+    if (!routing && !voipms.voipmsRouting()) {
       throw badRequest(
-        'VoIP.ms needs to know where the DID rings. Set VOIPMS_ROUTING (for example account:100001_telno) or pass a routing value with the order.'
+        'VoIP.ms needs to know where the DID rings. Store VOIPMS_ROUTING in Settings → Numbers from VoIP.ms (for example account:100001_telno) or pass a routing value with the order.'
       );
     }
 

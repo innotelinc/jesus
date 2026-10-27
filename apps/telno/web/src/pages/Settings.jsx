@@ -37,6 +37,11 @@ export default function Settings() {
   const [stripeSecret, setStripeSecret] = useState('');
   const [mailjetKey, setMailjetKey] = useState('');
   const [mailjetSecret, setMailjetSecret] = useState('');
+  const [voipUser, setVoipUser] = useState('');
+  const [voipPass, setVoipPass] = useState('');
+  const [voipRoutingField, setVoipRoutingField] = useState('');
+  const [provider, setProvider] = useState(null);
+  const [testingProvider, setTestingProvider] = useState(false);
   const [aiKey, setAiKey] = useState('');
   const [aiTest, setAiTest] = useState(null);
   const [brandForm, setBrandForm] = useState(null);
@@ -189,6 +194,41 @@ export default function Settings() {
   const secretByName = (name) => vault.items.find((item) => item.name === name);
   const stripeKeyStored = secretByName('STRIPE_SECRET_KEY');
   const stripeSecretStored = secretByName('STRIPE_WEBHOOK_SECRET');
+  const voipUserStored = secretByName('VOIPMS_API_USERNAME');
+  const voipPassStored = secretByName('VOIPMS_API_PASSWORD');
+  const voipRoutingStored = secretByName('VOIPMS_ROUTING');
+
+  /**
+   * Ask the number provider whether it answers, as the operator, from here.
+   *
+   * The interesting failure is `invalid_ip`: VoIP.ms only answers allow-listed
+   * source addresses, so a connection that is refused for that reason needs a
+   * different fix from a wrong password, and the test says which it is.
+   */
+  const testNumberProvider = async () => {
+    setTestingProvider(true);
+    try {
+      const result = await api.get('/provider/voipms');
+      setProvider(result);
+      if (result.configured && result.reachable) {
+        const balance = Number.isFinite(result.balanceCents)
+          ? (result.balanceCents / 100).toLocaleString('en-US', {
+              style: 'currency',
+              currency: result.currency || 'USD',
+            })
+          : 'not reported';
+        toast.success('VoIP.ms answered', `Balance ${balance} · routing ${result.defaults?.routing || 'not set'}`);
+      } else if (result.configured) {
+        toast.error('VoIP.ms refused the call', result.error || 'The provider did not explain');
+      } else {
+        toast.error('VoIP.ms is not connected', 'Store the API username and API password first — both come from Main Menu → SOAP & REST API.');
+      }
+    } catch (err) {
+      toast.error('The connection test failed', err.message);
+    } finally {
+      setTestingProvider(false);
+    }
+  };
 
   /** Same vault, same rules: stored encrypted, only the last four characters come back. */
   const storeSecret = async (name, value, label) => {
@@ -208,6 +248,9 @@ export default function Settings() {
       else if (name === 'STRIPE_WEBHOOK_SECRET') setStripeSecret('');
       else if (name === 'MAILJET_API_KEY') setMailjetKey('');
       else if (name === 'MAILJET_API_SECRET') setMailjetSecret('');
+      else if (name === 'VOIPMS_API_USERNAME') setVoipUser('');
+      else if (name === 'VOIPMS_API_PASSWORD') setVoipPass('');
+      else if (name === 'VOIPMS_ROUTING') setVoipRoutingField('');
       else if (name === 'LLM_API_KEY') setAiKey('');
       else if (name === 'MAGNATE_WEBHOOK_URL') setMagnateHook('');
       else if (name === 'MAGNATE_API_TOKEN') setMagnateToken('');
@@ -692,6 +735,145 @@ export default function Settings() {
                 Send test
               </Button>
             </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Numbers from VoIP.ms"
+        subtitle="Where a rented DID comes from, and where it rings"
+        actions={
+          <Badge tone={provider?.configured ? (provider?.reachable ? 'success' : 'warn') : 'neutral'} dot>
+            {provider
+              ? provider.configured
+                ? provider.reachable
+                  ? 'Connected'
+                  : 'Configured, refused'
+                : 'Not configured'
+              : 'Not configured'}
+          </Badge>
+        }
+      >
+        <p className="tiny muted" style={{ marginTop: 0 }}>
+          The API username and API password are not the credentials you sign in to the VoIP.ms portal with: they are
+          under Main Menu → SOAP &amp; REST API, and that page also has to allow-list this server&apos;s public IP
+          address. They go into the same encrypted vault as everything else here. Routing is where a bought number
+          rings on your switch, for example <span className="mono">account:100001_telno</span>.
+        </p>
+        <div className="grid two">
+          <div className="stack">
+            <Input
+              label="VoIP.ms API username"
+              autoComplete="off"
+              placeholder={voipUserStored ? `Stored ${voipUserStored.hint}` : 'Usually the email on the account'}
+              hint={
+                voipUserStored
+                  ? `Stored ${relativeTime(voipUserStored.updatedAt)}${voipUserStored.updatedBy ? ` by ${voipUserStored.updatedBy}` : ''}`
+                  : 'voip.ms → Main Menu → SOAP & REST API'
+              }
+              value={voipUser}
+              onChange={(event) => setVoipUser(event.target.value)}
+            />
+            <Input
+              label="VoIP.ms API password"
+              type="password"
+              autoComplete="off"
+              placeholder={voipPassStored ? `Stored ${voipPassStored.hint}` : 'The API password, not the portal one'}
+              hint={voipPassStored ? `Stored ${relativeTime(voipPassStored.updatedAt)}` : 'Both halves are needed before a DID can be ordered'}
+              value={voipPass}
+              onChange={(event) => setVoipPass(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'VOIPMS_API_USERNAME'}
+                onClick={() => storeSecret('VOIPMS_API_USERNAME', voipUser, 'VoIP.ms API username')}
+              >
+                {voipUserStored ? 'Replace username' : 'Store username'}
+              </Button>
+              {voipUserStored ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearSecret('VOIPMS_API_USERNAME', 'Remove the stored VoIP.ms username? Number ordering stops until it is stored again.')}
+                >
+                  Remove
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'VOIPMS_API_PASSWORD'}
+                onClick={() => storeSecret('VOIPMS_API_PASSWORD', voipPass, 'VoIP.ms API password')}
+              >
+                {voipPassStored ? 'Replace password' : 'Store password'}
+              </Button>
+              {voipPassStored ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearSecret('VOIPMS_API_PASSWORD', 'Remove the stored VoIP.ms password? Number ordering stops until it is stored again.')}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="stack">
+            <Input
+              label="Routing target"
+              placeholder={voipRoutingStored ? `Stored ${voipRoutingStored.hint}` : 'account:100001_telno'}
+              hint={
+                voipRoutingStored
+                  ? `Stored ${relativeTime(voipRoutingStored.updatedAt)} — new numbers ring here`
+                  : 'Where a number bought from the console rings; every order needs one'
+              }
+              value={voipRoutingField}
+              onChange={(event) => setVoipRoutingField(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'VOIPMS_ROUTING'}
+                onClick={() => storeSecret('VOIPMS_ROUTING', voipRoutingField, 'routing target')}
+              >
+                {voipRoutingStored ? 'Replace routing' : 'Store routing'}
+              </Button>
+              {voipRoutingStored ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearSecret('VOIPMS_ROUTING', 'Remove the stored routing target? Numbers can then only be ordered with one supplied.')}
+                >
+                  Remove
+                </Button>
+              ) : null}
+              <Button size="sm" icon="refresh" loading={testingProvider} onClick={testNumberProvider}>
+                Test the connection
+              </Button>
+            </div>
+            {provider ? (
+              <div className="tiny dim" style={{ display: 'grid', gap: 3 }}>
+                <span>
+                  From the provider:{' '}
+                  {provider.configured
+                    ? provider.reachable
+                      ? `reachable, balance ${Number.isFinite(provider.balanceCents) ? (provider.balanceCents / 100).toLocaleString('en-US', { style: 'currency', currency: provider.currency || 'USD' }) : 'not reported'}`
+                      : provider.error || 'no answer'
+                    : 'not configured'}
+                </span>
+                <span>
+                  Credentials from {provider.credentials?.username || 'nowhere'} · routing from{' '}
+                  {provider.routingSource || 'nowhere'}
+                </span>
+                <span>Checked {relativeTime(provider.checkedAt)}</span>
+              </div>
+            ) : null}
           </div>
         </div>
       </Card>

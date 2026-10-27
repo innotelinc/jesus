@@ -430,7 +430,7 @@ export default function Onboarding() {
                         className="mono"
                         value={line.number}
                         onChange={(event) => setLine({ ...line, number: event.target.value })}
-                        hint="A number you already own, in international form. To buy one from the carrier instead, connect VoIP.ms in Settings and use Numbers."
+                        hint="A number you already own, in international form. To rent one from the carrier instead, connect VoIP.ms under Settings → Numbers from VoIP.ms."
                       />
                       <div className="row">
                         <Button
