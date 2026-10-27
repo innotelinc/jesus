@@ -50,7 +50,22 @@ target.build_configurations.each do |config|
   # TestFlight rejects a build number it has already seen, so CI passes the run
   # number here rather than a value somebody has to remember to bump.
   settings['CURRENT_PROJECT_VERSION'] = build unless build.empty?
-  settings['IPHONEOS_DEPLOYMENT_TARGET'] ||= '15.0'
+  # The template ships 14.0, and `||=` will never raise that — which is how the
+  # first TestFlight upload came back with warning 90068: "Deployment target too
+  # low... Starting in April 2027, iOS apps must target 15.0 or later". So raise
+  # the floor on every deployment-target key the template set, including the
+  # conditional [sdk=iphoneos*] variants.
+  floor = ENV['APP_MIN_IOS'].to_s
+  floor = '15.0' if floor.empty?
+  floor_parts = floor.split('.').map(&:to_i)
+  settings.keys.each do |key|
+    next unless key =~ /\AIPHONEOS_DEPLOYMENT_TARGET(\[.*\])?\z/
+
+    current = settings[key].to_s
+    next unless current.empty? || (current.split('.').map(&:to_i) <=> floor_parts) == -1
+
+    settings[key] = floor
+  end
   # Automatic signing with -allowProvisioningUpdates: the App Store Connect key
   # in CI has the rights to create the certificate and profile it needs, so no
   # .p12 has to live in the repository.
