@@ -350,7 +350,7 @@ export default function Onboarding() {
                       <p className="tiny dim" style={{ margin: 0 }}>
                         This is where your invoices and service notices are sent, so it has to be an address you can
                         actually open.
-                        {state.channel?.codesVisible
+                        {state.channel?.codes?.email
                           ? ' This install sends mail through its own log, so the code is put in the box for you when you ask for it.'
                           : ''}
                       </p>
@@ -397,6 +397,9 @@ export default function Onboarding() {
                       <p className="tiny dim" style={{ margin: 0 }}>
                         Outage and billing notices go to the number verified here. It is not the number you call from —
                         that comes next.
+                        {state.channel?.codes?.sms
+                          ? ' Text delivery is not configured on this install, so the code is put in the box for you.'
+                          : ''}
                       </p>
                     </div>
                   ) : null}

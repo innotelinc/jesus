@@ -4,7 +4,7 @@ import { checkCode, maskTarget, onboardingState, sendCode, sendWelcome, TERMS_TE
 import { saveProfile } from '../lib/profile.js';
 import { badRequest } from '../lib/errors.js';
 import { logEvent } from '../lib/audit.js';
-import { deliverNotice } from '../lib/channels.js';
+import { deliverNotice, providerFor } from '../lib/channels.js';
 import { welcomeEmail } from '../lib/mail.js';
 import * as v from '../lib/validate.js';
 
@@ -32,10 +32,18 @@ export default async function onboardingRoutes(app) {
     channel: {
       active: config.notify.channel,
       devExposeCodes: config.directory.devExposeCodes,
-      // Whether the next code will come back in the response, which is the only
-      // thing the screen needs to know: it can then say so instead of leaving
-      // somebody waiting for a message that was never sent.
-      codesVisible: config.notify.channel === 'console' && config.directory.exposeSimulatedCodes,
+      // Which of the two codes is going to come back in the response.
+      //
+      // Asked per channel, and asked of the provider that will actually send:
+      // the delivery channel an operator sets for notices is not the provider an
+      // email code goes through, so reading one to describe the other is how a
+      // screen ends up promising a code that is on its way to a real inbox. The
+      // email step and the SMS step can answer differently, and on an install
+      // with a mail key but no SMS carrier they do.
+      codes: {
+        email: providerFor('email').name === 'console' && config.directory.exposeSimulatedCodes,
+        sms: providerFor('sms').name === 'console' && config.directory.exposeSimulatedCodes,
+      },
     },
   });
 
