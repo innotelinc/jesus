@@ -58,8 +58,12 @@ function token() {
   const payload = Buffer.from(
     JSON.stringify({ iss: issuerId, iat: now, exp: now + 600, aud: 'appstoreconnect-v1' })
   ).toString('base64url');
+  // The signed bytes go in through update(): sign()'s second argument is the
+  // output encoding, so passing the payload there makes Node read the JWT as an
+  // encoding name and throw ERR_UNKNOWN_ENCODING.
   const signature = createSign('SHA256')
-    .sign({ key: privateKey, dsaEncoding: 'ieee-p1363' }, `${header}.${payload}`)
+    .update(`${header}.${payload}`)
+    .sign({ key: privateKey, dsaEncoding: 'ieee-p1363' })
     .toString('base64url');
   return `${header}.${payload}.${signature}`;
 }
