@@ -66,6 +66,26 @@ services:
       SOFTPHONE_WSS_URL: ${SOFTPHONE_WSS_URL:-}
       SOFTPHONE_VIDEO: ${SOFTPHONE_VIDEO:-true}
       SOFTPHONE_ENABLED: ${SOFTPHONE_ENABLED:-true}
+      # Apple push for the native app: the VoIP push that rings a locked iPhone.
+      # The .p8 belongs on the data volume — set APNS_KEY_PATH to it, never put
+      # the key itself in .env. Without a key the platform still works and the
+      # Voice card says why the phone will not ring.
+      APNS_ENABLED: ${APNS_ENABLED:-false}
+      APNS_KEY_PATH: ${APNS_KEY_PATH:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-us.innotel.scif}
+      APNS_ENVIRONMENT: ${APNS_ENVIRONMENT:-development}
+      APNS_RING_ON_DIAL: ${APNS_RING_ON_DIAL:-true}
+      # Parking: an unanswered call waits in a numbered space so a phone that was
+      # asleep can dial it and join. Only a line with a registered phone parks.
+      PARKING_ENABLED: ${PARKING_ENABLED:-true}
+      PARKING_LOT: ${PARKING_LOT:-telno}
+      PARKING_START: ${PARKING_START:-7001}
+      PARKING_END: ${PARKING_END:-7099}
+      PARKING_RING_SECONDS: ${PARKING_RING_SECONDS:-12}
+      PARKING_TIMEOUT: ${PARKING_TIMEOUT:-35}
+      PARKING_MOH: ${PARKING_MOH:-default}
       # TURN is optional: without it, calls still work on ordinary NATs.
       TURN_URLS: ${TURN_URLS:-}
       TURN_SECRET: ${TURN_SECRET:-}
