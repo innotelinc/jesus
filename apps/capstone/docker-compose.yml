@@ -1600,7 +1600,15 @@ volumes:
   probe-bin:
   postgres_data:
   redis_data:
+  # The media store: interview recordings and transcripts, which the edge serves
+  # from /voice-audio. External with a fixed name so `docker compose down -v`
+  # cannot delete it — this volume predates the compose project and carries no
+  # labels ("volume \"capstone_minio-data\" already exists but was not created by
+  # Docker Compose"), so as a plain key compose would consider it its own and
+  # remove it along with the recordings. Same pattern as the pbx-* volumes below.
   minio-data:
+    name: capstone_minio-data
+    external: true
   # The gateway's own volume lives with the gateway now — `innotel-gateway_omniroute-data`
   # on i1 `.71`, declared by `ips/extensions/llm/docker-compose.host.yml`. This name
   # still exists on the host that ran the gateway before 2026-09-28 (`.46` keeps its

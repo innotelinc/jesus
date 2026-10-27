@@ -329,8 +329,12 @@ fi
 # The PBX services reuse named external volumes so they can share state with a
 # standalone pbx-portal deployment. Create them on a fresh host; existing
 # volumes remain untouched.
+# capstone_minio-data is here for the same reason: docker-compose.yml declares it
+# external (so `down -v` cannot delete the recordings), so on a fresh host
+# nothing else would create it.
 for volume in pbx-asterisk-config pbx-asterisk-sounds pbx-asterisk-spool \
-             pbx-asterisk-logs pbx-freepbx-www pbx-mariadb-data pbx-portal-data; do
+             pbx-asterisk-logs pbx-freepbx-www pbx-mariadb-data pbx-portal-data \
+             capstone_minio-data; do
     if ! docker volume inspect "$volume" >/dev/null 2>&1; then
         docker volume create "$volume" >/dev/null \
             || fail "could not create Docker volume $volume"

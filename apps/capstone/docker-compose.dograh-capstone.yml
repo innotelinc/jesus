@@ -184,6 +184,17 @@ services:
       - app-network
       - interview-net
 
+    # `!override`, not a merge: upstream's api waits on postgres, redis and its
+    # own minio, and the third of those is a service this project parks (see the
+    # minio note below). Listing the two that are still real keeps the project
+    # valid. The ordering api actually needs — the object store healthy before it
+    # starts — is what boot-stack.sh's object-store step provides now that the
+    # store is the capstone project's.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
   ui:
     # Fork image by default, for the same reason as api (see note 3), and pinned
     # in the same place.
@@ -193,20 +204,81 @@ services:
     ports: !override
       - "0.0.0.0:3010:3010"
 
-  # See note 6. `ports` is a merged list: this appends 9200 to upstream's two
-  # loopback publishes rather than replacing them.
+  # See note 6. Upstream's minio is PARKED, exactly as `grist` is below and for
+  # the same reason: the object store belongs to the Capstone project
+  # (docker-compose.yml), whose minio service owns the container name, the media
+  # volume capstone_minio-data and the LAN publish the edge's /voice-audio route
+  # needs. Two projects cannot both create a container named `minio`, so leaving
+  # this one enabled made `boot-stack.sh`'s step 1 fail on every boot — with the
+  # missing image below when the capstone-owned container did not exist yet, and
+  #   Conflict. The container name "/minio" is already in use by container ...
+  # once it did. Under `set -e` that failure skipped step 2/2 entirely, which is
+  # how capstone.service ended up failed on ord-atheniq at 2026-10-27 06:53 while
+  # the stack itself stayed up on docker-restore.service and restart policies.
+  # Parked, upstream's service keeps its definition (and its port publish, which
+  # is only a duplicate of the capstone project's) but a `compose up` of this
+  # project steps over it, so the name can never be taken back. `api` no longer
+  # depends on it — see the depends_on override above — because a dependency on a
+  # parked service is an invalid project ("service \"api\" depends on undefined
+  # service \"minio\""). Upstream's image tag is also unpullable
+  # (REGISTRY=dograhai in data/.env.dograh), which is why enabling this profile
+  # would need an image override as well.
   minio:
+    profiles: ["dograh-minio-legacy"]
+    image: "${MINIO_IMAGE:-ghcr.io/innotelinc/capstone/minio:RELEASE.2026-08-04T00-00-00Z}"
     ports:
       - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:9200:9000"
+
+  # Parked, for the same reason as minio and n8n above: `speaches` (local Whisper
+  # STT, 127.0.0.1:8001) is the Capstone project's service and is in that
+  # project's boot working set, so upstream's copy here collides on the container
+  # name ("Conflict. The container name \"/speaches\" is already in use") — the
+  # next blocker step 2/3 hit once minio was parked. Nothing is lost by parking
+  # it: upstream's image, ports, model cache and healthcheck stay defined for
+  # anyone who enables the profile.
+  speaches:
+    profiles: ["dograh-speaches-legacy"]
+  # Parked with n8n above: upstream's one-shot workflow importer depends on that
+  # n8n, and a dependency on a parked service makes the whole project invalid
+  # ("service \"n8n-import\" depends on undefined service \"n8n\""). The Capstone
+  # project has its own n8n-import (n8n_import, restart=no) that imports into the
+  # n8n it also owns, so nothing is lost by stepping over this copy.
+  n8n-import:
+    profiles: ["dograh-n8n-legacy"]
 
   # See note 7. `networks` merges by key, so app-network (upstream's own) stays
   # and interview-net is added.
   n8n:
+    # Parked for the same reason as minio above: the container name `n8n`, the
+    # image and the Grist key the grading workflow uses belong to the Capstone
+    # project's n8n service (docker-compose.yml), which is what is actually
+    # running — it already carries GRIST_API_KEY and its OTLP endpoint. A second
+    # definition here collides on the name, and that collision is what step 2/3 of
+    # the boot hit after minio was fixed
+    #   Conflict. The container name "/n8n" is already in use ...
+    # The env below stays with the definition so enabling the profile is a
+    # complete, working configuration.
+    profiles: ["dograh-n8n-legacy"]
     networks:
       - app-network
       - interview-net
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://192.168.1.88:4318/v1/traces"
+      # The grader's Save-to-Grist node authenticates with the document's owner
+      # key: this Grist is single-identity only for the *web* UI, and its REST
+      # API answers 403 to a caller with no key on a doc it does not own.
+      GRIST_API_KEY: "${GRIST_API_KEY:-}"
 
+  # Grist belongs to the Capstone project (docker-compose.yml): that service
+  # owns the document store dashboard-api, n8n and grist-sso read, and its
+  # container_name is `grist`. Upstream's copy collides on that name and mounts
+  # the empty `dograh_grist_data` volume — exactly the state that made
+  # /interviews/reports answer 502 (Grist docCount=0, "invalid API key") while
+  # the real document sat untouched in `capstone_grist_data`. Park it behind a
+  # profile nothing enables so a `compose up` of this project cannot take the
+  # name back.
   grist:
+    profiles: ["dograh-grist-legacy"]
     networks:
       - app-network
       - interview-net
@@ -219,6 +291,13 @@ services:
   # `!override` drops upstream's single-network list rather than merging keys;
   # the container keeps its app-network address for this project's own clients.
   kokoro:
+    # Parked: this deployment's local voice is Piper inside `tts-shim`, and the
+    # repo's own note on the service says Kokoro is retired and opt-in
+    # ("start this only to A/B against Piper"). Upstream starts it unconditionally,
+    # which would put a PyTorch TTS of roughly 4 GiB into a container capped at
+    # 6144 MiB that already runs the PBX, n8n and the sandbox. Enabling the
+    # profile is one command: docker compose --profile dograh-kokoro-legacy up -d kokoro
+    profiles: ["dograh-kokoro-legacy"]
     networks: !override
       - app-network
       - interview-net

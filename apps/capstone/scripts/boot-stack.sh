@@ -51,7 +51,7 @@ cd "$REPO"
 # voice project's (see docker-compose.dograh-capstone.yml note 6, which is what
 # puts them on interview-net for their gateway to reach); `workflow-studio` is
 # this project's and the only app behind `workflow.<domain>`.
-CAPSTONE_SERVICES_DEFAULT="tts-shim dashboard dashboard-api \
+CAPSTONE_SERVICES_DEFAULT="minio tts-shim dashboard dashboard-api \
 pbx-sso prometheus grafana grafana-sso \
 otel-collector searxng sandbox-api sandbox-runner-1 \
 n8n-sso grist-sso workflow-sso workflow-studio"
@@ -121,13 +121,29 @@ if [ "$STOP" = 1 ]; then
     exec docker compose --env-file "$ENV_FILE" -f docker-compose.yml down --remove-orphans
 fi
 
+# The object store first, from the project that owns it. The voice platform's
+# own minio is parked (`profiles: ["dograh-minio-legacy"]` in
+# docker-compose.dograh-capstone.yml) because the container name `minio` and the
+# media volume belong to this project, and its api waits on that store — this is
+# the health-then-start ordering api's depends_on used to express. `--wait`
+# (minio has a healthcheck) is what makes the ordering real; no
+# --remove-orphans, so this cannot disturb the rest of the project.
+log "1/3 object store (project: capstone)"
+# minio-data is external (see docker-compose.yml): compose will not create it,
+# and a host that never ran scripts/setup.sh would otherwise fail here rather
+# than start. Creating it when absent is the same thing setup.sh does.
+docker volume inspect capstone_minio-data >/dev/null 2>&1 \
+    || docker volume create capstone_minio-data >/dev/null
+docker compose "${DRY_RUN[@]}" --env-file "$ENV_FILE" -f docker-compose.yml \
+    up -d --wait --pull=never minio
+
 SPLIT=0
 if [ -f "$REPO/dograh/upstream/docker-compose.yaml" ]; then
     SPLIT=1
-    log "1/2 voice platform (project: dograh)"
+    log "2/3 voice platform (project: dograh)"
     docker compose "${DRY_RUN[@]}" "${DOGRAH_COMPOSE[@]}" up -d --pull=never
 else
-    log "1/2 no dograh/upstream checkout — single-project layout, the capstone run starts the whole stack"
+    log "2/3 no dograh/upstream checkout — single-project layout, the capstone run starts the whole stack"
 fi
 
 if [ -n "${CAPSTONE_BOOT_SERVICES:-}" ]; then
@@ -139,9 +155,9 @@ else
 fi
 
 if [ "${#SERVICES[@]}" -gt 0 ]; then
-    log "2/2 capstone: ${SERVICES[*]}"
+    log "3/3 capstone: ${SERVICES[*]}"
 else
-    log "2/2 capstone: the whole file"
+    log "3/3 capstone: the whole file"
 fi
 
 # --wait is the boot verification: it returns non-zero unless every service with
