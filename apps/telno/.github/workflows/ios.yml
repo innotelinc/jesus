@@ -127,7 +127,15 @@ jobs:
           test -f ios/App/App/ScifCallManager.swift
           test -f ios/App/App/App.entitlements
           if [ -f ios/App/App/Info.merged.plist ]; then echo "the plist merge left its scratch file behind"; exit 1; fi
-          ruby -e 'require "rexml/document"; d = REXML::Document.new(File.read("ios/App/App.xcodeproj/project.pbxproj")); abort "ScifCallManager is not in the project" unless d.to_s.include?("ScifCallManager.swift")'
+          # pbxproj is OpenStep-format, not XML, so this is a text check: each
+          # plugin has to appear in the App target's Sources phase.
+          for plugin in ScifCallManager ScifCallPlugin ScifSpeechPlugin ScifBiometricsPlugin; do
+            grep -q "$plugin.swift in Sources" ios/App/App.xcodeproj/project.pbxproj || {
+              echo "$plugin.swift is not in the App target's sources"
+              exit 1
+            }
+          done
+          echo "Four plugins in Sources"
           /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' ios/App/App/Info.plist | tr '\n' ' '
           echo
           /usr/libexec/PlistBuddy -c 'Print :NSFaceIDUsageDescription' ios/App/App/Info.plist
