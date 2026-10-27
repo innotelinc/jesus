@@ -26,6 +26,10 @@ public final class ScifCallManager: NSObject, PKPushRegistryDelegate, CXProvider
     private var registry: PKPushRegistry?
     private var provider: CXProvider?
 
+    /// CallKit is driven by transactions requested through a controller, not by
+    /// the provider directly: ending a call is a CXEndCallAction handed to this.
+    private let callController = CXCallController()
+
     /// Calls CallKit is showing, by our own id, plus the mapping to its UUIDs.
     private var pending: [String: [String: Any]] = [:]
     private var uuidToCall: [UUID: String] = [:]
@@ -140,9 +144,13 @@ public final class ScifCallManager: NSObject, PKPushRegistryDelegate, CXProvider
 
     /** Hang up from the app's side, e.g. the caller gave up. */
     @objc public func endCall(id: String, reason: String = "remoteEnded") {
-        guard let uuid = callToUuid[id], let provider else { return }
+        guard let uuid = callToUuid[id] else { return }
         let ended = CXEndCallAction(call: uuid)
-        provider.requestTransaction(CXTransaction(action: ended)) { _ in }
+        callController.request(CXTransaction(action: ended)) { error in
+            if let error {
+                NSLog("SCIF: CallKit refused to end the call: %@", error.localizedDescription)
+            }
+        }
         forget(callId: id)
         ringing = ""
         onEnded?(id, reason)
