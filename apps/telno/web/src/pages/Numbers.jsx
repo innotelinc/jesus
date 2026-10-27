@@ -22,7 +22,7 @@ const money = (cents, currency = 'USD') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format((cents || 0) / 100);
 
 const providerSubtitle = (provider) => {
-  if (!provider.configured) return 'Not connected — add the API credentials in Settings → Vault, or keep adding numbers by hand';
+  if (!provider.configured) return 'Not connected — add the API credentials in Settings → Numbers from VoIP.ms, or keep adding numbers by hand';
   if (!provider.reachable) return 'Credentials saved, but the carrier is not answering';
   return provider.balanceCents === null ? 'Connected' : `Connected · balance ${money(provider.balanceCents, provider.currency)}`;
 };
@@ -134,7 +134,7 @@ export default function Numbers() {
         ) : null}
         {provider && !provider.configured ? (
           <p className="tiny dim" style={{ marginTop: 10 }}>
-            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Vault, and allow-list this server&apos;s
+            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Numbers from VoIP.ms, and allow-list this server&apos;s
             address in the VoIP.ms portal. Numbers can still be added by hand below.
           </p>
         ) : null}
@@ -491,7 +491,7 @@ function BuyNumbers({ provider, onClose, onSaved }) {
         <div className="panel stack" style={{ gap: 8, padding: 14 }}>
           <strong className="tiny">Connect the carrier first</strong>
           <p className="tiny dim" style={{ margin: 0 }}>
-            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Vault. Both come from Main Menu → SOAP &
+            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Numbers from VoIP.ms. Both come from Main Menu → SOAP &
             REST/JSON API in the VoIP.ms portal, and the API password is not the portal password. The same page
             allow-lists the address this server calls from.
           </p>

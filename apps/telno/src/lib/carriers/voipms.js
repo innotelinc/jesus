@@ -15,7 +15,7 @@ import { HttpError } from '../errors.js';
  * reason. Two consequences matter:
  *
  *  - The API password is a *separate* credential from the portal password. It
- *    lives in the vault (Settings → Vault) so it can be rotated without a
+ *    lives in the vault (Settings → Numbers from VoIP.ms) so it can be rotated without a
  *    redeploy, and the env values are only the .env-only fallback.
  *  - VoIP.ms only answers allow-listed source addresses. Their `getIP` method is
  *    the one exception, so an operator who sees `invalid_ip` is told exactly
@@ -27,6 +27,18 @@ import { HttpError } from '../errors.js';
 
 const USER_KEY = 'VOIPMS_API_USERNAME';
 const PASS_KEY = 'VOIPMS_API_PASSWORD';
+const ROUTING_KEY = 'VOIPMS_ROUTING';
+
+/**
+ * Where a newly bought DID rings.
+ *
+ * Three places, in order of preference: the value sent with the order, then the
+ * vault, then the environment. The vault in the middle is the point — it is where
+ * Settings → Numbers from VoIP.ms writes, so a routing target typed in the console takes effect
+ * on the next order. Reading the environment alone meant a DID bought from the
+ * console could not be routed at all until the container was redeployed.
+ */
+export const voipmsRouting = () => getSecret(ROUTING_KEY) || config.voipms.routing;
 
 /** A provider failure is not this platform's fault, and says so with 502. */
 const providerError = (message, details) => new HttpError(502, 'provider_error', message, details);
@@ -35,7 +47,7 @@ const notConfigured = () =>
   new HttpError(
     409,
     'not_configured',
-    'VoIP.ms is not connected. Add the API username and API password in Settings → Vault (or VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in the environment).'
+    'VoIP.ms is not connected. Add the API username and API password in Settings → Numbers from VoIP.ms (or VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in the environment).'
   );
 
 function credentials() {
@@ -184,7 +196,7 @@ export async function searchNumbers({ country = 'US', region = '', query = '', s
 /** Order one DID. Returns the provider's record of it. */
 export async function orderNumber(e164, { routing = '', pop, dialTime, cnam, billingType, note = '' } = {}) {
   const did = providerDid(e164);
-  const target = routing || config.voipms.routing;
+  const target = routing || voipmsRouting();
   if (!target) {
     throw new HttpError(
       400,
@@ -271,8 +283,9 @@ export async function providerStatus() {
       username: sourceOf(USER_KEY, config.voipms.apiUsername),
       password: sourceOf(PASS_KEY, config.voipms.apiPassword),
     },
+    routingSource: getSecret(ROUTING_KEY) ? 'vault' : config.voipms.routing ? 'environment' : '',
     defaults: {
-      routing: config.voipms.routing,
+      routing: voipmsRouting(),
       pop: config.voipms.pop,
       billingType: config.voipms.billingType,
       dialTime: config.voipms.dialTime,
