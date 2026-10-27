@@ -19,5 +19,9 @@ export const tooMany = (message = 'Too many requests') => new HttpError(429, 'ra
 export const paymentRequired = (message = 'This account is suspended for non-payment') =>
   new HttpError(402, 'payment_required', message);
 
+/** 403 with a reason the softphone can act on: it needs a voice check first. */
+export const voiceRequired = (message = 'This line requires a voice check before it can be used') =>
+  new HttpError(403, 'voice_required', message);
+
 /** Wrap an async route so thrown HttpErrors reach the error handler. */
 export const route = (fn) => async (request, reply) => fn(request, reply);

@@ -11,9 +11,21 @@ import {
   Modal,
   PageHeader,
   Select,
+  Stat,
   statusTone,
   useToast,
 } from '../ui.jsx';
+
+/* Money is shown in currency, never in cents: the numbers screen should read
+   the same as the invoice the rent lands on. */
+const money = (cents, currency = 'USD') =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format((cents || 0) / 100);
+
+const providerSubtitle = (provider) => {
+  if (!provider.configured) return 'Not connected — add the API credentials in Settings → Vault, or keep adding numbers by hand';
+  if (!provider.reachable) return 'Credentials saved, but the carrier is not answering';
+  return provider.balanceCents === null ? 'Connected' : `Connected · balance ${money(provider.balanceCents, provider.currency)}`;
+};
 
 const KINDS = [
   ['business', 'Business'],
@@ -42,6 +54,8 @@ export default function Numbers() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [provider, setProvider] = useState(null);
+  const [buying, setBuying] = useState(false);
   const debounce = useRef();
 
   const load = useCallback(async () => {
@@ -62,6 +76,25 @@ export default function Numbers() {
     return () => clearTimeout(debounce.current);
   }, [load, query]);
 
+  // The carrier is optional: a deployment without credentials still runs the
+  // registry, so a failed provider read must not break this screen.
+  const loadProvider = useCallback(async () => {
+    try {
+      setProvider(await api.get('/provider/voipms'));
+    } catch {
+      setProvider(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProvider();
+  }, [loadProvider]);
+
+  const refresh = useCallback(() => {
+    load();
+    loadProvider();
+  }, [load, loadProvider]);
+
   const items = data?.items || [];
 
   return (
@@ -75,6 +108,37 @@ export default function Numbers() {
           </Button>
         }
       />
+
+      <Card
+        title="Numbers from VoIP.ms"
+        subtitle={provider ? providerSubtitle(provider) : 'Checking the carrier…'}
+        actions={
+          provider?.configured ? (
+            <Button size="sm" icon="plus" onClick={() => setBuying(true)}>
+              Buy numbers
+            </Button>
+          ) : null
+        }
+      >
+        <div className="row wrap" style={{ gap: 26 }}>
+          <Stat label="Rented here" value={provider ? provider.held : '—'} />
+          <Stat label="Rent this month" value={provider ? money(provider.costs?.totalCents, provider.costs?.currency) : '—'} />
+          <Stat label="Accounts carrying rent" value={provider ? provider.costs?.accounts : '—'} />
+          <Stat
+            label="Balance at the carrier"
+            value={provider?.reachable ? money(provider.balanceCents, provider.currency) : '—'}
+          />
+        </div>
+        {provider && provider.configured && provider.reachable === false ? (
+          <p className="tiny" style={{ marginTop: 10, color: 'var(--danger)' }}>{provider.error}</p>
+        ) : null}
+        {provider && !provider.configured ? (
+          <p className="tiny dim" style={{ marginTop: 10 }}>
+            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Vault, and allow-list this server&apos;s
+            address in the VoIP.ms portal. Numbers can still be added by hand below.
+          </p>
+        ) : null}
+      </Card>
 
       <Card bodyClass="tight">
         <div className="row wrap" style={{ padding: 12, gap: 8 }}>
@@ -140,6 +204,7 @@ export default function Numbers() {
                     <th>Type</th>
                     <th>Country</th>
                     <th>Status</th>
+                    <th className="align-right">Rent</th>
                     <th className="align-right">Listings</th>
                     <th className="align-right">Trust</th>
                     <th>Updated</th>
@@ -157,6 +222,9 @@ export default function Numbers() {
                       <td className="tiny muted">{row.country || '—'}</td>
                       <td>
                         <Badge tone={statusTone(row.status)}>{row.status}</Badge>
+                      </td>
+                      <td className="align-right tiny mono nowrap">
+                        {row.monthlyCostCents ? money(row.monthlyCostCents, row.currency) : <span className="dim">—</span>}
                       </td>
                       <td className="align-right tiny mono">{row.listingCount}</td>
                       <td className="align-right tiny mono">{row.trust}</td>
@@ -188,8 +256,9 @@ export default function Numbers() {
         )}
       </Card>
 
-      {adding ? <AddNumberDialog onClose={() => setAdding(false)} onSaved={load} /> : null}
-      {selected ? <NumberDetail id={selected} onClose={() => setSelected(null)} onChanged={load} /> : null}
+      {adding ? <AddNumberDialog onClose={() => setAdding(false)} onSaved={refresh} /> : null}
+      {selected ? <NumberDetail id={selected} onClose={() => setSelected(null)} onChanged={refresh} /> : null}
+      {buying ? <BuyNumbers provider={provider} onClose={() => setBuying(false)} onSaved={refresh} /> : null}
     </>
   );
 }
@@ -346,6 +415,182 @@ function AddNumberDialog({ onClose, onSaved }) {
   );
 }
 
+
+/**
+ * Buying a number.
+ *
+ * The search is the carrier's inventory, not ours: an operator types an area
+ * code, sees what can actually be bought there, and buys one. The price field is
+ * the rent recorded against the account, which the carrier does not know.
+ */
+function BuyNumbers({ provider, onClose, onSaved }) {
+  const toast = useToast();
+  const defaults = provider?.defaults || {};
+  const [form, setForm] = useState({
+    country: 'US',
+    region: '',
+    areaCode: '',
+    account: '',
+    cost: defaults.monthlyCostCents ? (defaults.monthlyCostCents / 100).toFixed(2) : '',
+  });
+  const [results, setResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [ordering, setOrdering] = useState('');
+  const [error, setError] = useState('');
+  const configured = !!provider?.configured;
+
+  const search = async (event) => {
+    event?.preventDefault();
+    setError('');
+    setSearching(true);
+    try {
+      const result = await api.get(
+        `/provider/voipms/search${qs({ country: form.country, region: form.region, q: form.areaCode, type: 'starts', limit: 25 })}`
+      );
+      setResults(result);
+      if (!result.items.length) setError('Nothing available on that prefix. Try a nearby area code.');
+    } catch (err) {
+      setResults(null);
+      setError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const order = async (item) => {
+    setOrdering(item.e164);
+    setError('');
+    try {
+      const result = await api.post('/provider/voipms/numbers', {
+        dids: [item.e164],
+        account: form.account.trim() || undefined,
+        monthlyCostCents: form.cost === '' ? undefined : Math.round(Number(form.cost) * 100),
+      });
+      if (result.failed?.length) {
+        setError(`${item.display}: ${result.failed[0].error}`);
+      } else {
+        toast.success('Number bought', `${item.display} is on the platform`);
+        onSaved?.();
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOrdering('');
+    }
+  };
+
+  return (
+    <Modal
+      wide
+      title="Buy numbers"
+      subtitle={configured ? 'Searched and ordered at VoIP.ms, then recorded here with its rent' : 'VoIP.ms is not connected'}
+      onClose={onClose}
+      footer={<Button variant="ghost" onClick={onClose}>Close</Button>}
+    >
+      {!configured ? (
+        <div className="panel stack" style={{ gap: 8, padding: 14 }}>
+          <strong className="tiny">Connect the carrier first</strong>
+          <p className="tiny dim" style={{ margin: 0 }}>
+            Add VOIPMS_API_USERNAME and VOIPMS_API_PASSWORD in Settings → Vault. Both come from Main Menu → SOAP &
+            REST/JSON API in the VoIP.ms portal, and the API password is not the portal password. The same page
+            allow-lists the address this server calls from.
+          </p>
+        </div>
+      ) : (
+        <>
+          <form className="stack" onSubmit={search}>
+            <div className="grid two" style={{ gap: 12 }}>
+              <Select
+                label="Country"
+                value={form.country}
+                onChange={(event) => setForm({ ...form, country: event.target.value })}
+              >
+                <option value="US">United States</option>
+                <option value="CA">Canada</option>
+              </Select>
+              <Input
+                label={form.country === 'CA' ? 'Province' : 'State'}
+                value={form.region}
+                onChange={(event) => setForm({ ...form, region: event.target.value.toUpperCase().slice(0, 2) })}
+                placeholder={form.country === 'CA' ? 'ON' : 'CA'}
+                hint="Two letters, or leave it empty for the whole country."
+              />
+              <Input
+                label="Area code"
+                value={form.areaCode}
+                onChange={(event) => setForm({ ...form, areaCode: event.target.value.replace(/\D/g, '').slice(0, 6) })}
+                placeholder="415"
+                className="mono"
+                hint="Matched by prefix, so an exchange works too."
+              />
+              <Input
+                label="Give it to a customer (optional)"
+                value={form.account}
+                onChange={(event) => setForm({ ...form, account: event.target.value })}
+                placeholder="customer@example.com"
+                hint="The account whose bill the rent lands on."
+              />
+            </div>
+            <div className="row" style={{ gap: 10 }}>
+              <Input
+                label="Rent per month"
+                value={form.cost}
+                onChange={(event) => setForm({ ...form, cost: event.target.value.replace(/[^0-9.]/g, '') })}
+                placeholder="0.85"
+                className="mono"
+                hint="In USD, what the line costs."
+              />
+              <div className="spacer" />
+              <Button variant="primary" icon="search" loading={searching} onClick={search} disabled={!form.areaCode}>
+                Search
+              </Button>
+            </div>
+          </form>
+
+          {error ? <p className="tiny" style={{ color: 'var(--danger)' }}>{error}</p> : null}
+
+          {results?.items?.length ? (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Number</th>
+                    <th>Region</th>
+                    <th className="align-right">Rent</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.items.map((item) => (
+                    <tr key={item.e164}>
+                      <td className="num nowrap">{item.display}</td>
+                      <td className="tiny dim">{item.region || item.country}</td>
+                      <td className="align-right tiny mono">
+                        {form.cost ? money(Math.round(Number(form.cost) * 100), item.currency) : '—'}
+                      </td>
+                      <td className="align-right">
+                        <Button
+                          size="sm"
+                          variant={item.alreadyHeld ? 'ghost' : 'primary'}
+                          disabled={item.alreadyHeld || !!ordering}
+                          loading={ordering === item.e164}
+                          onClick={() => order(item)}
+                        >
+                          {item.alreadyHeld ? 'Held' : 'Buy'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </>
+      )}
+    </Modal>
+  );
+}
+
 function NumberDetail({ id, onClose, onChanged }) {
   const toast = useToast();
   const [data, setData] = useState(null);
@@ -419,6 +664,25 @@ function NumberDetail({ id, onClose, onChanged }) {
     }
   };
 
+  const releaseNumber = async () => {
+    const label = data?.number?.display || data?.number?.e164 || 'this number';
+    if (
+      !window.confirm(
+        `Release ${label} back to VoIP.ms? It stops ringing here, the customer loses the line, and the number cannot be recovered from this console.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.del(`/provider/voipms/numbers/${encodeURIComponent(data.number.e164)}`);
+      onChanged?.();
+      onClose();
+      toast.success('Number released', `${label} is back with the carrier`);
+    } catch (err) {
+      toast.error('Release failed', err.message);
+    }
+  };
+
   const removeNumber = async () => {
     if (!window.confirm('Delete this number and all of its listings?')) return;
     try {
@@ -440,6 +704,9 @@ function NumberDetail({ id, onClose, onChanged }) {
       footer={
         <>
           <Button variant="danger" icon="trash" onClick={removeNumber}>Delete</Button>
+          {data?.number?.provider && !data?.number?.releasedAt ? (
+            <Button variant="ghost" icon="arrowUp" onClick={releaseNumber}>Release to carrier</Button>
+          ) : null}
           <div className="spacer" />
           <Button variant="ghost" onClick={onClose}>Close</Button>
           <Button variant="primary" icon="check" onClick={verify} loading={saving}>Mark verified</Button>
@@ -497,9 +764,40 @@ function NumberDetail({ id, onClose, onChanged }) {
             <dd>{data.number.verifiedAt ? relativeTime(data.number.verifiedAt) : 'not yet'}</dd>
             <dt>Source</dt>
             <dd>{data.number.source}</dd>
+          {data.number.provider ? (
+            <>
+              <dt>Carrier</dt>
+              <dd>VoIP.ms · {data.number.providerRef || '—'}</dd>
+              <dt>Rent</dt>
+              <dd>{money(data.number.monthlyCostCents, data.number.currency)} / month</dd>
+              <dt>Renews</dt>
+              <dd>{data.number.nextBillingAt ? relativeTime(data.number.nextBillingAt) : '—'}</dd>
+              {data.number.releasedAt ? (
+                <>
+                  <dt>Released</dt>
+                  <dd>{relativeTime(data.number.releasedAt)}</dd>
+                </>
+              ) : null}
+            </>
+          ) : null}
             <dt>Extension</dt>
             <dd>{data.extension ? `${data.extension.extension} — ${data.extension.name}` : 'not assigned'}</dd>
           </dl>
+
+          {data.charges?.length ? (
+            <div>
+              <h3 style={{ fontSize: '0.875rem', marginBottom: 6 }}>Rent history</h3>
+              <div className="stack" style={{ gap: 4 }}>
+                {data.charges.slice(0, 6).map((charge) => (
+                  <div key={charge.id} className="row tiny">
+                    <span className="mono">{charge.period}</span>
+                    <Badge tone={charge.status === 'void' ? 'neutral' : 'info'}>{charge.status}</Badge>
+                    <span className="right mono dim">{money(charge.amountCents, charge.currency)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <h3 style={{ fontSize: '0.875rem', marginBottom: 8 }}>Listings ({data.listings.length})</h3>

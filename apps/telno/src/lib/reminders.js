@@ -289,6 +289,9 @@ export async function runReminderSweep({ at = new Date(), actor = 'system', invo
     : db_.all(
         `SELECT * FROM invoices
           WHERE status IN ('open', 'overdue') AND due_at IS NOT NULL AND due_at <> ''
+            -- A bill whose lines a card subscription already collected has
+            -- nothing to chase; only a real balance earns a reminder.
+            AND amount_cents > 0
           ORDER BY date(due_at) ASC LIMIT ?`,
         [BATCH]
       );

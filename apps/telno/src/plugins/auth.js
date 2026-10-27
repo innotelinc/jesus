@@ -56,6 +56,9 @@ const CUSTOMER_PATHS = [
   /^\/api\/me(\/|$)/,
   /^\/api\/portal(\/|$)/,
   /^\/api\/softphone(\/|$)/,
+  // A voiceprint belongs to a line, and a customer's line is theirs. The route
+  // itself checks ownership before it reads, writes or scores anything.
+  /^\/api\/voice(\/|$)/,
   /^\/api\/public(\/|$)/,
 ];
 

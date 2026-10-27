@@ -5,6 +5,8 @@ import { notFound, badRequest } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
 import { applyAfterChange } from '../telephony/index.js';
+import { chargesForNumber } from '../lib/rentals.js';
+import { syncNumberToListing } from '../lib/profile.js';
 
 /**
  * A route whose success can change the generated dialplan.
@@ -38,6 +40,15 @@ const numberView = (row, extra = {}) => ({
   source: row.source,
   // Who holds the number on the platform, when a customer rented it.
   accountId: row.account_id || '',
+  // A rented line carries where it came from and what it costs a month. Empty
+  // provider means an operator typed the row in and there is no rent.
+  provider: row.provider || '',
+  providerRef: row.provider_ref || '',
+  monthlyCostCents: Number(row.monthly_cost_cents || 0),
+  currency: row.cost_currency || 'USD',
+  nextBillingAt: row.next_billing_at || null,
+  rentedAt: row.rented_at || null,
+  releasedAt: row.released_at || null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   ...extra,
@@ -194,6 +205,8 @@ export default async function registryRoutes(app) {
     return {
       number: numberView(row),
       listings: listingsFor(row.id).map(listingView),
+      // Rent history for a rented line: the months this number has cost money.
+      charges: chargesForNumber(row.id),
       extension: extension ? { id: extension.id, extension: extension.extension, name: extension.display_name } : null,
       calls: calls.map((c) => ({
         id: c.id,
@@ -241,6 +254,9 @@ export default async function registryRoutes(app) {
     const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
     db_.run(`UPDATE numbers SET ${sets}, updated_at = ? WHERE id = ?`, [...Object.values(patch), now(), row.id]);
     const fresh = db_.get('SELECT * FROM numbers WHERE id = ?', [row.id]);
+    // A customer who asked to be listed gets their new number listed too, and a
+    // number taken back stops carrying their directory entry.
+    if (body.account !== undefined) syncNumberToListing(fresh.id);
     logEvent({
       actor: request.account?.email || request.apiKey?.label || 'api',
       action: 'registry.number_updated',

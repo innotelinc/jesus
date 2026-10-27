@@ -75,17 +75,23 @@ export default function Billing() {
   const [accountSummary, setAccountSummary] = useState(null);
   const [stripeTest, setStripeTest] = useState(null);
   const [testing, setTesting] = useState(false);
+  // The month's rent, and the lines of whichever invoice is open in the dialog.
+  const [rent, setRent] = useState(null);
+  const [invoiceItems, setInvoiceItems] = useState([]);
+  const [lineForm, setLineForm] = useState({ description: '', amount: '' });
 
   const load = async () => {
     try {
-      const [data, dunning] = await Promise.all([
+      const [data, dunning, rentData] = await Promise.all([
         api.get(`/billing/invoices${tab ? `?status=${tab}` : ''}`),
         api.get('/billing/accounts'),
+        api.get('/billing/rent'),
       ]);
       setItems(data.items);
       setSummary(data.summary);
       setAccounts(dunning.items || []);
       setAccountSummary(dunning.summary || null);
+      setRent(rentData);
     } catch (err) {
       toast.error('Could not load billing', err.message);
     } finally {
@@ -118,11 +124,104 @@ export default function Billing() {
     setEditing(invoice);
     setForm(toForm(invoice));
     setHistory(null);
+    setInvoiceItems([]);
+    setLineForm({ description: '', amount: '' });
     try {
-      const data = await api.get(`/billing/invoices/${invoice.id}/reminders`);
+      // The list carries a row count, not the rows: the dialog asks for the
+      // invoice itself so it can show what the amount is made of.
+      const [detail, data] = await Promise.all([
+        api.get(`/billing/invoices/${invoice.id}`),
+        api.get(`/billing/invoices/${invoice.id}/reminders`),
+      ]);
+      setEditing(detail.invoice);
+      setForm(toForm(detail.invoice));
+      setInvoiceItems(detail.invoice.items || []);
       setHistory(data.items);
     } catch {
       setHistory([]);
+    }
+  };
+
+  const pullRent = async (invoice) => {
+    setBusy('rent');
+    try {
+      const data = await api.post(`/billing/invoices/${invoice.id}/rent`, {});
+      setEditing(data.invoice);
+      setForm(toForm(data.invoice));
+      setInvoiceItems(data.invoice.items || []);
+      load();
+      toast.success(
+        data.billed.added ? `${data.billed.added} rent line(s) added` : 'Nothing left to bill',
+        data.billed.added
+          ? `This invoice now covers ${money(data.billed.cents, invoice.currency)} of number rent.`
+          : 'Every number on this account is already on an invoice for that month.'
+      );
+    } catch (err) {
+      toast.error('Could not pull the rent', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const addLine = async () => {
+    setBusy('line');
+    try {
+      const amountCents = Math.round(Number(lineForm.amount || 0) * 100);
+      const data = await api.post(`/billing/invoices/${editing.id}/items`, {
+        description: lineForm.description,
+        amountCents,
+        unitAmountCents: amountCents,
+      });
+      setEditing(data.invoice);
+      setInvoiceItems(data.invoice.items || []);
+      setForm(toForm(data.invoice));
+      setLineForm({ description: '', amount: '' });
+      load();
+      toast.success('Line added', 'The invoice total is now the sum of its lines.');
+    } catch (err) {
+      toast.error('Could not add that line', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const removeLine = async (item) => {
+    setBusy(`item:${item.id}`);
+    try {
+      const data = await api.del(`/billing/invoice-items/${item.id}`);
+      setEditing(data.invoice);
+      setInvoiceItems(data.invoice.items || []);
+      setForm(toForm(data.invoice));
+      load();
+      toast.success(
+        'Line removed',
+        item.kind === 'number_rent' ? 'That month of rent is back in the ledger, unbilled.' : 'The total was recalculated.'
+      );
+    } catch (err) {
+      toast.error('Could not remove that line', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const billAllRent = async () => {
+    setBusy('rentrun');
+    try {
+      const data = await api.post('/billing/rent/run', {});
+      load();
+      const billed = (data.planLines || 0) + (data.billedLines || 0);
+      toast.success(
+        billed
+          ? `${billed} line(s) billed: ${data.planLines || 0} plan, ${data.billedLines || 0} rent`
+          : 'Nothing left to bill this month',
+        data.invoices.length
+          ? data.invoices.map((entry) => `${entry.invoiceNo}${entry.created ? ' (new)' : ''}`).join(', ')
+          : 'Every number is already on an invoice for this month.'
+      );
+    } catch (err) {
+      toast.error('Could not bill the rent', err.message);
+    } finally {
+      setBusy('');
     }
   };
 
@@ -290,7 +389,9 @@ export default function Billing() {
       await api.patch(`/billing/invoices/${editing.id}`, {
         accountName: form.accountName,
         email: form.email,
-        amountCents: Math.round(Number(form.amount || 0) * 100),
+        // A bill built from lines owns its total: sending one by hand would be
+        // rejected, and it must not stop a note or a due date from being saved.
+        ...(invoiceItems.length ? {} : { amountCents: Math.round(Number(form.amount || 0) * 100) }),
         currency: form.currency,
         periodStart: form.periodStart,
         periodEnd: form.periodEnd,
@@ -334,7 +435,8 @@ export default function Billing() {
           step="0.01"
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
-          hint="Major units; stored as integer cents."
+          disabled={invoiceItems.length > 0}
+          hint={invoiceItems.length ? 'The sum of the lines below.' : 'Major units; stored as integer cents.'}
         />
         <Select label="Currency" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
           <option value="USD">USD</option>
@@ -582,6 +684,39 @@ export default function Billing() {
       ) : null}
 
       <Card
+        title="Monthly billing"
+        subtitle={rent ? `${rent.label} — one invoice per account, plan and number rent together` : 'Plans and rented numbers on one monthly invoice'}
+        actions={
+          <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+            <span className="tiny dim">
+              {rent?.uninvoiced?.lines ? `${rent.uninvoiced.lines} line(s) not yet billed` : 'All rent is billed'}
+            </span>
+            <Button size="sm" variant="ghost" loading={busy === 'rentrun'} disabled={!rent?.enabled} onClick={billAllRent}>
+              Bill this month
+            </Button>
+          </div>
+        }
+      >
+        <div className="row wrap" style={{ gap: 26, alignItems: 'flex-start' }}>
+          <div>
+            <div className="tiny dim">Unbilled</div>
+            <div style={{ fontWeight: 600 }}>
+              {money(rent?.uninvoiced?.totalCents ?? 0, rent?.invoices?.[0]?.currency || 'USD')}
+            </div>
+          </div>
+          <div>
+            <div className="tiny dim">Invoices this month</div>
+            <div style={{ fontWeight: 600 }}>{rent?.invoices?.length ?? 0}</div>
+          </div>
+          <p className="tiny dim" style={{ maxWidth: '58ch', margin: 0 }}>
+            {rent?.enabled
+              ? 'Each month every subscriber gets one invoice: the plan fee and the rent for each number they hold, as separate lines. A plan already collected by a card subscription is shown as included, so only the rest is due.'
+              : 'Automatic monthly invoicing is off (RENT_INVOICING_ENABLED=false). The ledger still records what each number costs.'}
+          </p>
+        </div>
+      </Card>
+
+      <Card
         title="Invoices"
         bodyClass="tight"
         actions={
@@ -625,7 +760,11 @@ export default function Billing() {
                       {invoice.email ? <div className="tiny dim">{invoice.email}</div> : null}
                     </td>
                     <td className="tiny dim nowrap">{day(invoice.periodStart)} – {day(invoice.periodEnd)}</td>
-                    <td className="align-right tiny mono nowrap">{money(invoice.amountCents, invoice.currency)}</td>
+                    <td className="align-right tiny mono nowrap">
+                      {money(invoice.amountCents, invoice.currency)}
+                      {invoice.itemCount ? <div className="tiny dim">{invoice.itemCount} lines</div> : null}
+                      {invoice.rentPeriod ? <div className="tiny dim">rent {invoice.rentPeriod}</div> : null}
+                    </td>
                     <td className="tiny dim nowrap" title={invoice.dueAt || ''}>{day(invoice.dueAt)}</td>
                     <td className="tiny dim nowrap">
                       {invoice.lastSentAt ? (
@@ -743,6 +882,93 @@ export default function Billing() {
           }
         >
           {fields}
+
+          <div className="panel stack" style={{ gap: 10, marginTop: 14 }}>
+            <div className="row wrap" style={{ gap: 8, alignItems: 'baseline' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div className="field-label">What this bill covers</div>
+                <div className="tiny dim">
+                  {invoiceItems.length
+                    ? (() => {
+                        const lines = invoiceItems.reduce((total, item) => total + Number(item.amountCents || 0), 0);
+                        const covered = invoiceItems
+                          .filter((item) => item.settledBy === 'subscription')
+                          .reduce((total, item) => total + Number(item.amountCents || 0), 0);
+                        // One bill, two facts: what it covers and what is left
+                        // to collect. A plan the card already paid is not due.
+                        return covered
+                          ? `${invoiceItems.length} line(s) totaling ${money(lines, editing.currency)}: ${money(
+                              covered,
+                              editing.currency
+                            )} already collected by the subscription, ${money(
+                              editing.amountCents,
+                              editing.currency
+                            )} due.`
+                          : `${invoiceItems.length} line(s), adding up to ${money(
+                              editing.amountCents,
+                              editing.currency
+                            )}.`;
+                      })()
+                    : 'No breakdown yet — this invoice is one amount.'}
+                </div>
+              </div>
+              {editing.accountId && !['void', 'paid'].includes(editing.status) ? (
+                <Button size="sm" variant="ghost" icon="download" loading={busy === 'rent'} onClick={() => pullRent(editing)}>
+                  Pull number rent
+                </Button>
+              ) : null}
+            </div>
+            {invoiceItems.map((item) => (
+              <div key={item.id} className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+                <Badge tone={item.kind === 'number_rent' ? 'info' : 'neutral'}>{item.kind.replace('_', ' ')}</Badge>
+                <span className="tiny" style={{ flex: 1, minWidth: 180 }}>{item.description}</span>
+                <span className="tiny mono" style={item.settledBy === 'subscription' ? { opacity: 0.65 } : undefined}>
+                  {item.settledBy === 'subscription' ? 'Included' : money(item.amountCents, editing.currency)}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="trash"
+                  loading={busy === `item:${item.id}`}
+                  onClick={() => removeLine(item)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+            {editing.status !== 'void' ? (
+              <div className="row wrap" style={{ gap: 8, alignItems: 'flex-end' }}>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Input
+                    label="Add a line"
+                    value={lineForm.description}
+                    onChange={(e) => setLineForm({ ...lineForm, description: e.target.value })}
+                    placeholder="Equipment rental"
+                  />
+                </div>
+                <div style={{ width: 130 }}>
+                  <Input
+                    label="Amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={lineForm.amount}
+                    onChange={(e) => setLineForm({ ...lineForm, amount: e.target.value })}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={busy === 'line'}
+                  disabled={!lineForm.description.trim() || !lineForm.amount}
+                  onClick={addLine}
+                >
+                  Add line
+                </Button>
+              </div>
+            ) : null}
+          </div>
+
           <div className="panel stack" style={{ gap: 10, marginTop: 14 }}>
             <div className="row wrap" style={{ gap: 8 }}>
               <div style={{ flex: 1, minWidth: 220 }}>

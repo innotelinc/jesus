@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merge these keys into ios/App/App/Info.plist (inside the top-level <dict>).
+  Xcode's generated plist does not have them, and each one is a hard requirement:
+  without the background modes a VoIP push arrives but the app is killed, and
+  without the usage strings the microphone, camera and speech APIs crash on first
+  use rather than prompting.
+-->
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<!-- PushKit wake-up for an incoming call. -->
+		<string>voip</string>
+		<!-- Keep the audio session alive when the screen locks mid-call. -->
+		<string>audio</string>
+		<string>remote-notification</string>
+	</array>
+
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SCIF uses the microphone for calls, for dialing by voice and for checking your voiceprint.</string>
+
+	<key>NSCameraUsageDescription</key>
+	<string>SCIF uses the camera for video calls.</string>
+
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SCIF turns what you say into a number to dial and checks the phrase you enrolled.</string>
+
+	<!-- The app talks to one HTTPS origin and to the switch over WSS. Nothing here
+	     permits plain HTTP: a SIP credential over cleartext is the thing SCIF is
+	     supposed to prevent. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+</dict>
+</plist>

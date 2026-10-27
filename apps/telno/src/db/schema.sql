@@ -17,7 +17,20 @@ CREATE TABLE IF NOT EXISTS accounts (
   last_login_at TEXT,
   -- Set when billing suspends the customer. An owner is never suspended by the
   -- sweep: locking the last owner out of the platform is not a billing remedy.
-  suspended_at  TEXT
+  suspended_at  TEXT,
+  -- What the customer confirmed about themselves on their first visit: the name
+  -- a directory would publish, a reachable address, and where they are. Kept on
+  -- the account rather than on a listing because it is the person, not a line.
+  company        TEXT NOT NULL DEFAULT '',
+  address        TEXT NOT NULL DEFAULT '',
+  city           TEXT NOT NULL DEFAULT '',
+  country        TEXT NOT NULL DEFAULT '',
+  website        TEXT NOT NULL DEFAULT '',
+  listing_kind   TEXT NOT NULL DEFAULT 'business',
+  -- The public-directory choice, stated by the customer rather than assumed.
+  -- profile_confirmed_at is what makes "first login" a fact instead of a guess.
+  directory_opt_in     INTEGER NOT NULL DEFAULT 0,
+  profile_confirmed_at TEXT
 );
 
 -- Directory surfaces. One codebase, six hostnames, per-host presentation.
@@ -55,11 +68,41 @@ CREATE TABLE IF NOT EXISTS numbers (
   -- The customer account that holds this number, when it is rented rather than
   -- merely listed. NULL means a registry entry with no owner on the platform.
   account_id   TEXT REFERENCES accounts (id) ON DELETE SET NULL,
+  -- The carrier a number was bought from. Empty means an operator typed the
+  -- row in; 'voipms' means it was ordered, and this row is the receipt: which
+  -- DID to release, what it costs a month, and when it renews.
+  provider           TEXT NOT NULL DEFAULT '',
+  provider_ref       TEXT NOT NULL DEFAULT '',
+  monthly_cost_cents INTEGER NOT NULL DEFAULT 0 CHECK (monthly_cost_cents >= 0),
+  cost_currency      TEXT NOT NULL DEFAULT 'USD',
+  next_billing_at    TEXT,
+  rented_at          TEXT,
+  released_at        TEXT,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_numbers_country ON numbers (country, status);
 CREATE INDEX IF NOT EXISTS idx_numbers_updated ON numbers (updated_at DESC);
+
+-- What a rented number costs, month by month, and which account carries it.
+-- One row per number per month: the unique key is what stops a sweep from
+-- charging the same month twice, and the account column is what makes the
+-- cost answerable per customer rather than only in total.
+CREATE TABLE IF NOT EXISTS number_charges (
+  id           TEXT PRIMARY KEY,
+  number_id    TEXT NOT NULL REFERENCES numbers (id) ON DELETE CASCADE,
+  account_id   TEXT REFERENCES accounts (id) ON DELETE SET NULL,
+  e164         TEXT NOT NULL,
+  period       TEXT NOT NULL,                    -- YYYY-MM, UTC
+  amount_cents INTEGER NOT NULL DEFAULT 0 CHECK (amount_cents >= 0),
+  currency     TEXT NOT NULL DEFAULT 'USD',
+  status       TEXT NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending', 'invoiced', 'void')),
+  invoice_id   TEXT,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_number_charges_month ON number_charges (number_id, period);
+CREATE INDEX IF NOT EXISTS idx_number_charges_account ON number_charges (account_id, period);
 
 -- Who/what a number belongs to. Several listings per number are legitimate
 -- (a business line shared by two teams), but an identical name is not.
@@ -165,6 +208,16 @@ CREATE TABLE IF NOT EXISTS extensions (
   -- Whose line this is. NULL is a platform or staff extension, which is what
   -- every extension was before customers could hold one.
   account_id   TEXT REFERENCES accounts (id) ON DELETE SET NULL,
+  -- SCIF: the secure profile. Encryption is mandatory either way; these decide
+  -- whether the line withholds its identity and never records.
+  scif              INTEGER NOT NULL DEFAULT 0,
+  caller_id_mode    TEXT NOT NULL DEFAULT 'own',
+  caller_id_number  TEXT NOT NULL DEFAULT '',
+  voice_mask        TEXT NOT NULL DEFAULT 'off',
+  mask_text         INTEGER NOT NULL DEFAULT 0,
+  -- The native app can ring this line while the phone is locked. CallKit needs
+  -- a VoIP push, and the push needs a device token somebody registered.
+  voice_auth        INTEGER NOT NULL DEFAULT 0,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -392,6 +445,12 @@ CREATE TABLE IF NOT EXISTS invoices (
   -- reference that settled it. Both are receipts, never credentials.
   stripe_session_id    TEXT NOT NULL DEFAULT '',
   payment_ref          TEXT NOT NULL DEFAULT '',
+  -- The account the invoice bills, when it bills one. An invoice addressed only
+  -- to an email cannot answer "whose line rent is this?".
+  account_id           TEXT,
+  -- The month this invoice bills rent for, empty for a one-off bill. The unique
+  -- index below is what stops a rerun creating a second invoice for the month.
+  rent_period          TEXT NOT NULL DEFAULT '',
   notes         TEXT NOT NULL DEFAULT '',
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -418,6 +477,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_reminders_stage
   ON invoice_reminders (invoice_id, stage_days);
 CREATE INDEX IF NOT EXISTS idx_invoice_reminders_recent
   ON invoice_reminders (sent_at DESC);
+
+-- What an invoice is made of. The amount on the invoice is the sum of these
+-- rows, so a bill can say "number rent, October" instead of one unexplained
+-- total — and a customer asking what they paid for can be answered line by line.
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id                TEXT PRIMARY KEY,
+  invoice_id        TEXT NOT NULL REFERENCES invoices (id) ON DELETE CASCADE,
+  kind              TEXT NOT NULL DEFAULT 'charge'
+                    CHECK (kind IN ('plan', 'number_rent', 'usage', 'charge', 'discount', 'tax')),
+  description       TEXT NOT NULL,
+  quantity          INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  unit_amount_cents INTEGER NOT NULL DEFAULT 0,
+  -- Negative for a discount, so the sum is the total without special cases.
+  amount_cents      INTEGER NOT NULL DEFAULT 0,
+  -- A rent line points at the number it is for, which is what makes one month
+  -- of one line billable exactly once.
+  number_id         TEXT,
+  period            TEXT NOT NULL DEFAULT '',
+  -- How this line gets paid. 'invoice' is payable on this bill; 'subscription'
+  -- means a card subscription already collected it, so the line is shown for the
+  -- record and excluded from the amount due. This is what stops a combined bill
+  -- from charging the plan twice.
+  settled_by        TEXT NOT NULL DEFAULT 'invoice' CHECK (settled_by IN ('invoice', 'subscription')),
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items (invoice_id);
 
 -- Dunning state per billing account. The identity is the billing email on the
 -- invoice, lower-cased: one customer, one state, however many invoices they owe.
@@ -617,8 +702,7 @@ CREATE TABLE IF NOT EXISTS plans (
   slug             TEXT NOT NULL UNIQUE,
   name             TEXT NOT NULL,
   tagline          TEXT NOT NULL DEFAULT '',
-  description      TEXT NOT NULL DEFAULT '',
-  price_cents      INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
+  description      TEXT NOT NULL DEFAULT '',  price_cents   INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
   currency         TEXT NOT NULL DEFAULT 'USD',
   interval         TEXT NOT NULL DEFAULT 'month' CHECK (interval IN ('month', 'year')),
   -- Flat rate: a plan is one price, not a price multiplied by headcount. The
@@ -679,3 +763,51 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 CREATE INDEX IF NOT EXISTS idx_subscriptions_account ON subscriptions (account_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions (stripe_subscription_id);
+
+-- ------------------------------------------------------------------- SCIF --
+-- A voiceprint is one enrolled line. The embedding is not audio: it is a vector
+-- of spectral statistics, replaced when the line is re-enrolled, so a copy of
+-- this table cannot be turned back into somebody's voice.
+CREATE TABLE IF NOT EXISTS voiceprints (
+  id         TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  extension  TEXT NOT NULL,
+  phrase     TEXT NOT NULL DEFAULT '',
+  embedding  TEXT NOT NULL,
+  samples    INTEGER NOT NULL DEFAULT 0,
+  threshold  REAL NOT NULL DEFAULT 0.82,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_voiceprints_line ON voiceprints (account_id, extension);
+
+-- Every attempt, so a lockout is a fact about the log rather than a guess, and
+-- so an operator can see why somebody could not get into their own line.
+CREATE TABLE IF NOT EXISTS voice_auth_events (
+  id         TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  extension  TEXT NOT NULL,
+  outcome    TEXT NOT NULL CHECK (outcome IN ('pass', 'fail', 'enroll', 'refused')),
+  score      REAL NOT NULL DEFAULT 0,
+  detail     TEXT NOT NULL DEFAULT '',
+  at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_voice_auth_events ON voice_auth_events (account_id, extension, at DESC);
+
+-- One row per installed SCIF app. A token is the device, so it is unique and
+-- re-registering the same phone updates the row instead of stacking up rings.
+CREATE TABLE IF NOT EXISTS push_devices (
+  id          TEXT PRIMARY KEY,
+  account_id  TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  extension   TEXT NOT NULL,
+  platform    TEXT NOT NULL DEFAULT 'ios' CHECK (platform IN ('ios', 'android')),
+  token       TEXT NOT NULL UNIQUE,
+  bundle_id   TEXT NOT NULL DEFAULT '',
+  environment TEXT NOT NULL DEFAULT 'development',
+  device_name TEXT NOT NULL DEFAULT '',
+  app_version TEXT NOT NULL DEFAULT '',
+  last_seen_at TEXT,
+  failure     TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_push_devices_line ON push_devices (account_id, extension);

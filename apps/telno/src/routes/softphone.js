@@ -1,7 +1,12 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { db_ } from '../db/index.js';
+import { db_, now } from '../db/index.js';
 import { config } from '../config.js';
-import { badRequest, forbidden, notFound } from '../lib/errors.js';
+import { CALLER_ID_MODES, VOICE_MASKS, scifPolicy } from '../lib/scif.js';
+import { takeVoiceTicket, voiceGate } from '../lib/voiceprint.js';
+import { devicesFor, maybeRingForDial, maybeRingForParkedCall, pushStatus, registerDevice, removeDevice, ringExtension } from '../lib/push.js';
+import { normalizeNumber } from '../lib/e164.js';
+import { applyAfterChange } from '../telephony/index.js';
+import { badRequest, forbidden, notFound, voiceRequired } from '../lib/errors.js';
 import { logEvent } from '../lib/audit.js';
 import { tlsFingerprint, tlsPaths } from '../telephony/provision.js';
 import { ami } from '../telephony/ami.js';
@@ -155,19 +160,74 @@ const presence = () => ({ type: 'presence', operators: [...operators.values()].m
 
 /* ------------------------------------------------------- line signaling -- */
 
-/** Asterisk's Dial events tell every operator which extension is ringing now. */
+/**
+ * Asterisk's Dial and parking events tell every operator which extension is
+ * ringing now, and which calls are waiting in a space.
+ */
 let dialWired = false;
 
 function wireDialEvents() {
   if (dialWired) return;
   dialWired = true;
   ami().on('event', (msg) => {
+    // A call arriving on a push-enabled line is parked once the desk phone and
+    // any open browser have had their turn; the park is what the phone answers.
+    if (msg.Event === 'ParkedCall' || msg.Event === 'ParkedCallTimeOut' || msg.Event === 'ParkedCallGiveUp' || msg.Event === 'UnParkedCall') {
+      const extension = String(msg.ParkeeExten || '').trim();
+      const space = String(msg.ParkingSpace || '').trim();
+      if (!extension || !space) return;
+      // Only a call parked out of `internal` is a call for a line; parking from
+      // anywhere else has its own meaning and no phone to ring.
+      if (msg.ParkeeContext && msg.ParkeeContext !== 'internal') return;
+      const caller = msg.ParkeeCallerIDNum || msg.ParkeeCallerID || '';
+      const phase =
+        msg.Event === 'ParkedCall'
+          ? 'parked'
+          : msg.Event === 'UnParkedCall'
+            ? 'answered'
+            : 'ended';
+      broadcast({
+        type: 'line',
+        extension,
+        phase,
+        space,
+        caller,
+        at: new Date().toISOString(),
+      });
+      if (phase === 'parked') {
+        const live = new Set([...operators.values()].map((op) => op.extension));
+        maybeRingForParkedCall({
+          extension,
+          space,
+          // Asterisk spells this `Parkinglot`, one word; accepting both keeps a
+          // future rename from silently dropping the lot name.
+          lot: msg.Parkinglot || msg.ParkingLot || '',
+          caller,
+          liveExtensions: live,
+        }).catch((err) => {
+          console.error(`[push] ringing ${extension} for space ${space} failed: ${err.message}`);
+        });
+      }
+      return;
+    }
+
     if (msg.Event !== 'Dial' || !msg.Destination) return;
     const match = EXTENSION_REF.exec(msg.Destination);
     if (!match) return;
     const extension = match[1];
     const phase = msg.SubEvent === 'Begin' ? 'ringing' : msg.DialStatus === 'ANSWER' ? 'answered' : 'ended';
     broadcast({ type: 'line', extension, phase, caller: msg.CallerIDNum || '', at: new Date().toISOString() });
+
+    // A ringing line with no live socket is a phone in somebody's pocket. A VoIP
+    // push is the only thing that can make it ring through a locked screen, and
+    // the app is what draws the call — so this is fire-and-forget: a failed push
+    // must never slow down the switch.
+    if (phase === 'ringing') {
+      const live = new Set([...operators.values()].map((op) => op.extension));
+      maybeRingForDial({ extension, caller: msg.CallerIDNum || '', liveExtensions: live }).catch((err) => {
+        console.error(`[push] ringing ${extension} failed: ${err.message}`);
+      });
+    }
   });
 }
 
@@ -194,6 +254,21 @@ export default async function softphoneRoutes(app) {
       },
       recordingDir: config.softphone.recordingDir,
       ticketTtlSec: config.softphone.ticketTtlSec,
+      // Voice on the line: recognition is the client's (free, on-device) and the
+      // voiceprint is this server's. A line can require a check before a session.
+      voice: { recognition: config.voice.recognition, auth: config.voice.authEnabled },
+      // Enough to explain "why doesn't my phone ring", and no more: the device
+      // list is per account, below.
+      push: (({ enabled, configured, problem, environment, ringOnDial, parking }) => ({
+        enabled,
+        configured,
+        problem,
+        environment,
+        ringOnDial,
+        // An unanswered call waits in this lot so the phone can take it; the
+        // console says where, because "parked in 7003" is the actionable part.
+        parking,
+      }))(pushStatus()),
       // Presence is a switch-wide roster: a customer sees their own lines, not
       // the staff directory they happen to be sharing a switch with.
       operators: visibleOperators(request.account),
@@ -210,6 +285,21 @@ export default async function softphoneRoutes(app) {
     if (!config.softphone.enabled) throw forbidden('The softphone is disabled (SOFTPHONE_ENABLED=false)');
     const account = request.account;
     const extension = extensionFor(request.body?.extension, account);
+
+    // A line that requires a voiceprint hands out no SIP credentials until the
+    // check has passed. The ticket is single use and tied to this account and
+    // line, so a captured response cannot be replayed for a second session.
+    const gate = voiceGate(extension);
+    if (
+      gate.enforced &&
+      !takeVoiceTicket(request.body?.voiceTicket, {
+        accountId: extension.account_id || account.id,
+        extension: extension.extension,
+      })
+    ) {
+      throw voiceRequired();
+    }
+
     const ticket = issueTicket(account, extension);
     const tls = tlsPaths();
     const policy = recordingPolicy(extension);
@@ -259,7 +349,141 @@ export default async function softphoneRoutes(app) {
         encryption: 'dtls-srtp',
       },
       recording: policy,
+      // What the browser needs to behave like a secure phone: withhold or
+      // present a caller ID, refuse plaintext media, mask the voice.
+      scif: scifPolicy(extension),
+      // The line's voice gate, so the app knows whether this session was checked
+      // and whether to ask again next time.
+      voice: { ...gate, checked: gate.enforced },
     };
+  });
+
+  /**
+   * Change the SCIF profile of a line.
+   *
+   * One route for staff and customers: the ownership check is the same one a
+   * session uses, so a customer cannot arm somebody else's line. Caller ID is a
+   * switch setting, so saving it regenerates and reloads the configuration
+   * rather than waiting for the next unrelated change.
+   */
+  app.post('/softphone/scif', async (request) => {
+    const account = request.account;
+    const extension = extensionFor(request.body?.extension, account);
+    const body = request.body || {};
+    const patch = {};
+    if (body.scif !== undefined) patch.scif = v.bool(body.scif) ? 1 : 0;
+    if (body.callerIdMode !== undefined) {
+      patch.caller_id_mode = v.oneOf(body.callerIdMode, CALLER_ID_MODES, 'callerIdMode');
+    }
+    if (body.callerIdNumber !== undefined) {
+      const raw = v.str(body.callerIdNumber, { name: 'callerIdNumber', max: 24, required: false });
+      if (!raw) patch.caller_id_number = '';
+      else {
+        const parsed = normalizeNumber(raw);
+        if (!parsed.ok) throw badRequest('callerIdNumber must be a phone number');
+        patch.caller_id_number = parsed.e164;
+      }
+    }
+    if (body.voiceMask !== undefined) patch.voice_mask = v.oneOf(body.voiceMask, VOICE_MASKS, 'voiceMask');
+    if (body.maskText !== undefined) patch.mask_text = v.bool(body.maskText) ? 1 : 0;
+
+    const mode = patch.caller_id_mode ?? extension.caller_id_mode;
+    const number = patch.caller_id_number ?? extension.caller_id_number;
+    if (mode === 'custom' && !number) throw badRequest('A custom caller ID needs a number to present');
+    if (!Object.keys(patch).length) throw badRequest('Nothing to update');
+
+    const sets = Object.keys(patch).map((column) => `${column} = ?`).join(', ');
+    db_.run(`UPDATE extensions SET ${sets}, updated_at = ? WHERE id = ?`, [
+      ...Object.values(patch),
+      now(),
+      extension.id,
+    ]);
+    logEvent({
+      actor: account.email,
+      action: 'softphone.scif_updated',
+      subject: extension.extension,
+      detail: JSON.stringify(patch),
+      ip: request.ip,
+    });
+    const fresh = db_.get('SELECT * FROM extensions WHERE id = ?', [extension.id]);
+    const applied = await applyAfterChange(request);
+    return { scif: scifPolicy(fresh), applied: applied || null };
+  });
+
+  /* ------------------------------------------------------------- push -- */
+
+  /** The tokens registered to this account, and why a ring might not arrive. */
+  app.get('/softphone/push', async (request) => {
+    const extension = request.query?.extension
+      ? extensionFor(request.query.extension, request.account)
+      : null;
+    return {
+      status: pushStatus(),
+      devices: devicesFor(request.account.id, extension ? extension.extension : null),
+    };
+  });
+
+  /**
+   * Register this phone for calls.
+   *
+   * The line is resolved and checked first: a customer cannot point their phone
+   * at somebody else's extension, and a token already owned by another account
+   * moves to this one — Apple hands the same token to one app on one phone, so a
+   * handset that changes hands must stop ringing for the old owner.
+   */
+  app.post('/softphone/push/register', async (request) => {
+    const extension = extensionFor(request.body?.extension, request.account);
+    const device = registerDevice({
+      accountId: extension.account_id || request.account.id,
+      extension: extension.extension,
+      token: request.body?.token,
+      platform: v.oneOf(request.body?.platform || 'ios', ['ios', 'android'], 'platform'),
+      bundleId: v.str(request.body?.bundleId, { name: 'bundleId', max: 120, required: false }),
+      environment: request.body?.environment === 'production' ? 'production' : 'development',
+      deviceName: v.str(request.body?.deviceName, { name: 'deviceName', max: 60, required: false }),
+      appVersion: v.str(request.body?.appVersion, { name: 'appVersion', max: 20, required: false }),
+    });
+    logEvent({
+      actor: request.account.email,
+      action: 'softphone.push_registered',
+      subject: extension.extension,
+      detail: device.platform,
+      ip: request.ip,
+    });
+    // Registering a phone changes how a call to this line is delivered: the line
+    // becomes park-capable, so the dialplan is regenerated now rather than on the
+    // next unrelated edit.
+    const applied = await applyAfterChange(request);
+    return { device, status: pushStatus(), applied: applied || null };
+  });
+
+  /** Forget a phone: signing out, or a lost handset. */
+  app.post('/softphone/push/remove', async (request) => {
+    const removed = removeDevice(request.account.id, request.body?.token);
+    if (!removed) throw notFound('That device is not registered to this account');
+    logEvent({ actor: request.account.email, action: 'softphone.push_removed', ip: request.ip });
+    const applied = await applyAfterChange(request);
+    return { removed: true, devices: devicesFor(request.account.id), applied: applied || null };
+  });
+
+  /**
+   * Ring a line on purpose: the test button in the app, and the manual ring an
+   * operator wants while a call is already in the switch. The ownership check is
+   * the same one a session uses, so it cannot ring somebody else's phone.
+   */
+  app.post('/softphone/push/ring', async (request) => {
+    const extension = extensionFor(request.body?.extension, request.account);
+    if (!config.apns.enabled) {
+      throw badRequest('Apple push is not configured on this platform (APNS_ENABLED=false)');
+    }
+    const result = await ringExtension(extension.extension, {
+      display: 'SCIF test call',
+      video: !!request.body?.video,
+    });
+    if (!result.devices) {
+      return { ...result, hint: 'Install the SCIF app on a phone and sign in on this line first' };
+    }
+    return result;
   });
 
   /**

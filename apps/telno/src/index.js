@@ -6,6 +6,8 @@ import { logEvent } from './lib/audit.js';
 import { startTelephony } from './telephony/index.js';
 import { writeConfigs } from './telephony/provision.js';
 import { startReminderSweep } from './lib/reminders.js';
+import { startRentalSweep } from './lib/rentals.js';
+import { startMonthlyInvoicing } from './lib/invoicing.js';
 import { applyStagedRestore, startBackupSchedule, setRestoreHandler } from './lib/backup.js';
 import { seedCommerce } from './lib/subscriptions.js';
 import { seedBrand } from './lib/brand.js';
@@ -82,12 +84,21 @@ const app = await buildApp();
 
 let stopReminders = () => {};
 let stopBackups = () => {};
+let stopRentals = () => {};
+let stopInvoicing = () => {};
 
 try {
   await app.listen({ port: config.port, host: config.host });
   // Billing automation starts with the process: a restart resumes reminding
   // without an operator remembering to switch it back on.
   stopReminders = startReminderSweep();
+  // Rented numbers accrue rent whether or not anybody opens the console, so the
+  // month is recorded on its own — and idempotently, so a restart is harmless.
+  // Rent then becomes a line on the account's invoice, which is the difference
+  // between the platform knowing what a number costs and the customer seeing it.
+  const stopRentSweep = startRentalSweep();
+  stopRentals = stopRentSweep;
+  stopInvoicing = startMonthlyInvoicing();
   // Backups too, and for the same reason. The first one waits a full interval.
   stopBackups = startBackupSchedule();
   console.log(
@@ -105,6 +116,8 @@ const shutdown = async (signal) => {
   closing = true;
   console.log(`[telno] ${signal} received, shutting down`);
   stopReminders();
+  stopRentals();
+  stopInvoicing();
   stopBackups();
   try {
     await app.close();

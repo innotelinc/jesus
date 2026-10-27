@@ -3,6 +3,8 @@ import { formatNumber } from '../lib/e164.js';
 import { entitlementFor, planView, subscriptionForAccount, subscriptionView } from '../lib/subscriptions.js';
 import { payUrlForInvoice, stripeConfigured } from '../lib/payments.js';
 import { publicBrand } from '../lib/brand.js';
+import { itemsFor } from '../lib/invoicing.js';
+import { profileView, saveProfile } from '../lib/profile.js';
 import { config } from '../config.js';
 import { notFound, badRequest } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
@@ -46,6 +48,9 @@ const invoiceView = (row) => ({
   issuedAt: row.issued_at,
   dueAt: row.due_at,
   paidAt: row.paid_at,
+  // The lines the amount is made of: "number rent, October" rather than one
+  // unexplained total. A customer asking what they paid for gets an answer here.
+  items: itemsFor(row.id),
   // Empty unless card payment is switched on and the invoice is payable.
   payUrl: payUrlForInvoice(row),
 });
@@ -72,15 +77,15 @@ export default async function meRoutes(app) {
     const account = request.account;
     const entitlement = request.entitlement || entitlementFor(account);
     const subscription = subscriptionForAccount(account.id);
-    const invoices = account.email
-      ? db_.all(
-          `SELECT * FROM invoices
-            WHERE lower(email) = ?
-            ORDER BY COALESCE(paid_at, issued_at, due_at, period_end) DESC
-            LIMIT 24`,
-          [String(account.email).toLowerCase()]
-        )
-      : [];
+    // Addressed by email or, when the bill was written against the account,
+    // by the account itself — an invoice with both still appears once.
+    const invoices = db_.all(
+      `SELECT * FROM invoices
+        WHERE lower(email) = ? OR account_id = ?
+        ORDER BY COALESCE(paid_at, issued_at, due_at, period_end) DESC
+        LIMIT 24`,
+      [String(account.email || '').toLowerCase(), account.id]
+    );
     const numbers = db_.all('SELECT * FROM numbers WHERE account_id = ? ORDER BY e164', [account.id]);
 
     return {
@@ -92,6 +97,9 @@ export default async function meRoutes(app) {
         suspended: !!account.suspended_at,
       },
       brand: publicBrand(),
+      // Whether the customer has confirmed their details and answered the
+      // directory question. The portal shows the step until this says it is done.
+      profile: profileView(account),
       entitlement,
       plan: entitlement.plan || null,
       subscription: subscription ? subscriptionView(subscription) : null,
@@ -103,6 +111,11 @@ export default async function meRoutes(app) {
         carrier: row.carrier,
         lineType: row.line_type,
         status: row.status,
+        // What this line costs its owner a month, so the portal answers "what am
+        // I paying for" without a support ticket.
+        monthlyCostCents: Number(row.monthly_cost_cents || 0),
+        currency: row.cost_currency || 'USD',
+        nextBillingAt: row.next_billing_at || null,
       })),
       invoices: invoices.map(invoiceView),
       payments: {
@@ -110,6 +123,40 @@ export default async function meRoutes(app) {
         // invoice can be settled online right now.
         configured: stripeConfigured() && config.payments.enabled,
         currency: invoices[0]?.currency || 'USD',
+      },
+    };
+  });
+
+  /** The confirmation step, for a portal that wants to show it again. */
+  app.get('/me/profile', async (request) => ({ profile: profileView(request.account) }));
+
+  /**
+   * Confirm who you are and answer the directory question.
+   *
+   * Required on the first visit: a paying customer's number should not appear in
+   * a worldwide phonebook because a form defaulted to yes, and it should not be
+   * missing because nobody asked. The answer is also what later numbers inherit.
+   */
+  app.post('/me/profile', async (request) => {
+    const body = request.body || {};
+    if (body.directoryOptIn === undefined) {
+      throw badRequest('Say whether your number may be listed in the public directory');
+    }
+    const before = profileView(request.account);
+    const result = saveProfile(request.account, body);
+    logEvent({
+      actor: request.account.email,
+      action: 'me.profile_confirmed',
+      subject: request.account.id,
+      detail: `directory ${result.profile.directoryOptIn ? 'opt-in' : 'opt-out'}; ${result.applied.listed} listed, ${result.applied.hidden} hidden`,
+      ip: request.ip,
+    });
+    return {
+      ...result,
+      // What changed, in the customer's words rather than a row count.
+      changed: {
+        firstConfirmation: !before.confirmed,
+        optedIn: result.profile.directoryOptIn,
       },
     };
   });

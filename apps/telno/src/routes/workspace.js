@@ -18,6 +18,22 @@ import { activeChannel, channelStatus, deliverNotice } from '../lib/channels.js'
 import { invoiceEmail } from '../lib/mail.js';
 import { payUrlForInvoice, paymentStatus, testConnection } from '../lib/payments.js';
 import { ladder, reminderHistory, runReminderSweep, sendReminderNow } from '../lib/reminders.js';
+import { monthPeriod } from '../lib/rentals.js';
+import { maskPhone, maskText, maskedExtensions, maskedNumberIds } from '../lib/scif.js';
+import {
+  addItem,
+  billPlanOnto,
+  billRentOnto,
+  itemsFor,
+  monthBounds,
+  monthLabel,
+  nextInvoiceNumber,
+  releaseRentFromInvoice,
+  removeItem,
+  runMonthlyInvoicing,
+  uninvoicedRent,
+  updateItem,
+} from '../lib/invoicing.js';
 import {
   billingAccount,
   escalationPolicy,
@@ -193,12 +209,28 @@ const invoiceView = (row) => ({
   // offers a link that would fail.
   payUrl: payUrlForInvoice(row),
   paymentRef: row.payment_ref || '',
+  // Which account and which month this bill is for. Both empty on a one-off
+  // invoice that is only addressed to an email.
+  accountId: row.account_id || null,
+  rentPeriod: row.rent_period || '',
+  // How many lines the total is made of. The list shows the count; the detail
+  // shows the lines themselves.
+  itemCount: row.item_count ?? 0,
+  // The part of the bill a card subscription already collected. Shown so the
+  // customer can see the plan on their bill without being charged for it twice.
+  coveredCents: row.covered_cents ?? 0,
   notes: row.notes,
   createdAt: row.created_at,
 });
 
+/** One invoice with the lines that make up its total. */
+const invoiceDetail = (row) => ({ ...invoiceView(row), items: itemsFor(row.id) });
+
 /** Reminder counts come from the ledger, so they cannot be stale. */
 const INVOICE_SELECT = `SELECT i.*,
+    (SELECT COUNT(*) FROM invoice_items it WHERE it.invoice_id = i.id) AS item_count,
+    (SELECT COALESCE(SUM(it.amount_cents), 0) FROM invoice_items it
+      WHERE it.invoice_id = i.id AND it.settled_by = 'subscription') AS covered_cents,
     (SELECT COUNT(*) FROM invoice_reminders r WHERE r.invoice_id = i.id AND r.status = 'sent') AS reminder_count,
     (SELECT MAX(r.sent_at) FROM invoice_reminders r
       WHERE r.invoice_id = i.id AND r.kind = 'final' AND r.status = 'sent') AS final_notice_at,
@@ -502,12 +534,26 @@ export default async function workspaceRoutes(app) {
       where.push('extension = ?');
       params.push(v.str(request.query.extension, { name: 'extension', max: 6 }));
     }
+    // A voicemail on a SCIF line is masked where the line asked for it: the
+    // caller's number and any identifiers in the transcript are redacted before
+    // the response leaves the platform.
+    const maskedLines = maskedExtensions(db_);
     const items = db_
       .all(
         `SELECT * FROM voicemails ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY received_at DESC LIMIT 100`,
         params
       )
-      .map(voicemailView);
+      .map((row) => {
+        const view = voicemailView(row);
+        if (!maskedLines.has(String(row.extension))) return view;
+        return {
+          ...view,
+          from: maskPhone(view.from),
+          fromE164: view.fromE164 ? maskPhone(view.fromE164) : '',
+          transcript: maskText(view.transcript),
+          masked: true,
+        };
+      });
     return {
       items,
       summary: {
@@ -614,12 +660,25 @@ export default async function workspaceRoutes(app) {
       where.push('channel = ?');
       params.push(v.oneOf(channel, ['sms', 'mms', 'whatsapp', 'web'], 'channel'));
     }
+    // Messages on a SCIF line: the addresses and any numbers or emails in the
+    // body are redacted for as long as the line asks for masking.
+    const maskedNumbers = maskedNumberIds(db_);
     const items = db_
       .all(
         `SELECT * FROM messages ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY sent_at DESC LIMIT 100`,
         params
       )
-      .map(messageView);
+      .map((row) => {
+        const view = messageView(row);
+        if (!row.number_id || !maskedNumbers.has(row.number_id)) return view;
+        return {
+          ...view,
+          from: maskPhone(view.from),
+          to: maskPhone(view.to),
+          body: maskText(view.body),
+          masked: true,
+        };
+      });
     return {
       items,
       summary: {
@@ -747,39 +806,194 @@ export default async function workspaceRoutes(app) {
     };
   });
 
+  /**
+   * Create a bill.
+   *
+   * Three shapes, in order of preference: line items (the total is their sum),
+   * the month's rent pulled from the ledger, or one amount typed by an operator.
+   * Naming the account links the invoice to a customer, which is what lets its
+   * own portal find the bill and its rent attach to the right person.
+   */
   app.post('/billing/invoices', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
-    const accountName = v.str(body.accountName, { name: 'accountName', max: 120 });
+    const accountEmail = v.str(body.account, { name: 'account', max: 160, required: false });
+    const account = accountEmail
+      ? db_.get('SELECT * FROM accounts WHERE lower(email) = ?', [String(accountEmail).toLowerCase()])
+      : null;
+    if (accountEmail && !account) throw badRequest('No account has that email');
+    const accountName = v.str(body.accountName || account?.company || account?.name, {
+      name: 'accountName',
+      max: 120,
+    });
     const periodStart = isoDate(body.periodStart, 'periodStart', { required: true });
     const periodEnd = isoDate(body.periodEnd, 'periodEnd', { required: true });
     if (new Date(periodEnd) < new Date(periodStart)) throw badRequest('periodEnd cannot precede periodStart');
     const status = v.oneOf(body.status || 'open', ['draft', 'open', 'paid', 'overdue', 'void'], 'status');
     const dueAt = isoDate(body.dueAt, 'dueAt') || new Date(Date.now() + 14 * 86400_000).toISOString();
+    const incoming = Array.isArray(body.items) ? body.items.slice(0, 100) : [];
+    const wantsRent = body.includeRent === undefined ? !!body.rentPeriod : v.bool(body.includeRent, false);
+    const rentPeriod = wantsRent ? String(body.rentPeriod || monthPeriod()).slice(0, 7) : '';
+    if (rentPeriod && !monthBounds(rentPeriod)) throw badRequest('rentPeriod must be a YYYY-MM month');
+    const amountCents =
+      body.amountCents === undefined && (incoming.length || rentPeriod)
+        ? 0
+        : v.integer(body.amountCents, { name: 'amountCents', min: 0, max: 100_000_000_00, required: true });
+
     const id = newId('inv_');
-    const serial = count('SELECT COUNT(*) AS n FROM invoices') + 1;
-    const invoiceNo = `INV-${new Date().getFullYear()}-${String(serial).padStart(4, '0')}`;
-    db_.run(
-      `INSERT INTO invoices (id, invoice_no, account_name, email, period_start, period_end, amount_cents, currency, status, issued_at, due_at, paid_at, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        invoiceNo,
-        accountName,
-        v.str(body.email, { name: 'email', max: 160, required: false }),
-        periodStart,
-        periodEnd,
-        v.integer(body.amountCents, { name: 'amountCents', min: 0, max: 100_000_000_00, required: true }),
-        v.str(body.currency, { name: 'currency', max: 3, required: false, fallback: 'USD' }).toUpperCase(),
-        status,
-        status === 'draft' ? null : now(),
-        dueAt,
-        status === 'paid' ? now() : null,
-        v.str(body.notes, { name: 'notes', max: 500, required: false }),
-      ]
-    );
+    const invoiceNo = nextInvoiceNumber();
+    try {
+      db_.run(
+        `INSERT INTO invoices (id, invoice_no, account_name, email, account_id, rent_period, period_start, period_end,
+                               amount_cents, currency, status, issued_at, due_at, paid_at, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          invoiceNo,
+          accountName,
+          v.str(body.email ?? account?.email, { name: 'email', max: 160, required: false }),
+          account?.id || null,
+          rentPeriod,
+          periodStart,
+          periodEnd,
+          amountCents,
+          v.str(body.currency, { name: 'currency', max: 3, required: false, fallback: 'USD' }).toUpperCase(),
+          status,
+          status === 'draft' ? null : now(),
+          dueAt,
+          status === 'paid' ? now() : null,
+          v.str(body.notes, { name: 'notes', max: 500, required: false }),
+        ]
+      );
+    } catch (err) {
+      // One invoice per account per month is the invariant; a second attempt is
+      // a corrected bill for the same month, so say so instead of a 500.
+      if (/UNIQUE/i.test(String(err.message))) {
+        throw conflict(`That account already has an invoice for ${monthLabel(rentPeriod)}`);
+      }
+      throw err;
+    }
+
+    for (const item of incoming) addItem(id, item);
+    let rent = null;
+    let plan = null;
+    if (rentPeriod) {
+      // A monthly bill carries the plan as well as the rent, so the invoice
+      // created here says the same thing the automatic run would.
+      const invoice = db_.get('SELECT * FROM invoices WHERE id = ?', [id]);
+      plan = billPlanOnto(invoice, rentPeriod);
+      rent = billRentOnto(db_.get('SELECT * FROM invoices WHERE id = ?', [id]), rentPeriod);
+    }
+
     logEvent({ actor: request.account.email, action: 'billing.invoice_created', subject: invoiceNo, ip: request.ip });
     reply.status(201);
-    return { invoice: invoiceView(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [id])) };
+    return { invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [id])), rent, plan };
+  });
+
+  /** One invoice with everything that makes up its total. */
+  app.get('/billing/invoices/:id', async (request) => {
+    const row = db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [request.params.id]);
+    if (!row) throw notFound('Invoice not found');
+    return { invoice: invoiceDetail(row) };
+  });
+
+  /**
+   * Put the month's number rent on an invoice that already exists.
+   *
+   * The charges move from pending to invoiced in the same pass, so pressing this
+   * twice bills a month once: the second press has nothing left to pull.
+   */
+  app.post('/billing/invoices/:id/rent', { preHandler: requireWrite }, async (request) => {
+    const row = db_.get('SELECT * FROM invoices WHERE id = ?', [request.params.id]);
+    if (!row) throw notFound('Invoice not found');
+    if (row.status === 'void') throw conflict('A void invoice cannot take new charges');
+    if (row.status === 'paid') throw conflict('This invoice is already settled');
+    if (!row.account_id) {
+      throw badRequest('This invoice is not linked to an account, so it holds no number rent');
+    }
+    const period = String(request.body?.period || row.rent_period || monthPeriod()).slice(0, 7);
+    if (!monthBounds(period)) throw badRequest('period must be a YYYY-MM month');
+    const billed = billRentOnto(row, period);
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.rent_billed',
+      subject: row.invoice_no,
+      detail: `${period}: ${billed.added} line(s)`,
+      ip: request.ip,
+    });
+    return { invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [row.id])), billed };
+  });
+
+  app.post('/billing/invoices/:id/items', { preHandler: requireWrite }, async (request) => {
+    const row = db_.get('SELECT * FROM invoices WHERE id = ?', [request.params.id]);
+    if (!row) throw notFound('Invoice not found');
+    if (row.status === 'void') throw conflict('A void invoice cannot take new lines');
+    const item = addItem(row.id, request.body || {});
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.item_added',
+      subject: row.invoice_no,
+      detail: item.description,
+      ip: request.ip,
+    });
+    return { item, invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [row.id])) };
+  });
+
+  app.patch('/billing/invoice-items/:id', { preHandler: requireWrite }, async (request) => {
+    const item = updateItem(request.params.id, request.body || {});
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.item_updated',
+      subject: item.id,
+      detail: item.description,
+      ip: request.ip,
+    });
+    return { item, invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [item.invoiceId])) };
+  });
+
+  app.delete('/billing/invoice-items/:id', { preHandler: requireWrite }, async (request) => {
+    const result = removeItem(request.params.id);
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.item_removed',
+      subject: result.id,
+      ip: request.ip,
+    });
+    return { ok: true, invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [result.invoiceId])) };
+  });
+
+  /** Rent recorded for a month but not yet on any bill. */
+  app.get('/billing/rent', async (request) => {
+    const period = String(request.query?.period || monthPeriod()).slice(0, 7);
+    if (!monthBounds(period)) throw badRequest('period must be a YYYY-MM month');
+    return {
+      period,
+      label: monthLabel(period),
+      enabled: config.billing.rentInvoicing,
+      uninvoiced: uninvoicedRent({ period }),
+      invoices: db_
+        .all('SELECT * FROM invoices WHERE rent_period = ? ORDER BY created_at DESC', [period])
+        .map(invoiceView),
+    };
+  });
+
+  /** Bill every subscriber and every account that owes rent for a month, now. */
+  app.post('/billing/rent/run', { preHandler: requireWrite }, async (request) => {
+    const period = String(request.body?.period || monthPeriod()).slice(0, 7);
+    if (!monthBounds(period)) throw badRequest('period must be a YYYY-MM month');
+    const accountEmail = v.str(request.body?.account, { name: 'account', max: 160, required: false });
+    const account = accountEmail
+      ? db_.get('SELECT * FROM accounts WHERE lower(email) = ?', [String(accountEmail).toLowerCase()])
+      : null;
+    if (accountEmail && !account) throw badRequest('No account has that email');
+    const result = runMonthlyInvoicing({ period, accountId: account?.id || null });
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.rent_run',
+      subject: period,
+      detail: `${result.planLines} plan + ${result.billedLines} rent line(s) across ${result.invoices.length} invoice(s)`,
+      ip: request.ip,
+    });
+    return { ...result, label: monthLabel(period), uninvoiced: uninvoicedRent({ period }) };
   });
 
   app.patch('/billing/invoices/:id', { preHandler: requireWrite }, async (request) => {
@@ -793,7 +1007,12 @@ export default async function workspaceRoutes(app) {
       // reopening clears it so an invoice cannot claim it was paid twice.
       patch.paid_at = patch.status === 'paid' ? row.paid_at || now() : null;
     }
+    // A bill built from lines owns its total: typing one by hand would make the
+    // invoice disagree with the items printed underneath it.
     if (body.amountCents !== undefined) {
+      if (itemsFor(row.id).length) {
+        throw badRequest('This invoice is built from line items — edit the items instead of the total');
+      }
       patch.amount_cents = v.integer(body.amountCents, { name: 'amountCents', min: 0, max: 100_000_000_00 });
     }
     if (body.dueAt !== undefined) patch.due_at = isoDate(body.dueAt, 'dueAt', { required: true });
@@ -810,8 +1029,11 @@ export default async function workspaceRoutes(app) {
     if (!Object.keys(patch).length) throw badRequest('Nothing to update');
     const sets = Object.keys(patch).map((column) => `${column} = ?`).join(', ');
     db_.run(`UPDATE invoices SET ${sets} WHERE id = ?`, [...Object.values(patch), row.id]);
+    // A void bill hands its month back to the ledger, so a corrected invoice can
+    // carry it rather than the customer paying for a month twice.
+    if (patch.status === 'void') releaseRentFromInvoice(row.id);
     logEvent({ actor: request.account.email, action: 'billing.invoice_updated', subject: row.invoice_no, ip: request.ip });
-    return { invoice: invoiceView(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [row.id])) };
+    return { invoice: invoiceDetail(db_.get(`${INVOICE_SELECT} WHERE i.id = ?`, [row.id])) };
   });
 
   app.post('/billing/invoices/:id/resend', { preHandler: requireWrite }, async (request) => {
@@ -821,7 +1043,7 @@ export default async function workspaceRoutes(app) {
     if (row.status === 'void') throw conflict('A void invoice cannot be resent');
     // One template, both parts: the HTML a customer reads and the text a
     // provider or a log falls back to describe the same invoice.
-    const message = invoiceEmail(row);
+    const message = invoiceEmail({ ...row, items: itemsFor(row.id) });
     const result = await deliverNotice({ to: row.email, ...message });
     // The provider is recorded whether or not it worked: a failed attempt names
     // who was asked, which is the part that makes an outage traceable.

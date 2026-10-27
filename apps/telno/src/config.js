@@ -128,6 +128,70 @@ export const config = {
     recordingDir: env.ASTERISK_RECORDING_DIR || '/data/recordings',
   },
 
+  // Voice on the line, not in a vendor. Recognition runs in the browser (Web
+  // Speech API) or in the native app (SFSpeechRecognizer), so it costs nothing
+  // per minute; the voiceprint that can be required before a session is computed
+  // here from the audio the browser sends.
+  voice: {
+    recognition: bool(env.VOICE_RECOGNITION_ENABLED, true),
+    authEnabled: bool(env.VOICE_AUTH_ENABLED, true),
+    // Cosine similarity, 0..1. Higher rejects more impostors and more of the
+    // owner; the enrollment screen reports the spread it saw so it can be tuned.
+    threshold: (() => {
+      const value = Number(env.VOICEPRINT_THRESHOLD || 0.82);
+      return Number.isFinite(value) && value > 0.5 && value < 0.999 ? value : 0.82;
+    })(),
+    // How long a passed check is good for, and therefore how long a session is
+    // trusted without asking again.
+    ticketTtlSec: Math.max(30, int(env.VOICEPRINT_TICKET_TTL, 300)),
+    minSeconds: Math.max(1, int(env.VOICEPRINT_MIN_SECONDS, 1)),
+    maxSeconds: Math.max(2, int(env.VOICEPRINT_MAX_SECONDS, 20)),
+    // Per line, per hour: a voiceprint is a check, not a guessing game.
+    attemptsPerHour: Math.max(3, int(env.VOICEPRINT_ATTEMPTS_PER_HOUR, 20)),
+  },
+
+  // Apple push for the native SCIF app. A VoIP push is the only thing that can
+  // make a locked iPhone ring in CallKit, and it is free: APNs charges nothing,
+  // the .p8 comes from the developer account this deployment already has.
+  apns: {
+    enabled: bool(env.APNS_ENABLED, false),
+    keyId: env.APNS_KEY_ID || '',
+    teamId: env.APNS_TEAM_ID || '',
+    // The .p8 lives on the data volume; the env form is for hosts without one.
+    keyPath: env.APNS_KEY_PATH || '',
+    key: (env.APNS_KEY || '').replace(/\\n/g, String.fromCharCode(10)),
+    bundleId: env.APNS_BUNDLE_ID || 'us.innotel.scif',
+    // A VoIP push goes to <bundle>.voip, not to the app's own topic.
+    topicSuffix: env.APNS_TOPIC_SUFFIX || '.voip',
+    environment: env.APNS_ENVIRONMENT === 'production' ? 'production' : 'development',
+    // Overridable so a test can point the sender at a local stub.
+    host: env.APNS_HOST || '',
+    // Ring a locked phone when the switch says its line is ringing.
+    ringOnDial: bool(env.APNS_RING_ON_DIAL, true),
+  },
+
+  // Parking: the half of "answer on a locked iPhone" that the switch owns.
+  //
+  // A call that rings a phone in somebody's pocket cannot be joined by that
+  // phone while the switch is still dialing the desk: Asterisk cannot add a
+  // party to a call it has not answered yet. Parking gives the call somewhere to
+  // wait — a slot with a name — so the app can dial that slot and be bridged.
+  parking: {
+    enabled: bool(env.PARKING_ENABLED, true),
+    // Slots live in 7000-7999 because the dialplan retrieves one by dialing
+    // _7XXX; a lot outside that range could not be reached from a phone.
+    lot: (env.PARKING_LOT || 'telno').replace(/[^A-Za-z0-9_]/g, '') || 'telno',
+    start: Math.min(7999, Math.max(7000, int(env.PARKING_START, 7001))),
+    end: Math.min(7999, Math.max(7000, int(env.PARKING_END, 7099))),
+    // How long the desk phone and an open browser ring before the call is parked
+    // for the pocket phone: answer locally and parking never happens.
+    ringSeconds: Math.min(45, Math.max(5, int(env.PARKING_RING_SECONDS, 12))),
+    // How long a parked caller waits for a phone to pick it up before the line's
+    // voicemail answers instead.
+    timeoutSeconds: Math.min(300, Math.max(10, int(env.PARKING_TIMEOUT, 35))),
+    mohClass: (env.PARKING_MOH || 'default').replace(/[^A-Za-z0-9_.-]/g, '') || 'default',
+  },
+
   directory: {
     // The worldwide registry is served from every one of these hosts.
     domains: (env.DIRECTORY_DOMAINS ||
@@ -173,6 +237,11 @@ export const config = {
     // Days after the final notice before service is suspended. The exact date is
     // printed in the notice, so 0 means "today" and is not offered.
     suspendGraceDays: Math.max(0, int(env.SUSPEND_GRACE_DAYS, 14)),
+
+    // Rent on the bill. A number's monthly cost is recorded in the ledger by the
+    // rental sweep; this switch decides whether it also becomes a line on the
+    // account's invoice. Turning it off leaves the ledger intact.
+    rentInvoicing: bool(env.RENT_INVOICING_ENABLED, true),
   },
 
   // Online payment for invoices. The button in a final notice or a suspension
@@ -183,6 +252,30 @@ export const config = {
     // Overridable so a test can point the API at a local stub instead of
     // charging a real card.
     apiUrl: String(env.STRIPE_API_URL || 'https://api.stripe.com').replace(/\/+$/, ''),
+  },
+
+  // The number provider. DIDs are searched, bought and released through VoIP.ms.
+  // Its API password is separate from the portal password and belongs in the
+  // vault (Settings → Vault) on a deployment that has one; the values here are
+  // the .env-only fallback and the defaults an order is placed with.
+  voipms: {
+    // Overridable so a test can point the client at a local stub.
+    apiUrl: String(env.VOIPMS_API_URL || 'https://voip.ms/api/v1/rest.php'),
+    apiUsername: env.VOIPMS_API_USERNAME || '',
+    apiPassword: env.VOIPMS_API_PASSWORD || '',
+    // Where a newly bought DID rings: a routing string such as
+    // `account:100001_telno`. Empty means every order has to name one.
+    routing: env.VOIPMS_ROUTING || '',
+    pop: int(env.VOIPMS_POP, 1),
+    // 1 = per minute, 2 = flat monthly. Flat is what an unlimited plan sells.
+    billingType: int(env.VOIPMS_BILLING_TYPE, 2),
+    dialTime: int(env.VOIPMS_DIAL_TIME, 60),
+    cnam: bool(env.VOIPMS_CNAM, false),
+    // What the DID costs us a month, in minor units. Stored on the number so the
+    // bill can answer for it; 0 means "not priced yet", not "free".
+    monthlyCostCents: int(env.VOIPMS_DID_MONTHLY_CENTS, 0),
+    currency: (env.VOIPMS_CURRENCY || 'USD').toUpperCase(),
+    timeoutMs: int(env.VOIPMS_TIMEOUT_MS, 15000),
   },
 
   // Backups of everything the data volume holds. The database is dumped with

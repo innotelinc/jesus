@@ -19,7 +19,20 @@ export async function buildApp(opts = {}) {
     logger: opts.logger ?? { level: config.isProd ? 'warn' : 'info' },
     trustProxy: config.trustProxy,
     bodyLimit: 1024 * 1024,
+    // Keep-alive has to outlast whatever is in front of this process. Node
+    // closes an idle connection after 5 seconds by default, while nginx — and
+    // Nginx Proxy Manager in particular — holds its upstream connections for
+    // 90 seconds and reuses them. Every connection the proxy reuses just after
+    // Node closed it is a request that dies as `recv() failed (104: Connection
+    // reset by peer) while reading response header from upstream`, which the
+    // browser sees as an intermittent 502 on a site that is otherwise healthy.
+    // These sit above nginx's 90s so the proxy always decides first.
+    keepAliveTimeout: 95_000,
   });
+  // Fastify forwards keepAliveTimeout but drops headersTimeout, so the header
+  // window is set on the server itself: headers have to be able to arrive for
+  // as long as a keep-alive connection may live.
+  app.server.headersTimeout = 96_000;
 
   await app.register(cookie, { secret: config.sessionSecret });
   // Softphone presence/intent channel. Registered at the root because the
