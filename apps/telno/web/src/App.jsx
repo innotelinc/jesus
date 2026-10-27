@@ -27,6 +27,7 @@ import Plans from './pages/Plans.jsx';
 import Subscribe from './pages/Subscribe.jsx';
 import Site from './pages/Site.jsx';
 import PublicDirectory from './pages/PublicDirectory.jsx';
+import Customer from './pages/Customer.jsx';
 
 const PAGES = [
   { path: '/', title: 'Dashboard', subtitle: 'Platform and registry at a glance', Component: Dashboard },
@@ -107,6 +108,12 @@ function Router() {
         <Softphone />
       </div>
     );
+  }
+
+  // A subscriber gets the customer portal, not the operator's console: their
+  // own line, plan and invoices, and no way through to the switch.
+  if (user?.kind === 'customer') {
+    return <Customer />;
   }
 
   const route = PAGES.find((page) => page.path === pathname);

@@ -229,7 +229,7 @@ function FlowDialog({ flow, extensions, onClose, onSaved }) {
           onChange={(event) => setForm({ ...form, extension: event.target.value })}
           placeholder="200"
           className="mono"
-          hint="Dialled internally or mapped to a DID"
+          hint="Dialed internally or mapped to a DID"
           disabled={!!flow.id}
         />
       </div>

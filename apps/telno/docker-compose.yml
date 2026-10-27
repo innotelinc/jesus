@@ -2,7 +2,13 @@ name: telno
 
 services:
   telno:
-    build: .
+    build:
+      context: .
+      # Point these at a mirror when the Docker Hub registry is unreachable:
+      #   NODE_IMAGE=mirror.gcr.io/library/node:24-bookworm-slim docker compose build
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+        SWITCH_IMAGE: ${SWITCH_IMAGE:-debian:bookworm}
     image: telno:latest
     container_name: telno
     restart: unless-stopped
@@ -20,11 +26,11 @@ services:
       # Browser softphone: SIP over secure WebSocket, straight to chan_pjsip.
       # Media is DTLS-SRTP on the RTP range below, so both have to be reachable.
       - "${SOFTPHONE_PORT:-8089}:8089"
-      # Media for the browser softphone. The WebSocket carries signalling only;
+      # Media for the browser softphone. The WebSocket carries signaling only;
       # DTLS-SRTP audio and video arrive on this range, so a call needs it
       # published (or use network_mode: host below on a Linux host).
       - "10000-10100:10000-10100/udp"
-      # - "5060:5060/udp"              # SIP signalling for desk phones/trunks
+      # - "5060:5060/udp"              # SIP signaling for desk phones/trunks
 
     environment:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}

@@ -7,7 +7,7 @@
  * the cache API is never touched — an offline-first app store this is not, a
  * browser that lets you install it as a window is.
  *
- * If offline behaviour is ever wanted, it belongs in an explicit offline page,
+ * If offline behavior is ever wanted, it belongs in an explicit offline page,
  * not in a cache that quietly answers for the platform.
  */
 

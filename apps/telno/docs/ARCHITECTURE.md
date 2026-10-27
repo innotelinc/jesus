@@ -11,7 +11,8 @@ Two decisions follow from that:
 1. **One number table.** `numbers.e164` is a `UNIQUE` column. Extensions, trunks, call records,
    directory listings and submissions all reference `numbers.id`. This is the dedupe.
 2. **The database is the source of truth.** Switch configuration is generated, never hand-edited. A
-   corrupt config is one **Apply config** away from correct.
+   corrupt config is one regeneration away from correct, and the console regenerates and reloads
+automatically after every change that touches a generated file.
 
 ## Processes
 

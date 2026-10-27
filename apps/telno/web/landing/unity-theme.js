@@ -49,33 +49,33 @@
     }
   }
 
-  function normaliseMode(mode) {
+  function normalizeMode(mode) {
     return mode === "light" || mode === "dark" ? mode : "system";
   }
 
-  function normaliseScheme(scheme) {
+  function normalizeScheme(scheme) {
     return scheme === "operations" || scheme === "desk" || scheme === "soc" ? scheme : "";
   }
 
   /** Paint a mode/scheme pair onto <html>. Anything falsy is removed, not zeroed. */
   function apply(mode, scheme) {
     var root = global.document.documentElement;
-    var picked = normaliseMode(mode);
+    var picked = normalizeMode(mode);
     if (picked === "system") root.removeAttribute("data-mode");
     else root.setAttribute("data-mode", picked);
 
-    var chosen = normaliseScheme(scheme) || normaliseScheme(DEFAULT_SCHEME);
+    var chosen = normalizeScheme(scheme) || normalizeScheme(DEFAULT_SCHEME);
     if (chosen) root.setAttribute("data-scheme", chosen);
     else root.removeAttribute("data-scheme");
   }
 
   function mode() {
-    var stored = normaliseMode(read(MODE_KEY));
+    var stored = normalizeMode(read(MODE_KEY));
     return stored === "system" ? "system" : stored;
   }
 
   function scheme() {
-    return normaliseScheme(read(SCHEME_KEY)) || normaliseScheme(DEFAULT_SCHEME) || "desk";
+    return normalizeScheme(read(SCHEME_KEY)) || normalizeScheme(DEFAULT_SCHEME) || "desk";
   }
 
   /** Whether the page is actually dark right now, including "follow the machine". */
@@ -97,7 +97,7 @@
     apply: apply,
 
     setMode: function (next) {
-      var picked = normaliseMode(next);
+      var picked = normalizeMode(next);
       write(MODE_KEY, picked === "system" ? "" : picked);
       apply(picked, read(SCHEME_KEY));
       notify();
@@ -105,7 +105,7 @@
     },
 
     setScheme: function (next) {
-      var picked = normaliseScheme(next) || normaliseScheme(DEFAULT_SCHEME) || "desk";
+      var picked = normalizeScheme(next) || normalizeScheme(DEFAULT_SCHEME) || "desk";
       write(SCHEME_KEY, picked);
       apply(read(MODE_KEY), picked);
       notify();

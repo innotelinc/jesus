@@ -68,6 +68,32 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Anchor jumps glide instead of snapping. */
+  scroll-behavior: smooth;
+}
+
+/*
+   No visible scrollbars anywhere: the content still scrolls, it just does not
+   wear a gray track down the side of every panel. `scrollbar-width: none`
+   covers Firefox, the pseudo-elements cover Chromium and Safari, and the
+   scroll-gutter property keeps a long page from shifting sideways when the bar
+   goes away.
+*/
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+html,
+body {
+  scrollbar-gutter: auto;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -124,17 +150,12 @@ button, input, select, textarea {
   color: var(--text);
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
-}
-*::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-full);
-  border: 3px solid transparent;
-  background-clip: content-box;
-}
+/*
+   Deliberately no scrollbar styling here. An earlier block sets
+   `scrollbar-width: none` and a zero-width webkit scrollbar; a second `*`
+   rule down here used to put a 10px `thin` bar back on every element and won
+   on specificity order, which is what made bars reappear. Leave it out.
+*/
 
 .sr-only {
   position: absolute;
@@ -1319,7 +1340,16 @@ table.table {
   box-shadow: var(--shadow-1);
 }
 .price-card.featured { border-color: rgba(111, 102, 255, 0.5); box-shadow: 0 22px 60px -34px rgba(111, 102, 255, 0.7); }
-.price-card h2 { font-size: 1.05rem; }
+.price-card h2,
+.price-card h3,
+.price-card h4 { font-size: 1.05rem; font-weight: 620; letter-spacing: -0.01em; }
+
+/* Two ladders on one page: a heading and a line of copy above each grid. */
+.plan-group { display: flex; flex-direction: column; gap: 12px; }
+.plan-group + .plan-group { margin-top: 34px; }
+.plan-group-head { display: flex; flex-direction: column; gap: 2px; }
+.plan-group-head h2,
+.plan-group-head h3 { font-size: 1.15rem; }
 .price-row { display: flex; align-items: baseline; gap: 4px; }
 .price-row strong { font-size: 1.9rem; letter-spacing: -0.02em; }
 .plan-features { list-style: none; display: flex; flex-direction: column; gap: 7px; margin: 4px 0 10px; padding: 0; }
@@ -1657,3 +1687,81 @@ table.table {
   .site-actions .btn.ghost { display: none; }
   .site-foot nav { margin-left: 0; }
 }
+
+/* ==========================================================================
+   Customer portal
+   The subscriber's own surface: one column of cards, no operator chrome, and
+   the softphone inline so a customer never needs to find the console.
+   ========================================================================== */
+
+.portal {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px clamp(14px, 4vw, 40px) 48px;
+  max-width: 1080px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.portal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.portal-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.portal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.portal-tab:hover { color: var(--text); background: var(--surface-hover); }
+.portal-tab.on { background: var(--accent-soft); color: #c9c4ff; }
+
+.portal-dot {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--warning);
+  color: #21160a;
+  font-size: 0.66rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.portal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.portal-body .btn { width: auto; }

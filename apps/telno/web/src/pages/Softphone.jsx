@@ -160,7 +160,24 @@ export default function Softphone() {
   useEffect(() => {
     (async () => {
       try {
-        const [statusData, extData] = await Promise.all([api.get('/softphone/status'), api.get('/extensions')]);
+        const [statusData, extData] = await Promise.all([
+          api.get('/softphone/status'),
+          // A customer has no reach into the switch inventory, so the console's
+          // extension list is not theirs to read; their own lines come from the
+          // customer endpoint instead, in the same shape.
+          api.get('/extensions').catch(async () => {
+            const me = await api.get('/me');
+            return {
+              items: (me.lines || []).map((line) => ({
+                id: line.id,
+                extension: line.extension,
+                displayName: line.displayName,
+                enabled: line.enabled,
+                voicemail: line.voicemail,
+              })),
+            };
+          }),
+        ]);
         setStatus(statusData);
         const enabled = (extData.items || []).filter((row) => row.enabled !== false);
         setExtensions(enabled);
@@ -510,16 +527,16 @@ export default function Softphone() {
   useEffect(() => {
     if (regState !== 'registered' || !('wakeLock' in navigator)) return undefined;
     let lock = null;
-    let cancelled = false;
+    let canceled = false;
     navigator.wakeLock
       .request('screen')
       .then((granted) => {
-        if (cancelled) granted.release?.();
+        if (canceled) granted.release?.();
         else lock = granted;
       })
       .catch(() => {});
     return () => {
-      cancelled = true;
+      canceled = true;
       lock?.release?.().catch?.(() => {});
     };
   }, [regState]);
@@ -755,7 +772,7 @@ export default function Softphone() {
       {!tlsReady ? (
         <Card title="The switch has no TLS certificate" subtitle="WebSocket signaling cannot start until it does">
           <p className="tiny muted">
-            Generate one by applying the configuration (Telephony → Apply config), or point
+            Generate one by saving any extension, which rewrites the switch configuration, or point
             <code> SOFTPHONE_TLS_CERT</code> and <code>SOFTPHONE_TLS_KEY</code> at a real certificate.
             Browsers will refuse an encrypted WebSocket to a host with no certificate at all.
           </p>

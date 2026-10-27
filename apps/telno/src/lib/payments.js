@@ -181,7 +181,7 @@ const PAYABLE_SQL = "('open', 'overdue')";
 /** Everything Stripe needs to know about who is paying and for what. */
 function checkoutParams({ invoices, email, reference, invoiceIds }) {
   const success = `${base()}/api/public/pay/return?status=paid&session_id={CHECKOUT_SESSION_ID}`;
-  const cancel = `${base()}/api/public/pay/return?status=cancelled`;
+  const cancel = `${base()}/api/public/pay/return?status=canceled`;
   const params = {
     mode: 'payment',
     success_url: success,
@@ -227,7 +227,7 @@ export async function checkoutForSubscription({ plan, account, subscriptionId, o
   const params = {
     mode: 'subscription',
     success_url: `${site}/subscribe?status=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${site}/subscribe?status=cancelled`,
+    cancel_url: `${site}/subscribe?status=canceled`,
     customer_email: account.email,
     client_reference_id: account.id,
     'line_items[0][quantity]': 1,
@@ -424,7 +424,7 @@ export function applyCheckoutSession(session) {
 /** The URL Stripe has to call, built from the same base as the notice links. */
 export const webhookUrl = () => `${base()}${WEBHOOK_PATH}`;
 
-/** Enough of a key to recognise it, never enough to use it. */
+/** Enough of a key to recognize it, never enough to use it. */
 const maskKey = (value) =>
   String(value).length <= 8 ? '••••' : `${String(value).slice(0, 8)}…${String(value).slice(-4)}`;
 
@@ -516,7 +516,7 @@ export async function testConnection() {
       const probe = await stripePost('/v1/checkout/sessions', {
         mode: 'payment',
         success_url: `${base()}/api/public/pay/return?status=paid`,
-        cancel_url: `${base()}/api/public/pay/return?status=cancelled`,
+        cancel_url: `${base()}/api/public/pay/return?status=canceled`,
         'line_items[0][quantity]': 1,
         'line_items[0][price_data][currency]': 'usd',
         'line_items[0][price_data][unit_amount]': MIN_CHARGE_CENTS,
@@ -616,7 +616,7 @@ export async function testConnection() {
           'Subscription events',
           missingSubscriptions.length ? 'warn' : 'pass',
           missingSubscriptions.length
-            ? `Not subscribed to ${missingSubscriptions.join(', ')} — the portal will not learn about lapsed or cancelled subscriptions until it does.`
+            ? `Not subscribed to ${missingSubscriptions.join(', ')} — the portal will not learn about lapsed or canceled subscriptions until it does.`
             : 'Renewals, cancellations and failed payments reach the portal gate.'
         );
       }

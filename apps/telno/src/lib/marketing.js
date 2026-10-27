@@ -48,7 +48,7 @@ export const TEMPLATES = [
   {
     id: 'winback',
     name: 'Win-back',
-    goal: 'Bring back a customer who left or cancelled in the last year.',
+    goal: 'Bring back a customer who left or canceled in the last year.',
     script:
       'Hi, this is Alex from Innotel Labs. We used to look after the phones for your business and I am not calling to sell you anything today. ' +
       'I am checking whether the reason you left is something we have since fixed. Can I ask what the old setup got wrong? ' +
@@ -64,7 +64,7 @@ export const TEMPLATES = [
     name: 'Lead qualification',
     goal: 'Find out whether an inbound lead has a real requirement and a budget.',
     script:
-      'Hi, this is Alex from Innotel Labs returning your enquiry about business phone service. ' +
+      'Hi, this is Alex from Innotel Labs returning your inquiry about business phone service. ' +
       'So I point you at the right thing: how many people need a line, and are they in one office or several? ' +
       'Who handles the phone bill today? And is there a date you need this working by?',
     tips: [
@@ -416,7 +416,7 @@ export async function finishContact(contactId, { status, outcome, transcript, du
   );
 
   const fresh = db_.get('SELECT * FROM campaign_contacts WHERE id = ?', [contact.id]);
-  // A do-not-call is not graded; it is honoured, and the number is added to the
+  // A do-not-call is not graded; it is honored, and the number is added to the
   // platform-wide opt-out list so no future campaign can dial it either.
   if (nextStatus === 'do_not_call' || outcome === 'do-not-call') {
     db_.run(

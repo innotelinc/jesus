@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 /**
- * Session state, in three flavours rather than two:
+ * Session state, in three flavors rather than two:
  *
  *   ready  a session that can use the console
  *   unpaid a real session whose subscription is not in force — it can see the

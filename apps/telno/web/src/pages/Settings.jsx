@@ -173,20 +173,6 @@ export default function Settings() {
     }
   };
 
-  const apply = async () => {
-    setApplying(true);
-    try {
-      const result = await api.post('/system/apply', {});
-      toast.success(result.written ? 'Configuration written' : 'Nothing written', result.written ? result.dir : result.reason);
-      const refreshed = await api.get(`/system/config-preview?file=${configFile}`);
-      setConfig(refreshed.content);
-    } catch (err) {
-      toast.error('Apply failed', err.message);
-    } finally {
-      setApplying(false);
-    }
-  };
-
   const emailStatus =
     vault.channels?.email || status?.channels?.email || { provider: 'console', configured: false, providers: {} };
   const keySecret = vault.items.find((item) => item.name === 'RESEND_API_KEY');
@@ -503,24 +489,25 @@ export default function Settings() {
 
       <Card
         title="Generated switch configuration"
-        subtitle={status?.telephony?.configDir ? `Written to ${status.telephony.configDir}` : 'ASTERISK_CONFIG_DIR is not set'}
+        subtitle={
+          status?.telephony?.configDir
+            ? `Written to ${status.telephony.configDir} and reloaded as changes are saved`
+            : 'ASTERISK_CONFIG_DIR is not set'
+        }
         actions={
-          <>
-            <select
-              className="select"
-              style={{ width: 160 }}
-              value={configFile}
-              onChange={(event) => setConfigFile(event.target.value)}
-              aria-label="Configuration file"
-            >
-              {CONFIG_FILES.map((file) => (
-                <option key={file} value={file}>{file}</option>
-              ))}
-            </select>
-            <Button size="sm" variant="primary" icon="check" onClick={apply} loading={applying}>
-              Apply
-            </Button>
-          </>
+          // Read-only on purpose: saving an extension, trunk or menu writes and
+          // reloads the switch by itself, so this is a window, not a button.
+          <select
+            className="select"
+            style={{ width: 160 }}
+            value={configFile}
+            onChange={(event) => setConfigFile(event.target.value)}
+            aria-label="Configuration file"
+          >
+            {CONFIG_FILES.map((file) => (
+              <option key={file} value={file}>{file}</option>
+            ))}
+          </select>
         }
       >
         <pre
@@ -824,7 +811,7 @@ export default function Settings() {
 
       <Card
         title="Branding"
-        subtitle="The name, vendor and colour the site, console, signup page and reports use"
+        subtitle="The name, vendor and color the site, console, signup page and reports use"
         actions={
           brandForm ? (
             <Button size="sm" variant="primary" icon="check" loading={savingBrand} onClick={saveBrand}>
@@ -867,7 +854,7 @@ export default function Settings() {
             />
             <div className="grid three">
               <Input
-                label="Accent colour"
+                label="Accent color"
                 value={brandForm.accent}
                 onChange={(event) => setBrandForm({ ...brandForm, accent: event.target.value })}
                 hint="Six-digit hex, e.g. #6f66ff."
@@ -1009,7 +996,7 @@ export default function Settings() {
               type="url"
               autoComplete="off"
               placeholder={secretByName('MAGNATE_WEBHOOK_URL') ? `Stored ${secretByName('MAGNATE_WEBHOOK_URL').hint}` : 'https://…/hooks/telno'}
-              hint="Every plan change is posted here, so the catalogue is never retyped by hand."
+              hint="Every plan change is posted here, so the catalog is never retyped by hand."
               value={magnateHook}
               onChange={(event) => setMagnateHook(event.target.value)}
             />

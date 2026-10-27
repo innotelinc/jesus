@@ -133,8 +133,13 @@ function CreateTrunk({ onClose, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      await api.post('/trunks', form);
-      toast.success('Trunk added', 'Apply config to register it with the switch');
+      const result = await api.post('/trunks', form);
+      toast.success(
+        'Trunk added',
+        result.applied?.error
+          ? `Saved, but the switch did not reload: ${result.applied.error}`
+          : 'Written to pjsip.conf and registered with the switch'
+      );
       onSaved();
       onClose();
     } catch (err) {

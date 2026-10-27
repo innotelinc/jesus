@@ -60,6 +60,9 @@ const planBody = (body) => ({
   seats: body.seats === undefined ? undefined : v.integer(body.seats, { name: 'seats', min: 1, max: 100_000 }),
   includedMinutes:
     body.includedMinutes === undefined ? undefined : v.integer(body.includedMinutes, { name: 'includedMinutes', min: 0, max: 10_000_000 }),
+  // Flat rate by default: an operator has to deliberately ask for a meter.
+  minutesUnlimited: body.minutesUnlimited === undefined ? undefined : body.minutesUnlimited ? 1 : 0,
+  audience: body.audience === undefined ? undefined : v.oneOf(body.audience, ['business', 'residential'], 'audience'),
   active: body.active === undefined ? undefined : body.active ? 1 : 0,
   sortOrder: body.sortOrder === undefined ? undefined : v.integer(body.sortOrder, { name: 'sortOrder', min: 0, max: 10_000 }),
   features: Array.isArray(body.features) ? body.features.map((key) => String(key)) : undefined,
@@ -491,7 +494,7 @@ export default async function portalRoutes(app) {
     };
   });
 
-  /** Re-seed the starter catalogue. Idempotent: only ever adds what is missing. */
+  /** Re-seed the starter catalog. Idempotent: only ever adds what is missing. */
   app.post('/plans/seed', { preHandler: requireOwner }, async () => {
     seedCommerce();
     return { plans: listPlans(), features: listFeatures() };

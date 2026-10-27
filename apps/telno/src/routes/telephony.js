@@ -5,7 +5,7 @@ import { resolveNumber } from '../lib/registry.js';
 import { badRequest, notFound, conflict } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
-import { liveChannels } from '../telephony/index.js';
+import { applyAfterChange, liveChannels } from '../telephony/index.js';
 
 const extensionView = (row) => ({
   id: row.id,
@@ -19,6 +19,10 @@ const extensionView = (row) => ({
   // True only when billing switched this extension off; reinstatement relies on
   // the same flag, so the screen can say why a line is dark.
   suspendedByBilling: !!row.suspended_by_billing,
+  // Empty for a platform or staff line, which is every line an operator made
+  // before customers could hold one.
+  accountId: row.account_id || '',
+  accountEmail: row.account_email || '',
   numberId: row.number_id,
   number: row.e164 ? formatNumber(row.e164) : '',
   e164: row.e164 || '',
@@ -74,18 +78,50 @@ export default async function telephonyRoutes(app) {
   });
   const requireWrite = app.requireRole('owner', 'operator');
 
+  /**
+   * Write the switch configuration and reload it.
+   *
+   * Every change in this file alters a generated file, so there is no Apply
+   * button to forget: a saved change is a live change. The shared helper does
+   * the write and reports a failure without rolling the row back, because the
+   * row is what commits and the switch is rebuilt from it.
+   */
+  const syncSwitch = (request) => applyAfterChange(request);
+
+  /**
+   * A route whose success rewrites the switch configuration. The handler runs
+   * first, so a rejected request never touches the switch, and the reply says
+   * whether the change reached it.
+   */
+  const writeRoute = (method, url, options, handler) =>
+    app[method](url, options, async (request, reply) => {
+      const result = await handler(request, reply);
+      const applied = await syncSwitch(request);
+      return applied ? { ...(result || {}), applied } : result;
+    });
+
   // ------------------------------------------------------------ extensions --
   app.get('/extensions', async () => ({
     items: db_
       .all(
-        `SELECT e.*, n.e164 FROM extensions e
+        `SELECT e.*, n.e164, a.email AS account_email FROM extensions e
            LEFT JOIN numbers n ON n.id = e.number_id
+           LEFT JOIN accounts a ON a.id = e.account_id
           ORDER BY CAST(e.extension AS INTEGER), e.extension`
       )
       .map(extensionView),
   }));
 
-  app.post('/extensions', { preHandler: requireWrite }, async (request, reply) => {
+  /** Resolve the account an extension belongs to, by email. */
+  function ownerId(raw) {
+    const email = v.str(raw, { name: 'account', max: 160, required: false });
+    if (!email) return null;
+    const target = db_.get('SELECT id FROM accounts WHERE email = ?', [email]);
+    if (!target) throw notFound(`No account with the email ${email}`);
+    return target.id;
+  }
+
+  writeRoute('post', '/extensions', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
     const extension = v.str(body.extension, { name: 'extension', max: 6, pattern: /^\d{2,6}$/ });
     if (db_.get('SELECT id FROM extensions WHERE extension = ?', [extension])) {
@@ -94,8 +130,9 @@ export default async function telephonyRoutes(app) {
     const id = newId('ext_');
     const secret = v.str(body.secret, { name: 'secret', min: 8, max: 64, required: false }) || randomBytes(9).toString('base64url');
     db_.run(
-      `INSERT INTO extensions (id, extension, display_name, number_id, email, secret, voicemail, dnd, forward_to, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO extensions (id, extension, display_name, number_id, email, secret, voicemail, dnd,
+                               forward_to, enabled, account_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         extension,
@@ -107,18 +144,22 @@ export default async function telephonyRoutes(app) {
         v.bool(body.dnd, false) ? 1 : 0,
         v.str(body.forwardTo, { name: 'forwardTo', max: 10, required: false }),
         v.bool(body.enabled, true) ? 1 : 0,
+        ownerId(body.account),
       ]
     );
     logEvent({ actor: request.account.email, action: 'telephony.extension_created', subject: extension, ip: request.ip });
     reply.status(201);
     const row = db_.get(
-      'SELECT e.*, n.e164 FROM extensions e LEFT JOIN numbers n ON n.id = e.number_id WHERE e.id = ?',
+      `SELECT e.*, n.e164, a.email AS account_email FROM extensions e
+         LEFT JOIN numbers n ON n.id = e.number_id
+         LEFT JOIN accounts a ON a.id = e.account_id
+        WHERE e.id = ?`,
       [id]
     );
     return { extension: extensionView(row), secret };
   });
 
-  app.patch('/extensions/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('patch', '/extensions/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM extensions WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Extension not found');
     const body = request.body || {};
@@ -130,19 +171,24 @@ export default async function telephonyRoutes(app) {
     if (body.enabled !== undefined) patch.enabled = v.bool(body.enabled) ? 1 : 0;
     if (body.forwardTo !== undefined) patch.forward_to = v.str(body.forwardTo, { name: 'forwardTo', max: 10, required: false });
     if (body.number !== undefined) patch.number_id = body.number ? linkNumber(body.number) : null;
+    if (body.account !== undefined) patch.account_id = ownerId(body.account);
     if (body.secret !== undefined) patch.secret = v.str(body.secret, { name: 'secret', min: 8, max: 64 });
     if (!Object.keys(patch).length) throw badRequest('Nothing to update');
 
     const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
     db_.run(`UPDATE extensions SET ${sets}, updated_at = ? WHERE id = ?`, [...Object.values(patch), now(), row.id]);
     logEvent({ actor: request.account.email, action: 'telephony.extension_updated', subject: row.extension, ip: request.ip });
-    const fresh = db_.get('SELECT e.*, n.e164 FROM extensions e LEFT JOIN numbers n ON n.id = e.number_id WHERE e.id = ?', [
-      row.id,
-    ]);
+    const fresh = db_.get(
+      `SELECT e.*, n.e164, a.email AS account_email FROM extensions e
+         LEFT JOIN numbers n ON n.id = e.number_id
+         LEFT JOIN accounts a ON a.id = e.account_id
+        WHERE e.id = ?`,
+      [row.id]
+    );
     return { extension: extensionView(fresh) };
   });
 
-  app.delete('/extensions/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('delete', '/extensions/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM extensions WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Extension not found');
     db_.run('DELETE FROM extensions WHERE id = ?', [row.id]);
@@ -150,7 +196,7 @@ export default async function telephonyRoutes(app) {
     return { ok: true };
   });
 
-  app.post('/extensions/:id/rotate-secret', { preHandler: requireWrite }, async (request) => {
+  writeRoute('post', '/extensions/:id/rotate-secret', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM extensions WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Extension not found');
     const secret = randomBytes(9).toString('base64url');
@@ -164,7 +210,7 @@ export default async function telephonyRoutes(app) {
     items: db_.all('SELECT * FROM trunks ORDER BY name').map(trunkView),
   }));
 
-  app.post('/trunks', { preHandler: requireWrite }, async (request, reply) => {
+  writeRoute('post', '/trunks', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
     const name = v.str(body.name, { name: 'name', max: 40, pattern: /^[A-Za-z0-9_.-]+$/ });
     if (db_.get('SELECT id FROM trunks WHERE name = ?', [name])) throw conflict(`Trunk ${name} already exists`);
@@ -190,7 +236,7 @@ export default async function telephonyRoutes(app) {
     return { trunk: trunkView(db_.get('SELECT * FROM trunks WHERE id = ?', [id])) };
   });
 
-  app.patch('/trunks/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('patch', '/trunks/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM trunks WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Trunk not found');
     const body = request.body || {};
@@ -209,7 +255,7 @@ export default async function telephonyRoutes(app) {
     return { trunk: trunkView(db_.get('SELECT * FROM trunks WHERE id = ?', [row.id])) };
   });
 
-  app.delete('/trunks/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('delete', '/trunks/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM trunks WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Trunk not found');
     db_.run('DELETE FROM trunks WHERE id = ?', [row.id]);
@@ -220,7 +266,7 @@ export default async function telephonyRoutes(app) {
   // ------------------------------------------------------------------ IVRs --
   app.get('/ivr', async () => ({ items: db_.all('SELECT * FROM ivr_flows ORDER BY name').map(ivrView) }));
 
-  app.post('/ivr', { preHandler: requireWrite }, async (request, reply) => {
+  writeRoute('post', '/ivr', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
     const extension = v.str(body.extension, { name: 'extension', max: 6, pattern: /^\d{2,6}$/ });
     if (db_.get('SELECT id FROM ivr_flows WHERE extension = ?', [extension])) {
@@ -249,7 +295,7 @@ export default async function telephonyRoutes(app) {
     return { ivr: ivrView(db_.get('SELECT * FROM ivr_flows WHERE id = ?', [id])) };
   });
 
-  app.patch('/ivr/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('patch', '/ivr/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM ivr_flows WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('IVR not found');
     const body = request.body || {};
@@ -266,7 +312,7 @@ export default async function telephonyRoutes(app) {
     return { ivr: ivrView(db_.get('SELECT * FROM ivr_flows WHERE id = ?', [row.id])) };
   });
 
-  app.delete('/ivr/:id', { preHandler: requireWrite }, async (request) => {
+  writeRoute('delete', '/ivr/:id', { preHandler: requireWrite }, async (request) => {
     const row = db_.get('SELECT * FROM ivr_flows WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('IVR not found');
     db_.run('DELETE FROM ivr_flows WHERE id = ?', [row.id]);

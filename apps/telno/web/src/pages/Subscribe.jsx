@@ -160,43 +160,64 @@ export default function Subscribe({ locked = null, user = null }) {
         </p>
       </section>
 
-      <div className="pricing-grid">
-        {plans.map((plan) => (
-          <div key={plan.id} className={`price-card${plan.isDefault ? ' featured' : ''}`}>
-            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <h2>{plan.name}</h2>
-              {plan.isDefault ? <Badge tone="success">Most chosen</Badge> : null}
+      {/*
+        Two ladders, not one list: a household should not have to read the
+        business tiers to find its own, and the headings say which is which.
+      */}
+      {[
+        { audience: 'business', title: 'For business', blurb: 'Flat monthly rate, unlimited calling, cancel any time.' },
+        { audience: 'residential', title: 'For home', blurb: 'The same switch and the same encryption, priced for a household.' },
+      ].map((group) => {
+        const groupPlans = plans.filter((plan) => (plan.audience || 'business') === group.audience);
+        if (!groupPlans.length) return null;
+        return (
+          <section key={group.audience} className="plan-group">
+            <div className="plan-group-head">
+              <h2>{group.title}</h2>
+              <p className="tiny dim">{group.blurb}</p>
             </div>
-            <div className="price-row">
-              <strong>{money(plan.priceCents, plan.currency)}</strong>
-              <span className="tiny dim">/{plan.interval}</span>
-            </div>
-            <p className="tiny muted">{plan.tagline}</p>
-            <div className="row wrap" style={{ gap: 10 }}>
-              <span className="tiny dim">{plan.seats} seats</span>
-              <span className="tiny dim">·</span>
-              <span className="tiny dim">{plan.includedMinutes.toLocaleString()} minutes</span>
-            </div>
-            <ul className="plan-features">
-              {plan.features.map((feature) => (
-                <li key={feature.key}>
-                  <Icon name="check" size={13} /> {feature.label}
-                </li>
+            <div className="pricing-grid">
+              {groupPlans.map((plan) => (
+                <div key={plan.id} className={`price-card${plan.isDefault ? ' featured' : ''}`}>
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <h3>{plan.name}</h3>
+                    {plan.isDefault ? <Badge tone="success">Most chosen</Badge> : null}
+                  </div>
+                  <div className="price-row">
+                    <strong>{money(plan.priceCents, plan.currency)}</strong>
+                    <span className="tiny dim">/{plan.interval}</span>
+                  </div>
+                  <p className="tiny muted">{plan.tagline}</p>
+                  <div className="row wrap" style={{ gap: 10 }}>
+                    <span className="tiny dim">
+                      {plan.minutesUnlimited ? 'Unlimited minutes' : `${plan.includedMinutes.toLocaleString()} minutes`}
+                    </span>
+                    <span className="tiny dim">·</span>
+                    <span className="tiny dim">Flat rate</span>
+                  </div>
+                  <ul className="plan-features">
+                    {plan.features.map((feature) => (
+                      <li key={feature.key}>
+                        <Icon name="check" size={13} /> {feature.label}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    variant={plan.isDefault ? 'primary' : ''}
+                    onClick={() => {
+                      setChosen(plan);
+                      setError('');
+                    }}
+                  >
+                    Choose {plan.name}
+                  </Button>
+                </div>
               ))}
-            </ul>
-            <Button
-              variant={plan.isDefault ? 'primary' : ''}
-              onClick={() => {
-                setChosen(plan);
-                setError('');
-              }}
-            >
-              Choose {plan.name}
-            </Button>
-          </div>
-        ))}
-        {!plans.length ? <p className="muted">No plans are on sale yet.</p> : null}
-      </div>
+            </div>
+          </section>
+        );
+      })}
+      {!plans.length ? <p className="muted">No plans are on sale yet.</p> : null}
 
       <footer className="public-foot">
         <span>

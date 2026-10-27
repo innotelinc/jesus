@@ -196,7 +196,7 @@ const ENTRIES = [
   { number: '+81 3 1234 5678', name: 'Sakura Logistics', kind: 'business', category: 'Logistics', city: 'Tokyo', country: 'JP' },
   { number: '+86 10 1234 5678', name: 'Jade Bridge Trading', kind: 'business', category: 'Import/export', city: 'Beijing', country: 'CN' },
   { number: '+91 98765 43210', name: 'Mehta Textiles', kind: 'business', category: 'Textiles', city: 'Mumbai', country: 'IN' },
-  { number: '+61 2 9374 4000', name: 'Harbour Freight', kind: 'business', category: 'Logistics', city: 'Sydney', country: 'AU' },
+  { number: '+61 2 9374 4000', name: 'Harbor Freight', kind: 'business', category: 'Logistics', city: 'Sydney', country: 'AU' },
   { number: '+64 9 123 4567', name: 'Kauri Analytics', kind: 'business', category: 'Software', city: 'Auckland', country: 'NZ' },
   { number: '+55 11 91234 5678', name: 'Cafe Paulista', kind: 'business', category: 'Cafe', city: 'Sao Paulo', country: 'BR' },
   { number: '+52 55 1234 5678', name: 'Casa Azul', kind: 'business', category: 'Hospitality', city: 'Mexico City', country: 'MX' },
@@ -470,7 +470,7 @@ const VOICEMAILS = [
 const FAXES = [
   ['fax_1', 'inbound', '+12125550142', '', 4, 'received', 'Signed service agreement', 'agreement-2026.pdf', 1],
   ['fax_2', 'outbound', '', '+442079460111', 2, 'sent', 'Porting confirmation', 'port-confirm.pdf', 2],
-  ['fax_3', 'inbound', '+4930901820', '', 9, 'received', 'VAT certificate', 'vat-de.pdf', 4],
+  ['fax_3', 'inbound', '+4930901820', '', 9, 'received', 'Tax certificate', 'tax-de.pdf', 4],
   ['fax_4', 'outbound', '', '+14155550111', 1, 'failed', 'Number change notice', 'change-notice.pdf', 0],
   ['fax_5', 'inbound', '+12125550142', '', 1, 'received', 'Porting window confirmed', '', 5],
 ];

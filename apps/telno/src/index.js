@@ -55,7 +55,7 @@ function ensureOwner() {
 
 ensureOwner();
 // A fresh install has something to sell: the starter plans and the feature
-// catalogue are inserted only when they are missing, so an operator's edits are
+// catalog are inserted only when they are missing, so an operator's edits are
 // never overwritten by a restart.
 seedCommerce();
 // The brand defaults are rows too: a white-label deployment edits them in

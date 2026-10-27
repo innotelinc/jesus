@@ -10,7 +10,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createHmac } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -550,6 +550,42 @@ const newExtension = await call('POST', '/api/extensions', {
   voicemail: true,
 });
 check('extension created with a generated secret', newExtension.status === 201 && !!newExtension.body.secret, newExtension.body);
+// There is no Apply button anywhere in the console: saving the row has to be
+// what writes the file and reloads the switch, or a saved endpoint stays dark.
+check(
+  'saving an extension writes the switch config and reloads it, with no apply step',
+  newExtension.body.applied?.written === true &&
+    readFileSync(join(configDir, 'pjsip.conf'), 'utf8').includes('[299]'),
+  newExtension.body.applied
+);
+
+// A DID is just a number joined to an extension, so the number routes have to
+// write the switch as well. Without that, a new DID stays unroutable until
+// somebody presses Apply — and there is no Apply button to press any more.
+const switchNumber = await call('POST', '/api/numbers', {
+  number: '+14155550198',
+  name: 'Switch Smoke Line',
+  visibility: 'unlisted',
+});
+check(
+  'creating a number rewrites the switch config with no apply step',
+  switchNumber.body.applied?.written === true,
+  switchNumber.body.applied
+);
+
+const linked = await call('PATCH', `/api/extensions/${newExtension.body.extension.id}`, { number: '+14155550198' });
+check(
+  'a number linked to an extension lands in the generated dialplan',
+  linked.status === 200 && readFileSync(join(configDir, 'extensions.conf'), 'utf8').includes('+14155550198'),
+  linked.body
+);
+
+const unlinked = await call('DELETE', `/api/numbers/${switchNumber.body.number.id}`);
+check(
+  'deleting the number takes the DID back out of the dialplan',
+  unlinked.status === 200 && !readFileSync(join(configDir, 'extensions.conf'), 'utf8').includes('+14155550198'),
+  unlinked.body
+);
 
 const rotate = await call('POST', `/api/extensions/${newExtension.body.extension?.id}/rotate-secret`, {});
 check('secret can be rotated', rotate.status === 200 && !!rotate.body.secret, rotate.body);
@@ -806,7 +842,7 @@ check(
 // route: the HTML and the text part have to agree on the amount and the date.
 const rendered = invoiceEmail({
   invoice_no: 'INV-2026-0099',
-  account_name: 'Harbour & Finch Ltd',
+  account_name: 'Harbor & Finch Ltd',
   period_start: '2026-01-01T00:00:00.000Z',
   period_end: '2026-01-31T00:00:00.000Z',
   amount_cents: 13000,
@@ -834,7 +870,7 @@ check(
 const reminder = reminderEmail(
   {
     invoice_no: 'INV-2026-0101',
-    account_name: 'Harbour & Finch Ltd',
+    account_name: 'Harbor & Finch Ltd',
     period_start: '2026-01-01T00:00:00.000Z',
     period_end: '2026-01-31T00:00:00.000Z',
     amount_cents: 13000,
@@ -862,7 +898,7 @@ check(
 );
 check(
   'an account name is escaped rather than injected into the markup',
-  rendered.html.includes('Harbour &amp; Finch Ltd') && !rendered.html.includes('Harbour & Finch Ltd'),
+  rendered.html.includes('Harbor &amp; Finch Ltd') && !rendered.html.includes('Harbor & Finch Ltd'),
   'unescaped'
 );
 
@@ -870,7 +906,7 @@ check(
 const finalNotice = finalNoticeEmail(
   {
     invoice_no: 'INV-2026-0101',
-    account_name: 'Harbour & Finch Ltd',
+    account_name: 'Harbor & Finch Ltd',
     period_start: '2026-01-01T00:00:00.000Z',
     period_end: '2026-01-31T00:00:00.000Z',
     amount_cents: 13000,
@@ -921,7 +957,7 @@ check(
 );
 
 const suspendedMail = suspensionEmail({
-  accountName: 'Harbour & Finch Ltd',
+  accountName: 'Harbor & Finch Ltd',
   email: 'ap@example.com',
   amount: 13000,
   currency: 'USD',
@@ -2203,13 +2239,13 @@ if (startServer) {
   );
 
   // A row created after the archive must be gone once it is put back.
-  const afterwards = `After the archive ${Date.now()}`;
-  await call('POST', '/api/operations/tasks', { title: afterwards, kind: 'change', priority: 'low' });
+  const afterward = `After the archive ${Date.now()}`;
+  await call('POST', '/api/operations/tasks', { title: afterward, kind: 'change', priority: 'low' });
   const beforeRestore = await call('GET', '/api/operations/tasks');
   const beforeTitles = (beforeRestore.body.items || []).map((task) => task.title);
   check(
     'both tasks are in the database before the restore',
-    beforeTitles.includes(marker) && beforeTitles.includes(afterwards),
+    beforeTitles.includes(marker) && beforeTitles.includes(afterward),
     beforeTitles.slice(0, 4)
   );
 
@@ -2247,7 +2283,7 @@ if (startServer) {
   const afterTitles = (afterRestore.body.items || []).map((task) => task.title);
   check('the restored database is served after the restart', afterRestore.status === 200, afterRestore.body);
   check('a row from before the backup is back', afterTitles.includes(marker), afterTitles.slice(0, 4));
-  check('a row created after the archive is gone', !afterTitles.includes(afterwards), afterTitles.slice(0, 4));
+  check('a row created after the archive is gone', !afterTitles.includes(afterward), afterTitles.slice(0, 4));
 
   const cleared = await call('GET', '/api/system/backups');
   check(
@@ -2458,12 +2494,12 @@ const blocked = await call('POST', `/api/marketing/contacts/${firstIds[1]}/outco
   transcript: 'Please stop calling me.',
 });
 check(
-  'a do-not-call is honoured and scores zero, not averaged in',
+  'a do-not-call is honored and scores zero, not averaged in',
   blocked.body.contact?.status === 'do_not_call' && blocked.body.contact?.grade === 0,
   blocked.body.contact
 );
 // Same number, same list, second import: the opt-out is checked before the
-// duplicate, because honouring a do-not-call matters more than tidiness.
+// duplicate, because honoring a do-not-call matters more than tidiness.
 const blockedNumber = blocked.body.contact?.number || '';
 const afterDoNotCall = await call('POST', `/api/marketing/campaigns/${campaignId}/contacts`, {
   text: blockedNumber,
@@ -2541,6 +2577,30 @@ check(
   pricing.body.product === 'Telno' && pricing.body.vendor === 'Innotel Labs',
   { product: pricing.body.product, vendor: pricing.body.vendor }
 );
+// The catalog is flat rate with unlimited calling, and it carries a second
+// ladder for households: a plan that is priced per seat, or one that appears on
+// the wrong shelf, is the thing this asserts against.
+const audienceOf = (plan) => plan.audience || 'business';
+check(
+  'every plan is flat rate with unlimited minutes',
+  pricing.body.plans.every((plan) => plan.minutesUnlimited === true),
+  pricing.body.plans.map((plan) => `${plan.slug}=${plan.minutesUnlimited}`)
+);
+check(
+  'the catalog sells both a business and a residential ladder',
+  pricing.body.plans.filter((plan) => audienceOf(plan) === 'business').length >= 3 &&
+    pricing.body.plans.filter((plan) => audienceOf(plan) === 'residential').length >= 2,
+  pricing.body.plans.map((plan) => `${plan.slug}:${audienceOf(plan)}`)
+);
+const residential = pricing.body.plans.find((plan) => audienceOf(plan) === 'residential');
+check(
+  'a residential plan carries calling and encryption but no campaign machinery',
+  !!residential &&
+    residential.features.some((feature) => feature.key === 'calling') &&
+    residential.features.some((feature) => feature.key === 'encrypted-media') &&
+    !residential.features.some((feature) => feature.key === 'campaigns'),
+  residential?.features.map((feature) => feature.key)
+);
 
 const featureKey = `smoke-feature-${Date.now()}`;
 const newFeature = await call('POST', '/api/features', {
@@ -2549,7 +2609,7 @@ const newFeature = await call('POST', '/api/features', {
   description: 'Created by the smoke suite',
   category: 'calling',
 });
-check('a feature can be added to the catalogue', newFeature.status === 201 && newFeature.body.feature?.key === featureKey, newFeature.body);
+check('a feature can be added to the catalog', newFeature.status === 201 && newFeature.body.feature?.key === featureKey, newFeature.body);
 
 const planSlug = `smoke-plan-${Date.now()}`;
 const newPlan = await call('POST', '/api/plans', {
@@ -2702,7 +2762,10 @@ check(
 const failedRenewal = await postStripeEvent(
   subscriptionEvent('invoice.payment_failed', { id: 'in_smoke_1', subscription: 'sub_test_smoke_1' })
 );
-const afterFailed = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
+// The paid gate is probed on the customer's own surface: /api/calls is the
+// platform's, and a customer is refused that outright whether they are paid or
+// not. What their subscription buys is their own portal.
+const afterFailed = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
 check(
   'a failed renewal closes the portal again',
   failedRenewal.body.ok === true && afterFailed.status === 402,
@@ -2741,7 +2804,7 @@ const parentShaped = await postStripeEvent(
     parent: { subscription_details: { subscription: 'sub_test_smoke_1' } },
   })
 );
-const afterParentFailed = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
+const afterParentFailed = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
 check(
   'a 2025+ invoice failure finds the subscription under the invoice parent',
   parentShaped.body.ok === true && afterParentFailed.status === 402,
@@ -2755,8 +2818,130 @@ check(
   comped.status === 201 && comped.body.subscription?.status === 'active',
   comped.body.subscription
 );
-const afterComp = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
-check('the restored subscription opens the console', afterComp.status === 200, afterComp.status);
+const afterComp = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
+check('the restored subscription opens the customer portal', afterComp.status === 200, afterComp.status);
+
+/* --------------------------------------------------- the customer portal -- */
+// A paying customer is not an operator. Their own line, plan and invoices are
+// theirs; the switch, the registry and the campaigns are not, and the boundary
+// is a single check in the auth plugin rather than a habit of each route.
+
+console.log('\nThe customer portal');
+
+const assignedLine = await call('POST', '/api/extensions', {
+  extension: '296',
+  displayName: 'Subscriber Line',
+  voicemail: true,
+  account: subscriberEmail,
+});
+check(
+  'an operator can assign a line to a customer account',
+  assignedLine.status === 201 && assignedLine.body.extension?.accountEmail === subscriberEmail,
+  assignedLine.body.extension
+);
+
+const customerMe = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
+const customerMeBody = await customerMe.json().catch(() => ({}));
+check(
+  'the portal serves the customer their own line, plan and brand',
+  customerMe.status === 200 &&
+    customerMeBody.lines?.some((line) => line.extension === '296') &&
+    customerMeBody.plan?.slug === 'business' &&
+    !!customerMeBody.brand?.name,
+  { lines: customerMeBody.lines?.map((line) => line.extension), plan: customerMeBody.plan?.slug }
+);
+check(
+  'the portal lists only lines that belong to the customer',
+  (customerMeBody.lines || []).length > 0 &&
+    (customerMeBody.lines || []).every((line) => line.extension === '296'),
+  customerMeBody.lines?.map((line) => line.extension)
+);
+
+const staffSurface = ['/api/calls', '/api/extensions', '/api/numbers', '/api/plans', '/api/system/status', '/api/marketing/campaigns', '/api/estate/sites', '/api/billing/summary'];
+const reached = [];
+for (const path of staffSurface) {
+  const res = await fetch(base + path, { headers: { cookie: subscriberCookie } });
+  reached.push(`${path}=${res.status}`);
+}
+check(
+  'a customer cannot reach platform operations, campaigns or the switch inventory',
+  reached.every((entry) => entry.endsWith('=403')),
+  reached
+);
+
+// The invoice ledger is the one place where a wrong filter shows somebody else
+// their neighbor's bill, so it gets its own two-sided test.
+const ownInvoice = await call('POST', '/api/billing/invoices', {
+  accountName: 'Smoke Subscriber',
+  email: subscriberEmail,
+  periodStart: '2026-10-01',
+  periodEnd: '2026-10-31',
+  amountCents: 7900,
+});
+const otherEmail = `portal-other-${Date.now()}@example.com`;
+await call('POST', '/api/billing/invoices', {
+  accountName: 'Someone Else',
+  email: otherEmail,
+  periodStart: '2026-10-01',
+  periodEnd: '2026-10-31',
+  amountCents: 19900,
+});
+const meWithInvoices = await (await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } })).json();
+check(
+  'the portal shows the customer their own invoices and nobody else\u2019s',
+  ownInvoice.status === 201 &&
+    (meWithInvoices.invoices || []).some((invoice) => invoice.id === ownInvoice.body.invoice?.id) &&
+    (meWithInvoices.invoices || []).every((invoice) => !invoice.number.includes('Someone Else')),
+  meWithInvoices.invoices?.map((invoice) => invoice.number)
+);
+
+// ...whereas the operator still sees the whole ledger.
+const wholeLedger = (await call('GET', '/api/billing/invoices')).body.items || [];
+check(
+  'the operator still sees every invoice on the platform',
+  wholeLedger.some((invoice) => invoice.id === ownInvoice.body.invoice?.id) && wholeLedger.length > 1,
+  wholeLedger.length
+);
+
+const foreignLine = await fetch(`${base}/api/softphone/session`, {
+  method: 'POST',
+  headers: { cookie: subscriberCookie, 'content-type': 'application/json' },
+  body: JSON.stringify({ extension: '101' }),
+});
+check('a customer cannot open a softphone session for another line', foreignLine.status === 403, foreignLine.status);
+
+const ownLine = await fetch(`${base}/api/softphone/session`, {
+  method: 'POST',
+  headers: { cookie: subscriberCookie, 'content-type': 'application/json' },
+  body: JSON.stringify({ extension: '296' }),
+});
+const ownLineBody = await ownLine.json().catch(() => ({}));
+check(
+  'a customer can open a softphone session on their own line, with encrypted media',
+  ownLine.status === 201 && ownLineBody.media?.encryption === 'dtls-srtp' && !!ownLineBody.ticket,
+  { status: ownLine.status, media: ownLineBody.media }
+);
+
+const lineId = (customerMeBody.lines || []).find((line) => line.extension === '296')?.id;
+const selfService = await fetch(`${base}/api/me/line/${lineId}`, {
+  method: 'PATCH',
+  headers: { cookie: subscriberCookie, 'content-type': 'application/json' },
+  body: JSON.stringify({ voicemail: false, displayName: 'Subscriber Desk' }),
+});
+const selfBody = await selfService.json().catch(() => ({}));
+check(
+  'a customer can rename and reconfigure their own line',
+  selfService.status === 200 && selfBody.line?.voicemail === false && selfBody.line?.displayName === 'Subscriber Desk',
+  selfBody.line
+);
+
+const staffLine = (await call('GET', '/api/extensions')).body.items.find((row) => row.extension === '101');
+const foreignPatch = await fetch(`${base}/api/me/line/${staffLine.id}`, {
+  method: 'PATCH',
+  headers: { cookie: subscriberCookie, 'content-type': 'application/json' },
+  body: JSON.stringify({ voicemail: false }),
+});
+check("a customer cannot touch a line that is not theirs", foreignPatch.status === 404, foreignPatch.status);
 
 // Onboarding by hand: the customer who pays by transfer has no checkout page.
 const handEmail = `smoke-hand-${Date.now()}@example.com`;
@@ -2779,7 +2964,7 @@ const handLogin = await call(
   { noCookie: true, bearer: '' }
 );
 const handCookie = (handLogin.headers.get('set-cookie') || '').split(';')[0];
-const handAccess = await fetch(`${base}/api/calls`, { headers: { cookie: handCookie } });
+const handAccess = await fetch(`${base}/api/me`, { headers: { cookie: handCookie } });
 check('the hand-onboarded customer can use the portal immediately', handAccess.status === 200, handAccess.status);
 
 // A staff account is never gated: the owner can still reach everything above.
@@ -2824,7 +3009,7 @@ check(
   { product: pricingAfterRename.body.product, brand: pricingAfterRename.body.brand?.name }
 );
 check(
-  'an accent that is not a hex colour is refused, because it becomes CSS',
+  'an accent that is not a hex color is refused, because it becomes CSS',
   (await call('PUT', '/api/system/brand', { accent: 'red' })).status === 400
 );
 check(

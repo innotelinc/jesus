@@ -42,28 +42,31 @@ const STARTER_FEATURES = [
   ['recording', 'Call recording', 'Kept per direction, per agent', 'compliance', 1, 120],
 ];
 
+/*
+ * One flat price per plan, unlimited calling, no per-seat arithmetic: the
+ * public pages render "Unlimited minutes" and never a meter. `audience` is what
+ * separates the two ladders a customer chooses between.
+ */
 const STARTER_PLANS = [
   {
     slug: 'starter',
     name: 'Starter',
+    audience: 'business',
     tagline: 'One office, one number, everything you need to sound bigger.',
-    description: 'A single site with encrypted calling, voicemail, fax and texting on your own numbers.',
+    description: 'A single site with unlimited encrypted calling, voicemail, fax and texting on your own numbers.',
     price_cents: 2900,
     interval: 'month',
-    seats: 5,
-    included_minutes: 1000,
     features: ['calling', 'voicemail', 'fax', 'sms', 'encrypted-media'],
     sort_order: 10,
   },
   {
     slug: 'business',
     name: 'Business',
+    audience: 'business',
     tagline: 'Video, voice agents and the full console.',
-    description: 'Video calling, AI voice agents and outbound campaigns over the same numbers, for teams that sell on the phone.',
+    description: 'Unlimited calling plus video, AI voice agents and outbound campaigns over the same numbers, for teams that sell on the phone.',
     price_cents: 7900,
     interval: 'month',
-    seats: 25,
-    included_minutes: 5000,
     features: [
       'calling',
       'voicemail',
@@ -82,14 +85,56 @@ const STARTER_PLANS = [
   {
     slug: 'scale',
     name: 'Scale',
+    audience: 'business',
     tagline: 'Multi-site estate, recording and every AI surface.',
     description: 'Everything in Business plus site inventory, per-agent recording and the marketing pipeline with graded reports.',
     price_cents: 19900,
     interval: 'month',
-    seats: 100,
-    included_minutes: 20000,
     features: STARTER_FEATURES.map((feature) => feature[0]),
     sort_order: 30,
+  },
+  {
+    slug: 'home',
+    name: 'Home',
+    audience: 'residential',
+    tagline: 'One home line with unlimited calling.',
+    description: 'Unlimited local and long-distance calling on a number you keep, with voicemail and encrypted audio.',
+    price_cents: 1995,
+    interval: 'month',
+    features: ['calling', 'voicemail', 'encrypted-media'],
+    sort_order: 110,
+  },
+  {
+    slug: 'home-plus',
+    name: 'Home Plus',
+    audience: 'residential',
+    tagline: 'Video calls, texting and fax from the same line.',
+    description: 'Everything in Home plus encrypted video calling, texting and a fax number the household can use.',
+    price_cents: 2995,
+    interval: 'month',
+    features: ['calling', 'voicemail', 'encrypted-media', 'video-calling', 'sms', 'fax'],
+    sort_order: 120,
+  },
+  {
+    slug: 'home-pro',
+    name: 'Home Pro',
+    audience: 'residential',
+    tagline: 'Two lines, a screened answering agent and recordings you keep.',
+    description: 'For a household that runs on the phone: a second line, an AI agent that screens unknown callers, call recording and the secure messaging channel.',
+    price_cents: 4495,
+    interval: 'month',
+    features: [
+      'calling',
+      'voicemail',
+      'encrypted-media',
+      'video-calling',
+      'sms',
+      'fax',
+      'secure-messaging',
+      'voice-agents',
+      'recording',
+    ],
+    sort_order: 130,
   },
 ];
 
@@ -106,9 +151,9 @@ export function seedCommerce() {
     if (db_.get('SELECT id FROM plans WHERE slug = ?', [plan.slug])) continue;
     const id = newId('pln_');
     db_.run(
-      `INSERT INTO plans (id, slug, name, tagline, description, price_cents, currency, interval, seats,
-                          included_minutes, is_default, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, ?)`,
+      `INSERT INTO plans (id, slug, name, tagline, description, price_cents, currency, interval,
+                          seats, included_minutes, minutes_unlimited, audience, is_default, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, 'USD', ?, 1, 0, 1, ?, ?, ?)`,
       [
         id,
         plan.slug,
@@ -117,8 +162,7 @@ export function seedCommerce() {
         plan.description,
         plan.price_cents,
         plan.interval,
-        plan.seats,
-        plan.included_minutes,
+        plan.audience,
         plan.is_default || 0,
         plan.sort_order,
       ]
@@ -154,6 +198,10 @@ export const planView = (row, features = []) => ({
   interval: row.interval,
   seats: row.seats,
   includedMinutes: row.included_minutes,
+  // A flat-rate plan says "unlimited" rather than printing a meter nobody
+  // watches; the flag travels with the plan so every page agrees.
+  minutesUnlimited: !!row.minutes_unlimited,
+  audience: row.audience || 'business',
   isDefault: !!row.is_default,
   active: !!row.active,
   sortOrder: row.sort_order,
@@ -224,6 +272,8 @@ export function savePlan(payload, { id = '' } = {}) {
     interval: payload.interval,
     seats: payload.seats,
     included_minutes: payload.includedMinutes,
+    minutes_unlimited: payload.minutesUnlimited,
+    audience: payload.audience,
     active: payload.active,
     sort_order: payload.sortOrder,
   };
@@ -239,6 +289,8 @@ export function savePlan(payload, { id = '' } = {}) {
       interval: 'interval',
       seats: 'seats',
       included_minutes: 'included_minutes',
+      minutes_unlimited: 'minutes_unlimited',
+      audience: 'audience',
       active: 'active',
       sort_order: 'sort_order',
     };
@@ -261,8 +313,8 @@ export function savePlan(payload, { id = '' } = {}) {
   const newPlanId = newId('pln_');
   db_.run(
     `INSERT INTO plans (id, slug, name, tagline, description, price_cents, currency, interval, seats,
-                        included_minutes, active, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        included_minutes, minutes_unlimited, audience, active, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       newPlanId,
       fields.slug || `plan-${newPlanId.slice(-6)}`,
@@ -274,6 +326,9 @@ export function savePlan(payload, { id = '' } = {}) {
       fields.interval || 'month',
       fields.seats ?? 1,
       fields.included_minutes ?? 0,
+      // A new plan is flat rate with unlimited calling unless told otherwise.
+      fields.minutes_unlimited ?? 1,
+      fields.audience || 'business',
       fields.active ?? 1,
       fields.sort_order ?? 100,
     ]
@@ -347,7 +402,7 @@ export function deleteFeature(key) {
 /**
  * Mirror a plan into the subscriber system of record.
  *
- * Magnate owns the commercial catalogue; this platform owns service. When a
+ * Magnate owns the commercial catalog; this platform owns service. When a
  * plan changes, the change is pushed rather than waiting for a human to retype
  * it. A push that fails is logged and does not block the edit: the public page
  * here has already changed, and a retry is the admin's call.
@@ -562,7 +617,7 @@ export function applySubscriptionEvent(subscription, { deleted = false } = {}) {
   const status = deleted ? 'canceled' : String(subscription.status || row.status);
   const periodEnd = subscriptionPeriodEnd(subscription);
   // 'unpaid' and 'paused' are lapses too: nothing is entitling the account any
-  // more, so they are stored rather than ignored in favour of the old status.
+  // more, so they are stored rather than ignored in favor of the old status.
   const known = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'paused', 'incomplete', 'incomplete_expired'];
   db_.run(
     `UPDATE subscriptions
@@ -683,7 +738,7 @@ export function publicPricing() {
   const brand = publicBrand();
   return {
     // Kept for compatibility with the first shape; the `brand` block is what a
-    // white-labelled page actually renders.
+    // white-labeled page actually renders.
     product: brand.name,
     vendor: brand.vendor,
     brand,
