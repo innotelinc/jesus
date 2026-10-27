@@ -90,9 +90,16 @@ function explain(error, status) {
   const message = String(error?.message || '');
   if (!message) return '';
   if (/WebSocket|1006|transport|connect|certificate/i.test(message)) {
-    // A browser will not let a user "continue anyway" for WSS, so the only two
-    // fixes are trusting the certificate or installing a real one. Say that,
-    // and name the fingerprint the switch is actually presenting.
+    // Two ways the socket can fail, and they want different words. Same-origin
+    // (the default) means the app relays to the switch, so the certificate is
+    // already the one the console loaded over and the fault is behind it. The
+    // switch's own port is the other case, and there the certificate is the
+    // usual reason: a browser offers no way past an untrusted one for WSS.
+    if (status?.relay) {
+      return `No secure WebSocket answered at ${status?.wssUrl}. The app relays this to the switch on ${
+        status?.wssPort || 8089
+      }, so check that Asterisk is running (Get started names its state) and that the relay target is set correctly with SOFTPHONE_WSS_INTERNAL. (${message})`;
+    }
     const fingerprint = status?.tls?.fingerprint ? ` Switch certificate: ${status.tls.fingerprint}.` : '';
     return `No trusted secure WebSocket answered at ${status?.wssUrl}. Publish port ${
       status?.wssPort || 8089

@@ -10,6 +10,7 @@ import { config } from './config.js';
 import { installAuth } from './plugins/auth.js';
 import { HttpError } from './lib/errors.js';
 import { registerRoutes } from './routes/index.js';
+import { registerWssRelay } from './telephony/wssRelay.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'web', 'dist');
@@ -102,6 +103,11 @@ export async function buildApp(opts = {}) {
   });
 
   await app.register(registerRoutes, { prefix: '/api' });
+
+  // SIP over this origin. Registered at the root, before the static handler and
+  // its wildcard, because the softphone connects here and not to the switch's
+  // own port — see the module for why.
+  registerWssRelay(app);
 
   if (existsSync(dist)) {
     // `wildcard: true` matters: with per-file routes a hashed asset built after

@@ -10,6 +10,7 @@ import { badRequest, forbidden, notFound, voiceRequired } from '../lib/errors.js
 import { logEvent } from '../lib/audit.js';
 import { tlsFingerprint, tlsPaths } from '../telephony/provision.js';
 import { ami } from '../telephony/ami.js';
+import { relayUrlFor } from '../telephony/wssRelay.js';
 import * as v from '../lib/validate.js';
 
 /**
@@ -84,12 +85,26 @@ function iceServers(identity) {
 
 const hostOf = (value) => String(value || '').split(',')[0].split(':')[0].trim();
 
+/**
+ * The host in a WebSocket URL, without its port or path.
+ *
+ * A SIP domain is a name, nothing else: when this container relays the socket the
+ * URL is same-origin and carries a path, and `host/ws` used as a domain is a
+ * registration Asterisk refuses.
+ */
+const wsHostOf = (url) => hostOf(String(url || '').replace(/^wss?:\/\//, '').split('/')[0]);
+
 /** SIP identity of the browser endpoint for an extension (see pjsip.conf). */
 const webrtcUser = (extension) => `webrtc-${String(extension).replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 60)}`;
 
 function publicWssUrl(request) {
   if (config.softphone.wssUrl) return config.softphone.wssUrl;
   const host = hostOf(request.headers['x-forwarded-host'] || request.headers.host) || 'localhost';
+  // Same origin while the app relays the socket: that name is served by the
+  // certificate the browser is already on. The switch's own port presents the
+  // certificate Asterisk was given, which is self-signed on a fresh install and
+  // which a browser refuses for a WebSocket without offering a way past it.
+  if (config.softphone.relay) return relayUrlFor(host);
   return `wss://${host}:${config.softphone.wssPort}/ws`;
 }
 
@@ -255,6 +270,10 @@ export default async function softphoneRoutes(app) {
     return {
       enabled: config.softphone.enabled,
       wssUrl: publicWssUrl(request),
+      // How the browser is being told to reach the switch, so the screen can be
+      // accurate about what to fix when nothing answers.
+      relay: config.softphone.relay,
+      wssPort: config.softphone.wssPort,
       video: config.softphone.video,
       tls: { ready: tls.ready, fingerprint: tlsFingerprint() },
       ice: {
@@ -345,7 +364,7 @@ export default async function softphoneRoutes(app) {
         // of the request, so the URI and the auth user must both be the WebRTC
         // endpoint name; sending the bare extension matches the desk endpoint
         // and the call loses DTLS-SRTP.
-        uri: `sip:${webrtcUser(extension.extension)}@${hostOf(wssUrl.replace('wss://', ''))}`,
+        uri: `sip:${webrtcUser(extension.extension)}@${wsHostOf(wssUrl)}`,
         authUser: webrtcUser(extension.extension),
         extensionUser: extension.extension,
         password: extension.secret || `change-me-${extension.extension}`,
