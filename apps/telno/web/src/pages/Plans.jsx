@@ -20,7 +20,7 @@ import {
 /**
  * Plans, features and subscriptions.
  *
- * This is the one place the commercial catalogue changes. Every edit writes to
+ * This is the one place the commercial catalog changes. Every edit writes to
  * the rows the public subscribe page reads, so there is no second copy to keep
  * in step — and a change is pushed to the subscriber system of record when one
  * is configured.
@@ -39,8 +39,9 @@ const BLANK_PLAN = {
   priceCents: 2900,
   currency: 'USD',
   interval: 'month',
-  seats: 5,
-  includedMinutes: 1000,
+  audience: 'business',
+  minutesUnlimited: true,
+  includedMinutes: 0,
   active: true,
   sortOrder: 100,
   features: [],
@@ -84,7 +85,8 @@ export default function Plans() {
             priceCents: plan.priceCents,
             currency: plan.currency,
             interval: plan.interval,
-            seats: plan.seats,
+            audience: plan.audience || 'business',
+            minutesUnlimited: plan.minutesUnlimited !== false,
             includedMinutes: plan.includedMinutes,
             active: plan.active,
             sortOrder: plan.sortOrder,
@@ -105,8 +107,9 @@ export default function Plans() {
         priceCents: Number(planForm.priceCents),
         currency: planForm.currency,
         interval: planForm.interval,
-        seats: Number(planForm.seats),
-        includedMinutes: Number(planForm.includedMinutes),
+        audience: planForm.audience,
+        minutesUnlimited: planForm.minutesUnlimited,
+        includedMinutes: planForm.minutesUnlimited ? 0 : Number(planForm.includedMinutes),
         active: planForm.active,
         sortOrder: Number(planForm.sortOrder),
         features: planForm.features,
@@ -146,7 +149,7 @@ export default function Plans() {
     setBusy(`sync-${plan.id}`);
     try {
       const result = await api.post(`/plans/${plan.id}/sync`, {});
-      if (result.magnate.ok) toast.success('Mirrored', 'The subscriber system has the new catalogue.');
+      if (result.magnate.ok) toast.success('Mirrored', 'The subscriber system has the new catalog.');
       else toast.error('Not mirrored', result.magnate.error === 'magnate_not_configured'
         ? 'Add MAGNATE_WEBHOOK_URL in Settings → Vault to mirror automatically.'
         : result.magnate.error);
@@ -311,9 +314,14 @@ export default function Plans() {
                   {plan.isDefault ? <Badge tone="neutral">Default</Badge> : null}
                 </div>
                 <div className="row wrap" style={{ gap: 6 }}>
-                  <span className="tiny dim">{plan.seats} seats</span>
+                  <Badge tone={plan.audience === 'residential' ? 'neutral' : 'accent'}>{
+                    plan.audience === 'residential' ? 'Home' : 'Business'
+                  }</Badge>
+                  <span className="tiny dim">
+                    {plan.minutesUnlimited ? 'Unlimited minutes' : `${plan.includedMinutes.toLocaleString()} minutes`}
+                  </span>
                   <span className="tiny dim">·</span>
-                  <span className="tiny dim">{plan.includedMinutes.toLocaleString()} minutes</span>
+                  <span className="tiny dim">Flat rate</span>
                 </div>
                 <div className="row wrap" style={{ gap: 4 }}>
                   {plan.features.length ? (
@@ -359,7 +367,7 @@ export default function Plans() {
 
       {tab === 'features' ? (
         <Card
-          title="Feature catalogue"
+          title="Feature catalog"
           subtitle="Every capability a plan can include — one list, read by the admin, the subscribe page and the entitlement check"
           actions={<Button size="sm" icon="plus" onClick={() => setFeatureForm({ key: '', label: '', description: '', category: 'calling', addon: false, sortOrder: 100, active: true })}>New feature</Button>}
           bodyClass=""
@@ -556,20 +564,37 @@ export default function Plans() {
               </Select>
             </div>
             <div className="grid three">
-              <Input
-                label="Seats"
-                type="number"
-                min="1"
-                value={planForm.seats}
-                onChange={(event) => setPlanForm({ ...planForm, seats: event.target.value })}
-              />
-              <Input
-                label="Included minutes"
-                type="number"
-                min="0"
-                value={planForm.includedMinutes}
-                onChange={(event) => setPlanForm({ ...planForm, includedMinutes: event.target.value })}
-              />
+              <Select
+                label="Sold to"
+                value={planForm.audience}
+                onChange={(event) => setPlanForm({ ...planForm, audience: event.target.value })}
+                hint="Which shelf the public pricing page puts it on"
+              >
+                <option value="business">Business</option>
+                <option value="residential">Home</option>
+              </Select>
+              <label className="field">
+                <span className="label">Minutes</span>
+                <span className="row" style={{ gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={planForm.minutesUnlimited}
+                    onChange={(event) => setPlanForm({ ...planForm, minutesUnlimited: event.target.checked })}
+                  />
+                  <span className="tiny">Unlimited — flat rate, no meter</span>
+                </span>
+                {!planForm.minutesUnlimited ? (
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    style={{ marginTop: 6 }}
+                    value={planForm.includedMinutes}
+                    onChange={(event) => setPlanForm({ ...planForm, includedMinutes: event.target.value })}
+                    aria-label="Included minutes"
+                  />
+                ) : null}
+              </label>
               <Input
                 label="Sort order"
                 type="number"

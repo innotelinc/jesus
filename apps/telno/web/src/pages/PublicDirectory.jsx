@@ -86,7 +86,7 @@ export default function PublicDirectory({ host, search }) {
   const brand = useBrand();
   const accent = domain?.accent || brand.accent || '#635bff';
   const style = useMemo(() => ({ '--domain-accent': accent }), [accent]);
-  // A white-labelled deployment must not fall back to the vendor's name on a
+  // A white-labeled deployment must not fall back to the vendor's name on a
   // page its customers reach without signing in.
   const directoryHost = domain?.host || brand.domain;
 

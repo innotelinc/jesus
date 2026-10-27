@@ -42,9 +42,37 @@ function keyFromRequest(request) {
 }
 
 /** Installed directly on the root instance so decorators are visible everywhere. */
+/**
+ * What a customer account is allowed to reach.
+ *
+ * A customer owns a subscription, a line and the softphone on it. Everything
+ * else under /api belongs to the platform: the switch and its inventory, the
+ * registry, the campaigns, the books. Allowing a paid customer to read those
+ * was never a decision anyone made — the console simply had no notion of a
+ * customer — so the surface is named here instead of inherited.
+ */
+const CUSTOMER_PATHS = [
+  /^\/api\/auth(\/|$)/,
+  /^\/api\/me(\/|$)/,
+  /^\/api\/portal(\/|$)/,
+  /^\/api\/softphone(\/|$)/,
+  /^\/api\/public(\/|$)/,
+];
+
 export function installAuth(app) {
   app.decorateRequest('account', null);
   app.decorateRequest('apiKey', null);
+
+  // One choke point, before any route runs: signing a customer in must not sign
+  // them into the operator's console.
+  app.addHook('onRequest', async (request) => {
+    const path = String(request.url || '').split('?')[0];
+    if (!path.startsWith('/api/')) return;
+    const account = app.readSession(request);
+    if (!account || (account.account_kind || 'staff') !== 'customer') return;
+    if (CUSTOMER_PATHS.some((pattern) => pattern.test(path))) return;
+    throw forbidden('That part of the platform is for staff. Your account reaches your own line, plan and invoices.');
+  });
 
   app.decorate('readSession', (request) => {
     const token = readToken(request);

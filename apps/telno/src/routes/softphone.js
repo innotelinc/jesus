@@ -107,11 +107,17 @@ function recordingPolicy(extension) {
   };
 }
 
-function extensionFor(value) {
+function extensionFor(value, account) {
   const text = v.str(value, { name: 'extension', max: 12, required: true });
   const row = db_.get('SELECT * FROM extensions WHERE extension = ?', [text]);
   if (!row) throw notFound(`Extension ${text} does not exist`);
   if (!row.enabled) throw badRequest(`Extension ${text} is disabled`);
+  // A session hands over the endpoint's own SIP secret, so a customer may only
+  // mint one for a line that belongs to them. Staff hold the whole switch and
+  // are not narrowed here.
+  if ((account?.account_kind || 'staff') === 'customer' && row.account_id !== account.id) {
+    throw forbidden(`Extension ${text} is not on your account`);
+  }
   return row;
 }
 
@@ -133,6 +139,16 @@ function broadcast(payload) {
   for (const op of operators.values()) {
     if (op.socket.readyState === 1) op.socket.send(text);
   }
+}
+
+/** The roster an account is allowed to see: everyone for staff, own lines only. */
+function visibleOperators(account) {
+  const all = [...operators.values()];
+  if ((account?.account_kind || 'staff') !== 'customer') return all.map(publicOperator);
+  const mine = new Set(
+    db_.all('SELECT extension FROM extensions WHERE account_id = ?', [account.id]).map((row) => row.extension)
+  );
+  return all.filter((op) => mine.has(op.extension)).map(publicOperator);
 }
 
 const presence = () => ({ type: 'presence', operators: [...operators.values()].map(publicOperator) });
@@ -178,7 +194,9 @@ export default async function softphoneRoutes(app) {
       },
       recordingDir: config.softphone.recordingDir,
       ticketTtlSec: config.softphone.ticketTtlSec,
-      operators: [...operators.values()].map(publicOperator),
+      // Presence is a switch-wide roster: a customer sees their own lines, not
+      // the staff directory they happen to be sharing a switch with.
+      operators: visibleOperators(request.account),
       webSocket: true,
     };
   });
@@ -190,8 +208,8 @@ export default async function softphoneRoutes(app) {
    */
   app.post('/softphone/session', async (request, reply) => {
     if (!config.softphone.enabled) throw forbidden('The softphone is disabled (SOFTPHONE_ENABLED=false)');
-    const extension = extensionFor(request.body?.extension);
     const account = request.account;
+    const extension = extensionFor(request.body?.extension, account);
     const ticket = issueTicket(account, extension);
     const tls = tlsPaths();
     const policy = recordingPolicy(extension);

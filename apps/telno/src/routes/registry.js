@@ -4,6 +4,21 @@ import { resolveNumber, addListing, listingsFor, mergeNumbers, normalizeName } f
 import { notFound, badRequest } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
+import { applyAfterChange } from '../telephony/index.js';
+
+/**
+ * A route whose success can change the generated dialplan.
+ *
+ * A DID *is* a number joined to an extension, so creating, editing, deleting
+ * or merging a number can rewrite `extensions.conf`. The handler runs first,
+ * so a rejected request never touches the switch, and the reply says whether
+ * the change reached it. Nothing here needs an operator to press Apply.
+ */
+const withSwitch = (handler) => async (request, reply) => {
+  const result = await handler(request, reply);
+  const applied = await applyAfterChange(request);
+  return applied ? { ...(result || {}), applied } : result;
+};
 
 const numberView = (row, extra = {}) => ({
   id: row.id,
@@ -21,6 +36,8 @@ const numberView = (row, extra = {}) => ({
   trust: row.trust_score,
   verifiedAt: row.verified_at,
   source: row.source,
+  // Who holds the number on the platform, when a customer rented it.
+  accountId: row.account_id || '',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   ...extra,
@@ -134,7 +151,7 @@ export default async function registryRoutes(app) {
     };
   });
 
-  app.post('/numbers', async (request, reply) => {
+  app.post('/numbers', withSwitch(async (request, reply) => {
     const body = request.body || {};
     const resolved = resolveNumber(body.number, {
       visibility: body.visibility ? v.oneOf(body.visibility, ['public', 'unlisted', 'private'], 'visibility') : undefined,
@@ -164,7 +181,7 @@ export default async function registryRoutes(app) {
       deduplicated: !resolved.created,
       parsed: resolved.parsed.valid === false ? { reason: resolved.parsed.reason, valid: false } : { valid: true },
     };
-  });
+  }));
 
   app.get('/numbers/:id', async (request) => {
     const row = db_.get('SELECT * FROM numbers WHERE id = ? OR e164 = ?', [request.params.id, request.params.id]);
@@ -190,7 +207,7 @@ export default async function registryRoutes(app) {
     };
   });
 
-  app.patch('/numbers/:id', async (request) => {
+  app.patch('/numbers/:id', withSwitch(async (request) => {
     const row = db_.get('SELECT * FROM numbers WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Number not found');
     const body = request.body || {};
@@ -208,6 +225,17 @@ export default async function registryRoutes(app) {
     if (body.region !== undefined) patch.region = v.str(body.region, { name: 'region', max: 120, required: false });
     if (body.timezone !== undefined) patch.timezone = v.str(body.timezone, { name: 'timezone', max: 60, required: false });
     if (body.trust !== undefined) patch.trust_score = v.integer(body.trust, { name: 'trust', min: 0, max: 100 });
+    // Handing a number to a customer, or taking it back: by account email, like
+    // every other assignment in the console, and '' releases it.
+    if (body.account !== undefined) {
+      const email = v.str(body.account, { name: 'account', max: 160, required: false });
+      if (!email) patch.account_id = null;
+      else {
+        const target = db_.get('SELECT id FROM accounts WHERE email = ?', [email]);
+        if (!target) throw notFound(`No account with the email ${email}`);
+        patch.account_id = target.id;
+      }
+    }
     if (!Object.keys(patch).length) throw badRequest('Nothing to update');
 
     const sets = Object.keys(patch).map((k) => `${k} = ?`).join(', ');
@@ -221,7 +249,7 @@ export default async function registryRoutes(app) {
       ip: request.ip,
     });
     return { number: numberView(fresh) };
-  });
+  }));
 
   app.post('/numbers/:id/listings', async (request, reply) => {
     const row = db_.get('SELECT * FROM numbers WHERE id = ?', [request.params.id]);
@@ -271,7 +299,7 @@ export default async function registryRoutes(app) {
     return { ok: true };
   });
 
-  app.delete('/numbers/:id', { preHandler: app.requireRole('owner', 'operator') }, async (request) => {
+  app.delete('/numbers/:id', { preHandler: app.requireRole('owner', 'operator') }, withSwitch(async (request) => {
     const row = db_.get('SELECT * FROM numbers WHERE id = ?', [request.params.id]);
     if (!row) throw notFound('Number not found');
     db_.tx(() => {
@@ -279,16 +307,16 @@ export default async function registryRoutes(app) {
     });
     logEvent({ actor: request.account.email, action: 'registry.number_deleted', subject: row.e164, ip: request.ip });
     return { ok: true, deleted: row.e164 };
-  });
+  }));
 
-  app.post('/numbers/merge', async (request) => {
+  app.post('/numbers/merge', withSwitch(async (request) => {
     const body = request.body || {};
     const into = v.str(body.into, { name: 'into', max: 60 });
     const from = v.str(body.from, { name: 'from', max: 60 });
     const result = mergeNumbers(into, from, request.account?.email || 'api', v.str(body.reason, { name: 'reason', max: 200, required: false }));
     logEvent({ actor: request.account?.email || 'api', action: 'registry.numbers_merged', subject: result.merged, detail: JSON.stringify({ into }), ip: request.ip });
     return { number: numberView(result.into), merged: result.merged };
-  });
+  }));
 
   app.post('/numbers/:id/verify', async (request) => {
     const row = db_.get('SELECT * FROM numbers WHERE id = ?', [request.params.id]);

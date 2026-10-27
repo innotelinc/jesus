@@ -4,7 +4,7 @@ import { config } from '../config.js';
 /**
  * White-label branding.
  *
- * The product name, the vendor behind it, the accent colour and the logo are
+ * The product name, the vendor behind it, the accent color and the logo are
  * rows, not constants: a deployment that resells this platform needs its own
  * name on the marketing site, the console, the signup page and the report it
  * emails — without a fork or an image rebuild.
@@ -90,7 +90,7 @@ const write = (key, value) =>
 
 /**
  * Save a brand edit. Only known fields are written, and an accent that is not a
- * six-digit hex is refused rather than rendered into a stylesheet — a colour is
+ * six-digit hex is refused rather than rendered into a stylesheet — a color is
  * injected into CSS, which is exactly where a free-form string does damage.
  */
 export function saveBrand(payload = {}) {
@@ -119,7 +119,7 @@ export function saveBrand(payload = {}) {
   };
 
   if (next.accent !== undefined && next.accent !== '' && !HEX.test(next.accent)) {
-    errors.push('accent must be a six-digit hex colour such as #6f66ff');
+    errors.push('accent must be a six-digit hex color such as #6f66ff');
   }
   if (next.logoUrl) {
     try {

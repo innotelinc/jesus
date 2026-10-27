@@ -45,7 +45,7 @@ jobs:
         run: npm run smoke
 
       - name: Fail if the skeleton drifted
-        # The suite asserts behaviour; this asserts the two files that decide
+        # The suite asserts behavior; this asserts the two files that decide
         # whether a deployment can even boot are still parseable.
         run: |
           node --check src/index.js

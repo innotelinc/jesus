@@ -209,7 +209,7 @@ for a live device — only a real check-in moves them.
 | — | `402 payment_required` | a suspended customer's correct sign-in, and every authenticated call with its session |
 | GET | `/public/pay/invoice/:id?t=` | signed link from a notice: creates a Stripe Checkout Session and 303s to it; a forged token is 403, an unconfigured Stripe is an HTML page, not a crash |
 | GET | `/public/pay/account/:id?t=` | the same for a billing account, with one line per unpaid invoice and one charge for the whole balance |
-| GET | `/public/pay/return?status=paid\|cancelled` | the page Stripe sends the customer back to; no console, no scripts |
+| GET | `/public/pay/return?status=paid\|canceled` | the page Stripe sends the customer back to; no console, no scripts |
 | POST | `/public/stripe/webhook` | Stripe's callback, signature-verified: marks the named invoices paid (receipt in `paymentRef`), reinstates a suspended account, and is idempotent on replay |
 | GET/POST/PATCH/DELETE | `/estate/sites[/:id]` | sites with counts derived from their devices, status and last contact |
 | GET/POST | `/estate/devices` | real inventory rows: handset, gateway, ata, conference, door; `?site=&kind=&status=` |
@@ -305,7 +305,7 @@ always carries `total`, `up`, `auth` and `down`.
 |---|---|---|---|
 | GET | `/healthz` | none | liveness (also at `/healthz`) |
 | GET | `/system/status` | session | telephony + registry + counts + channels + `payments` (enabled, configured, mode, `webhookUrl` — no key) |
-| POST | `/system/apply` | operator | regenerate configs, reload Asterisk |
+| POST | `/system/apply` | operator | regenerate configs, reload Asterisk — for scripts; the console applies any change automatically instead |
 | GET | `/system/config-preview?file=` | session | generated `.conf` content |
 | GET | `/system/domains` | session | directory hostnames |
 | PATCH | `/system/domains/:slug` | owner | label, tagline, accent, scope, enabled |
@@ -397,12 +397,12 @@ Plans and features are rows: the admin edits them and the public page at
 | POST | `/public/subscribe` | none | `{ plan, name, email, password, origin? }`; creates the customer account and returns a Stripe checkout URL |
 | GET | `/public/subscribe/status?email=` | none | whether the webhook has landed yet |
 | GET | `/portal/status` | session | entitlement, subscription and plans for the signed-in account |
-| GET | `/plans` | operator | plans, feature catalogue, subscriptions, mirror status |
+| GET | `/plans` | operator | plans, feature catalog, subscriptions, mirror status |
 | POST | `/plans` | operator | create; `features` is a list of feature keys |
 | PATCH | `/plans/:id` | operator | price, interval, seats, included minutes, features, on sale |
 | DELETE | `/plans/:id` | operator | retire; live subscriptions keep it |
 | POST | `/plans/:id/sync` | operator | push the plan to the subscriber system of record |
-| GET | `/features` | operator | the catalogue |
+| GET | `/features` | operator | the catalog |
 | POST | `/features` | operator | `{ key, label, description?, category?, addon? }` |
 | PATCH | `/features/:key` | operator | label, description, category, add-on, active |
 | DELETE | `/features/:key` | operator | remove it from every plan |

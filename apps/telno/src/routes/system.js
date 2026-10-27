@@ -59,7 +59,7 @@ export default async function systemRoutes(app) {
       // Whether card payment is on, which mode, and the URL Stripe has to call.
       // Settings shows this next to the vault fields that switch it on.
       payments: paymentStatus(),
-      // The model behind grading and suggestions, and whether the catalogue is
+      // The model behind grading and suggestions, and whether the catalog is
       // mirrored into the subscriber system of record.
       ai: aiStatus(),
       // What the console header, the public site and the signup page call this
@@ -232,7 +232,7 @@ export default async function systemRoutes(app) {
   }));
 
   /**
-   * White-label edit. The accent colour is validated as a hex value because it
+   * White-label edit. The accent color is validated as a hex value because it
    * is written into a stylesheet, and the logo as an http(s) URL because it is
    * fetched by every visitor's browser.
    */

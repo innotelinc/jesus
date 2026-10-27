@@ -11,6 +11,7 @@ import systemRoutes from './system.js';
 import payRoutes from './pay.js';
 import marketingRoutes from './marketing.js';
 import portalRoutes from './portal.js';
+import meRoutes from './me.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
@@ -31,6 +32,8 @@ export async function registerRoutes(app) {
   await app.register(marketingRoutes);
   // The public pricing page, subscriptions and the plan/feature admin.
   await app.register(portalRoutes);
+  // A customer's own surface: their line, plan and invoices, and nothing else.
+  await app.register(meRoutes);
 }
 
 export default registerRoutes;

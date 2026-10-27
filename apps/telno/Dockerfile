@@ -7,8 +7,15 @@
 #   Build:  docker build -t telno .
 #   Run:    docker compose up -d
 
+# The two base images are arguments so a network that cannot reach Docker Hub
+# (a rate-limited or blocked registry) can still build from a mirror without
+# editing this file, e.g.
+#   NODE_IMAGE=mirror.gcr.io/library/node:24-bookworm-slim docker compose build
+ARG NODE_IMAGE=node:24-bookworm-slim
+ARG SWITCH_IMAGE=debian:bookworm
+
 # ---------------------------------------------------------------- build -----
-FROM node:24-bookworm-slim AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -33,7 +40,7 @@ RUN npm run build
 # The base is glibc on purpose: Asterisk redirects libc allocators to its own
 # debug ones with function-like macros, and musl re-declares calloc/free after
 # those macros exist, so a musl build fails in its own headers.
-FROM debian:bookworm AS switch
+FROM ${SWITCH_IMAGE} AS switch
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -63,7 +70,7 @@ RUN rm -rf /staging/etc/asterisk /staging/usr/share/doc /staging/usr/lib/systemd
  && mkdir -p /staging/etc/asterisk
 
 # -------------------------------------------------------------- runtime -----
-FROM node:24-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 
 # supervisor runs both processes under one root; curl backs the health check;
 # openssl mints the WSS certificate on first boot. The rest are the runtime

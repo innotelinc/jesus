@@ -305,7 +305,8 @@ the dialplan can start a recording, the generator writes it into `extensions.con
 whose number has an active agent with `recordInbound` gets `Set(__TELNO_AGENT=…)` and `MixMonitor`
 before the call is routed, and outbound calls set `__TELNO_RECORD_OUT` from the caller's extension
 before dialing through the trunk. Turning the switch off in the console removes those lines on the
-next **Apply config** — the UI and the switch cannot disagree. `MixMonitor` events are then matched
+next save — every change that touches a generated file rewrites it and reloads the switch, so the
+UI and the switch cannot disagree. `MixMonitor` events are then matched
 to the call row, so the recording is playable from call history.
 
 ## Connected systems
@@ -373,7 +374,7 @@ curl -X POST http://localhost:8080/api/system/email/test -b cookie.txt -H 'conte
 | | |
 |---|---|
 | Data | `/data` volume — SQLite database plus generated session/API/AMI secrets |
-| Switch config | `/etc/asterisk` volume — regenerated from the database on every boot and on **Apply config** |
+| Switch config | `/etc/asterisk` volume — regenerated from the database on every boot, and automatically after any change that touches it |
 | Health | `GET /healthz` and `GET /api/healthz`; compose health check included |
 | Backup | `docker compose exec telno sh -c 'sqlite3 /data/telno.db ".backup /data/backup.db"'` (or copy the volume while stopped) |
 | Memory | Node capped at 192 MB; whole container fits comfortably in 512 MB |
@@ -534,7 +535,7 @@ import a list  ->  claim a batch  ->  record each outcome  ->  graded  ->  repor
 - **A disposition becomes a grade.** The endpoint takes the disposition, the call length and the
   transcript, asks the model for a score with reasons and a next step, and falls back to a visible rule
   grader (disposition, duration, positive and negative signals) when no key is set. `do-not-call` is
-  never graded: it is honoured, and the number is added to the platform-wide opt-out list so no future
+  never graded: it is honored, and the number is added to the platform-wide opt-out list so no future
   campaign can dial it either.
 - **The report is a document.** Results, dispositions, the recurring reasons the grader gave, the top
   graded calls, and a summary written from the totals — never from individual transcripts. It is
@@ -554,7 +555,7 @@ Plans and features are **rows**, not code. The admin console edits them at **Pla
 at `/subscribe` (linked as `SUBSCRIBE_URL`, e.g. `subscribe.telno.services`) reads the same rows, so an
 edit is live on both sides at once and there is no second copy to keep in step.
 
-- **Features are a catalogue.** A plan carries a set of them; ticking or unticking a box changes the
+- **Features are a catalog.** A plan carries a set of them; ticking or unticking a box changes the
   plan, the public page and what a subscriber is entitled to in one save. Deleting a feature removes it
   from every plan.
 - **Retiring a plan is not deleting it.** It stops being sold; the customers on it keep it, because a
@@ -574,7 +575,7 @@ edit is live on both sides at once and there is no second copy to keep in step.
 - **Operators can override.** An account can be put on a plan without a card, moved between plans, or
   set active/canceled from **Plans -> Subscriptions**; onboarding a customer by hand creates the
   account and its subscription in one step. Every override is in the audit log with who did it.
-- **The catalogue mirrors out.** With `MAGNATE_WEBHOOK_URL` set (vault or environment), every plan
+- **The catalog mirrors out.** With `MAGNATE_WEBHOOK_URL` set (vault or environment), every plan
   create or edit is posted to the subscriber system of record with its feature list, so the pricing
   page here and billing elsewhere cannot drift. No webhook configured is a normal state, not an error.
 
@@ -600,7 +601,7 @@ no second design — the console, the site and the signup page are the same buil
 - **It is data-driven.** The features section is the union of the plans' features, the pricing table
   is the plan rows, and the counters come from the registry (`/api/public/stats`). Add a feature in
   Plans and it appears; change a price and the site shows it on the next request.
-- **It is white-label.** The product name, vendor, tagline, description, accent colour, logo URL,
+- **It is white-label.** The product name, vendor, tagline, description, accent color, logo URL,
   support and sales addresses, directory host and footer note are settings rows
   (`Settings → Branding`, owner only), served publicly at `/api/public/brand`. The site, the console
   header, the login screen, the signup page, the public directory and the document title all read
@@ -608,7 +609,7 @@ no second design — the console, the site and the signup page are the same buil
   without a fork or an image build.
 - **Two things are validated rather than trusted.** The accent has to be a six-digit hex value
   because it is written into a stylesheet, and the logo has to be an `http(s)` URL because every
-  visitor's browser fetches it. Both are refused with a reason, not sanitised silently.
+  visitor's browser fetches it. Both are refused with a reason, not sanitized silently.
 - **The directory is reachable from it.** The site lists the enabled directory hostnames and links
   each one, so the worldwide phonebook is part of the product story rather than a URL somebody has to
   be told.

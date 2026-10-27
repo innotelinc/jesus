@@ -11,7 +11,7 @@ import { Link, navigate } from '../router.jsx';
  * what it is, sees what each plan includes, and picks one without being sent to
  * a different domain or a different design. Everything it shows — the name, the
  * features, the prices, the registry counters — comes from the database, which
- * is what makes it work white-labelled: an operator edits the catalogue and the
+ * is what makes it work white-labeled: an operator edits the catalog and the
  * brand in the console and this page follows.
  */
 
@@ -62,7 +62,7 @@ const FAQ = [
   ],
   [
     'Can I run this under my own brand?',
-    'Yes. The product name, vendor, accent colour, logo and support addresses are settings, not source code: the site, the console, the signup page and the reports all read them.',
+    'Yes. The product name, vendor, accent color, logo and support addresses are settings, not source code: the site, the console, the signup page and the reports all read them.',
   ],
 ];
 
@@ -152,7 +152,7 @@ export default function Site() {
     };
   }, []);
 
-  // The union of every plan's features, in catalogue order: the product story
+  // The union of every plan's features, in catalog order: the product story
   // is the same list the pricing table is built from.
   const features = useMemo(() => {
     const seen = new Map();
@@ -379,7 +379,7 @@ export default function Site() {
           <div className="site-section-head">
             <h2>What every plan can carry.</h2>
             <p>
-              Features are a catalogue, not a code branch. What is listed under a plan below is exactly what the
+              Features are a catalog, not a code branch. What is listed under a plan below is exactly what the
               platform will let that account use.
             </p>
           </div>
@@ -418,47 +418,71 @@ export default function Site() {
         <section id="pricing" className="site-section">
           <div className="site-section-head">
             <h2>Pricing.</h2>
-            <p>Monthly or yearly, billed by card through Stripe. Change plan or cancel from the portal.</p>
+            <p>
+              One flat monthly rate with unlimited calling — no per-seat pricing and no meter to watch. Billed by
+              card through Stripe; change plan or cancel from the portal.
+            </p>
           </div>
 
           {loading ? (
             <Loading rows={3} />
           ) : (
-            <div className="pricing-grid">
-              {(pricing?.plans || []).map((plan) => (
-                <div key={plan.id} className={`price-card${plan.isDefault ? ' featured' : ''}`}>
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <h3>{plan.name}</h3>
-                    {plan.isDefault ? <Badge tone="success">Most chosen</Badge> : null}
+            [
+              { audience: 'business', title: 'For business' },
+              { audience: 'residential', title: 'For home' },
+            ].map((group) => {
+              const groupPlans = (pricing?.plans || []).filter((plan) => (plan.audience || 'business') === group.audience);
+              if (!groupPlans.length) return null;
+              return (
+                <div className="plan-group" key={group.audience}>
+                  <div className="plan-group-head">
+                    <h3>{group.title}</h3>
+                    <p className="tiny dim">
+                      {group.audience === 'residential'
+                        ? 'For a home line: the same switch, the same encryption.'
+                        : 'For a team: numbers, voice agents and the full console.'}
+                    </p>
                   </div>
-                  <div className="price-row">
-                    <strong>{money(plan.priceCents, plan.currency)}</strong>
-                    <span className="tiny dim">/{plan.interval}</span>
-                  </div>
-                  <p className="tiny muted">{plan.tagline}</p>
-                  <div className="row wrap" style={{ gap: 10 }}>
-                    <span className="tiny dim">{plan.seats} seats</span>
-                    <span className="tiny dim">·</span>
-                    <span className="tiny dim">{plan.includedMinutes.toLocaleString()} minutes</span>
-                  </div>
-                  <ul className="plan-features">
-                    {plan.features.map((feature) => (
-                      <li key={feature.key}>
-                        <Icon name="check" size={13} /> {feature.label}
-                      </li>
+                  <div className="pricing-grid">
+                    {groupPlans.map((plan) => (
+                      <div key={plan.id} className={`price-card${plan.isDefault ? ' featured' : ''}`}>
+                        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <h4>{plan.name}</h4>
+                          {plan.isDefault ? <Badge tone="success">Most chosen</Badge> : null}
+                        </div>
+                        <div className="price-row">
+                          <strong>{money(plan.priceCents, plan.currency)}</strong>
+                          <span className="tiny dim">/{plan.interval}</span>
+                        </div>
+                        <p className="tiny muted">{plan.tagline}</p>
+                        <div className="row wrap" style={{ gap: 10 }}>
+                          <span className="tiny dim">
+                            {plan.minutesUnlimited ? 'Unlimited minutes' : `${plan.includedMinutes.toLocaleString()} minutes`}
+                          </span>
+                          <span className="tiny dim">·</span>
+                          <span className="tiny dim">Flat rate</span>
+                        </div>
+                        <ul className="plan-features">
+                          {plan.features.map((feature) => (
+                            <li key={feature.key}>
+                              <Icon name="check" size={13} /> {feature.label}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          variant={plan.isDefault ? 'primary' : ''}
+                          onClick={() => scrollToSignup(plan)}
+                        >
+                          Choose {plan.name}
+                        </Button>
+                      </div>
                     ))}
-                  </ul>
-                  <Button
-                    variant={plan.isDefault ? 'primary' : ''}
-                    onClick={() => scrollToSignup(plan)}
-                  >
-                    Choose {plan.name}
-                  </Button>
+                  </div>
                 </div>
-              ))}
-              {!(pricing?.plans || []).length ? <p className="muted">No plans are on sale yet.</p> : null}
-            </div>
+              );
+            })
           )}
+          {!loading && !(pricing?.plans || []).length ? <p className="muted">No plans are on sale yet.</p> : null}
 
           <p className="site-fineprint">
             Prices in USD. Card details are entered on Stripe's page and never touch this platform.

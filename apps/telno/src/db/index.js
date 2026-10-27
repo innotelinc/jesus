@@ -85,12 +85,35 @@ function migrate(db) {
     // it exists to hold a subscription, and it is the only kind that is gated
     // on paying. Staff are never locked out by the commerce side.
     ['accounts', 'account_kind', "TEXT NOT NULL DEFAULT 'staff'"],
+    // v11: flat-rate plans. Selling per seat gave way to one price with
+    // unlimited calling, and the catalog gained a residential audience that
+    // the public pages group separately from the business ladder. Defaulting
+    // minutes_unlimited to 1 stamps the plans that already exist.
+    ['plans', 'minutes_unlimited', 'INTEGER NOT NULL DEFAULT 1'],
+    ['plans', 'audience', "TEXT NOT NULL DEFAULT 'business'"],
+    // v12: a line belongs to somebody. Extensions and numbers carry the account
+    // that holds them, so a customer's portal can show their own line — and so
+    // the softphone can refuse to mint a session for a line that is not theirs.
+    ['extensions', 'account_id', 'TEXT'],
+    ['numbers', 'account_id', 'TEXT'],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
     }
   }
+
+  // A plan sold before flat-rate plans existed has no audience and no unlimited
+  // flag of its own: give it both once, so an upgrade keeps selling the same
+  // three plans under the new pricing instead of leaving them metered.
+  db.exec("UPDATE plans SET minutes_unlimited = 1 WHERE minutes_unlimited IS NULL");
+  db.exec("UPDATE plans SET audience = 'business' WHERE audience IS NULL OR audience = ''");
+
+  // Ownership lookups are per account and happen on every portal load. Created
+  // here, after the columns above, so an upgrade never indexes a column that
+  // does not exist yet.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_extensions_account ON extensions (account_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_numbers_account ON numbers (account_id)');
 
   const current = db.prepare("SELECT value FROM settings WHERE key = 'schema_version'").get();
   if (!current) {

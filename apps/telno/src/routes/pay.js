@@ -109,7 +109,7 @@ export default async function payRoutes(app) {
             action: { label: 'Back to Telno', href: '/' },
           }
         : {
-            heading: 'Payment cancelled',
+            heading: 'Payment canceled',
             message:
               'Nothing has been charged. The invoice is unchanged and any payment link in your email still works whenever you are ready.',
             tone: 'info',

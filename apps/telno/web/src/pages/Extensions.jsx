@@ -70,7 +70,7 @@ export default function Extensions() {
     <>
       <PageHeader
         title="Extensions"
-        subtitle="SIP endpoints generated into pjsip.conf on apply"
+        subtitle="SIP endpoints generated into pjsip.conf as they are saved"
         actions={
           <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
             New extension
@@ -152,8 +152,8 @@ export default function Extensions() {
       </Card>
 
       <p className="tiny dim">
-        Changes are stored immediately and become live on the switch after <strong>Apply config</strong> on the
-        dashboard.
+        Saving an extension writes <span className="mono">pjsip.conf</span> and reloads the switch straight
+        away — there is no apply step, and a change is live the moment it is saved.
       </p>
 
       {creating ? (

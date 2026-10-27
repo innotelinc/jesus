@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS numbers (
   verified_at  TEXT,
   trust_score  INTEGER NOT NULL DEFAULT 40 CHECK (trust_score BETWEEN 0 AND 100),
   source       TEXT NOT NULL DEFAULT 'manual',
+  -- The customer account that holds this number, when it is rented rather than
+  -- merely listed. NULL means a registry entry with no owner on the platform.
+  account_id   TEXT REFERENCES accounts (id) ON DELETE SET NULL,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -159,6 +162,9 @@ CREATE TABLE IF NOT EXISTS extensions (
   -- 1 means the platform switched this extension off for non-payment, so
   -- reinstatement re-enables it and never an extension an operator disabled.
   suspended_by_billing INTEGER NOT NULL DEFAULT 0,
+  -- Whose line this is. NULL is a platform or staff extension, which is what
+  -- every extension was before customers could hold one.
+  account_id   TEXT REFERENCES accounts (id) ON DELETE SET NULL,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -593,7 +599,7 @@ CREATE INDEX IF NOT EXISTS idx_campaign_reports ON campaign_reports (campaign_id
 -- customer bought at which price — a snapshot, because editing a plan tomorrow
 -- must not rewrite what somebody was charged today.
 
--- The feature catalogue: every capability a plan can include or exclude.
+-- The feature catalog: every capability a plan can include or exclude.
 CREATE TABLE IF NOT EXISTS features (
   key         TEXT PRIMARY KEY,             -- 'video-calling', 'ai-grading'
   label       TEXT NOT NULL,
@@ -615,8 +621,17 @@ CREATE TABLE IF NOT EXISTS plans (
   price_cents      INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
   currency         TEXT NOT NULL DEFAULT 'USD',
   interval         TEXT NOT NULL DEFAULT 'month' CHECK (interval IN ('month', 'year')),
+  -- Flat rate: a plan is one price, not a price multiplied by headcount. The
+  -- column stays because a subscription froze its snapshot around it.
   seats            INTEGER NOT NULL DEFAULT 1,
+  -- Kept for a metered plan should one come back; a consumer plan leaves it at
+  -- zero and sets minutes_unlimited instead.
   included_minutes INTEGER NOT NULL DEFAULT 0,
+  -- 1 means the plan sells unlimited calling and shows no minute meter.
+  minutes_unlimited INTEGER NOT NULL DEFAULT 1,
+  -- Who the plan is sold to. The public pages group by this, so a home plan
+  -- never appears in the business ladder.
+  audience         TEXT NOT NULL DEFAULT 'business' CHECK (audience IN ('business', 'residential')),
   -- A plan that is not in Stripe can still be sold: checkout creates the price
   -- from these numbers and stores the id back here.
   stripe_price_id  TEXT NOT NULL DEFAULT '',

@@ -110,7 +110,7 @@ export function addListing(numberId, data) {
   if (duplicate) return { id: duplicate.id, created: false, listing: duplicate };
 
   const id = newId('lst_');
-  const domain = sanitiseDomain(data.domainSlug);
+  const domain = sanitizeDomain(data.domainSlug);
   db_.run(
     `INSERT INTO listings
        (id, number_id, name, name_norm, kind, category, address, city, country,
@@ -137,7 +137,7 @@ export function addListing(numberId, data) {
   return { id, created: true, listing: db_.get('SELECT * FROM listings WHERE id = ?', [id]) };
 }
 
-function sanitiseDomain(slug) {
+function sanitizeDomain(slug) {
   if (!slug) return null;
   const row = db_.get('SELECT slug FROM domains WHERE slug = ?', [String(slug)]);
   return row ? row.slug : null;

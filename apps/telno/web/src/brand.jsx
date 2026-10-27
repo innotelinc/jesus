@@ -35,7 +35,7 @@ const hexToRgb = (hex) => {
   return [0, 2, 4].map((offset) => parseInt(value.slice(offset, offset + 2), 16));
 };
 
-/** Lighten or darken a hex colour by a ratio, for the hover and press tokens. */
+/** Lighten or darken a hex color by a ratio, for the hover and press tokens. */
 const shade = (hex, amount) => {
   const rgb = hexToRgb(hex);
   if (!rgb) return hex;

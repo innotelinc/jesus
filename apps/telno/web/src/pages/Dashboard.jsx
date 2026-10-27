@@ -11,7 +11,6 @@ export default function Dashboard() {
   const [queue, setQueue] = useState(null);
   const [systems, setSystems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
 
   const load = async () => {
     try {
@@ -45,22 +44,6 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const apply = async () => {
-    setApplying(true);
-    try {
-      const result = await api.post('/system/apply', {});
-      toast.success(
-        result.written ? 'Configuration applied' : 'Configuration generated',
-        result.written ? `Asterisk reloaded from ${result.dir}` : result.reason
-      );
-      load();
-    } catch (err) {
-      toast.error('Apply failed', err.message);
-    } finally {
-      setApplying(false);
-    }
-  };
-
   if (loading) {
     return <Loading rows={5} />;
   }
@@ -83,14 +66,11 @@ export default function Dashboard() {
             : 'Registry is ready'
         }
         actions={
-          <>
-            <Button variant="ghost" icon="refresh" onClick={load}>
-              Refresh
-            </Button>
-            <Button variant="primary" icon="check" onClick={apply} loading={applying}>
-              Apply config
-            </Button>
-          </>
+          // No Apply button: every change is written to the switch and reloaded
+          // as it is saved, so there is nothing here to press.
+          <Button variant="ghost" icon="refresh" onClick={load}>
+            Refresh
+          </Button>
         }
       />
 

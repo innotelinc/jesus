@@ -2,6 +2,7 @@ import { ami } from './ami.js';
 import { writeConfigs, generateConfigs } from './provision.js';
 import { db_, newId, now } from '../db/index.js';
 import { config } from '../config.js';
+import { logEvent } from '../lib/audit.js';
 
 const channels = new Map();
 // MixMonitor reports its file when recording starts and stops; the call row is
@@ -217,6 +218,34 @@ export async function applyConfiguration(actor = 'system') {
     JSON.stringify({ write, reloaded: !!reload }),
   ]);
   return { ...write, reloaded: !!reload };
+}
+
+/**
+ * Write the switch configuration and reload it after a saved change.
+ *
+ * The database is the source of truth and every generated file is derived from
+ * it, so a saved change is a live change: there is no Apply button to forget,
+ * and the UI cannot disagree with the switch. A write that cannot reach the
+ * switch is reported to the caller rather than rolling the row back — the row
+ * is already committed and the next change, or the next boot, regenerates the
+ * files from it anyway.
+ */
+export async function applyAfterChange(request) {
+  if (!config.telephony.configDir) return null;
+  const actor = request?.account?.email || request?.apiKey?.label || 'api';
+  try {
+    const result = await applyConfiguration(actor);
+    return { written: result.written, dir: result.dir, reloaded: result.reloaded };
+  } catch (err) {
+    logEvent({
+      actor,
+      action: 'telephony.apply_failed',
+      subject: 'asterisk',
+      detail: err.message,
+      ip: request?.ip,
+    });
+    return { error: err.message };
+  }
 }
 
 export const previewConfiguration = () => generateConfigs();
