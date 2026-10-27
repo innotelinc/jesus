@@ -403,6 +403,43 @@ export const subscriptionForStripeId = (stripeId) =>
   (stripeId && db_.get('SELECT * FROM subscriptions WHERE stripe_subscription_id = ?', [stripeId])) || null;
 
 /**
+ * When the paid period ends, in seconds, from either Stripe shape.
+ *
+ * API version 2025-03-31 moved `current_period_end` off the subscription and
+ * onto its items, so a deployment whose webhook endpoint runs on a newer
+ * version would otherwise store no paid-through date at all — and an account
+ * with no date to check never looks lapsed. Reading both means the version a
+ * customer's endpoint happens to use cannot change whether access expires.
+ */
+export function subscriptionPeriodEnd(subscription) {
+  const direct = Number(subscription?.current_period_end);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  const ends = items
+    .map((item) => Number(item?.current_period_end))
+    .filter((seconds) => Number.isFinite(seconds) && seconds > 0);
+  // The period ends when the last item's does; a plan with an add-on item keeps
+  // access until the add-on lapses too.
+  return ends.length ? Math.max(...ends) : null;
+}
+
+/**
+ * The subscription an invoice belongs to, from either Stripe shape. Before
+ * 2025-03-31 that was `invoice.subscription`; the parent field replaced it.
+ */
+export function invoiceSubscriptionId(invoice) {
+  const candidates = [
+    invoice?.subscription,
+    invoice?.parent?.subscription_details?.subscription,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate) return candidate;
+    if (candidate && typeof candidate.id === 'string' && candidate.id) return candidate.id;
+  }
+  return '';
+}
+
+/**
  * The whole access decision, in one place.
  *
  * A staff account is never gated: the owner locking themselves out of their own
@@ -497,8 +534,8 @@ export async function activateFromSession(session) {
   let periodEnd = null;
   if (stripeSubscriptionId) {
     const remote = await fetchStripeSubscription(stripeSubscriptionId);
-    const seconds = remote.ok ? remote.data?.current_period_end : null;
-    if (Number.isFinite(Number(seconds)) && Number(seconds) > 0) periodEnd = new Date(Number(seconds) * 1000).toISOString();
+    const seconds = remote.ok ? subscriptionPeriodEnd(remote.data) : null;
+    if (seconds) periodEnd = new Date(seconds * 1000).toISOString();
   }
 
   db_.run(
@@ -523,15 +560,18 @@ export function applySubscriptionEvent(subscription, { deleted = false } = {}) {
   const row = subscriptionForStripeId(subscription.id);
   if (!row) return { ok: false, error: 'unknown_subscription' };
   const status = deleted ? 'canceled' : String(subscription.status || row.status);
-  const periodEnd = Number(subscription.current_period_end);
+  const periodEnd = subscriptionPeriodEnd(subscription);
+  // 'unpaid' and 'paused' are lapses too: nothing is entitling the account any
+  // more, so they are stored rather than ignored in favour of the old status.
+  const known = ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'paused', 'incomplete', 'incomplete_expired'];
   db_.run(
     `UPDATE subscriptions
         SET status = ?, current_period_end = ?, cancel_at_period_end = ?,
             canceled_at = ?, updated_at = ?
       WHERE id = ?`,
     [
-      ['active', 'trialing', 'past_due', 'canceled', 'incomplete'].includes(status) ? status : row.status,
-      Number.isFinite(periodEnd) && periodEnd > 0 ? new Date(periodEnd * 1000).toISOString() : row.current_period_end,
+      known.includes(status) ? status : row.status,
+      periodEnd ? new Date(periodEnd * 1000).toISOString() : row.current_period_end,
       subscription.cancel_at_period_end ? 1 : 0,
       deleted ? now() : row.canceled_at,
       now(),
