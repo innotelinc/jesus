@@ -96,6 +96,44 @@ function migrate(db) {
     // the softphone can refuse to mint a session for a line that is not theirs.
     ['extensions', 'account_id', 'TEXT'],
     ['numbers', 'account_id', 'TEXT'],
+    // v13: numbers can be bought from a carrier instead of typed in. The
+    // provider link and its cost live on the row, so a release knows which DID
+    // to cancel and the bill knows what the line costs.
+    ['numbers', 'provider', "TEXT NOT NULL DEFAULT ''"],
+    ['numbers', 'provider_ref', "TEXT NOT NULL DEFAULT ''"],
+    ['numbers', 'monthly_cost_cents', 'INTEGER NOT NULL DEFAULT 0'],
+    ['numbers', 'cost_currency', "TEXT NOT NULL DEFAULT 'USD'"],
+    ['numbers', 'next_billing_at', 'TEXT'],
+    ['numbers', 'rented_at', 'TEXT'],
+    ['numbers', 'released_at', 'TEXT'],
+    // v14: rent on the bill, not only in the ledger. An invoice now names the
+    // account it bills and the month it bills rent for, and its amount is the
+    // sum of the line items a customer can read.
+    ['invoices', 'account_id', 'TEXT'],
+    ['invoices', 'rent_period', "TEXT NOT NULL DEFAULT ''"],
+    // v15: the first-login confirmation. What the customer says about themselves
+    // and whether their numbers may appear in the public directory.
+    ['accounts', 'company', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'address', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'city', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'country', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'website', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'listing_kind', "TEXT NOT NULL DEFAULT 'business'"],
+    ['accounts', 'directory_opt_in', 'INTEGER NOT NULL DEFAULT 0'],
+    ['accounts', 'profile_confirmed_at', 'TEXT'],
+    // v16: SCIF. A line can withhold its caller ID, never record, ask for a
+    // masked voice and have identifiers redacted in the app.
+    ['extensions', 'scif', 'INTEGER NOT NULL DEFAULT 0'],
+    ['extensions', 'caller_id_mode', "TEXT NOT NULL DEFAULT 'own'"],
+    ['extensions', 'caller_id_number', "TEXT NOT NULL DEFAULT ''"],
+    ['extensions', 'voice_mask', "TEXT NOT NULL DEFAULT 'off'"],
+    ['extensions', 'mask_text', 'INTEGER NOT NULL DEFAULT 0'],
+    // v17: one monthly invoice per account. A line says whether it is payable on
+    // the bill or already collected by a card subscription.
+    ['invoice_items', 'settled_by', "TEXT NOT NULL DEFAULT 'invoice'"],
+    // v18: a line can require a recent voiceprint check before it hands out SIP
+    // credentials, and the native app registers a push token per line.
+    ['extensions', 'voice_auth', 'INTEGER NOT NULL DEFAULT 0'],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {
@@ -114,6 +152,33 @@ function migrate(db) {
   // does not exist yet.
   db.exec('CREATE INDEX IF NOT EXISTS idx_extensions_account ON extensions (account_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_numbers_account ON numbers (account_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_invoices_account ON invoices (account_id)');
+  // One invoice per account per rent month. Created here rather than in the
+  // schema so an existing database has the columns before it is indexed.
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_rent_period ON invoices (account_id, rent_period) WHERE rent_period <> ''"
+  );
+  // One rent line per number per month on a given invoice. Scoped to the invoice
+  // rather than globally, so a voided bill keeps the lines it printed while a
+  // corrected invoice can carry the same month.
+  db.exec('DROP INDEX IF EXISTS idx_invoice_items_rent');
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_items_rent ON invoice_items (invoice_id, number_id, period) WHERE kind = 'number_rent'"
+  );
+  // One plan line per monthly invoice, whatever a rerun or a retry does. A
+  // database that already carries two plan lines on a bill was edited by hand;
+  // that is left alone rather than failed on at boot, and the engine's own
+  // check still stops it adding a third.
+  const duplicatePlans = db
+    .prepare("SELECT invoice_id FROM invoice_items WHERE kind = 'plan' GROUP BY invoice_id HAVING COUNT(*) > 1 LIMIT 1")
+    .get();
+  if (!duplicatePlans) {
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_items_plan ON invoice_items (invoice_id) WHERE kind = 'plan'"
+    );
+  } else {
+    console.warn(`[db] leaving ${duplicatePlans.invoice_id} with more than one plan line; not indexing it`);
+  }
 
   const current = db.prepare("SELECT value FROM settings WHERE key = 'schema_version'").get();
   if (!current) {

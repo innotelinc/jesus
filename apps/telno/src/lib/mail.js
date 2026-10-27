@@ -67,7 +67,7 @@ const rowHtml = ([label, value], { mono = false } = {}) => `<tr>
  * reminder and an invoice from diverging: same branding, same row rhythm, same
  * legibility on a phone.
  */
-function card({ eyebrow, amount, pill, pillTone, pillBackground, intro, rows, totalLabel, total, notes, footer, cta }) {
+function card({ eyebrow, amount, pill, pillTone, pillBackground, intro, rows, items = [], currency = 'USD', totalLabel, total, notes, footer, cta }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -110,6 +110,34 @@ function card({ eyebrow, amount, pill, pillTone, pillBackground, intro, rows, to
       </td>
     </tr>
     ${
+      items.length
+        ? `<tr>
+      <td style="padding:18px 28px 0 28px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:13px;border-collapse:collapse;">
+          <tr>
+            <td style="padding:0 0 6px 0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;">What this bill covers</td>
+            <td style="padding:0 0 6px 0;color:#667085;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;text-align:right;">Amount</td>
+          </tr>
+          ${items
+            .map(
+              (item) => `<tr>
+            <td style="padding:7px 0;border-top:1px solid #f2f4f7;color:#344054;line-height:1.5;">${escapeHtml(item.description)}${
+              Number(item.quantity) > 1 ? ` <span style="color:#98a2b3;">× ${escapeHtml(item.quantity)}</span>` : ''
+            }</td>
+            <td style="padding:7px 0;border-top:1px solid #f2f4f7;text-align:right;font-weight:600;white-space:nowrap;color:${
+              (item.settledBy ?? item.settled_by) === 'subscription' ? '#98a2b3' : 'inherit'
+            };">${escapeHtml(
+              (item.settledBy ?? item.settled_by) === 'subscription' ? 'Included' : money(item.amount_cents ?? item.amountCents, currency)
+            )}</td>
+          </tr>`
+            )
+            .join('')}
+        </table>
+      </td>
+    </tr>`
+        : ''
+    }
+    ${
       cta
         ? `<tr>
       <td style="padding:20px 28px 0 28px;">
@@ -144,6 +172,9 @@ function card({ eyebrow, amount, pill, pillTone, pillBackground, intro, rows, to
  */
 export function invoiceEmail(invoice) {
   const amount = money(invoice.amount_cents, invoice.currency);
+  // The lines the total is made of. An invoice that says "$14.00" is a demand;
+  // one that says what the $14.00 bought is a bill the customer can check.
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
   const status = STATUS_COPY[invoice.status] || STATUS_COPY.open;
   const due = invoice.status === 'paid' && invoice.paid_at ? `Paid ${day(invoice.paid_at)}` : day(invoice.due_at);
   const period =
@@ -173,6 +204,8 @@ export function invoiceEmail(invoice) {
     pillTone: status.tone,
     pillBackground: status.background,
     rows,
+    items,
+    currency: invoice.currency || 'USD',
     totalLabel: invoice.status === 'paid' ? 'Paid' : 'Amount due',
     total: amount,
     notes: invoice.notes,
@@ -187,6 +220,13 @@ export function invoiceEmail(invoice) {
   const text = [
     `Invoice ${invoice.invoice_no}`,
     `Amount: ${amount}`,
+    // A line the card subscription already collected is named as covered, so
+    // the lines still add up to the amount due.
+    ...items.map((item) =>
+      (item.settledBy ?? item.settled_by) === 'subscription'
+        ? `  ${item.description}: included in your subscription`
+        : `  ${item.description}: ${money(item.amount_cents ?? item.amountCents, invoice.currency)}`
+    ),
     invoice.status === 'paid' && invoice.paid_at ? `Paid: ${day(invoice.paid_at)}` : `Due: ${day(invoice.due_at) || 'on receipt'}`,
     `Account: ${invoice.account_name}`,
     period ? `Period: ${period}` : '',

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SCIF</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #0b0d12; color: #e7e9ee; }
+      body {
+        display: grid;
+        place-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 24px;
+      }
+      .card { max-width: 34ch; text-align: center; }
+      h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      p { color: #98a2b3; font-size: 14px; line-height: 1.6; margin: 0 0 10px; }
+      code { color: #c9cdf5; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>SCIF</h1>
+      <!-- This page is only reached when capacitor.config.json has no server.url.
+           The app is a shell around the deployed softphone; see native/README.md. -->
+      <p>Point this app at your Telno deployment:</p>
+      <p><code>npm run origin -- https://telno.services</code></p>
+      <p>then <code>npx cap sync ios</code> and run it from Xcode.</p>
+    </div>
+  </body>
+</html>

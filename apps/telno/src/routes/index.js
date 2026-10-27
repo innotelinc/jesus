@@ -6,12 +6,14 @@ import workspaceRoutes from './workspace.js';
 import mediaRoutes from './media.js';
 import systemsRoutes from './systems.js';
 import softphoneRoutes from './softphone.js';
+import voiceRoutes from './voice.js';
 import heartbeatRoutes from './heartbeat.js';
 import systemRoutes from './system.js';
 import payRoutes from './pay.js';
 import marketingRoutes from './marketing.js';
 import portalRoutes from './portal.js';
 import meRoutes from './me.js';
+import carrierRoutes from './carriers.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
@@ -23,6 +25,8 @@ export async function registerRoutes(app) {
   await app.register(mediaRoutes);
   await app.register(systemsRoutes);
   await app.register(softphoneRoutes);
+  // Voiceprints: enrollment, checks and the gate a softphone session spends.
+  await app.register(voiceRoutes);
   // Devices authenticate themselves, so this sits outside the session surface.
   await app.register(heartbeatRoutes);
   await app.register(systemRoutes);
@@ -34,6 +38,8 @@ export async function registerRoutes(app) {
   await app.register(portalRoutes);
   // A customer's own surface: their line, plan and invoices, and nothing else.
   await app.register(meRoutes);
+  // Buying and releasing numbers at the carrier, and what they cost.
+  await app.register(carrierRoutes);
 }
 
 export default registerRoutes;

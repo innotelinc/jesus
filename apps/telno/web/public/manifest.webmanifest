@@ -1,8 +1,9 @@
 {
-  "name": "Telno Softphone",
-  "short_name": "Telno",
-  "description": "A Telno line in its own window: encrypted audio and video, registered while you work elsewhere.",
-  "start_url": "/softphone?window=1",
+  "id": "/scif",
+  "name": "Telno SCIF",
+  "short_name": "SCIF",
+  "description": "A secure line in its own window: encrypted media, withheld caller ID, masked voice and no recording.",
+  "start_url": "/softphone?window=1&scif=1",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
@@ -24,6 +25,11 @@
     }
   ],
   "shortcuts": [
+    {
+      "name": "Secure window",
+      "short_name": "SCIF",
+      "url": "/softphone?window=1&scif=1"
+    },
     {
       "name": "Open the console",
       "short_name": "Console",

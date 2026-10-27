@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, prettyNumber } from '../api.js';
-import { Badge, Button, Card, Empty, Icon, Loading, PageHeader, Select, Stat, Switch, useToast } from '../ui.jsx';
+import { Badge, Button, Card, Empty, Icon, Input, Loading, PageHeader, Select, Stat, Switch, useToast } from '../ui.jsx';
 import { isSoftphoneWindow, openSoftphoneWindow } from '../softphoneWindow.js';
 import { readLine, saveLine } from '../softphoneLine.js';
+import { MASK_MODES, createVoiceMask } from '../voiceMask.js';
+import VoicePanel from '../VoicePanel.jsx';
+import { digitsFromSpeech, recognitionSupported, startDictation } from '../speech.js';
+import { watchCalls } from '../native.js';
 
 /**
  * Browser softphone.
@@ -107,6 +111,11 @@ export default function Softphone() {
   const [extension, setExtension] = useState(() => readLine().extension);
   const [session, setSession] = useState(null);
   const [regState, setRegState] = useState('off');
+  // The parking space a call answered on the phone is waiting in, and the dial
+  // that joins it. Both are refs because the answer and the registration that
+  // makes dialing possible can arrive in either order.
+  const parkSpaceRef = useRef('');
+  const dialRef = useRef(null);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState('');
   const [dial, setDial] = useState('');
@@ -125,12 +134,30 @@ export default function Softphone() {
   const [reconnecting, setReconnecting] = useState(false);
   const [devices, setDevices] = useState({ mics: [], cams: [] });
   const [inbox, setInbox] = useState([]);
+  // SCIF: the secure profile of this line, applied by the switch and by this
+  // browser. The URL can arm it for the window — that is how the installed app
+  // opens — and the line keeps the setting once it has been saved.
+  const [scif, setScif] = useState(() => ({
+    enabled: new URLSearchParams(window.location.search).get('scif') === '1',
+    callerId: { mode: 'own', number: '', presentation: 'allowed' },
+    voiceMask: 'off',
+    maskText: false,
+  }));
+  const [scifSaving, setScifSaving] = useState(false);
+  // A passed voice check is a single-use ticket; it lives in a ref because
+  // connect() needs it immediately, not on the next render.
+  const voiceTicketRef = useRef('');
+  const [voiceNeeded, setVoiceNeeded] = useState(false);
 
   const uaRef = useRef(null);
   const sessionRef = useRef(null);
   const pcRef = useRef(null);
   const wsRef = useRef(null);
   const localStreamRef = useRef(null);
+  // The mask graph currently in the outbound audio path, and the original track
+  // it replaced so "off" can put the real microphone back.
+  const maskRef = useRef(null);
+  const armedRef = useRef(new URLSearchParams(window.location.search).get('scif') === '1');
   const cameraTrackRef = useRef(null);
   const constraintsRef = useRef({ audio: true, video: false });
   const remoteVideoRef = useRef(null);
@@ -252,8 +279,11 @@ export default function Softphone() {
         }
         if (message.type === 'presence') setPeers(message.operators || []);
         if (message.type === 'line') {
+          // A parked call is the one state worth spelling out: the caller is
+          // holding, and dialing the space is what takes them.
+          const what = message.phase === 'parked' && message.space ? `waiting in ${message.space}` : message.phase;
           setInbox((list) => [
-            `${message.extension} ${message.phase}${message.caller ? ` · ${message.caller}` : ''}`,
+            `${message.extension} ${what}${message.caller ? ` · ${message.caller}` : ''}`,
             ...list,
           ].slice(0, 4));
         }
@@ -268,6 +298,11 @@ export default function Softphone() {
   /* ------------------------------------------------------------- teardown -- */
 
   const stopMedia = useCallback(() => {
+    // The mask graph must not outlive the call: an AudioContext left open keeps
+    // the tab's audio pipeline awake and holds the microphone indicator on.
+    const mask = maskRef.current;
+    maskRef.current = null;
+    mask?.mask.stop();
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     cameraTrackRef.current = null;
@@ -317,6 +352,8 @@ export default function Softphone() {
     // Leaving the page must not leave the microphone hot.
     sessionRef.current?.bye?.().catch?.(() => {});
     uaRef.current?.stop?.();
+    maskRef.current?.mask.stop();
+    maskRef.current = null;
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     wsRef.current?.close();
   }, []);
@@ -346,12 +383,53 @@ export default function Softphone() {
     }, delay);
   }, []);
 
+  /**
+   * Dial by voice: recognition turns what was said into digits, and the dial
+   * field is filled rather than called, so a misheard word is visible before it
+   * becomes a call.
+   */
+  const dictateNumber = () => {
+    if (!recognitionSupported()) {
+      toast.error('No speech recognition', 'This browser has none. Chrome, Edge and Safari do.');
+      return;
+    }
+    toast.info('Listening', 'Say a number — “call one oh one”.');
+    startDictation({
+      onFinal: (text) => {
+        const digits = digitsFromSpeech(text);
+        if (!digits) {
+          toast.error('Nothing dialable heard', text ? `Heard “${text}”.` : 'Try again a little closer to the microphone.');
+          return;
+        }
+        setDial(digits);
+      },
+      onError: (message) => toast.error('Could not listen', message),
+    });
+  };
+
   const connect = async ({ auto = false } = {}) => {
     if (!extension) return;
     setConnecting(!auto);
     setConnectError('');
     try {
-      const data = await api.post('/softphone/session', { extension });
+      const data = await api.post('/softphone/session', { extension, voiceTicket: voiceTicketRef.current || undefined });
+      // Spent by the server, whatever happened next.
+      voiceTicketRef.current = '';
+      setVoiceNeeded(false);
+      if (data.scif) setScif(data.scif);
+      // The installed SCIF app opens with `scif=1`: arm the line itself, so the
+      // promise holds for the handset too and survives this browser.
+      if (armedRef.current && data.scif && !data.scif.enabled) {
+        api
+          .post('/softphone/scif', { extension, scif: true })
+          .then((result) => {
+            setScif(result.scif);
+            toast.success('SCIF armed on this line', 'Caller ID is withheld and recording is off at the switch.');
+          })
+          .catch(() => {
+            /* the session still works; the operator can arm it by hand */
+          });
+      }
 
       const sip = await import('sip.js');
       const { UserAgent, Registerer } = sip;
@@ -466,10 +544,17 @@ export default function Softphone() {
       }
       uaRef.current = null;
       setSession(null);
-      setConnectError(
-        explain(err, status) ||
-          `Could not reach the switch at ${status?.wssUrl}. Check that port ${status?.wssPort || 8089} is published and the certificate is trusted.`
-      );
+      if (err?.code === 'voice_required') {
+        // The line asked for a voice check and did not get one: say where the fix
+        // is instead of blaming the switch.
+        setVoiceNeeded(true);
+        setConnectError('This line requires a voice check. Use Voice → Check my voice, then connect again.');
+      } else {
+        setConnectError(
+          explain(err, status) ||
+            `Could not reach the switch at ${status?.wssUrl}. Check that port ${status?.wssPort || 8089} is published and the certificate is trusted.`
+        );
+      }
       setRegState('failed');
       if (auto) {
         // Silent by design: an automatic retry must not stack up toasts.
@@ -482,9 +567,59 @@ export default function Softphone() {
     }
   };
 
+  /**
+   * In the native app: register this phone for calls, and come back online when
+   * one is answered from the lock screen. A browser has no such bridge, so this
+   * does nothing there.
+   */
+  useEffect(() => {
+    if (!session) return undefined;
+    return watchCalls({
+      extension: session.extension.extension,
+      onIncoming: (call) => {
+        // The switch parks a call it cannot hand to a registered phone, and the
+        // push carries the space it is waiting in.
+        if (call?.parkingSpace) parkSpaceRef.current = String(call.parkingSpace);
+        toast.info('Incoming call', call?.display || call?.from || 'Ringing on this phone');
+      },
+      onAnswered: () => {
+        toast.success(
+          'Answered on the phone',
+          parkSpaceRef.current ? `Joining the call in ${parkSpaceRef.current}…` : 'Joining the line…'
+        );
+        // The app was suspended; CallKit is now holding the audio session. A
+        // registration that lapsed while asleep is rebuilt here.
+        if (!sessionRef.current) connectRef.current?.({ auto: true });
+      },
+      onEnded: () => {
+        // Declined, or the caller gave up: nothing left to join.
+        parkSpaceRef.current = '';
+      },
+      onError: (message) => toast.error('Native calls', message),
+    });
+  }, [session]);
+
+  // Joining the parked call. Answering CallKit does not by itself put the audio
+  // anywhere: the line has to register and then dial the space, and that dial is
+  // what bridges the caller in. Answering into silence is the bug this closes.
+  useEffect(() => {
+    const space = parkSpaceRef.current;
+    if (!space || regState !== 'registered') return;
+    if (call?.state === 'incall' || call?.state === 'dialing') return;
+    // Claimed before dialing: the space is one attempt, not a number to redial
+    // every time the call state changes.
+    parkSpaceRef.current = '';
+    setDial(space);
+    dialRef.current?.(space, { parked: true });
+  }, [regState, call]);
+
   // The reconnect timer and the online listener both need the current connect.
   useEffect(() => {
     connectRef.current = connect;
+  });
+  // The parked-call join dials from an effect, so it needs the current dial.
+  useEffect(() => {
+    dialRef.current = dialTarget;
   });
   useEffect(() => {
     keepRef.current = keep;
@@ -550,9 +685,15 @@ export default function Softphone() {
 
   /* ---------------------------------------------------------------- calls -- */
 
-  const placeCall = async () => {
+  /**
+   * Dial something on this line.
+   *
+   * The number is an argument rather than read from the pad because two things
+   * dial: the operator, and the phone answering a call that is already parked —
+   * that one dials the parking space the push named.
+   */
+  const dialTarget = async (target, { parked = false } = {}) => {
     const ua = uaRef.current;
-    const target = dial.trim();
     if (!ua || !target) return;
     const sip = await import('sip.js');
     const domain = new URL(session.wssUrl.replace(/^wss:/, 'https:')).hostname;
@@ -603,11 +744,19 @@ export default function Softphone() {
     sessionRef.current = inviter;
     inviter.invite().catch(async (err) => {
       setCall(null);
-      toast.error('Call failed', err.message);
+      // A space is only held for the parking timeout, so failing to reach one
+      // means the caller went to voicemail — worth saying plainly.
+      if (parked) {
+        toast.error('The call is no longer parked', 'It may have gone to voicemail already.');
+      } else {
+        toast.error('Call failed', err.message);
+      }
       sendPresence('idle', '');
       await inviter.dispose?.();
     });
   };
+
+  const placeCall = () => dialTarget(dial.trim());
 
   const answer = async () => {
     const invitation = sessionRef.current;
@@ -705,6 +854,78 @@ export default function Softphone() {
       /* a keypress that cannot be sent must not break the call */
     }
   };
+
+  /* ---------------------------------------------------------------- SCIF -- */
+
+  const saveScif = async (patch) => {
+    if (!extension) return;
+    setScifSaving(true);
+    try {
+      const result = await api.post('/softphone/scif', { extension, ...patch });
+      setScif(result.scif);
+      toast.success(
+        'SCIF updated',
+        result.applied ? 'Switch configuration written and reloaded.' : 'Saved for this line.'
+      );
+    } catch (err) {
+      toast.error('Could not save the SCIF setting', err.message);
+    } finally {
+      setScifSaving(false);
+    }
+  };
+
+  // Put the mask into the outbound audio path, or take it out. The sender's own
+  // track is kept, so "off" restores the real microphone exactly rather than a
+  // second-hand copy of it.
+  useEffect(() => {
+    const pc = pcRef.current;
+    if (!pc) return undefined;
+    const wanted = scif.enabled ? scif.voiceMask : 'off';
+    const sender = maskRef.current?.sender || pc.getSenders().find((entry) => entry.track?.kind === 'audio');
+    if (!sender) return undefined;
+
+    if (wanted === 'off') {
+      const current = maskRef.current;
+      if (!current) return undefined;
+      maskRef.current = null;
+      current.mask.stop();
+      current.sender.replaceTrack(current.original).catch(() => {});
+      return undefined;
+    }
+    if (maskRef.current) {
+      // A different disguise on a live call: the graph stays, the ratio changes.
+      maskRef.current.mask.setMode(wanted);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const original = sender.track;
+    createVoiceMask(original, wanted)
+      .then(async (mask) => {
+        if (cancelled) {
+          await mask.stop();
+          return;
+        }
+        await sender.replaceTrack(mask.track);
+        maskRef.current = { sender, original, mask };
+      })
+      .catch((err) => toast.error('Voice masking is unavailable', err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [scif.enabled, scif.voiceMask, call?.state, toast]);
+
+  // SCIF refuses a call it cannot prove is encrypted. DTLS settles within a
+  // second on a healthy path, so a call still unverified after seven is a call
+  // that was never going to be.
+  useEffect(() => {
+    if (!scif.enabled || call?.state !== 'incall' || secure === true) return undefined;
+    const timer = setTimeout(() => {
+      toast.error('Call ended — media is not encrypted', 'SCIF refuses a call unless DTLS-SRTP is established.');
+      hangup();
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [scif.enabled, call?.state, secure, hangup, toast]);
 
   if (!status) return <Loading rows={4} />;
 
@@ -860,6 +1081,12 @@ export default function Softphone() {
                   {connectError}
                 </p>
               ) : null}
+              {voiceNeeded ? (
+                <p className="tiny" style={{ color: 'var(--warning)' }}>
+                  A voice check is required on this line. The Voice card on the right records it and connects you
+                  when it passes.
+                </p>
+              ) : null}
               <p className="tiny dim">
                 Registration goes to <span className="mono">{status.wssUrl}</span> using the extension's own
                 credentials. The switch has no DTLS, ICE or AVPF switch to turn off: the generated endpoint is
@@ -887,18 +1114,30 @@ export default function Softphone() {
                 </div>
               ) : null}
 
-              <input
-                className="input mono"
-                style={{ fontSize: '1.125rem', letterSpacing: '.04em' }}
-                value={dial}
-                onChange={(e) => setDial(e.target.value.replace(/[^\d+*#]/g, ''))}
-                placeholder="Number or extension"
-                inputMode="tel"
-                aria-label="Destination"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !inCall) placeCall();
-                }}
-              />
+              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                <input
+                  className="input mono"
+                  style={{ fontSize: '1.125rem', letterSpacing: '.04em', flex: 1 }}
+                  value={dial}
+                  onChange={(e) => setDial(e.target.value.replace(/[^\d+*#]/g, ''))}
+                  placeholder="Number or extension"
+                  inputMode="tel"
+                  aria-label="Destination"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !inCall) placeCall();
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  icon="mic"
+                  aria-label="Dial by voice"
+                  title="Say a number, e.g. “call one oh one”"
+                  disabled={!registered || !status.voice?.recognition}
+                  onClick={dictateNumber}
+                >
+                  Say it
+                </Button>
+              </div>
 
               <div className="dialpad" role="group" aria-label="Keypad">
                 {DIALPAD.map(([digit, letters]) => (
@@ -942,6 +1181,7 @@ export default function Softphone() {
                     </Badge>
                     {call.direction === 'inbound' ? <Badge tone="info">inbound</Badge> : null}
                     {secure ? <Badge tone="success">DTLS-SRTP</Badge> : null}
+                    {scif.enabled ? <Badge tone="info">SCIF</Badge> : null}
                     {reconnecting ? <Badge tone="warning" dot="warn">reconnecting</Badge> : null}
                   </div>
                 )}
@@ -987,6 +1227,78 @@ export default function Softphone() {
               </Empty>
             )}
           </Card>
+
+          <Card
+            title="SCIF"
+            subtitle="Secure profile the switch enforces on this line"
+            actions={
+              <Badge tone={scif.enabled ? 'success' : 'neutral'} dot={scif.enabled ? 'live' : undefined}>
+                {scif.enabled ? 'Armed' : 'Off'}
+              </Badge>
+            }
+          >
+            <div className="stack">
+              <Switch
+                checked={scif.enabled}
+                label="SCIF mode — withhold identity, never record"
+                onChange={(value) => saveScif({ scif: value })}
+              />
+              <div className="grid two">
+                <Select
+                  label="Caller ID"
+                  value={scif.callerId?.mode || 'own'}
+                  onChange={(event) => saveScif({ callerIdMode: event.target.value })}
+                  disabled={!scif.enabled || scifSaving}
+                >
+                  <option value="own">Show this line's number</option>
+                  <option value="anonymous">Withhold it (anonymous)</option>
+                  <option value="custom">Present another number</option>
+                </Select>
+                <Select
+                  label="Voice mask"
+                  value={scif.voiceMask || 'off'}
+                  onChange={(event) => saveScif({ voiceMask: event.target.value })}
+                  disabled={!scif.enabled || scifSaving}
+                >
+                  {MASK_MODES.map((mode) => (
+                    <option key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              {scif.callerId?.mode === 'custom' ? (
+                <Input
+                  label="Number to present"
+                  defaultValue={scif.callerId.number}
+                  placeholder="+14155550100"
+                  onBlur={(event) => saveScif({ callerIdNumber: event.target.value })}
+                  disabled={!scif.enabled || scifSaving}
+                  hint="Applied by the switch, so it holds on every device on this line."
+                />
+              ) : null}
+              <Switch
+                checked={!!scif.maskText}
+                label="Mask numbers and addresses in voicemail and messages"
+                onChange={(value) => saveScif({ maskText: value })}
+                disabled={!scif.enabled || scifSaving}
+              />
+              <p className="tiny dim" style={{ margin: 0 }}>
+                {scif.enabled
+                  ? 'Media must be DTLS-SRTP or the call is ended. This line is never recorded, caller ID follows the setting above, and the voice mask runs on the microphone in this browser before anything is sent.'
+                  : 'Off. Turning this on withholds your number, stops recording on this line at the switch, and enables the voice mask and text masking.'}
+              </p>
+            </div>
+          </Card>
+
+          <VoicePanel
+            extension={extension}
+            onTicket={(ticket) => {
+              voiceTicketRef.current = ticket;
+              toast.success('Voice check passed', 'Opening the line…');
+              connectRef.current?.();
+            }}
+          />
 
           <Card title="Operators online" subtitle="Presence over the platform socket">
             {peers.length ? (

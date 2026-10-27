@@ -540,6 +540,69 @@ check('opt-out can be reversed', restored.status === 200 && restored.body.ok ===
 const visibleAgain = await call('GET', `/api/public/lookup?number=${encode(FIXTURE_NUMBER)}`);
 check('reversed opt-out restores public visibility', visibleAgain.body.found === true, visibleAgain.body);
 
+// --------------------------------------------------------- number provider --
+// The carrier is optional, and this suite runs with no VoIP.ms credentials on
+// purpose: what is asserted is that a deployment without one behaves — the
+// console learns the provider is not connected instead of meeting a 500, and no
+// request tries to buy a number it cannot pay for.
+const providerStatus = await call('GET', '/api/provider/voipms');
+check(
+  'number provider reports itself disconnected without credentials',
+  providerStatus.status === 200 &&
+    providerStatus.body.provider === 'voipms' &&
+    providerStatus.body.configured === false &&
+    providerStatus.body.error === 'not_configured',
+  providerStatus.body
+);
+check(
+  'provider status says where credentials would come from, never what they are',
+  providerStatus.body.credentials?.username === '' && providerStatus.body.credentials?.password === '',
+  providerStatus.body.credentials
+);
+
+const providerSearch = await call('GET', '/api/provider/voipms/search?country=US&region=CA&q=415');
+check(
+  'search without a connected provider is refused, not crashed',
+  providerSearch.status === 409 && providerSearch.body.error?.code === 'not_configured',
+  providerSearch.body
+);
+
+const providerOrder = await call('POST', '/api/provider/voipms/numbers', { dids: ['+14155550199'], monthlyCostCents: 85 });
+check(
+  'ordering without a connected provider is refused before anything is bought',
+  providerOrder.status === 409 && providerOrder.body.error?.code === 'not_configured',
+  providerOrder.body
+);
+
+const providerBadOrder = await call('POST', '/api/provider/voipms/numbers', { dids: ['not-a-number'] });
+check(
+  'a garbage DID never reaches the carrier',
+  providerBadOrder.status === 400 && providerBadOrder.body.failed?.[0]?.did === 'not-a-number',
+  providerBadOrder.body
+);
+
+const providerEmptyOrder = await call('POST', '/api/provider/voipms/numbers', {});
+check('an empty order is rejected', providerEmptyOrder.status === 400, providerEmptyOrder.body);
+
+const providerCosts = await call('GET', '/api/provider/voipms/costs');
+check(
+  'rent roll-up answers for the current month',
+  providerCosts.status === 200 &&
+    /^\d{4}-\d{2}$/.test(providerCosts.body.period) &&
+    providerCosts.body.totalCents === 0,
+  providerCosts.body
+);
+
+const providerBadPeriod = await call('GET', '/api/provider/voipms/costs?period=2026-13');
+check('a nonsense rent period is rejected', providerBadPeriod.status === 400, providerBadPeriod.body);
+
+const providerCostsForAccount = await call('GET', `/api/provider/voipms/costs?account=${encode(email)}`);
+check(
+  'rent can be asked for one account',
+  providerCostsForAccount.status === 200 && Array.isArray(providerCostsForAccount.body.charges),
+  providerCostsForAccount.body
+);
+
 // ---------------------------------------------------------------- telephony --
 const extensions = await call('GET', '/api/extensions');
 check('extensions listed', extensions.status === 200 && extensions.body.items.length >= 5, extensions.body.items?.length);
@@ -2971,6 +3034,591 @@ check('the hand-onboarded customer can use the portal immediately', handAccess.s
 const staffStillIn = await fetch(`${base}/api/plans`, { headers: { cookie: ownerCookie } });
 check('a staff account is never gated by the commerce side', staffStillIn.status === 200, staffStillIn.status);
 cookie = ownerCookie;
+
+/* ------------------------------------------------- invoice lines and rent -- */
+// An invoice used to be one number. A line item is what lets a customer see
+// what they are paying for, and what lets a month of number rent live on the
+// bill instead of only in the ledger.
+console.log('\nInvoice line items and number rent');
+
+const today = new Date().toISOString().slice(0, 10);
+const lineInvoice = await call('POST', '/api/billing/invoices', {
+  accountName: 'Line Items Co',
+  email: 'lines@example.com',
+  periodStart: today,
+  periodEnd: today,
+  items: [
+    { description: 'Number rent — office line', amountCents: 1450 },
+    { description: 'Installation', amountCents: 5000 },
+    { description: 'Loyalty discount', kind: 'discount', amountCents: -500 },
+  ],
+});
+const lineInvoiceId = lineInvoice.body.invoice?.id;
+check(
+  'an invoice built from lines totals their sum',
+  lineInvoice.status === 201 &&
+    lineInvoice.body.invoice?.amountCents === 5950 &&
+    (lineInvoice.body.invoice?.items || []).length === 3,
+  lineInvoice.body.invoice
+);
+check(
+  'a discount is a negative line, not a special case in the total',
+  (lineInvoice.body.invoice?.items || []).some((item) => item.kind === 'discount' && item.amountCents === -500),
+  lineInvoice.body.invoice?.items
+);
+
+const typedTotal = await call('PATCH', `/api/billing/invoices/${lineInvoiceId}`, { amountCents: 100 });
+check('a typed total cannot overwrite a line-built invoice', typedTotal.status === 400, typedTotal.body);
+
+const extraLine = await call('POST', `/api/billing/invoices/${lineInvoiceId}/items`, {
+  description: 'Extra handset',
+  unitAmountCents: 2500,
+});
+check(
+  'adding a line raises the total by that line',
+  extraLine.status === 200 && extraLine.body.invoice?.amountCents === 8450,
+  extraLine.body.invoice?.amountCents
+);
+
+const dropLine = await call('DELETE', `/api/billing/invoice-items/${extraLine.body.item?.id}`);
+check(
+  'removing a line brings the total back',
+  dropLine.status === 200 && dropLine.body.invoice?.amountCents === 5950,
+  dropLine.body.invoice?.amountCents
+);
+
+const lineDetail = await call('GET', `/api/billing/invoices/${lineInvoiceId}`);
+check(
+  'the invoice detail carries the lines behind its total',
+  lineDetail.status === 200 && (lineDetail.body.invoice?.items || []).length === 3,
+  lineDetail.body.invoice?.items?.map((item) => item.kind)
+);
+
+const rentOverview = await call('GET', '/api/billing/rent');
+check(
+  'rent reports the month, its label and what is not yet billed',
+  rentOverview.status === 200 &&
+    /^\d{4}-\d{2}$/.test(rentOverview.body.period) &&
+    /\d{4}/.test(rentOverview.body.label || '') &&
+    typeof rentOverview.body.uninvoiced?.lines === 'number',
+  rentOverview.body
+);
+
+// One bill per subscriber per month: the plan fee and the number rent are lines
+// on the same invoice, so a customer is never sent a rent-only statement.
+const rentForAccount = await call('POST', '/api/billing/invoices', {
+  account: subscriberEmail,
+  periodStart: today,
+  periodEnd: today,
+  rentPeriod: rentOverview.body.period,
+});
+const duplicateRent = await call('POST', '/api/billing/invoices', {
+  account: subscriberEmail,
+  periodStart: today,
+  periodEnd: today,
+  rentPeriod: rentOverview.body.period,
+});
+check(
+  'one invoice per account per rent month',
+  rentForAccount.status === 201 && duplicateRent.status === 409,
+  { first: rentForAccount.status, second: duplicateRent.status, body: duplicateRent.body }
+);
+check(
+  'an invoice created for a rent month is linked to the account it bills',
+  rentForAccount.body.invoice?.accountId &&
+    rentForAccount.body.invoice?.rentPeriod === rentOverview.body.period &&
+    rentForAccount.body.invoice?.email === subscriberEmail,
+  rentForAccount.body.invoice
+);
+
+// The subscriber's plan was comped, so nothing collected its fee and the plan
+// fee is payable on the same bill as the rent.
+const monthPlanLine = (rentForAccount.body.invoice?.items || []).find((item) => item.kind === 'plan');
+check(
+  'a month invoice carries the plan next to the rent',
+  monthPlanLine?.settledBy === 'invoice' &&
+    /Plan/.test(monthPlanLine?.description || '') &&
+    rentForAccount.body.plan?.added === 1,
+  { line: monthPlanLine, plan: rentForAccount.body.plan }
+);
+
+const rentOnto = await call('POST', `/api/billing/invoices/${rentForAccount.body.invoice?.id}/rent`, {
+  period: rentOverview.body.period,
+});
+check(
+  'pulling rent onto an invoice with no rented lines adds none',
+  rentOnto.status === 200 && rentOnto.body.billed?.added === 0 && rentOnto.body.billed?.cents === 0,
+  rentOnto.body
+);
+
+// A second run for the same account and month must not add a line or a bill.
+const rentRun = await call('POST', '/api/billing/rent/run', {
+  account: subscriberEmail,
+  period: rentOverview.body.period,
+});
+check(
+  'a monthly run for an account already billed adds nothing',
+  rentRun.status === 200 &&
+    rentRun.body.billedLines === 0 &&
+    rentRun.body.planLines === 0 &&
+    rentRun.body.invoices.length === 0,
+  rentRun.body
+);
+
+/* ------------------------------------------- the first-login confirmation -- */
+// A paying customer's number must not appear in a worldwide directory because a
+// form defaulted to yes — and must not be missing because nobody asked.
+console.log('\nThe first-login confirmation');
+
+const listedNumber = await call('POST', '/api/numbers', { number: '+1 415 555 0196', lineType: 'voip' });
+const ownedNumber = await call('PATCH', `/api/numbers/${listedNumber.body.number?.id}`, {
+  account: subscriberEmail,
+  visibility: 'private',
+});
+check(
+  'a customer can be given a number',
+  ownedNumber.status === 200 && ownedNumber.body.number?.e164 === '+14155550196',
+  ownedNumber.body.number?.e164
+);
+
+const asCustomer = async (method, path, body) => {
+  const res = await fetch(base + path, {
+    method,
+    headers: { accept: 'application/json', 'content-type': 'application/json', cookie: subscriberCookie },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+};
+
+const freshPortal = await asCustomer('GET', '/api/me');
+check(
+  'a customer arrives with their details unconfirmed and no directory answer',
+  freshPortal.status === 200 &&
+    freshPortal.body.profile?.confirmed === false &&
+    freshPortal.body.profile?.directoryOptIn === false,
+  freshPortal.body.profile
+);
+
+const guessingDirectory = await asCustomer('POST', '/api/me/profile', { name: 'Smoke Subscriber' });
+check(
+  'the confirmation refuses to guess the directory answer',
+  guessingDirectory.status === 400 && /directory/i.test(guessingDirectory.body.error?.message || ''),
+  guessingDirectory.body
+);
+
+const optedOut = await asCustomer('POST', '/api/me/profile', {
+  name: 'Smoke Subscriber',
+  company: 'Smoke Subscriber Co',
+  address: '120 Harbor Way',
+  city: 'Austin',
+  country: 'us',
+  website: 'smoke.example',
+  kind: 'business',
+  directoryOptIn: false,
+});
+check(
+  'confirming with an opt-out keeps the number out of the directory',
+  optedOut.status === 200 &&
+    optedOut.body.profile?.confirmed === true &&
+    optedOut.body.profile?.directoryOptIn === false &&
+    (optedOut.body.profile?.numbers || []).every((number) => number.visibility === 'private' && !number.listed),
+  optedOut.body
+);
+const hiddenLookup = await call('GET', `/api/public/lookup?number=${encode('+14155550196')}`, undefined, {
+  noCookie: true,
+  bearer: '',
+});
+check('an opted-out number is not in the public directory', hiddenLookup.body.found === false, hiddenLookup.body);
+
+const optedIn = await asCustomer('POST', '/api/me/profile', {
+  name: 'Smoke Subscriber',
+  company: 'Smoke Subscriber Co',
+  address: '120 Harbor Way',
+  city: 'Austin',
+  country: 'US',
+  website: 'smoke.example',
+  kind: 'business',
+  directoryOptIn: true,
+});
+check(
+  'opting in publishes the number and writes the listing',
+  optedIn.status === 200 &&
+    optedIn.body.applied?.listed >= 1 &&
+    (optedIn.body.profile?.numbers || []).some((number) => number.listed && number.visibility === 'public'),
+  optedIn.body
+);
+const publishedLookup = await call('GET', `/api/public/lookup?number=${encode('+14155550196')}`, undefined, {
+  noCookie: true,
+  bearer: '',
+});
+check(
+  'the directory finds it under the name the customer gave',
+  publishedLookup.body.found === true &&
+    (publishedLookup.body.entry?.listings || []).some((entry) => entry.name === 'Smoke Subscriber Co'),
+  publishedLookup.body.entry
+);
+
+const withdrawn = await asCustomer('POST', '/api/me/profile', {
+  name: 'Smoke Subscriber',
+  company: 'Smoke Subscriber Co',
+  directoryOptIn: false,
+});
+const withdrawnLookup = await call('GET', `/api/public/lookup?number=${encode('+14155550196')}`, undefined, {
+  noCookie: true,
+  bearer: '',
+});
+check(
+  'opting out again withdraws the listing and hides the number',
+  withdrawn.status === 200 &&
+    withdrawn.body.profile?.directoryOptIn === false &&
+    withdrawnLookup.body.found === false,
+  { profile: withdrawn.body.profile, lookup: withdrawnLookup.body.found }
+);
+
+/* ------------------------------------------------------------------ SCIF -- */
+// SCIF is a promise the switch keeps, not a badge in the UI: the line withholds
+// its caller ID, never records, and the app masks what it shows.
+console.log('\nSCIF — the secure line profile');
+
+const scifLine = await call('PATCH', `/api/extensions/${assignedLine.body.extension?.id}`, {
+  number: '+14155550196',
+});
+const scifAgent = await call('POST', '/api/voice/agents', {
+  name: `SCIF Recording ${Date.now()}`,
+  greeting: 'SCIF recording policy test.',
+  number: '+14155550196',
+  status: 'active',
+  recordInbound: true,
+});
+const blockFor = (content, digits) => {
+  const match = new RegExp(`exten => ${digits},1([\\s\\S]*?)(?=\\nexten|\\n\\[)`).exec(content);
+  return match ? match[0] : '';
+};
+const preScif = await call('GET', '/api/system/config-preview?file=extensions.conf');
+check(
+  'the agent would record this line before SCIF is armed',
+  scifLine.status === 200 &&
+    scifAgent.status === 201 &&
+    /MixMonitor\(/.test(blockFor(preScif.body.content || '', '14155550196')),
+  blockFor(preScif.body.content || '', '14155550196')
+);
+
+const scifSave = await asCustomer('POST', '/api/softphone/scif', {
+  extension: '296',
+  scif: true,
+  callerIdMode: 'anonymous',
+  voiceMask: 'low',
+  maskText: true,
+});
+check(
+  'SCIF arms the line with a withheld caller ID, a mask and no recording',
+  scifSave.status === 200 &&
+    scifSave.body.scif?.enabled === true &&
+    scifSave.body.scif?.callerId?.presentation === 'prohibited' &&
+    scifSave.body.scif?.voiceMask === 'low' &&
+    scifSave.body.scif?.maskText === true &&
+    scifSave.body.scif?.recording === 'off',
+  scifSave.body
+);
+
+const postScif = await call('GET', '/api/system/config-preview?file=extensions.conf');
+check(
+  'the switch stops recording a SCIF line, whatever the agent asks for',
+  !/MixMonitor\(/.test(blockFor(postScif.body.content || '', '14155550196')) &&
+    /SCIF lines never record: 296/.test(postScif.body.content || ''),
+  blockFor(postScif.body.content || '', '14155550196')
+);
+const scifPjsip = await call('GET', '/api/system/config-preview?file=pjsip.conf');
+check(
+  'the endpoints present an anonymous caller ID',
+  (scifPjsip.body.content || '').split('callerid="Anonymous" <anonymous>').length - 1 >= 2,
+  (scifPjsip.body.content || '')
+    .split('\n')
+    .filter((line) => line.startsWith('callerid='))
+    .slice(0, 4)
+);
+
+const badMask = await asCustomer('POST', '/api/softphone/scif', { extension: '296', voiceMask: 'helium' });
+check('an unknown voice mask is refused', badMask.status === 400, badMask.body);
+
+const customWithoutNumber = await asCustomer('POST', '/api/softphone/scif', {
+  extension: '296',
+  callerIdMode: 'custom',
+});
+check('presenting another number needs that number', customWithoutNumber.status === 400, customWithoutNumber.body);
+
+const foreignScif = await asCustomer('POST', '/api/softphone/scif', { extension: '101', scif: true });
+check(
+  'a customer cannot arm a line that is not theirs',
+  foreignScif.status === 403 || foreignScif.status === 404,
+  foreignScif.status
+);
+
+const scifSession = await asCustomer('POST', '/api/softphone/session', { extension: '296' });
+check(
+  'the session tells the browser to require encryption',
+  scifSession.status === 201 &&
+    scifSession.body.scif?.requiresEncryption === true &&
+    scifSession.body.scif?.recording === 'off',
+  scifSession.body.scif
+);
+
+// Masking: the line asked for redaction, so identifiers do not leave the API.
+await call('POST', '/api/messages', {
+  to: '+14155550196',
+  channel: 'sms',
+  body: 'Call +1 415 555 0177 or write sam@example.com',
+});
+const scifMessages = await call('GET', '/api/messages?channel=sms');
+const maskedRow = (scifMessages.body.items || [])[0];
+check(
+  'a masked line redacts numbers and addresses in its messages',
+  maskedRow?.masked === true &&
+    !/415 555 0177/.test(maskedRow.body || '') &&
+    !/sam@example\.com/.test(maskedRow.body || ''),
+  maskedRow
+);
+
+/* ------------------------------------------------------------------ voice -- */
+// Voice on the line: a voiceprint computed by the platform, and the gate a
+// softphone session has to spend a passed check on. The audio here is synthetic
+// — two formant patterns, one "person" each — so the check is repeatable and no
+// microphone is involved.
+
+console.log('\nVoice: voiceprint and the session gate');
+
+const voiceWav = ({ f0, formants, seed = 1, seconds = 1.6 }) => {
+  const rate = 16000;
+  const length = Math.floor(rate * seconds);
+  const buffer = Buffer.alloc(44 + length * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + length * 2, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(1, 22);
+  buffer.writeUInt32LE(rate, 24);
+  buffer.writeUInt32LE(rate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(length * 2, 40);
+
+  let state = seed;
+  const random = () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const offsets = Array.from({ length: 40 }, () => random() * Math.PI * 2);
+  let phase = 0;
+  for (let i = 0; i < length; i += 1) {
+    const t = i / rate;
+    const frequency = f0 * (1 + 0.01 * Math.sin(2 * Math.PI * 5.5 * t));
+    phase += (2 * Math.PI * frequency) / rate;
+    let value = 0;
+    for (let h = 1; h <= 12; h += 1) {
+      const harmonic = frequency * h;
+      if (harmonic > 7500) break;
+      let amp = 0.05 / h;
+      for (const formant of formants) amp += Math.exp(-((harmonic - formant) ** 2) / (2 * 180 ** 2));
+      value += amp * Math.sin(h * phase + offsets[h - 1]);
+    }
+    const envelope = Math.min(1, t / 0.1, (seconds - t) / 0.15);
+    const sample = 0.35 * envelope * value + (random() - 0.5) * 0.01;
+    buffer.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(sample * 32768))), 44 + i * 2);
+  }
+  return buffer.toString('base64');
+};
+
+const ownerTake = (seed) => voiceWav({ f0: 196, formants: [760, 1400, 2700], seed });
+const otherTake = (seed) => voiceWav({ f0: 112, formants: [520, 960, 2400], seed });
+
+const voiceBefore = await asCustomer('GET', '/api/voice/status?extension=296');
+check(
+  'a line starts with no voiceprint and no gate',
+  voiceBefore.status === 200 &&
+    voiceBefore.body.voiceprint?.enrolled === false &&
+    voiceBefore.body.gate?.required === false &&
+    voiceBefore.body.available === true,
+  voiceBefore.body
+);
+
+const junkEnroll = await asCustomer('POST', '/api/voice/enroll', {
+  extension: '296',
+  phrase: 'my voice unlocks this line',
+  samples: ['not even base64!!'],
+});
+check('junk audio is refused at enrollment', junkEnroll.status === 400, junkEnroll.body);
+
+const enrolledVoice = await asCustomer('POST', '/api/voice/enroll', {
+  extension: '296',
+  phrase: 'my voice unlocks this line',
+  samples: [ownerTake(7), ownerTake(99)],
+});
+check(
+  'two takes enroll a voiceprint on the line',
+  enrolledVoice.status === 200 &&
+    enrolledVoice.body.voiceprint?.samples === 2 &&
+    enrolledVoice.body.voiceprint?.consistency > 0.75,
+  enrolledVoice.body.voiceprint
+);
+
+const voiceAfter = await asCustomer('GET', '/api/voice/status?extension=296');
+check(
+  'the status reports the print without handing back the vector',
+  voiceAfter.status === 200 &&
+    voiceAfter.body.voiceprint?.enrolled === true &&
+    voiceAfter.body.voiceprint?.embedding === undefined &&
+    voiceAfter.body.sample?.minSeconds >= 1,
+  voiceAfter.body.voiceprint
+);
+
+const impostor = await asCustomer('POST', '/api/voice/verify', {
+  extension: '296',
+  audio: otherTake(3),
+  heard: 'my voice unlocks this line',
+});
+check(
+  'another voice does not pass, and gets no ticket',
+  impostor.status === 200 &&
+    impostor.body.ok === false &&
+    impostor.body.score < impostor.body.threshold &&
+    !impostor.body.ticket,
+  impostor.body
+);
+
+const ownerCheck = await asCustomer('POST', '/api/voice/verify', {
+  extension: '296',
+  audio: ownerTake(51),
+  heard: 'my voice unlocks this line',
+});
+check(
+  'the owner passes and is given one ticket',
+  ownerCheck.status === 200 && ownerCheck.body.ok === true && !!ownerCheck.body.ticket,
+  ownerCheck.body
+);
+
+const required = await asCustomer('POST', '/api/voice/require', { extension: '296', enabled: true });
+check(
+  'the line can require a check once it has a print',
+  required.status === 200 && required.body.gate?.required === true && required.body.gate?.enforced === true,
+  required.body
+);
+
+const blockedSession = await asCustomer('POST', '/api/softphone/session', { extension: '296' });
+check(
+  'a session without a passed check is refused, with a reason the app can act on',
+  blockedSession.status === 403 && blockedSession.body.error?.code === 'voice_required',
+  blockedSession.body
+);
+
+const ticketedSession = await asCustomer('POST', '/api/softphone/session', {
+  extension: '296',
+  voiceTicket: ownerCheck.body.ticket,
+});
+check('the ticket opens the line', ticketedSession.status === 201, ticketedSession.body.error);
+
+const replaySession = await asCustomer('POST', '/api/softphone/session', {
+  extension: '296',
+  voiceTicket: ownerCheck.body.ticket,
+});
+check('the same ticket cannot be spent twice', replaySession.status === 403, replaySession.body);
+
+const foreignVoice = await asCustomer('GET', '/api/voice/status?extension=101');
+check('a customer cannot read another line\'s voice settings', foreignVoice.status === 403 || foreignVoice.status === 404, foreignVoice.status);
+
+const opened = await asCustomer('POST', '/api/voice/require', { extension: '296', enabled: false });
+check('the gate can be switched off again', opened.status === 200 && opened.body.gate?.required === false, opened.body);
+
+/* ------------------------------------------------------------------- push -- */
+// Ringing a locked iPhone. APNs is off in this environment, so what is proved
+// here is the registration contract and that the platform says why it cannot
+// ring instead of pretending it did.
+
+console.log('\nPush: the native app registration');
+
+const pushBefore = await asCustomer('GET', '/api/softphone/push?extension=296');
+check(
+  'push status is honest about being unconfigured',
+  pushBefore.status === 200 &&
+    pushBefore.body.status?.enabled === false &&
+    pushBefore.body.devices?.length === 0,
+  pushBefore.body.status
+);
+
+const voipToken = 'a'.repeat(32) + 'b'.repeat(32);
+const registered = await asCustomer('POST', '/api/softphone/push/register', {
+  extension: '296',
+  token: voipToken,
+  platform: 'ios',
+  environment: 'development',
+  deviceName: 'Smoke iPhone',
+});
+check(
+  'a phone can register a push token against its line',
+  registered.status === 200 &&
+    registered.body.device?.extension === '296' &&
+    registered.body.device?.token?.includes('…') &&
+    !JSON.stringify(registered.body).includes(voipToken),
+  registered.body.device
+);
+
+const registeredAgain = await asCustomer('POST', '/api/softphone/push/register', {
+  extension: '296',
+  token: voipToken,
+  platform: 'ios',
+});
+const pushAfter = await asCustomer('GET', '/api/softphone/push?extension=296');
+check(
+  'registering the same phone twice leaves one device',
+  registeredAgain.status === 200 && pushAfter.body.devices?.length === 1,
+  pushAfter.body.devices
+);
+
+check(
+  'the platform says where an unanswered call would park',
+  pushAfter.body.status?.parking?.enabled === true &&
+    pushAfter.body.status?.parking?.lot === 'telno' &&
+    pushAfter.body.status?.parking?.start === 7001 &&
+    pushAfter.body.status?.parking?.end === 7099 &&
+    pushAfter.body.status?.parking?.timeoutSeconds > 0,
+  pushAfter.body.status?.parking
+);
+
+const statusForParking = await asCustomer('GET', '/api/softphone/status');
+check(
+  'the softphone status carries the lot, so a console can say where a call waits',
+  statusForParking.status === 200 &&
+    statusForParking.body.push?.parking?.lot === 'telno' &&
+    statusForParking.body.push?.parking?.ringSeconds > 0,
+  statusForParking.body.push
+);
+
+const ringUnconfigured = await asCustomer('POST', '/api/softphone/push/ring', { extension: '296' });
+check(
+  'a ring without APNs is a clear refusal, not a fake success',
+  ringUnconfigured.status === 400 && /APNS_ENABLED|push/i.test(ringUnconfigured.body.error?.message || ''),
+  ringUnconfigured.body
+);
+
+const foreignToken = await asCustomer('POST', '/api/softphone/push/register', {
+  extension: '101',
+  token: 'c'.repeat(64),
+  platform: 'ios',
+});
+check(
+  'a customer cannot register a phone on somebody else\'s line',
+  foreignToken.status === 403 || foreignToken.status === 404,
+  foreignToken.status
+);
+
+const removed = await asCustomer('POST', '/api/softphone/push/remove', { token: voipToken });
+check('a phone can be unregistered', removed.status === 200 && removed.body.removed === true, removed.body);
 
 /* ------------------------------------------------------------------- brand -- */
 // White-label configuration: the name, vendor and accent every public page and

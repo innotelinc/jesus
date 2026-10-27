@@ -19,18 +19,29 @@ services:
     # message. "telno" is also what AMI and the CLI show.
     hostname: ${TELNO_HOSTNAME:-telno}
 
-    # Only the web/API port is published by default. AMI (5038) stays inside
-    # the container, and SIP/RTP are added below when this box terminates calls.
-    ports:
-      - "${TELNO_PORT:-8080}:8080"
-      # Browser softphone: SIP over secure WebSocket, straight to chan_pjsip.
-      # Media is DTLS-SRTP on the RTP range below, so both have to be reachable.
-      - "${SOFTPHONE_PORT:-8089}:8089"
-      # Media for the browser softphone. The WebSocket carries signaling only;
-      # DTLS-SRTP audio and video arrive on this range, so a call needs it
-      # published (or use network_mode: host below on a Linux host).
-      - "10000-10100:10000-10100/udp"
-      # - "5060:5060/udp"              # SIP signaling for desk phones/trunks
+    # The switch runs on the host's own network stack.
+    #
+    # Host networking is what a real switch wants: the web port, SIP and the
+    # RTP media range all land directly on the host's addresses, so a reverse
+    # proxy reaches the app over a plain host socket and no SDP/RTP address has
+    # to be rewritten on the way through Docker's NAT.
+    #
+    # It also avoids a real failure: a Docker published port is terminated by
+    # the host's userland proxy, and on a virtualized network that duplicates
+    # frames (VMware bridging a guest onto a host link, for example) that extra
+    # TCP endpoint desyncs and resets a third to a half of the proxy's upstream
+    # requests, which surfaces as intermittent 502s in front of a healthy app.
+    #
+    # On Docker Desktop for Mac or Windows host networking is limited, so use
+    # the published-port form instead: comment out network_mode, then restore
+    #    ports:
+    #      - "${TELNO_PORT:-8080}:8080"
+    #      - "${SOFTPHONE_PORT:-8089}:8089"
+    #      - "10000-10100:10000-10100/udp"
+    network_mode: host
+
+    # Web/API 8080, browser softphone signalling 8089 (SIP over secure
+    # WebSocket), media 10000-10100/udp and AMI 5038 are all on the host now.
 
     environment:
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
@@ -75,6 +86,18 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Numbers are bought, routed and released at VoIP.ms. Both API values are
+      # better kept in the vault (Settings → Vault); these pass a .env-only
+      # deployment through.
+      VOIPMS_API_USERNAME: ${VOIPMS_API_USERNAME:-}
+      VOIPMS_API_PASSWORD: ${VOIPMS_API_PASSWORD:-}
+      VOIPMS_ROUTING: ${VOIPMS_ROUTING:-}
+      VOIPMS_POP: ${VOIPMS_POP:-1}
+      VOIPMS_BILLING_TYPE: ${VOIPMS_BILLING_TYPE:-2}
+      VOIPMS_DIAL_TIME: ${VOIPMS_DIAL_TIME:-60}
+      VOIPMS_CNAM: ${VOIPMS_CNAM:-false}
+      VOIPMS_DID_MONTHLY_CENTS: ${VOIPMS_DID_MONTHLY_CENTS:-0}
+      VOIPMS_CURRENCY: ${VOIPMS_CURRENCY:-USD}
       # Backups of the data volume: database, recordings and a manifest. The
       # schedule is what makes this a real protection rather than a button; keep
       # at least two archives, because one copy can be the good one and the bad
@@ -116,9 +139,9 @@ services:
         reservations:
           memory: 128M
 
-    # For a real switch behind a NAT, host networking avoids SDP/RTP rewriting:
-    # network_mode: host
-    # and remove `ports` above.
+    # Host networking is the default here, so this file never mixes
+    # network_mode with published ports — Docker rejects that combination.
+    # Switch modes by editing the service above, not by layering another file.
 
 volumes:
   telno-data:

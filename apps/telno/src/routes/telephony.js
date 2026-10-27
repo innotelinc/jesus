@@ -23,6 +23,12 @@ const extensionView = (row) => ({
   // before customers could hold one.
   accountId: row.account_id || '',
   accountEmail: row.account_email || '',
+  // The secure profile of this line, as the switch applies it.
+  scif: !!row.scif,
+  callerIdMode: row.caller_id_mode || 'own',
+  callerIdNumber: row.caller_id_number || '',
+  voiceMask: row.voice_mask || 'off',
+  maskText: !!row.mask_text,
   numberId: row.number_id,
   number: row.e164 ? formatNumber(row.e164) : '',
   e164: row.e164 || '',

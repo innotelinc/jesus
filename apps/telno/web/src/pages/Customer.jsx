@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { api, relativeTime } from '../api.js';
-import { Badge, Button, Card, Empty, Icon, Input, Loading, Switch, useToast } from '../ui.jsx';
+import { Badge, Button, Card, Empty, Icon, Input, Loading, Select, Switch, useToast } from '../ui.jsx';
 import { Link } from '../router.jsx';
 import { useAuth } from '../auth.jsx';
 import { BrandMark } from '../brand.jsx';
@@ -29,8 +29,146 @@ const TABS = [
   { id: 'home', label: 'My line', icon: 'phone' },
   { id: 'invoices', label: 'Invoices', icon: 'card' },
   { id: 'plan', label: 'Plan', icon: 'tag' },
+  { id: 'details', label: 'Details', icon: 'building' },
   { id: 'softphone', label: 'Softphone', icon: 'mic' },
 ];
+
+const LISTING_KINDS = [
+  { value: 'business', label: 'A business' },
+  { value: 'person', label: 'A person' },
+  { value: 'service', label: 'A service line' },
+];
+
+/**
+ * Confirm (or correct) who the customer is, and answer the directory question.
+ *
+ * The same component is the first-login step and the Details tab: the fields are
+ * the ones a directory needs, so asking twice with different shapes would only
+ * teach the customer to distrust both.
+ */
+function ProfileForm({ profile, submitLabel = 'Save my details', onSaved }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    name: profile.name || '',
+    company: profile.company || '',
+    address: profile.address || '',
+    city: profile.city || '',
+    country: profile.country || '',
+    website: profile.website || '',
+    kind: profile.kind || 'business',
+    // A posted value, not a checkbox: "not answered" is not an answer.
+    directoryOptIn: profile.directoryOptIn ? 'yes' : 'no',
+  });
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const result = await api.post('/me/profile', {
+        name: form.name,
+        company: form.company,
+        address: form.address,
+        city: form.city,
+        country: form.country,
+        website: form.website,
+        kind: form.kind,
+        directoryOptIn: form.directoryOptIn === 'yes',
+      });
+      toast.success(
+        result.changed?.firstConfirmation ? 'Thanks — your details are saved' : 'Details updated',
+        result.profile.directoryOptIn
+          ? `${result.applied.listed} number(s) now appear in the public directory.`
+          : 'Your numbers stay out of the public directory.'
+      );
+      onSaved?.(result);
+    } catch (err) {
+      toast.error('Could not save your details', err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="stack"
+      style={{ gap: 14 }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        save();
+      }}
+    >
+      <div className="grid two">
+        <Input
+          label="Your name"
+          value={form.name}
+          onChange={(event) => setForm({ ...form, name: event.target.value })}
+          required
+        />
+        <Input
+          label="Company or business name"
+          value={form.company}
+          onChange={(event) => setForm({ ...form, company: event.target.value })}
+          placeholder="Hudson & Vale"
+          hint="The name a directory listing would carry. Blank uses your name."
+        />
+      </div>
+      <Input
+        label="Address"
+        value={form.address}
+        onChange={(event) => setForm({ ...form, address: event.target.value })}
+        placeholder="120 Harbor Way"
+        hint="Optional. Only published if you choose to be listed."
+      />
+      <div className="grid three">
+        <Input label="City" value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
+        <Input
+          label="Country"
+          value={form.country}
+          maxLength={2}
+          placeholder="US"
+          onChange={(event) => setForm({ ...form, country: event.target.value.toUpperCase() })}
+          hint="Two-letter code."
+        />
+        <Input
+          label="Website"
+          value={form.website}
+          placeholder="example.com"
+          onChange={(event) => setForm({ ...form, website: event.target.value })}
+        />
+      </div>
+      <div className="grid two">
+        <Select label="This number is" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
+          {LISTING_KINDS.map((kind) => (
+            <option key={kind.value} value={kind.value}>
+              {kind.label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Public directory"
+          value={form.directoryOptIn}
+          onChange={(event) => setForm({ ...form, directoryOptIn: event.target.value })}
+        >
+          <option value="no">Keep it private — opt out</option>
+          <option value="yes">List my number — anyone can look it up</option>
+        </Select>
+      </div>
+      <p className="tiny dim" style={{ margin: 0 }}>
+        {profile.numbers?.length
+          ? `Applies to ${profile.numbers.map((number) => number.display).join(', ')}. Listing publishes the number and this name to the public directory; opting out hides the number and removes your entry.`
+          : 'No number is assigned yet. Your answer applies as soon as one is.'}
+      </p>
+      <div className="row wrap" style={{ gap: 8, alignItems: 'center' }}>
+        <Button variant="primary" type="submit" loading={busy} disabled={form.name.trim().length < 2}>
+          {submitLabel}
+        </Button>
+        <span className="tiny dim">
+          {profile.confirmed ? `Confirmed ${day(profile.confirmedAt)}` : 'You can change any of this later.'}
+        </span>
+      </div>
+    </form>
+  );
+}
 
 export default function Customer() {
   const { user, logout } = useAuth();
@@ -82,6 +220,10 @@ export default function Customer() {
   const lines = data?.lines || [];
   const open = (data?.invoices || []).filter((invoice) => ['open', 'overdue'].includes(invoice.status));
   const owed = open.reduce((total, invoice) => total + invoice.amount_cents, 0);
+  // A customer who has not confirmed their details and stated a directory choice
+  // sees that step instead of the tabs. It is not a paywall: the line, plan and
+  // invoices are already theirs; this is the one question the platform must ask.
+  const unconfirmed = !!data?.profile && !data.profile.confirmed;
 
   return (
     <div className="portal">
@@ -110,6 +252,18 @@ export default function Customer() {
         </div>
       </header>
 
+      {unconfirmed ? (
+        <main className="portal-body">
+          <Card title="Confirm your details" subtitle="One step before your line is set up the way you want it">
+            <p className="tiny dim" style={{ marginTop: 0 }}>
+              We ask once, then use your answer everywhere. Nothing here is sold or shared, and the public directory
+              only ever lists a number you choose to publish.
+            </p>
+            <ProfileForm profile={data.profile} submitLabel="Confirm and continue" onSaved={() => load()} />
+          </Card>
+        </main>
+      ) : (
+        <>
       <nav className="portal-nav" aria-label="Account">
         {TABS.map((item) => (
           <button
@@ -246,7 +400,8 @@ export default function Customer() {
                   </thead>
                   <tbody>
                     {data.invoices.map((invoice) => (
-                      <tr key={invoice.id}>
+                      <Fragment key={invoice.id}>
+                      <tr>
                         <td className="mono">{invoice.number}</td>
                         <td className="tiny dim">
                           {day(invoice.periodStart)} → {day(invoice.periodEnd)}
@@ -278,6 +433,30 @@ export default function Customer() {
                           ) : null}
                         </td>
                       </tr>
+                      {invoice.items?.length ? (
+                        <tr>
+                          <td colSpan={6} style={{ paddingTop: 0 }}>
+                            <div className="stack" style={{ gap: 4 }}>
+                              {invoice.items.map((item) => (
+                                <div key={item.id} className="row" style={{ gap: 10, justifyContent: 'space-between' }}>
+                                  <span className="tiny dim">{item.description}</span>
+                                  {/* A plan the card subscription already paid is on the
+                                      bill but is not owed again. */}
+                                  <span
+                                    className="tiny mono"
+                                    style={item.settledBy === 'subscription' ? { opacity: 0.65 } : undefined}
+                                  >
+                                    {item.settledBy === 'subscription'
+                                      ? 'Included'
+                                      : money(item.amountCents, invoice.currency)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -332,6 +511,36 @@ export default function Customer() {
           </>
         ) : null}
 
+        {tab === 'details' ? (
+          <>
+            <Card title="Your details" subtitle="What the platform and the public directory know about you">
+              <ProfileForm profile={data.profile} submitLabel="Save changes" onSaved={() => load()} />
+            </Card>
+            <Card title="Directory" subtitle="Whether your number can be looked up">
+              <div className="stack">
+                <Badge tone={data.profile?.directoryOptIn ? 'success' : 'neutral'}>
+                  {data.profile?.directoryOptIn ? 'Listed' : 'Private'}
+                </Badge>
+                <p className="tiny dim" style={{ margin: 0 }}>
+                  {data.profile?.directoryOptIn
+                    ? 'Your number and the name above appear in the public directory and can be looked up by anyone.'
+                    : 'Your number is hidden from the directory: a lookup returns nothing. Choose "List my number" above to publish it.'}
+                </p>
+                {(data.profile?.numbers || []).length ? (
+                  <div className="stack" style={{ gap: 4 }}>
+                    {data.profile.numbers.map((number) => (
+                      <div key={number.id} className="row" style={{ gap: 10, justifyContent: 'space-between' }}>
+                        <span className="tiny mono">{number.display}</span>
+                        <span className="tiny dim">{number.listed ? 'listed' : number.visibility}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+          </>
+        ) : null}
+
         {tab === 'softphone' ? (
           <Card
             title="Softphone"
@@ -354,6 +563,8 @@ export default function Customer() {
           </Card>
         ) : null}
       </main>
+        </>
+      )}
     </div>
   );
 }

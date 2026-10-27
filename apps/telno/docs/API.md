@@ -153,6 +153,44 @@ The second identical call answers:
 
 ---
 
+## Numbers from the carrier (session or key for reads; operator/owner for writes)
+
+DIDs are bought at VoIP.ms and then recorded on the `numbers` row with the
+account that holds the line, the rent it costs and the day it renews. The
+provider is optional: with no credentials these routes answer
+`409 not_configured` and the registry keeps working on operator-entered numbers.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/provider/voipms` | connection state, balance, held numbers, this month's rent |
+| GET | `/provider/voipms/search?country=&region=&q=&type=&limit=` | available DIDs by area code (US state / CA province) |
+| POST | `/provider/voipms/numbers` | `{ dids: [...], account?, monthlyCostCents?, routing?, pop?, billingType? }` — buy at the carrier, record here |
+| DELETE | `/provider/voipms/numbers/:value` | cancel the DID at the carrier and retire the row |
+| GET | `/provider/voipms/inventory` | carrier inventory vs. local rows (`unknownLocally`, `missingAtProvider`) |
+| GET | `/provider/voipms/costs?period=&account=` | rent per account for a month |
+| GET | `/provider/voipms/numbers/:value/charges` | that line's rent history |
+
+```bash
+curl -X POST http://localhost:8080/api/provider/voipms/numbers \
+  -H "x-api-key: tl_…" -H 'content-type: application/json' \
+  -d '{"dids":["+14155550123"],"account":"customer@example.com","monthlyCostCents":85}'
+```
+
+The reply names what was bought and what failed, per DID, so a batch never
+half-applies silently:
+
+```json
+{ "ordered": [{ "e164": "+14155550123", "provider": "voipms", "monthlyCostCents": 85,
+               "nextBillingAt": "2026-11-01T00:00:00.000Z" }],
+  "failed": [], "period": "2026-10" }
+```
+
+Rent is recorded once per number per month in `number_charges`, at boot and on a
+timer, so a restart cannot charge the same month twice. Releasing a DID voids
+nothing already incurred and stops the months after it.
+
+---
+
 ## Telephony (session or key for reads; operator/owner for writes)
 
 | Method | Path | Purpose |
@@ -197,11 +235,20 @@ for a live device — only a real check-in moves them.
 | GET | `/messages?channel=` | SMS/MMS/WhatsApp/web threads |
 | POST/PATCH | `/messages[/:id]` | queue outbound (stays `queued` without a provider); requeue a failure |
 | GET/POST/PATCH | `/billing/invoices[/:id]` | amounts in integer minor units; totals per currency, never summed across; an invoice carries `payUrl` while it is open and Stripe is configured, plus `lastProvider` and `lastSendError` for its last email attempt |
+| GET | `/billing/invoices/:id` | one invoice with its `items` — the lines its amount is the sum of — plus `coveredCents`, the part a card subscription already collected. A line's `settledBy` is `invoice` (payable here) or `subscription` (shown, not charged) |
+| POST | `/billing/invoices` | accepts `items: [{ description, kind?, quantity?, unitAmountCents?, amountCents? }]` (the total becomes their sum), `account` (email, links the bill to a customer) and `rentPeriod: "YYYY-MM"` / `includeRent: true` to pull that month's number rent onto a new invoice — and with it the account's plan fee, so one month is one bill |
+| POST | `/billing/invoices/:id/items` | add a line; the invoice total is recalculated |
+| PATCH/DELETE | `/billing/invoice-items/:id` | edit or remove a line; removing a rent line returns that month to the ledger as unbilled |
+| POST | `/billing/invoices/:id/rent` | pull the account's unbilled number rent for `{ period }` onto this invoice; idempotent, so a second press bills nothing |
+| GET | `/billing/rent?period=` | the month's `label`, whether invoicing is `enabled`, the `uninvoiced` charges and the invoices that already carry that month |
+| POST | `/billing/rent/run` | bill the month for `{ period?, account? }`: one invoice per subscriber carrying the plan fee and every number's rent. Returns `planLines`, `billedLines`, `billedCents` and the invoices it touched (`created` marks a new one). A plan a card subscription already collected is a `settledBy: "subscription"` line, so only the rent is due |
+| — | invoice lifecycle | voiding an invoice releases its rent lines back to `pending`, keeping the void bill as the record of what it said |
 | POST | `/billing/invoices/:id/resend` | send the invoice (HTML + text) to its billing email; records `lastSentAt` and the provider that carried it, or `lastSendError` when the attempt failed |
 | PATCH | `/billing/invoices/:id` | any field, plus `remindersPaused: true\|false` to stop or resume automatic reminders |
 | GET | `/billing/invoices/:id/reminders` | the reminder ledger: each rung, its status (`sent`, `failed`, `skipped`, `sending`), recipient, time, `provider` and `error` |
 | POST | `/billing/invoices/:id/reminder` | send one now, past the sweep gap; `action` is `sent`, `failed` or `skipped` with a `reason` (`paused`, `paid`, …) |
 | POST | `/billing/reminders/run` | run the sweep immediately; returns `checked`, `sent`, `failed`, `markedOverdue`, per-invoice `items` and the `escalation` pass (`suspended`, `reinstated`) |
+| POST | `/softphone/scif` | `{ extension, scif?, callerIdMode?, callerIdNumber?, voiceMask?, maskText? }`; ownership is the same check a session uses. `callerIdMode` is `own`, `anonymous` or `custom` (which needs a number), `voiceMask` is `off`, `low`, `high` or `robot`. Saves the line, regenerates and reloads the switch config, and returns the resulting policy |
 | POST | `/billing/payments/test` | prove the Stripe credentials against Stripe: `ok`, `mode`, `summary` and `checks[]` (`enabled`, `key`, `api`, `checkout`, `webhook-secret`, `webhook-endpoint`, `public-url`), each `pass`, `warn` or `fail` with the fix in `detail` |
 | GET | `/billing/accounts?state=` | dunning state per billing email: `state` (`current`, `final-notice`, `suspended`), `finalNoticeAt`, `suspendOn`, `suspendedAt`, balance, extensions off and logins blocked |
 | GET | `/billing/accounts/:id` | one account and the invoices billed to its email |
@@ -234,8 +281,17 @@ the ICE servers and the operator presence channel.
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/softphone/status` | session | WSS URL, TLS fingerprint, ICE, video flag, operators online |
-| POST | `/softphone/session` | session | mint a single-use ticket + SIP credentials + ICE servers |
+| GET | `/softphone/status` | session | WSS URL, TLS fingerprint, ICE, video flag, operators online, and where an unanswered call parks (`push.parking`) |
+| POST | `/softphone/session` | session | mint a single-use ticket + SIP credentials + ICE servers; a line with a voice gate also needs `voiceTicket` |
+| GET | `/softphone/push?extension=` | session | push provider state (`enabled`, `configured`, `problem`, `environment`) and this account's registered devices |
+| POST | `/softphone/push/register` | session | `{ extension, token, platform?, bundleId?, environment?, deviceName?, appVersion? }`; a token already owned elsewhere moves to this line, and the switch config is regenerated because the line now parks |
+| POST | `/softphone/push/remove` | session | forget a phone by `{ token }` |
+| POST | `/softphone/push/ring` | session | send a VoIP push now (the app's *Test ring*); `400` with the reason when `APNS_ENABLED` is off |
+| GET | `/voice/status?extension=` | session | voiceprint state, the gate, the recording limits and recent attempts — never the vector |
+| POST | `/voice/enroll` | session | `{ extension, phrase?, samples: [base64 WAV, …] }`; two to five takes, refused if they do not sound like each other |
+| POST | `/voice/verify` | session | `{ extension, audio, heard? }` → `{ ok, score, threshold, phraseMatch, margin, ticket? }`; a pass issues a single-use ticket for `voiceTicket` |
+| POST | `/voice/require` | session | `{ extension, enabled }`; turning it on needs an enrolled print, or the line would lock its owner out |
+| DELETE | `/voice?extension=` | session | forget the print and stop requiring it |
 | GET | `/softphone/ws?ticket=` | session + ticket | presence and call intents over WebSocket |
 
 `POST /softphone/session` takes `{ "extension": "101" }` and returns:
@@ -261,6 +317,10 @@ the ICE servers and the operator presence channel.
 extension: chan_pjsip resolves a registration by the user part of the request, so registering as
 `101` would match the desk-phone endpoint and the call would lose DTLS-SRTP. `extensionUser` is the
 extension as operators know it (dialing, voicemail, presence).
+
+A line whose `voice_auth` is on **and** which has an enrolled print answers `403 voice_required`
+until the body carries a `voiceTicket` from `POST /voice/verify`. It is single use and tied to that
+account and line, so a captured response cannot mint a second session.
 
 The ticket is single-use, expires after `SOFTPHONE_TICKET_TTL` seconds and is only accepted from a
 same-origin upgrade. When `TURN_URLS` and `TURN_SECRET` are set, `iceServers` also carries a TURN
@@ -397,6 +457,8 @@ Plans and features are rows: the admin edits them and the public page at
 | POST | `/public/subscribe` | none | `{ plan, name, email, password, origin? }`; creates the customer account and returns a Stripe checkout URL |
 | GET | `/public/subscribe/status?email=` | none | whether the webhook has landed yet |
 | GET | `/portal/status` | session | entitlement, subscription and plans for the signed-in account |
+| GET | `/me/profile` | customer | their confirmed details, the directory answer and each number with its `visibility` and whether it is `listed` |
+| POST | `/me/profile` | customer | `{ name, company?, address?, city?, country?, website?, kind?, directoryOptIn }`; `directoryOptIn` is required. Opting in publishes their numbers and writes the listing; opting out hides the numbers and removes only listings carrying their own email. `profile.confirmedAt` is what the portal uses to show the step once |
 | GET | `/plans` | operator | plans, feature catalog, subscriptions, mirror status |
 | POST | `/plans` | operator | create; `features` is a list of feature keys |
 | PATCH | `/plans/:id` | operator | price, interval, seats, included minutes, features, on sale |
