@@ -31,6 +31,10 @@ on:
         description: Upload the build to TestFlight
         type: boolean
         default: true
+      prepare_only:
+        description: Only generate the project and apply the wrapper (no credentials needed)
+        type: boolean
+        default: false
   push:
     tags: ['ios-v*']
 
@@ -63,6 +67,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Check the credentials are there
+        if: ${{ !inputs.prepare_only }}
         env:
           ASC_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
         run: |
@@ -109,7 +114,29 @@ jobs:
             APP_VERSION="$APP_VERSION" APP_BUILD="$APP_BUILD" \
             ruby scripts/ios-project.rb
 
+      # The wrapper is the part that cannot be checked on any other machine: it
+      # grafts Swift sources, plist keys and an entitlement onto a project Apple's
+      # template generated minutes earlier. This run proves that graft — and that
+      # the generated project still builds — without an Apple account.
+      - name: Prove the wrapper applied (no credentials)
+        if: ${{ inputs.prepare_only }}
+        working-directory: native
+        run: |
+          set -euo pipefail
+          test -d ios/App/App.xcodeproj
+          test -f ios/App/App/ScifCallManager.swift
+          test -f ios/App/App/App.entitlements
+          if [ -f ios/App/App/Info.merged.plist ]; then echo "the plist merge left its scratch file behind"; exit 1; fi
+          ruby -e 'require "rexml/document"; d = REXML::Document.new(File.read("ios/App/App.xcodeproj/project.pbxproj")); abort "ScifCallManager is not in the project" unless d.to_s.include?("ScifCallManager.swift")'
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' ios/App/App/Info.plist | tr '\n' ' '
+          echo
+          /usr/libexec/PlistBuddy -c 'Print :NSFaceIDUsageDescription' ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c 'Print :aps-environment' ios/App/App/App.entitlements
+          grep -c 'ScifCallManager.shared.start()' ios/App/App/AppDelegate.swift
+          echo "The wrapper applied to the generated project."
+
       - name: Write the App Store Connect key
+        if: ${{ !inputs.prepare_only }}
         env:
           ASC_KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
         run: |
@@ -122,6 +149,7 @@ jobs:
           chmod 600 "$KEY_PATH"
 
       - name: Archive
+        if: ${{ !inputs.prepare_only }}
         working-directory: native
         run: |
           set -euo pipefail
@@ -133,6 +161,7 @@ jobs:
             archive
 
       - name: Export the .ipa
+        if: ${{ !inputs.prepare_only }}
         working-directory: native
         run: |
           set -euo pipefail
@@ -145,6 +174,7 @@ jobs:
           ls -l "$PWD/build/ipa"
 
       - name: Upload the build as an artifact
+        if: ${{ !inputs.prepare_only }}
         uses: actions/upload-artifact@v5
         with:
           name: SCIF-${{ github.run_number }}
@@ -152,7 +182,7 @@ jobs:
           if-no-files-found: error
 
       - name: Send it to TestFlight
-        if: ${{ github.event_name == 'push' || inputs.upload }}
+        if: ${{ !inputs.prepare_only && (github.event_name == 'push' || inputs.upload) }}
         run: |
           set -euo pipefail
           xcrun altool --upload-app -f native/build/ipa/*.ipa -t ios \
