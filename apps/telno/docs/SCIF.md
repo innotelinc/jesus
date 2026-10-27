@@ -49,7 +49,7 @@ So yes — voice authentication works from the web page. What it is *not*:
 - **not a password replacement.** It is one factor, and it is weakest against a
   good recording of the owner;
 - **not portable across microphones without re-enrolling.** The cepstral mean is
-  normalised, but a headset and a laptop array still differ; enroll where you
+  normalized, but a headset and a laptop array still differ; enroll where you
   take calls, or re-enroll when you change.
 - **not tuned by us on your voice.** The default threshold (0.82) sits between
   the synthetic voices used in the test suite by a wide margin; a real voice

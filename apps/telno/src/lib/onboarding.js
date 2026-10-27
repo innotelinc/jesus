@@ -51,7 +51,7 @@ export const TERMS_TEXT = [
   'Billing. Charges are billed in advance at the rate in effect when the period begins, in US dollars, to the payment method on the account. A number rented for your line is billed monthly while you hold it. Invoices are due on the date shown on them; service may be suspended on an unpaid invoice after the reminders and a final notice, and restored when the balance is settled.',
   'Acceptable use. You will not use the service to break the law, to make calls that are unlawful where you or the person called is located, to send unsolicited bulk messages, or to place calls with a falsified identity. Numbers are registered to the person or business that holds them, and caller ID is presented as it is configured.',
   'Recording and privacy. Calls are not recorded unless recording is switched on for the line; where it is, you are responsible for the notices the law requires. Encryption applies between your device and the switch; a call that reaches the public telephone network is unencrypted on that last leg.',
-  'Your data. Your catalogue of numbers, calls and messages stays on the platform that serves you. You may export your own data and close the account at any time; a number released back to its carrier may not be recoverable.',
+  'Your data. Your catalog of numbers, calls and messages stays on the platform that serves you. You may export your own data and close the account at any time; a number released back to its carrier may not be recoverable.',
   'Availability. The service is provided as it is, without a promise of uninterrupted operation. Planned work is announced in advance where it is possible to do so.',
   'Changes. Future revisions of these terms apply to periods that begin after they take effect, and the version you accepted is recorded on your account.',
 ];
@@ -72,7 +72,7 @@ export const termsAccepted = (account) =>
  * Whether the wizard applies at all.
  *
  * An API-key client is a machine, not somebody to greet, and a deployment that
- * has said so with `ONBOARDING_REQUIRED=false` keeps its old behaviour. Staff and
+ * has said so with `ONBOARDING_REQUIRED=false` keeps its old behavior. Staff and
  * customers are both asked: the first install's owner needs a line as much as a
  * subscriber does, and the terms apply to whoever is operating the platform.
  */

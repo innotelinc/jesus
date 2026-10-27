@@ -11,7 +11,7 @@
  *   ScifCall    PushKit + CallKit. The page registers the phone's VoIP token
  *               against the line and reacts when a call is answered or declined.
  *   ScifSpeech  SFSpeechRecognizer. WKWebView has no Web Speech API, so the
- *               wrapped app needs Apple's recogniser for dialing by voice; this
+ *               wrapped app needs Apple's recognizer for dialing by voice; this
  *               installs it as window.ScifNative, which speech.js prefers.
  */
 

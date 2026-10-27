@@ -4,7 +4,7 @@
  * Two engines, one interface, and the choice is made for the user:
  *
  *   browser   Web Speech API (Chrome, Edge, Safari). Free, no key, and on iOS it
- *             is Apple's own recogniser doing the work.
+ *             is Apple's own recognizer doing the work.
  *   native    `ScifNative.recognize` when the app is wrapped in Capacitor. iOS
  *             in a WKWebView has no Web Speech API, so the wrapper exposes
  *             SFSpeechRecognizer over a small bridge instead. Without this the
@@ -84,7 +84,7 @@ export const recognitionSupported = () =>
  * Start dictating. Returns a stop function; `onText` fires with the transcript,
  * `onFinal` once when the engine stops, `onError` with a readable reason.
  *
- * A refusal (no microphone permission, no network for the recogniser) is
+ * A refusal (no microphone permission, no network for the recognizer) is
  * reported rather than hidden: a voice button that does nothing is worse than
  * one that says why.
  */
@@ -159,7 +159,7 @@ function mapError(code) {
   const text = String(code || '');
   if (/not-allowed|denied|permission/i.test(text)) return 'Microphone permission was refused';
   if (/no-speech/i.test(text)) return 'Nothing was heard — try again a little closer to the microphone';
-  if (/network/i.test(text)) return 'The recogniser needs a network connection';
+  if (/network/i.test(text)) return 'The recognizer needs a network connection';
   if (/audio-capture/i.test(text)) return 'No microphone was found';
   return text || 'Speech recognition failed';
 }
