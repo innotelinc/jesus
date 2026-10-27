@@ -30,8 +30,36 @@ CREATE TABLE IF NOT EXISTS accounts (
   -- The public-directory choice, stated by the customer rather than assumed.
   -- profile_confirmed_at is what makes "first login" a fact instead of a guess.
   directory_opt_in     INTEGER NOT NULL DEFAULT 0,
-  profile_confirmed_at TEXT
+  profile_confirmed_at TEXT,
+  -- First login, in the order the platform asks for it: accept the terms, then
+  -- prove the address and the phone are really the account holder's. Each is a
+  -- timestamp so the console can say when it happened, not merely that it did.
+  terms_accepted_at  TEXT,
+  terms_version      TEXT NOT NULL DEFAULT '',
+  email_verified_at  TEXT,
+  phone              TEXT NOT NULL DEFAULT '',
+  phone_verified_at  TEXT,
+  -- When the welcome message went out, so a restart cannot send a second one.
+  welcome_sent_at    TEXT
 );
+
+-- One pending proof per account and channel: a code that was emailed or texted
+-- and is waiting to be typed back. The code itself is stored only as a hash, and
+-- a row is consumed rather than remembered.
+CREATE TABLE IF NOT EXISTS account_verifications (
+  id         TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  channel    TEXT NOT NULL CHECK (channel IN ('email', 'sms')),
+  target     TEXT NOT NULL,
+  code_hash  TEXT NOT NULL,
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_verifications_account
+  ON account_verifications (account_id, channel, used_at);
 
 -- Directory surfaces. One codebase, six hostnames, per-host presentation.
 CREATE TABLE IF NOT EXISTS domains (

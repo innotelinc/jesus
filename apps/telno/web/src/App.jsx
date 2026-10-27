@@ -30,6 +30,7 @@ import Site from './pages/Site.jsx';
 import PublicDirectory from './pages/PublicDirectory.jsx';
 import Customer from './pages/Customer.jsx';
 import Setup, { useSetupStatus } from './pages/Setup.jsx';
+import Onboarding from './pages/Onboarding.jsx';
 
 const PAGES = [
   { path: '/', title: 'Dashboard', subtitle: 'Platform and registry at a glance', Component: Dashboard },
@@ -59,7 +60,7 @@ const PAGES = [
 
 function Router() {
   const { pathname, search } = useLocation();
-  const { status, user, reason } = useAuth();
+  const { status, user, reason, onboarding } = useAuth();
   // Whether this install still has no line at all: the one thing that makes the
   // console empty rather than busy, and the reason a first run starts on setup.
   const setup = useSetupStatus(status === 'ready' && (user?.kind || 'staff') !== 'customer');
@@ -105,6 +106,13 @@ function Router() {
     if (pathname === '/') return <Site />;
     navigate('/login', { replace: true });
     return <Login />;
+  }
+
+  // The first login, and it is not a suggestion: terms, details, address, phone
+  // and a line, in that order, before the console answers anything. The server
+  // refuses every other route until then, so this is the door and not a greeting.
+  if (onboarding?.required) {
+    return <Onboarding />;
   }
 
   // The softphone's own window: one document, one registration, no console

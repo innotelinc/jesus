@@ -19,6 +19,15 @@ export const tooMany = (message = 'Too many requests') => new HttpError(429, 'ra
 export const paymentRequired = (message = 'This account is suspended for non-payment') =>
   new HttpError(402, 'payment_required', message);
 
+/**
+ * 403 for an account that has signed in but not finished the first-login steps.
+ *
+ * Its own code rather than a plain `forbidden`, because the console has an
+ * action to take: the wizard, opened at the step named in `details.next`.
+ */
+export const onboardingRequired = (next, message = 'Finish setting up your account to continue') =>
+  new HttpError(403, 'onboarding_required', message, { next });
+
 /** 403 with a reason the softphone can act on: it needs a voice check first. */
 export const voiceRequired = (message = 'This line requires a voice check before it can be used') =>
   new HttpError(403, 'voice_required', message);

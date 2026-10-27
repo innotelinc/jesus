@@ -412,6 +412,30 @@ button, input, select, textarea {
   gap: 14px;
 }
 .grid.stats { grid-template-columns: repeat(auto-fit, minmax(196px, 1fr)); }
+/*
+ * Four even squares. A flex row of tiles sized itself to its own text, so four
+ * numbers of different lengths produced four different widths; a fixed track
+ * count and a square aspect ratio make the group a set, and the whole row is
+ * centred in the card instead of stretching across it.
+ */
+.grid.squares {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 760px;
+  margin-inline: auto;
+}
+.grid.squares > .stat {
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px 12px;
+}
+@media (max-width: 760px) {
+  .grid.squares { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
+}
+@media (max-width: 420px) {
+  .grid.squares { grid-template-columns: minmax(0, 1fr); }
+}
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grid.three { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 
@@ -1344,10 +1368,20 @@ table.table {
 .price-card h3,
 .price-card h4 { font-size: 1.05rem; font-weight: 620; letter-spacing: -0.01em; }
 
-/* Two ladders on one page: a heading and a line of copy above each grid. */
-.plan-group { display: flex; flex-direction: column; gap: 12px; }
+/* Two ladders on one page: a heading and a line of copy above each grid.
+   Both the group and its heading share the grid's width and centre line: with a
+   heading pinned to the far left of a 1920px window above a centred ladder, the
+   page reads as two different layouts stacked on top of each other. */
+.plan-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+}
 .plan-group + .plan-group { margin-top: 34px; }
-.plan-group-head { display: flex; flex-direction: column; gap: 2px; }
+.plan-group-head { display: flex; flex-direction: column; gap: 2px; align-items: center; text-align: center; }
 .plan-group-head h2,
 .plan-group-head h3 { font-size: 1.15rem; }
 .price-row { display: flex; align-items: baseline; gap: 4px; }

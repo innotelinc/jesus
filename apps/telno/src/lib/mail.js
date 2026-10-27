@@ -167,6 +167,106 @@ function card({ eyebrow, amount, pill, pillTone, pillBackground, intro, rows, it
 }
 
 /**
+ * The first message a new account receives.
+ *
+ * It goes out when the account is created, before anyone has configured
+ * anything, so it does not promise a working phone — it says what the account is
+ * and what to do first. Deliberately no amount, no invoice number and no "due":
+ * a welcome that reads like a bill is the worst first impression this platform
+ * can make. That is also why it is not built on the bill card.
+ */
+export function welcomeEmail(account, { line = {}, signInUrl = '', brand = 'Telno' } = {}) {
+  const name = String(account?.name || '').trim() || String(account?.email || '').split('@')[0] || 'there';
+  const email = String(account?.email || '');
+  // What the account already has, so the message is specific rather than
+  // generic: a fresh platform says "no line yet", not "your line is ready".
+  const hasLine = Number(line.lines || 0) > 0;
+  const number = line.numbers ? `${line.numbers} number${line.numbers === 1 ? '' : 's'}` : '';
+  const nextSteps = [
+    'Open the console and finish the first-run steps: agree to the terms, confirm your details, and verify the email address and phone number on the account.',
+    hasLine
+      ? `Your line is on the switch${number ? ` with ${number} attached` : ''} — open the softphone to register this browser and place a test call.`
+      : 'Create your line and attach a phone number. An extension is the number you dial; the number is what the outside world calls.',
+    'Install the SCIF app (or add the softphone to your home screen) to keep the line registered while you work in other tabs.',
+  ];
+
+  const subject = `Welcome to ${brand} — here is what to do first`;
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:24px 12px;background:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#101828;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:14px;border:1px solid #e4e7ec;">
+    <tr>
+      <td style="padding:22px 28px 0 28px;">
+        <div style="font-size:20px;font-weight:700;letter-spacing:-0.02em;">tel<span style="color:#635bff;">no</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:18px 28px 0 28px;">
+        <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#667085;">Welcome aboard</div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-0.02em;margin-top:6px;">Hello ${escapeHtml(name)}</div>
+        <div style="margin-top:12px;font-size:14px;line-height:1.65;color:#344054;">
+          This is the account for <strong>${escapeHtml(email)}</strong>. It is the one that holds your line, your number and your bill.
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:18px 28px 0 28px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#667085;padding-bottom:6px;">What to do first</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="font-size:14px;">
+          ${nextSteps
+            .map(
+              (step) => `<tr>
+            <td style="padding:9px 0;border-top:1px solid #f2f4f7;color:#344054;line-height:1.6;">${escapeHtml(step)}</td>
+          </tr>`
+            )
+            .join('')}
+        </table>
+      </td>
+    </tr>
+    ${
+      signInUrl
+        ? `<tr>
+      <td style="padding:20px 28px 0 28px;">
+        <a href="${escapeHtml(signInUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#635bff;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">Sign in to the console</a>
+        <div style="margin-top:8px;font-size:12px;color:#98a2b3;">${escapeHtml(signInUrl)}</div>
+      </td>
+    </tr>`
+        : ''
+    }
+    <tr>
+      <td style="padding:22px 28px 26px 28px;">
+        <div style="font-size:12px;color:#98a2b3;line-height:1.6;">
+          You received this because an account was created for this address on ${escapeHtml(brand)}.
+          If that was not you, reply to this message and we will close it.
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    `Hello ${name}`,
+    '',
+    `This is the account for ${email}. It holds your line, your number and your bill.`,
+    '',
+    'What to do first:',
+    ...nextSteps.map((step) => `  - ${step}`),
+    ...(signInUrl ? ['', `Sign in: ${signInUrl}`] : []),
+    '',
+    `You received this because an account was created for this address on ${brand}.`,
+  ].join('\n');
+
+  return { subject, text, html };
+}
+
+/**
  * The invoice a customer receives: who it is for, what period it covers, the
  * total and — the part people actually look for — when it is due.
  */

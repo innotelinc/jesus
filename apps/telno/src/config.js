@@ -105,6 +105,14 @@ export const config = {
     simulate: bool(env.TELEPHONY_SIMULATE, false),
   },
 
+  // The required first login: terms, details, a proved address and phone, and a
+  // line. On by default — an install that skips it is one that cannot prove who
+  // agreed to what — and switchable off for a deployment that runs its own
+  // onboarding in front of this one.
+  onboarding: {
+    required: bool(env.ONBOARDING_REQUIRED, true),
+  },
+
   // Browser softphone: the platform mints the session, Asterisk carries the
   // media. SIP travels over WSS to chan_pjsip; audio and video are DTLS-SRTP.
   softphone: {
@@ -113,6 +121,13 @@ export const config = {
     // from the request host", which is right for a same-host deployment.
     wssUrl: env.SOFTPHONE_WSS_URL || '',
     wssPort: int(env.SOFTPHONE_WSS_PORT, 8089),
+    // Serve that listener same-origin through the app. The browser then reaches
+    // the switch over the certificate it already trusts, instead of the
+    // switch's own, which on a first boot is self-signed and refused outright.
+    relay: bool(env.SOFTPHONE_WSS_RELAY, true),
+    // Where the switch's WSS listener is from inside this container. Only a
+    // split deployment (switch on another host) needs to set it.
+    wssInternal: env.SOFTPHONE_WSS_INTERNAL || '',
     // TLS material for that listener; generated under ASTERISK_CONFIG_DIR/keys
     // on first apply when these are left empty.
     tlsCert: env.SOFTPHONE_TLS_CERT || '',
@@ -207,6 +222,13 @@ export const config = {
     // Without a live SMS/email provider, verification codes are returned in the
     // API response only outside production so the flow stays testable.
     devExposeCodes: bool(env.DEV_EXPOSE_VERIFICATION_CODES, env.NODE_ENV !== 'production'),
+    // ...and the console channel is the one case where that holds in production
+    // too: the message is written to the log and nothing is sent, so a fresh
+    // install whose only delivery channel is the console would have no way to
+    // finish its own first login. A code that was never transmitted is not a
+    // secret from the account that asked for it. Set
+    // DEV_EXPOSE_VERIFICATION_CODES=false to switch this off as well.
+    exposeSimulatedCodes: bool(env.DEV_EXPOSE_VERIFICATION_CODES, true),
   },
 
   // Billing automation. Reminders go out through the same delivery channel as

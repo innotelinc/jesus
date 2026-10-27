@@ -406,6 +406,97 @@ check('session resolves to the account', me.status === 200 && me.body.user.email
 const anon = await call('GET', '/api/numbers', undefined, { bearer: '', noCookie: true });
 check('registry requires auth', anon.status === 401, anon.body);
 
+// ------------------------------------------------------------- first login --
+// A new account may not use the console until it has agreed to the terms,
+// confirmed its details, proved its address and its phone, and holds a line.
+// The suite walks the wizard rather than switching it off: the gate is the
+// feature, and every check below this point depends on it having been finished.
+const wizard = await call('GET', '/api/onboarding');
+check('a fresh account is sent to the first login', wizard.status === 200 && wizard.body.required === true, wizard.body);
+check(
+  'the first step is the terms',
+  wizard.body.next === 'terms',
+  wizard.body.steps?.map((step) => `${step.id}:${step.done}`)
+);
+
+check(
+  'the wizard says where a number can be bought, without inventing a carrier',
+  typeof wizard.body.line?.carrier?.voipms === 'boolean',
+  wizard.body.line?.carrier
+);
+
+const wizardGated = await call('GET', '/api/numbers');
+check(
+  'the console is closed until the first login is finished',
+  wizardGated.status === 403 &&
+    wizardGated.body.error?.code === 'onboarding_required' &&
+    wizardGated.body.error?.details?.next === 'terms',
+  wizardGated.body
+);
+
+const accepted = await call('POST', '/api/onboarding/terms', { accept: true });
+check(
+  'the terms are recorded with the version that was on screen',
+  accepted.status === 200 &&
+    accepted.body.steps.find((step) => step.id === 'terms').done === true &&
+    accepted.body.terms.acceptedVersion === accepted.body.terms.version,
+  accepted.body.terms
+);
+
+const confirmed = await call('POST', '/api/onboarding/profile', {
+  name: 'Telno Owner',
+  company: 'Telno',
+  address: '1 Main Street',
+  city: 'Austin',
+  country: 'TX',
+  website: '',
+  directoryOptIn: false,
+});
+check(
+  'the account and billing details are confirmed',
+  confirmed.status === 200 && confirmed.body.steps.find((step) => step.id === 'profile').done === true,
+  confirmed.body
+);
+
+const emailCode = await call('POST', '/api/onboarding/email/code', {});
+check('a code is sent to the address on the account', emailCode.status === 200 && !!emailCode.body.devCode, emailCode.body);
+const emailOk = await call('POST', '/api/onboarding/email/verify', { code: emailCode.body.devCode });
+check(
+  'the address is verified with the code that was sent',
+  emailOk.status === 200 && emailOk.body.steps.find((step) => step.id === 'email').done === true,
+  emailOk.body
+);
+
+const phoneCode = await call('POST', '/api/onboarding/phone/code', { phone: '+15550107777' });
+check('a code is sent by text to the phone given', phoneCode.status === 200 && !!phoneCode.body.devCode, phoneCode.body);
+const phoneOk = await call('POST', '/api/onboarding/phone/verify', { code: phoneCode.body.devCode });
+check(
+  'the phone number is verified with the code that was sent',
+  phoneOk.status === 200 && phoneOk.body.steps.find((step) => step.id === 'phone').done === true,
+  phoneOk.body
+);
+
+if (phoneOk.body.next === 'line') {
+  // A seeded instance already holds lines with numbers on them. A truly empty
+  // one — the case this step exists for — creates its first line here.
+  const plan = await call('GET', '/api/setup');
+  const made = await call('POST', '/api/setup/line', {
+    extension: plan.body.suggested?.extension || '101',
+    displayName: 'Owner',
+    number: '+15550107788',
+  });
+  check('the first line and number are created on the switch', made.status === 201 && !!made.body.extension?.secret, made.body);
+}
+
+const finished = await call('GET', '/api/onboarding');
+check(
+  'the first login is finished',
+  finished.body.required === false && finished.body.complete === true,
+  finished.body.steps?.map((step) => `${step.id}:${step.done}`)
+);
+const reopened = await call('GET', '/api/numbers');
+check('the console answers again once the first login is done', reopened.status === 200, reopened.body);
+
 // ---------------------------------------------------------------- fixtures --
 // Remove anything a previous run left behind so assertions stay deterministic.
 for (const value of [FIXTURE_NUMBER, SUBMISSION_NUMBER]) {
@@ -2887,6 +2978,29 @@ const subscriberLogin = await call(
 const subscriberCookie = (subscriberLogin.headers.get('set-cookie') || '').split(';')[0];
 check('the new subscriber can sign in', subscriberLogin.status === 200 && !!subscriberCookie, subscriberLogin.status);
 
+// The line comes from the platform, the number from the subscriber: the operator
+// assigns the line the plan bought, and the first login puts a number on it. Both
+// happen before the portal checks below, because an account that has not finished
+// the wizard is refused every portal route with the step it stopped at.
+const assignedLine = await call('POST', '/api/extensions', {
+  extension: '296',
+  displayName: 'Subscriber Line',
+  voicemail: true,
+  account: subscriberEmail,
+});
+check(
+  'an operator can assign a line to a customer account',
+  assignedLine.status === 201 && assignedLine.body.extension?.accountEmail === subscriberEmail,
+  assignedLine.body.extension
+);
+
+const subscriberSetup = await finishFirstLogin(subscriberCookie, { extension: '296', number: '+14155550112' });
+check(
+  'a paying subscriber finishes the first login and then holds their line',
+  subscriberSetup.body?.complete === true,
+  subscriberSetup.body?.steps?.map((step) => `${step.id}:${step.done}`)
+);
+
 const gated = await fetch(`${base}/api/auth/me`, { headers: { cookie: subscriberCookie } });
 const gatedBody = await gated.json().catch(() => ({}));
 check(
@@ -3010,24 +3124,59 @@ check(
 const afterComp = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
 check('the restored subscription opens the customer portal', afterComp.status === 200, afterComp.status);
 
+/**
+ * Walk the required first login for a session, the way a person does.
+ *
+ * The gate is part of the product, so every account the suite expects to use the
+ * console has to finish it: terms, details, a code typed back for the address and
+ * for the phone, and a line with a number on it. `extension` names the line to
+ * put the number on when the account has one, `makeLine` the line to create when
+ * it has none.
+ */
+async function finishFirstLogin(cookie, { extension = '', number = '', makeLine = '' } = {}) {
+  const send = async (method, path, body) => {
+    const res = await fetch(base + path, {
+      method,
+      headers: { accept: 'application/json', 'content-type': 'application/json', cookie },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  };
+
+  await send('POST', '/api/onboarding/terms', { accept: true });
+  await send('POST', '/api/onboarding/profile', {
+    name: 'Smoke Subscriber',
+    company: 'Smoke Subscriber Co',
+    address: '120 Harbor Way',
+    city: 'Austin',
+    country: 'US',
+    website: 'smoke.example',
+    directoryOptIn: false,
+  });
+  const email = await send('POST', '/api/onboarding/email/code', {});
+  if (email.body?.devCode) await send('POST', '/api/onboarding/email/verify', { code: email.body.devCode });
+  const phone = await send('POST', '/api/onboarding/phone/code', { phone: '+14155550111' });
+  if (phone.body?.devCode) await send('POST', '/api/onboarding/phone/verify', { code: phone.body.devCode });
+
+  const state = await send('GET', '/api/onboarding');
+  if (state.body?.next === 'line') {
+    // A line of their own takes the number; without one the step creates the line
+    // itself, which is what a subscriber who has just paid is looking at.
+    const made = state.body.line?.lines
+      ? await send('POST', '/api/setup/number', { extension, number })
+      : await send('POST', '/api/setup/line', { extension: makeLine || '275', displayName: 'Smoke Subscriber', number });
+    if (made.status >= 400) throw new Error(`first login could not finish the line step: ${made.status} ${JSON.stringify(made.body)}`);
+  }
+  return send('GET', '/api/onboarding');
+}
+
 /* --------------------------------------------------- the customer portal -- */
 // A paying customer is not an operator. Their own line, plan and invoices are
 // theirs; the switch, the registry and the campaigns are not, and the boundary
 // is a single check in the auth plugin rather than a habit of each route.
 
 console.log('\nThe customer portal');
-
-const assignedLine = await call('POST', '/api/extensions', {
-  extension: '296',
-  displayName: 'Subscriber Line',
-  voicemail: true,
-  account: subscriberEmail,
-});
-check(
-  'an operator can assign a line to a customer account',
-  assignedLine.status === 201 && assignedLine.body.extension?.accountEmail === subscriberEmail,
-  assignedLine.body.extension
-);
 
 const customerMe = await fetch(`${base}/api/me`, { headers: { cookie: subscriberCookie } });
 const customerMeBody = await customerMe.json().catch(() => ({}));
@@ -3153,6 +3302,12 @@ const handLogin = await call(
   { noCookie: true, bearer: '' }
 );
 const handCookie = (handLogin.headers.get('set-cookie') || '').split(';')[0];
+const handSetup = await finishFirstLogin(handCookie, { number: '+14155550144', makeLine: '285' });
+check(
+  'a hand-onboarded customer finishes the same first login',
+  handSetup.body?.complete === true && handSetup.body?.line?.lines === 1,
+  handSetup.body?.steps?.map((step) => `${step.id}:${step.done}`)
+);
 const handAccess = await fetch(`${base}/api/me`, { headers: { cookie: handCookie } });
 check('the hand-onboarded customer can use the portal immediately', handAccess.status === 200, handAccess.status);
 
@@ -3319,9 +3474,9 @@ const asCustomer = async (method, path, body) => {
 
 const freshPortal = await asCustomer('GET', '/api/me');
 check(
-  'a customer arrives with their details unconfirmed and no directory answer',
+  'the portal reads back the details the first login confirmed, and no guessed directory answer',
   freshPortal.status === 200 &&
-    freshPortal.body.profile?.confirmed === false &&
+    freshPortal.body.profile?.confirmed === true &&
     freshPortal.body.profile?.directoryOptIn === false,
   freshPortal.body.profile
 );

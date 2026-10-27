@@ -1,7 +1,8 @@
 import { db_, now } from '../db/index.js';
 import { resolveNumber } from '../lib/registry.js';
 import { insertExtension, extensionByNumber, suggestExtension } from '../lib/extensions.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, notFound, unauthorized } from '../lib/errors.js';
+import { needsOnboarding, numberCount, lineCount } from '../lib/onboarding.js';
 import { logEvent } from '../lib/audit.js';
 import * as v from '../lib/validate.js';
 import { applyAfterChange, telephonyStatus } from '../telephony/index.js';
@@ -30,13 +31,59 @@ const displayNameFor = (account) => {
 
 const numberView = (row) => (row ? { e164: row.e164 } : null);
 
+/**
+ * Put a number on the account that just attached it to a line.
+ *
+ * The registry is worldwide and most of its rows belong to nobody, so a number
+ * is only ever claimed here — by the setup path, for an account that is putting
+ * it on its own line — and never adopted in bulk.
+ */
+const claimNumber = (numberId, accountId) => {
+  if (!numberId || !accountId) return;
+  db_.run('UPDATE numbers SET account_id = ? WHERE id = ? AND (account_id IS NULL OR account_id = ?)', [
+    accountId,
+    numberId,
+    accountId,
+  ]);
+};
+
+/**
+ * Whether this number may be published in the worldwide directory.
+ *
+ * Not a silent default either way: the account answers that question in the step
+ * before this one, and a number put on a line is listed only if they said their
+ * numbers may be. resolveNumber applies it, so a number that already exists in
+ * the registry is corrected rather than left public by accident.
+ */
+const listedFor = (account) => (account?.directory_opt_in ? 'public' : 'private');
+
 export default async function setupRoutes(app) {
   app.addHook('preHandler', async (request) => {
     // Staff only: a customer's console is their own line, and setup is the
     // switch's own front door.
     await app.authenticate(request);
   });
-  const requireWrite = app.requireRole('owner', 'operator');
+  /**
+   * Staff write, or an account still in the first login creating the one thing it
+   * cannot do without.
+   *
+   * A subscriber is not an operator, and the last step of the wizard is a line
+   * with a number on it — so without this the one screen every new account has to
+   * finish would be closed to the people signing up. The allowance is narrow on
+   * purpose: it holds only while the account is unfinished, only for the first
+   * line it owns and the first number on it, and it is spent the moment setup is
+   * done. Everything else about the switch stays staff-only, which is what the
+   * test suite asserts against a customer session.
+   */
+  const requireWriteOrSetup = async (request, kind) => {
+    const account = request.account || app.readSession(request);
+    if (!account) throw unauthorized();
+    if (['owner', 'operator'].includes(account.role)) return;
+    if (!needsOnboarding(account)) throw forbidden('Requires one of: owner, operator');
+    const owned = kind === 'number' ? numberCount(account.id) : lineCount(account.id);
+    if (owned > 0) throw forbidden('Requires one of: owner, operator');
+  };
+  const requireOwnLine = (kind) => async (request) => requireWriteOrSetup(request, kind);
 
   /** What is missing between this install and a phone that rings. */
   app.get('/setup', async (request) => {
@@ -110,7 +157,7 @@ export default async function setupRoutes(app) {
    * Not restricted to an empty switch: an operator setting up a second line is
    * the same job, and refusing it here would be an arbitrary rule.
    */
-  app.post('/setup/line', { preHandler: requireWrite }, async (request, reply) => {
+  app.post('/setup/line', { preHandler: requireOwnLine('line') }, async (request, reply) => {
     const body = request.body || {};
     const extension = v.str(body.extension, { name: 'extension', max: 6, required: false }) || suggestExtension();
     if (!extension) throw badRequest('Every extension from 101 to 999 is in use');
@@ -119,8 +166,12 @@ export default async function setupRoutes(app) {
     if (v.str(body.number, { name: 'number', max: 20, required: false })) {
       // resolveNumber records the DID in the registry as well, so the line is
       // reachable from the Numbers screen the moment it exists.
-      const resolved = resolveNumber(body.number, { source: 'setup' });
+      const resolved = resolveNumber(body.number, {
+        source: 'setup',
+        visibility: listedFor(request.account),
+      });
       number = resolved.number;
+      claimNumber(number.id, request.account.id);
     }
 
     const created = insertExtension({
@@ -128,6 +179,9 @@ export default async function setupRoutes(app) {
       displayName: v.str(body.displayName, { name: 'displayName', max: 80, required: false }) || displayNameFor(request.account),
       email: request.account.email,
       numberId: number?.id || null,
+      // The line belongs to whoever made it. Without this the wizard's own step
+      // could never see it and the account would stay unfinished.
+      accountId: request.account.id,
     });
 
     logEvent({
@@ -158,13 +212,20 @@ export default async function setupRoutes(app) {
   });
 
   /** Attach a number to a line that already exists. */
-  app.post('/setup/number', { preHandler: requireWrite }, async (request) => {
+  app.post('/setup/number', { preHandler: requireOwnLine('number') }, async (request) => {
     const extension = extensionByNumber(v.str(request.body?.extension, { name: 'extension', max: 6 }));
     if (!extension) throw notFound('That extension does not exist');
+    // A subscriber may only put a number on a line of their own: an operator's
+    // line is not theirs to change, however tidy the extension number looks.
+    if (!['owner', 'operator'].includes(request.account.role) && extension.account_id !== request.account.id) {
+      throw notFound('That extension does not exist');
+    }
     const resolved = resolveNumber(v.str(request.body?.number, { name: 'number', max: 20 }), {
       source: 'setup',
+      visibility: listedFor(request.account),
     });
     db_.run('UPDATE extensions SET number_id = ?, updated_at = ? WHERE id = ?', [resolved.id, now(), extension.id]);
+    claimNumber(resolved.id, request.account.id);
     logEvent({
       actor: request.account.email,
       action: 'setup.number_attached',
