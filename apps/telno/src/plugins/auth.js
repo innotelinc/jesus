@@ -1,8 +1,9 @@
 import { db_ } from '../db/index.js';
 import { config } from '../config.js';
 import { verifySession, apiKeyHash, signSession } from '../lib/security.js';
-import { unauthorized, forbidden, paymentRequired } from '../lib/errors.js';
+import { unauthorized, forbidden, paymentRequired, onboardingRequired } from '../lib/errors.js';
 import { entitlementFor } from '../lib/subscriptions.js';
+import { isAllowedWhileOnboarding, needsOnboarding, onboardingState } from '../lib/onboarding.js';
 
 export const SESSION_COOKIE = 'telno_session';
 
@@ -60,7 +61,27 @@ const CUSTOMER_PATHS = [
   // itself checks ownership before it reads, writes or scores anything.
   /^\/api\/voice(\/|$)/,
   /^\/api\/public(\/|$)/,
+  // The wizard's last step: a subscriber's first line and number are created by
+  // the person who owns them, and that screen is part of signing up. The rest of
+  // setup — the switch inventory and its trunks — stays staff-only.
+  /^\/api\/setup\/line$/,
+  /^\/api\/setup\/number$/,
+  /^\/api\/onboarding(\/|$)/,
 ];
+
+/**
+ * Routes that are not paid capabilities.
+ *
+ * The first login is what makes an account real: it records the agreement, proves
+ * the address and the phone, and puts a line behind the account. A subscriber
+ * whose payment has not settled yet must be able to finish it — the wizard is not
+ * something the subscription buys. Everything that opens *because* of the
+ * subscription (the portal, the line, the softphone) stays behind the paid gate,
+ * which is also what keeps /auth/me answering 402 to a lapsed customer.
+ */
+const NOT_A_PAID_CAPABILITY = [/^\/api\/onboarding(\/|$)/, /^\/api\/setup\/(line|number)$/];
+
+export const isPaidCapability = (path) => !NOT_A_PAID_CAPABILITY.some((pattern) => pattern.test(path));
 
 export function installAuth(app) {
   app.decorateRequest('account', null);
@@ -104,6 +125,23 @@ export function installAuth(app) {
     return entitlement;
   });
 
+  /**
+   * The first-login gate.
+   *
+   * An account that has signed in has to finish the wizard before the console
+   * answers it: the terms on record, the details confirmed, the address and the
+   * phone proved, and a line that can actually ring. Enforced here rather than
+   * in the screen so a hand-written request cannot skip it. The step it stopped
+   * at travels in the error, which is what lets the console open the right one.
+   */
+  const enforceOnboarding = (request, account) => {
+    if (!needsOnboarding(account)) return;
+    const path = String(request.url || '').split('?')[0];
+    if (isAllowedWhileOnboarding(path)) return;
+    const state = onboardingState(account);
+    throw onboardingRequired(state.next, state.next ? undefined : 'Finish setting up your account to continue');
+  };
+
   app.decorate('authenticate', async (request) => {
     const account = app.readSession(request);
     if (!account) throw unauthorized();
@@ -112,7 +150,9 @@ export function installAuth(app) {
     if (account.suspended_at) {
       throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
     }
-    request.entitlement = app.enforceEntitlement(account);
+    enforceOnboarding(request, account);
+    const path = String(request.url || '').split('?')[0];
+    request.entitlement = isPaidCapability(path) ? app.enforceEntitlement(account) : entitlementFor(account);
     request.account = account;
   });
 
@@ -122,6 +162,10 @@ export function installAuth(app) {
       if (account.suspended_at) {
         throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
       }
+      // A session is a session, whichever decorator reads it: the first-login
+      // gate would mean nothing if a half-finished account could reach the
+      // registry through this door. An API key is a machine and is never asked.
+      enforceOnboarding(request, account);
       request.entitlement = app.enforceEntitlement(account);
       request.account = account;
       return;
@@ -142,7 +186,9 @@ export function installAuth(app) {
       throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
     }
     if (!roles.includes(account.role)) throw forbidden(`Requires one of: ${roles.join(', ')}`);
-    request.entitlement = app.enforceEntitlement(account);
+    enforceOnboarding(request, account);
+    const path = String(request.url || '').split('?')[0];
+    request.entitlement = isPaidCapability(path) ? app.enforceEntitlement(account) : entitlementFor(account);
     request.account = account;
   });
 

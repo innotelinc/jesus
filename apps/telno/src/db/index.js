@@ -134,6 +134,16 @@ function migrate(db) {
     // v18: a line can require a recent voiceprint check before it hands out SIP
     // credentials, and the native app registers a push token per line.
     ['extensions', 'voice_auth', 'INTEGER NOT NULL DEFAULT 0'],
+    // v19: the required first login. Accepting the terms is recorded with the
+    // version that was accepted, so a later revision can ask again instead of
+    // inheriting an old yes; the address and the phone are proven, not asserted;
+    // and the welcome message is stamped so a restart cannot repeat it.
+    ['accounts', 'terms_accepted_at', 'TEXT'],
+    ['accounts', 'terms_version', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'email_verified_at', 'TEXT'],
+    ['accounts', 'phone', "TEXT NOT NULL DEFAULT ''"],
+    ['accounts', 'phone_verified_at', 'TEXT'],
+    ['accounts', 'welcome_sent_at', 'TEXT'],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {
@@ -146,6 +156,24 @@ function migrate(db) {
   // three plans under the new pricing instead of leaving them metered.
   db.exec("UPDATE plans SET minutes_unlimited = 1 WHERE minutes_unlimited IS NULL");
   db.exec("UPDATE plans SET audience = 'business' WHERE audience IS NULL OR audience = ''");
+
+  // v20: the first-login wizard asks which line is yours, so the switch's own
+  // inventory has to have an owner. Lines and numbers made before accounts owned
+  // them carry no account at all, and an install that upgraded into the wizard
+  // would otherwise be told to add a line it already has — forever, because the
+  // step counts lines that belong to the account.
+  //
+  // Ownership is granted once, to the owner account, and only to numbers that
+  // are attached to one of those lines: a registry row that nobody holds is not
+  // the owner's number and stays unowned.
+  const inventoryOwner = db.prepare("SELECT id FROM accounts WHERE role = 'owner' ORDER BY created_at LIMIT 1").get();
+  if (inventoryOwner) {
+    db.prepare('UPDATE extensions SET account_id = ? WHERE account_id IS NULL').run(inventoryOwner.id);
+    db.prepare(
+      `UPDATE numbers SET account_id = ?
+        WHERE account_id IS NULL AND id IN (SELECT number_id FROM extensions WHERE number_id IS NOT NULL)`
+    ).run(inventoryOwner.id);
+  }
 
   // Ownership lookups are per account and happen on every portal load. Created
   // here, after the columns above, so an upgrade never indexes a column that

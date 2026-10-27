@@ -5,6 +5,7 @@ import { hashPassword } from './security.js';
 import { logEvent } from './audit.js';
 import { checkoutForSubscription, fetchStripeSubscription } from './payments.js';
 import { publicBrand } from './brand.js';
+import { sendWelcome } from './onboarding.js';
 
 /**
  * Plans, features and subscriptions.
@@ -729,7 +730,12 @@ export function createCustomerAccount({ email, name, password }) {
     [id, email, name || email.split('@')[0], hashPassword(password)]
   );
   logEvent({ actor: 'public', action: 'portal.account_created', subject: email });
-  return { ok: true, account: db_.get('SELECT * FROM accounts WHERE id = ?', [id]) };
+  const account = db_.get('SELECT * FROM accounts WHERE id = ?', [id]);
+  // Buying a plan is not a reason to wait on an email provider, and a signup
+  // must not fail because one is misconfigured: sent after the row exists, never
+  // awaited, with the reason in the log when it does not go out.
+  sendWelcome(account).catch((err) => console.warn(`[welcome] could not send: ${err.message}`));
+  return { ok: true, account };
 }
 
 /** The public pricing page's data: plans, features and what the portal needs. */

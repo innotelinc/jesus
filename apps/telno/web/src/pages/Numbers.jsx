@@ -120,7 +120,7 @@ export default function Numbers() {
           ) : null
         }
       >
-        <div className="row wrap" style={{ gap: 26 }}>
+        <div className="grid squares">
           <Stat label="Rented here" value={provider ? provider.held : '—'} />
           <Stat label="Rent this month" value={provider ? money(provider.costs?.totalCents, provider.costs?.currency) : '—'} />
           <Stat label="Accounts carrying rent" value={provider ? provider.costs?.accounts : '—'} />

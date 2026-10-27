@@ -7,6 +7,7 @@ import { cookieOptions, SESSION_COOKIE } from '../plugins/auth.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
 import { clearFirstRunPassword, firstRunPasswordFile, firstRunPasswordPending } from '../lib/firstRun.js';
+import { onboardingState } from '../lib/onboarding.js';
 
 const view = (account) => ({
   id: account.id,
@@ -74,6 +75,10 @@ export default async function authRoutes(app) {
   // and where it lives.
   app.get('/me', { preHandler: app.authenticate }, async (request) => ({
     user: view(request.account),
+    // Whether the first-login steps are done, carried on the session bootstrap so
+    // the console knows before it renders anything: a screen full of panels the
+    // API then refuses is not what "required" is supposed to look like.
+    onboarding: onboardingState(request.account),
     firstRun:
       request.account.role === 'owner'
         ? { pending: firstRunPasswordPending(), file: firstRunPasswordFile() }

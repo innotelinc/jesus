@@ -13,6 +13,7 @@ import { applyStagedRestore, startBackupSchedule, setRestoreHandler } from './li
 import { seedCommerce } from './lib/subscriptions.js';
 import { seedBrand } from './lib/brand.js';
 import { writeFirstRunPassword } from './lib/firstRun.js';
+import { sendWelcome } from './lib/onboarding.js';
 import { randomBytes } from 'node:crypto';
 
 assertConfig();
@@ -43,6 +44,17 @@ function ensureOwner() {
     'owner',
   ]);
   logEvent({ actor: 'system', action: 'account.bootstrap', subject: config.adminEmail });
+
+  // The first message this platform ever sends: what the account is and what to
+  // do first. Not awaited — a boot must not wait on a mail provider, and the row
+  // it belongs to is already committed — and never sent twice, which the stamp
+  // on the row is what makes true.
+  sendWelcome(db_.get('SELECT * FROM accounts WHERE id = ?', [id]))
+    .then((result) => {
+      if (result.sent) console.log(`[welcome] sent to ${config.adminEmail} via ${result.channel}`);
+      else if (!result.skipped) console.warn(`[welcome] not delivered: ${result.error}`);
+    })
+    .catch((err) => console.warn(`[welcome] could not send: ${err.message}`));
 
   if (!config.adminPassword) {
     // Written to the data volume rather than printed: a log is copied into

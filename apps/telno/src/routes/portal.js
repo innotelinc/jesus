@@ -29,6 +29,7 @@ import {
   syncPlanToMagnate,
 } from '../lib/subscriptions.js';
 import { publicBrand } from '../lib/brand.js';
+import { onboardingState } from '../lib/onboarding.js';
 import * as v from '../lib/validate.js';
 
 /**
@@ -183,6 +184,11 @@ export default async function portalRoutes(app) {
       plans: listPlans({ activeOnly: true }),
       payments: { configured: stripeConfigured() && config.payments.enabled },
       subscribeUrl: config.subscribeUrl || '/subscribe',
+      // A subscriber who has just paid is in the same first login as anyone else,
+      // and this is the only bootstrap an unpaid-then-paid customer reads before
+      // the console renders: without the steps here they would be sent into the
+      // portal only to have every route refuse them.
+      onboarding: onboardingState(account),
     };
   });
 

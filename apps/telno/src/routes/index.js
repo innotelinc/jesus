@@ -15,6 +15,7 @@ import portalRoutes from './portal.js';
 import meRoutes from './me.js';
 import carrierRoutes from './carriers.js';
 import setupRoutes from './setup.js';
+import onboardingRoutes from './onboarding.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
@@ -44,6 +45,9 @@ export async function registerRoutes(app) {
   // First run: the line, number and registration that make a fresh install
   // able to place a call at all.
   await app.register(setupRoutes);
+  // The required first login: terms, details, a proved address and phone, and a
+  // line. Staff and customers both walk through it.
+  await app.register(onboardingRoutes);
 }
 
 export default registerRoutes;
