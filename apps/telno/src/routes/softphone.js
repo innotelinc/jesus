@@ -233,6 +233,16 @@ function wireDialEvents() {
 
 /* ---------------------------------------------------------------- routes -- */
 
+/**
+ * Follow the switch's line events from boot, not from the first browser.
+ *
+ * The push that rings a parked call is driven by these events, so wiring them
+ * inside the WebSocket handler meant a call parked before anybody opened a
+ * softphone rang nobody at all — which is exactly the call a locked phone is
+ * supposed to catch.
+ */
+export const startLineEvents = () => wireDialEvents();
+
 export default async function softphoneRoutes(app) {
   app.addHook('preHandler', async (request) => {
     if (request.method === 'OPTIONS') return;

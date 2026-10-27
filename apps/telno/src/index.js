@@ -4,6 +4,7 @@ import { getDb, db_, newId, now } from './db/index.js';
 import { hashPassword } from './lib/security.js';
 import { logEvent } from './lib/audit.js';
 import { startTelephony } from './telephony/index.js';
+import { startLineEvents } from './routes/softphone.js';
 import { writeConfigs } from './telephony/provision.js';
 import { startReminderSweep } from './lib/reminders.js';
 import { startRentalSweep } from './lib/rentals.js';
@@ -79,6 +80,10 @@ if (process.argv.includes('--provision-only')) {
 }
 
 startTelephony();
+// Line events (a call ringing, a call parked) drive the push that wakes a
+// phone. They are followed from boot because the phone that is not in the
+// console is the one that most needs the call.
+startLineEvents();
 
 const app = await buildApp();
 
