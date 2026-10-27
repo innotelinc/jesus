@@ -202,7 +202,17 @@ jobs:
       - name: Send it to TestFlight
         if: ${{ !inputs.prepare_only && (github.event_name == 'push' || inputs.upload) }}
         run: |
-          set -euo pipefail
-          xcrun altool --upload-app -f native/build/ipa/*.ipa -t ios \
-            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
-          echo "Uploaded build $APP_BUILD of $APP_VERSION — it appears in App Store Connect under TestFlight after processing."
+          set -uo pipefail
+          if xcrun altool --upload-app -f native/build/ipa/*.ipa -t ios \
+               --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"; then
+            echo "Uploaded build $APP_BUILD of $APP_VERSION — it appears in App Store Connect under TestFlight after processing."
+            exit 0
+          fi
+          # -19000 is Apple saying it has no app for this bundle id. The App
+          # Store Connect API cannot create app records, so this is the one step
+          # that is genuinely a human's: it is a five-field form, not a signing
+          # problem, and a bare -19000 reads like one.
+          cat <<EOF
+          ::error::Apple refused the upload. If the log above says -19000 / "No suitable application records were found", create the app record once: App Store Connect -> Apps -> + -> New App -> iOS, bundle id ${APP_BUNDLE_ID}, then re-run this workflow. The signed .ipa is attached to this run as an artifact, so the re-run rebuilds nothing it needs.
+          EOF
+          exit 1
