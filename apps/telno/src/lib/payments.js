@@ -27,7 +27,20 @@ const WEBHOOK_NAME = 'STRIPE_WEBHOOK_SECRET';
 const WEBHOOK_PATH = '/api/public/stripe/webhook';
 // The two events that mean money moved. An endpoint without them reports 200
 // to Stripe and pays nothing, which is the worst possible failure: silent.
-const WEBHOOK_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+// The two events that mean money moved. An endpoint without them reports 200
+// to Stripe and pays nothing, which is the worst possible failure: silent.
+const PAYMENT_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+// A subscription is a standing instruction, so its own events matter to the
+// portal gate. They are recommended rather than required: a deployment that
+// only invoices does not need them, and failing its connection test for that
+// would be a false alarm.
+const SUBSCRIPTION_EVENTS = [
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.payment_failed',
+];
+const WEBHOOK_EVENTS = PAYMENT_EVENTS;
+export const webhookEventList = () => [...PAYMENT_EVENTS, ...SUBSCRIPTION_EVENTS];
 const MIN_CHARGE_CENTS = 50;
 
 /** Key from the vault first, environment second — the console can rotate it. */
@@ -184,6 +197,68 @@ function checkoutParams({ invoices, email, reference, invoiceIds }) {
     Object.assign(params, lineItem(invoice, index));
   });
   return params;
+}
+
+/**
+ * Create a hosted subscription page for a plan.
+ *
+ * `mode=subscription` is the difference: Stripe keeps the card and charges on
+ * the interval, so the portal does not have to remember to bill anyone. A plan
+ * with a stored price uses it; otherwise the price is created from the plan's
+ * own numbers, which is what makes a price edit on the public page immediate.
+ */
+export async function checkoutForSubscription({ plan, account, subscriptionId, origin }) {
+  if (!config.payments.enabled) return { ok: false, error: 'payments_disabled' };
+  if (!stripeConfigured()) return { ok: false, error: 'stripe_not_configured' };
+  if (!plan?.id) return { ok: false, error: 'not_found' };
+  if (!account?.email) return { ok: false, error: 'not_found' };
+
+  const site = String(origin || config.subscribeUrl || base()).replace(/\/+$/, '');
+  const item = plan.stripe_price_id
+    ? { 'line_items[0][price]': plan.stripe_price_id }
+    : {
+        'line_items[0][price_data][currency]': currencyOf(plan.currency),
+        'line_items[0][price_data][unit_amount]': plan.price_cents,
+        'line_items[0][price_data][recurring][interval]': plan.interval || 'month',
+        'line_items[0][price_data][product_data][name]': plan.name,
+        ...(plan.tagline ? { 'line_items[0][price_data][product_data][description]': plan.tagline } : {}),
+      };
+
+  const params = {
+    mode: 'subscription',
+    success_url: `${site}/subscribe?status=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${site}/subscribe?status=cancelled`,
+    customer_email: account.email,
+    client_reference_id: account.id,
+    'line_items[0][quantity]': 1,
+    ...item,
+    'metadata[kind]': 'subscription',
+    'metadata[platform]': 'telno',
+    'metadata[subscriptionId]': subscriptionId,
+    'metadata[planId]': plan.id,
+    'subscription_data[metadata][kind]': 'subscription',
+    'subscription_data[metadata][subscriptionId]': subscriptionId,
+    'subscription_data[metadata][planId]': plan.id,
+  };
+
+  const result = await stripePost('/v1/checkout/sessions', params);
+  if (!result.ok) return { ok: false, error: result.error, status: result.status };
+  if (!result.data?.url) return { ok: false, error: 'no_checkout_url' };
+
+  db_.run('UPDATE subscriptions SET stripe_session_id = ? WHERE id = ?', [result.data.id || '', subscriptionId]);
+  logEvent({
+    actor: 'customer',
+    action: 'portal.checkout_created',
+    subject: account.email,
+    detail: `${plan.name} · session ${result.data.id || 'unknown'}`,
+  });
+  return { ok: true, url: result.data.url, sessionId: result.data.id || null };
+}
+
+/** The subscription as Stripe sees it, for the period end checkout omits. */
+export async function fetchStripeSubscription(id) {
+  if (!id) return { ok: false, error: 'no_subscription_id' };
+  return stripeRequest('GET', `/v1/subscriptions/${encodeURIComponent(id)}`);
 }
 
 /**
@@ -521,6 +596,7 @@ export async function testConnection() {
         const events = match.enabled_events || [];
         const wildcard = events.includes('*');
         const missing = WEBHOOK_EVENTS.filter((event) => !wildcard && !events.includes(event));
+        const missingSubscriptions = SUBSCRIPTION_EVENTS.filter((event) => !wildcard && !events.includes(event));
         const problems = [];
         if (match.status && match.status !== 'enabled') problems.push(`its status is ${match.status}`);
         if (missing.length) problems.push(`it is not subscribed to ${missing.join(' or ')}`);
@@ -531,6 +607,17 @@ export async function testConnection() {
           problems.length
             ? `${match.url} — ${problems.join('; ')}.`
             : `${match.url} · ${wildcard ? 'all events' : `${events.length} event(s)`}, including both payment events.`
+        );
+        // Subscriptions are a separate promise: the portal gate needs these to
+        // know a renewal lapsed, and a missing one is worth fixing before the
+        // first customer signs up.
+        add(
+          'webhook-subscriptions',
+          'Subscription events',
+          missingSubscriptions.length ? 'warn' : 'pass',
+          missingSubscriptions.length
+            ? `Not subscribed to ${missingSubscriptions.join(', ')} — the portal will not learn about lapsed or cancelled subscriptions until it does.`
+            : 'Renewals, cancellations and failed payments reach the portal gate.'
         );
       }
     }

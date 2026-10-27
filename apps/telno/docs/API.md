@@ -346,3 +346,109 @@ in the environment still works for a compose-driven deployment.
 | POST | `/submissions/:id/reject` | operator | reject with a note |
 | GET | `/optouts` | session | suppression list |
 | DELETE | `/optouts/:e164` | operator | reverse an opt-out |
+
+## Marketing
+
+Campaigns over the voice agents: a list, a script and a goal, with every answered
+call graded against that goal and a report that can be emailed as a PDF.
+Writes need `owner` or `operator`.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/marketing/overview` | campaigns, templates, agents, dialer extensions, AI status |
+| GET | `/marketing/campaigns` | campaigns with their contact counts |
+| POST | `/marketing/campaigns` | `{ name, template?, goal?, script?, agentId?, dialerExtension? }` |
+| GET | `/marketing/campaigns/:id` | campaign, contacts, reports and totals |
+| PATCH | `/marketing/campaigns/:id` | name, goal, script, status, limits, threshold, agent, dialer |
+| DELETE | `/marketing/campaigns/:id` | removes the campaign and its contacts |
+| POST | `/marketing/campaigns/:id/contacts` | `{ text }`; returns `{ added, duplicates, optedOut, invalid }` |
+| DELETE | `/marketing/contacts/:id` | remove one contact |
+| POST | `/marketing/campaigns/:id/run` | `{ limit }`; claims the next batch exclusively |
+| POST | `/marketing/contacts/:id/outcome` | `{ outcome, transcript?, durationSec? }`; records and grades |
+| POST | `/marketing/campaigns/:id/grade` | re-grade every answered call |
+| POST | `/marketing/campaigns/:id/report` | `{ email? }`; builds the PDF and emails it when an address is given |
+| GET | `/marketing/reports/:id/download` | the PDF, rebuilt from the stored totals |
+| POST | `/marketing/suggest` | `{ goal, script? }`; a rewrite plus coaching notes, or `ai_not_configured` |
+
+Outcomes are a closed set: `interested`, `callback`, `not-interested`,
+`wrong-number`, `do-not-call`, `voicemail`, `no-answer`, `busy`, `failed`.
+`do-not-call` also writes the number to `/optouts`, so no campaign can dial it
+again.
+
+```bash
+# Claim two contacts, then record one of them
+curl -X POST http://localhost:8080/api/marketing/campaigns/cmp_…/run -b cookie.txt \
+  -H 'content-type: application/json' -d '{"limit":2}'
+
+curl -X POST http://localhost:8080/api/marketing/contacts/cc_…/outcome -b cookie.txt \
+  -H 'content-type: application/json' \
+  -d '{"outcome":"interested","durationSec":190,"transcript":"Customer: send the quote, book Thursday."}'
+# { "contact": { "status": "completed", "grade": 91, "reasons": [...] }, "campaign": { … } }
+```
+
+## Plans, subscriptions and the portal
+
+Plans and features are rows: the admin edits them and the public page at
+`/subscribe` reads the same rows.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/public/plans` | none | sellable plans with their features |
+| POST | `/public/subscribe` | none | `{ plan, name, email, password, origin? }`; creates the customer account and returns a Stripe checkout URL |
+| GET | `/public/subscribe/status?email=` | none | whether the webhook has landed yet |
+| GET | `/portal/status` | session | entitlement, subscription and plans for the signed-in account |
+| GET | `/plans` | operator | plans, feature catalogue, subscriptions, mirror status |
+| POST | `/plans` | operator | create; `features` is a list of feature keys |
+| PATCH | `/plans/:id` | operator | price, interval, seats, included minutes, features, on sale |
+| DELETE | `/plans/:id` | operator | retire; live subscriptions keep it |
+| POST | `/plans/:id/sync` | operator | push the plan to the subscriber system of record |
+| GET | `/features` | operator | the catalogue |
+| POST | `/features` | operator | `{ key, label, description?, category?, addon? }` |
+| PATCH | `/features/:key` | operator | label, description, category, add-on, active |
+| DELETE | `/features/:key` | operator | remove it from every plan |
+| GET | `/subscriptions` | operator | every subscription with its account |
+| POST | `/subscriptions` | operator | put an existing customer account on a plan |
+| PATCH | `/subscriptions/:id` | operator | `{ status?, planId? }`; an override, Stripe untouched |
+| GET | `/customers` | operator | customer accounts and their subscription |
+| POST | `/customers` | operator | `{ email, name, password, planId?, status? }`; onboard by hand |
+
+A **customer** account needs a live subscription; without one every console route
+answers `402 payment_required`. A **staff** account is never gated. The gate lives
+in `entitlementFor`, so the login check, the console and the portal cannot
+disagree.
+
+Stripe drives the lifecycle through the same webhook as invoices:
+`checkout.session.completed` with `mode=subscription` activates,
+`customer.subscription.updated` / `deleted` move status and period end, and
+`invoice.payment_failed` marks the subscription past due.
+
+## AI
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/system/ai/test` | operator | a real completion through the gateway; returns model, latency and reply |
+
+The key is `LLM_API_KEY` in the vault (or the environment), the gateway is
+`LLM_BASE_URL` and the model `LLM_MODEL`. Without a key every AI surface degrades
+visibly: campaign grading uses the rule grader and suggestions say so.
+
+## Brand (white-label)
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/public/brand` | none | product name, vendor, tagline, description, accent, logo, support/sales, directory host, footer |
+| GET | `/system/brand` | operator | the stored brand plus the public shape |
+| PUT | `/system/brand` | owner | any of the fields above; the accent must be a six-digit hex and the logo an http(s) URL |
+
+The site at `/` and `/welcome`, the console header, the login screen, the signup page and the document
+title all render from this record. An edit is live on the next page load — there is no build step and
+no cache to clear.
+
+```bash
+curl -X PUT http://localhost:8080/api/system/brand -b cookie.txt \
+  -H 'content-type: application/json' \
+  -d '{"name":"Northwind Voice","vendor":"Northwind Ltd","accent":"#12a594"}'
+
+curl -s http://localhost:8080/api/public/brand
+# { "brand": { "name": "Northwind Voice", "vendor": "Northwind Ltd", "accent": "#12a594", … } }
+```

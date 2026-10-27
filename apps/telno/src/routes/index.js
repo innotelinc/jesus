@@ -9,6 +9,8 @@ import softphoneRoutes from './softphone.js';
 import heartbeatRoutes from './heartbeat.js';
 import systemRoutes from './system.js';
 import payRoutes from './pay.js';
+import marketingRoutes from './marketing.js';
+import portalRoutes from './portal.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
@@ -25,6 +27,10 @@ export async function registerRoutes(app) {
   await app.register(systemRoutes);
   // Public invoice payment links and Stripe's webhook: no session, by design.
   await app.register(payRoutes);
+  // Outbound campaigns over the voice agents, with a graded report.
+  await app.register(marketingRoutes);
+  // The public pricing page, subscriptions and the plan/feature admin.
+  await app.register(portalRoutes);
 }
 
 export default registerRoutes;

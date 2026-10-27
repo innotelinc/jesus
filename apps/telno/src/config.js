@@ -42,7 +42,13 @@ export const config = {
   dbFile: env.DB_FILE || '',
   defaultCountry: (env.DEFAULT_COUNTRY || 'US').toUpperCase(),
   publicUrl: env.PUBLIC_URL || `http://localhost:${int(env.PORT, 8080)}`,
+  // The public pricing page. One container serves it, but it is linked as its
+  // own hostname so the subscriber never lands in the console.
+  subscribeUrl: env.SUBSCRIBE_URL || '',
   trustProxy: bool(env.TRUST_PROXY, false),
+  // An escape hatch for a deliberate plain-HTTP deployment, e.g. behind a
+  // tunnel that terminates TLS and forwards. Off unless someone asks.
+  allowInsecurePublicUrl: bool(env.ALLOW_INSECURE_PUBLIC_URL, false),
 
   // Set automatically by the container entrypoint on first boot.
   adminEmail: env.ADMIN_EMAIL || 'admin@telno.local',
@@ -179,6 +185,29 @@ export const config = {
     apiUrl: String(env.STRIPE_API_URL || 'https://api.stripe.com').replace(/\/+$/, ''),
   },
 
+  // Backups of everything the data volume holds. The database is dumped with
+  // `VACUUM INTO` rather than copied, so a running instance produces a
+  // consistent snapshot without stopping the platform.
+  backup: {
+    enabled: bool(env.BACKUP_ENABLED, true),
+    // 0 turns the schedule off; the API and the CLI still work.
+    intervalHours: Math.max(0, int(env.BACKUP_INTERVAL_HOURS, 24)),
+    // How many archives to keep. One is a mistake waiting to happen: the good
+    // copy and the bad state can be the same file.
+    keep: Math.max(1, int(env.BACKUP_KEEP, 7)),
+    dir: env.BACKUP_DIR || '',
+  },
+
+  // The language model behind grading, campaign suggestions and the operations
+  // autopilot. Any OpenAI-compatible gateway works; the key belongs in the
+  // vault (Settings → Vault → LLM_API_KEY), the environment is the fallback.
+  ai: {
+    enabled: bool(env.AI_ENABLED, true),
+    baseUrl: (env.LLM_BASE_URL || 'https://gateway.innotel.us/v1').replace(/\/+$/, ''),
+    model: env.LLM_MODEL || 'gpt-4o-mini',
+    timeoutMs: Math.max(3000, int(env.LLM_TIMEOUT_MS, 30000)),
+  },
+
   notify: {
     channel: env.NOTIFY_CHANNEL || 'console', // console | twilio | resend
     from: env.NOTIFY_FROM || 'directory@telno.directory',
@@ -200,9 +229,77 @@ if (!config.telephony.simulate && !config.telephony.amiSecret) {
   config.telephony.simulate = !env.AMI_SECRET;
 }
 
+/**
+ * A production boot refuses to start on the settings that quietly become
+ * incidents: a password every reader of this repository knows, or an insecure
+ * public URL on a hostname that is actually reachable.
+ *
+ * Local development is left alone deliberately — `PUBLIC_URL=http://localhost`
+ * is not a mistake, it is a laptop — which is why the URL check looks at the
+ * host and not just the scheme.
+ */
+const DEMO_PASSWORDS = new Set([
+  'telno-demo-owner',
+  'telno-demo',
+  'password',
+  'password123',
+  'administrator',
+  'changeme',
+  'letmein',
+  'admin',
+  'telno',
+  'test1234',
+]);
+
+/** Loopback, and the RFC1918 ranges plus their IPv6 equivalents. */
+function isPrivateHost(host) {
+  const name = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!name) return true;
+  if (name === 'localhost' || name.endsWith('.localhost') || name.endsWith('.local')) return true;
+  if (name === '::1' || name.startsWith('fe80:') || name.startsWith('fc') || name.startsWith('fd')) return true;
+  const v4 = name.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!v4) return false;
+  const [a, b] = v4.slice(1).map(Number);
+  return a === 127 || a === 10 || a === 0 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
+}
+
+/** Problems that must stop a production boot, as a list of human sentences. */
+export function productionProblems() {
+  const problems = [];
+  if (!config.isProd) return problems;
+
+  const supplied = (process.env.ADMIN_PASSWORD || '').trim();
+  if (supplied) {
+    if (DEMO_PASSWORDS.has(supplied.toLowerCase())) {
+      problems.push('ADMIN_PASSWORD is a known default — choose one that is not in this repository');
+    } else if (supplied.length < 12) {
+      problems.push(`ADMIN_PASSWORD is ${supplied.length} characters — production requires at least 12`);
+    }
+  }
+
+  if (!config.allowInsecurePublicUrl) {
+    try {
+      const url = new URL(config.publicUrl);
+      if (url.protocol === 'http:' && !isPrivateHost(url.hostname)) {
+        problems.push(
+          `PUBLIC_URL is http:// on ${url.hostname} — sessions are marked secure in production, so sign-in over plain HTTP would fail; use https:// or set ALLOW_INSECURE_PUBLIC_URL=true`
+        );
+      }
+    } catch {
+      problems.push(`PUBLIC_URL is not a valid URL: ${config.publicUrl}`);
+    }
+  }
+
+  return problems;
+}
+
 export function assertConfig() {
   if (config.isProd && !config.sessionSecret) {
     throw new Error('SESSION_SECRET must be set in production');
+  }
+  const problems = productionProblems();
+  if (problems.length) {
+    throw new Error(`Refusing to start in production:\n  - ${problems.join('\n  - ')}`);
   }
   if (!config.sessionSecret) {
     // Deterministic per-process fallback so local dev works without a .env.

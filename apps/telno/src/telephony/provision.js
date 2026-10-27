@@ -554,15 +554,21 @@ export function ensureTlsMaterial() {
   if (result.error || result.status !== 0) {
     return { ok: false, reason: 'openssl unavailable', detail: (result.stderr || result.error?.message || '').slice(0, 200) };
   }
-  // Asterisk runs as its own user, and it has to be able to read the key even
-  // though this process (root, in the container) just wrote it.
+  // The switch and this process run as the same unprivileged user in the
+  // container, so the key only needs to be readable by its owner. Group read is
+  // kept for a deployment that runs Asterisk as a separate account, where a
+  // root-only chown is the one thing that can fix ownership.
   for (const file of [paths.cert, paths.key]) {
     try {
       chmodSync(file, 0o640);
     } catch {
-      /* the container's asterisk user may own it already */
+      /* the volume may already carry the right mode */
     }
-    spawnSync('chown', ['asterisk:asterisk', file], { stdio: 'ignore' });
+    if (typeof process.getuid === 'function' && process.getuid() === 0) {
+      spawnSync('chown', [`${config.telephony.runAs || 'telno'}:${config.telephony.runAs || 'telno'}`, file], {
+        stdio: 'ignore',
+      });
+    }
   }
   return { ok: true, generated: true, cert: paths.cert, key: paths.key };
 }

@@ -2,6 +2,7 @@ import { db_ } from '../db/index.js';
 import { config } from '../config.js';
 import { verifySession, apiKeyHash, signSession } from '../lib/security.js';
 import { unauthorized, forbidden, paymentRequired } from '../lib/errors.js';
+import { entitlementFor } from '../lib/subscriptions.js';
 
 export const SESSION_COOKIE = 'telno_session';
 
@@ -50,6 +51,28 @@ export function installAuth(app) {
     return token ? accountFromToken(token) : null;
   });
 
+  /**
+   * The paid-portal gate.
+   *
+   * A customer account holds a subscription; without a live one there is no
+   * console for it, because every route behind this decorator is a paid
+   * capability. Staff accounts are never gated here — the owner locking
+   * themselves out of their own platform is not a billing remedy.
+   */
+  app.decorate('enforceEntitlement', (account) => {
+    const entitlement = entitlementFor(account);
+    if (!entitlement.active) {
+      const reason =
+        entitlement.reason === 'no_subscription'
+          ? 'This portal is for subscribers. Choose a plan to open it.'
+          : entitlement.reason === 'period_ended'
+            ? 'Your subscription period has ended. Renewing restores access immediately.'
+            : `Your subscription is ${String(entitlement.reason).replace(/_/g, ' ')}. Update billing to restore access.`;
+      throw paymentRequired(reason);
+    }
+    return entitlement;
+  });
+
   app.decorate('authenticate', async (request) => {
     const account = app.readSession(request);
     if (!account) throw unauthorized();
@@ -58,6 +81,7 @@ export function installAuth(app) {
     if (account.suspended_at) {
       throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
     }
+    request.entitlement = app.enforceEntitlement(account);
     request.account = account;
   });
 
@@ -67,6 +91,7 @@ export function installAuth(app) {
       if (account.suspended_at) {
         throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
       }
+      request.entitlement = app.enforceEntitlement(account);
       request.account = account;
       return;
     }
@@ -86,6 +111,7 @@ export function installAuth(app) {
       throw paymentRequired('This account is suspended for non-payment. Settling the balance restores access automatically.');
     }
     if (!roles.includes(account.role)) throw forbidden(`Requires one of: ${roles.join(', ')}`);
+    request.entitlement = app.enforceEntitlement(account);
     request.account = account;
   });
 

@@ -74,9 +74,12 @@ RUN apt-get update \
       libssl3 libedit2 libxml2 libsqlite3-0 libjansson4 libsrtp2-1 \
       libcap2 libuuid1 zlib1g \
  && rm -rf /var/lib/apt/lists/* \
- && addgroup --system asterisk \
- && adduser --system --ingroup asterisk --home /var/lib/asterisk \
-      --no-create-home --shell /usr/sbin/nologin asterisk
+ # One unprivileged account owns the database, the switch configuration and the
+ # spool. Nothing in this image needs root: every port it listens on is above
+ # 1024 (8080 API, 8089 WSS, 5038 AMI, 5060/udp SIP, 10000+ RTP).
+ && addgroup --system --gid 999 telno \
+ && adduser --system --uid 999 --ingroup telno --home /data \
+      --no-create-home --shell /usr/sbin/nologin telno
 
 WORKDIR /app
 
@@ -118,7 +121,7 @@ RUN set -e; \
 RUN chmod +x /usr/local/bin/entrypoint \
  && mkdir -p /data /var/lib/asterisk /var/log/asterisk /var/spool/asterisk \
       /var/run/asterisk /var/lib/asterisk/keys \
- && chown -R asterisk:asterisk /etc/asterisk /var/lib/asterisk /var/log/asterisk \
+ && chown -R telno:telno /etc/asterisk /var/lib/asterisk /var/log/asterisk \
       /var/spool/asterisk /var/run/asterisk /data \
  && chmod 750 /data
 
@@ -129,5 +132,11 @@ EXPOSE 5038 8089 5060/udp 10000-10100/udp
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8080/api/healthz >/dev/null || exit 1
+
+# Everything below this line runs unprivileged, supervisor (PID 1) included.
+# On a fresh volume this needs no preparation; an existing volume written by an
+# older image has to change hands once, and the entrypoint says so with the
+# exact command rather than failing obscurely.
+USER telno
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]

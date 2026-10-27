@@ -522,3 +522,145 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status, priority);
+
+-- ------------------------------------------------------------- marketing --
+-- Outbound campaigns over the voice agents: a list, a script, a goal, and a
+-- graded result per call. The platform owns the queue, the disposition and the
+-- report; the agent engine owns the dialing, which is why a contacted row is
+-- claimed with `calling` before anything is dialed and finished with an outcome.
+
+CREATE TABLE IF NOT EXISTS campaigns (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  -- What this campaign is for, in words: the grader and the report both read it.
+  goal           TEXT NOT NULL DEFAULT '',
+  -- Which template it started from, so a result can be traced to a pitch.
+  template       TEXT NOT NULL DEFAULT '',
+  agent_id       TEXT REFERENCES voice_agents (id) ON DELETE SET NULL,
+  script         TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'draft'
+                 CHECK (status IN ('draft', 'running', 'paused', 'completed')),
+  daily_limit    INTEGER NOT NULL DEFAULT 50,
+  -- A grade at or above this is a lead; below it, follow-up or discard.
+  grade_threshold INTEGER NOT NULL DEFAULT 60,
+  created_by     TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns (status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS campaign_contacts (
+  id          TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES campaigns (id) ON DELETE CASCADE,
+  name        TEXT NOT NULL DEFAULT '',
+  e164        TEXT NOT NULL,
+  email       TEXT NOT NULL DEFAULT '',
+  notes       TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'queued'
+              CHECK (status IN ('queued', 'calling', 'completed', 'failed', 'skipped', 'do_not_call')),
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  outcome     TEXT NOT NULL DEFAULT '',
+  grade       INTEGER,
+  -- Why the grade, as a JSON list: a score with no reasons cannot be defended.
+  reasons     TEXT NOT NULL DEFAULT '[]',
+  transcript  TEXT NOT NULL DEFAULT '',
+  duration_sec INTEGER NOT NULL DEFAULT 0,
+  called_at   TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+-- One row per number per campaign: importing a list twice must not double-dial.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_contacts_number ON campaign_contacts (campaign_id, e164);
+CREATE INDEX IF NOT EXISTS idx_campaign_contacts_status ON campaign_contacts (campaign_id, status);
+
+CREATE TABLE IF NOT EXISTS campaign_reports (
+  id          TEXT PRIMARY KEY,
+  campaign_id TEXT NOT NULL REFERENCES campaigns (id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  created_by  TEXT NOT NULL DEFAULT '',
+  totals      TEXT NOT NULL DEFAULT '{}',
+  file        TEXT NOT NULL DEFAULT '',
+  bytes       INTEGER NOT NULL DEFAULT 0,
+  sent_to     TEXT NOT NULL DEFAULT '',
+  delivered   INTEGER NOT NULL DEFAULT 0,
+  provider    TEXT NOT NULL DEFAULT '',
+  error       TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_campaign_reports ON campaign_reports (campaign_id, created_at DESC);
+
+-- ---------------------------------------------------------------- commerce --
+-- Plans and features are data, not code. The admin console edits them, the
+-- public subscribe page reads them, and a subscription records which plan a
+-- customer bought at which price — a snapshot, because editing a plan tomorrow
+-- must not rewrite what somebody was charged today.
+
+-- The feature catalogue: every capability a plan can include or exclude.
+CREATE TABLE IF NOT EXISTS features (
+  key         TEXT PRIMARY KEY,             -- 'video-calling', 'ai-grading'
+  label       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category    TEXT NOT NULL DEFAULT 'calling',
+  -- Shown on the public page as an add-on rather than a plan line.
+  addon       INTEGER NOT NULL DEFAULT 0,
+  sort_order  INTEGER NOT NULL DEFAULT 100,
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS plans (
+  id               TEXT PRIMARY KEY,
+  slug             TEXT NOT NULL UNIQUE,
+  name             TEXT NOT NULL,
+  tagline          TEXT NOT NULL DEFAULT '',
+  description      TEXT NOT NULL DEFAULT '',
+  price_cents      INTEGER NOT NULL DEFAULT 0 CHECK (price_cents >= 0),
+  currency         TEXT NOT NULL DEFAULT 'USD',
+  interval         TEXT NOT NULL DEFAULT 'month' CHECK (interval IN ('month', 'year')),
+  seats            INTEGER NOT NULL DEFAULT 1,
+  included_minutes INTEGER NOT NULL DEFAULT 0,
+  -- A plan that is not in Stripe can still be sold: checkout creates the price
+  -- from these numbers and stores the id back here.
+  stripe_price_id  TEXT NOT NULL DEFAULT '',
+  stripe_product_id TEXT NOT NULL DEFAULT '',
+  -- The plan everybody lands on when they have no subscription.
+  is_default       INTEGER NOT NULL DEFAULT 0,
+  active           INTEGER NOT NULL DEFAULT 1,
+  sort_order       INTEGER NOT NULL DEFAULT 100,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_plans_active ON plans (active, sort_order);
+
+-- Which features a plan carries. Removing a row removes the feature from the
+-- plan, the public page and the customer's entitlement in one place.
+CREATE TABLE IF NOT EXISTS plan_features (
+  plan_id     TEXT NOT NULL REFERENCES plans (id) ON DELETE CASCADE,
+  feature_key TEXT NOT NULL REFERENCES features (key) ON DELETE CASCADE,
+  -- 'included' | 'addon' | 'trial': how the plan exposes the feature.
+  mode        TEXT NOT NULL DEFAULT 'included' CHECK (mode IN ('included', 'addon', 'trial')),
+  PRIMARY KEY (plan_id, feature_key)
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                     TEXT PRIMARY KEY,
+  account_id             TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  plan_id                TEXT REFERENCES plans (id) ON DELETE SET NULL,
+  -- Frozen copy of what was sold, so a later price change is not a rewrite.
+  plan_name              TEXT NOT NULL DEFAULT '',
+  plan_slug              TEXT NOT NULL DEFAULT '',
+  price_cents            INTEGER NOT NULL DEFAULT 0,
+  currency               TEXT NOT NULL DEFAULT 'USD',
+  interval               TEXT NOT NULL DEFAULT 'month',
+  seats                  INTEGER NOT NULL DEFAULT 1,
+  status                 TEXT NOT NULL DEFAULT 'incomplete'
+                         CHECK (status IN ('incomplete', 'active', 'trialing', 'past_due', 'canceled')),
+  stripe_customer_id     TEXT NOT NULL DEFAULT '',
+  stripe_subscription_id TEXT NOT NULL DEFAULT '',
+  stripe_session_id      TEXT NOT NULL DEFAULT '',
+  current_period_end     TEXT,
+  cancel_at_period_end   INTEGER NOT NULL DEFAULT 0,
+  canceled_at            TEXT,
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_account ON subscriptions (account_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions (stripe_subscription_id);

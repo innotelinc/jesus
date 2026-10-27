@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../auth.jsx';
+import { BrandMark, useBrand } from '../brand.jsx';
 import { navigate } from '../router.jsx';
 import { Button, Icon, Input } from '../ui.jsx';
 
@@ -11,6 +12,7 @@ const POINTS = [
 
 export default function Login() {
   const { login } = useAuth();
+  const brand = useBrand();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -40,9 +42,7 @@ export default function Login() {
           <span className="brand-mark" aria-hidden="true">
             <Icon name="phone" size={15} />
           </span>
-          <span className="brand-name">
-            tel<span>no</span>
-          </span>
+          <BrandMark brand={brand} size={24} />
         </div>
 
         <div>
@@ -58,7 +58,7 @@ export default function Login() {
         </div>
 
         <p className="tiny dim">
-          Asterisk switch, control API and the worldwide phonebook registry share one database and one
+          {brand.vendor}: switch, control API and the worldwide phonebook registry in one database and one
           container.
         </p>
       </aside>

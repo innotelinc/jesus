@@ -22,6 +22,10 @@ import Operations from './pages/Operations.jsx';
 import Settings from './pages/Settings.jsx';
 import Systems from './pages/Systems.jsx';
 import Softphone from './pages/Softphone.jsx';
+import Marketing from './pages/Marketing.jsx';
+import Plans from './pages/Plans.jsx';
+import Subscribe from './pages/Subscribe.jsx';
+import Site from './pages/Site.jsx';
 import PublicDirectory from './pages/PublicDirectory.jsx';
 
 const PAGES = [
@@ -35,10 +39,12 @@ const PAGES = [
   { path: '/fax', title: 'Fax', subtitle: 'Inbound documents and outbound sends', Component: Fax },
   { path: '/messages', title: 'Messages', subtitle: 'SMS, MMS and WhatsApp on your numbers', Component: Messages },
   { path: '/voice', title: 'Voice agents', subtitle: 'Personas that answer and place calls', Component: Voice },
+  { path: '/marketing', title: 'Marketing', subtitle: 'Outbound campaigns with graded reports', Component: Marketing },
   { path: '/workflows', title: 'Workflows', subtitle: 'Triggered automation with recorded runs', Component: Workflows },
   { path: '/numbers', title: 'Number registry', subtitle: 'One canonical row per E.164 number', Component: Numbers },
   { path: '/directory', title: 'Moderation', subtitle: 'Submitted listings awaiting review', Component: Moderation },
   { path: '/billing', title: 'Billing', subtitle: 'Invoices grouped by currency', Component: Billing },
+  { path: '/plans', title: 'Plans and subscriptions', subtitle: 'What the subscribe page sells and who is paying', Component: Plans },
   { path: '/estate', title: 'Estate', subtitle: 'Sites and the equipment installed at them', Component: Estate },
   { path: '/health', title: 'Health', subtitle: 'Live probes across the container', Component: Health },
   { path: '/operations', title: 'Operations', subtitle: 'Incidents, changes and provisioning', Component: Operations },
@@ -48,11 +54,25 @@ const PAGES = [
 
 function Router() {
   const { pathname, search } = useLocation();
-  const { status } = useAuth();
+  const { status, user, reason } = useAuth();
 
   // Public directory: /d/<host> and /lookup?number=...
   if (pathname.startsWith('/d/') || pathname === '/lookup') {
     return <PublicDirectory host={decodeURIComponent(pathname.replace('/d/', ''))} search={search} />;
+  }
+
+  // The shop window. Public on purpose: a stranger has to be able to reach it,
+  // and an unpaid customer is sent here rather than to a login form.
+  if (pathname === '/welcome') {
+    return <Site />;
+  }
+  if (pathname === '/subscribe') {
+    return <Subscribe user={user} locked={status === 'unpaid' ? reason : null} />;
+  }
+
+  // A valid session without a paid subscription gets the plans, not the console.
+  if (status === 'unpaid') {
+    return <Subscribe user={user} locked={reason} />;
   }
 
   if (pathname === '/login') {
@@ -72,7 +92,10 @@ function Router() {
   }
 
   if (status === 'anon') {
-    if (pathname !== '/') navigate('/login', { replace: true });
+    // A visitor who is not signed in lands on the site, not on a login form:
+    // the console is a paid product and the site is how somebody buys it.
+    if (pathname === '/') return <Site />;
+    navigate('/login', { replace: true });
     return <Login />;
   }
 

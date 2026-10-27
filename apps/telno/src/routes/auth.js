@@ -12,6 +12,9 @@ const view = (account) => ({
   email: account.email,
   name: account.name,
   role: account.role,
+  // 'staff' or 'customer'. The SPA needs it to tell a console user from a
+  // subscriber, whose access depends on a paid subscription.
+  kind: account.account_kind || 'staff',
   createdAt: account.created_at,
   lastLoginAt: account.last_login_at,
 });

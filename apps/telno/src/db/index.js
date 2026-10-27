@@ -76,6 +76,15 @@ function migrate(db) {
     // a provider without reading the log.
     ['invoices', 'last_provider', "TEXT NOT NULL DEFAULT ''"],
     ['invoices', 'last_send_error', "TEXT NOT NULL DEFAULT ''"],
+    // v9: marketing runs. The dialer extension is the line that places the
+    // calls, and the run timestamp lets the console show when a list was last
+    // worked instead of guessing from the contacts.
+    ['campaigns', 'dialer_extension', "TEXT NOT NULL DEFAULT ''"],
+    ['campaigns', 'last_run_at', 'TEXT'],
+    // v10: the subscriber portal. A customer account is not a staff account:
+    // it exists to hold a subscription, and it is the only kind that is gated
+    // on paying. Staff are never locked out by the commerce side.
+    ['accounts', 'account_kind', "TEXT NOT NULL DEFAULT 'staff'"],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {

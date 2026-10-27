@@ -69,12 +69,28 @@ services:
       PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Backups of the data volume: database, recordings and a manifest. The
+      # schedule is what makes this a real protection rather than a button; keep
+      # at least two archives, because one copy can be the good one and the bad
+      # state. Set BACKUP_INTERVAL_HOURS=0 to take them by hand only.
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      BACKUP_DIR: ${BACKUP_DIR:-}
+      # A production boot refuses an http public URL on a real hostname, since
+      # session cookies are marked secure. Set this only when TLS is terminated
+      # in front of the container and the browser still speaks http to it.
+      ALLOW_INSECURE_PUBLIC_URL: ${ALLOW_INSECURE_PUBLIC_URL:-false}
       # Session, API-key and AMI secrets are generated once and stored in the
       # data volume, so they survive restarts without being configured.
       LOG_LEVEL: ${LOG_LEVEL:-warn}
 
+    # The image runs unprivileged (USER telno, uid 999) — the same uid the
+    # volumes are given. A volume written by an older, root-running image needs
+    # one chown, and the entrypoint prints that exact command rather than
+    # failing obscurely.
     volumes:
-      - telno-data:/data                 # SQLite database + generated secrets
+      - telno-data:/data                 # database, secrets, recordings, backups
       - telno-asterisk:/etc/asterisk     # generated switch configuration
       - telno-spool:/var/spool/asterisk  # voicemail
 

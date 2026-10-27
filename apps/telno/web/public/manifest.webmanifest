@@ -1,0 +1,33 @@
+{
+  "name": "Telno Softphone",
+  "short_name": "Telno",
+  "description": "A Telno line in its own window: encrypted audio and video, registered while you work elsewhere.",
+  "start_url": "/softphone?window=1",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#07070d",
+  "theme_color": "#07070d",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open the console",
+      "short_name": "Console",
+      "url": "/"
+    }
+  ]
+}

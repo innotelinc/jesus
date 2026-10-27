@@ -511,14 +511,123 @@ The reply says when to come back (`checkInSec`) and when the platform would trea
 (`staleAfterSec`). A live device that stops checking in shows as **silent** and counts toward the
 attention tile; rotate its token to cut off a lost or replaced handset.
 
+## Marketing: campaigns over the voice agents
+
+The Marketing screen is an outbound pipeline, not a call list. A campaign is a list, a script and a
+**goal**; every call that comes back is graded against that goal, and the campaign closes with a report
+that leaves as a PDF and, if you want, as an email.
+
+```
+import a list  ->  claim a batch  ->  record each outcome  ->  graded  ->  report
+```
+
+- **Templates with a goal.** Renewal, win-back, lead qualification, appointment booking, payment
+  follow-up and a check-in survey. Choosing one copies its goal and script into the campaign, where
+  both are editable — the grader reads the goal and the script, so a vague goal produces grades nobody
+  can defend.
+- **Import de-duplicates.** One person per line, any number format; a name, an email and a number are
+  picked out of it. A number already on the campaign, or on the platform-wide opt-out list, is dropped
+  and counted in the reply — pasting the same list twice dials nobody twice.
+- **Claims are exclusive.** `run` moves the next contacts to `calling` in the same statement that
+  selects them, so two people working one campaign cannot call the same person. A claim left behind by
+  a crashed run is released after 30 minutes.
+- **A disposition becomes a grade.** The endpoint takes the disposition, the call length and the
+  transcript, asks the model for a score with reasons and a next step, and falls back to a visible rule
+  grader (disposition, duration, positive and negative signals) when no key is set. `do-not-call` is
+  never graded: it is honoured, and the number is added to the platform-wide opt-out list so no future
+  campaign can dial it either.
+- **The report is a document.** Results, dispositions, the recurring reasons the grader gave, the top
+  graded calls, and a summary written from the totals — never from individual transcripts. It is
+  emailed with the PDF attached and kept on the data volume; the download rebuilds the same document
+  from the stored numbers, so what is downloaded months later matches what was sent.
+- **AI is optional and honest.** Without `LLM_API_KEY` the console says "Rule grader", grading still
+  works, and "Rewrite with AI" explains that it needs a model. Add the key under **Settings -> AI and
+  subscriptions**; the Test button proves it with a real round trip rather than by the key existing.
+
+The dialing belongs to whatever answers the phone: the softphone on the campaign's dialer extension, or
+another agent engine claiming the same queue. The platform never pretends a call happened — the batch
+reply says whether the switch is live or simulated.
+
+## Plans, subscriptions and the paid portal
+
+Plans and features are **rows**, not code. The admin console edits them at **Plans**; the public page
+at `/subscribe` (linked as `SUBSCRIBE_URL`, e.g. `subscribe.telno.services`) reads the same rows, so an
+edit is live on both sides at once and there is no second copy to keep in step.
+
+- **Features are a catalogue.** A plan carries a set of them; ticking or unticking a box changes the
+  plan, the public page and what a subscriber is entitled to in one save. Deleting a feature removes it
+  from every plan.
+- **Retiring a plan is not deleting it.** It stops being sold; the customers on it keep it, because a
+  subscription stores a snapshot of what was sold (name, price, currency, interval, seats).
+- **Buying is Stripe Checkout in `subscription` mode.** A plan without a Stripe price is priced from
+  its own numbers at checkout, so a price edit needs no dashboard step. Signup creates the customer
+  account and then redirects; the **webhook is the authority** — `checkout.session.completed`
+  activates, `customer.subscription.updated` / `deleted` move the status and the period end, and
+  `invoice.payment_failed` marks it past due. Register all five events on the same endpoint as the
+  invoices (Settings -> Stripe prints the URL; a missing subscription event shows as a `warn` row in
+  the connection test).
+- **The gate is one function.** A customer account needs a live subscription (`active` or `trialing`,
+  period not lapsed); anything else is a `402 payment_required` on every console route. A **staff**
+  account is never gated — locking the owner out of their own platform is not a billing remedy. A
+  locked-out customer still gets `/api/portal/status` (why, and what the plans are) and `/subscribe`, so
+  they can pay rather than stare at a login form.
+- **Operators can override.** An account can be put on a plan without a card, moved between plans, or
+  set active/canceled from **Plans -> Subscriptions**; onboarding a customer by hand creates the
+  account and its subscription in one step. Every override is in the audit log with who did it.
+- **The catalogue mirrors out.** With `MAGNATE_WEBHOOK_URL` set (vault or environment), every plan
+  create or edit is posted to the subscriber system of record with its feature list, so the pricing
+  page here and billing elsewhere cannot drift. No webhook configured is a normal state, not an error.
+
+## The public site, and white-label
+
+A visitor who is not signed in lands on the marketing site at `/` (also `/welcome`), not on a login
+form. It is one page from introduction to signup: the headline with a live registry lookup, the
+product sections, the features, the pricing, the account form and the FAQ. Every plan button scrolls
+to the signup panel with that plan already selected, and the panel posts to the same
+`POST /api/public/subscribe` the standalone `/subscribe` page uses. There is no second deployment and
+no second design — the console, the site and the signup page are the same build.
+
+- **The signup is on the page.** Name, email and password create the customer account, then the
+  browser is handed to Stripe's hosted checkout; `success_url` returns to `/subscribe?status=success`,
+  which polls until the webhook lands. A deployment with no Stripe key reports
+  `payments.configured: false` on `/api/public/plans`, and the panel says checkout is off and disables
+  the button instead of refusing the submission at the last step.
+- **The registry is searchable from the hero.** The lookup box calls `/api/public/lookup` and shows
+  the listing or offers to claim the number, so the phonebook is demonstrated rather than described.
+  Registry counters are shown only when they are non-zero — a brand-new deployment does not advertise
+  "0 numbers indexed".
+
+- **It is data-driven.** The features section is the union of the plans' features, the pricing table
+  is the plan rows, and the counters come from the registry (`/api/public/stats`). Add a feature in
+  Plans and it appears; change a price and the site shows it on the next request.
+- **It is white-label.** The product name, vendor, tagline, description, accent colour, logo URL,
+  support and sales addresses, directory host and footer note are settings rows
+  (`Settings → Branding`, owner only), served publicly at `/api/public/brand`. The site, the console
+  header, the login screen, the signup page, the public directory and the document title all read
+  them, and the accent is applied as CSS variables at runtime. A reseller renames the platform
+  without a fork or an image build.
+- **Two things are validated rather than trusted.** The accent has to be a six-digit hex value
+  because it is written into a stylesheet, and the logo has to be an `http(s)` URL because every
+  visitor's browser fetches it. Both are refused with a reason, not sanitised silently.
+- **The directory is reachable from it.** The site lists the enabled directory hostnames and links
+  each one, so the worldwide phonebook is part of the product story rather than a URL somebody has to
+  be told.
+
+```
+GET /api/public/brand          the name, vendor, accent and links (no session)
+PUT /api/system/brand          owner: change the brand; live on the next page load
+```
+
 ## Repository
 
 ```
 src/                 Fastify API
   db/                schema + node:sqlite access layer
-  lib/               E.164, registry dedupe, security, channels, audit
+  lib/               E.164, registry dedupe, security, channels, audit, ai, marketing,
+                     subscriptions, payments, pdf, backup
   telephony/         AMI client, config generation, CDR ingest
-  routes/            auth, registry, directory, telephony, system, workspace, systems
+  routes/            auth, registry, directory, telephony, system, workspace, systems,
+                     marketing (campaigns) and portal (plans, subscriptions, signup)
 web/                 React UI (Vite, static build) + design system
 web/landing/         GitHub Pages landing site (vendored Unity theme)
 docker/              entrypoint, supervisor, base Asterisk config
@@ -536,15 +645,22 @@ in an encrypted vault that never returns a value, Stripe webhooks are signature-
 run in place on boot, the container ships a `HEALTHCHECK`, and a reminder cannot be sent twice because
 the (invoice, rung) pair is unique in the ledger.
 
-What still has to be done before this serves paying customers, in the order it matters:
+Since that list was written, four of the five items are done and covered by the smoke suite:
+
+| Item | What is true now |
+|---|---|
+| **Backups and restore** | Scheduled `VACUUM INTO` snapshots of the database plus the recordings, as a tar archive on the data volume. A restore is staged by the API and applied at boot, before the database is opened; the platform restarts itself to load it. Retention is configurable, and a restore cannot be pointed outside the backup directory. |
+| **Non-root container** | Asterisk and the API run as an unprivileged `telno` user under the supervisor; the entrypoint fixes ownership of the volume on first boot and refuses to start if it cannot. |
+| **A boot that asserts its inputs** | A production boot refuses a known default admin password and an `http://` public URL on a real host (loopback is exempt, for a tunnel that terminates TLS). |
+| **The paid portal** | Enforced in one place (`entitlementFor`), with the override and the audit trail described above. |
+
+Still outstanding, in the order it matters:
 
 | # | Item | Why it matters |
 |---|---|---|
-| 1 | **A backup and restore path for the data volume** | It holds the database, call recordings, voicemail audio and fax documents. Nothing here backs it up for you. |
-| 2 | **A non-root container** | The image has no `USER` directive; Asterisk and the API currently run as root under the supervisor. |
-| 3 | **Real TLS** | The console expects HTTPS in front (`secure` cookies are on in production) and the softphone's WSS listener serves a self-generated certificate unless `SOFTPHONE_TLS_CERT` and `SOFTPHONE_TLS_KEY` point at a real one. Browsers refuse an encrypted socket to a host with no certificate. |
-| 4 | **A deployment checklist that asserts its own inputs** | `assertConfig` enforces `SESSION_SECRET` and nothing else; a production boot should also refuse a default admin password and an `http://` public URL. |
-| 5 | **Monitoring that outlives the process** | Health probes are read inside the console. A crash that takes the container down should page someone outside it. |
+| 1 | **Real TLS** | The console expects HTTPS in front (`secure` cookies are on in production) and the softphone's WSS listener serves a self-generated certificate unless `SOFTPHONE_TLS_CERT` and `SOFTPHONE_TLS_KEY` point at a real one. Browsers refuse an encrypted socket to a host with no certificate. |
+| 2 | **Monitoring that outlives the process** | Health probes are read inside the console. A crash that takes the container down should page someone outside it. |
+| 3 | **Multi-tenancy** | One container, one tenant. Selling plans to unrelated customers on one deployment needs a tenancy key on the registry, billing and campaign tables. |
 
 ## Notes and limits
 

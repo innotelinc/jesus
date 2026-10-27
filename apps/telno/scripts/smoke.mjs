@@ -42,6 +42,9 @@ let configDir = '';
 // is pointed at a running instance they are whoever that instance has.
 const email = process.env.SMOKE_EMAIL || 'owner@telno.local';
 const password = process.env.SMOKE_PASSWORD || 'telno-demo-owner';
+// Assigned when this run starts its own server; see startServer() below.
+let startServer = null;
+let serverLog = () => '';
 let stripeStub = null;
 const stripeCalls = [];
 let mailjetStub = null;
@@ -152,45 +155,56 @@ if (!base) {
     process.exit(1);
   }
 
-  server = spawn(process.execPath, ['src/index.js'], {
-    env: {
-      ...process.env,
-      PORT: String(port),
-      // The owner this run will sign in as. Set explicitly so first boot creates
-      // the account the suite expects instead of printing a random password.
-      DATA_DIR: dataDir,
-      ASTERISK_CONFIG_DIR: configDir,
-      ADMIN_EMAIL: email,
-      ADMIN_PASSWORD: password,
-      // The same origin the stub will claim is registered in Stripe, so the
-      // connection test compares like with like.
-      PUBLIC_URL: base,
-      SESSION_SECRET: `smoke-${Date.now()}`,
-      SUBMISSION_LIMIT_PER_HOUR: '500',
-      TELEPHONY_SIMULATED: 'true',
-      // Escalation is compressed for the test: a final notice at 21 days and no
-      // grace period, so one sweep proves the whole path. Production defaults
-      // are 30 days and 14 days of grace.
-      FINAL_NOTICE_DAYS: '21',
-      SUSPEND_GRACE_DAYS: '0',
-      // Card payment, pointed at the stub above. The webhook secret is what the
-      // signed callbacks below are checked against.
-      STRIPE_API_URL: `http://127.0.0.1:${stripePort}`,
-      STRIPE_SECRET_KEY: 'sk_test_smoke',
-      STRIPE_WEBHOOK_SECRET: 'whsec_smoke',
-      // The mail adapter must never reach the real provider from a test run.
-      // Pointing it at a closed loopback port makes "the key was used" and
-      // "there is no key" distinguishable without sending anything.
-      RESEND_API_URL: 'http://127.0.0.1:1',
-      // Mailjet goes to a live stub: the point of this provider is the request
-      // it builds, which a closed port cannot show.
-      MAILJET_API_URL: `http://127.0.0.1:${mailjetPort}`,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let log = '';
-  server.stdout.on('data', (chunk) => (log += chunk));
-  server.stderr.on('data', (chunk) => (log += chunk));
+  const serverEnv = {
+    ...process.env,
+    PORT: String(port),
+    // More archives than the retention limit keeps, so the prune path has
+    // something to prune when the backup checks run.
+    BACKUP_KEEP: '2',
+    BACKUP_INTERVAL_HOURS: '0',
+    // The owner this run will sign in as. Set explicitly so first boot creates
+    // the account the suite expects instead of printing a random password.
+    DATA_DIR: dataDir,
+    ASTERISK_CONFIG_DIR: configDir,
+    ADMIN_EMAIL: email,
+    ADMIN_PASSWORD: password,
+    // The same origin the stub will claim is registered in Stripe, so the
+    // connection test compares like with like.
+    PUBLIC_URL: base,
+    SESSION_SECRET: `smoke-${Date.now()}`,
+    SUBMISSION_LIMIT_PER_HOUR: '500',
+    TELEPHONY_SIMULATED: 'true',
+    // Escalation is compressed for the test: a final notice at 21 days and no
+    // grace period, so one sweep proves the whole path. Production defaults
+    // are 30 days and 14 days of grace.
+    FINAL_NOTICE_DAYS: '21',
+    SUSPEND_GRACE_DAYS: '0',
+    // Card payment, pointed at the stub above. The webhook secret is what the
+    // signed callbacks below are checked against.
+    STRIPE_API_URL: `http://127.0.0.1:${stripePort}`,
+    STRIPE_SECRET_KEY: 'sk_test_smoke',
+    STRIPE_WEBHOOK_SECRET: 'whsec_smoke',
+    // The mail adapter must never reach the real provider from a test run.
+    // Pointing it at a closed loopback port makes "the key was used" and
+    // "there is no key" distinguishable without sending anything.
+    RESEND_API_URL: 'http://127.0.0.1:1',
+    // Mailjet goes to a live stub: the point of this provider is the request
+    // it builds, which a closed port cannot show.
+    MAILJET_API_URL: `http://127.0.0.1:${mailjetPort}`,
+  };
+
+  // Starting the server is a function because the backup checks restart the
+  // platform on purpose: a staged restore is applied at boot, and the only
+  // honest way to test that is to boot again.
+  startServer = () => {
+    server = spawn(process.execPath, ['src/index.js'], { env: serverEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+    let log = '';
+    server.stdout.on('data', (chunk) => (log += chunk));
+    server.stderr.on('data', (chunk) => (log += chunk));
+    serverLog = () => log;
+    return server;
+  };
+  startServer();
   // The child keeps this process alive, so it must be stopped explicitly at the
   // end of the run — an `exit` handler alone would never fire.
   globalThis.__smokeStopServer = () => {
@@ -205,27 +219,52 @@ if (!base) {
       }
     }
   };
+  globalThis.__smokeStartServer = () => startServer();
+  globalThis.__smokeServerLog = () => serverLog();
   process.on('exit', globalThis.__smokeStopServer);
 
-  const deadline = Date.now() + 20000;
-  let ready = false;
+  const ready = await waitForServer();
+  if (!ready) {
+    server.kill();
+    console.error(`\nCould not start a test server on ${base}\n${serverLog().slice(-1500)}`);
+    process.exit(1);
+  }
+}
+
+/** Poll until the platform answers, or give up. */
+async function waitForServer(timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
       const res = await fetch(`${base}/api/healthz`);
-      if (res.ok) {
-        ready = true;
-        break;
-      }
+      if (res.ok) return true;
     } catch {
       /* not up yet */
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  if (!ready) {
+  return false;
+}
+
+/**
+ * Restart the platform this run started. Used by the backup checks: a restore
+ * is staged and applied at boot, so proving it means booting again.
+ */
+async function restartServer() {
+  if (!startServer) return false;
+  if (server && !server.killed) {
     server.kill();
-    console.error(`\nCould not start a test server on ${base}\n${log.slice(-1500)}`);
-    process.exit(1);
+    // Let the old process release its port before the new one takes it.
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 5000);
+      server.on('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
+  startServer();
+  return waitForServer();
 }
 
 const FIXTURE_NUMBER = '+1 415 555 0177';
@@ -2104,6 +2143,673 @@ check('logout succeeds', logout.status === 200, logout.body);
 
 const afterLogout = await call('GET', '/api/auth/me', undefined, { bearer: token });
 check('token is invalid after logout', afterLogout.status === 401, afterLogout.body);
+
+// ------------------------------------------------------------------ backups --
+// These run last and on their own session, because the restore check restarts
+// the platform: a staged restore is applied at boot, so proving it means
+// booting again, and everything the suite built before this point lives in the
+// database that is about to be replaced.
+if (startServer) {
+  const again = await call('POST', '/api/auth/login', { email, password });
+  token = again.body.token || '';
+  check('the owner can sign in again for the backup checks', again.status === 200, again.body);
+
+  // A row that exists before the backup, and one that does not.
+  const marker = `Backup marker ${Date.now()}`;
+  const created = await call('POST', '/api/operations/tasks', {
+    title: marker,
+    kind: 'maintenance',
+    priority: 'low',
+    note: 'created by the backup checks',
+  });
+  check('a task is created to survive a restore', created.status === 201 || created.status === 200, created.body);
+
+  const taken = await call('POST', '/api/system/backups', {});
+  check(
+    'a backup can be taken on demand',
+    taken.status === 200 && taken.body.ok === true && taken.body.bytes > 0 && taken.body.name.endsWith('.tar.gz'),
+    taken.body
+  );
+  check(
+    'the backup records what it holds',
+    (taken.body.manifest?.counts?.calls ?? 0) > 0 && taken.body.manifest.database.bytes > 0,
+    taken.body.manifest
+  );
+  check(
+    'the manifest names the secrets it does not carry',
+    Array.isArray(taken.body.manifest?.secrets_not_included) &&
+      taken.body.manifest.secrets_not_included.includes('session.secret'),
+    taken.body.manifest?.secrets_not_included
+  );
+
+  const listed = await call('GET', '/api/system/backups');
+  check(
+    'the backup appears in the list with its contents',
+    listed.status === 200 &&
+      listed.body.items.some((item) => item.name === taken.body.name && item.counts && item.complete),
+    listed.body.items?.slice(0, 3)
+  );
+  check(
+    'backup status reports the schedule and where they live',
+    listed.body.status.enabled === true && listed.body.status.keep === 2 && !!listed.body.status.dir,
+    listed.body.status
+  );
+
+  const inspector = await call('GET', `/api/system/backups/${taken.body.name}`);
+  check(
+    'an archive can be inspected without restoring it',
+    inspector.status === 200 && (inspector.body.records?.calls ?? 0) > 0,
+    inspector.body
+  );
+
+  // A row created after the archive must be gone once it is put back.
+  const afterwards = `After the archive ${Date.now()}`;
+  await call('POST', '/api/operations/tasks', { title: afterwards, kind: 'change', priority: 'low' });
+  const beforeRestore = await call('GET', '/api/operations/tasks');
+  const beforeTitles = (beforeRestore.body.items || []).map((task) => task.title);
+  check(
+    'both tasks are in the database before the restore',
+    beforeTitles.includes(marker) && beforeTitles.includes(afterwards),
+    beforeTitles.slice(0, 4)
+  );
+
+  const badName = await call('POST', '/api/system/backups/restore', { name: '../../etc/passwd' });
+  check('a restore cannot be pointed outside the backup directory', badName.status === 400, badName.body);
+  const missing = await call('POST', '/api/system/backups/restore', { name: 'telno-19700101-000000.tar.gz' });
+  check('restoring an archive that does not exist is refused', missing.status === 400, missing.body);
+
+  const dry = await call('POST', '/api/system/backups/restore', { name: taken.body.name, dryRun: true });
+  check(
+    'a dry run reports the plan without touching the database',
+    dry.status === 200 && dry.body.dryRun === true && (dry.body.records?.calls ?? 0) > 0,
+    dry.body
+  );
+
+  const staged = await call('POST', '/api/system/backups/restore', { name: taken.body.name });
+  check(
+    'a restore is staged and asks for the restart it needs',
+    staged.status === 200 && staged.body.staged === true && staged.body.restartRequired === true,
+    staged.body
+  );
+
+  // The platform restarts itself; this is the supervisor's part of that.
+  const backUp = await restartServer();
+  check('the platform comes back up after staging a restore', backUp === true, globalThis.__smokeServerLog?.()?.slice(-400));
+  check(
+    'boot reports the restore it applied',
+    /restored telno-/.test(globalThis.__smokeServerLog?.() || ''),
+    globalThis.__smokeServerLog?.()?.slice(-600)
+  );
+
+  const relogin = await call('POST', '/api/auth/login', { email, password });
+  token = relogin.body.token || '';
+  const afterRestore = await call('GET', '/api/operations/tasks');
+  const afterTitles = (afterRestore.body.items || []).map((task) => task.title);
+  check('the restored database is served after the restart', afterRestore.status === 200, afterRestore.body);
+  check('a row from before the backup is back', afterTitles.includes(marker), afterTitles.slice(0, 4));
+  check('a row created after the archive is gone', !afterTitles.includes(afterwards), afterTitles.slice(0, 4));
+
+  const cleared = await call('GET', '/api/system/backups');
+  check(
+    'the staged restore is cleared once it has been applied',
+    cleared.body.status.pendingRestore === null && cleared.body.status.failedRestore === null,
+    cleared.body.status
+  );
+
+  // Retention: BACKUP_KEEP is 2 for this run, so a third archive prunes the oldest.
+  const second = await call('POST', '/api/system/backups', {});
+  const third = await call('POST', '/api/system/backups', {});
+  check(
+    'old archives are pruned to the retention limit',
+    second.status === 200 && third.status === 200 && third.body.items.length === 2,
+    third.body.items?.map((item) => item.name)
+  );
+  check(
+    'pruning removed the oldest archive',
+    !third.body.items.some((item) => item.name === taken.body.name),
+    third.body.items?.map((item) => item.name)
+  );
+
+  const removed = await call('DELETE', `/api/system/backups/${third.body.items[0].name}`);
+  check('an archive can be deleted', removed.status === 200 && removed.body.deleted === true, removed.body);
+  const gone = await call('GET', `/api/system/backups/${third.body.items[0].name}`);
+  check('a deleted archive is not inspectable', gone.status === 404, gone.body);
+
+  // The boot gate that keeps a weak deployment from starting at all.
+  const prodRefused = spawnSync(
+    process.execPath,
+    ['-e', "import('./src/config.js').then((m) => m.assertConfig())"],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        SESSION_SECRET: 'test-secret-for-the-boot-gate',
+        ADMIN_PASSWORD: 'telno-demo-owner',
+        PUBLIC_URL: 'https://telno.example',
+      },
+    }
+  );
+  check(
+    'a production boot refuses the demo password',
+    prodRefused.status !== 0 && /known default/.test(`${prodRefused.stdout}${prodRefused.stderr}`),
+    `${prodRefused.status} ${(prodRefused.stderr || '').slice(-200)}`
+  );
+
+  const httpRefused = spawnSync(
+    process.execPath,
+    ['-e', "import('./src/config.js').then((m) => m.assertConfig())"],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        SESSION_SECRET: 'test-secret-for-the-boot-gate',
+        ADMIN_PASSWORD: 'a-long-enough-password',
+        PUBLIC_URL: 'http://telno.example',
+      },
+    }
+  );
+  check(
+    'a production boot refuses an http public URL on a real host',
+    httpRefused.status !== 0 && /PUBLIC_URL is http/.test(`${httpRefused.stdout}${httpRefused.stderr}`),
+    `${httpRefused.status} ${(httpRefused.stderr || '').slice(-200)}`
+  );
+
+  const localOkay = spawnSync(
+    process.execPath,
+    ['-e', "import('./src/config.js').then((m) => m.assertConfig())"],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        SESSION_SECRET: 'test-secret-for-the-boot-gate',
+        ADMIN_PASSWORD: 'a-long-enough-password',
+        PUBLIC_URL: 'http://localhost:8080',
+      },
+    }
+  );
+  check(
+    'a production boot on localhost is allowed to be plain HTTP',
+    localOkay.status === 0,
+    `${localOkay.status} ${(localOkay.stderr || '').slice(-200)}`
+  );
+}
+
+/* --------------------------------------------------------------- marketing -- */
+// A campaign is the whole pipeline in one feature: a list that de-duplicates,
+// an exclusive queue, a disposition that becomes a grade, and a report that
+// leaves as a real PDF. Each of those is checked separately because each one
+// failing looks different to the operator.
+
+console.log('\nMarketing');
+
+const anonymousMarketing = await fetch(`${base}/api/marketing/overview`);
+check(
+  'the marketing pipeline is not readable without a session',
+  anonymousMarketing.status === 401,
+  anonymousMarketing.status
+);
+
+const templates = await call('GET', '/api/marketing/overview');
+check(
+  'the campaign templates carry a goal, a script and coaching notes',
+  templates.body.templates?.length >= 4 &&
+    templates.body.templates.every((entry) => entry.goal && entry.script && entry.tips?.length),
+  templates.body.templates?.map((entry) => entry.id)
+);
+check(
+  'the overview says whether grading is on a model or on rules',
+  typeof templates.body.ai?.configured === 'boolean' && !!templates.body.ai?.model,
+  templates.body.ai
+);
+
+const campaignName = `Smoke renewal ${Date.now()}`;
+const createdCampaign = await call('POST', '/api/marketing/campaigns', { name: campaignName, template: 'renewal' });
+const campaignId = createdCampaign.body.campaign?.id;
+check('a campaign can be created from a template', createdCampaign.status === 201 && !!campaignId, createdCampaign.body);
+check(
+  'the template copies its goal and script into the campaign',
+  /Renew a subscription/.test(createdCampaign.body.campaign?.goal || '') &&
+    /Innotel Labs/.test(createdCampaign.body.campaign?.script || ''),
+  createdCampaign.body.campaign
+);
+check(
+  'a second campaign with the same name is refused',
+  (await call('POST', '/api/marketing/campaigns', { name: campaignName })).status === 409
+);
+
+// Dedupe is the point of the importer: the same list, pasted twice, must not
+// dial anybody twice.
+const imported = await call('POST', `/api/marketing/campaigns/${campaignId}/contacts`, {
+  text: [
+    'Dana Reed, (415) 555-0150',
+    'dana@example.com, +1 415 555 0150',
+    'Acme Ltd 0044 20 7946 0026',
+    'this line is not a phone number',
+    '+1 415 555 0162',
+  ].join('\n'),
+});
+check(
+  'a pasted list is imported, de-duplicated and counted honestly',
+  imported.body.report?.added === 3 &&
+    imported.body.report?.duplicates === 1 &&
+    imported.body.report?.invalid === 1,
+  imported.body.report
+);
+check(
+  'the same person pasted again adds nothing',
+  (
+    await call('POST', `/api/marketing/campaigns/${campaignId}/contacts`, {
+      text: 'Dana Reed, (415) 555-0150',
+    })
+  ).body.report?.added === 0
+);
+
+const draftCampaignRun = await call('POST', `/api/marketing/campaigns/${campaignId}/run`, { limit: 5 });
+check('a draft campaign refuses to dial', draftCampaignRun.status === 400, draftCampaignRun.body);
+
+await call('PATCH', `/api/marketing/campaigns/${campaignId}`, { status: 'running' });
+const firstBatch = await call('POST', `/api/marketing/campaigns/${campaignId}/run`, { limit: 2 });
+const secondBatch = await call('POST', `/api/marketing/campaigns/${campaignId}/run`, { limit: 2 });
+const firstIds = (firstBatch.body.batch || []).map((contact) => contact.id);
+check(
+  'a run claims a batch and moves the contacts to calling',
+  firstIds.length === 2 && firstBatch.body.batch.every((contact) => contact.status === 'calling'),
+  firstBatch.body.batch
+);
+check(
+  'a second run never claims the same contact',
+  (secondBatch.body.batch || []).every((contact) => !firstIds.includes(contact.id)),
+  { first: firstIds, second: (secondBatch.body.batch || []).map((contact) => contact.id) }
+);
+check(
+  'the batch says whether the switch is real or simulated',
+  typeof firstBatch.body.telephony?.simulate === 'boolean',
+  firstBatch.body.telephony
+);
+
+const graded = await call('POST', `/api/marketing/contacts/${firstIds[0]}/outcome`, {
+  outcome: 'interested',
+  durationSec: 190,
+  transcript:
+    'Customer: yes, send the quote by email and book Thursday at 2pm. Agent: I will send it now.',
+});
+check(
+  'a disposition is recorded and graded with reasons',
+  graded.status === 200 &&
+    Number.isFinite(graded.body.contact?.grade) &&
+    graded.body.contact?.reasons?.length > 0,
+  graded.body.contact
+);
+check(
+  'a call that agrees a next step scores as a lead',
+  graded.body.contact?.grade >= 60,
+  graded.body.contact?.grade
+);
+
+const blocked = await call('POST', `/api/marketing/contacts/${firstIds[1]}/outcome`, {
+  outcome: 'do-not-call',
+  durationSec: 25,
+  transcript: 'Please stop calling me.',
+});
+check(
+  'a do-not-call is honoured and scores zero, not averaged in',
+  blocked.body.contact?.status === 'do_not_call' && blocked.body.contact?.grade === 0,
+  blocked.body.contact
+);
+// Same number, same list, second import: the opt-out is checked before the
+// duplicate, because honouring a do-not-call matters more than tidiness.
+const blockedNumber = blocked.body.contact?.number || '';
+const afterDoNotCall = await call('POST', `/api/marketing/campaigns/${campaignId}/contacts`, {
+  text: blockedNumber,
+});
+const optouts = await call('GET', '/api/optouts');
+check(
+  'the number that asked not to be called cannot be imported again',
+  afterDoNotCall.body.report?.added === 0 && afterDoNotCall.body.report?.optedOut === 1,
+  { report: afterDoNotCall.body.report, number: blockedNumber }
+);
+check(
+  'the platform-wide opt-out list knows about it',
+  (optouts.body.items || []).some((row) => row.e164 === blocked.body.contact?.e164),
+  optouts.body.items
+);
+
+const report = await call('POST', `/api/marketing/campaigns/${campaignId}/report`, {});
+check(
+  'a report is built for the campaign with its own numbers',
+  report.status === 201 && report.body.report?.bytes > 800 && report.body.report?.totals?.dialed >= 2,
+  report.body.report && { bytes: report.body.report.bytes, totals: report.body.report.totals }
+);
+check(
+  'the report totals exclude the blocked contact from the average',
+  report.body.report?.totals?.averageGrade >= 60 && report.body.report?.totals?.blocked === 1,
+  report.body.report?.totals
+);
+const pdf = await fetch(`${base}${report.body.report.downloadPath}`, { headers: { cookie } });
+const pdfBytes = Buffer.from(await pdf.arrayBuffer());
+check(
+  'the report downloads as a real PDF, not a renamed text file',
+  pdf.status === 200 &&
+    pdf.headers.get('content-type') === 'application/pdf' &&
+    pdfBytes.subarray(0, 5).toString() === '%PDF-' &&
+    pdfBytes.length > 800,
+  { status: pdf.status, type: pdf.headers.get('content-type'), bytes: pdfBytes.length }
+);
+
+const reportEmailBecauseUnconfigured = await call('POST', `/api/marketing/campaigns/${campaignId}/report`, {
+  email: 'reports@example.com',
+});
+check(
+  'a report email records which provider carried it, or why it did not',
+  reportEmailBecauseUnconfigured.status === 201 &&
+    !!reportEmailBecauseUnconfigured.body.report?.delivery?.channel &&
+    (reportEmailBecauseUnconfigured.body.report.delivery.delivered === true ||
+      !!reportEmailBecauseUnconfigured.body.report.delivery.error),
+  reportEmailBecauseUnconfigured.body.report?.delivery
+);
+
+const suggestion = await call('POST', '/api/marketing/suggest', { goal: 'Book a review call', script: '' });
+check(
+  'a script suggestion works or explains that no model key is set',
+  suggestion.status === 200 && (suggestion.body.ok === true || suggestion.body.error === 'ai_not_configured'),
+  suggestion.body.error || 'suggested'
+);
+
+await call('DELETE', `/api/marketing/campaigns/${campaignId}`);
+check('a campaign can be deleted', (await call('GET', `/api/marketing/campaigns/${campaignId}`)).status === 404);
+
+/* ---------------------------------------------------------------- commerce -- */
+
+console.log('\nPlans and the subscriber portal');
+
+const pricing = await call('GET', '/api/public/plans', undefined, { noCookie: true, bearer: '' });
+check(
+  'the public pricing page lists sellable plans and what each includes',
+  pricing.status === 200 &&
+    pricing.body.plans?.length >= 3 &&
+    pricing.body.plans.every((plan) => plan.features.length > 0 && plan.price),
+  pricing.body.plans?.map((plan) => `${plan.slug}:${plan.features.length}`)
+);
+check(
+  'the pricing page is public and names the product and vendor',
+  pricing.body.product === 'Telno' && pricing.body.vendor === 'Innotel Labs',
+  { product: pricing.body.product, vendor: pricing.body.vendor }
+);
+
+const featureKey = `smoke-feature-${Date.now()}`;
+const newFeature = await call('POST', '/api/features', {
+  key: featureKey,
+  label: 'Smoke feature',
+  description: 'Created by the smoke suite',
+  category: 'calling',
+});
+check('a feature can be added to the catalogue', newFeature.status === 201 && newFeature.body.feature?.key === featureKey, newFeature.body);
+
+const planSlug = `smoke-plan-${Date.now()}`;
+const newPlan = await call('POST', '/api/plans', {
+  name: 'Smoke plan',
+  slug: planSlug,
+  tagline: 'Created by the smoke suite',
+  priceCents: 4900,
+  currency: 'USD',
+  interval: 'month',
+  seats: 3,
+  includedMinutes: 500,
+  features: ['calling', featureKey],
+});
+const planId = newPlan.body.plan?.id;
+check(
+  'a plan can be created with a chosen set of features',
+  newPlan.status === 201 && newPlan.body.plan?.features?.some((feature) => feature.key === featureKey),
+  newPlan.body.plan?.features?.map((feature) => feature.key)
+);
+const publicWithPlan = await call('GET', '/api/public/plans', undefined, { noCookie: true, bearer: '' });
+check(
+  'a new plan appears on the public page immediately, with its price',
+  publicWithPlan.body.plans?.some((plan) => plan.slug === planSlug && plan.priceCents === 4900),
+  publicWithPlan.body.plans?.map((plan) => plan.slug)
+);
+
+const repriced = await call('PATCH', `/api/plans/${planId}`, { priceCents: 5900, features: ['calling'] });
+check(
+  'editing a plan changes its price and drops a feature in one save',
+  repriced.body.plan?.priceCents === 5900 &&
+    !repriced.body.plan?.features?.some((feature) => feature.key === featureKey),
+  repriced.body.plan
+);
+
+const retired = await call('DELETE', `/api/plans/${planId}`);
+const publicAfterRetire = await call('GET', '/api/public/plans', undefined, { noCookie: true, bearer: '' });
+check(
+  'a retired plan stops being sold but is not deleted',
+  retired.body.ok === true && !publicAfterRetire.body.plans?.some((plan) => plan.slug === planSlug),
+  publicAfterRetire.body.plans?.map((plan) => plan.slug)
+);
+check('deleting a feature for good works', (await call('DELETE', `/api/features/${featureKey}`)).status === 200);
+
+// The gate: a customer without a live subscription cannot use the console, and
+// a staff account is never locked out by the commerce side.
+//
+// The signup path is exercised against the local Stripe stand-in, and the
+// subscription is granted by a signed webhook rather than by the browser
+// returning to the success page: the event is what the platform trusts.
+const subscriberEmail = `smoke-subscriber-${Date.now()}@example.com`;
+const signedUp = await call(
+  'POST',
+  '/api/public/subscribe',
+  {
+    plan: 'business',
+    name: 'Smoke Subscriber',
+    email: subscriberEmail,
+    password: 'smoke-subscriber-password',
+    origin: 'http://subscribe.telno.services',
+  },
+  { noCookie: true, bearer: '' }
+);
+check(
+  'a public signup creates the account and returns a Stripe checkout page',
+  signedUp.status === 201 && /checkout\.stripe\.test/.test(signedUp.body.checkoutUrl || '') && !!signedUp.body.subscriptionId,
+  signedUp.body
+);
+check(
+  'the checkout page is a subscription, priced from the plan, with the account attached',
+  stripeCalls.some(
+    (entry) =>
+      entry.path.startsWith('/v1/checkout/sessions') &&
+      entry.body.includes('mode=subscription') &&
+      entry.body.includes('%5Bprice_data%5D%5Brecurring%5D%5Binterval%5D=month') &&
+      entry.body.includes(encodeURIComponent(signedUp.body.subscriptionId))
+  ),
+  stripeCalls.filter((entry) => entry.path.startsWith('/v1/checkout/sessions')).slice(-1)
+);
+
+const subscriberLogin = await call(
+  'POST',
+  '/api/auth/login',
+  { email: subscriberEmail, password: 'smoke-subscriber-password' },
+  { noCookie: true, bearer: '' }
+);
+const subscriberCookie = (subscriberLogin.headers.get('set-cookie') || '').split(';')[0];
+check('the new subscriber can sign in', subscriberLogin.status === 200 && !!subscriberCookie, subscriberLogin.status);
+
+const gated = await fetch(`${base}/api/auth/me`, { headers: { cookie: subscriberCookie } });
+const gatedBody = await gated.json().catch(() => ({}));
+check(
+  'an unpaid subscriber is locked out of the console with a 402 and a reason',
+  gated.status === 402 && gatedBody.error?.code === 'payment_required',
+  { status: gated.status, error: gatedBody.error }
+);
+const portalStatus = await fetch(`${base}/api/portal/status`, { headers: { cookie: subscriberCookie } });
+const portalBody = await portalStatus.json().catch(() => ({}));
+check(
+  'the locked-out subscriber can still see their status and the plans',
+  portalStatus.status === 200 && portalBody.entitlement?.active === false && portalBody.plans?.length > 0,
+  portalBody.entitlement
+);
+const customerAdmin = await fetch(`${base}/api/plans`, { headers: { cookie: subscriberCookie } });
+check('a customer cannot reach the commerce admin', customerAdmin.status === 403, customerAdmin.status);
+
+// The webhook is the authority: until Stripe confirms, the account stays shut.
+const subscriptionEvent = (event, object) =>
+  JSON.stringify({ id: `evt_${event.replace(/\W/g, '_')}`, type: event, data: { object } });
+const postStripeEvent = async (payload) => {
+  const stamp = Math.floor(Date.now() / 1000);
+  const digest = createHmac('sha256', 'whsec_smoke').update(`${stamp}.${payload}`).digest('hex');
+  const res = await fetch(`${base}/api/public/stripe/webhook`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'stripe-signature': `t=${stamp},v1=${digest}` },
+    body: payload,
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+};
+
+const subscriptionActivated = await postStripeEvent(
+  subscriptionEvent('checkout.session.completed', {
+    id: 'cs_test_sub_1',
+    object: 'checkout.session',
+    mode: 'subscription',
+    payment_status: 'paid',
+    subscription: 'sub_test_smoke_1',
+    customer: 'cus_test_smoke_1',
+    client_reference_id: signedUp.body.account?.id || '',
+    metadata: { kind: 'subscription', subscriptionId: signedUp.body.subscriptionId, platform: 'telno' },
+  })
+);
+check(
+  'a signed subscription webhook activates the subscription',
+  subscriptionActivated.status === 200 && subscriptionActivated.body.subscription?.ok === true,
+  subscriptionActivated.body
+);
+const afterActivation = await fetch(`${base}/api/auth/me`, { headers: { cookie: subscriberCookie } });
+check('paying for the plan opens the console', afterActivation.status === 200, afterActivation.status);
+const entitled = await fetch(`${base}/api/portal/status`, { headers: { cookie: subscriberCookie } });
+const entitledBody = await entitled.json();
+check(
+  'the portal reports the plan and the features it carries',
+  entitledBody.entitlement?.active === true &&
+    entitledBody.entitlement?.plan?.slug === 'business' &&
+    entitledBody.entitlement?.features?.includes('video-calling'),
+  entitledBody.entitlement
+);
+
+// A failed renewal is what the gate exists for on an established account.
+const failedRenewal = await postStripeEvent(
+  subscriptionEvent('invoice.payment_failed', { id: 'in_smoke_1', subscription: 'sub_test_smoke_1' })
+);
+const afterFailed = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
+check(
+  'a failed renewal closes the portal again',
+  failedRenewal.body.ok === true && afterFailed.status === 402,
+  { webhook: failedRenewal.body, access: afterFailed.status }
+);
+
+const ownerCookie = cookie;
+const comped = await call('POST', '/api/subscriptions', { email: subscriberEmail, planId: 'business', status: 'active' });
+check(
+  'an operator can restore access without a card',
+  comped.status === 201 && comped.body.subscription?.status === 'active',
+  comped.body.subscription
+);
+const afterComp = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
+check('the restored subscription opens the console', afterComp.status === 200, afterComp.status);
+
+// Onboarding by hand: the customer who pays by transfer has no checkout page.
+const handEmail = `smoke-hand-${Date.now()}@example.com`;
+const onboarded = await call('POST', '/api/customers', {
+  email: handEmail,
+  name: 'Hand Onboarded',
+  password: 'smoke-hand-password',
+  planId: 'starter',
+  status: 'active',
+});
+check(
+  'an operator can onboard a customer account with a plan in one step',
+  onboarded.status === 201 && onboarded.body.subscription?.planSlug === 'starter',
+  onboarded.body
+);
+const handLogin = await call(
+  'POST',
+  '/api/auth/login',
+  { email: handEmail, password: 'smoke-hand-password' },
+  { noCookie: true, bearer: '' }
+);
+const handCookie = (handLogin.headers.get('set-cookie') || '').split(';')[0];
+const handAccess = await fetch(`${base}/api/calls`, { headers: { cookie: handCookie } });
+check('the hand-onboarded customer can use the portal immediately', handAccess.status === 200, handAccess.status);
+
+// A staff account is never gated: the owner can still reach everything above.
+const staffStillIn = await fetch(`${base}/api/plans`, { headers: { cookie: ownerCookie } });
+check('a staff account is never gated by the commerce side', staffStillIn.status === 200, staffStillIn.status);
+cookie = ownerCookie;
+
+/* ------------------------------------------------------------------- brand -- */
+// White-label configuration: the name, vendor and accent every public page and
+// the console render. It is a settings row, so an edit is live immediately.
+
+console.log('\nWhite-label branding');
+
+const brandDefaults = await call('GET', '/api/public/brand', undefined, { noCookie: true, bearer: '' });
+check(
+  'the public brand is served without a session',
+  brandDefaults.status === 200 && brandDefaults.body.brand?.name && brandDefaults.body.brand?.vendor,
+  brandDefaults.body.brand
+);
+const originalBrand = brandDefaults.body.brand;
+
+const renamed = await call('PUT', '/api/system/brand', {
+  name: 'Smoke Telco',
+  vendor: 'Smoke Holdings',
+  accent: '#12a594',
+});
+check(
+  'an owner can rebrand the deployment',
+  renamed.status === 200 && renamed.body.brand?.name === 'Smoke Telco' && renamed.body.brand?.accent === '#12a594',
+  renamed.body.brand
+);
+const publicAfterRename = await call('GET', '/api/public/brand', undefined, { noCookie: true, bearer: '' });
+check(
+  'the new brand is what the public page reads',
+  publicAfterRename.body.brand?.name === 'Smoke Telco' && publicAfterRename.body.brand?.vendor === 'Smoke Holdings',
+  publicAfterRename.body.brand
+);
+const pricingAfterRename = await call('GET', '/api/public/plans', undefined, { noCookie: true, bearer: '' });
+check(
+  'the pricing page and the site carry the same brand',
+  pricingAfterRename.body.brand?.name === 'Smoke Telco' && pricingAfterRename.body.product === 'Smoke Telco',
+  { product: pricingAfterRename.body.product, brand: pricingAfterRename.body.brand?.name }
+);
+check(
+  'an accent that is not a hex colour is refused, because it becomes CSS',
+  (await call('PUT', '/api/system/brand', { accent: 'red' })).status === 400
+);
+check(
+  'a logo that is not an http(s) URL is refused',
+  (await call('PUT', '/api/system/brand', { logoUrl: 'javascript:alert(1)' })).status === 400
+);
+
+const brandRestored = await call('PUT', '/api/system/brand', {
+  name: originalBrand.name,
+  vendor: originalBrand.vendor,
+  tagline: originalBrand.tagline,
+  description: originalBrand.description,
+  accent: originalBrand.accent,
+  logoUrl: originalBrand.logoUrl,
+  supportEmail: originalBrand.supportEmail,
+  salesEmail: originalBrand.salesEmail,
+  domain: originalBrand.domain,
+  footerNote: originalBrand.footerNote,
+});
+check(
+  'the original brand can be restored',
+  brandRestored.status === 200 && brandRestored.body.brand?.name === originalBrand.name,
+  brandRestored.body.brand?.name
+);
 
 globalThis.__smokeStopServer?.();
 

@@ -4,6 +4,7 @@ import { Icon, Badge, Button, useToast } from './ui.jsx';
 import { Link } from './router.jsx';
 import { useAuth } from './auth.jsx';
 import { openSoftphoneWindow } from './softphoneWindow.js';
+import { BrandMark, useBrand } from './brand.jsx';
 
 const GROUPS = [
   {
@@ -25,6 +26,7 @@ const GROUPS = [
     items: [
       { path: '/voice', label: 'Voice agents', icon: 'wave' },
       { path: '/workflows', label: 'Workflows', icon: 'flow' },
+      { path: '/marketing', label: 'Marketing', icon: 'megaphone' },
     ],
   },
   {
@@ -38,6 +40,7 @@ const GROUPS = [
     label: 'Business',
     items: [
       { path: '/billing', label: 'Billing', icon: 'card' },
+      { path: '/plans', label: 'Plans', icon: 'tag' },
       { path: '/estate', label: 'Estate', icon: 'building' },
     ],
   },
@@ -63,6 +66,7 @@ const MOBILE = [
 
 export default function Shell({ path, title, subtitle, children }) {
   const { user, logout } = useAuth();
+  const brand = useBrand();
   const toast = useToast();
   const [health, setHealth] = useState(null);
   const [pending, setPending] = useState(0);
@@ -103,9 +107,7 @@ export default function Shell({ path, title, subtitle, children }) {
         <span className="brand-mark" aria-hidden="true">
           <Icon name="phone" size={15} />
         </span>
-        <span className="brand-name">
-          tel<span>no</span>
-        </span>
+        <BrandMark brand={brand} size={22} />
         <span className="brand-sub">v1.0</span>
       </div>
 
