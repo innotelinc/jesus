@@ -12,6 +12,7 @@ import {
   PageHeader,
   Select,
   Switch,
+  Textarea,
   useToast,
 } from '../ui.jsx';
 
@@ -36,25 +37,60 @@ export default function Settings() {
   const [stripeSecret, setStripeSecret] = useState('');
   const [mailjetKey, setMailjetKey] = useState('');
   const [mailjetSecret, setMailjetSecret] = useState('');
+  const [aiKey, setAiKey] = useState('');
+  const [aiTest, setAiTest] = useState(null);
+  const [brandForm, setBrandForm] = useState(null);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [magnateHook, setMagnateHook] = useState('');
+  const [magnateToken, setMagnateToken] = useState('');
   const [savingSecret, setSavingSecret] = useState('');
   const [testTo, setTestTo] = useState('');
   const [savingMail, setSavingMail] = useState(false);
   const [testingMail, setTestingMail] = useState(false);
+  const [backups, setBackups] = useState({ status: null, items: [] });
+  const [backupBusy, setBackupBusy] = useState('');
+  const [restoring, setRestoring] = useState(null);
+
+  // Branding is its own request: it is white-label configuration, not part of
+  // the operator status the rest of this page reads.
+  useEffect(() => {
+    api
+      .get('/system/brand')
+      .then((data) => setBrandForm(data.brand))
+      .catch(() => setBrandForm(null));
+  }, []);
+
+  const saveBrand = async () => {
+    setSavingBrand(true);
+    try {
+      const data = await api.put('/system/brand', brandForm);
+      setBrandForm(data.brand);
+      toast.success('Brand updated', 'The site, console and signup page now use it on the next load.');
+      load();
+    } catch (err) {
+      toast.error('Could not save the brand', err.message);
+    } finally {
+      setSavingBrand(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
-      const [domainData, keyData, eventData, statusData, vaultData] = await Promise.all([
+      const [domainData, keyData, eventData, statusData, vaultData, backupData] = await Promise.all([
         api.get('/system/domains'),
         api.get('/system/keys'),
         api.get('/system/events?limit=25'),
         api.get('/system/status'),
         api.get('/system/vault').catch(() => ({ items: [], channels: null })),
+        // Backups are owner-only, so a viewer's Settings page still loads.
+        api.get('/system/backups').catch(() => ({ status: null, items: [] })),
       ]);
       setDomains(domainData.items);
       setKeys(keyData.items);
       setEvents(eventData.items);
       setStatus(statusData);
       setVault(vaultData);
+      setBackups(backupData);
       setMailFrom((current) => current || vaultData.channels?.email?.from || '');
     } catch (err) {
       toast.error('Could not load settings', err.message);
@@ -85,6 +121,55 @@ export default function Settings() {
       toast.success('Domain updated');
     } catch (err) {
       toast.error('Update failed', err.message);
+    }
+  };
+
+  const runBackup = async () => {
+    setBackupBusy('new');
+    try {
+      const data = await api.post('/system/backups', {});
+      setBackups({ status: data.status, items: data.items });
+      toast.success('Backup taken', `${data.name} · ${Math.round(data.bytes / 1024)} kB`);
+    } catch (err) {
+      toast.error('Backup failed', err.message);
+    } finally {
+      setBackupBusy('');
+    }
+  };
+
+  /**
+   * A restore is the one action here that replaces live data, so it is behind a
+   * dialog that names the archive, what it holds, and the fact that the platform
+   * restarts to apply it.
+   */
+  const restore = async (item) => {
+    setBackupBusy(item.name);
+    try {
+      const data = await api.post('/system/backups/restore', { name: item.name });
+      toast.success(
+        'Restore staged',
+        `${data.name} will be applied as the platform restarts (${data.records?.calls ?? 0} calls in the archive).`
+      );
+      setRestoring(null);
+      // The platform is going down to apply it; the page will lose its session.
+      setTimeout(() => window.location.reload(), 4000);
+    } catch (err) {
+      toast.error('Could not stage the restore', err.message);
+      setBackupBusy('');
+    }
+  };
+
+  const removeBackup = async (item) => {
+    if (!window.confirm(`Delete ${item.name}? The other archives are kept.`)) return;
+    setBackupBusy(item.name);
+    try {
+      const data = await api.del(`/system/backups/${item.name}`);
+      setBackups((current) => ({ ...current, items: data.items }));
+      toast.success('Archive deleted');
+    } catch (err) {
+      toast.error('Could not delete it', err.message);
+    } finally {
+      setBackupBusy('');
     }
   };
 
@@ -137,6 +222,9 @@ export default function Settings() {
       else if (name === 'STRIPE_WEBHOOK_SECRET') setStripeSecret('');
       else if (name === 'MAILJET_API_KEY') setMailjetKey('');
       else if (name === 'MAILJET_API_SECRET') setMailjetSecret('');
+      else if (name === 'LLM_API_KEY') setAiKey('');
+      else if (name === 'MAGNATE_WEBHOOK_URL') setMagnateHook('');
+      else if (name === 'MAGNATE_API_TOKEN') setMagnateToken('');
       await load();
       toast.success(`${label} stored`, 'Held encrypted in the vault — only the last four characters are shown.');
     } catch (err) {
@@ -723,7 +811,344 @@ export default function Settings() {
           <div className="mono" style={{ marginTop: 4, wordBreak: 'break-all' }}>{payments.webhookUrl}</div>
           <a href="/billing">Then run Test Stripe connection on Billing</a> to prove the key and the secret against
           Stripe before a customer ever clicks Pay now.
+          <div style={{ marginTop: 6 }}>
+            Subscriptions bill through the same account, from the public page at
+            <span className="mono"> /subscribe</span> — register
+            <span className="mono"> customer.subscription.updated</span>,
+            <span className="mono"> customer.subscription.deleted</span> and
+            <span className="mono"> invoice.payment_failed</span> on the same endpoint, or the portal gate will
+            never learn that a renewal lapsed.
+          </div>
         </div>
+      </Card>
+
+      <Card
+        title="Branding"
+        subtitle="The name, vendor and colour the site, console, signup page and reports use"
+        actions={
+          brandForm ? (
+            <Button size="sm" variant="primary" icon="check" loading={savingBrand} onClick={saveBrand}>
+              Save brand
+            </Button>
+          ) : null
+        }
+      >
+        {brandForm ? (
+          <div className="stack">
+            <div className="grid two">
+              <Input
+                label="Product name"
+                value={brandForm.name}
+                maxLength={40}
+                onChange={(event) => setBrandForm({ ...brandForm, name: event.target.value })}
+                hint="Appears in the console, the site, the signup page and every report."
+              />
+              <Input
+                label="Vendor"
+                value={brandForm.vendor}
+                maxLength={60}
+                onChange={(event) => setBrandForm({ ...brandForm, vendor: event.target.value })}
+                hint="“A product of …” on the public pages."
+              />
+            </div>
+            <Input
+              label="Tagline"
+              value={brandForm.tagline}
+              maxLength={160}
+              onChange={(event) => setBrandForm({ ...brandForm, tagline: event.target.value })}
+              hint="The headline on the site and the signup page."
+            />
+            <Textarea
+              label="Description"
+              rows={3}
+              value={brandForm.description}
+              maxLength={600}
+              onChange={(event) => setBrandForm({ ...brandForm, description: event.target.value })}
+            />
+            <div className="grid three">
+              <Input
+                label="Accent colour"
+                value={brandForm.accent}
+                onChange={(event) => setBrandForm({ ...brandForm, accent: event.target.value })}
+                hint="Six-digit hex, e.g. #6f66ff."
+                type="color"
+                style={{ minHeight: 42, padding: 4 }}
+              />
+              <Input
+                label="Logo URL"
+                value={brandForm.logoUrl}
+                onChange={(event) => setBrandForm({ ...brandForm, logoUrl: event.target.value })}
+                placeholder="https://…/logo.svg"
+                hint="Optional; the wordmark is used when empty."
+              />
+              <Input
+                label="Directory domain"
+                value={brandForm.domain}
+                onChange={(event) => setBrandForm({ ...brandForm, domain: event.target.value })}
+                placeholder="telno.directory"
+                hint="Which host the site links as its public directory."
+              />
+            </div>
+            <div className="grid three">
+              <Input
+                label="Support email"
+                type="email"
+                value={brandForm.supportEmail}
+                onChange={(event) => setBrandForm({ ...brandForm, supportEmail: event.target.value })}
+              />
+              <Input
+                label="Sales email"
+                type="email"
+                value={brandForm.salesEmail}
+                onChange={(event) => setBrandForm({ ...brandForm, salesEmail: event.target.value })}
+              />
+              <Input
+                label="Footer note"
+                value={brandForm.footerNote}
+                onChange={(event) => setBrandForm({ ...brandForm, footerNote: event.target.value })}
+              />
+            </div>
+            <div className="row wrap" style={{ gap: 8 }}>
+              <a href="/" target="_blank" rel="noreferrer" className="btn sm">
+                <Icon name="external" size={14} /> Preview the site
+              </a>
+              <a href="/subscribe" target="_blank" rel="noreferrer" className="btn sm ghost">
+                <Icon name="external" size={14} /> Preview the signup page
+              </a>
+              <span className="tiny dim">Changes apply on the next page load, no restart.</span>
+            </div>
+          </div>
+        ) : (
+          <p className="tiny dim" style={{ margin: 0 }}>
+            Only an owner can read and change the brand.
+          </p>
+        )}
+      </Card>
+
+      <Card
+        title="AI and subscriptions"
+        subtitle="The model behind grading and suggestions, and the mirror into the subscriber system of record"
+        actions={
+          <Badge tone={status?.ai?.configured ? 'success' : 'warning'} dot={status?.ai?.configured}>
+            {status?.ai?.configured ? `${status.ai.model} · ${status.ai.host}` : 'No model key'}
+          </Badge>
+        }
+      >
+        <p className="tiny muted" style={{ marginTop: 0 }}>
+          Campaign grading, campaign suggestions and the operations autopilot all go through one OpenAI-compatible
+          gateway. Without a key the platform still works — grading falls back to rules and the console says so.
+        </p>
+        <div className="grid two">
+          <div className="stack">
+            <Input
+              label="Gateway API key"
+              type="password"
+              autoComplete="off"
+              placeholder={secretByName('LLM_API_KEY') ? `Stored ${secretByName('LLM_API_KEY').hint}` : 'sk-…'}
+              hint={`Sent to ${status?.ai?.host || 'the gateway'} · model ${status?.ai?.model || 'gpt-4o-mini'}`}
+              value={aiKey}
+              onChange={(event) => setAiKey(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'LLM_API_KEY'}
+                onClick={() => storeSecret('LLM_API_KEY', aiKey, 'gateway key')}
+              >
+                {secretByName('LLM_API_KEY') ? 'Replace key' : 'Store key'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="pulse"
+                loading={savingSecret === 'ai-test'}
+                onClick={async () => {
+                  setSavingSecret('ai-test');
+                  try {
+                    const result = await api.post('/system/ai/test', {});
+                    setAiTest(result);
+                    if (result.test.ok) toast.success('Model replied', `${result.test.model} in ${result.test.latencyMs}ms`);
+                    else toast.error('Model did not answer', result.test.error);
+                  } catch (err) {
+                    toast.error('Could not test the model', err.message);
+                  } finally {
+                    setSavingSecret('');
+                  }
+                }}
+              >
+                Test
+              </Button>
+              {secretByName('LLM_API_KEY') ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    clearSecret(
+                      'LLM_API_KEY',
+                      'Remove the model key? Campaign grading falls back to rules and suggestions stop working.'
+                    )
+                  }
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            {aiTest ? (
+              <p className="tiny" style={{ margin: 0, color: aiTest.test.ok ? 'var(--success)' : 'var(--danger)' }}>
+                {aiTest.test.ok
+                  ? `Replied "${aiTest.test.reply}" from ${aiTest.test.model} in ${aiTest.test.latencyMs}ms`
+                  : `Failed: ${aiTest.test.error}`}
+              </p>
+            ) : null}
+          </div>
+          <div className="stack">
+            <Input
+              label="Subscriber system webhook"
+              type="url"
+              autoComplete="off"
+              placeholder={secretByName('MAGNATE_WEBHOOK_URL') ? `Stored ${secretByName('MAGNATE_WEBHOOK_URL').hint}` : 'https://…/hooks/telno'}
+              hint="Every plan change is posted here, so the catalogue is never retyped by hand."
+              value={magnateHook}
+              onChange={(event) => setMagnateHook(event.target.value)}
+            />
+            <Input
+              label="Webhook token"
+              type="password"
+              autoComplete="off"
+              placeholder={secretByName('MAGNATE_API_TOKEN') ? `Stored ${secretByName('MAGNATE_API_TOKEN').hint}` : 'bearer token'}
+              hint="Sent as Authorization: Bearer on every push."
+              value={magnateToken}
+              onChange={(event) => setMagnateToken(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                loading={savingSecret === 'MAGNATE_WEBHOOK_URL'}
+                onClick={() => storeSecret('MAGNATE_WEBHOOK_URL', magnateHook, 'subscriber webhook')}
+              >
+                Save webhook
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={savingSecret === 'MAGNATE_API_TOKEN'}
+                onClick={() => storeSecret('MAGNATE_API_TOKEN', magnateToken, 'webhook token')}
+              >
+                Save token
+              </Button>
+              <span className="tiny dim right">
+                {status?.commerce?.magnateConfigured ? 'Mirroring' : 'Not mirroring'} · {status?.commerce?.plans ?? 0} plans
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Data backups"
+        subtitle="The database, the recordings and a manifest — taken on a schedule and restorable in one request"
+        actions={
+          backups.status ? (
+            <div className="row" style={{ gap: 8 }}>
+              <Badge tone={backups.status.enabled ? 'info' : 'neutral'} dot={backups.status.enabled}>
+                {backups.status.enabled
+                  ? `every ${backups.status.intervalHours}h · keep ${backups.status.keep}`
+                  : 'schedule off'}
+              </Badge>
+              <Button size="sm" variant="primary" icon="check" loading={backupBusy === 'new'} onClick={runBackup}>
+                Back up now
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        {!backups.status ? (
+          <p className="tiny dim" style={{ margin: 0 }}>
+            Backups are owner-only.
+          </p>
+        ) : (
+          <>
+            <div className="grid two" style={{ gap: 14 }}>
+              <div className="stack" style={{ gap: 6 }}>
+                <span className="tiny dim">Stored in</span>
+                <span className="mono tiny truncate" style={{ maxWidth: 360 }}>{backups.status.dir}</span>
+                <span className="tiny dim">
+                  Last: {backups.status.lastAt ? `${relativeTime(backups.status.lastAt)} (${backups.status.lastLabel})` : 'none yet'}
+                </span>
+              </div>
+              <div className="tiny dim" style={{ lineHeight: 1.7 }}>
+                An archive holds the database dumped consistently with <span className="mono">VACUUM INTO</span>, the
+                recordings, voicemail audio and fax attachments, and a manifest of what it contains. It deliberately
+                does <strong>not</strong> hold {backups.status.secretFilesNotIncluded.join(', ')} — restoring on new
+                hardware means carrying those across too, or the credential vault cannot be decrypted.
+              </div>
+            </div>
+
+            {backups.status.pendingRestore ? (
+              <p className="tiny" style={{ marginTop: 12, color: 'var(--warning)' }}>
+                A restore of {backups.status.pendingRestore} is staged and will be applied at the next boot.
+              </p>
+            ) : null}
+            {backups.status.failedRestore ? (
+              <p className="tiny" style={{ marginTop: 12, color: 'var(--danger)' }}>
+                A staged restore failed at boot ({backups.status.failedRestore.error}) — the database was left
+                untouched.
+              </p>
+            ) : null}
+
+            <div className="table-wrap" style={{ marginTop: 14 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Archive</th>
+                    <th>Taken</th>
+                    <th>Contents</th>
+                    <th className="align-right">Size</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {backups.items.map((item) => (
+                    <tr key={item.name}>
+                      <td className="tiny mono nowrap">{item.name}</td>
+                      <td className="tiny dim nowrap">{relativeTime(item.createdAt)}</td>
+                      <td className="tiny dim">
+                        {item.counts
+                          ? `${item.counts.calls} calls · ${item.counts.listings} listings · ${item.recordings?.files ?? 0} media files`
+                          : 'manifest unreadable'}
+                      </td>
+                      <td className="tiny align-right mono">{Math.max(1, Math.round(item.bytes / 1024))} kB</td>
+                      <td className="align-right">
+                        <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                          <Button size="sm" variant="ghost" onClick={() => setRestoring(item)}>
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            icon="trash"
+                            loading={backupBusy === item.name}
+                            onClick={() => removeBackup(item)}
+                            aria-label={`Delete ${item.name}`}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {backups.items.length ? null : (
+                <div style={{ padding: 16 }}>
+                  <Empty icon="terminal" title="No backups yet">
+                    The schedule writes one to the data volume; Back up now takes one immediately.
+                  </Empty>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card title="Activity" subtitle="Who changed what" bodyClass="tight">
@@ -756,6 +1181,50 @@ export default function Settings() {
           <Empty icon="clock" title="No activity recorded" />
         )}
       </Card>
+
+      {restoring ? (
+        <Modal
+          title="Restore from an archive"
+          subtitle={restoring.name}
+          onClose={() => setRestoring(null)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setRestoring(null)}>Cancel</Button>
+              <Button
+                variant="danger"
+                loading={backupBusy === restoring.name}
+                onClick={() => restore(restoring)}
+              >
+                Stage the restore
+              </Button>
+            </>
+          }
+        >
+          <div className="stack" style={{ gap: 12 }}>
+            <p className="tiny" style={{ margin: 0 }}>
+              This replaces the live database and the media tree with the contents of{' '}
+              <span className="mono">{restoring.name}</span>, taken {relativeTime(restoring.createdAt)}.
+            </p>
+            <dl className="kv">
+              <dt>Contents</dt>
+              <dd className="tiny">
+                {restoring.counts
+                  ? `${restoring.counts.calls} calls · ${restoring.counts.listings} listings · ${restoring.counts.invoices} invoices`
+                  : 'unknown'}
+              </dd>
+              <dt>Media</dt>
+              <dd className="tiny">{restoring.recordings?.files ?? 0} files</dd>
+              <dt>How it applies</dt>
+              <dd className="tiny">The platform restarts itself and applies the archive before it opens the database.</dd>
+              <dt>Previous media</dt>
+              <dd className="tiny">Kept beside the new tree, so a partial archive is not a loss.</dd>
+            </dl>
+            <p className="tiny" style={{ color: 'var(--warning)', margin: 0 }}>
+              Anything created since that archive was taken will be gone: this is a real replacement, not a merge.
+            </p>
+          </div>
+        </Modal>
+      ) : null}
 
       {creatingKey ? (
         <CreateKey

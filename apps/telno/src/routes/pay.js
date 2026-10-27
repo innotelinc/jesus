@@ -10,6 +10,7 @@ import {
   verifyWebhook,
 } from '../lib/payments.js';
 import { billingAccount, reinstateAccount } from '../lib/escalation.js';
+import { activateFromSession, applySubscriptionEvent, markSubscriptionPastDue } from '../lib/subscriptions.js';
 
 /**
  * The public side of billing: the link in an email, and Stripe calling back.
@@ -140,12 +141,51 @@ export default async function payRoutes(app) {
 
       const session = event?.data?.object || {};
       const type = String(event?.type || '');
+
+      // A standing instruction has its own lifecycle: status and period end live
+      // on the subscription object, not on a checkout session.
+      if (type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+        const result = applySubscriptionEvent(session, { deleted: type === 'customer.subscription.deleted' });
+        logEvent({
+          actor: 'stripe',
+          action: 'portal.webhook_subscription',
+          subject: session.id || '',
+          detail: `${type}${result.ok ? '' : ` · ${result.error}`}`,
+          ip: request.ip,
+        });
+        return { received: true, ...result };
+      }
+      if (type === 'invoice.payment_failed') {
+        const result = markSubscriptionPastDue(String(session.subscription || ''));
+        logEvent({
+          actor: 'stripe',
+          action: 'portal.webhook_payment_failed',
+          subject: String(session.subscription || session.id || ''),
+          detail: result.ok ? 'subscription marked past due' : result.error,
+          ip: request.ip,
+        });
+        return { received: true, ...result };
+      }
+
       if (type !== 'checkout.session.completed' && type !== 'checkout.session.async_payment_succeeded') {
         return { received: true, ignored: type };
       }
       // Delayed methods can complete an unpaid session; only money counts.
       if (type === 'checkout.session.completed' && session.payment_status && session.payment_status !== 'paid') {
         return { received: true, awaitingPayment: session.payment_status };
+      }
+
+      // A subscription checkout creates an account's access, not an invoice.
+      if (session.mode === 'subscription' || session?.metadata?.kind === 'subscription') {
+        const activated = await activateFromSession(session);
+        logEvent({
+          actor: 'stripe',
+          action: 'portal.subscription_activated',
+          subject: String(session?.metadata?.subscriptionId || session.id || ''),
+          detail: activated.ok ? `${activated.periodEnd ? `paid to ${activated.periodEnd.slice(0, 10)}` : 'active'}` : activated.error,
+          ip: request.ip,
+        });
+        return { received: true, subscription: activated };
       }
 
       const applied = applyCheckoutSession(session);

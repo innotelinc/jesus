@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, prettyNumber } from '../api.js';
 import { Badge, Button, Card, Empty, Icon, Loading, PageHeader, Select, Stat, Switch, useToast } from '../ui.jsx';
 import { isSoftphoneWindow, openSoftphoneWindow } from '../softphoneWindow.js';
+import { readLine, saveLine } from '../softphoneLine.js';
 
 /**
  * Browser softphone.
@@ -101,7 +102,9 @@ export default function Softphone() {
   const [standalone] = useState(() => isSoftphoneWindow());
   const [status, setStatus] = useState(null);
   const [extensions, setExtensions] = useState([]);
-  const [extension, setExtension] = useState('');
+  // The line this browser had last: the same extension and devices come back
+  // after a reload, which is the difference between a phone and a demo.
+  const [extension, setExtension] = useState(() => readLine().extension);
   const [session, setSession] = useState(null);
   const [regState, setRegState] = useState('off');
   const [connecting, setConnecting] = useState(false);
@@ -114,7 +117,12 @@ export default function Softphone() {
   const [incoming, setIncoming] = useState(false);
   const [secure, setSecure] = useState(null);
   const [peers, setPeers] = useState([]);
-  const [settings, setSettings] = useState({ video: true, micId: '', camId: '' });
+  const [settings, setSettings] = useState(() => {
+    const line = readLine();
+    return { video: line.video, micId: line.micId, camId: line.camId };
+  });
+  const [keep, setKeep] = useState(() => readLine().keep !== false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [devices, setDevices] = useState({ mics: [], cams: [] });
   const [inbox, setInbox] = useState([]);
 
@@ -128,6 +136,12 @@ export default function Softphone() {
   const remoteVideoRef = useRef(null);
   const localVideoRef = useRef(null);
   const startedAtRef = useRef(0);
+  // Reconnection state: one timer, an attempt count and the latest connect.
+  const connectRef = useRef(null);
+  const reconnectTimer = useRef(null);
+  const attemptsRef = useRef(0);
+  const keepRef = useRef(keep);
+  const callRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
 
   const loadDevices = useCallback(async () => {
@@ -150,7 +164,12 @@ export default function Softphone() {
         setStatus(statusData);
         const enabled = (extData.items || []).filter((row) => row.enabled !== false);
         setExtensions(enabled);
-        if (enabled[0]) setExtension(String(enabled[0].extension));
+        // Keep the remembered extension when it still exists; otherwise fall
+        // back to the first one so the screen is usable on a fresh browser.
+        const remembered = readLine().extension;
+        const stillThere = enabled.some((row) => String(row.extension) === String(remembered));
+        if (stillThere) setExtension(String(remembered));
+        else if (enabled[0]) setExtension(String(enabled[0].extension));
       } catch (err) {
         toast.error('Could not load the softphone', err.message);
       }
@@ -287,9 +306,32 @@ export default function Softphone() {
 
   /* -------------------------------------------------------------- connect -- */
 
-  const connect = async () => {
+  /**
+   * Bring a dropped line back on its own. Backoff is deliberately slow at the
+   * top and capped: a switch restart takes a few seconds, and a softphone that
+   * hammers a dead socket is noise in a log rather than a recovery.
+   */
+  const scheduleReconnect = useCallback((reason) => {
+    if (!keepRef.current || reconnectTimer.current) return;
+    if (callRef.current && callRef.current.state !== 'ended') return;
+    attemptsRef.current += 1;
+    if (attemptsRef.current > 8) {
+      setReconnecting(false);
+      setRegState('failed');
+      setConnectError(`The line stayed down after 8 attempts (${reason}). Connect manually when the switch is back.`);
+      return;
+    }
+    const delay = Math.min(30_000, 1000 * 2 ** attemptsRef.current);
+    setReconnecting(true);
+    reconnectTimer.current = setTimeout(() => {
+      reconnectTimer.current = null;
+      connectRef.current?.({ auto: true });
+    }, delay);
+  }, []);
+
+  const connect = async ({ auto = false } = {}) => {
     if (!extension) return;
-    setConnecting(true);
+    setConnecting(!auto);
     setConnectError('');
     try {
       const data = await api.post('/softphone/session', { extension });
@@ -358,6 +400,13 @@ export default function Softphone() {
         },
         logLevel: 'error',
         delegate: {
+          onDisconnect: (error) => {
+            setRegState('failed');
+            setConnectError(error?.message || 'The switch closed the connection');
+            // A closed transport is exactly the case a kept line should recover
+            // from without a human clicking anything.
+            scheduleReconnect(error?.message || 'the switch closed the connection');
+          },
           onInvite: (invitation) => {
             attach(invitation);
             setCall({ state: 'ringing', direction: 'inbound', peer: invitation.remoteIdentity?.uri?.user || 'unknown' });
@@ -365,10 +414,6 @@ export default function Softphone() {
             sendPresence('ringing', invitation.remoteIdentity?.uri?.user || '');
             // Answer with the same media preferences as an outgoing call.
             constraintsRef.current = constraints;
-          },
-          onDisconnect: (error) => {
-            setRegState('failed');
-            setConnectError(error?.message || 'The switch closed the connection');
           },
         },
       });
@@ -381,6 +426,13 @@ export default function Softphone() {
         setRegState(
           state === 'Registered' ? 'registered' : state === 'Unregistered' ? 'off' : 'registering'
         );
+        if (state === 'Registered') {
+          // A registration that lands is the only proof a reconnect worked.
+          attemptsRef.current = 0;
+          setReconnecting(false);
+        }
+        // A registration that drops while nothing was asked for is a lost line.
+        if (state === 'Unregistered' && keepRef.current) scheduleReconnect('the switch unregistered the line');
       });
       await registerer.register();
 
@@ -402,11 +454,82 @@ export default function Softphone() {
           `Could not reach the switch at ${status?.wssUrl}. Check that port ${status?.wssPort || 8089} is published and the certificate is trusted.`
       );
       setRegState('failed');
-      toast.error('Softphone could not connect', err?.message || 'The switch did not answer');
+      if (auto) {
+        // Silent by design: an automatic retry must not stack up toasts.
+        scheduleReconnect(err?.message || 'the switch did not answer');
+      } else {
+        toast.error('Softphone could not connect', err?.message || 'The switch did not answer');
+      }
     } finally {
       setConnecting(false);
     }
   };
+
+  // The reconnect timer and the online listener both need the current connect.
+  useEffect(() => {
+    connectRef.current = connect;
+  });
+  useEffect(() => {
+    keepRef.current = keep;
+    if (!keep) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+      setReconnecting(false);
+    }
+  }, [keep]);
+  useEffect(() => {
+    callRef.current = call;
+  }, [call]);
+
+  // Remember the line: extension, devices, video and whether to come back.
+  useEffect(() => {
+    saveLine({ extension, video: settings.video, micId: settings.micId, camId: settings.camId, keep });
+  }, [extension, settings, keep]);
+
+  // First load of a kept line: register without being asked.
+  useEffect(() => {
+    if (!status || !keep || session || connecting || regState !== 'off') return;
+    if (!extension || !extensions.length) return;
+    connectRef.current?.({ auto: true });
+    // Only when the inputs that decide it change; connecting is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, keep, extensions.length, extension]);
+
+  // A laptop that slept, a VPN that reconnected, a Wi-Fi that came back: all of
+  // these are the browser telling us it is worth trying again.
+  useEffect(() => {
+    const onOnline = () => {
+      if (keepRef.current && regState !== 'registered') scheduleReconnect('the network came back');
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [regState, scheduleReconnect]);
+
+  // A registered phone on a docked laptop should not be put to sleep by the
+  // screen timeout; the browser may refuse, which is not an error worth showing.
+  useEffect(() => {
+    if (regState !== 'registered' || !('wakeLock' in navigator)) return undefined;
+    let lock = null;
+    let cancelled = false;
+    navigator.wakeLock
+      .request('screen')
+      .then((granted) => {
+        if (cancelled) granted.release?.();
+        else lock = granted;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      lock?.release?.().catch?.(() => {});
+    };
+  }, [regState]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(reconnectTimer.current);
+    },
+    []
+  );
 
   /* ---------------------------------------------------------------- calls -- */
 
@@ -669,7 +792,17 @@ export default function Softphone() {
                   label="Allow video"
                   disabled={!status.video}
                 />
+                <Switch
+                  checked={keep}
+                  onChange={setKeep}
+                  label="Keep this line registered"
+                />
               </div>
+              <p className="tiny dim" style={{ margin: 0 }}>
+                {keep
+                  ? 'This browser comes back on its own: after a reload, a dropped network or a switch restart, and it remembers this extension and these devices.'
+                  : 'The line ends when this page does. Turn this on to have it register again by itself.'}
+              </p>
               <div className="row wrap" style={{ gap: 8 }}>
                 <Select
                   label="Microphone"
@@ -700,6 +833,11 @@ export default function Softphone() {
               <Button variant="primary" icon="phone" loading={connecting} disabled={!extension || !status.enabled} onClick={connect}>
                 Connect softphone
               </Button>
+              {reconnecting ? (
+                <p className="tiny" style={{ color: 'var(--warning)' }}>
+                  The line dropped — reconnecting automatically.
+                </p>
+              ) : null}
               {connectError ? (
                 <p className="tiny" style={{ color: 'var(--danger)' }}>
                   {connectError}
@@ -787,6 +925,7 @@ export default function Softphone() {
                     </Badge>
                     {call.direction === 'inbound' ? <Badge tone="info">inbound</Badge> : null}
                     {secure ? <Badge tone="success">DTLS-SRTP</Badge> : null}
+                    {reconnecting ? <Badge tone="warning" dot="warn">reconnecting</Badge> : null}
                   </div>
                 )}
               </div>

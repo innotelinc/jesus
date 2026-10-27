@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, compactNumber } from '../api.js';
+import { useBrand } from '../brand.jsx';
 import { Badge, Button, Card, Empty, Icon, Input, Loading, Select, useToast } from '../ui.jsx';
 
 const KIND_OPTIONS = [
@@ -82,8 +83,12 @@ export default function PublicDirectory({ host, search }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, country]);
 
-  const accent = domain?.accent || '#635bff';
+  const brand = useBrand();
+  const accent = domain?.accent || brand.accent || '#635bff';
   const style = useMemo(() => ({ '--domain-accent': accent }), [accent]);
+  // A white-labelled deployment must not fall back to the vendor's name on a
+  // page its customers reach without signing in.
+  const directoryHost = domain?.host || brand.domain;
 
   return (
     <div className="public" style={style}>
@@ -93,9 +98,9 @@ export default function PublicDirectory({ host, search }) {
         </span>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 600, letterSpacing: '-0.01em' }} className="truncate">
-            {domain?.label || 'Telno Directory'}
+            {domain?.label || `${brand.name} Directory`}
           </div>
-          <div className="tiny dim mono truncate">{domain?.host || 'telno.directory'}</div>
+          {directoryHost ? <div className="tiny dim mono truncate">{directoryHost}</div> : null}
         </div>
         <div className="row right" style={{ gap: 6 }}>
           <a className="btn ghost sm" href="/login">
@@ -253,7 +258,7 @@ export default function PublicDirectory({ host, search }) {
 
       <footer className="public-foot">
         <div className="public-foot-inner">
-          <span>© {new Date().getFullYear()} Telno — one registry, many doors:</span>
+          <span>© {new Date().getFullYear()} {brand.name} — {brand.footerNote}</span>
           {domains.map((item) => (
             <a key={item.slug} href={`/d/${item.host}`} aria-current={item.host === domain?.host ? 'page' : undefined}>
               {item.host}

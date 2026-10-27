@@ -53,6 +53,11 @@ const PATHS = {
   videoOff: 'M3 3l18 18M3 7h8M14 11l7-4v10l-4-2.3M3 7v10h8',
   screen: 'M3 5h18v11H3zM8 21h8M12 16v5',
   terminal: 'M4 17l6-5-6-5M12 19h8',
+  upload: 'M12 21V9M7 13l5-5 5 5M4 3h16',
+  sparkle: 'M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z',
+  megaphone: 'M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1zM14 7a5 5 0 0 1 0 10',
+  tag: 'M3 3h8l10 10-8 8L3 11zM7.5 7.5h.01',
+  lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
 };
 
 export function Icon({ name, size = 16, className = '', ...rest }) {

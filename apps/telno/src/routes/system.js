@@ -8,6 +8,19 @@ import { directoryStats } from '../lib/registry.js';
 import { channelStatus, sendEmail } from '../lib/channels.js';
 import { listSecrets, putSecret, deleteSecret } from '../lib/vault.js';
 import { paymentStatus } from '../lib/payments.js';
+import { aiStatus, testAi } from '../lib/ai.js';
+import { brand, saveBrand, publicBrand } from '../lib/brand.js';
+import { magnateUrl, publicPricing } from '../lib/subscriptions.js';
+import {
+  backupStatus,
+  dbPath,
+  deleteBackup,
+  inspectBackup,
+  listBackups,
+  requestRestartAfterRestore,
+  runBackup,
+  stageRestore,
+} from '../lib/backup.js';
 import * as v from '../lib/validate.js';
 
 const domainView = (row) => ({
@@ -46,14 +59,87 @@ export default async function systemRoutes(app) {
       // Whether card payment is on, which mode, and the URL Stripe has to call.
       // Settings shows this next to the vault fields that switch it on.
       payments: paymentStatus(),
+      // The model behind grading and suggestions, and whether the catalogue is
+      // mirrored into the subscriber system of record.
+      ai: aiStatus(),
+      // What the console header, the public site and the signup page call this
+      // deployment. Edited in Settings → Branding.
+      brand: brand(),
+      commerce: {
+        magnateConfigured: !!magnateUrl(),
+        subscribeUrl: config.subscribeUrl || '/subscribe',
+        plans: publicPricing().plans.length,
+      },
       catalog: {
         defaultCountry: config.defaultCountry,
         domains: config.directory.domains,
         canonical: config.directory.canonical,
         simulate: config.telephony.simulate,
       },
-      storage: { dbFile: config.dbFile || `${config.dataDir}\\telno.db` },
+      storage: { dbFile: dbPath() },
     };
+  });
+
+  // ----------------------------------------------------------------- backups --
+  // Owner-only: an archive is the whole database, and a restore replaces it.
+
+  app.get('/system/backups', { preHandler: app.authenticate }, async () => ({
+    status: backupStatus(),
+    items: listBackups(),
+  }));
+
+  app.post('/system/backups', { preHandler: app.requireRole('owner') }, async (request) => {
+    const result = await runBackup({ label: `manual:${request.account.email}` });
+    if (!result.ok) {
+      logEvent({ actor: request.account.email, action: 'backup.manual_failed', subject: result.name, detail: result.error });
+      throw badRequest(`Backup failed: ${result.error}`);
+    }
+    logEvent({
+      actor: request.account.email,
+      action: 'backup.manual',
+      subject: result.name,
+      detail: `${Math.round(result.bytes / 1024)} kB, pruned ${result.pruned.length}`,
+    });
+    return { ...result, status: backupStatus(), items: listBackups() };
+  });
+
+  app.get('/system/backups/:name', { preHandler: app.requireRole('owner') }, async (request) => {
+    const name = v.str(request.params?.name, { name: 'name', max: 80, required: true });
+    const result = await inspectBackup(name);
+    if (!result.ok) throw notFound(`No usable backup named ${name} (${result.error})`);
+    return result;
+  });
+
+  /**
+   * A restore cannot swap the database out from under the process serving this
+   * request, so it is staged and applied at the next boot; the platform asks to
+   * be restarted, which the container's supervisor does immediately.
+   */
+  app.post('/system/backups/restore', { preHandler: app.requireRole('owner') }, async (request) => {
+    const name = v.str(request.body?.name, { name: 'name', max: 80, required: true });
+    const preview = await inspectBackup(name);
+    if (!preview.ok) throw badRequest(`Restore failed: no usable backup named ${name} (${preview.error})`);
+
+    if (request.body?.dryRun === true) {
+      logEvent({ actor: request.account.email, action: 'backup.restore_checked', subject: name });
+      return { ok: true, dryRun: true, name, manifest: preview.manifest, records: preview.records };
+    }
+
+    const staged = stageRestore(name, { by: request.account.email });
+    if (!staged.ok) throw badRequest(`Restore failed: ${staged.error}`);
+
+    // The response is flushed before the process goes down, so the operator sees
+    // the answer rather than a dropped connection.
+    requestRestartAfterRestore();
+    return { ...staged, records: preview.records, manifest: preview.manifest };
+  });
+
+  app.delete('/system/backups/:name', { preHandler: app.requireRole('owner') }, async (request) => {
+    const name = v.str(request.params?.name, { name: 'name', max: 80, required: true });
+    const result = deleteBackup(name);
+    if (!result.ok) throw notFound(`No backup named ${name}`);
+    logEvent({ actor: request.account.email, action: 'backup.deleted', subject: name });
+    return { deleted: true, name, items: listBackups() };
   });
 
   app.post('/system/apply', { preHandler: app.requireRole('owner', 'operator') }, async (request) => {
@@ -139,6 +225,39 @@ export default async function systemRoutes(app) {
   /* ------------------------------------------------------------------ vault -- */
   // Credentials live here, not in the image. The API returns names, hints and
   // dates only: once a value is stored there is no endpoint that echoes it.
+
+  app.get('/system/brand', { preHandler: app.requireRole('owner', 'operator') }, async () => ({
+    brand: brand(),
+    public: publicBrand(),
+  }));
+
+  /**
+   * White-label edit. The accent colour is validated as a hex value because it
+   * is written into a stylesheet, and the logo as an http(s) URL because it is
+   * fetched by every visitor's browser.
+   */
+  app.put('/system/brand', { preHandler: app.requireRole('owner') }, async (request) => {
+    const result = saveBrand(request.body || {});
+    if (!result.ok) throw badRequest(result.errors.join('; '));
+    logEvent({
+      actor: request.account.email,
+      action: 'brand.updated',
+      subject: result.brand.name,
+      detail: result.brand.vendor,
+      ip: request.ip,
+    });
+    return { brand: result.brand, public: publicBrand(), channels: channelStatus() };
+  });
+
+  /**
+   * The model is a real round trip, not a key-shaped string in a field. A
+   * gateway can hold a key that is wrong, expired or out of credit, and the
+   * grader would silently fall back to rules for weeks.
+   */
+  app.post('/system/ai/test', { preHandler: app.requireRole('owner', 'operator') }, async () => ({
+    status: aiStatus(),
+    test: await testAi(),
+  }));
 
   app.get('/system/vault', { preHandler: app.requireRole('owner') }, async () => ({
     items: listSecrets(),

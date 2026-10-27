@@ -113,8 +113,20 @@ export const emailSource = () => {
   return 'none';
 };
 
+/**
+ * Attachments as both providers want them: a filename, a content type and the
+ * bytes as base64. A campaign report is the reason this exists — a PDF that
+ * arrives as a link is a PDF somebody has to log in to read.
+ */
+const resendAttachments = (attachments) =>
+  (attachments || []).map((file) => ({
+    filename: file.filename,
+    content: Buffer.from(file.content).toString('base64'),
+    ...(file.contentType ? { content_type: file.contentType } : {}),
+  }));
+
 /** Resend: one POST, bearer key, JSON body. */
-async function sendViaResend({ to, subject, text, html }) {
+async function sendViaResend({ to, subject, text, html, attachments }) {
   const key = resendKey();
   if (!key) return { delivered: false, provider: 'resend', error: 'resend_not_configured' };
   let res;
@@ -124,7 +136,14 @@ async function sendViaResend({ to, subject, text, html }) {
       headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
       // `html` is optional: a message without markup is still sent as text, and
       // a client that refuses HTML reads the text part.
-      body: JSON.stringify({ from: emailFrom(), to: [to], subject, text, ...(html ? { html } : {}) }),
+      body: JSON.stringify({
+        from: emailFrom(),
+        to: [to],
+        subject,
+        text,
+        ...(html ? { html } : {}),
+        ...(attachments?.length ? { attachments: resendAttachments(attachments) } : {}),
+      }),
       signal: AbortSignal.timeout(15_000),
     });
   } catch (err) {
@@ -142,7 +161,7 @@ async function sendViaResend({ to, subject, text, html }) {
  * still carry a per-message failure — so the status inside the body is checked,
  * not just the HTTP code.
  */
-async function sendViaMailjet({ to, subject, text, html }) {
+async function sendViaMailjet({ to, subject, text, html, attachments }) {
   const key = mailjetKey();
   const secret = mailjetSecret();
   if (!key || !secret) {
@@ -168,6 +187,15 @@ async function sendViaMailjet({ to, subject, text, html }) {
             Subject: subject,
             TextPart: text,
             ...(html ? { HTMLPart: html } : {}),
+            ...(attachments?.length
+              ? {
+                  Attachments: attachments.map((file) => ({
+                    ContentType: file.contentType || 'application/octet-stream',
+                    Filename: file.filename,
+                    Base64Content: Buffer.from(file.content).toString('base64'),
+                  })),
+                }
+              : {}),
           },
         ],
       }),
@@ -197,10 +225,10 @@ async function sendViaMailjet({ to, subject, text, html }) {
  * codes, invoice resend, reports and the Settings test button, so every
  * outbound mail behaves the same way.
  */
-export async function sendEmail({ to, subject, text, html }) {
+export async function sendEmail({ to, subject, text, html, attachments }) {
   const provider = emailProviderName();
-  if (provider === 'resend') return sendViaResend({ to, subject, text, html });
-  if (provider === 'mailjet') return sendViaMailjet({ to, subject, text, html });
+  if (provider === 'resend') return sendViaResend({ to, subject, text, html, attachments });
+  if (provider === 'mailjet') return sendViaMailjet({ to, subject, text, html, attachments });
   return { delivered: false, provider: 'console', error: 'email_not_configured' };
 }
 
@@ -266,13 +294,13 @@ export async function deliverVerification(payload) {
  * channel. Same provider, different message: verification codes have their own
  * template, so the two paths cannot accidentally cross.
  */
-export async function deliverNotice({ to, subject, text, html }) {
+export async function deliverNotice({ to, subject, text, html, attachments }) {
   const channel = emailProviderName();
   try {
     if (channel === 'resend' || channel === 'mailjet') {
       const result = channel === 'resend'
-        ? await sendViaResend({ to, subject, text, html })
-        : await sendViaMailjet({ to, subject, text, html });
+        ? await sendViaResend({ to, subject, text, html, attachments })
+        : await sendViaMailjet({ to, subject, text, html, attachments });
       return { ...result, channel };
     }
     if (config.notify.channel === 'twilio') {
