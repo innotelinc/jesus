@@ -20,6 +20,7 @@ import Estate from './pages/Estate.jsx';
 import Health from './pages/Health.jsx';
 import Operations from './pages/Operations.jsx';
 import Settings from './pages/Settings.jsx';
+import Account from './pages/Account.jsx';
 import Systems from './pages/Systems.jsx';
 import Softphone from './pages/Softphone.jsx';
 import Marketing from './pages/Marketing.jsx';
@@ -28,9 +29,11 @@ import Subscribe from './pages/Subscribe.jsx';
 import Site from './pages/Site.jsx';
 import PublicDirectory from './pages/PublicDirectory.jsx';
 import Customer from './pages/Customer.jsx';
+import Setup, { useSetupStatus } from './pages/Setup.jsx';
 
 const PAGES = [
   { path: '/', title: 'Dashboard', subtitle: 'Platform and registry at a glance', Component: Dashboard },
+  { path: '/setup', title: 'Get started', subtitle: 'The line, number and registration a fresh install needs', Component: Setup },
   { path: '/calls', title: 'Call history', subtitle: 'Live and completed calls', Component: Calls },
   { path: '/softphone', title: 'Softphone', subtitle: 'Encrypted audio and video in the browser', Component: Softphone },
   { path: '/extensions', title: 'Extensions', subtitle: 'Devices and voicemail boxes', Component: Extensions },
@@ -51,11 +54,15 @@ const PAGES = [
   { path: '/operations', title: 'Operations', subtitle: 'Incidents, changes and provisioning', Component: Operations },
   { path: '/systems', title: 'Connected systems', subtitle: 'The consoles this platform sits beside', Component: Systems },
   { path: '/settings', title: 'Settings', subtitle: 'Domains, API keys and telephony', Component: Settings },
+  { path: '/account', title: 'Account', subtitle: 'Your password and the credential this install started with', Component: Account },
 ];
 
 function Router() {
   const { pathname, search } = useLocation();
   const { status, user, reason } = useAuth();
+  // Whether this install still has no line at all: the one thing that makes the
+  // console empty rather than busy, and the reason a first run starts on setup.
+  const setup = useSetupStatus(status === 'ready' && (user?.kind || 'staff') !== 'customer');
 
   // Public directory: /d/<host> and /lookup?number=...
   if (pathname.startsWith('/d/') || pathname === '/lookup') {
@@ -114,6 +121,14 @@ function Router() {
   // own line, plan and invoices, and no way through to the switch.
   if (user?.kind === 'customer') {
     return <Customer />;
+  }
+
+  // A switch with no line cannot place a call, so the dashboard is the wrong
+  // place to land first. Only the dashboard redirects: Settings and Numbers are
+  // needed to finish setting up, so they stay reachable.
+  if (setup?.needed && pathname === '/') {
+    navigate('/setup', { replace: true });
+    return null;
   }
 
   const route = PAGES.find((page) => page.path === pathname);

@@ -98,8 +98,9 @@ export default function Login() {
           </Button>
 
           <p className="tiny dim" style={{ marginTop: 6 }}>
-            First boot creates an owner account — the password is printed once in the container log, or set
-            with <span className="mono">ADMIN_PASSWORD</span>.
+            First boot creates an owner account — its password is written to the data volume, or set with
+            <span className="mono"> ADMIN_PASSWORD</span>. Change it under <span className="mono">Account</span>
+            once you are in.
           </p>
         </form>
       </div>

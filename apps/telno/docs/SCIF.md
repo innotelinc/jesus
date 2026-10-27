@@ -23,6 +23,7 @@ one SIP registration while you use the console or any other tab.
 | Caller ID withheld, or presented as a chosen number | `callerid=` on **both** the desk endpoint and the WebRTC endpoint | Applies to every device on the line, including a handset, and survives a browser restart. |
 | Masked voice | AudioWorklet on the outgoing microphone before the peer connection | Pitch shift (lower/higher) or a ring-modulated "robot" voice. The far end and the switch only ever receive the masked audio. |
 | Masked text and voicemail identity | `maskText` on the line; redaction in `/api/messages` and `/api/voicemails` | Phone numbers become `+1 ••• ••• ••77`, emails `s•••@example.com`. The raw rows stay in the database; the API is what redacts. |
+| Unlock with a face | `LocalAuthentication` in the app — `ScifBiometrics` | With the lock on, the page mints no session until Face ID (or Touch ID, or Apple's passcode when no face is enrolled) recognizes the person holding the phone. The gate is in `connect()`, before the platform hands out SIP credentials. |
 
 ## Voice on the line
 
@@ -90,6 +91,14 @@ session uses.
   gate a phone line; it is not a trained speaker-recognition network and should
   not be the only thing protecting something that matters. The threshold is
   measured, not magic: see `VOICEPRINT_THRESHOLD`.
+- **Nothing here authenticates against a biometric server.** Voice is compared
+  on the platform (see the voiceprint note above); a face is compared by iOS in
+  the Secure Enclave and the platform is only told "unlocked". That is the right
+  place for it — the platform never sees, stores or transmits a face — but it
+  also means the lock protects *this install of the app*, not the account: a
+  second phone with the same line, or the same page on a desktop, is not locked
+  by another device's face. Turn the lock on in the app it applies to, and turn
+  the voiceprint on if the line itself has to prove who is speaking.
 - **Masking is not anonymisation.** It redacts identifiers, it does not defeat a
   determined analysis of writing style or call timing.
 
@@ -134,3 +143,6 @@ Android has no equivalent here yet; the PWA keeps working.
 - A live call: **Media** reads `DTLS-SRTP`. If it does not, SCIF ends the call.
 - `POST /api/softphone/scif` with `voiceMask: "low"` and talk — the far end hears
   a different voice, and the browser's own local playback (muted) is unaffected.
+- In the app, **SCIF → Require Face ID to unlock this line**, then close and
+  reopen it: the page comes up locked, the dial controls are not drawn, and no
+  registration appears on the switch until the face prompt passes.

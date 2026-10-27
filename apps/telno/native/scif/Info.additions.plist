@@ -27,6 +27,16 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>SCIF turns what you say into a number to dial and checks the phrase you enrolled.</string>
 
+	<!-- LocalAuthentication fails the Face ID prompt without this string, rather
+	     than asking for permission. It is the unlock, not a call feature. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>SCIF uses Face ID to unlock your line and keep it registered.</string>
+
+	<!-- Required for Face ID: without it the unlock prompt fails instead of
+	     being shown, and the SCIF lock cannot be switched on. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>SCIF uses Face ID to unlock your line before it registers.</string>
+
 	<!-- The app talks to one HTTPS origin and to the switch over WSS. Nothing here
 	     permits plain HTTP: a SIP credential over cleartext is the thing SCIF is
 	     supposed to prevent. -->

@@ -12,6 +12,7 @@ import { startMonthlyInvoicing } from './lib/invoicing.js';
 import { applyStagedRestore, startBackupSchedule, setRestoreHandler } from './lib/backup.js';
 import { seedCommerce } from './lib/subscriptions.js';
 import { seedBrand } from './lib/brand.js';
+import { writeFirstRunPassword } from './lib/firstRun.js';
 import { randomBytes } from 'node:crypto';
 
 assertConfig();
@@ -44,12 +45,17 @@ function ensureOwner() {
   logEvent({ actor: 'system', action: 'account.bootstrap', subject: config.adminEmail });
 
   if (!config.adminPassword) {
-    // Printed once, only when no password was supplied.
+    // Written to the data volume rather than printed: a log is copied into
+    // scrollbacks, log drivers and tickets, and the one person who needs this
+    // password is the one who can read the volume. Setting your own password
+    // deletes the file (see auth.js), because the generated one dies then.
+    const file = writeFirstRunPassword(config.adminEmail, password);
     console.log('\n' + '='.repeat(64));
     console.log('  First run — owner account created');
     console.log(`  Email:    ${config.adminEmail}`);
-    console.log(`  Password: ${password}`);
-    console.log('  Set ADMIN_PASSWORD in .env to choose your own.');
+    console.log(`  Password: written to ${file}`);
+    console.log('  Change it under Account in the console — that deletes this file.');
+    console.log('  Set ADMIN_PASSWORD in .env to choose one up front instead.');
     console.log('='.repeat(64) + '\n');
   } else {
     console.log(`[bootstrap] owner account ready: ${config.adminEmail}`);

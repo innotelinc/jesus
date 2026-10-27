@@ -7,6 +7,15 @@ import { MASK_MODES, createVoiceMask } from '../voiceMask.js';
 import VoicePanel from '../VoicePanel.jsx';
 import { digitsFromSpeech, recognitionSupported, startDictation } from '../speech.js';
 import { watchCalls } from '../native.js';
+import {
+  biometry,
+  biometricsInApp,
+  lockOnOpen,
+  methodLabel,
+  readLockPolicy,
+  saveLockPolicy,
+  unlockLine,
+} from '../biometrics.js';
 
 /**
  * Browser softphone.
@@ -144,6 +153,14 @@ export default function Softphone() {
     maskText: false,
   }));
   const [scifSaving, setScifSaving] = useState(false);
+  // Face ID. The lock is read synchronously because the line registers on
+  // mount: a lock that arrived a render later would have already let the
+  // registration through. Both the state and the ref, because connect() reads
+  // it outside the render.
+  const [locked, setLocked] = useState(() => lockOnOpen());
+  const lockedRef = useRef(locked);
+  const [lockPolicy, setLockPolicy] = useState(() => readLockPolicy());
+  const [biometryInfo, setBiometryInfo] = useState(() => ({ supported: false, biometryType: 'none', label: '', reason: '' }));
   // A passed voice check is a single-use ticket; it lives in a ref because
   // connect() needs it immediately, not on the next render.
   const voiceTicketRef = useRef('');
@@ -409,6 +426,13 @@ export default function Softphone() {
 
   const connect = async ({ auto = false } = {}) => {
     if (!extension) return;
+    // A locked line asks the platform for nothing, so there is no SIP secret to
+    // leak and no endpoint to ring. The gate is here and not in the markup
+    // because a hidden button is not a security boundary.
+    if (lockedRef.current) {
+      setConnectError('Locked — unlock with Face ID to bring this line up.');
+      return;
+    }
     setConnecting(!auto);
     setConnectError('');
     try {
@@ -638,14 +662,15 @@ export default function Softphone() {
     saveLine({ extension, video: settings.video, micId: settings.micId, camId: settings.camId, keep });
   }, [extension, settings, keep]);
 
-  // First load of a kept line: register without being asked.
+  // First load of a kept line: register without being asked — unless the line is
+  // locked, in which case opening it is what the face is for.
   useEffect(() => {
-    if (!status || !keep || session || connecting || regState !== 'off') return;
+    if (!status || !keep || session || connecting || regState !== 'off' || locked) return;
     if (!extension || !extensions.length) return;
     connectRef.current?.({ auto: true });
     // Only when the inputs that decide it change; connecting is the point.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, keep, extensions.length, extension]);
+  }, [status, keep, extensions.length, extension, locked]);
 
   // A laptop that slept, a VPN that reconnected, a Wi-Fi that came back: all of
   // these are the browser telling us it is worth trying again.
@@ -856,6 +881,58 @@ export default function Softphone() {
   };
 
   /* ---------------------------------------------------------------- SCIF -- */
+
+  // What this device can do, asked once. A phone with no face enrolled gets a
+  // sentence saying so instead of a switch that fails when pressed.
+  useEffect(() => {
+    let cancelled = false;
+    biometry()
+      .then((info) => {
+        if (!cancelled) setBiometryInfo(info);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const biometryLabel = () => biometryInfo.label || 'Face ID';
+
+  /** Recognize the person holding the phone, then bring the line up. */
+  const unlockNow = async () => {
+    const result = await unlockLine({ reason: 'Unlock this SCIF line' });
+    if (!result.ok) {
+      toast.error('Not unlocked', result.reason);
+      return;
+    }
+    lockedRef.current = false;
+    setLocked(false);
+    toast.success(`Unlocked with ${methodLabel(result.method)}`, 'Bringing the line up…');
+    connectRef.current?.({ auto: true });
+  };
+
+  /** Take the line down and require a face before it comes back. */
+  const lockNow = async () => {
+    lockedRef.current = true;
+    setLocked(true);
+    await disconnect();
+    toast.info('Line locked', `${biometryLabel()} is required before it registers again.`);
+  };
+
+  /**
+   * Turn the lock on or off for this install. Switching it on does not lock the
+   * current call out — it applies to the next time the app opens, which is when
+   * a lock is worth anything.
+   */
+  const setLockRequired = (value) => {
+    setLockPolicy(saveLockPolicy({ required: value }));
+    lockedRef.current = false;
+    setLocked(false);
+    toast.success(
+      value ? `${biometryLabel()} required on open` : 'Biometric lock off',
+      value ? 'The line stays down until a face is recognized.' : 'The line registers as soon as the app opens.'
+    );
+  };
 
   const saveScif = async (patch) => {
     if (!extension) return;
@@ -1114,6 +1191,28 @@ export default function Softphone() {
                 </div>
               ) : null}
 
+              {/*
+                Locked: the dial controls are not rendered at all, rather than
+                drawn and disabled. The line is not registered in this state, so
+                there is nothing to dial and nothing that can ring.
+              */}
+              {locked ? (
+                <div className="panel" style={{ padding: 14, borderColor: 'var(--accent)' }}>
+                  <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                    <div>
+                      <strong>Line locked</strong>
+                      <p className="tiny dim" style={{ margin: '4px 0 0' }}>
+                        This line stays down until {biometryLabel()} recognizes you. No session is minted in the
+                        meantime, so nothing rings and nothing can be dialed.
+                      </p>
+                    </div>
+                    <Button variant="primary" icon="shield" onClick={unlockNow}>
+                      Unlock
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                 <input
                   className="input mono"
@@ -1165,6 +1264,8 @@ export default function Softphone() {
                   Hang up
                 </Button>
               </div>
+                </>
+              )}
 
               <div className="softphone-stage">
                 <video ref={remoteVideoRef} className="remote" autoPlay playsInline />
@@ -1283,6 +1384,27 @@ export default function Softphone() {
                 onChange={(value) => saveScif({ maskText: value })}
                 disabled={!scif.enabled || scifSaving}
               />
+              <Switch
+                checked={!!lockPolicy.required}
+                label={`Require ${biometryLabel()} to unlock this line`}
+                onChange={setLockRequired}
+                disabled={!biometryInfo.supported}
+              />
+              {!biometryInfo.supported ? (
+                <p className="tiny dim" style={{ margin: 0 }}>
+                  {biometryInfo.reason ||
+                    'Biometric unlock runs in the SCIF app on a phone with a face or fingerprint enrolled.'}
+                </p>
+              ) : biometricsInApp() ? (
+                <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                  <Button variant="ghost" size="sm" icon="shield" onClick={locked ? unlockNow : lockNow}>
+                    {locked ? 'Unlock now' : 'Lock now'}
+                  </Button>
+                  <span className="tiny dim">
+                    {locked ? 'This line is locked.' : `Locking takes the line down until ${biometryLabel()} passes.`}
+                  </span>
+                </div>
+              ) : null}
               <p className="tiny dim" style={{ margin: 0 }}>
                 {scif.enabled
                   ? 'Media must be DTLS-SRTP or the call is ended. This line is never recorded, caller ID follows the setting above, and the voice mask runs on the microphone in this browser before anything is sent.'

@@ -10,6 +10,9 @@ const GROUPS = [
   {
     label: 'Telephony',
     items: [
+      // Shown only while the switch has no line: after that, Extensions is where
+      // a line is created and this would be a permanently empty step.
+      { path: '/setup', label: 'Get started', icon: 'sparkle', firstRun: true },
       { path: '/', label: 'Dashboard', icon: 'dashboard' },
       { path: '/softphone', label: 'Softphone', icon: 'phone' },
       { path: '/calls', label: 'Call history', icon: 'calls' },
@@ -51,6 +54,10 @@ const GROUPS = [
       { path: '/operations', label: 'Operations', icon: 'terminal' },
       { path: '/systems', label: 'Connected systems', icon: 'globe' },
       { path: '/settings', label: 'Settings', icon: 'settings' },
+      // Where the password a fresh install generated can be retired. Kept out of
+      // the groups above because it is about the person signed in, not the
+      // platform they are signed in to.
+      { path: '/account', label: 'Account', icon: 'lock' },
     ],
   },
 ];
@@ -93,6 +100,9 @@ export default function Shell({ path, title, subtitle, children }) {
   }, [path]);
 
   const telephony = health?.telephony;
+  // No line means nothing on the platform can ring; say so on every page rather
+  // than leaving an operator to work out why the dashboard is empty.
+  const needsSetup = health?.counts?.extensions === 0 && path !== '/setup';
   const connected = telephony?.connected && !telephony?.simulated;
   const statusLabel = connected ? 'Switch connected' : telephony?.simulated ? 'Simulated switch' : 'Switch offline';
   const statusTone = connected ? 'live' : telephony?.simulated ? 'warn' : 'down';
@@ -157,7 +167,9 @@ export default function Shell({ path, title, subtitle, children }) {
         {GROUPS.map((group) => (
           <div className="nav-group" key={group.label}>
             <span className="nav-label">{group.label}</span>
-            {group.items.map((item) => (
+            {group.items
+              .filter((item) => !item.firstRun || needsSetup)
+              .map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -191,7 +203,18 @@ export default function Shell({ path, title, subtitle, children }) {
       </nav>
 
       <main className="main" id="main" tabIndex={-1}>
-        <div className="container">{children}</div>
+        <div className="container">
+          {needsSetup ? (
+            <Link to="/setup" className="setup-banner">
+              <Icon name="sparkle" size={15} />
+              <span>
+                <strong>This switch has no line yet.</strong> Create one to place or receive your first call.
+              </span>
+              <span className="btn primary sm">Get started</span>
+            </Link>
+          ) : null}
+          {children}
+        </div>
       </main>
 
       <nav className="bottom-nav" aria-label="Primary">
