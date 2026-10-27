@@ -892,14 +892,14 @@ export default function Softphone() {
   // What this device can do, asked once. A phone with no face enrolled gets a
   // sentence saying so instead of a switch that fails when pressed.
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     biometry()
       .then((info) => {
-        if (!cancelled) setBiometryInfo(info);
+        if (!canceled) setBiometryInfo(info);
       })
       .catch(() => {});
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
 
@@ -982,11 +982,11 @@ export default function Softphone() {
       return undefined;
     }
 
-    let cancelled = false;
+    let canceled = false;
     const original = sender.track;
     createVoiceMask(original, wanted)
       .then(async (mask) => {
-        if (cancelled) {
+        if (canceled) {
           await mask.stop();
           return;
         }
@@ -995,7 +995,7 @@ export default function Softphone() {
       })
       .catch((err) => toast.error('Voice masking is unavailable', err.message));
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [scif.enabled, scif.voiceMask, call?.state, toast]);
 

@@ -416,7 +416,7 @@ button, input, select, textarea {
  * Four even squares. A flex row of tiles sized itself to its own text, so four
  * numbers of different lengths produced four different widths; a fixed track
  * count and a square aspect ratio make the group a set, and the whole row is
- * centred in the card instead of stretching across it.
+ * centered in the card instead of stretching across it.
  */
 .grid.squares {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1369,8 +1369,8 @@ table.table {
 .price-card h4 { font-size: 1.05rem; font-weight: 620; letter-spacing: -0.01em; }
 
 /* Two ladders on one page: a heading and a line of copy above each grid.
-   Both the group and its heading share the grid's width and centre line: with a
-   heading pinned to the far left of a 1920px window above a centred ladder, the
+   Both the group and its heading share the grid's width and center line: with a
+   heading pinned to the far left of a 1920px window above a centered ladder, the
    page reads as two different layouts stacked on top of each other. */
 .plan-group {
   display: flex;

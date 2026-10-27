@@ -232,26 +232,26 @@ function estimatePitch(samples, start) {
     difference[lag] = sum;
   }
 
-  // Cumulative mean normalisation: this is the part that removes the bias
+  // Cumulative mean normalization: this is the part that removes the bias
   // towards long lags that makes raw autocorrelation fail at high pitch.
-  const normalised = new Float32Array(MAX_LAG + 1);
+  const normalized = new Float32Array(MAX_LAG + 1);
   let running = 0;
-  normalised[0] = 1;
+  normalized[0] = 1;
   for (let lag = 1; lag <= MAX_LAG; lag += 1) {
     running += difference[lag];
-    normalised[lag] = running === 0 ? 1 : (difference[lag] * lag) / running;
+    normalized[lag] = running === 0 ? 1 : (difference[lag] * lag) / running;
   }
 
   let bestLag = 0;
   for (let lag = MIN_LAG; lag <= MAX_LAG; lag += 1) {
-    if (normalised[lag] < 0.15) {
+    if (normalized[lag] < 0.15) {
       // Walk to the bottom of this dip and take a parabolic refinement, so the
       // estimate is not quantised to whole samples.
       let dip = lag;
-      while (dip + 1 <= MAX_LAG && normalised[dip + 1] < normalised[dip]) dip += 1;
-      const before = normalised[dip - 1] ?? normalised[dip];
-      const after = normalised[dip + 1] ?? normalised[dip];
-      const denominator = 2 * (2 * normalised[dip] - before - after);
+      while (dip + 1 <= MAX_LAG && normalized[dip + 1] < normalized[dip]) dip += 1;
+      const before = normalized[dip - 1] ?? normalized[dip];
+      const after = normalized[dip + 1] ?? normalized[dip];
+      const denominator = 2 * (2 * normalized[dip] - before - after);
       const shift = denominator === 0 ? 0 : (after - before) / denominator;
       bestLag = dip + shift;
       break;
@@ -260,8 +260,8 @@ function estimatePitch(samples, start) {
   if (!bestLag) {
     let lowest = 0.3;
     for (let lag = MIN_LAG; lag <= MAX_LAG; lag += 1) {
-      if (normalised[lag] < lowest) {
-        lowest = normalised[lag];
+      if (normalized[lag] < lowest) {
+        lowest = normalized[lag];
         bestLag = lag;
       }
     }
@@ -357,7 +357,7 @@ export function embeddingFromSamples(samples) {
   const mean = new Array(dims).fill(0);
   for (const frame of frames) for (let d = 0; d < dims; d += 1) mean[d] += frame[d] / frames.length;
 
-  // Cepstral mean normalisation: a different microphone changes the average of
+  // Cepstral mean normalization: a different microphone changes the average of
   // every coefficient, and that is exactly the thing to remove.
   const variance = new Array(dims).fill(0);
   const delta = new Array(dims).fill(0);
@@ -477,7 +477,7 @@ const words = (text) =>
 /**
  * How much of the enrolled phrase the browser heard. Speech recognition is the
  * page's, not ours, so this is a sanity check on the attempt — the voiceprint is
- * what actually authorises. A missing transcript is not a failure.
+ * what actually authorizes. A missing transcript is not a failure.
  */
 export function phraseMatch(heard, expected) {
   const want = words(expected);
