@@ -10,7 +10,12 @@ import {
   verifyWebhook,
 } from '../lib/payments.js';
 import { billingAccount, reinstateAccount } from '../lib/escalation.js';
-import { activateFromSession, applySubscriptionEvent, markSubscriptionPastDue } from '../lib/subscriptions.js';
+import {
+  activateFromSession,
+  applySubscriptionEvent,
+  invoiceSubscriptionId,
+  markSubscriptionPastDue,
+} from '../lib/subscriptions.js';
 
 /**
  * The public side of billing: the link in an email, and Stripe calling back.
@@ -156,11 +161,14 @@ export default async function payRoutes(app) {
         return { received: true, ...result };
       }
       if (type === 'invoice.payment_failed') {
-        const result = markSubscriptionPastDue(String(session.subscription || ''));
+        // Read from either shape: the endpoint's API version decides whether the
+        // subscription is on the invoice itself or under its parent.
+        const failedSubscription = invoiceSubscriptionId(session);
+        const result = markSubscriptionPastDue(failedSubscription);
         logEvent({
           actor: 'stripe',
           action: 'portal.webhook_payment_failed',
-          subject: String(session.subscription || session.id || ''),
+          subject: failedSubscription || String(session.id || ''),
           detail: result.ok ? 'subscription marked past due' : result.error,
           ip: request.ip,
         });

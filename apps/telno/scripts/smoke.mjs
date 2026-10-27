@@ -2709,6 +2709,45 @@ check(
   { webhook: failedRenewal.body, access: afterFailed.status }
 );
 
+// A webhook endpoint can run a newer API version than the one the platform
+// itself calls Stripe with. Version 2025-03-31 moved two fields this code
+// reads, so both shapes have to work: otherwise a paid account silently never
+// expires, and a lapsed renewal is never noticed.
+console.log('\nStripe API versions');
+
+const itemPeriodEnd = Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
+const itemShaped = await postStripeEvent(
+  subscriptionEvent('customer.subscription.updated', {
+    id: 'sub_test_smoke_1',
+    status: 'active',
+    // No top-level current_period_end: only the item carries it now.
+    items: { data: [{ id: 'si_smoke_1', current_period_end: itemPeriodEnd }] },
+  })
+);
+const itemStatus = await fetch(`${base}/api/portal/status`, { headers: { cookie: subscriberCookie } });
+const itemBody = await itemStatus.json();
+check(
+  'a 2025+ subscription event stores the period from the subscription item',
+  itemShaped.body.ok === true &&
+    itemBody.entitlement?.active === true &&
+    itemBody.subscription?.currentPeriodEnd === new Date(itemPeriodEnd * 1000).toISOString(),
+  { webhook: itemShaped.body, subscription: itemBody.subscription }
+);
+
+const parentShaped = await postStripeEvent(
+  subscriptionEvent('invoice.payment_failed', {
+    id: 'in_smoke_2',
+    // The invoice itself no longer names the subscription; its parent does.
+    parent: { subscription_details: { subscription: 'sub_test_smoke_1' } },
+  })
+);
+const afterParentFailed = await fetch(`${base}/api/calls`, { headers: { cookie: subscriberCookie } });
+check(
+  'a 2025+ invoice failure finds the subscription under the invoice parent',
+  parentShaped.body.ok === true && afterParentFailed.status === 402,
+  { webhook: parentShaped.body, access: afterParentFailed.status }
+);
+
 const ownerCookie = cookie;
 const comped = await call('POST', '/api/subscriptions', { email: subscriberEmail, planId: 'business', status: 'active' });
 check(
