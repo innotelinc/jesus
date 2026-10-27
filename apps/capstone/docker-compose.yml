@@ -1416,6 +1416,10 @@ services:
       # Settings card writes this file; scripts/opensms_client.py reads the same
       # host path through the ./data/capstone mount below. `.env` seeds it.
       CAPSTONE_SMS_TRANSPORT_STATE: "/state/sms-transport"
+      # Inbound SMS from the phone node. Empty = the /sms-inbound route is
+      # closed (503), so an unset secret can never mean "open".
+      CAPSTONE_SMS_INBOUND_TOKEN: "${CAPSTONE_SMS_INBOUND_TOKEN:-}"
+      CAPSTONE_SMS_INBOUND_STATE: "/state/sms-inbound.jsonl"
       # PBX self-healing (standalone mode only). The bundled freepbx sits behind
       # profiles: ["standalone"], so a profile-less `docker compose up -d` stops
       # it; the API starts it on the next PBX action and a background watchdog

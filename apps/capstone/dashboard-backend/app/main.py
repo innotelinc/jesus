@@ -42,6 +42,8 @@ from . import agents
 from . import grading
 from . import hosts
 from . import interviews
+from . import sms_inbound
+from . import sms_outbound
 from . import sms_transport
 from . import stack_access
 from . import workflows
@@ -3204,6 +3206,57 @@ def sms_gateway_health(user: dict = Depends(require_session)):
         "url": url,
         "health": sms_transport.gateway_health(url),
     }
+
+
+# --------------------------------------------------------------------------
+# Inbound SMS — the reply half of the opensms path
+# --------------------------------------------------------------------------
+# The phone's poller (phone-node/opensms_termux_bridge.py) POSTs each new inbox
+# message here. It is a machine caller, not a user, so it authenticates with a
+# shared secret instead of a session: unset secret means the route is closed.
+
+@app.post("/sms-inbound")
+def sms_inbound_post(body: dict, request: Request):
+    """Receive one inbound SMS from the phone node."""
+    if not sms_inbound.enabled():
+        raise HTTPException(status_code=503,
+                            detail="inbound SMS is not enabled — set CAPSTONE_SMS_INBOUND_TOKEN")
+    presented = request.headers.get("X-Capstone-SMS-Token") or ""
+    if not presented:
+        scheme, _, value = (request.headers.get("Authorization") or "").partition(" ")
+        if scheme.lower() == "bearer":
+            presented = value
+    if not sms_inbound.authorised(presented):
+        raise HTTPException(status_code=401, detail="invalid inbound SMS token")
+    try:
+        return sms_inbound.store(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/sms-inbound")
+def sms_inbound_list(limit: int = 50, user: dict = Depends(require_session)):
+    """Recent replies and sent answers, newest last, for the inbox and agents."""
+    return sms_inbound.snapshot(limit)
+
+
+@app.post("/sms-outbound")
+def sms_outbound_send(body: dict, user: dict = Depends(require_session)):
+    """Answer a reply through the phone that received it.
+
+    A session, not the phone's shared secret: this is a person typing in the
+    Control Center. The message always goes out via OPENSMS_* — the same SIM
+    the reply arrived on — regardless of SMS_PROVIDER, because answering from a
+    Zeus DID would show the recipient a different number.
+    """
+    try:
+        return sms_outbound.send(body.get("to"), body.get("body"))
+    except sms_outbound.SmsNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except sms_outbound.SmsSendError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # ── FreePBX side of an agent (mirrors sync_dograh_routes; both modes) ────────

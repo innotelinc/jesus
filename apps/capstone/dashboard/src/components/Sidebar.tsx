@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useDashboardData } from '../context/DashboardDataContext';
+import { useSmsUnreadCount } from '../hooks/useSmsUnreadCount';
 import { VOICE_PLANE_LINK_ID, voicePortalVoiceScreenUrl } from '../lib/config';
 
 interface SidebarProps {
@@ -47,6 +48,7 @@ const groups: { label: string; items: NavItem[] }[] = [
     label: 'Tools',
     items: [
       { label: 'Softphone', path: '/softphone', icon: icon('<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />') },
+      { label: 'SMS Inbox', path: '/messages', icon: icon('<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />') },
       { label: 'Extensions', path: '/extensions', icon: icon('<path d="M3 9h4l2 5 3-9 2 6h2" /><rect x="2" y="5" width="20" height="14" rx="2" />') },
       { label: 'Agents', path: '/agents', icon: icon('<path d="M12 2a4 4 0 0 1 4 4v1h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v1h4V6a2 2 0 0 0-2-2zm-3 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0z" />') },
       { label: 'Workflows', path: '/workflows', icon: icon('<rect x="3" y="3" width="6" height="6" rx="1" /><rect x="15" y="15" width="6" height="6" rx="1" /><path d="M9 6h6a3 3 0 0 1 3 3v6" />') },
@@ -72,6 +74,8 @@ export default function Sidebar({
 }: SidebarProps) {
   const location = useLocation();
   const { links } = useDashboardData();
+  // Replies this browser has not opened yet — the inbox badge, and nothing else.
+  const unreadSmsCount = useSmsUnreadCount();
   // External entries resolve from the same payload the Links page renders, so
   // one value decides where both point. The constant is only the fallback for
   // the first paint, or while the aggregator is unreachable.
@@ -132,8 +136,10 @@ export default function Sidebar({
                 const isActive =
                   !item.external &&
                   (item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path));
+                const unread = item.path === '/messages' ? unreadSmsCount : 0;
+                const label = unread > 0 ? `${item.label} (${unread} unread)` : item.label;
                 const className = cn(
-                  'flex items-center gap-3 rounded-lg text-[13px] font-medium transition-colors',
+                  'relative flex items-center gap-3 rounded-lg text-[13px] font-medium transition-colors',
                   collapsed ? 'justify-center px-0 py-2' : 'px-2.5 py-2',
                   isActive
                     ? 'bg-primary/10 text-primary'
@@ -151,6 +157,20 @@ export default function Sidebar({
                       )}
                     </span>
                     {!collapsed && <span className="truncate">{item.label}</span>}
+                    {unread > 0 &&
+                      (collapsed ? (
+                        // No room for a number in the rail: a dot still says
+                        // "there is something here", and the accessible name
+                        // carries the count.
+                        <span
+                          aria-hidden="true"
+                          className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary"
+                        />
+                      ) : (
+                        <span className="ml-auto shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground">
+                          {unread > 99 ? '99+' : unread}
+                        </span>
+                      ))}
                   </>
                 );
                 if (externalHref) {
@@ -162,8 +182,8 @@ export default function Sidebar({
                       // product it points at, and the SSO session is shared.
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={collapsed ? item.label : undefined}
-                      aria-label={item.label}
+                      title={collapsed ? label : undefined}
+                      aria-label={label}
                       className={className}
                     >
                       {contents}
@@ -175,8 +195,8 @@ export default function Sidebar({
                     key={item.path}
                     to={item.path}
                     end={item.path === '/'}
-                    title={collapsed ? item.label : undefined}
-                    aria-label={item.label}
+                    title={collapsed ? label : undefined}
+                    aria-label={label}
                     className={className}
                   >
                     {contents}

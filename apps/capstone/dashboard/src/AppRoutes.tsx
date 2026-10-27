@@ -11,6 +11,7 @@ const Monitoring = lazy(() => import('./pages/Monitoring'));
 const Secrets = lazy(() => import('./pages/Secrets'));
 const PasswordGenerator = lazy(() => import('./pages/PasswordGenerator'));
 const Softphone = lazy(() => import('./pages/Softphone'));
+const SmsInbox = lazy(() => import('./pages/SmsInbox'));
 const Extensions = lazy(() => import('./pages/Extensions'));
 const Agents = lazy(() => import('./pages/Agents'));
 const Workflows = lazy(() => import('./pages/Workflows'));
@@ -45,6 +46,7 @@ export default function AppRoutes() {
         <Route path="/secrets" element={<Secrets />} />
         <Route path="/password" element={<PasswordGenerator />} />
         <Route path="/softphone" element={<Softphone />} />
+        <Route path="/messages" element={<SmsInbox />} />
         <Route path="/extensions" element={<Extensions />} />
         <Route path="/agents" element={<Agents />} />
         <Route path="/workflows" element={<Workflows />} />

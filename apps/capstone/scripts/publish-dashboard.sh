@@ -99,13 +99,16 @@ if [ -z "$ghcr_user" ] || [ -z "$ghcr_token" ]; then
   if [ -n "$vault_out" ]; then
     ghcr_user="${ghcr_user:-$(printf '%s\n' "$vault_out" | sed -n 1p)}"
     ghcr_token="${ghcr_token:-$(printf '%s\n' "$vault_out" | sed -n 2p)}"
-    [ -n "$ghcr_user" ] && [ -n "$ghcr_token" ] \
-      && log "credentials: vault://$VAULT_MOUNT/$VAULT_PATH (GHCR_USERNAME)" \
-      || log "credentials: vault path $VAULT_MOUNT/$VAULT_PATH has no GHCR keys"
+    if [ -n "$ghcr_user" ] && [ -n "$ghcr_token" ]; then
+      log "credentials: vault://$VAULT_MOUNT/$VAULT_PATH (GHCR_USERNAME)"
+    else
+      log "credentials: vault path $VAULT_MOUNT/$VAULT_PATH has no GHCR keys"
+    fi
   fi
 fi
-[ -n "$ghcr_user" ] && [ -n "$ghcr_token" ] \
-  || skip "no GHCR credentials (GHCR_USERNAME/GHCR_TOKEN, or the vault path)"
+if [ -z "$ghcr_user" ] || [ -z "$ghcr_token" ]; then
+  skip "no GHCR credentials (GHCR_USERNAME/GHCR_TOKEN, or the vault path)"
+fi
 
 # ── plan ────────────────────────────────────────────────────────────────────
 plan=()

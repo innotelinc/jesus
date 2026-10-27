@@ -287,6 +287,44 @@ export interface SmsTransportState {
   saved?: boolean;
 }
 
+/**
+ * One SMS in a conversation. Inbound rows come from the phone's poller and
+ * carry `from`/`received_at`; replies sent from this page carry `to`/`sent_at`.
+ * Rows written before the inbox existed have no `direction` — treat those as
+ * inbound, which is what the log was until then.
+ */
+export interface SmsMessage {
+  id: string;
+  direction?: 'in' | 'out';
+  from?: string;
+  to?: string;
+  body: string;
+  received_at?: string;
+  sent_at?: string;
+  sim?: number;
+  transport?: string;
+  status?: string;
+}
+
+/** The inbound log plus the answers sent from this Control Center. */
+export interface SmsInboxState {
+  /** False when CAPSTONE_SMS_INBOUND_TOKEN is unset (the phone cannot post). */
+  enabled: boolean;
+  token_set: boolean;
+  count: number;
+  messages: SmsMessage[];
+}
+
+export interface SmsSendResult {
+  ok: boolean;
+  to: string;
+  /** 'modem' or 'pjsip' — which path the phone actually used. */
+  transport: string;
+  status: string;
+  /** False when the reply was sent but could not be appended to the log. */
+  recorded: boolean;
+}
+
 /** Whether the local gateway can actually send right now (modem, SIM, signal). */
 export interface SmsGatewayHealth {
   configured: boolean;
@@ -435,6 +473,10 @@ export const api = {
   smsGateway: () => getJSON<SmsGatewayHealth>('/sms-gateway'),
   setSmsTransport: (transport: SmsTransportChoice) =>
     postJSON<SmsTransportState>('/sms-transport', { transport }),
+  /** Replies the phone received, plus the answers already sent from here. */
+  smsInbox: (limit = 200) => getJSON<SmsInboxState>(`/sms-inbound?limit=${limit}`),
+  /** Answer through the phone that received the message (not `SMS_PROVIDER`). */
+  sendSms: (to: string, body: string) => postJSON<SmsSendResult>('/sms-outbound', { to, body }),
   workflows: () => getJSON<AgentWorkflow[]>('/workflows'),
   workflow: (id: number) => getJSON<Workflow>(`/workflows/${id}`),
   createWorkflow: (body: WorkflowCreate) => postJSON<Workflow>('/workflows', body),
