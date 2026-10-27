@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { db_, newId, now } from '../db/index.js';
 import { formatNumber } from '../lib/e164.js';
 import { resolveNumber } from '../lib/registry.js';
+import { insertExtension } from '../lib/extensions.js';
 import { badRequest, notFound, conflict } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
@@ -129,40 +130,35 @@ export default async function telephonyRoutes(app) {
 
   writeRoute('post', '/extensions', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
-    const extension = v.str(body.extension, { name: 'extension', max: 6, pattern: /^\d{2,6}$/ });
-    if (db_.get('SELECT id FROM extensions WHERE extension = ?', [extension])) {
-      throw conflict(`Extension ${extension} already exists`);
-    }
-    const id = newId('ext_');
-    const secret = v.str(body.secret, { name: 'secret', min: 8, max: 64, required: false }) || randomBytes(9).toString('base64url');
-    db_.run(
-      `INSERT INTO extensions (id, extension, display_name, number_id, email, secret, voicemail, dnd,
-                               forward_to, enabled, account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        extension,
-        v.str(body.displayName, { name: 'displayName', max: 80 }),
-        linkNumber(body.number),
-        v.email(body.email, { required: false }),
-        secret,
-        v.bool(body.voicemail, true) ? 1 : 0,
-        v.bool(body.dnd, false) ? 1 : 0,
-        v.str(body.forwardTo, { name: 'forwardTo', max: 10, required: false }),
-        v.bool(body.enabled, true) ? 1 : 0,
-        ownerId(body.account),
-      ]
-    );
-    logEvent({ actor: request.account.email, action: 'telephony.extension_created', subject: extension, ip: request.ip });
+    // The insert lives in lib/extensions.js so the first-run setup makes a line
+    // with the same defaults as this screen does.
+    const created = insertExtension({
+      extension: v.str(body.extension, { name: 'extension', max: 6, pattern: /^\d{2,6}$/ }),
+      displayName: v.str(body.displayName, { name: 'displayName', max: 80 }),
+      email: v.email(body.email, { required: false }),
+      secret: v.str(body.secret, { name: 'secret', min: 8, max: 64, required: false }),
+      voicemail: v.bool(body.voicemail, true),
+      dnd: v.bool(body.dnd, false),
+      forwardTo: v.str(body.forwardTo, { name: 'forwardTo', max: 10, required: false }),
+      enabled: v.bool(body.enabled, true),
+      numberId: linkNumber(body.number),
+      accountId: ownerId(body.account),
+    });
+    logEvent({
+      actor: request.account.email,
+      action: 'telephony.extension_created',
+      subject: created.extension,
+      ip: request.ip,
+    });
     reply.status(201);
     const row = db_.get(
       `SELECT e.*, n.e164, a.email AS account_email FROM extensions e
          LEFT JOIN numbers n ON n.id = e.number_id
          LEFT JOIN accounts a ON a.id = e.account_id
         WHERE e.id = ?`,
-      [id]
+      [created.id]
     );
-    return { extension: extensionView(row), secret };
+    return { extension: extensionView(row), secret: created.secret };
   });
 
   writeRoute('patch', '/extensions/:id', { preHandler: requireWrite }, async (request) => {

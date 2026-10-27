@@ -6,6 +6,7 @@ import { money } from '../lib/mail.js';
 import { cookieOptions, SESSION_COOKIE } from '../plugins/auth.js';
 import * as v from '../lib/validate.js';
 import { logEvent } from '../lib/audit.js';
+import { clearFirstRunPassword, firstRunPasswordFile, firstRunPasswordPending } from '../lib/firstRun.js';
 
 const view = (account) => ({
   id: account.id,
@@ -66,7 +67,18 @@ export default async function authRoutes(app) {
     return { ok: true };
   });
 
-  app.get('/me', { preHandler: app.authenticate }, async (request) => ({ user: view(request.account) }));
+  // The session payload carries one thing beyond the account view: whether this
+  // install still has the credential it generated at first boot sitting on the
+  // volume. Only an owner has one to retire, so nobody else is told about it —
+  // and the password itself is never part of this answer, only its existence
+  // and where it lives.
+  app.get('/me', { preHandler: app.authenticate }, async (request) => ({
+    user: view(request.account),
+    firstRun:
+      request.account.role === 'owner'
+        ? { pending: firstRunPasswordPending(), file: firstRunPasswordFile() }
+        : null,
+  }));
 
   app.post('/password', { preHandler: app.authenticate }, async (request, reply) => {
     const body = request.body || {};
@@ -82,6 +94,9 @@ export default async function authRoutes(app) {
     const token = signSession({ sub: fresh.id, role: fresh.role, tv: fresh.token_version });
     reply.setCookie(SESSION_COOKIE, token, cookieOptions);
     logEvent({ actor: fresh.email, action: 'auth.password_changed', ip: request.ip });
-    return { ok: true, token, user: view(fresh) };
+    // The generated first-run password is dead from here, so the file holding
+    // it is not left lying on the volume.
+    const removed = clearFirstRunPassword();
+    return { ok: true, token, user: view(fresh), firstRunCredentialRemoved: removed };
   });
 }

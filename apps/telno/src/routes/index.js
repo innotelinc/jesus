@@ -14,6 +14,7 @@ import marketingRoutes from './marketing.js';
 import portalRoutes from './portal.js';
 import meRoutes from './me.js';
 import carrierRoutes from './carriers.js';
+import setupRoutes from './setup.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
@@ -40,6 +41,9 @@ export async function registerRoutes(app) {
   await app.register(meRoutes);
   // Buying and releasing numbers at the carrier, and what they cost.
   await app.register(carrierRoutes);
+  // First run: the line, number and registration that make a fresh install
+  // able to place a call at all.
+  await app.register(setupRoutes);
 }
 
 export default registerRoutes;

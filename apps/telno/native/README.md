@@ -37,6 +37,7 @@ app, one place where the switch enforces encryption, caller ID and recording.
 | Video flag on the call screen | Built (passthrough from the ring request). |
 | Ringing in the simulator | Not a thing — VoIP push needs a real device. Use `Test ring` on a phone. |
 | Voice auth (voiceprint) | Web-based, works in the shell too: the page records, the platform scores. No Apple entitlement involved. |
+| Face ID / Touch ID unlock | Built. SCIF → *Require Face ID to unlock this line* keeps the line unregistered until `LocalAuthentication` recognizes you. Falls back to the device passcode when no face is enrolled. |
 
 ### The honest gap: answering a call that is already in the switch
 
@@ -73,36 +74,56 @@ this to anyone.
 cd native
 npm install
 npm run origin -- https://telno.services     # or your host; ?window=1&scif=1 is added
-npx cap add ios
+npx cap add ios                              # generates ios/ (gitignored)
 npx cap sync ios
-npx cap open ios
+npm run prep                                 # copies the wrapper in, merges plists, patches AppDelegate
+gem install xcodeproj                        # once
+TEAM_ID=ABCDE12345 APP_BUNDLE_ID=us.innotel.scif APP_BUILD=1 npm run project
+npm run open                                 # Xcode
 ```
 
-Then in Xcode, once:
+`cap add ios` writes an empty template; everything SCIF needs is applied by the
+last three commands rather than by clicking through Xcode, because the same
+steps run in CI ([.github/workflows/ios.yml](../.github/workflows/ios.yml)) and a
+step that only exists in someone's memory is a step that gets missed:
 
-1. **Signing & Capabilities** → your team, and change the bundle id if
-   `us.innotel.scif` is taken (then set `APNS_BUNDLE_ID` on the server to match).
-2. **+ Capability → Push Notifications** (this writes `aps-environment`).
-3. **+ Capability → Background Modes** → tick *Audio, AirPlay and Picture in
-   Picture*, *Voice over IP*, *Remote notifications*.
-4. Copy the three Swift files in [ios/App/App](ios/App/App) into the App group
-   (drag them in, "Copy items if needed", target App):
-   `ScifCallManager.swift`, `ScifCallPlugin.swift`, `ScifSpeechPlugin.swift`.
-5. Copy the keys from [Info.additions.plist](ios/App/App/Info.additions.plist)
-   into `Info.plist`. They are not optional: without `voip` background mode the
-   push arrives and the app is killed, and without the usage strings the
-   microphone and speech APIs crash instead of prompting.
-6. In the generated `AppDelegate.swift`, start the call manager once:
+| Applied | By |
+|---|---|
+| the four Swift plugins, into the App target's sources | `scripts/ios-prep.mjs`, `scripts/ios-project.rb` |
+| `UIBackgroundModes` (`voip`, `audio`, `remote-notification`), the camera/microphone/speech/Face ID usage strings, ATS | `scripts/ios-prep.mjs`, from [Info.additions.plist](scif/Info.additions.plist) |
+| the push entitlement (`aps-environment`) | `scripts/ios-prep.mjs`, from [App.entitlements](scif/App.entitlements) |
+| `ScifCallManager.shared.start()` in `didFinishLaunchingWithOptions` | `scripts/ios-prep.mjs` — a VoIP push that arrives before it runs is dropped |
+| team, bundle id, version and build number, automatic signing | `scripts/ios-project.rb` |
 
-   ```swift
-   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-       ScifCallManager.shared.start()
-       return true
-   }
-   ```
+The usage strings are not optional: without the `voip` background mode the push
+arrives and the app is killed, without the microphone and speech strings those
+APIs crash instead of prompting, and without `NSFaceIDUsageDescription` the Face
+ID unlock fails instead of prompting.
 
-   Capacitor registers the plugins itself; nothing else to wire.
-7. Run on a **device**, not the simulator.
+Then run on a **device**, not the simulator — a VoIP push has no simulator
+equivalent.
+
+### TestFlight
+
+The **iOS** workflow builds on a macOS runner (free for public repositories) and
+uploads to TestFlight. It needs four repository secrets:
+
+| Secret | Where it comes from |
+|---|---|
+| `APP_STORE_CONNECT_KEY_ID` | App Store Connect → Users and Access → Integrations → App Store Connect API, the key's ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | the issuer UUID on the same page |
+| `APP_STORE_CONNECT_KEY` | the `.p8` file's contents, downloaded once when the key is created |
+| `APPLE_TEAM_ID` | Membership details, a 10-character id |
+
+A variable `APP_BUNDLE_ID` overrides `us.innotel.scif`. The key needs **App
+Manager** rights: signing is automatic, so the runner asks App Store Connect for
+the certificate and profile it does not have rather than carrying a `.p12`.
+The app record for the bundle id has to exist before the first upload, and
+the build number is the workflow run number, so TestFlight never sees the same
+build twice.
+
+Run it from **Actions → iOS → Run workflow**, or push a tag `ios-v1.0.0`. It does
+not run on every commit on purpose: without the secrets it can only fail.
 
 The app opens the deployed softphone (`server.url`), so a change to the web app
 needs no rebuild. `npm run origin -- <url>` rewrites that address, including the
@@ -184,9 +205,13 @@ dial.
 | File | What it is |
 |---|---|
 | [capacitor.config.json](capacitor.config.json) | app id, the deployment it opens, navigation allowlist |
-| [ios/App/App/ScifCallManager.swift](ios/App/App/ScifCallManager.swift) | PushKit + CallKit, one owner of each |
-| [ios/App/App/ScifCallPlugin.swift](ios/App/App/ScifCallPlugin.swift) | the `ScifCall` bridge: token, test ring, answer/end events |
-| [ios/App/App/ScifSpeechPlugin.swift](ios/App/App/ScifSpeechPlugin.swift) | SFSpeechRecognizer for a WKWebView |
-| [ios/App/App/App.entitlements](ios/App/App/App.entitlements) | `aps-environment` |
-| [ios/App/App/Info.additions.plist](ios/App/App/Info.additions.plist) | background modes and usage strings to merge |
-| [../web/src/native.js](../web/src/native.js) | the page's half: register, react, prefer Apple's recogniser |
+| [scif/ScifCallManager.swift](scif/ScifCallManager.swift) | PushKit + CallKit, one owner of each |
+| [scif/ScifCallPlugin.swift](scif/ScifCallPlugin.swift) | the `ScifCall` bridge: token, test ring, answer/end events |
+| [scif/ScifSpeechPlugin.swift](scif/ScifSpeechPlugin.swift) | SFSpeechRecognizer for a WKWebView |
+| [scif/ScifBiometricsPlugin.swift](scif/ScifBiometricsPlugin.swift) | Face ID / Touch ID unlock through LocalAuthentication |
+| [scif/App.entitlements](scif/App.entitlements) | `aps-environment`, set to production for a TestFlight build |
+| [scif/Info.additions.plist](scif/Info.additions.plist) | background modes and usage strings, merged into the generated Info.plist |
+| [scripts/ios-prep.mjs](scripts/ios-prep.mjs) | applies the wrapper to a generated project |
+| [scripts/ios-project.rb](scripts/ios-project.rb) | sources, entitlements, signing and versions, in the Xcode project |
+| [../web/src/native.js](../web/src/native.js) | the page's half: register, react, prefer Apple's recognizer |
+| [../web/src/biometrics.js](../web/src/biometrics.js) | the page's half of the unlock: ask, and say what the device can do |

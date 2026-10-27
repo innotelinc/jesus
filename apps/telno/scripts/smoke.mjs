@@ -10,7 +10,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createHmac } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -2437,6 +2437,132 @@ if (startServer) {
     localOkay.status === 0,
     `${localOkay.status} ${(localOkay.stderr || '').slice(-200)}`
   );
+
+  // The first-run credential. A fresh install without ADMIN_PASSWORD used to
+  // print the generated owner password to the log and nowhere else, which for
+  // the one credential to a new platform is the wrong place. This boots a
+  // second, throwaway instance on its own port and data directory, so both
+  // halves are proved: the password is on the volume, and it is not in the log.
+  const firstRunDir = await mkdtemp(join(tmpdir(), 'telno-first-run-'));
+  const firstRunPort = 8100 + Math.floor(Math.random() * 800);
+  const firstRunBase = `http://127.0.0.1:${firstRunPort}`;
+  const firstRunEmail = 'first-run@telno.local';
+  const firstRunInstance = spawn(process.execPath, ['src/index.js'], {
+    env: {
+      ...process.env,
+      NODE_ENV: 'development',
+      PORT: String(firstRunPort),
+      HOST: '127.0.0.1',
+      DATA_DIR: firstRunDir,
+      ASTERISK_CONFIG_DIR: join(firstRunDir, 'asterisk'),
+      ADMIN_EMAIL: firstRunEmail,
+      // Empty on purpose: this is the branch that generates a password.
+      ADMIN_PASSWORD: '',
+      SESSION_SECRET: 'smoke-first-run-secret',
+      PUBLIC_URL: firstRunBase,
+      TELEPHONY_SIMULATED: 'true',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let firstRunLog = '';
+  firstRunInstance.stdout.on('data', (chunk) => (firstRunLog += chunk));
+  firstRunInstance.stderr.on('data', (chunk) => (firstRunLog += chunk));
+  const firstRunFile = join(firstRunDir, 'first-run-password.txt');
+  let firstRunPassword = '';
+  for (let attempt = 0; attempt < 100 && !firstRunPassword; attempt += 1) {
+    if (existsSync(firstRunFile)) {
+      firstRunPassword = (readFileSync(firstRunFile, 'utf8').match(/password:\s*(\S+)/) || [])[1] || '';
+    }
+    if (!firstRunPassword) await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  check(
+    'a fresh install writes its owner password to the data volume',
+    !!firstRunPassword,
+    firstRunPassword ? 'found' : firstRunLog.slice(-300)
+  );
+  // Windows keeps no Unix mode bits, so a writable file there always reports
+  // 666 and the assertion would be theatre. It is strict where it means
+  // something (Linux, macOS, and the container), and the real 0600 is checked
+  // in the container as well.
+  const firstRunMode = existsSync(firstRunFile) ? statSync(firstRunFile).mode & 0o777 : 0;
+  const windows = process.platform === 'win32';
+  check(
+    windows ? 'the first-run credential file is written' : 'the first-run credential file is readable only by its owner',
+    windows ? !!firstRunPassword : firstRunMode === 0o600,
+    `mode ${firstRunMode.toString(8)}`
+  );
+  check(
+    'the generated password is kept out of the log',
+    !!firstRunPassword && !firstRunLog.includes(firstRunPassword),
+    'the log mentions the password'
+  );
+  check('boot says where the password went', firstRunLog.includes('first-run-password.txt'), firstRunLog.slice(-200));
+
+  // And the loop closes: it signs in, and setting your own password takes the
+  // file away, because the generated password is dead from then on.
+  let firstRunReady = false;
+  for (let attempt = 0; attempt < 60 && !firstRunReady; attempt += 1) {
+    try {
+      firstRunReady = (await fetch(`${firstRunBase}/api/healthz`)).ok;
+    } catch {
+      /* not up yet */
+    }
+    if (!firstRunReady) await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  const firstRunLogin = await fetch(`${firstRunBase}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: firstRunEmail, password: firstRunPassword }),
+  });
+  const firstRunCookie = (firstRunLogin.headers.get('set-cookie') || '').split(';')[0];
+  check('the owner signs in with the password from the volume', firstRunLogin.status === 200, firstRunLogin.status);
+
+  // The console's Account screen is how that credential gets retired, so the
+  // session it reads has to say the file is still there — and hand over the
+  // path, so the screen can show the command that reads it, without ever
+  // receiving the credential itself.
+  const firstRunMe = await fetch(`${firstRunBase}/api/auth/me`, { headers: { cookie: firstRunCookie } });
+  const firstRunMeBody = await firstRunMe.json().catch(() => ({}));
+  check(
+    'the owner session says the generated credential is still on the volume',
+    firstRunMeBody.firstRun?.pending === true &&
+      String(firstRunMeBody.firstRun?.file).endsWith('first-run-password.txt'),
+    JSON.stringify(firstRunMeBody.firstRun)
+  );
+  check(
+    'the session payload never carries the credential itself',
+    !!firstRunPassword && !JSON.stringify(firstRunMeBody).includes(firstRunPassword),
+    'the credential is in the /auth/me payload'
+  );
+  const firstRunChange = await fetch(`${firstRunBase}/api/auth/password`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: firstRunCookie },
+    body: JSON.stringify({ currentPassword: firstRunPassword, newPassword: 'a-real-owner-password' }),
+  });
+  const changedBody = await firstRunChange.json().catch(() => ({}));
+  check(
+    'setting your own password removes the first-run file',
+    firstRunChange.status === 200 && changedBody.firstRunCredentialRemoved === true && !existsSync(firstRunFile),
+    `${firstRunChange.status} ${JSON.stringify(changedBody).slice(0, 120)}`
+  );
+  // The other half of the screen's contract: once the password is the owner's
+  // own, the file is gone and the notice has to go with it. The cookie from
+  // before the change is dead by design, so this uses the one the change set.
+  const refreshedCookie = (firstRunChange.headers.get('set-cookie') || '').split(';')[0];
+  const firstRunMeAfter = await fetch(`${firstRunBase}/api/auth/me`, { headers: { cookie: refreshedCookie } });
+  const firstRunMeAfterBody = await firstRunMeAfter.json().catch(() => ({}));
+  check(
+    'the screen is told the generated credential is gone',
+    firstRunMeAfter.status === 200 && firstRunMeAfterBody.firstRun?.pending === false,
+    `${firstRunMeAfter.status} ${JSON.stringify(firstRunMeAfterBody.firstRun)}`
+  );
+
+  if (!firstRunInstance.killed) firstRunInstance.kill();
+  try {
+    rmSync(firstRunDir, { recursive: true, force: true });
+  } catch {
+    /* a leftover temp directory is not a test failure */
+  }
 }
 
 /* --------------------------------------------------------------- marketing -- */
@@ -3619,6 +3745,77 @@ check(
 
 const removed = await asCustomer('POST', '/api/softphone/push/remove', { token: voipToken });
 check('a phone can be unregistered', removed.status === 200 && removed.body.removed === true, removed.body);
+
+/* -------------------------------------------------------------- first run -- */
+// The setup contract. This instance already has lines, so what is proved here is
+// the shape and the refusals; the empty-install path is exercised by the unit
+// script that starts from a fresh database.
+
+console.log('\nFirst run: the setup contract');
+
+const setupNow = await call('GET', '/api/setup');
+check(
+  'setup answers with the three steps and stops asking once a line exists',
+  setupNow.status === 200 &&
+    setupNow.body.needed === false &&
+    Array.isArray(setupNow.body.steps) &&
+    ['line', 'number', 'register'].every((id) => setupNow.body.steps.some((step) => step.id === id)) &&
+    setupNow.body.steps.find((step) => step.id === 'line')?.done === true,
+  setupNow.body
+);
+
+const freeExtension = setupNow.body.suggested?.extension || '';
+const allExtensions = (await call('GET', '/api/extensions')).body.items || [];
+check(
+  'it offers an extension that is actually free',
+  /^\d{2,6}$/.test(freeExtension) && !allExtensions.some((row) => row.extension === freeExtension),
+  { freeExtension }
+);
+check(
+  'and it says whether the softphone can register and whether a carrier exists',
+  typeof setupNow.body.softphone?.enabled === 'boolean' &&
+    typeof setupNow.body.softphone?.tls === 'boolean' &&
+    typeof setupNow.body.carrier?.voipms === 'boolean',
+  setupNow.body.softphone
+);
+
+const setupLine = await call('POST', '/api/setup/line', {
+  displayName: 'Setup smoke',
+  extension: freeExtension,
+});
+check(
+  'setup creates a line and shows its secret once',
+  setupLine.status === 201 &&
+    setupLine.body.extension?.extension === freeExtension &&
+    typeof setupLine.body.extension?.secret === 'string' &&
+    setupLine.body.extension.secret.length >= 8,
+  setupLine.body
+);
+check(
+  'the new line is on the switch the moment it is created',
+  ((await call('GET', '/api/extensions')).body.items || []).some((row) => row.extension === freeExtension),
+  freeExtension
+);
+
+const setupTwice = await call('POST', '/api/setup/line', { displayName: 'Again', extension: freeExtension });
+check('the same extension cannot be created twice', setupTwice.status === 409, setupTwice.status);
+
+const setupNumber = await call('POST', '/api/setup/number', { extension: freeExtension, number: '+14155550188' });
+check(
+  'a number can be attached to that line from setup',
+  setupNumber.status === 200 && setupNumber.body.extension?.number?.e164 === '+14155550188',
+  setupNumber.body
+);
+
+const setupFromCustomer = await asCustomer('POST', '/api/setup/line', { displayName: 'Nope', extension: '555' });
+check(
+  'a customer cannot set up the platform',
+  setupFromCustomer.status === 403 || setupFromCustomer.status === 404,
+  setupFromCustomer.status
+);
+
+const setupDrop = await call('DELETE', `/api/extensions/${setupLine.body.extension.id}`);
+check('the setup line can be removed again', setupDrop.status === 200, setupDrop.body);
 
 /* ------------------------------------------------------------------- brand -- */
 // White-label configuration: the name, vendor and accent every public page and

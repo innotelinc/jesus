@@ -117,8 +117,8 @@ Always `{ "ok": true }`, whether or not the number was listed.
 |---|---|---|---|
 | POST | `/auth/login` | `{ email, password }` | 10/min per IP, sets cookie, returns token + user |
 | POST | `/auth/logout` | — | bumps the token version (all sessions invalid) |
-| GET | `/auth/me` | — | current user |
-| POST | `/auth/password` | `{ currentPassword, newPassword }` | invalidates old sessions, returns a new token |
+| GET | `/auth/me` | — | current user; an owner also gets `firstRun` (`pending`, `file`) — whether the password first boot generated is still on the volume |
+| POST | `/auth/password` | `{ currentPassword, newPassword }` | invalidates old sessions, returns a new token, and removes the generated first-run password file |
 
 ---
 
@@ -204,6 +204,32 @@ nothing already incurred and stops the months after it.
 | GET/POST/PATCH/DELETE | `/ivr[/:id]` | menus: `options: [{digit, target, label}]` |
 | GET | `/calls?limit=&direction=&q=` | call history, formatted |
 | GET | `/calls/stats` | 24h totals, dispositions, 7-day series |
+
+---
+
+## First run (session; operator/owner for writes)
+
+A fresh container has an owner account and no line, so nothing can ring. These
+the three routes the *Get started* screen uses; they create the same rows the
+Extensions and Numbers screens do, by the same helper, and each write
+regenerates the switch configuration.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/setup` | `needed` (no enabled line), `suggested` extension and name, the three `steps`, switch state, whether the softphone can register, whether VoIP.ms is configured |
+| POST | `/setup/line` | `{ displayName?, extension?, number? }`; creates the line, records and attaches an optional DID, returns the SIP `secret` once |
+| POST | `/setup/number` | `{ extension, number }`; records the DID in the registry and routes it to that line |
+
+An install that was never given `ADMIN_PASSWORD` has its generated owner
+password on the data volume in `first-run-password.txt`, mode 0600, with the
+path printed at boot instead of the secret. `POST /auth/password` deletes that
+file, because setting your own password retires the generated one — which is
+what the console's **Account** screen does, and it reports
+`firstRunCredentialRemoved: true` when the file went away.
+
+`needed: false` on a populated switch is normal — the routes are not restricted
+to a first line, so the same screen works for a second one. A customer account
+never reaches them: `/api/setup` is staff-only.
 
 ---
 

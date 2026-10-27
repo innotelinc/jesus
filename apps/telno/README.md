@@ -64,17 +64,35 @@ docker compose up -d --build
 docker compose logs -f telno
 ```
 
-First boot prints the generated owner password once:
+First boot generates the owner password and writes it to the data volume, mode
+0600, at `data/first-run-password.txt`. It is deliberately not printed: a
+container log ends up in scrollbacks, log drivers and tickets, and the only
+person who needs the password is the one who can read the volume. Boot says
+where it went:
 
 ```
 ================================================================
   First run — owner account created
   Email:    admin@telno.local
-  Password: <generated>
+  Password: written to /data/first-run-password.txt
 ================================================================
 ```
 
-Open <http://localhost:8080> and sign in. The public directory is at
+```bash
+docker compose exec telno cat /data/first-run-password.txt
+```
+
+Changing your password — **Account** in the console, or `POST /api/auth/password`
+with `currentPassword` and `newPassword` — deletes the file, because the
+generated password is dead from then on. The console says so for as long as the
+file is there, and shows the exact command that reads it. Setting
+`ADMIN_PASSWORD` before the first boot skips the file altogether, which is the
+better option anywhere that is not a laptop — then no file is written at all.
+
+Open <http://localhost:8080> and sign in. A switch with no line yet opens
+**Get started**, which creates the first extension, attaches a number you own and
+takes you to the softphone to register — three steps, and the platform can then
+place and receive a call. The public directory is at
 <http://localhost:8080/d/telno.directory>.
 
 Optional demo data (27 listings across 19 countries, 5 extensions, 180 calls, a moderation queue):
@@ -159,15 +177,15 @@ curl -H "x-api-key: tl_…" "http://localhost:8080/api/numbers?limit=5"
 
 ## Console
 
-Nineteen screens behind one login, grouped the way the work is done:
+Twenty-three screens behind one login, grouped the way the work is done:
 
 | Group | Screens |
 |---|---|
-| Telephony | Dashboard, Softphone, Call history, Extensions, Trunks, Call routing, Voicemail, Fax, Messages |
-| Voice & automation | Voice agents, Workflows |
+| Telephony | Get started, Dashboard, Softphone, Call history, Extensions, Trunks, Call routing, Voicemail, Fax, Messages |
+| Voice & automation | Voice agents, Workflows, Marketing |
 | Registry | Numbers, Moderation |
-| Business | Billing, Estate |
-| Operations | Health, Operations, Connected systems, Settings |
+| Business | Billing, Plans, Estate |
+| Operations | Health, Operations, Connected systems, Settings, Account |
 
 Every screen reads and writes the API in [docs/API.md](docs/API.md) — no screen keeps its own copy of
 the data — and refreshes its counters after each write so the tiles and the list never disagree.

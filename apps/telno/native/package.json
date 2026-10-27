@@ -5,8 +5,11 @@
   "description": "SCIF — the native shell that lets a Telno line ring on a locked iPhone",
   "scripts": {
     "origin": "node scripts/set-origin.mjs",
+    "add": "cap add ios",
     "sync": "cap sync ios",
-    "open": "cap open ios"
+    "open": "cap open ios",
+    "prep": "node scripts/ios-prep.mjs",
+    "project": "ruby scripts/ios-project.rb"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
