@@ -193,7 +193,11 @@ public final class ScifCallManager: NSObject, PKPushRegistryDelegate, CXProvider
             try audioSession.setCategory(
                 .playAndRecord,
                 mode: .voiceChat,
-                options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
+                // allowBluetoothHFP is the same raw value as the old
+                // allowBluetooth (HFP audio in, so a headset's mic works) and
+                // is the name Xcode 26 wants: the older spelling is reported
+                // deprecated and warns on every build.
+                options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker]
             )
             try audioSession.setActive(true)
         } catch {
