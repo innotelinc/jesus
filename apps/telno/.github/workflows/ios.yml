@@ -161,8 +161,14 @@ jobs:
         working-directory: native
         run: |
           set -euo pipefail
+          # A TestFlight build is a distribution build. Signed as "Apple
+          # Development", Xcode asks Apple for an iOS App Development profile,
+          # and a team with no registered devices cannot be given one — the
+          # archive fails before the code is even compiled. The distribution
+          # identity provisions an App Store profile, which needs no devices.
           xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$PWD/build/App.xcarchive" \
+            CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" \
             -authenticationKeyIssuerID "$ISSUER_ID" \

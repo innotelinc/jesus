@@ -55,6 +55,23 @@ target.build_configurations.each do |config|
   # in CI has the rights to create the certificate and profile it needs, so no
   # .p12 has to live in the repository.
   settings['CODE_SIGN_STYLE'] = 'Automatic'
+
+  # A TestFlight archive is a distribution build, so it has to be signed with a
+  # distribution identity. Left on the template's development identity, Xcode
+  # asks Apple for an iOS App Development profile, which cannot be minted for a
+  # team with no registered devices: the archive dies with "Your team has no
+  # devices from which to generate a provisioning profile". An Apple
+  # Distribution profile needs no devices at all.
+  #
+  # The [sdk=iphoneos*] variant is set too because the Capacitor template ships
+  # that conditional key, and a conditional setting outranks the plain one.
+  if config.name == 'Release'
+    settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+    settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
+    # Empty, not absent: an explicit empty value overrides the template's, and
+    # tells automatic signing to create the App Store profile itself.
+    settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
+  end
 end
 
 project.save
