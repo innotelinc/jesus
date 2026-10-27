@@ -16,7 +16,11 @@
 #
 # One-time, in App Store Connect: the app record must exist for the bundle id,
 # and the API key needs App Manager rights, because signing is automatic and the
-# runner asks it for the certificate and profile it does not have.
+# runner asks it for the certificate and profile it does not have, and because
+# the last step reads the build's processing state back from the API.
+#
+# The runner image has to carry an iOS 26 SDK, which is why this is macos-26:
+# Apple rejects an upload built against anything older.
 #
 # It does not run on every push: without the secrets above it can only fail, and
 # a red X nobody can fix is worse than no check at all. Run it from Actions, or
@@ -246,3 +250,11 @@ jobs:
           ::error::Apple refused the upload. If the log above says -19000 / "No suitable application records were found", create the app record once: App Store Connect -> Apps -> + -> New App -> iOS, bundle id ${APP_BUNDLE_ID}, then re-run this workflow. The signed .ipa is attached to this run as an artifact, so the re-run rebuilds nothing it needs.
           EOF
           exit 1
+
+      # An upload that returns 0 only means Apple took the bytes. This asks the
+      # API whether the build actually became installable, so a build Apple
+      # rejects in processing says so here instead of waiting to be noticed.
+      - name: Watch TestFlight process the build
+        if: ${{ !inputs.prepare_only && (github.event_name == 'push' || inputs.upload) }}
+        working-directory: native
+        run: node scripts/testflight-status.mjs
