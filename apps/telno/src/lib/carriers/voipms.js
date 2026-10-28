@@ -201,7 +201,7 @@ export async function orderNumber(e164, { routing = '', pop, dialTime, cnam, bil
     throw new HttpError(
       400,
       'routing_required',
-      'VoIP.ms needs to know where the DID rings. Set VOIPMS_ROUTING (for example account:100001_telno) or pass a routing value with the order.'
+      'VoIP.ms needs to know where the DID rings. Store VOIPMS_ROUTING in Settings → Numbers from VoIP.ms (for example account:100001_telno), or pass a routing value with the order.'
     );
   }
 
