@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Telno">
+  <rect width="512" height="512" rx="112" fill="#6f66ff"/>
+  <path fill="#ffffff" d="M160 116h58l22 74-33 25a192 192 0 0 0 90 90l25-33 74 22v58c0 17-15 30-32 30A348 348 0 0 1 130 148c0-17 13-32 30-32z"/>
+</svg>

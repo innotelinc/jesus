@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push Notifications capability. Xcode writes this when the capability is
+	     added; keeping it here means the setting survives a project regenerated
+	     by `npx cap add ios`. Xcode switches it to "production" for a release
+	     build and for TestFlight. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

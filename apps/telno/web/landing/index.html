@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en" data-scheme="operations">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@450;500;600;700&display=swap" rel="stylesheet">
+  <title>Telno — telephony and a worldwide phonebook, in one container</title>
+  <meta name="description" content="Telno is a self-hosted telephony platform and worldwide phonebook registry: extensions, trunks, IVR, voicemail, fax, SMS, AI voice agents, an encrypted WebRTC softphone, automatic billing and a device estate — one image, one database, no per-seat fees.">
+  <meta property="og:title" content="Telno — telephony and a worldwide phonebook, in one container">
+  <meta property="og:description" content="Extensions, trunks, IVR, voicemail, fax, SMS, AI voice agents, encrypted WebRTC calling, automatic billing and a device estate. One image, one database, an Innotel Labs product.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23635bff'/%3E%3Cpath fill='%23fff' d='M20 14h7l3 9-4 3a24 24 0 0 0 12 12l3-4 9 3v7c0 2-2 4-4 4A38 38 0 0 1 16 18c0-2 2-4 4-4z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="unity-theme.css">
+  <script>window.UNITY_DEFAULT_SCHEME = "operations";</script>
+  <script src="unity-theme.js"></script>
+  <style>:root {
+      --p-bg: var(--canvas);
+      --p-bg-elevated: var(--surface-muted);
+      --p-surface: var(--surface);
+      --p-surface-hover: var(--surface-sunken);
+      --p-border: var(--line);
+      --p-border-strong: var(--line-strong);
+      --p-text: var(--ink);
+      --p-text-secondary: var(--ink-soft);
+      --p-text-muted: var(--ink-faint);
+      --p-accent: var(--brand);
+      --p-accent-hover: var(--brand-ring);
+      --p-accent-tint: var(--brand-soft);
+      --p-success: var(--ok);
+      --p-warning: var(--attention);
+      --p-danger: var(--bad);
+      --p-info: var(--info);
+      --radius-md: var(--radius);
+      --ease: cubic-bezier(.2, .8, .2, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--p-bg);
+      color: var(--p-text);
+      font-family: "Geist", ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection { background: var(--p-accent-tint); }
+
+    a { color: var(--p-accent); text-decoration: none; }
+    a:hover { color: var(--p-accent-hover); }
+
+    code, pre {
+      font-family: var(--mono);
+      font-size: .875rem;
+    }
+
+    code {
+      background: var(--p-bg-elevated);
+      border: 1px solid var(--p-border);
+      border-radius: 6px;
+      padding: 1px 5px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 16px 18px;
+      background: var(--p-surface-hover);
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      line-height: 1.65;
+      color: var(--p-text-secondary);
+    }
+
+    pre code { background: none; border: 0; padding: 0; }
+
+    /* ---------------------------------------------------------------- shell -- */
+
+    .wrap { width: min(1080px, 100% - 40px); margin-inline: auto; }
+
+    header.site {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: color-mix(in srgb, var(--p-bg) 88%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--p-border);
+    }
+
+    .bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-height: 62px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      letter-spacing: -.02em;
+      color: var(--p-text);
+    }
+
+    .brand svg { display: block; }
+
+    nav.links { display: flex; gap: 18px; margin-left: 8px; flex-wrap: wrap; }
+    nav.links a { color: var(--p-text-secondary); font-size: .875rem; }
+    nav.links a:hover { color: var(--p-text); }
+    .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    .gh {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: .875rem;
+      color: var(--p-text-secondary);
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-pill);
+      padding: 6px 13px;
+    }
+
+    .gh:hover { color: var(--p-text); border-color: var(--p-border-strong); }
+
+    /* ----------------------------------------------------------------- hero -- */
+
+    .hero { padding: 78px 0 54px; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .78rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--p-text-muted);
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-pill);
+      padding: 5px 12px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow i {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--p-success); flex: none;
+    }
+
+    h1 {
+      font-size: clamp(2.1rem, 5.4vw, 3.35rem);
+      line-height: 1.06;
+      letter-spacing: -.035em;
+      margin: 0 0 18px;
+      font-weight: 600;
+      max-width: 20ch;
+    }
+
+    h1 .accent { color: var(--p-accent); }
+
+    .lede {
+      font-size: 1.075rem;
+      color: var(--p-text-secondary);
+      max-width: 62ch;
+      margin: 0 0 28px;
+    }
+
+    .cta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 34px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--p-border-strong);
+      border-radius: var(--radius-md);
+      padding: 10px 18px;
+      font-size: .9rem;
+      font-weight: 500;
+      color: var(--p-text);
+      background: var(--p-surface);
+      transition: border-color .15s var(--ease), transform .15s var(--ease);
+    }
+
+    .btn:hover { border-color: var(--p-accent); color: var(--p-text); text-decoration: none; }
+    .btn.primary {
+      background: var(--p-accent);
+      border-color: var(--p-accent);
+      color: var(--brand-ink);
+    }
+    .btn.primary:hover { background: var(--p-accent-hover); border-color: var(--p-accent-hover); }
+
+    /* -------------------------------------------------------------- section -- */
+
+    section { padding: 54px 0; border-top: 1px solid var(--p-border); }
+
+    h2 {
+      font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+      letter-spacing: -.025em;
+      margin: 0 0 10px;
+      font-weight: 600;
+    }
+
+    h3 { font-size: 1rem; margin: 0 0 6px; font-weight: 600; letter-spacing: -.01em; }
+
+    .sub { color: var(--p-text-secondary); max-width: 68ch; margin: 0 0 30px; }
+
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .grid.three { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+    .card {
+      background: var(--p-surface);
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+    }
+
+    .card p { margin: 0; color: var(--p-text-secondary); font-size: .9rem; }
+    .card ul { margin: 8px 0 0; padding-left: 18px; color: var(--p-text-secondary); font-size: .9rem; }
+    .card li { margin-bottom: 4px; }
+
+    .table-wrap {
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: var(--p-surface);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+
+    th, td {
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--p-border);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--p-bg-elevated);
+      font-weight: 600;
+      font-size: .78rem;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--p-text-muted);
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    td strong { font-weight: 600; }
+    td.mono, .mono { font-family: var(--mono); font-size: .82rem; }
+    .muted { color: var(--p-text-muted); }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .75rem;
+      border: 1px solid var(--p-border);
+      border-radius: var(--radius-pill);
+      padding: 3px 10px;
+      color: var(--p-text-secondary);
+      white-space: nowrap;
+    }
+
+    .pill.ok { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+    .pill.info { border-color: var(--info); color: var(--info); background: var(--info-soft); }
+    .pill.attention { border-color: var(--attention); color: var(--attention); background: var(--attention-soft); }
+
+    .stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+    .note {
+      border-left: 3px solid var(--p-accent);
+      background: var(--p-bg-elevated);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 12px 16px;
+      font-size: .875rem;
+      color: var(--p-text-secondary);
+      margin-top: 22px;
+    }
+
+    .split { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+
+    .facts { display: grid; gap: 10px; }
+    .fact { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px dashed var(--p-border); padding-bottom: 9px; font-size: .875rem; }
+    .fact:last-child { border-bottom: 0; }
+    .fact span { color: var(--p-text-muted); }
+    .fact strong { font-family: var(--mono); font-size: .8rem; font-weight: 500; text-align: right; }
+
+    ol.steps { counter-reset: step; list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+    ol.steps li { position: relative; padding-left: 44px; color: var(--p-text-secondary); font-size: .9rem; }
+    ol.steps li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 0; top: -1px;
+      width: 28px; height: 28px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      border: 1px solid var(--p-border-strong);
+      color: var(--p-accent);
+      font-size: .8rem;
+      font-family: var(--mono);
+    }
+
+    ol.steps li strong { color: var(--p-text); display: block; }
+
+    footer.site {
+      border-top: 1px solid var(--p-border);
+      padding: 30px 0 46px;
+      color: var(--p-text-muted);
+      font-size: .85rem;
+    }
+
+    footer.site .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+    footer.site a { color: var(--p-text-secondary); }
+
+    @media (max-width: 620px) {
+      .hero { padding: 46px 0 34px; }
+      nav.links { display: none; }
+      section { padding: 40px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap bar">
+    <a class="brand" href="#top" aria-label="Telno home">
+      <svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="var(--p-accent)"/>
+        <path fill="#fff" d="M20 14h7l3 9-4 3a24 24 0 0 0 12 12l3-4 9 3v7c0 2-2 4-4 4A38 38 0 0 1 16 18c0-2 2-4 4-4z"/>
+      </svg>
+      <span>Telno</span>
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="#why">Why</a>
+      <a href="#surfaces">Surfaces</a>
+      <a href="#phonebook">Phonebook</a>
+      <a href="#security">Security</a>
+      <a href="#billing">Billing</a>
+      <a href="#quickstart">Quick start</a>
+    </nav>
+    <div class="right">
+      <a class="gh" href="https://github.com/innotelinc/telno/tree/main/docs">Docs</a>
+      <a class="gh" href="https://github.com/innotelinc/telno">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <div class="ot-theme" role="group" aria-label="Color theme" data-unity-switch>
+        <button type="button" data-theme-mode="system" aria-pressed="false">System</button>
+        <button type="button" data-theme-mode="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <div class="wrap hero">
+    <span class="eyebrow"><i></i> An Innotel Labs product</span>
+    <h1>Telephony and a worldwide phonebook,<span class="accent"> in one container.</span></h1>
+    <p class="lede">
+      Telno is the phone system and the registry in a single image: extensions, trunks, call routing,
+      voicemail, fax, SMS, AI voice agents and an encrypted WebRTC softphone — plus the directory that
+      answers <em>who is this number?</em> for six public hostnames. One database, one login, no
+      per-seat fee and no cloud dependency.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#quickstart">Start it in one command</a>
+      <a class="btn" href="https://github.com/innotelinc/telno">Read the source</a>
+    </div>
+    <pre><code>docker compose up -d --build   <span class="muted"># Asterisk 20 + API + UI, one container, ~200 MB RSS</span></code></pre>
+    <div class="stack">
+      <span class="pill ok">DTLS-SRTP calling</span>
+      <span class="pill info">Worldwide E.164 registry</span>
+      <span class="pill">Self-hosted</span>
+      <span class="pill">SQLite — no ORM, no Redis</span>
+      <span class="pill attention">Automatic billing and dunning</span>
+    </div>
+  </div>
+
+  <section id="why">
+    <div class="wrap">
+      <h2>Why Telno<span class="accent">.</span></h2>
+      <p class="sub">
+        The estate audit behind this build found four applications, four logins and three design
+        systems serving one job. Telno is the collapsed version: one control plane, one number table,
+        one place where a change is made.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Problem</th><th>Telno answer</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>VoIP stack, CRM, phonebook and billing are four vendors</td>
+              <td><strong>One image</strong> — the switch, the API, the console, the registry and the ledger ship together</td>
+            </tr>
+            <tr>
+              <td>Per-seat and per-minute pricing</td>
+              <td>Self-hosted on hardware you already own; the only bill is your carrier's</td>
+            </tr>
+            <tr>
+              <td>Numbers duplicated across systems</td>
+              <td><strong>E.164 is the primary key.</strong> Listings dedupe on normalized name; a submission is checked for duplicates before a human sees it</td>
+            </tr>
+            <tr>
+              <td>Secrets in <code>.env</code>, in git, in chat</td>
+              <td>Provider keys live in an <strong>encrypted vault</strong> inside the container and are never returned by the API — only the last four characters are</td>
+            </tr>
+            <tr>
+              <td>Dunning is somebody's spreadsheet reminder</td>
+              <td>A reminder ladder, a final notice, suspension and automatic reinstatement run from the ledger</td>
+            </tr>
+            <tr>
+              <td>Heavyweight runtime for a phone system</td>
+              <td>Node 24, <code>node:sqlite</code> and a static UI. No SSR runtime, no ORM, no Redis, no native modules</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="runtime">
+    <div class="wrap">
+      <h2>One image, two processes, one database<span class="accent">.</span></h2>
+      <p class="sub">
+        Asterisk and the control plane share the container under one supervisor, so a deployment is a
+        single artifact to version, back up and roll back.
+      </p>
+      <div class="split">
+        <pre><code>   ┌─────────────────────────── docker container ───────────────────────────┐
+   │                                                                        │
+   │  Asterisk 20 ──AMI──►  Fastify control API  ◄──HTTP──  React UI (static)│
+   │      │                        │                        + /d/&lt;host&gt;      │
+   │      │                      SQLite                                      │
+   │      └──── SIP / RTP          │                                         │
+   │                               └──►  registry + directory               │
+   └────────────────────────────────────────────────────────────────────────┘</code></pre>
+        <div class="card">
+          <h3>What that costs you</h3>
+          <div class="facts">
+            <div class="fact"><span>Runtime</span><strong>Node 24 · Fastify 5</strong></div>
+            <div class="fact"><span>Database</span><strong>SQLite (node:sqlite)</strong></div>
+            <div class="fact"><span>Switch</span><strong>Asterisk 20 · PJSIP</strong></div>
+            <div class="fact"><span>Control plane</span><strong>AMI + ARI</strong></div>
+            <div class="fact"><span>UI</span><strong>React, static build</strong></div>
+            <div class="fact"><span>Migrations</span><strong>automatic on boot</strong></div>
+            <div class="fact"><span>Health</span><strong>HEALTHCHECK + probes</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="surfaces">
+    <div class="wrap">
+      <h2>Every surface, in one console<span class="accent">.</span></h2>
+      <p class="sub">
+        Each screen is backed by the API rather than by a mock: what the console shows is what the
+        platform actually holds.
+      </p>
+      <div class="grid three">
+        <div class="card">
+          <h3>Voice</h3>
+          <p>Live and completed call history, a browser softphone, extensions with voicemail boxes, carrier trunks, call routing and IVR, AI voice agents that answer and place calls, and workflows with recorded runs.</p>
+        </div>
+        <div class="card">
+          <h3>Messages and documents</h3>
+          <p>SMS, MMS and WhatsApp on your numbers; voicemail with audio and transcripts; fax in and out, accepting either an uploaded attachment or a plain-text body.</p>
+        </div>
+        <div class="card">
+          <h3>Registry and directory</h3>
+          <p>The canonical number registry, a moderation queue for submitted listings, verification by email or SMS code, duplicate detection and opt-out that removes a number from every host.</p>
+        </div>
+        <div class="card">
+          <h3>Commerce</h3>
+          <p>Invoices grouped by currency, payment links, a per-message delivery ledger, reminder sweeps, escalation to a final notice, suspension and reinstatement.</p>
+        </div>
+        <div class="card">
+          <h3>Estate and operations</h3>
+          <p>Sites with a real device inventory — handsets and gateways belong to a site, check themselves in and go stale on their own — plus provisioning configs a device fetches to configure itself.</p>
+        </div>
+        <div class="card">
+          <h3>Platform</h3>
+          <p>Health probes across every target the container can observe, connected systems, API keys with scopes, directory hostnames and the credential vault — all in Settings.</p>
+        </div>
+      </div>
+      <div class="note">
+        Nothing on a screen is a counter that drifts from reality: reminder counts come from the ledger,
+        device counts from the inventory, and the newest health row is current by definition.
+      </div>
+    </div>
+  </section>
+
+  <section id="phonebook">
+    <div class="wrap">
+      <h2>A worldwide phonebook, six front doors<span class="accent">.</span></h2>
+      <p class="sub">
+        One registry answers on six hostnames, each with its own label, tagline and accent — every one
+        serving the same data. A listing is published only after the number owner verifies a code and
+        an operator approves it.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Hostname</th><th>What it is for</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">telno.directory</td><td>The worldwide phonebook, one number at a time</td></tr>
+            <tr><td class="mono">num.directory</td><td>Look up any number, anywhere</td></tr>
+            <tr><td class="mono">number.directory</td><td>Every listing, verified and de-duplicated</td></tr>
+            <tr><td class="mono">directory.telno.services</td><td>Business and service lines worldwide</td></tr>
+            <tr><td class="mono">directory.pbx.services</td><td>Numbers behind hosted and on-premise PBX</td></tr>
+            <tr><td class="mono">directory.pbx.technology</td><td>Carrier, SIP and trunk registry</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="stack">
+        <span class="pill ok">245 countries normalized</span>
+        <span class="pill">Owner-only visibility</span>
+        <span class="pill">Removal on request</span>
+        <span class="pill info">Public API for lookup and search</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="security">
+    <div class="wrap">
+      <h2>Encrypted because you turned it on, not because you hoped<span class="accent">.</span></h2>
+      <p class="sub">
+        The generated endpoint is DTLS-SRTP and mandatory: the switch has no plain-media fallback to
+        quietly negotiate instead.
+      </p>
+      <div class="grid two">
+        <div class="card">
+          <h3>Media</h3>
+          <ul>
+            <li>DTLS-SRTP on every call the browser or a device places</li>
+            <li>ICE and AVPF on by default; coturn with expiring, per-session credentials for carrier-grade NAT</li>
+            <li>Video and screen sharing in the browser, and on a device that supports it</li>
+            <li>Recording policy enforced by the grade of service attached to the number — never by the client</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Platform</h3>
+          <ul>
+            <li>Passwords stored with scrypt; sessions are HMAC-signed and revocable per account</li>
+            <li><code>httpOnly</code>, <code>sameSite=lax</code> cookies that are <code>secure</code> in production</li>
+            <li>Provider keys in an encrypted vault; the API returns a hint, never a value</li>
+            <li>CSP, frame denial and a permissions policy that opens the camera and microphone to the page and nothing else</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note">
+        Encryption is per leg, and that is the honest limit: your leg is encrypted the moment you use
+        Telno, and the far end is encrypted when the far end supports it. A carrier that refuses SRTP
+        can only be reached in the clear, which is why the console reports what a call actually
+        negotiated rather than what was requested.
+      </div>
+    </div>
+  </section>
+
+  <section id="billing">
+    <div class="wrap">
+      <h2>Billing that chases the invoice itself<span class="accent">.</span></h2>
+      <p class="sub">
+        The ledger is the source of truth, not a counter: every rung is written before the provider is
+        called, so a restart or a second sweep cannot send the same message twice.
+      </p>
+      <div class="grid two">
+        <div class="card">
+          <h3>The ladder</h3>
+          <ul>
+            <li>Reminders go out on a configurable ladder as an invoice passes its due date</li>
+            <li>A final notice names the day service stops — and that is the date acted on</li>
+            <li>Severely overdue accounts are suspended, then reinstated automatically on payment</li>
+            <li>Each message records the provider that carried it, or the reason it failed</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Paying</h3>
+          <ul>
+            <li>Invoices, reminders, final notices and suspension emails carry a payment link</li>
+            <li>One page settles a whole balance, so a customer with three late bills needs one payment</li>
+            <li>Stripe webhooks mark an invoice paid against a verified signature</li>
+            <li>Email leaves through Resend or Mailjet, chosen in Settings, with no restart</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <div class="wrap">
+      <h2>Quick start<span class="accent">.</span></h2>
+      <ol class="steps">
+        <li>
+          <strong>Start the container</strong>
+          <code>docker compose up -d --build</code> — the switch, the API and the UI come up together.
+        </li>
+        <li>
+          <strong>Read the owner password</strong>
+          First boot prints it once in <code>docker compose logs telno</code>; nothing is emailed anywhere.
+        </li>
+        <li>
+          <strong>Sign in</strong>
+          The console is at <code>http://localhost:8080</code>, the public directory at <code>/d/telno.directory</code>.
+        </li>
+        <li>
+          <strong>Add a number and an extension</strong>
+          Generate the switch configuration from the console; it applies on change rather than waiting for a button.
+        </li>
+        <li>
+          <strong>Optional demo data</strong>
+          <code>docker compose exec telno node src/seed.js</code> loads listings across 19 countries, extensions and call history.
+        </li>
+      </ol>
+      <div class="note">
+        Every value that matters — session secret, API key pepper and the AMI password — is generated on
+        first boot and kept on the data volume. Back up that volume: it holds the database, call
+        recordings, voicemail audio and fax documents.
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="wrap">
+      <h2>Where it is<span class="accent">.</span></h2>
+      <p class="sub">
+        Shipped and exercised end to end by the repository's own test suite, which runs against a real
+        instance and covers number normalization, dedupe, verification, payments, escalation and the
+        device check-in path.
+      </p>
+      <div class="grid three">
+        <div class="card">
+          <h3>Shipped</h3>
+          <p>Console, softphone with encrypted audio and video, registry and directory, verification, billing and dunning, estate and devices, provisioning, health and audit.</p>
+          <p>Marketing campaigns over the voice agents with graded PDF reports, plans and features with a subscriber portal behind Stripe, and a portable softphone that keeps a line registered outside the console tab.</p>
+        </div>
+        <div class="card">
+          <h3>Hardened</h3>
+          <p>The container runs unprivileged, a production boot refuses a default admin password or a plain-HTTP public URL, and the data volume has a scheduled backup with a restore that applies at boot.</p>
+        </div>
+        <div class="card">
+          <h3>Next</h3>
+          <p>Real TLS certificates and the WSS listener behind them, monitoring that outlives the container, and a tenancy key for serving unrelated customers from one deployment.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap row">
+    <span>© <span id="year">2026</span> Telno — a product of <a href="https://github.com/innotelinc">Innotel Labs</a>.</span>
+    <a href="https://github.com/innotelinc/telno">Source</a>
+    <a href="https://github.com/innotelinc/telno/tree/main/docs">Docs</a>
+    <a href="https://github.com/innotelinc/telno/blob/main/LICENSE">AGPL-3.0</a>
+    <span class="muted">One registry, many doors.</span>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+<script>(function(){
+  var api=window.UnityTheme||window.OntrakTheme;if(!api)return;
+  function paint(){var now=api.mode();var all=document.querySelectorAll('[data-theme-mode]');
+    for(var i=0;i<all.length;i++){all[i].setAttribute('aria-pressed',String(all[i].getAttribute('data-theme-mode')===now));}}
+  var buttons=document.querySelectorAll('[data-theme-mode]');
+  for(var i=0;i<buttons.length;i++){buttons[i].addEventListener('click',function(){api.setMode(this.getAttribute('data-theme-mode'));});}
+  window.addEventListener('unity:theme',paint);window.addEventListener('ontrak:theme',paint);paint();
+})();</script>
+</body>
+</html>

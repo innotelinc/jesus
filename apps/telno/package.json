@@ -1,0 +1,38 @@
+{
+  "name": "telno-platform",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Slim all-in-one telephony platform, API and worldwide phonebook registry",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "predev": "node scripts/check-node.mjs",
+    "dev:web": "vite --config web/vite.config.js",
+    "start": "node src/index.js",
+    "prestart": "node scripts/check-node.mjs",
+    "check:node": "node scripts/check-node.mjs",
+    "build": "vite build --config web/vite.config.js",
+    "seed": "node src/seed.js",
+    "smoke": "node scripts/smoke.mjs",
+    "inspect": "node scripts/cdp-inspect.mjs"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.3",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/static": "^10.1.7",
+    "@fastify/websocket": "^11.3.4",
+    "fastify": "^5.12.7",
+    "libphonenumber-js": "^1.13.15",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sip.js": "^0.21.2",
+    "vite": "^8.3.5"
+  }
+}
