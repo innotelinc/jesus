@@ -66,6 +66,19 @@ services:
       SOFTPHONE_WSS_URL: ${SOFTPHONE_WSS_URL:-}
       SOFTPHONE_VIDEO: ${SOFTPHONE_VIDEO:-true}
       SOFTPHONE_ENABLED: ${SOFTPHONE_ENABLED:-true}
+      # Desk-phone provisioning: a handset fetches its config by MAC from this
+      # URL (DHCP Option 66), and registers as sip:<extension>@<domain>.
+      PROVISIONING_ENABLED: ${PROVISIONING_ENABLED:-true}
+      PROVISIONING_URL: ${PROVISIONING_URL:-https://telno.tel}
+      PROVISIONING_SIP_DOMAIN: ${PROVISIONING_SIP_DOMAIN:-}
+      PROVISIONING_SIP_PORT: ${PROVISIONING_SIP_PORT:-5060}
+      # Fax on the switch: res_fax with spandsp over the SIP trunk voice already
+      # uses. No carrier fax API, no per-page charge.
+      FAX_ENABLED: ${FAX_ENABLED:-true}
+      FAX_T38: ${FAX_T38:-true}
+      FAX_STATION_ID: ${FAX_STATION_ID:-Telno}
+      FAX_DIR: ${FAX_DIR:-}
+      FAX_MAX_RATE: ${FAX_MAX_RATE:-14400}
       # Apple push for the native app: the VoIP push that rings a locked iPhone.
       # The .p8 belongs on the data volume — set APNS_KEY_PATH to it, never put
       # the key itself in .env. Without a key the platform still works and the
