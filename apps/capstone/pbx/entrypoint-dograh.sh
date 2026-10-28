@@ -1,0 +1,1559 @@
+#!/bin/bash
+# ═══════════════════════════════════════════════════════════════════════════
+# dograh-ARI bootstrap for the FreePBX fullstack image.
+#
+# Injects the dograh ARI wiring into /etc/asterisk BEFORE the stock entrypoint
+# (entrypoint.sh) starts, so the config is in place for the first boot and
+# re-applied (idempotently) on every restart:
+#
+#   ari.conf            ARI user [dograh] converged into the live file
+#   http.conf               Asterisk HTTP on 8088 (only if the image lacks one)
+#   websocket_client.conf   external media WS -> dograh-api (host mode :8000)
+#   extensions_custom.conf  [dograh-inbound] dialplan context -> Stasis(dograh)
+#   rtp_custom.conf         cap RTP range to the compose-published 10101-10120
+#
+# /etc/asterisk is the named volume pbx-asterisk-config; FreePBX manages its
+# own files there (extensions.conf, http_additional.conf, ...) and does NOT
+# regenerate the *_custom.conf files above, so those injections survive Apply
+# Config. ari.conf on the pbx-portal fullstack image is a plain file (not a
+# module symlink, no #include) and survives `fwconsole reload` too, so the
+# [dograh] ARI user is converged straight into it on every boot.
+#
+# Env overrides (from the compose .env):
+#   DOGRAH_ARI_PASSWORD  strong password for the ARI user (sed'd into ari.conf)
+#   DOGRAH_WS_URI        media WebSocket URI (default ws://<LAN IP>:8000/...;
+#                        host.docker.internal is not resolvable here)
+#   PJSIP_LOCAL_NET      LAN subnet for the pjsip transport local_net (default 192.168.1.0/24)
+# ═══════════════════════════════════════════════════════════════════════════
+set -euo pipefail
+
+SRC="/opt/pbx-dograh"
+DEST="/etc/asterisk"
+
+echo ">>> [dograh-ari] injecting dograh ARI config into ${DEST}"
+
+# ── PHP memory_limit → 512M (idempotent) ──────────────────────────────────
+# The fullstack image ships memory_limit=128M in the PHP ini files (Apache +
+# FPM + CGI, PHP 8.2 and 7.4). The FreePBX UI / API can hit that ceiling on
+# large configs, so raise it to 512M on every boot.
+for ini in /etc/php/*/apache2/php.ini /etc/php/*/fpm/php.ini /etc/php/*/cgi/php.ini; do
+  [ -f "$ini" ] || continue
+  if grep -q '^memory_limit' "$ini"; then
+    sed -i 's/^memory_limit.*/memory_limit = 512M/' "$ini"
+  else
+    printf '\nmemory_limit = 512M\n' >> "$ini"
+  fi
+done
+echo ">>> [dograh-ari] PHP memory_limit set to 512M"
+
+# ── ODBC driver / socket fix (idempotent) ──────────────────────────────────
+# The image's /etc/odbc.ini references driver=MySQL, but only the MariaDB
+# driver ("MariaDB Unicode") is installed, and the socket path points at a
+# stale location. That makes res_odbc / cdr_adaptive_odbc / cel_odbc fail
+# with "Data source name not found" on every boot. Point the DSN at the
+# bundled MariaDB so CDR/CEL actually work.
+if [ -f /etc/odbc.ini ]; then
+  sed -i 's/^driver=MySQL[[:space:]]*$/driver=MariaDB Unicode/' /etc/odbc.ini
+  sed -i 's|^Socket=.*|Socket=/var/run/mysqld/mysqld.sock|' /etc/odbc.ini
+  echo ">>> [dograh-ari] odbc.ini driver -> MariaDB Unicode, socket fixed"
+fi
+
+# ── stasis.conf: keep minimum_size commented (idempotent) ──────────────────
+# The shipped sample has a stray option that Asterisk 22's res_stasis does not
+# register for its taskpool type, producing "Could not find option
+# 'minimum_size' with type 'threadpool' in module 'stasis'" at load. Keep any
+# uncommented occurrence commented out.
+if [ -f "${DEST}/stasis.conf" ]; then
+  sed -i 's/^[[:space:]]*minimum_size/;minimum_size/' "${DEST}/stasis.conf"
+  echo ">>> [dograh-ari] stasis.conf minimum_size kept commented"
+fi
+
+# ── cel_sqlite3_custom.conf: fix stray values line (idempotent) ────────────
+# The image ships a template where every section header is commented but one
+# `values = ...` line is not, causing "parse error: No category context for
+# line 64". Comment that stray line so the file parses (CEL stays disabled).
+if [ -f "${DEST}/cel_sqlite3_custom.conf" ]; then
+  # Hard-comment any stray uncommented key=value line that sits outside a
+  # real (non-commented) [section] — the image ships one such line at 64.
+  python3 - "${DEST}/cel_sqlite3_custom.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+cur_section = None
+changed = False
+for i, line in enumerate(lines):
+    s = line.strip()
+    if s.startswith('['):
+        cur_section = None if s.startswith(';[') else s
+        continue
+    if cur_section is None and s and not s.startswith(';') and '=' in s:
+        lines[i] = ';' + lines[i]
+        changed = True
+if changed:
+    open(p, 'w').write('\n'.join(lines))
+    print('>>> [dograh-ari] commented stray keys in cel_sqlite3_custom.conf')
+PYEOF
+fi
+
+# ── iax.conf / rtp.conf include hygiene (idempotent) ───────────────────────
+# The fullstack image appends '#include iax_fax_custom.conf' to BOTH iax.conf
+# and iax_custom.conf (and the module template adds it again), so the fax
+# config is loaded twice -> "Same File included more than once". Move it to
+# iax_custom_post.conf (included after everything else) and remove the dupes.
+# rtp.conf likewise ends up with '#include rtp_custom.conf' twice.
+fix_include_hygiene() {
+  # rtp.conf: keep exactly one '#include rtp_custom.conf' (the image appends
+  # a second one at build time -> "Same File included more than once")
+  if [ -f "${DEST}/rtp.conf" ]; then
+    python3 - "${DEST}/rtp.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+seen = False
+out = []
+for line in lines:
+    if line.strip() == '#include rtp_custom.conf':
+        if seen:
+            continue
+        seen = True
+    out.append(line)
+open(p, 'w').write('\n'.join(out))
+if seen:
+    print('>>> [dograh-ari] rtp.conf: deduped #include rtp_custom.conf')
+PYEOF
+  fi
+
+  # iax: drop the fax include from iax.conf and iax_custom.conf, keep it in
+  # iax_custom_post.conf (which iax.conf includes after everything else).
+  #
+  # IMPORTANT: /etc/asterisk/iax.conf is a SYMLINK to the core module template
+  # (/var/www/html/admin/modules/core/etc/iax.conf), and FreePBX re-creates the
+  # symlink on reload. So we must edit THROUGH the symlink with python
+  # (open() follows the link and rewrites the template in place); `sed -i`
+  # would replace the symlink with a regular file and the include would
+  # reappear on the next reload. Same for rtp.conf below.
+  if [ -L "${DEST}/iax.conf" ] || [ -f "${DEST}/iax.conf" ]; then
+    python3 - "${DEST}/iax.conf" <<'PYEOF' 2>/dev/null || true
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+out = [l for l in lines if l.strip() != '#include iax_fax_custom.conf']
+if out != lines:
+    open(p, 'w').write('\n'.join(out))
+    print('>>> [dograh-ari] removed fax include from iax.conf (via template)')
+PYEOF
+  fi
+  if [ -f "${DEST}/iax_custom.conf" ] && grep -q '^#include iax_fax_custom.conf' "${DEST}/iax_custom.conf"; then
+    sed -i '/^#include iax_fax_custom.conf/d' "${DEST}/iax_custom.conf"
+    echo ">>> [dograh-ari] removed fax include from iax_custom.conf"
+  fi
+  touch "${DEST}/iax_custom_post.conf"
+  if ! grep -q '^#include iax_fax_custom.conf' "${DEST}/iax_custom_post.conf"; then
+    printf '#include iax_fax_custom.conf\n' >> "${DEST}/iax_custom_post.conf"
+    echo ">>> [dograh-ari] fax include moved to iax_custom_post.conf"
+  fi
+  # The edits above ran as root (sed -i replaces files with a root-owned
+  # temp; touch creates root-owned). FreePBX regenerates iax.conf / rtp.conf
+  # (through the module-template symlinks) on Apply Config, and the reload
+  # user must be able to rewrite them — restore ownership or the next
+  # Apply Config dies with "Unknown Error. Please Run: fwconsole reload
+  # --verbose." chown follows the iax.conf/rtp.conf symlinks to the module
+  # templates, which is exactly what the reload regenerates.
+  chown asterisk:asterisk \
+    "${DEST}/iax.conf" \
+    "${DEST}/rtp.conf" \
+    "${DEST}/iax_custom.conf" \
+    "${DEST}/iax_custom_post.conf" 2>/dev/null || true
+}
+fix_include_hygiene
+
+# ── modules.conf: silence loader errors (idempotent) ────────────────────────
+# The fullstack image ships `preload = chan_local.so` but does NOT include
+# chan_local.so in the module tree, so every Asterisk start logs "cannot open
+# shared object file" for it. HEP and the SQLite CDR/CEL custom backends are
+# likewise shipped-but-disabled and log "declined to load". Comment the
+# chan_local preload and noload the unused modules so a clean boot runs quiet.
+fix_modules_conf() {
+  local MC="${DEST}/modules.conf"
+  [ -f "$MC" ] || return 0
+  sed -i 's|^preload = chan_local.so.*|;preload = chan_local.so  # module absent from image|' "$MC"
+  for m in res_hep.so res_hep_rtcp.so res_hep_pjsip.so \
+           cdr_sqlite3_custom.so cel_sqlite3_custom.so \
+           res_pjsip_phoneprov_provider.so; do
+    grep -q "^noload = $m$" "$MC" || printf 'noload = %s\n' "$m" >> "$MC"
+  done
+  # sed -i rewrote modules.conf as root (temp+rename). FreePBX regenerates
+  # this file on EVERY Apply Config, so a root-owned copy makes the reload
+  # user's write fail with "Unknown Error. Please Run: fwconsole reload
+  # --verbose." Restore ownership so the GUI's Apply Config can rewrite it.
+  chown asterisk:asterisk "$MC" 2>/dev/null || true
+  echo ">>> [dograh-ari] modules.conf: chan_local preload + unused modules noloaded"
+}
+fix_modules_conf
+
+# ── rtp_custom.conf: canonical content (idempotent) ─────────────────────────
+# Rewrite the whole file so it always contains exactly the RTP cap block the
+# compose publishes. Keeps stunaddr/icesupport even if the image file drifts.
+RTP_START="${FREEPBX_RTP_PORT_START:-10101}"
+RTP_END="${FREEPBX_RTP_PORT_END:-10120}"
+# Coturn runs on the host (published 3478/tcp+udp, relay 49152-49251). From
+# inside the freepbx container the host is host.docker.internal; override with
+# PJSIP_STUN_TURN_ADDR (e.g. the LAN IP) if the bridge gateway is not usable.
+# Default is the `coturn` compose service (same network — always resolvable),
+# not host.docker.internal: ast_sockaddr_resolve fails on that alias in
+# Asterisk's res_rtp_asterisk, which would silently disable STUN.
+STUN_TURN_ADDR="${PJSIP_STUN_TURN_ADDR:-coturn}:${TURN_LISTENING_PORT:-3478}"
+# STUN discovery and TURN are *different* servers, on purpose. Asterisk's STUN
+# client (`main/stun.c`) is RFC 3489 — a 16-byte transaction id and no RFC 5389
+# magic cookie — and coturn is RFC 5389 and, as that RFC requires, silently drops
+# a datagram that is not a STUN message. So a `stunaddr` pointed at coturn
+# discovered nothing and cost 3x3s of retries on every call. It runs with
+# `--no-stun` here anyway (an unauthenticated STUN endpoint on the WAN is a
+# public reflector), so the two addresses cannot be the same server. The default
+# below answers both generations and returns MAPPED-ADDRESS (0x0001), the one
+# attribute the legacy client parses. Override with PJSIP_STUN_ADDR; an empty
+# value disables discovery. See `pbx/rtp_settings_guard.py`.
+STUN_ADDR="${PJSIP_STUN_ADDR:-stun.l.google.com:19302}"
+# The WebRTC rows are read by *browsers*, and a browser's ICE wants a server
+# that answers a modern (RFC 5389) Binding request. coturn does, but it runs
+# `--no-stun`, so the browsers are handed the same public STUN Asterisk uses.
+# Only the STUN row moves: webrtcturnaddr stays on coturn, which is what relays
+# the media.
+WEBRTC_STUN_ADDR="${PJSIP_WEBRTC_STUN_ADDR:-${STUN_ADDR}}"
+if ! [[ "${RTP_START}" =~ ^[0-9]+$ && "${RTP_END}" =~ ^[0-9]+$ ]] || [ "${RTP_START}" -lt 1024 ] || [ "${RTP_START}" -gt "${RTP_END}" ]; then
+  echo ">>> [dograh-ari] invalid RTP range ${RTP_START}-${RTP_END}" >&2
+  exit 1
+fi
+cat > "${DEST}/rtp_custom.conf" <<EOF
+[general]
+stunaddr = ${STUN_ADDR}
+icesupport = yes
+rtpstart=${RTP_START}
+rtpend=${RTP_END}
+EOF
+chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
+echo ">>> [dograh-ari] rtp_custom.conf canonical (${RTP_START}-${RTP_END}, STUN ${STUN_ADDR}, TURN ${STUN_TURN_ADDR})"
+
+# ── logger security channel — rejected-SIP records for fail2ban ────────────
+# FreePBX owns logger.conf and regenerates it on Apply Config, but it ships
+# `#include logger_logfiles_custom.conf` inside the [logfiles] section — the
+# documented hook for extra channels. Adding `security => security` there makes
+# Asterisk write one res_security_log record per rejected SIP message to
+# /var/log/asterisk/security, which host-side fail2ban reads through the
+# asterisk-logs volume (scripts/install-fail2ban.sh + pbx/fail2ban/).
+#
+# Only the security channel is added: the `full` channel already carries the
+# "No matching endpoint found" / "Failed to authenticate" NOTICEs at the
+# image's default level, and the registration jail matches those there.
+# Idempotent — re-running never stacks duplicate channel lines, and an operator
+# who already added the channel keeps their version.
+LOGGER_CUSTOM="${DEST}/logger_logfiles_custom.conf"
+touch "${LOGGER_CUSTOM}"
+if ! grep -qE '^[[:space:]]*security[[:space:]]*=>' "${LOGGER_CUSTOM}"; then
+  {
+    echo
+    echo "; capstone: rejected-SIP records for fail2ban (scripts/install-fail2ban.sh)"
+    echo "security => security"
+  } >> "${LOGGER_CUSTOM}"
+  echo ">>> [dograh-ari] logger.conf security channel enabled (fail2ban)"
+else
+  echo ">>> [dograh-ari] logger.conf security channel already present"
+fi
+chown asterisk:asterisk "${LOGGER_CUSTOM}" 2>/dev/null || true
+
+# ── FreePBX API module: fix a corrupted line in the image ──────────────────
+# pbx-portal fullstack images shipped a stray 't' on Api.class.php:290
+# ("tif (!isset($activeModules[$module]))") which is a PHP parse error — it
+# makes every /admin/api request return HTTP 500 and freezes the dograh route
+# bootstrap (bootstrap_dograh_route.py waits forever for the OAuth token).
+# Idempotent: only rewrites the file when the corruption is present.
+API_CLASS="/var/www/html/admin/modules/api/Api.class.php"
+if [ -f "${API_CLASS}" ] && grep -qP '^t\s+if \(' "${API_CLASS}" 2>/dev/null; then
+  python3 - "${API_CLASS}" <<'PYEOF'
+import sys
+p = sys.argv[1]
+lines = open(p).read().split('\n')
+for i, line in enumerate(lines):
+    if line.startswith('t') and 'if (!isset($activeModules' in line:
+        lines[i] = '\t\t\t\t' + line[1:].lstrip()
+        break
+open(p, 'w').write('\n'.join(lines))
+print('>>> [dograh-ari] fixed corrupted Api.class.php line')
+PYEOF
+fi
+
+# Generic per-[section] merge fallback for images without python3 or the
+# converge tool. Used by the ari.conf and extensions_custom.conf blocks
+# below; merges per [section] (not just dialplan), replacing sections the
+# source defines and appending source-only ones, leaving foreign sections
+# untouched.
+inject_dialplan() {
+  local src="$1" dst="$2" tmp
+  tmp="$(mktemp)"
+  awk -v srcfile="${src}" '
+    BEGIN {
+      cur = ""
+      while ((getline line < srcfile) > 0) {
+        if (line ~ /^\[[^]]+\][ \t]*$/) {
+          cur = line
+          inctx[line] = 1
+          if (!(line in sblk)) sblk[line] = line "\n"
+          else sblk[line] = sblk[line] line "\n"
+        } else if (cur != "") {
+          sblk[cur] = sblk[cur] line "\n"
+        }
+      }
+      close(srcfile)
+    }
+    {
+      if ($0 ~ /^\[[^]]+\][ \t]*$/) {
+        if ($0 in inctx) {
+          if (!done[$0]) { printf "%s", sblk[$0]; done[$0] = 1 }
+          skipping = 1
+          next
+        }
+        skipping = 0
+        print
+        next
+      }
+      if (skipping) next
+      print
+    }
+    END {
+      for (c in inctx) if (!(c in done)) printf "%s", sblk[c]
+    }
+  ' "${dst}" > "${tmp}"
+  mv -f "${tmp}" "${dst}"
+  echo ">>> [dograh-ari] sections merged from $(basename "${src}")"
+}
+
+# ── ari.conf — [dograh] ARI user (always converge) ────────────────────────
+# The [dograh] ARI user must live in the file Asterisk actually reads. The
+# pbx-portal fullstack image ships /etc/asterisk/ari.conf as a PLAIN file
+# (verified: not a module symlink, no `#include ari_additional_custom.conf`,
+# and `fwconsole reload` does not regenerate it), so the older
+# ari_additional_custom.conf install was dead weight — nothing included it,
+# and a fresh install shipped with no ARI user. Converge the [dograh]
+# section straight into ari.conf: the section replaces wholesale while
+# [general] and any other users (e.g. a zeus ARI user on a shared PBX) pass
+# through untouched. inject_dialplan() doubles as the no-python fallback
+# here — it merges per [section] generically.
+if [ -f "${SRC}/ari.conf" ]; then
+  touch "${DEST}/ari.conf"
+  # Render the password into a temp fragment BEFORE merging, so the real
+  # password lands only inside the [dograh] section and never touches other
+  # ARI users' password lines. `|` delimiter: DOGRAH_ARI_PASSWORD is base64
+  # and can contain `/`, which would terminate a s/// sed and kill the
+  # entrypoint (the container then crash-looped on fresh installs).
+  ARI_SRC="${SRC}/ari.conf"
+  if [ -n "${DOGRAH_ARI_PASSWORD:-}" ]; then
+    ARI_SRC="$(mktemp)"
+    sed "s|^password = .*|password = ${DOGRAH_ARI_PASSWORD}|" "${SRC}/ari.conf" > "${ARI_SRC}"
+    echo ">>> [dograh-ari] ari.conf [dograh] password set from DOGRAH_ARI_PASSWORD"
+  else
+    echo ">>> [dograh-ari] WARNING: DOGRAH_ARI_PASSWORD unset — ari.conf keeps CHANGE_ME_ARI_PASSWORD"
+  fi
+  CONVERGE="${ASTERISK_CONVERGE_TOOL:-${SRC}/asterisk_converge.py}"
+  if command -v python3 >/dev/null 2>&1 && [ -f "${CONVERGE}" ]; then
+    python3 "${CONVERGE}" \
+      --target "${DEST}/ari.conf" \
+      --source "${ARI_SRC}" \
+      --owner capstone
+    echo ">>> [dograh-ari] ari.conf [dograh] user converged (owner=capstone)"
+  else
+    inject_dialplan "${ARI_SRC}" "${DEST}/ari.conf"
+    echo ">>> [dograh-ari] ari.conf [dograh] user merged (awk fallback)"
+  fi
+  if [ "${ARI_SRC}" != "${SRC}/ari.conf" ]; then
+    rm -f "${ARI_SRC}"
+  fi
+
+  # Some fullstack image versions regenerate ari.conf (FreePBX-owned, with
+  # `#include ari_additional_custom.conf`) on first boot, wiping the
+  # [dograh] section converged above. ari_additional_custom.conf is
+  # included by those images and is never regenerated by FreePBX, so write
+  # the [dograh] user there too (idempotent; harmless on images whose
+  # ari.conf is a plain file with no include).
+  ARI_CUSTOM="${DEST}/ari_additional_custom.conf"
+  if [ -f "${ARI_CUSTOM}" ] && ! grep -q '^\[dograh\]' "${ARI_CUSTOM}"; then
+    {
+      echo
+      echo "[dograh]"
+      echo "type = user"
+      echo "read_only = no"
+      echo "password = ${DOGRAH_ARI_PASSWORD:-CHANGE_ME_ARI_PASSWORD}"
+    } >> "${ARI_CUSTOM}"
+    echo ">>> [dograh-ari] ari_additional_custom.conf [dograh] user added (survives FreePBX boot)"
+  fi
+fi
+
+# ── http.conf (only if the image doesn't ship one — FreePBX manages HTTP) ──
+# NOTE: the fullstack image ships http.conf → FreePBX's managed file, and its
+# boot-time `fwconsole reload` REGENERATES http_additional.conf from the
+# freepbx_settings DB. So enabling HTTP at the file level does not survive a
+# boot. The durable enable happens post-boot via the settings DB (see the
+# background hook at the bottom of this script); this file stays as a base
+# fallback for images that ship no http.conf at all.
+if [ -f "${SRC}/http.conf" ] && [ ! -f "${DEST}/http.conf" ]; then
+  cp -f "${SRC}/http.conf" "${DEST}/http.conf"
+  echo ">>> [dograh-ari] installed http.conf (was missing)"
+fi
+
+# ── websocket_client.conf (always install; URI overridable) ────────────────
+if [ -f "${SRC}/websocket_client.conf" ]; then
+  cp -f "${SRC}/websocket_client.conf" "${DEST}/websocket_client.conf"
+  if [ -n "${DOGRAH_WS_URI:-}" ]; then
+    sed -i "s|^uri = .*|uri = ${DOGRAH_WS_URI}|" "${DEST}/websocket_client.conf"
+    echo ">>> [dograh-ari] websocket_client.conf uri set from DOGRAH_WS_URI"
+  elif grep -q 'host\.docker\.internal' "${DEST}/websocket_client.conf"; then
+    # PROJECT RULE: LAN addresses only. A volume carried over from an older
+    # image can still hold host.docker.internal, which is not resolvable here
+    # (ast_sockaddr_resolve fails on that alias) — repair it to the host LAN IP
+    # rather than leaving a URI whose failure is silent (no audio, empty log).
+    _ws_lan="${PJSIP_MEDIA_ADDRESS:-192.168.1.30}"
+    sed -i "s|host\.docker\.internal|${_ws_lan}|" "${DEST}/websocket_client.conf"
+    echo ">>> [dograh-ari] websocket_client.conf repaired: host.docker.internal -> ${_ws_lan}"
+  fi
+fi
+
+# ── extensions_custom.conf (context-aware merge, idempotent) ────────────────
+# The source file is CANONICAL for every [context] it defines: the PBX copy's
+# matching context is replaced wholesale with the source version, so
+# added/changed extensions propagate on the next boot and can never
+# duplicate. Contexts that exist only on the PBX side pass through untouched,
+# and source-only contexts are appended.
+#
+# Preferred path: the shared-voice-plane renderer (pbx/asterisk_converge.py)
+# — [dograh-inbound] replaces wholesale while [from-internal-custom] is
+# append-shared under `; >>> begin/end capstone` markers, so on a shared PBX
+# zeus (or FreePBX modules) can also add entries to that context without
+# capstone clobbering them. inject_dialplan() (defined above) is the fallback
+# for images without python3 or the converge tool.
+if [ -f "${SRC}/extensions_custom.conf" ]; then
+  touch "${DEST}/extensions_custom.conf"
+  CONVERGE="${ASTERISK_CONVERGE_TOOL:-${SRC}/asterisk_converge.py}"
+  if command -v python3 >/dev/null 2>&1 && [ -f "${CONVERGE}" ]; then
+    python3 "${CONVERGE}" \
+      --target "${DEST}/extensions_custom.conf" \
+      --source "${SRC}/extensions_custom.conf" \
+      --owner capstone --append from-internal-custom
+    echo ">>> [dograh-ari] dialplan contexts converged (owner=capstone)"
+  else
+    inject_dialplan "${SRC}/extensions_custom.conf" "${DEST}/extensions_custom.conf"
+  fi
+  # The Stasis app name is GENERATED by dograh per config (dograh_<hex>), not
+  # the ARI username. dograh_wire.py persists it as DOGRAH_STASIS_APP_NAME;
+  # rewrite the injected dialplan to route into that app (the source file
+  # keeps the legacy "dograh" default for pre-split configs).
+  if [ -n "${DOGRAH_STASIS_APP_NAME:-}" ]; then
+    sed -i "s/Stasis(dograh)/Stasis(${DOGRAH_STASIS_APP_NAME})/g" "${DEST}/extensions_custom.conf"
+    # extensions_custom_dograh.conf (numbers beyond the static 8000-8007 set,
+    # written by the Control Center's Agents page) needs the same rewrite —
+    # a bare Stasis(dograh) names an unregistered app and the call hangs up.
+    if [ -f "${DEST}/extensions_custom_dograh.conf" ]; then
+      sed -i "s/Stasis(dograh)/Stasis(${DOGRAH_STASIS_APP_NAME})/g" "${DEST}/extensions_custom_dograh.conf"
+    fi
+    echo ">>> [dograh-ari] dialplan Stasis app name -> ${DOGRAH_STASIS_APP_NAME}"
+  fi
+fi
+
+# Asterisk reads configs as the asterisk user — match the image's ownership.
+chown -R asterisk:asterisk \
+  "${DEST}/ari.conf" \
+  "${DEST}/websocket_client.conf" \
+  "${DEST}/extensions_custom.conf" \
+  "${DEST}/rtp_custom.conf" 2>/dev/null || true
+if [ -f "${DEST}/http.conf" ]; then
+  chown asterisk:asterisk "${DEST}/http.conf" 2>/dev/null || true
+fi
+
+echo ">>> [dograh-ari] configs injected — starting stock entrypoint in background"
+
+# ── Harden the stock entrypoint's value-injecting s/// seds ───────────────
+# The stock /usr/local/bin/entrypoint.sh uses UNGUARDED s///-delimited seds to
+# inject env values that are base64 (or otherwise can contain `/`) into config
+# files:
+#
+#     sed -i "s/secret = .*/secret = ${FREEPBX_AMI_SECRET}/" manager_custom.conf
+#     sed -i "s/define('AFDB_PASS',.*/...'${AVANTFAX_DB_PASS}'.../"
+#     sed -i "s/define('ADMIN_EMAIL',.*/...'${FAX_EMAIL}'.../"
+#
+# A `/` in the value terminates the s/// delimiter, sed fails with "unknown
+# option to `s'", and under `set -e` the entrypoint exits — the container
+# crash-loops (until-stopped restarts). This is the same bug we already
+# guarded for DOGRAH_ARI_PASSWORD: switch the delimiter to `|` so any value
+# (base64/hex/email, none of which contain `|`) works. Idempotent.
+#
+# Note: iteration over a list of (old, new) pairs is deliberate — the target
+# lines sit on DISK in the image and we rewrite them in place; a byte-exact
+# replace is the only safe transform.
+if [ -f /usr/local/bin/entrypoint.sh ]; then
+  python3 - <<'PYEOF' 2>/dev/null || true
+path = '/usr/local/bin/entrypoint.sh'
+src = open(path).read()
+changes = []
+
+# AMI secret (base64, the original crash-loop bug)
+pairs = [
+    ('s/secret = .*/secret = ${FREEPBX_AMI_SECRET}/',  'AMI secret',
+     's|secret = .*|secret = ${FREEPBX_AMI_SECRET}|'),
+    ("s/define('AFDB_PASS',.*/define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');/",
+     'AvantFax AFDB_PASS',
+     "s|define('AFDB_PASS',.*|define('AFDB_PASS',     '${AVANTFAX_DB_PASS}');|"),
+    ("s/define('ADMIN_EMAIL',.*/define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@capstone.innotel.us}');/",
+     'AvantFax ADMIN_EMAIL',
+     "s|define('ADMIN_EMAIL',.*|define('ADMIN_EMAIL', '${FAX_EMAIL:-fax@capstone.innotel.us}');|"),
+]
+for old, name, new in pairs:
+    if old in src:
+        src = src.replace(old, new)
+        changes.append(name)
+if changes:
+    open(path, 'w').write(src)
+    print('>>> [dograh-ari] hardened stock entrypoint seds: ' + ', '.join(changes) + ' -> `|` delimiter')
+PYEOF
+fi
+
+# ── Run Apache as the FreePBX system user (asterisk) ─────────────────────
+# The web UI's PHP runs via mod_php (mpm_prefork), i.e. as whatever user
+# Apache runs as. The stock image sets APACHE_RUN_USER=www-data, but FreePBX
+# expects the web server to run as the asterisk user: config writes, crontab
+# edits (queues' edit_crontab throws "Trying to edit user asterisk, when I'm
+# running as www-data"), and the reload lock all fail as www-data and surface
+# as Apply Config "Unknown Error. Please Run: fwconsole reload --verbose".
+# Flip the Apache runtime user/group to asterisk (apache2ctl reads envvars on
+# every start, so this is durable across boots and stock entrypoint restarts).
+if [ -f /etc/apache2/envvars ]; then
+  sed -i 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=asterisk/' /etc/apache2/envvars
+  sed -i 's/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=asterisk/' /etc/apache2/envvars
+  if grep -q 'APACHE_RUN_USER=asterisk' /etc/apache2/envvars; then
+    echo ">>> [dograh-ari] Apache runtime user -> asterisk:asterisk"
+  fi
+fi
+# A stale apache2.pid from a previous boot (docker restart preserves
+# /var/run) makes apache2ctl refuse to start with "httpd (pid N) already
+# running" — the web UI stays down while the container looks healthy. Clear
+# it before the stock entrypoint starts Apache. Idempotent + harmless.
+rm -f /var/run/apache2/apache2.pid
+
+# ── Run the stock entrypoint in the background so we can enable Asterisk ──
+# HTTP/ARI at the FreePBX settings-DB level AFTER it boots. The entrypoint's
+# own `fwconsole reload` regenerates http_additional.conf from the DB, so the
+# file-level http.conf above is not enough — HTTPENABLED must be flipped in
+# freepbx_settings (idempotent; harmless if already set).
+/usr/local/bin/entrypoint.sh "$@" &
+ENTRYPOINT_PID=$!
+
+trap 'kill -TERM ${ENTRYPOINT_PID} 2>/dev/null; exit 0' TERM INT
+
+# Wait for MariaDB to accept connections (the entrypoint starts it). Root
+# auth works via the unix socket — plain `mysql -u root` (no -h) is correct.
+for i in $(seq 1 120); do
+  if mysqladmin ping --silent 2>/dev/null; then
+    echo ">>> [dograh-ari] MariaDB up (attempt ${i})"
+    break
+  fi
+  sleep 5
+done
+
+# Flip HTTP on at the settings level (survives fwconsole reloads). Retry
+# until it actually takes effect — on first boot FreePBX may still be
+# populating freepbx_settings when MariaDB first answers. Guard everything
+# against `set -e` (a failed probe must NOT kill this wrapper).
+for i in $(seq 1 24); do
+  set +e
+  done=$(mysql -u root asterisk -N -B 2>/dev/null \
+    -e "UPDATE freepbx_settings SET value='1' WHERE keyword='HTTPENABLED' AND value!='1'; \
+        UPDATE freepbx_settings SET value='0.0.0.0' WHERE keyword='HTTPBINDADDRESS' AND value!='0.0.0.0'; \
+        INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpstart','${RTP_START}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_START}'; \
+        INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES ('rtpend','${RTP_END}',NULL,'noid') ON DUPLICATE KEY UPDATE val='${RTP_END}'; \
+        SELECT COUNT(*) FROM freepbx_settings WHERE keyword='HTTPENABLED' AND value='1';" \
+    | tail -1)
+  rc=$?
+  set -e
+  if [ "${rc}" -eq 0 ] && [ "${done:-0}" = "1" ]; then
+    echo ">>> [dograh-ari] HTTPENABLED=1 / HTTPBINDADDRESS=0.0.0.0 written to freepbx_settings"
+    # FreePBX may leave a stale generated file after the DB update. Ensure the
+    # generated config explicitly enables the HTTP server before reloading.
+    HTTP_ADDITIONAL="${DEST}/http_additional.conf"
+    if [ -f "${HTTP_ADDITIONAL}" ]; then
+      if grep -q '^enabled[[:space:]]*=' "${HTTP_ADDITIONAL}"; then
+        sed -i 's/^enabled[[:space:]]*=.*/enabled = yes/' "${HTTP_ADDITIONAL}"
+      else
+        printf '\n[general]\nenabled = yes\nbindaddr = 0.0.0.0\nbindport = 8088\n' >> "${HTTP_ADDITIONAL}"
+      fi
+      chown asterisk:asterisk "${HTTP_ADDITIONAL}" 2>/dev/null || true
+    fi
+    break
+  fi
+  sleep 5
+done
+
+# ── STUN / TURN / WebRTC wiring (durable, via the FreePBX settings DB) ──
+# Coturn runs on the host (published 3478/tcp+udp, relay 49152-49251) and is
+# wired into FreePBX/Asterisk at the settings level so the GUI's Apply Config
+# can't undo it:
+#   • SIP Settings → RTP (stunaddr/turnaddr/turnusername/turnpassword) →
+#     rtp_additional.conf — media-transport ICE STUN + TURN relay for RTP.
+#     stunaddr is the *discovery* server (PJSIP_STUN_ADDR), NOT coturn — and
+#     FreePBX lower-cases the TURN credential on the way into that file, so
+#     `pbx/rtp_settings_guard.py` re-asserts both rows after every reload.
+#   • SIP Settings → binds + wssport-0.0.0.0 → the WSS transport on 8089 (the
+#     port the compose service publishes and the portal's WSS URL uses)
+#   • SIP Settings → WebRTC (webrtcstunaddr/webrtcturnaddr/...) fields
+#   • Asterisk HTTP TLS is enabled on 0.0.0.0:8089 — the WSS transport does
+#     NOT create its own socket; it registers with the HTTP server's websocket
+#     support (res_http_websocket), so the TLS listener must be up for the
+#     pjsip WSS transport to accept WebRTC connections on 8089.
+# A durable [webrtc-template](!) endpoint template goes into
+# pjsip.endpoint_custom.conf (included by FreePBX, never regenerated) so
+# WebRTC devices inherit DTLS/ICE/TURN with template=webrtc-template.
+wire_stun_turn_webrtc() {
+  local turn_uri="${STUN_TURN_ADDR}"
+  local turn_user="${TURN_USERNAME:-}"
+  local turn_pass="${TURN_PASSWORD:-}"
+  # Hex-encode user/pass so the SQL string can't be broken by quotes/slashes.
+  local uh ph
+  uh="$(python3 -c 'import sys; print(sys.argv[1].encode().hex())' "$turn_user" 2>/dev/null || echo "")"
+  ph="$(python3 -c 'import sys; print(sys.argv[1].encode().hex())' "$turn_pass" 2>/dev/null || echo "")"
+
+  mysql -u root asterisk <<SQL
+INSERT INTO kvstore_Sipsettings (\`key\`, val, type, id) VALUES
+ ('stunaddr','${STUN_ADDR}',NULL,'noid'),
+ ('turnaddr','${turn_uri}',NULL,'noid'),
+ ('turnusername',UNHEX('${uh}'),NULL,'noid'),
+ ('turnpassword',UNHEX('${ph}'),NULL,'noid'),
+ ('webrtcstunaddr','${WEBRTC_STUN_ADDR}',NULL,'noid'),
+ ('webrtcturnaddr','${turn_uri}',NULL,'noid'),
+ ('webrtcturnusername',UNHEX('${uh}'),NULL,'noid'),
+ ('webrtcturnpassword',UNHEX('${ph}'),NULL,'noid'),
+ ('wssport-0.0.0.0','8089',NULL,'noid')
+ON DUPLICATE KEY UPDATE val=VALUES(val);
+UPDATE kvstore_Sipsettings SET val='{"udp":{"0.0.0.0":"on"},"tcp":{"0.0.0.0":"off"},"tls":{"0.0.0.0":"off"},"ws":{"0.0.0.0":"off"},"wss":{"0.0.0.0":"on"}}' WHERE \`key\`='binds';
+UPDATE freepbx_settings SET value='1' WHERE keyword='HTTPTLSENABLE' AND value!='1';
+UPDATE freepbx_settings SET value='0.0.0.0' WHERE keyword='HTTPTLSBINDADDRESS' AND value!='0.0.0.0';
+UPDATE freepbx_settings SET value='8089' WHERE keyword='HTTPTLSBINDPORT' AND value!='8089';
+SQL
+
+  # Durable WebRTC endpoint template (pjsip.endpoint_custom.conf is included
+  # by FreePBX's generated pjsip.endpoint.conf and is never regenerated).
+  local ec="${DEST}/pjsip.endpoint_custom.conf"
+  [ -f "$ec" ] || touch "$ec"
+  if ! grep -q '^\[webrtc-template\]' "$ec" 2>/dev/null; then
+    cat >> "$ec" <<EOF
+
+; Capstone WebRTC endpoint template — STUN/TURN relay via the host coturn.
+; Point a WebRTC device at it with template=webrtc-template (inherits DTLS,
+; ICE + TURN relay, rtcp-mux and the WSS transport on 0.0.0.0:8089).
+[webrtc-template](!)
+type = endpoint
+transport = 0.0.0.0-wss
+context = from-internal
+disallow = all
+allow = ulaw,alaw,opus,gsm,g722
+webrtc = yes
+dtls_auto_generate_cert = yes
+use_avpf = yes
+media_encryption = dtls
+ice_support = yes
+direct_media = no
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+rtcp_mux = yes
+; TURN relay is NOT set here: 'turnaddr/turnusername/turnpassword' are not
+; valid res_pjsip endpoint options (they'd fail the whole template). The
+; STUN/TURN relay lives at the RTP-engine level (rtp_additional.conf above),
+; which all WebRTC endpoints inherit automatically.
+EOF
+    echo ">>> [dograh-ari] webrtc-template written to pjsip.endpoint_custom.conf"
+  fi
+  chown asterisk:asterisk "$ec" 2>/dev/null || true
+
+  # Durable WebRTC test extension (default 101, WEBRTC_TEST_EXTENSION) —
+  # inherits the webrtc-template above. Endpoint + auth + aor all live in the
+  # never-regenerated *_custom.conf files so the GUI's Apply Config can't drop
+  # them. Lets anyone verify the WSS/DTLS/ICE path end-to-end with a browser
+  # SIP.js client (or the scripts/webrtc-register-test.py probe):
+  #   server wss://<host>:8089   user ${WEBRTC_TEST_EXTENSION:-101}
+  #   password ${WEBRTC_TEST_PASSWORD:-webrtc-test-101}
+  local webrtc_ext="${WEBRTC_TEST_EXTENSION:-101}"
+  local webrtc_pass="${WEBRTC_TEST_PASSWORD:-webrtc-test-101}"
+  local ec2="${DEST}/pjsip.endpoint_custom.conf"
+  local ac="${DEST}/pjsip.auth_custom.conf"
+  local oc="${DEST}/pjsip.aor_custom.conf"
+  [ -f "$ac" ] || touch "$ac"
+  [ -f "$oc" ] || touch "$oc"
+  # If the demo extension was renumbered away from 102 (the original default),
+  # drop the stale 102 demo sections so a re-provisioned box never keeps both.
+  if [ "$webrtc_ext" != "102" ]; then
+    for conf in "$ec2" "$ac" "$oc"; do
+      [ -f "$conf" ] || continue
+      awk -v keep="$webrtc_ext" '
+        /^\[/ { keepblock = ($0 ~ "^\\[102(\\(|\\])") || ($0 ~ "^\\[102-auth\\]");
+                if (!keepblock) print; next }
+        !keepblock { print }
+      ' "$conf" > "$conf.tmp" 2>/dev/null && mv "$conf.tmp" "$conf"
+    done
+  fi
+  if ! grep -q '^\['"$webrtc_ext"'\]' "$ec2" 2>/dev/null; then
+    cat >> "$ec2" <<EOF
+
+; Capstone WebRTC test extension — register from a browser over WSS with
+; user ${webrtc_ext} / ${webrtc_pass} (template=webrtc-template inherits DTLS/ICE/TURN).
+[${webrtc_ext}](webrtc-template)
+type = endpoint
+auth = ${webrtc_ext}-auth
+aors = ${webrtc_ext}
+callerid = WebRTC Test <${webrtc_ext}>
+EOF
+    echo ">>> [dograh-ari] webrtc test endpoint ${webrtc_ext} written to pjsip.endpoint_custom.conf"
+  fi
+  if ! grep -q '^\['"$webrtc_ext"'-auth\]' "$ac" 2>/dev/null; then
+    cat >> "$ac" <<EOF
+
+; WebRTC test extension auth (user ${webrtc_ext}) — ${webrtc_pass}
+[${webrtc_ext}-auth]
+type = auth
+auth_type = userpass
+username = ${webrtc_ext}
+password = ${webrtc_pass}
+EOF
+    echo ">>> [dograh-ari] webrtc test auth ${webrtc_ext}-auth written to pjsip.auth_custom.conf"
+  fi
+  if ! grep -q '^\['"$webrtc_ext"'\]' "$oc" 2>/dev/null; then
+    cat >> "$oc" <<EOF
+
+; WebRTC test extension AOR (single WSS contact)
+[${webrtc_ext}]
+type = aor
+max_contacts = 1
+remove_existing = yes
+EOF
+    echo ">>> [dograh-ari] webrtc test aor ${webrtc_ext} written to pjsip.aor_custom.conf"
+  fi
+  chown asterisk:asterisk "$ec2" "$ac" "$oc" 2>/dev/null || true
+  echo ">>> [dograh-ari] STUN/TURN/WebRTC wired (STUN/TURN ${turn_uri}, WSS :8089)"
+}
+wire_stun_turn_webrtc
+
+# Wait for the entrypoint's boot reload + web stack to finish (Apache on :80),
+# then reload once more so Asterisk picks up the DB change cleanly. Also
+# re-apply the include hygiene + canonical RTP file: the stock entrypoint may
+# regenerate iax.conf/rtp.conf from the module templates on first boot (or
+# after a module repair), which would re-introduce the duplicate includes.
+for i in $(seq 1 60); do
+  if timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/80' 2>/dev/null; then
+    echo ">>> [dograh-ari] web UI up (attempt ${i}) — reloading for ARI"
+    # Reset FreePBX-managed file ownership BEFORE reload. Our root-owned edits
+    # (sed/python rewrites of pjsip/http/template files) can leave root-owned
+    # files under /etc/asterisk that the www-data/asterisk reload user can no
+    # longer write, so FreePBX's Apply Config / reload dies with "Unknown
+    # Error. Please Run: fwconsole reload --verbose." fwconsole chown restores
+    # the expected owners and makes the reload (and later Apply-Configs)
+    # succeed. Idempotent + guarded so a failed chown never kills the boot.
+    fwconsole chown >/tmp/dograh-ari-chown.log 2>&1 || true
+    # Reload FIRST, then apply include hygiene LAST: `fwconsole reload`
+    # regenerates iax.conf/rtp.conf from the module templates, which would
+    # otherwise re-introduce the duplicate includes we just removed.
+    fwconsole reload >/tmp/dograh-ari-reload.log 2>&1 || true
+    fix_include_hygiene
+    fix_modules_conf
+
+    # Re-assert the two rows of rtp_additional.conf that FreePBX just mangled.
+    # `Sipsettings::genConfig()` strtolower()s turnusername/turnpassword (a TURN
+    # password is case-sensitive, so coturn answers "credentials are incorrect"
+    # once per call and the WebRTC relay is dead), and `stunaddr` has to name a
+    # server that speaks RFC 3489 — coturn runs `--no-stun` here and coturn is
+    # RFC 5389 anyway. Both fail silently: nothing on either side of the wire
+    # says the relay is gone. See pbx/rtp_settings_guard.py.
+    if [ -f /opt/rtp_settings_guard.py ]; then
+      set +e
+      python3 /opt/rtp_settings_guard.py \
+        --rtp-conf "${DEST}/rtp_additional.conf" \
+        --stun-addr "${STUN_ADDR}" \
+        --turn-username "${TURN_USERNAME:-}" \
+        --turn-password "${TURN_PASSWORD:-}" --apply
+      rtp_guard_rc=$?
+      set -e
+      if [ "${rtp_guard_rc}" = 0 ]; then
+        echo ">>> [dograh-ari] rtp_additional.conf converged (STUN ${STUN_ADDR}, TURN credential case restored)"
+      else
+        echo ">>> [dograh-ari] WARNING: rtp_additional.conf not converged (rc=${rtp_guard_rc}); coturn will reject every call (pbx/rtp_settings_guard.py)" >&2
+      fi
+      # res_rtp_asterisk caches the rows; a fresh file is not live until it reloads.
+      asterisk -rx "module reload res_rtp_asterisk.so" >/dev/null 2>&1 || true
+    fi
+
+    # ── The concurrency-limit row FreePBX only writes for its own children ──
+    # [macro-user-callerid] decides whether to block an outbound call with
+    #
+    #   $[... & ${DB_EXISTS(AMPUSER/${AMPUSER}/concurrency_limit)} &
+    #         ${DB(AMPUSER/${AMPUSER}/concurrency_limit)}>0 &
+    #         ${GROUP_COUNT(${AMPUSER}@concurrency_limit)}>=${DB(...)}]
+    #
+    # When that row is missing both DB() lookups expand to nothing, so the
+    # expression reads `... & 0 & >0 & 0>=]` — a syntax error, and Asterisk logs
+    # `ast_expr2.fl: ast_yyerror(): syntax error: ... unexpected '>'` on *every*
+    # call while evaluating the whole thing false. The outbound limit (a defence
+    # against a compromised extension) is therefore never enforced, and the
+    # warning is the only symptom.
+    #
+    # FreePBX writes the row itself in Core::addUser, defaulting to
+    # CONCURRENCYLIMITDEFAULT — but only on that path. An extension the legacy
+    # migration inserted straight into the database never went through it, so
+    # the row was never created. Seed it exactly the way FreePBX would; it is
+    # per extension and idempotent, so this is safe to re-run every boot.
+    if command -v asterisk >/dev/null 2>&1; then
+      conc_default="$(mysql -u root asterisk -N -B \
+        -e "SELECT value FROM freepbx_settings WHERE keyword='CONCURRENCYLIMITDEFAULT'" 2>/dev/null | head -1)"
+      [ -n "${conc_default}" ] || conc_default="0"
+      conc_seeded=0
+      for _ext in $(asterisk -rx "database show AMPUSER" 2>/dev/null \
+                      | sed -n 's#^/AMPUSER/\([^/]*\)/.*#\1#p' | sort -u); do
+        if ! asterisk -rx "database show AMPUSER/${_ext}/concurrency_limit" 2>/dev/null | grep -q concurrency_limit; then
+          asterisk -rx "database put AMPUSER ${_ext}/concurrency_limit ${conc_default}" >/dev/null 2>&1 \
+            && conc_seeded=$((conc_seeded + 1))
+        fi
+      done
+      if [ "${conc_seeded}" != 0 ]; then
+        echo ">>> [dograh-ari] concurrency_limit=${conc_default} seeded onto ${conc_seeded} extension(s) — [macro-user-callerid] had none to read"
+      fi
+    fi
+
+    # Re-assert the canonical RTP file too (regeneration can drop it).
+    if [ -f "${DEST}/rtp_custom.conf" ]; then
+      grep -q "^rtpstart=${RTP_START}" "${DEST}/rtp_custom.conf" 2>/dev/null || \
+        printf '[general]\nstunaddr = %s\nicesupport = yes\nrtpstart=%s\nrtpend=%s\n' "${STUN_ADDR}" "${RTP_START}" "${RTP_END}" > "${DEST}/rtp_custom.conf"
+      chown asterisk:asterisk "${DEST}/rtp_custom.conf" 2>/dev/null || true
+    fi
+    # Reload once more so the running Asterisk actually loads the cleaned
+    # configs (the reload above regenerated iax.conf/rtp.conf from the
+    # templates; hygiene cleaned them after the fact).
+    fwconsole reload >/tmp/dograh-ari-reload2.log 2>&1 || true
+    break
+  fi
+  sleep 5
+done
+
+# WSS transport bind changes require a full core restart (pjsip transports
+# are allow_reload=no; a plain reload keeps the old bind). Verify the
+# FreePBX-generated [0.0.0.0-wss] transport actually bound 0.0.0.0:8089 and
+# restart Asterisk once if not — this is what makes external WebRTC reachable.
+if ! asterisk -rx "pjsip show transport 0.0.0.0-wss" 2>/dev/null | grep -q '0.0.0.0:8089'; then
+  echo ">>> [dograh-ari] restarting Asterisk so the WSS transport binds :8089"
+  asterisk -rx "core restart now" >/dev/null 2>&1 || true
+  sleep 6
+fi
+
+# ── VoIP.ms SIP trunk auto-config (idempotent) ────────────────────────────
+# When VOIPMS_SIP_USER/VOIPMS_SIP_PASS are set (from the compose .env), write
+# a pjsip trunk that registers to the VoIP.ms server and route its DIDs to
+# the dograh agents. Two files:
+#
+#   pjsip_custom_voipms.conf   the trunk registration + endpoint/auth/aor
+#   extensions_custom_voipms.conf   inbound DID → dograh-inbound contexts
+#
+# FreePBX does NOT manage these files (they are #include'd from
+# pjsip_custom_post.conf / extensions_custom.conf, which the entrypoint
+# maintains), so they survive Apply Config / reloads.
+#
+# The DID list is discovered from the env (VOIPMS_DIDS, comma-separated).
+# Without it, the trunk registers but no DID routes are created — add DIDs
+# in the VoIP.ms portal, list them here, and restart the container.
+# Find the non-template transport section in pjsip.transports.conf (its
+# name varies by FreePBX build: 0.0.0.0-udp, transport-udp, ...). Returns ""
+# if none is found so callers can omit transport= and let res_pjsip fall back.
+detect_pjsip_transport() {
+  if [ -f "${DEST}/pjsip.transports.conf" ]; then
+    awk '
+      /^\[/ { sec=$0; sub(/^\[/,"",sec); sub(/\].*/,"",sec);
+              is_transport=0; is_template=0; next }
+      /^[[:space:]]*type[[:space:]]*=[[:space:]]*transport/ { is_transport=1 }
+      /template[[:space:]]*=[[:space:]]*yes/ { is_template=1 }
+      is_transport && !is_template && sec != "" && !done {
+        print sec; done=1
+      }
+    ' "${DEST}/pjsip.transports.conf" 2>/dev/null | head -1
+  fi
+}
+
+# Read the UDP bind port of a named transport section ("5060" from
+# "bind=0.0.0.0:5060"). Returns "" when the section/line is absent.
+detect_pjsip_bind_port() {
+  [ -n "$1" ] || return 0
+  [ -f "${DEST}/pjsip.transports.conf" ] || return 0
+  awk -v n="$1" '
+    $0 == "[" n "]" { insec=1; next }
+    insec && /^\[/ { exit }
+    insec && /^[[:space:]]*bind[[:space:]]*=/ {
+      v=$0; sub(/^[^:]*:/,"",v); gsub(/[^0-9].*/,"",v); print v; exit
+    }
+  ' "${DEST}/pjsip.transports.conf" 2>/dev/null | head -1
+}
+
+setup_voipms_trunk() {
+  local user="${VOIPMS_SIP_USER:-}" pass="${VOIPMS_SIP_PASS:-}" server="${VOIPMS_SIP_SERVER:-newyork1.voip.ms}"
+  [ -n "$user" ] && [ -n "$pass" ] || return 0
+  echo ">>> [dograh-ari] configuring VoIP.ms SIP trunk (${user}@${server})"
+
+  # The trunk identity FreePBX/asterisk sees. Registration string format:
+  #   <user>:<pass>@<server>:5060/<user>
+
+  # Reuse FreePBX's own SIP transport instead of defining our own: a second
+  # transport bound to 0.0.0.0:5060 collides with FreePBX's ("Address already
+  # in use") and the trunk can never register. Find the non-template transport
+  # section name; if none is found, omit transport= and let res_pjsip fall back
+  # to its default transport.
+  local transport_name
+  transport_name="$(detect_pjsip_transport)"
+  # Main transport attributes (external signaling address + the local_net
+  # list) so a dedicated registration transport can mirror them.
+  local main_ext_addr="" main_local_nets=""
+  if [ -n "$transport_name" ] && [ -f "${DEST}/pjsip.transports.conf" ]; then
+    main_ext_addr="$(awk -v n="$transport_name" '
+      $0 == "[" n "]" { insec=1; next }
+      insec && /^\[/ { exit }
+      insec && /external_signaling_address[[:space:]]*=/ { sub(/^[^=]*=/,""); print; exit }
+    ' "${DEST}/pjsip.transports.conf")"
+    main_local_nets="$(awk -v n="$transport_name" '
+      $0 == "[" n "]" { insec=1; next }
+      insec && /^\[/ { exit }
+      insec && /local_net[[:space:]]*=/ { print }
+    ' "${DEST}/pjsip.transports.conf")"
+  fi
+
+  # Which transport do the registration + endpoint use?
+  #   default        → FreePBX's own transport (normal case).
+  #   VOIPMS_REGISTER_PORT set to a port other than the main bind port → a
+  #   dedicated transport bound to that port. Two reasons to use one:
+  #   1. Some routers drop outbound UDP that originates from the same port as
+  #      a port-forward rule (the 5060 forward "swallows" the PBX's own
+  #      REGISTERs), so the REGISTER must leave from a different source port.
+  #   2. VoIP.ms (and similar anti-spoofing proxies) silently drop REGISTERs
+  #      whose Via port differs from the actual source port — so when using a
+  #      dedicated port, NO external_signaling_port override is set here: the
+  #      Via/Contact advertise the external IP with the SAME dedicated port
+  #      (external_signaling_address only). Inbound calls then arrive on that
+  #      port, so forward it on the router + publish it in the compose file.
+  local voipms_transport_line="" voipms_transport_extra=""
+  local reg_port="${VOIPMS_REGISTER_PORT:-}"
+  local main_port
+  main_port="$(detect_pjsip_bind_port "$transport_name")"
+  if [ -n "$reg_port" ] && [ "$reg_port" != "$main_port" ]; then
+    voipms_transport_line="transport=voipms-register"
+    voipms_transport_extra="
+[voipms-register]
+type=transport
+protocol=udp
+bind=0.0.0.0:${reg_port}
+${main_ext_addr:+external_signaling_address=${main_ext_addr}}
+${main_local_nets}
+allow_reload=no"
+  elif [ -n "$transport_name" ]; then
+    voipms_transport_line="transport=${transport_name}"
+  fi
+
+  cat > "${DEST}/pjsip_custom_voipms.conf" <<EOF
+; Auto-generated by pbx/entrypoint-dograh.sh — VoIP.ms SIP trunk.
+; Managed outside FreePBX (include hygiene keeps the include alive); edit via
+; the compose .env (VOIPMS_SIP_USER/VOIPMS_SIP_PASS/VOIPMS_SIP_SERVER/VOIPMS_DIDS).${voipms_transport_extra}
+
+[voipms-reg]
+type=registration
+${voipms_transport_line}
+outbound_auth=voipms-auth
+server_uri=sip:${server}
+client_uri=sip:${user}@${server}
+retry_interval=60
+
+[voipms-auth]
+type=auth
+auth_type=userpass
+username=${user}
+password=${pass}
+
+[voipms-identify]
+type=identify
+endpoint=voipms-endpoint
+match=${server}
+
+[voipms-endpoint]
+type=endpoint
+${voipms_transport_line}
+context=from-trunk
+disallow=all
+allow=ulaw,alaw
+outbound_auth=voipms-auth
+aors=voipms-aor
+from_domain=${server}
+
+[voipms-aor]
+type=aor
+contact=sip:${server}:5060
+qualify_frequency=60
+EOF
+
+  # Inbound routing: dashboard-managed DID → WebRTC-extension routes first,
+  # then static dograh agent mappings (VOIPMS_DIDS="2125551234:8003,..."
+  # DID:agent-ext pairs), then the dograh default (8000). The dashboard
+  # writes extensions_webrtc_dids_custom.conf (included below); this file is
+  # regenerated every boot but that one is only created when missing, so
+  # control-center routes survive restarts.
+  local dids="${VOIPMS_DIDS:-}"
+  local wdids="${DEST}/extensions_webrtc_dids_custom.conf"
+  if [ ! -f "$wdids" ]; then
+    {
+      echo "; Inbound DID → WebRTC-extension routes."
+      echo "; Managed by the Capstone control center (Extensions → routing); do"
+      echo "; not edit by hand — changes here are overwritten on the next write."
+      echo "; Each line:  exten => <did>,1,NoOp(...)"
+      echo ";              same => n,Dial(PJSIP/<extension>,45)"
+    } > "$wdids"
+  fi
+  {
+    echo "; Auto-generated by pbx/entrypoint-dograh.sh — VoIP.ms DID routing."
+    echo "; The voipms-endpoint context is FreePBX's [from-trunk], so inbound"
+    echo "; calls are routed by FreePBX inbound routes (the 'incoming' table,"
+    echo "; GUI: Connectivity → Inbound Routes) — e.g. 7745057135 →"
+    echo "; dograh-inbound,8000,1 — with a catch-all route to the dograh"
+    echo "; default agent (8000). The contexts below are kept as a dormant"
+    echo "; hook for the dashboard control center (extensions_webrtc_dids_custom.conf);"
+    echo "; trunk calls no longer enter [from-trunk-voipms] / [webrtc-inbound]."
+    echo "[from-trunk-voipms]"
+    echo "exten => _X.,1,NoOp(VoIP.ms inbound)"
+    # shellcheck disable=SC2016  # ${EXTEN} is Asterisk dialplan syntax, must stay literal
+    echo ' same => n,Goto(webrtc-inbound,${EXTEN},1)'
+    echo " same => n,Hangup()"
+    echo ""
+    echo "[webrtc-inbound]"
+    echo "; Dashboard-managed DID → WebRTC-extension routes (control center)."
+    echo "#include extensions_webrtc_dids_custom.conf"
+    if [ -n "$dids" ]; then
+      local pair did ext
+      IFS=','
+      for pair in $dids; do
+        did="${pair%%:*}"
+        ext="${pair#*:}"
+        [ "$ext" != "$did" ] || ext=8000
+        [ -n "$did" ] || continue
+        echo "exten => ${did},1,NoOp(VoIP.ms DID ${did} -> dograh ext ${ext})"
+        echo " same => n,Goto(dograh-inbound,${ext},1)"
+        echo " same => n,Hangup()"
+      done
+      unset IFS
+    else
+      echo "; No VOIPMS_DIDS configured — agent DIDs below default to dograh 8000."
+    fi
+    echo "; No route matched — dograh default agent (8000)."
+    echo "exten => _X.,1,NoOp(no inbound route -> dograh ext 8000)"
+    echo " same => n,Goto(dograh-inbound,8000,1)"
+    echo " same => n,Hangup()"
+  } > "${DEST}/extensions_custom_voipms.conf"
+
+  # Wire the includes (idempotent). The pjsip trunk include goes into
+  # pjsip_custom_post.conf (loaded last, after FreePBX's own pjsip files);
+  # the DID routing include goes into extensions_custom.conf (which FreePBX
+  # already #includes from its generated extensions.conf).
+  local inc
+  inc="${DEST}/pjsip_custom_post.conf"
+  [ -f "$inc" ] || touch "$inc"
+  grep -q '#include pjsip_custom_voipms.conf' "$inc" 2>/dev/null || \
+    printf '\n#include pjsip_custom_voipms.conf\n' >> "$inc"
+  inc="${DEST}/extensions_custom.conf"
+  [ -f "$inc" ] || touch "$inc"
+  grep -q '#include extensions_custom_voipms.conf' "$inc" 2>/dev/null || \
+    printf '\n#include extensions_custom_voipms.conf\n' >> "$inc"
+
+  # Ownership for the reload user (fwconsole chown also runs before reload).
+  chown asterisk:asterisk "${DEST}/pjsip_custom_voipms.conf" \
+    "${DEST}/extensions_custom_voipms.conf" \
+    "${DEST}/extensions_webrtc_dids_custom.conf" 2>/dev/null || true
+  echo ">>> [dograh-ari] VoIP.ms trunk configured (registration to ${server})"
+}
+setup_voipms_trunk
+
+# ── Cloudonix SIP trunk auto-config (idempotent) ───────────────────────────
+# Peers this PBX with a Cloudonix domain so Cloudonix-originated calls land on
+# Asterisk (and therefore on the dograh agents) instead of using Cloudonix's
+# own websocket application path.
+#
+# Two ways to admit Cloudonix traffic, and both can be on at once:
+#   • IP identity (default): the Cloudonix regional edge is trusted via a
+#     pjsip `identify` block. CLOUDONIX_EDGE_IP defaults to the Global edge IP
+#     that dograh's own region table publishes
+#     (api/services/telephony/providers/cloudonix/regions.py), so the PBX and
+#     the platform agree on the peer without extra configuration.
+#   • Registration (NAT-friendly, mirrors the VoIP.ms trunk): set
+#     CLOUDONIX_SIP_USER/CLOUDONIX_SIP_PASS and the trunk registers out to
+#     Cloudonix; inbound calls then arrive on that registration, so no inbound
+#     5060 port-forward is required.
+#
+# Files written (FreePBX never manages them; the entrypoint keeps the
+# #include lines alive):
+#   pjsip_custom_cloudonix.conf       endpoint/auth/aor/identify/registration
+#   extensions_custom_cloudonix.conf  dormant DID -> dograh-inbound hook
+setup_cloudonix_trunk() {
+  local enabled="${CLOUDONIX_SIP_ENABLED:-}"
+  local server="${CLOUDONIX_SIP_SERVER:-sip.cloudonix.net}"
+  local edge_ip="${CLOUDONIX_EDGE_IP:-18.219.128.166}"
+  local sip_port="${CLOUDONIX_SIP_PORT:-5060}"
+  local user="${CLOUDONIX_SIP_USER:-}" pass="${CLOUDONIX_SIP_PASS:-}"
+  local dids="${CLOUDONIX_DIDS:-}"
+
+  # Opt-in explicitly, or automatically when anything Cloudonix-specific is set.
+  if [ -z "$enabled" ] && [ -z "${CLOUDONIX_SIP_SERVER:-}" ] && \
+     [ -z "${CLOUDONIX_EDGE_IP:-}" ] && [ -z "$user" ] && [ -z "$dids" ]; then
+    return 0
+  fi
+  echo ">>> [dograh-ari] configuring Cloudonix SIP trunk (edge ${edge_ip}, server ${server})"
+
+  local transport_name transport_line=""
+  transport_name="$(detect_pjsip_transport)"
+  [ -n "$transport_name" ] && transport_line="transport=${transport_name}"
+
+  # Registration only when credentials are supplied — otherwise the trunk is
+  # IP-identified, which is what a Cloudonix domain with a peer trunk uses.
+  # The AOR reference is unconditional: the endpoint needs it to place OUTBOUND
+  # calls through the static contact (and the qualify that keeps the edge warm);
+  # only the auth differs between the two admission modes.
+  local reg_block="" auth_block="" outbound_auth_line=""
+  local aors_line="aors=cloudonix-aor"
+  if [ -n "$user" ] && [ -n "$pass" ]; then
+    reg_block="
+[cloudonix-reg]
+type=registration
+${transport_line:+${transport_line}}
+outbound_auth=cloudonix-auth
+server_uri=sip:${server}:${sip_port}
+client_uri=sip:${user}@${server}
+retry_interval=60"
+    auth_block="
+[cloudonix-auth]
+type=auth
+auth_type=userpass
+username=${user}
+password=${pass}"
+    outbound_auth_line="outbound_auth=cloudonix-auth"
+    aors_line="aors=cloudonix-aor"
+  fi
+
+  cat > "${DEST}/pjsip_custom_cloudonix.conf" <<EOF
+; Auto-generated by pbx/entrypoint-dograh.sh — Cloudonix SIP trunk.
+; Managed outside FreePBX (include hygiene keeps the include alive); edit via
+; the compose .env (CLOUDONIX_SIP_SERVER/CLOUDONIX_EDGE_IP/CLOUDONIX_SIP_USER/
+; CLOUDONIX_SIP_PASS/CLOUDONIX_DIDS).
+${reg_block}
+${auth_block}
+
+[cloudonix-identify]
+type=identify
+endpoint=cloudonix-endpoint
+match=${edge_ip}/32
+match=${server}
+
+[cloudonix-endpoint]
+type=endpoint
+${transport_line}
+context=from-trunk
+disallow=all
+allow=ulaw,alaw
+${outbound_auth_line}
+${aors_line}
+from_domain=${server}
+
+[cloudonix-aor]
+type=aor
+contact=sip:${server}:${sip_port}
+qualify_frequency=60
+EOF
+
+  # Inbound DID hook: Cloudonix's endpoint context is FreePBX's [from-trunk],
+  # so real DID routes come from the incoming table (Connectivity → Inbound
+  # Routes). The context below is the same dormant pattern the VoIP.ms trunk
+  # keeps for dashboard-managed routes.
+  {
+    echo "; Auto-generated by pbx/entrypoint-dograh.sh — Cloudonix DID routing."
+    echo "; Calls from the Cloudonix edge enter FreePBX's [from-trunk] and are"
+    echo "; routed by the incoming table. This context is a dormant hook for"
+    echo "; CLOUDONIX_DIDS entries (did:agent-ext pairs)."
+    echo "[from-trunk-cloudonix]"
+    echo "exten => _X.,1,NoOp(Cloudonix inbound)"
+    # shellcheck disable=SC2016  # ${EXTEN} is Asterisk dialplan syntax, must stay literal
+    echo ' same => n,Goto(from-trunk,${EXTEN},1)'
+    echo " same => n,Hangup()"
+    if [ -n "$dids" ]; then
+      local pair did ext
+      IFS=','
+      for pair in $dids; do
+        did="${pair%%:*}"
+        ext="${pair#*:}"
+        [ "$ext" != "$did" ] || ext=8000
+        [ -n "$did" ] || continue
+        echo "exten => ${did},1,NoOp(Cloudonix DID ${did} -> dograh ext ${ext})"
+        echo " same => n,Goto(dograh-inbound,${ext},1)"
+        echo " same => n,Hangup()"
+      done
+      unset IFS
+    fi
+  } > "${DEST}/extensions_custom_cloudonix.conf"
+
+  local inc
+  inc="${DEST}/pjsip_custom_post.conf"
+  [ -f "$inc" ] || touch "$inc"
+  grep -q '#include pjsip_custom_cloudonix.conf' "$inc" 2>/dev/null || \
+    printf '\n#include pjsip_custom_cloudonix.conf\n' >> "$inc"
+  inc="${DEST}/extensions_custom.conf"
+  [ -f "$inc" ] || touch "$inc"
+  grep -q '#include extensions_custom_cloudonix.conf' "$inc" 2>/dev/null || \
+    printf '\n#include extensions_custom_cloudonix.conf\n' >> "$inc"
+
+  chown asterisk:asterisk "${DEST}/pjsip_custom_cloudonix.conf" \
+    "${DEST}/extensions_custom_cloudonix.conf" 2>/dev/null || true
+  echo ">>> [dograh-ari] Cloudonix trunk configured (edge ${edge_ip} → context from-trunk)"
+}
+setup_cloudonix_trunk
+
+# ── FreePBX outbound route for the VoIP.ms trunk (GUI-visible) ─────────────
+# The pjsip files above make the trunk register; the FreePBX GUI needs a
+# trunk row + outbound route in the core tables so calls from internal
+# extensions can dial out through it. We insert the rows directly (the same
+# tables the GUI writes) — idempotently, guarded so a schema difference on
+# some FreePBX build never breaks boot. After this, Connectivity → Outbound
+# Routes shows "voipms" wired to the endpoint.
+setup_voipms_outbound_route() {
+  [ -n "${VOIPMS_SIP_USER:-}" ] && [ -n "${VOIPMS_SIP_PASS:-}" ] || return 0
+  echo ">>> [dograh-ari] ensuring FreePBX outbound route for the VoIP.ms trunk"
+
+  # Trunk row (tech=custom → channelid holds the dial string).
+  local trunk_id=""
+  trunk_id="$(mysql -N -B -u root asterisk \
+    -e "SELECT trunkid FROM trunks WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  if [ -z "$trunk_id" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO trunks (name, tech, channelid) VALUES ('voipms','custom','PJSIP/\${EXTEN}@voipms-endpoint')" \
+      2>/dev/null || return 1
+    trunk_id="$(mysql -N -B -u root asterisk \
+      -e "SELECT trunkid FROM trunks WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  fi
+  [ -n "$trunk_id" ] || { echo ">>> [dograh-ari] WARN: could not create voipms trunk row" >&2; return 1; }
+
+  # Outbound route row (match most common patterns; user can add more in GUI).
+  local route_id=""
+  route_id="$(mysql -N -B -u root asterisk \
+    -e "SELECT route_id FROM outbound_routes WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  if [ -z "$route_id" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_routes (name) VALUES ('voipms')" 2>/dev/null || return 1
+    route_id="$(mysql -N -B -u root asterisk \
+      -e "SELECT route_id FROM outbound_routes WHERE name='voipms' LIMIT 1" 2>/dev/null | head -1)"
+  fi
+  [ -n "$route_id" ] || { echo ">>> [dograh-ari] WARN: could not create voipms outbound route" >&2; return 1; }
+
+  # Pattern: anything the user dials (7-15 digits, leading 1 or 011 allowed).
+  local has_pat
+  has_pat="$(mysql -N -B -u root asterisk \
+    -e "SELECT COUNT(*) FROM outbound_route_patterns WHERE route_id=${route_id}" 2>/dev/null)"
+  if [ "${has_pat:-0}" = "0" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_route_patterns (route_id, match_pattern_prefix, match_pattern_pass) VALUES (${route_id},'', 'X.'), (${route_id},'', '1NXXNXXXXXX'), (${route_id},'', '011.')" \
+      2>/dev/null || return 1
+  fi
+
+  # Route sequence: FreePBX's getAllRoutes() JOINs outbound_route_sequence, so
+  # a route with no row there never appears in the dialplan. Add it (seq 0 =
+  # first route tried).
+  local seqd
+  seqd="$(mysql -N -B -u root asterisk \
+    -e "SELECT COUNT(*) FROM outbound_route_sequence WHERE route_id=${route_id}" 2>/dev/null)"
+  if [ "${seqd:-0}" = "0" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_route_sequence (route_id, seq) VALUES (${route_id}, 0)" \
+      2>/dev/null || return 1
+  fi
+
+  # Link trunk to route. The column is `seq` (trunk ordering), not `priority`.
+  local linked
+  linked="$(mysql -N -B -u root asterisk \
+    -e "SELECT COUNT(*) FROM outbound_route_trunks WHERE route_id=${route_id} AND trunk_id=${trunk_id}" 2>/dev/null)"
+  if [ "${linked:-0}" = "0" ]; then
+    mysql -u root asterisk \
+      -e "INSERT INTO outbound_route_trunks (route_id, trunk_id, seq) VALUES (${route_id}, ${trunk_id}, 1)" \
+      2>/dev/null || return 1
+  fi
+  echo ">>> [dograh-ari] FreePBX outbound route 'voipms' ready (route ${route_id}, trunk ${trunk_id})"
+}
+setup_voipms_outbound_route
+# The trunk files were written after the boot reload, so make the running
+# Asterisk pick them up now (guarded — a failed reload must not kill boot).
+if [ -f "${DEST}/pjsip_custom_voipms.conf" ]; then
+  fwconsole chown >/dev/null 2>&1 || true
+  asterisk -rx "module reload res_pjsip.so" >/dev/null 2>&1 || true
+  asterisk -rx "dialplan reload" >/dev/null 2>&1 || true
+  echo ">>> [dograh-ari] pjsip + dialplan reloaded for the VoIP.ms trunk"
+fi
+
+# ── pjsip local media-address fix (durable LAN one-way-audio fix) ───────
+# FreePBX regenerates pjsip.transports.conf / pjsip.endpoint.conf (with
+# external_media_address=public for remote SIP) on every apply/reload. Inside
+# the docker container pjsip would otherwise advertise a docker-bridge IP
+# (172.x) as the LOCAL media address, so LAN softphones get an unreachable
+# address and their RTP never reaches Asterisk — one-way audio. Fix: mark the
+# LAN subnet as local_net on the transport (so remote peers still get the
+# public address) and force media_address=<host LAN IP> on each LAN-only
+# endpoint (so that endpoint advertises the reachable address). The transport
+# setting goes in the durable pjsip.transports_custom.conf (which Apply Config
+# does NOT regenerate), so it survives reloads. Overridables: PJSIP_LOCAL_NET
+# (192.168.1.0/24), PJSIP_MEDIA_ADDRESS (192.168.1.30), PJSIP_LAN_ENDPOINTS
+# (space-separated, default 101).
+inject_pjsip_media_address() {
+  # transport: mark the LAN subnet as local so remote peers keep the public
+  # addr. Write a [<transport>] section into pjsip.transports_custom.conf
+  # (the file FreePBX #includes and does NOT regenerate), rather than sed-ing
+  # the generated pjsip.transports.conf which Apply Config overwrites.
+  local net="${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}"
+  local transport_name
+  transport_name="$(detect_pjsip_transport)"
+  if [ -n "$transport_name" ]; then
+    local cfg="${DEST}/pjsip.transports_custom.conf"
+    [ -f "$cfg" ] || touch "$cfg"
+    python3 - "$cfg" "$transport_name" "$net" <<'PY'
+import sys
+p, transport, net = sys.argv[1], sys.argv[2], sys.argv[3]
+lines = [ln for ln in open(p).read().split('\n')]
+if lines and lines[-1] == '':
+    lines.pop()
+# Locate the [transport] section and whether it already sets local_net.
+start = None
+needs_local = True   # missing -> we must set it
+cur = None
+for i, ln in enumerate(lines):
+    s = ln.strip()
+    if s.startswith('['):
+        cur = s.strip('[]').strip()
+        if cur == transport and start is None:
+            start = i
+    elif cur == transport and start is not None:
+        if s.startswith('local_net='):
+            needs_local = False
+# If the section is missing, append a clean [transport] section at the end
+# (pjsip merges same-name sections; no #include/[0] wrapper is needed).
+if start is None:
+    lines.append('')
+    lines.append('[' + transport + ']')
+    start = len(lines) - 1
+if needs_local:
+    lines[start+1:start+1] = ['local_net=' + net]
+    open(p, 'w').write('\n'.join(lines) + '\n')
+    print('>>> [dograh-ari] pjsip transport local_net=' + net + ' (in pjsip.transports_custom.conf [' + transport + '])')
+PY
+  fi
+  # endpoints: force media_address to the host LAN IP for LAN-only extensions
+  local ecfg="${DEST}/pjsip.endpoint.conf"
+  local lan_ip="${PJSIP_MEDIA_ADDRESS:-192.168.1.30}"
+  local eps="${PJSIP_LAN_ENDPOINTS:-101}"
+  if [ -f "$ecfg" ]; then
+    python3 - "$ecfg" "$lan_ip" "$eps" <<'PY'
+import sys
+p, ip, eps = sys.argv[1], sys.argv[2], sys.argv[3].split()
+lines = open(p).read().split('\n')
+out, section, added, changed = [], None, False, False
+for line in lines:
+    s = line.strip()
+    if s.startswith('['):
+        section = s.strip('[]').strip()
+        added = False
+    out.append(line)
+    if not added and s == 'type=endpoint' and section in eps:
+        out.append('media_address=' + ip)
+        added, changed = True, True
+if changed:
+    open(p, 'w').write('\n'.join(out) + '\n')
+    print('>>> [dograh-ari] pjsip media_address=' + ip + ' for endpoints: ' + ', '.join(eps))
+PY
+  fi
+  asterisk -rx "module reload res_pjsip.so" >/dev/null 2>&1 || true
+}
+inject_pjsip_media_address
+# The pjsip block rewrites the generated endpoint config as root (python);
+# restore ownership so a later Apply Config / reload (which rewrites these
+# files) can do so instead of failing the reload with "Unknown Error".
+chown asterisk:asterisk \
+  "${DEST}/pjsip.transports_custom.conf" \
+  "${DEST}/pjsip.endpoint.conf" 2>/dev/null || true
+
+# ── AvantFAX + UCP durable bring-up (idempotent, every boot) ───────────────
+# The fullstack image ships /var/lib/asterisk/bin/fwconsole (and the
+# /usr/sbin/fwconsole symlink) WITHOUT the exec bit, so `fwconsole` fails
+# with "not executable" until someone chmods it. Self-heal it here so the
+# CLI works on every boot (and future image rebuilds bake the fix in).
+chmod +x /var/lib/asterisk/bin/fwconsole /usr/sbin/fwconsole 2>/dev/null || true
+
+# FreePBX's UCP module (web panel + softphone presence) must stay enabled.
+# The FreePBX module DB is volatile across container recreations until
+# fwconsole re-registers modules, so re-enable idempotently when MariaDB is
+# up (the module itself is installed in the image). Guarded: a failure here
+# must never kill the boot.
+set +e
+fwconsole ma enable ucp >/tmp/dograh-ucp-enable.log 2>&1
+set -e
+if grep -qi 'enabled' /tmp/dograh-ucp-enable.log 2>/dev/null; then
+  echo ">>> [dograh-ari] UCP module enabled"
+fi
+
+# AvantFAX (the fax UI at /fax) needs its MySQL user + schema aligned with
+# local_config.php on every boot. The stock entrypoint injects AFDB_PASS /
+# ADMIN_EMAIL into the config from env, but the avantfax DATABASE itself is
+# never bootstrapped by the image, so on a fresh (or rebuilt) MariaDB volume
+# AvantFAX reports "The AvantFAX database is DOWN". Converge all three:
+# db/user (idempotent), schema (import when empty), config (env-forced).
+ensure_avantfax() {
+  local dbpass="${AVANTFAX_DB_PASS:-1d18eb145d805ff7}"
+  local faxemail="${FAX_EMAIL:-fax@innotel.us}"
+  local faxhost="${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}"
+
+  # DB + user: never DROP (idempotent); set the password every boot so the
+  # user always matches the injected config value.
+  mysql -u root <<SQL
+CREATE DATABASE IF NOT EXISTS avantfax DEFAULT CHARACTER SET utf8;
+CREATE USER IF NOT EXISTS 'avantfax'@'localhost' IDENTIFIED BY '${dbpass}';
+ALTER USER 'avantfax'@'localhost' IDENTIFIED BY '${dbpass}';
+GRANT ALL PRIVILEGES ON avantfax.* TO 'avantfax'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+  # Schema: create_tables.sql ships with AvantFAX in the image and is
+  # all CREATE TABLE IF NOT EXISTS — safe to import whenever empty.
+  local n_tables
+  n_tables="$(mysql -u root avantfax -N -B -e 'SHOW TABLES;' 2>/dev/null | wc -l)"
+  if [ "${n_tables:-0}" -lt 5 ]; then
+    mysql -u root avantfax < /usr/src/avantfax/create_tables.sql 2>/dev/null || true
+    echo ">>> [dograh-ari] AvantFAX schema imported (${n_tables} tables before)"
+  fi
+
+  # Config: force the three env-driven values so they can never drift from
+  # the DB user / branding (python replace — values may contain any bytes).
+  local cfg="/var/www/html/fax/includes/local_config.php"
+  if [ -f "${cfg}" ]; then
+    python3 - "${cfg}" "${dbpass}" "${faxemail}" "${faxhost}" <<'PY'
+import sys
+p, dbpass, faxemail, faxhost = sys.argv[1:5]
+lines = open(p).read().split('\n')
+out = []
+for line in lines:
+    s = line.strip()
+    if s.startswith("define('AFDB_PASS'"):
+        line = "define('AFDB_PASS',     '" + dbpass + "');"
+    elif s.startswith("define('ADMIN_EMAIL'"):
+        line = "define('ADMIN_EMAIL', '" + faxemail + "');"
+    elif s.startswith('$AVANTFAX_SERVERNAME'):
+        line = "$AVANTFAX_SERVERNAME = '" + faxhost + "';"
+    out.append(line)
+open(p, 'w').write('\n'.join(out) + '\n')
+print('>>> [dograh-ari] AvantFAX config aligned (db pass / admin email / server name)')
+PY
+  fi
+}
+
+# ── UCP node AMI credential converge ───────────────────────────────────────
+# The image's stock entrypoint writes UCPMGRPASS only when the row is empty
+# (`WHERE keyword='UCPMGRPASS' AND (value IS NULL OR value = '')`) and then
+# rewrites every `secret =` line in manager_custom.conf to FREEPBX_AMI_SECRET.
+# On an existing MariaDB volume those two disagree, so the UCP NodeJS server
+# authenticates as `ucp_events` with a stale password: Asterisk rejects every
+# attempt, the security log fills with InvalidPassword for a loopback client,
+# and the node process pins a core restarting roughly once a minute (observed
+# live: 100% CPU, 72 restarts). Converge the DB value onto the [ucp_events]
+# secret actually present in manager_custom.conf, and only bounce the process
+# when it really changed (restarting UCP on every boot is pointless churn).
+sync_ucp_ami_secret() {
+  local secret current
+  secret="$(awk '/^\[ucp_events\]/{f=1} f && /^secret[[:space:]]*=/{sub(/^[^=]*=[[:space:]]*/, ""); print; exit}' \
+            "${DEST}/manager_custom.conf" 2>/dev/null)"
+  [ -n "${secret}" ] || return 0
+  # The secret is base64-without-/,+ and hex in every shipped .env, so it can
+  # never contain a quote — safe to interpolate into this single-quoted UPDATE.
+# The secret is base64/hex in every shipped .env; reject anything that could
+  # break out of the single-quoted SQL below.
+  case "${secret}" in
+    *[!A-Za-z0-9+/=_-]*) return 0 ;;
+  esac
+  current="$(mysql -u root asterisk -N -B \
+      -e 'SELECT value FROM freepbx_settings WHERE keyword="UCPMGRPASS" LIMIT 1;' 2>/dev/null)"
+  [ "${current}" = "${secret}" ] && return 0
+  mysql -u root asterisk \
+    -e "UPDATE freepbx_settings SET value = '${secret}' WHERE keyword = 'UCPMGRPASS';" 2>/dev/null || return 0
+  echo ">>> [dograh-ari] UCP AMI credential converged (ucp_events) — restarting ucp node"
+  fwconsole pm2 --restart ucp >/dev/null 2>&1 || true
+}
+
+# ── Tighten the [pbxportal] AMI ACL ────────────────────────────────────────
+# The image writes `permit = 0.0.0.0/0.0.0.0` for the portal's AMI user, which
+# means any address that can reach 5038 may authenticate against it (the port is
+# published on every interface, so that is the whole LAN plus anything the
+# router ever forwards). Narrow it to loopback and the host's own LAN subnet.
+#
+# PROJECT RULE: LAN addresses only. This used to permit 172.16.0.0/12 and
+# 10.0.0.0/8 — docker ranges the stack was reached from when the portal ran on
+# a compose bridge. Both are dead weight now that every service target is the
+# host LAN IP, and 10.0.0.0/8 in particular admitted addresses that exist
+# nowhere on this box.
+#
+# ORDER MATTERS: Asterisk takes the LAST matching ACL entry, so the permits must
+# come AFTER the deny. Putting them before it leaves the deny last and makes
+# every login fail (observed live while tightening this: both loopback and the
+# compose bridge were rejected until the permits moved below the deny line).
+# Idempotent: existing permit lines in the section are replaced, not stacked.
+tighten_ami_acl() {
+  local f="${DEST}/manager_custom.conf"
+  [ -f "${f}" ] || return 0
+  python3 - "${f}" "${PJSIP_LOCAL_NET:-}" "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}" <<'PYEOF'
+import re, sys
+path, want, lan_ip = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path).read()
+perms = ["127.0.0.1/255.255.255.255"]
+# Asterisk wants net/mask, the env carries CIDR; derive it from the LAN IP when
+# the subnet was not pinned explicitly.
+cidr = want or (lan_ip.rsplit(".", 1)[0] + ".0/24")
+try:
+    net, _, plen = cidr.partition("/")
+    plen = int(plen or 24)
+    m = (0xFFFFFFFF << (32 - plen)) & 0xFFFFFFFF
+    perms.append("%s/%d.%d.%d.%d" % (net, m >> 24 & 255, m >> 16 & 255, m >> 8 & 255, m & 255))
+except ValueError:
+    pass
+m = re.search(r"(\[pbxportal\]\n)(.*?)(?=\n\[|\Z)", text, re.S)
+if not m:
+    sys.exit(0)
+body = [ln for ln in m.group(2).splitlines() if not ln.startswith("permit")]
+body = [ln for ln in body if ln.strip() != ""]
+if not any(ln.startswith("deny") for ln in body):
+    body.append("deny = 0.0.0.0/0.0.0.0")
+body += ["permit = " + p for p in perms]
+new = m.group(1) + "\n".join(body) + "\n"
+if new != m.group(0):
+    open(path, "w").write(text[:m.start()] + new + text[m.end():])
+    print(">>> [dograh-ari] [pbxportal] AMI permit narrowed to loopback + " + ", ".join(perms[1:]))
+PYEOF
+  asterisk -rx "manager reload" >/dev/null 2>&1 || true
+}
+
+if mysqladmin ping --silent 2>/dev/null; then
+  ensure_avantfax
+  sync_ucp_ami_secret
+  tighten_ami_acl
+fi
+
+# Final safety net: every edit above ran as root, and any file FreePBX
+# regenerates on Apply Config must be writable by the reload user or the
+# GUI dies with "Unknown Error. Please Run: fwconsole reload --verbose."
+# fwconsole chown restores the framework's expected owners across the whole
+# tree (idempotent; guarded so a failure never kills the boot). This is the
+# same belt-and-suspenders the web-UI wait loop above applies before its
+# reloads — applied one last time after ALL writes so the hand-off to the
+# stock entrypoint always leaves correct ownership.
+fwconsole chown >/tmp/dograh-ari-chown-final.log 2>&1 || true
+
+echo ">>> [dograh-ari] bootstrap complete — following stock entrypoint"
+wait "${ENTRYPOINT_PID}"

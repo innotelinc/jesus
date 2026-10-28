@@ -1,0 +1,15 @@
+[Unit]
+Description=Capstone — periodic Control Center redeploy check
+Documentation=https://capstone.innotel.us
+
+[Timer]
+# Deploy-on-change: the service is hash-gated, so most runs exit without
+# touching Docker. Runs shortly after boot (once the stack is up) and then every
+# 5 minutes, which is the window between editing the dashboard and the running
+# API serving the new code.
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=capstone-dashboard-redeploy.service
+
+[Install]
+WantedBy=timers.target

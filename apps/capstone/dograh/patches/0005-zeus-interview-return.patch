@@ -1,0 +1,216 @@
+diff --git a/api/services/telephony/ari_manager.py b/api/services/telephony/ari_manager.py
+index f3ed812..370e6c4 100644
+--- a/api/services/telephony/ari_manager.py
++++ b/api/services/telephony/ari_manager.py
+@@ -706,6 +706,31 @@ class ARIConnection:
+             )
+         return identity
+ 
++    async def _capture_zeus_envelope(self, channel_id: str) -> Optional[dict]:
++        """Read the Zeus-owned call envelope from the live ARI channel.
++
++        Dograh must not invent a second context token. If the Zeus router
++        stamped one, preserve it and the facts around it; if it did not, return
++        ``None`` so standalone Dograh keeps its normal behaviour.
++        """
++        token = await self._get_channel_var(channel_id, "AI_CONTEXT_TOKEN")
++        if not token or token in {"(null)", "unset"}:
++            return None
++        values = {}
++        for name in (
++            "AI_ACCOUNT",
++            "AI_AGENT",
++            "AI_CALLER_NUM",
++            "AI_CALLER_NAME",
++            "AI_CALL_ID",
++            "ZEUS_CAPSTONE_TARGET",
++        ):
++            value = await self._get_channel_var(channel_id, name)
++            if value and value not in {"(null)", "unset"}:
++                values[name] = value
++        values["AI_CONTEXT_TOKEN"] = token
++        return values
++
+     async def _create_external_media(
+         self,
+         workflow_id: str,
+@@ -880,6 +905,12 @@ class ARIConnection:
+             external_pbx_call = await self._capture_external_pbx_call(
+                 channel_id, channel.get("name", ""), lead_fields
+             )
++            # Zeus stamps the cross-product envelope on the channel before
++            # entering [dograh-inbound]. Carry the small, certain facts into
++            # the workflow's initial context so the interview can greet the
++            # caller by name and the later return can retain the same call id;
++            # the portal remains the authority for the full context read.
++            zeus_context = await self._capture_zeus_envelope(channel_id)
+             workflow_run = await db_client.create_workflow_run(
+                 name=f"ARI Inbound {caller_number}",
+                 workflow_id=inbound_workflow_id,
+@@ -893,6 +924,8 @@ class ARIConnection:
+                     "provider": "ari",
+                     "telephony_configuration_id": self.telephony_configuration_id,
+                     "external_pbx_call": external_pbx_call,
++                    "zeus_context": zeus_context,
++                    "candidate_name": (zeus_context or {}).get("AI_CALLER_NAME", ""),
+                 },
+                 gathered_context={
+                     "call_id": call_id,
+@@ -1107,6 +1140,34 @@ class ARIConnection:
+             )
+             transfer_destination_channel_id = ctx.get("transfer_destination_channel_id")
+ 
++            # A Zeus return redirects the caller channel out of Dograh instead
++            # of deleting it. Its StasisEnd still arrives here, so normal
++            # teardown would delete the very channel AVA is about to answer.
++            # Read the marker from the caller (the variable is on that leg,
++            # not on the external-media leg) and clean only Dograh's resources.
++            if call_id:
++                return_outcome = await self._get_channel_var(
++                    call_id, "ZEUS_RETURN_OUTCOME"
++                )
++                if return_outcome and return_outcome not in {"(null)", "unset"}:
++                    logger.info(
++                        f"[ARI org={self.organization_id}] Zeus return in progress "
++                        f"for channel {call_id}; preserving caller during teardown"
++                    )
++                    if bridge_id:
++                        await self._delete_bridge(bridge_id)
++                    if ext_channel_id and ext_channel_id != channel_id:
++                        await self._delete_channel(ext_channel_id)
++                    keys_to_delete = [
++                        cid
++                        for cid in (call_id, ext_channel_id, channel_id)
++                        if cid
++                    ]
++                    if keys_to_delete:
++                        await self._delete_channel_run(*keys_to_delete)
++                    await self._delete_ext_channel(ext_channel_id)
++                    return
++
+             # Check if this is a call transfer scenario external channel. Skip full teardown if
+             # transfer is in progress and this is the external media channel
+             # During call transfer, we preserve the caller-destination bridge
+diff --git a/api/services/telephony/providers/ari/strategies.py b/api/services/telephony/providers/ari/strategies.py
+index 4bb9d1b..f8f92a8 100644
+--- a/api/services/telephony/providers/ari/strategies.py
++++ b/api/services/telephony/providers/ari/strategies.py
+@@ -4,6 +4,7 @@ This module contains the business logic for Asterisk ARI call operations.
+ """
+ 
+ import asyncio
++import os
+ from typing import TYPE_CHECKING, Any, Dict
+ 
+ from loguru import logger
+@@ -213,7 +214,19 @@ class ARIHangupStrategy(HangupStrategy):
+         self._external_pbx_adapter = external_pbx_adapter
+ 
+     async def execute_hangup(self, context: Dict[str, Any]) -> bool:
+-        """Hang up the Asterisk channel via ARI REST API."""
++        """Return a Zeus interview channel, or hang it up normally.
++
++        On a shared Zeus voice plane, the dialplan stamps ``AI_CONTEXT_TOKEN``
++        on the channel before entering Dograh. When the interview workflow
++        ends, redirecting that channel to ``[zeus-ai-return]`` keeps the same
++        Asterisk call id and envelope alive for AVA. Deleting the channel here
++        would end the caller before AVA could receive the interview outcome.
++
++        The feature is deliberately opt-in: standalone Dograh has no Zeus return
++        context, and a return redirect on a channel without the token would be
++        a guessed destination. ``ZEUS_RETURN_ENABLED`` is therefore the single
++        deployment switch, with the token providing the per-call guard.
++        """
+         try:
+             import aiohttp
+             from aiohttp import BasicAuth
+@@ -229,6 +242,17 @@ class ARIHangupStrategy(HangupStrategy):
+                 )
+                 return False
+ 
++            if self._zeus_return_enabled():
++                redirected = await self._redirect_to_zeus_return(
++                    session_factory=aiohttp.ClientSession,
++                    channel_id=channel_id,
++                    ari_endpoint=ari_endpoint,
++                    app_name=app_name,
++                    app_password=app_password,
++                )
++                if redirected:
++                    return True
++
+             # The external PBX owns the real customer leg, so it should be the
+             # one that ends the call: ask it to hang up, then wait for its BYE.
+             # Deleting the channel here instead makes Asterisk originate the
+@@ -268,6 +292,71 @@ class ARIHangupStrategy(HangupStrategy):
+             logger.exception(f"Failed to hang up Asterisk channel: {e}")
+             return False
+ 
++    @staticmethod
++    def _zeus_return_enabled() -> bool:
++        return os.environ.get("ZEUS_RETURN_ENABLED", "").strip().lower() in {
++            "1",
++            "true",
++            "yes",
++            "on",
++        }
++
++    @staticmethod
++    async def _redirect_to_zeus_return(
++        *,
++        session_factory: Any,
++        channel_id: str,
++        ari_endpoint: str,
++        app_name: str,
++        app_password: str,
++    ) -> bool:
++        """Redirect an enrolled channel to Zeus; return whether it happened.
++
++        ARI returns 204 for a successful variable write/redirect and 404 when
++        the channel ended while the workflow was closing. Neither is an error
++        for the caller: 404 means there is no channel left to return. Any other
++        response falls through to the ordinary hangup path so a failed return
++        can never strand a live interview channel.
++        """
++        import aiohttp
++
++        auth = aiohttp.BasicAuth(app_name, app_password)
++        base = f"{ari_endpoint.rstrip('/')}/ari/channels/{channel_id}"
++        async with session_factory() as session:
++            async with session.get(
++                f"{base}/variable", params={"variable": "AI_CONTEXT_TOKEN"}, auth=auth
++            ) as response:
++                if response.status == 404:
++                    return True
++                if response.status != 200:
++                    return False
++                token = (await response.json()).get("value", "") or ""
++                if not token.strip() or token.strip() in {"(null)", "unset"}:
++                    return False
++
++            async with session.post(
++                f"{base}/variable",
++                json={"variable": "ZEUS_RETURN_OUTCOME", "value": "interview_complete"},
++                auth=auth,
++            ) as response:
++                if response.status not in {200, 204}:
++                    return False
++
++            async with session.post(
++                f"{base}/redirect",
++                params={"context": "zeus-ai-return", "extension": "s", "priority": "1"},
++                auth=auth,
++            ) as response:
++                if response.status in {200, 204}:
++                    logger.info(
++                        "[ARI Hangup] Redirected Zeus interview channel "
++                        f"{channel_id} to zeus-ai-return"
++                    )
++                    return True
++                if response.status == 404:
++                    return True
++                return False
++
+     async def _await_external_pbx_bye(
+         self,
+         session: Any,

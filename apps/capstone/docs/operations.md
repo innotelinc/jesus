@@ -1,0 +1,1729 @@
+# Capstone — Operations Reference
+
+Deep-dive operational material for the Capstone — Voice AI Agent Platform. The
+[README](../README.md) is the product landing page (hero, features, quick start,
+architecture); this file carries the Control Center, PBX/Asterisk, telephony,
+proxy/TLS, troubleshooting, verification, and offline-install material that used
+to live there.
+
+## Control Center
+
+The stack ships with an operational dashboard — **Capstone Control Center** — that is part
+of the main compose file and starts with everything else:
+
+- **`dashboard`** — built React SPA served by nginx at `http://<host>:8096` (or
+  `https://admin.<domain>` behind the proxy — see [NPM proxy hosts](#npm-proxy-hosts)).
+- **`dashboard-api`** — FastAPI aggregator at `http://<host>:8095` that reads live state
+  from the Docker socket (container health, published ports, versions, stats), the `.env`
+  secret inventory (names/types only — never values), host users (`/etc/passwd`), and
+  whole-host `/proc` resource usage.
+
+The SPA talks to the aggregator same-origin through `/api`, which nginx reverse-proxies to
+`dashboard-api:8095` — no CORS or host/port wiring. The base URL can be overridden at
+runtime with `window.__DASHBOARD_BASE_URL__` or at build time with
+`VITE_DASHBOARD_BASE_URL` (default `/api`).
+
+The dashboard shows: **Services** (live Docker health + latency probes), **Health &
+Status**, **Network Ports**, **Alerts**, **Secrets inventory**, **Users**, **Monitoring**
+(real CPU/mem/disk/network from the host), **Logs** (recent Docker events), **Links**
+(service URLs derived from `PUBLIC_BASE_URL` / `NPM_BASE_DOMAIN` — see
+[NPM proxy hosts](#npm-proxy-hosts)), a **Softphone** — an in-browser WebRTC phone that
+registers to the PBX over WSS (`/softphone`, extension 101 by default, STUN/TURN pulled
+from coturn via `/api/turnconfig`) — and the voice-agent surfaces: **Agents**,
+**Workflows**, **Extensions** and **Interview Reports** (see
+[Authoring agents & workflows](#authoring-agents--workflows-from-the-control-center)).
+
+> Note: the Softphone page asks the aggregator (`/api/turnconfig`) for the STUN/TURN
+> endpoints (with credentials) and the WSS endpoint. On an HTTPS page that endpoint is this
+> dashboard's **own origin** — `wss://<dashboard host>/ws`, which `dashboard/nginx.conf`
+> (`location = /ws`) forwards to the PBX's PJSIP WSS listener at
+> `DASHBOARD_PBX_WSS_HOST:8089` (`pbx-freepbx` by default, `zeus-freepbx` on a
+> shared Zeus box, or this host's LAN IP in any mode). The browser therefore only
+> ever sees the certificate the reverse proxy issued for that host. `voice.<NPM_BASE_DOMAIN>`
+> (see [NPM proxy hosts](#npm-proxy-hosts)) remains supported when a proxy domain is
+> configured. The PBX's own `:8089` listener is a LAN/`--insecure` fallback only: it serves
+> the image's build-time self-signed cert (`CN=buildkitsandbox`, no SAN), which browsers
+> reject outright, so it cannot be made to work by accepting a warning. The page also has to
+> be served over **HTTPS** — a plain-HTTP origin is not a secure context, so `getUserMedia`
+> has no microphone and calls can't carry audio.
+
+### Authoring agents & workflows from the Control Center
+
+The **Agents** and **Workflows** pages are a drop-in for the dograh editor, so a phone
+number and the AI workflow behind it can be set up without leaving the dashboard (or
+opening the dograh UI). Both write the same definitions dograh's own editor would and are
+gated behind the Control Center's Cerulean session like every other page.
+
+- **Agents** (`/agents`) — each row is a dograh phone number bound to a workflow, plus its
+  FreePBX provisioning status. The **Add agent** and **Edit agent** dialogs can:
+  - **create a workflow inline** — *Describe it (AI)* (expanded by the local OmniRoute
+    gateway), a **guided template** (role/goal/script), or a **blank** starter — which is
+    imported into dograh and selected for the agent in one step; or
+  - **edit the bound workflow's prompts** (persona, greeting/opening, main script, closing)
+    directly, then save + publish it.
+  - pick any existing workflow, and jump to a workflow's editor via the Workflow column.
+  - Archived workflows are not offered for new bindings; the one already bound stays
+    visible (marked `(archived)`) so the selector never goes blank.
+- **Workflows** (`/workflows`) — every dograh workflow with its status, the agents using it
+  (each links straight to the agent's edit dialog), and actions:
+  - **New workflow** — same AI / guided / blank modes as the agent dialog.
+  - **Edit prompts** — edit the prompt-bearing nodes and save; the change is written to
+    dograh **and published**, so calls to any bound agent pick it up immediately.
+  - **Archive / Restore** — dograh has no workflow *delete* (its UI archives), so the
+    dashboard does the same via `PUT /api/v1/workflow/{id}/status`. Archiving is refused
+    while an agent is still bound unless you confirm, so a stray click can't silently leave
+    a number with no inbound workflow. A **Show archived** toggle filters the list.
+  - **Graded** — the per-workflow switch that decides whether a run is graded and
+    with what rubric. Ticking it (a) attaches the `Notify n8n Grader` post-call
+    webhook node if the workflow has none, so newly-created workflows are
+    selectable, and (b) asks the local OmniRoute model to write a rubric **from
+    that workflow's own prompts** (2–10 weighted dimensions, weights
+    renormalised to exactly 100, pass > review). **Plan** opens the generated
+    rubric (weights, model, generated-at, pass/review marks) and **Regenerate**
+    replaces it. Unticking writes `graded: false`, and the grader then returns
+    zero items and the run ends clean. Workflows with neither key keep the
+    built-in per-track rubric, so nothing existing changes.
+
+    The plan and the selection live on the workflow's webhook `payload_template`
+    in dograh and are published — dograh stays the source of truth, and n8n just
+    reads them off the payload it receives. The rubric that produced each grade
+    is stamped onto the report (`Rubric` in Grist) and shown in the report
+    detail's **"Graded with"** panel, so a score can always be traced back to
+    the rubric behind it.
+
+    API: `GET /grading/workflows/<id>`, `POST /grading/workflows/<id>` (enable +
+    generate), `POST /grading/workflows/<id>/regenerate`, `DELETE
+    /grading/workflows/<id>` (disable) — all session-gated.
+
+Under the hood `dashboard-api` proxies to dograh: `GET /workflows`,
+`GET /workflows/{id}` (definition + editable nodes), `POST /workflows`
+(`/api/v1/workflow/create/definition`), `PUT /workflows/{id}`
+(`/api/v1/workflow/{id}` then `/publish`) and `PUT /workflows/{id}/status`. The AI mode
+reaches the OmniRoute gateway through `OMNIROUTE_URL` (defaults to
+`http://host.docker.internal:20128`, the identity-aware proxy in front of the gateway —
+`20128` itself is published on loopback and docker0 only), the same gateway the
+Workflow Studio uses; set `OMNIROUTE_API_KEY` / `OMNIROUTE_MODEL` in `.env` to override.
+On a host other than the one running the proxy, pin that host's LAN address in `.env`
+(`OMNIROUTE_URL=http://192.168.1.71:20128`) — `host.docker.internal` resolves to the
+local docker0, where nothing listens.
+
+The proxy's host is the only host that runs the `omniroute` service: it is behind the
+`gateway` compose profile, so `docker compose up -d` elsewhere leaves it alone and the
+gateway's own host starts it with `docker compose --profile gateway up -d omniroute`.
+Both sides are load-bearing. Running a second gateway on an app host used to be a silent
+failure — it answers requests the way a working one does while holding no connections
+(`provider_connections`=0, every key `401 invalid_api_key`) and, if its volume is
+mounted anywhere other than the image's `DATA_DIR`, keeps that state in the container's
+writable layer where the next recreate discards it. `scripts/smoke-test.sh` now checks
+the gateway this stack actually uses (the door, when it is not local) rather than the
+container this host happens to have.
+
+## PBX / Asterisk side
+
+FreePBX exposes Webmin on host TCP port `10000` and Asterisk RTP on UDP ports
+`10101–10120`; these ranges are deliberately separate to avoid the Webmin/RTP conflict.
+Coturn listens on TCP/UDP `3478` and relays on UDP `49152–49251`, configured by `TURN_*`
+variables in `.env`. Setup generates the TURN username/password and points `TURN_REALM` at
+the public base domain. It leaves `TURN_EXTERNAL_IP` **empty**: the coturn image detects
+this host's public address on every start (`detect-external-ip`) and advertises it for
+relayed candidates, so a WAN IP change does not rot the relay. Pin an address only where
+that DNS probe is blocked. Asterisk HTTP/ARI is exposed on `8088` at the host LAN IP
+(`${PJSIP_MEDIA_ADDRESS}`) — LAN-only, never loopback and never forwarded, because 8088 has
+no loopback leg and everything that dials ARI (dograh, the edge proxy, the host-side scripts)
+dials the LAN IP. The Dograh ARI user and inbound dialplan are injected during PBX startup.
+The AMI on `5038` follows the same rule.
+
+Hold music is generated, not licensed: `pbx/asterisk/hold_music.py` writes four 32 s, 8 kHz
+mono WAV tracks into `/var/lib/asterisk/moh/capstone` (fixed seed, ~5 s, no ffmpeg), and
+`pbx/entrypoint-dograh.sh` re-runs it on every boot because `/var/lib/asterisk/moh` is not a
+volume. `[dograh-inbound]` sets `CHANNEL(musicclass)=capstone` and, if Stasis returns without
+the agent taking the call, answers and plays `MusicOnHold(capstone,60)` before the voicemail
+fallback or hangup — so a failed hand-off is music, not a busy tone. Details in
+`pbx/README.md`.
+
+The PBX is a service in the main compose file, so one command brings up the entire stack:
+
+```bash
+docker compose up -d
+```
+
+## VoIP.ms trunk (optional, auto-configured)
+
+Put your VoIP.ms SIP credentials in `.env` and the freepbx container configures the trunk on
+boot — no FreePBX GUI steps:
+
+```bash
+VOIPMS_SIP_USER=100000_sub
+VOIPMS_SIP_PASS=your-voipms-password
+VOIPMS_SIP_SERVER=newyork1.voip.ms
+# Map each DID to the dograh agent extension that should answer it
+# (see the agent table in the README). Empty = all inbound calls go to ext 8000.
+VOIPMS_DIDS=2125551234:8003,2125551235:8005
+```
+
+Then `docker compose up -d freepbx` (or restart the container). On boot the entrypoint:
+
+1. writes `pjsip_custom_voipms.conf` — a pjsip trunk that **registers** to your VoIP.ms
+   server (registration, auth, endpoint, AOR, identify);
+2. writes `extensions_custom_voipms.conf` — inbound DID routing into the dograh agent
+   contexts (`[dograh-inbound]`);
+3. includes both files where FreePBX won't overwrite them (`pjsip_custom_post.conf`,
+   `extensions_custom.conf`), reloads pjsip + the dialplan, and logs
+   `VoIP.ms trunk configured`.
+
+Verify registration from the host: `docker exec pbx-freepbx asterisk -rx "pjsip show
+registrations"` (state `Registered`).
+
+The entrypoint also creates the **FreePBX outbound route** (`voipms` trunk, Connectivity →
+Outbound Routes) so internal extensions can dial out through the trunk automatically.
+
+### The trunk sits at `Rejected` and nothing is logged: check the router's UDP 5060 forward
+
+A static **UDP 5060 port-forward on the router collides with the PBX's own outbound SIP**,
+because both want source port 5060. The router remaps the PBX's REGISTER to a different
+source port, the provider's reply comes back for a mapping that no longer matches, and it
+is dropped before it ever reaches this host. Asterisk then retransmits into the void and the
+registration times out — no error, no reply, nothing in the log beyond
+`Registration timed out.`
+
+Confirm it before touching any PBX config: capture everything from the provider, not just
+port 5060 — a mis-ported reply is invisible to a port filter.
+
+```bash
+tcpdump -n -nn -i eth0 'host newyork1.voip.ms' &
+docker exec pbx-freepbx asterisk -rx 'pjsip send unregister voipms-reg'
+docker exec pbx-freepbx asterisk -rx 'pjsip send register voipms-reg'
+```
+
+Nothing inbound at all ⇒ the router is eating it. To prove the path itself is fine, send an
+OPTIONS from any *other* source port:
+
+```bash
+python3 -c "import socket;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('0.0.0.0',5070));s.settimeout(5);\\
+s.sendto(b'OPTIONS sip:newyork1.voip.ms SIP/2.0\\r\\nVia: SIP/2.0/UDP 0.0.0.0:5070;branch=z9hG4bKx;rport\\r\\nFrom: <sip:p@x>;tag=1\\r\\nTo: <sip:newyork1.voip.ms>\\r\\nCall-ID: p1\\r\\nCSeq: 1 OPTIONS\\r\\nMax-Forwards: 70\\r\\nContent-Length: 0\\r\\n\\r\\n',('208.100.60.66',5060));print(s.recvfrom(4096)[0].splitlines()[0])"
+```
+
+A `SIP/2.0 200 OK` in ~25 ms proves the provider and the WAN path are healthy and that only
+the 5060 source port is affected. **Remove the UDP 5060 port-forward** and let inbound ride
+the registration's own NAT mapping — `qualify_frequency=60` keeps it warm. Registration then
+completes the normal `REGISTER → 401 → REGISTER(auth) → 200 OK` exchange and
+`pjsip show registrations` reports `Registered`. Do **not** work around it by registering from
+a different local port: the provider is reached on 5060, the router forwards 5060, and a
+dedicated transport only moves the problem to the inbound path.
+
+### Auto-mapped agents in FreePBX (dograh UI → inbound routes + extensions)
+
+Every phone number registered on dograh (the shipped agents plus anything you add later in
+the dograh UI or the Workflow Studio) is automatically mirrored into FreePBX by
+`scripts/sync_dograh_routes.py` (idempotent, run by `setup.sh` and re-run every 12 hours
+by the `capstone-pbx-sync.timer` systemd timer — a reconciliation safety net; the Control
+Center already syncs the PBX synchronously when you create or edit an agent):
+
+- **Custom Extensions** — Applications → Extensions lists each dograh agent as a basic
+  **Custom Extension** (registry-only: no voicemail, no call waiting, by design).
+- **Custom Destination + Inbound Route** — Connectivity → Inbound Routes shows a route per
+  agent (DID = the extension) ready for you to map VoIP.ms DIDs onto.
+- **Dynamic dialplan** — numbers beyond the static `8000-8007` set (e.g. one created in the
+  Workflow Studio or the Control Center's Agents page) get `[dograh-inbound]` entries from
+  `extensions_custom_dograh.conf`, so they're actually reachable. Those entries call
+  `Stasis(<DOGRAH_STASIS_APP_NAME>)` — the `dograh_<hex>` app dograh registers for its ARI
+  telephony config, **not** the literal name `dograh` (an unregistered app makes Asterisk
+  fall straight through to `Hangup()`, so the call dies silently). `scripts/dograh_wire.py`
+  persists the app name to `.env`, and the Control Center discovers it live from dograh's
+  config detail when the env var is missing, so a freshly created agent works without a
+  re-run. `scripts/sync_dograh_routes.py` (the `capstone-pbx-sync.timer`) resolves the app
+  name from dograh on **every** run and persists it, so a stale `DOGRAH_STASIS_APP_NAME`
+  self-heals the dialplan on the next timer run (within 12 hours) with no rebuild or restart. If a new
+  extension rings then drops immediately, check that the dialplan's app name matches
+  `docker exec pbx-freepbx asterisk -rx "ari show apps"` — the Control Center's **Agents**
+  page shows a red banner when it does not.
+
+Remove a number in the dograh UI and the next sync run **deletes** the matching FreePBX
+entries — but only the ones this script created (marked "Dograh Voice Agent" /
+"dograh-managed"); anything you made by hand in the FreePBX GUI is never touched. Sync
+manually any time:
+
+```bash
+python3 scripts/sync_dograh_routes.py            # create/update + prune removed
+python3 scripts/sync_dograh_routes.py --check    # verify only
+python3 scripts/sync_dograh_routes.py --no-prune # keep entries for removed numbers
+```
+
+### Voice models: where the LLM, STT, TTS and embeddings actually come from
+
+A call is only as good as the four services behind it, and on a self-hosted box they must
+not silently depend on a hosted account. The organization's model configuration in dograh
+(v3: each role names a provider *connection*, never a raw key) is set to this split:
+
+| Role | Provider connection | Model | Why this one |
+|---|---|---|---|
+| **LLM** | OmniRoute gateway, `provider=openai`, `base_url=http://192.168.1.71:20128/v1` | `gemini/gemini-3-flash-preview` | Measured **1.55–1.65 s** time-to-first-token with **zero reasoning tokens** on an interview-shaped prompt. The reasoning-heavy models on the same gateway (`agy/*`) spend the whole `max_tokens` budget on hidden reasoning and return no text at all, which reaches the caller as silence. |
+| **LLM fallback** | same connection | `auto/cheap` | Two rules: `error`, and `no_output after_ms=4000`. A stalled primary is abandoned mid-turn instead of leaving the caller listening to nothing. |
+| **STT** | local Speaches, `provider=speaches`, `base_url=http://speaches:8000/v1` | `Systran/faster-whisper-small` | Free, in-house, and the model is already on the `dograh_speaches_models` volume. |
+| **TTS** | local shim, `provider=speaches`, `base_url=http://tts-shim:8880/v1` | `kokoro`, voice `af_heart` (this host); `piper`, voice `en_US-amy-medium` (the fast fallback) | Free and local. Measured on 2 vCPU: **piper** 0.33–0.60 s to first audio, RTF 0.32–0.35; **kokoro af_heart** 2.8–6.3 s, RTF 0.92–1.00; either on a cache hit ~0.02 s. af_heart is chosen here for the voice, not the speed — see `tts-shim/README.md` for the trade-off and the two-variable revert. |
+| **Embeddings** | OmniRoute gateway, `provider=openai`, same `base_url` | `gemini/gemini-embedding-001` | Answered in ~0.57 s; only used by knowledge-base work, not on the call path. |
+
+**Why the whole list is not simply "everything through OmniRoute":** the gateway's only STT
+route is `openrouter/openai/whisper-*`, and that upstream answers `429 All accounts rate
+limited` (and `402 Insufficient credits` for the embeddings sibling), while its TTS route has
+no provider credentials at all (`400 No credentials for provider: openai`). Local Whisper and
+the local TTS engines are free, already warm, and faster than anything the gateway could reach
+for those two roles. Leave them local.
+
+**TTS engine choice is a latency decision, measured, not a taste one.** The shim picks the
+engine from the `model` field, so `TTS_SHIM_ENGINES`, `TTS_SHIM_DEFAULT_ENGINE`,
+`DOGRAH_TTS_MODEL` and `DOGRAH_TTS_VOICE` have to move together. On this host Kokoro
+`af_heart` is deliberately the voice even though Piper is ~3× faster to the first word: Kokoro
+sits at RTF ≈ 1.0, i.e. it synthesizes no faster than the caller hears it, so anything else
+competing for the box (STT, the LLM hop, dograh itself) eats into that and the audio gaps. The
+shim's startup warm-up (`TTS_SHIM_WARMUP`) removes the ~7 s first-synthesis stall from the
+first caller, and the audio cache makes repeated lines (the script's fixed lines, goodbyes)
+near-instant — which is why the cache matters more with af_heart than with Piper.
+
+**The addresses are container names on purpose.** Every one of them is dialled *by
+`dograh-api`*, from inside its own container: `127.0.0.1:8881` is the shim as seen from the
+host, and resolves to the dograh container itself — the symptom is a TTS connection error on
+the first word of the call. `scripts/dograh_wire.py` writes the TTS role from
+`DOGRAH_TTS_BASE_URL`, and `.env` carries `http://tts-shim:8880/v1` for that reason.
+
+`DEPLOYMENT_MODE=oss` still runs the managed-service credit check whenever a role names the
+`dograh` provider. On a self-hosted box that check is the reason calls die (see the
+"user busy" entry under Troubleshooting) — no role in the model configuration may reference
+it.
+
+### Switching between standalone and Add-on (shared Zeus PBX)
+
+The mode says which Asterisk the Control Center provisions: Capstone's own bundled
+`pbx-freepbx`, or the shared `zeus-freepbx` that Zeus owns. It is a switch, not a rebuild —
+the same writers run against whichever container the mode names (`_pbx_container`), and the
+Agents page applies them on load and on every create/edit/delete in **both** modes. In
+add-on mode that means the page itself converges `extensions_custom_dograh.conf` onto the
+shared PBX; it does not wait for the 12-hour reconcile, which stays a safety net.
+
+From the Control Center, the **Standalone / Add-on (Zeus)** switch at the top of the Agents
+page converts the box in place: it starts or stops the bundled FreePBX, points the dashboard
+at the new PBX, regenerates the dialplan include there, reloads it, and records the choice so
+later requests use it (`.env` still seeds the mode a container boots in).
+
+From a shell:
+
+```bash
+./scripts/deploy-mode.sh              # report the mode and what the two containers are doing
+./scripts/deploy-mode.sh standalone   # create/start the bundled FreePBX (compose profile `standalone`)
+./scripts/deploy-mode.sh addon        # stop the bundled FreePBX; point at zeus-freepbx
+./scripts/deploy-mode.sh addon --dry-run
+./scripts/deploy-mode.sh standalone --force   # convert even with the port conflict
+```
+
+The two PBXs publish the same host ports (`5060/udp`, `5061`, `8083`, `8088`, `8089`,
+`10000`, `10101-10120/udp`), so converting to standalone while the Zeus stack runs cannot
+work: compose creates `pbx-freepbx` and then Docker refuses the bind (`port is already
+allocated`). The script checks that first and refuses before touching `.env`; `--force`
+skips the check, and a conversion that fails after `.env` was written restores it, so the
+box is never left claiming a mode it is not in.
+
+The script is the only thing that can *create* a container compose has never brought up, so
+`--profile standalone` is its business. When the Control Center's switch is asked to reach a
+PBX that has no container on the host, it answers **409** naming that command rather than
+pretending to have applied it. Switching to add-on stops the bundled FreePBX on purpose: two
+Asterisks must not both be serving this host's calls. Switching back keeps the stopped
+container, so the switch can start it again without compose.
+
+### FreePBX web-UI healthcheck + auto-recovery
+
+The freepbx container's own Docker healthcheck probes **Asterisk**, not the web UI — so a
+stale `/var/run/apache2/apache2.pid` kept across a container restart (Docker preserves
+`/var/run`) makes `apache2ctl` refuse to start with `httpd (pid N) already running`, the GUI
+stays down, and the container still reports healthy. `scripts/freepbx-web-recover.sh` closes
+that gap and runs every 2 minutes via the `capstone-freepbx-web.timer` systemd timer:
+
+```bash
+./scripts/freepbx-web-recover.sh check     # probe web UI only (exit 1 if down)
+./scripts/freepbx-web-recover.sh recover   # probe; clear stale pid + restart Apache if needed
+```
+
+It probes `:80` inside the container, and when the UI is down it clears any stale pidfile
+and restarts Apache (as `asterisk`, preserving the Apply Config fix). Idempotent — a healthy
+UI is a no-op that exits 0.
+
+### dograh Stasis app healthcheck + auto-recovery
+
+Asterisk routes every dograh extension into `Stasis(<DOGRAH_STASIS_APP_NAME>)`. When no ARI
+client is registered under that name the `Stasis()` call never starts a call, so Asterisk
+hangs up immediately and the caller hears nothing. The Control Center reports it as
+*"Calls to 8008 will drop … registered: none"*.
+
+The usual cause is **not** a misconfiguration but dograh's own parking policy. A telephony
+configuration whose ARI connection keeps failing is marked `inactive` and, in upstream's
+words, *"parking is one-way: the customer fixes their side and reactivates the configuration
+explicitly"* — nothing retries it. So a PBX that is down (or restarting) for longer than
+dograh's transient-failure window leaves the range silently unable to take calls until
+somebody intervenes by hand. The honest reading of the Control Center banner's advice
+("re-run `scripts/dograh_wire.py`") is that the fix used to *be* the repair: it now
+reactivates a parked config, so the documented remedy actually works.
+
+`scripts/dograh-ari-recover.sh` runs the check unattended, every 10 minutes via the
+`capstone-dograh-ari.timer` systemd timer:
+
+```bash
+./scripts/dograh-ari-recover.sh check     # is the Stasis app registered? (exit 1 if not)
+./scripts/dograh-ari-recover.sh recover   # ...and repair it: re-run dograh_wire.py
+```
+
+The split matters: a missing app with **ARI unreachable** is *not* repaired. dograh cannot
+register against a PBX that isn't answering, and this runs on a timer, so reactivating on a
+loop would only churn for the whole outage — it logs and exits 1 for the journal to show.
+A missing app with **ARI reachable** (the parked-config case) re-runs
+`scripts/dograh_wire.py`, which clears the parked flag, then waits for registration and
+reports whether calls can be taken again. It resolves the PBX container by compose label
+the way `scripts/smoke-e2e.sh` does, so it works on a shared voice host where the PBX is
+`zeus-freepbx` rather than `pbx-freepbx`.
+
+If you would rather fix it by hand, the two commands are:
+
+```bash
+python3 scripts/dograh_wire.py --env-file .env   # un-park + re-assert the app name
+docker exec pbx-freepbx asterisk -rx "ari show apps"   # expect: dograh_<hex>
+```
+
+#### The same banner when ARI is disabled outright: no `/ari/...` at all
+
+dograh's own message for this one is `ari-404`, and it **parks** the telephony
+configuration when it sees it (see above) — so the repair is two steps, and the
+first is not dograh's. The 404 is ARI being *off*: Asterisk's `ari.conf` had lost
+its `[general]` block, so the includes that pull in `ari_general_additional.conf`
+(where `enabled=yes` lives) and `ari_additional_custom.conf` (where the `[dograh]`
+ARI user lives) were gone. Two commands show it:
+
+```bash
+# nothing under /ari/... means ARI is disabled, whatever dograh's error says
+docker exec <freepbx-container> asterisk -rx "http show status" | grep -A2 "Enabled URI"
+docker exec <freepbx-container> asterisk -rx "ari show users"     # want a `dograh` row
+```
+
+FreePBX's own `arimanager` maintenance rewrites that file, which is why Zeus ships
+a guard for it — `pbx/ari_conf_guard.py` (read-only `--check`, narrow `--repair`)
+run by `scripts/zeus-pbx-sync.sh`, whose apply path repairs the file and reloads
+Asterisk before the recovery above is worth re-running. A clobbered `ari.conf` is
+never dograh's fault and never a credential problem, so re-running
+`dograh_wire.py` alone cannot clear it:
+
+```bash
+systemctl start zeus-pbx-sync.service        # check -> restore ari.conf -> reload
+./scripts/dograh-ari-recover.sh recover      # un-park dograh's config, wait for the app
+docker exec <freepbx-container> asterisk -rx "ari show apps"   # expect dograh_<hex>
+```
+
+#### A second way the same banner appears: a `#` in `DOGRAH_ARI_PASSWORD`
+
+dograh builds its ARI WebSocket URL by string interpolation —
+`ws://host:8088/ari/events?api_key=<user>:<password>&app=<app>` — so a `#` in the
+password truncates the query string as a URI fragment and the client rejects the URL
+outright:
+
+```
+DOGRAH_FAILURE [code=ari-unknown] InvalidURI: ws://…/ari/events?api_key=… isn't a
+valid URI: fragment identifier is meaningless
+```
+
+The visible symptom is identical (`registered: none`, calls hang up), but the repair is
+different: **the credential must be changed on both sides.** `scripts/dograh_wire.py` now
+refuses to run on a password containing `#` or whitespace, so it fails loudly instead of
+PUT-ing a credential that cannot connect. To fix it, take the password Asterisk actually
+enforces and make `.env` agree with it (the live PBX is the authority — it is what
+Asterisk authenticates):
+
+```bash
+# the [dograh] ARI user's password, read from the PBX itself
+PW=$(docker exec pbx-freepbx bash -c \
+  'awk -F" = " "/^password/ {print \$2; exit}" /etc/asterisk/ari_additional_custom.conf')
+sed -i "s|^DOGRAH_ARI_PASSWORD=.*|DOGRAH_ARI_PASSWORD=${PW}|" .env
+python3 scripts/dograh_wire.py --env-file .env    # reconciles dograh with it
+```
+
+`openssl rand -base64 24` (what `scripts/setup.sh` generates) never emits `#`, so this
+only bites a hand-edited or re-generated password.
+
+## TURN / WebRTC configuration
+
+Setup persists these values in `.env` and preserves explicit non-placeholder values on
+reruns:
+
+```bash
+TURN_USERNAME=<generated username>
+TURN_PASSWORD=<generated password>
+TURN_REALM=<public base domain>
+TURN_EXTERNAL_IP=          # empty = detected by coturn on every start
+TURN_LISTENING_PORT=3478
+TURN_RELAY_PORT_START=49152
+TURN_RELAY_PORT_END=49251
+```
+
+For clients outside the LAN, forward `3478/tcp`, `3478/udp`, and `49152–49251/udp` from the
+router to this host. `scripts/smoke-e2e.sh` fails when the running coturn advertises an
+address other than the one this host resolves to now, and warns when the PBX's
+`external_media_address` disagrees with it (that one is set in FreePBX's SIP settings).
+
+## NPM proxy hosts
+
+All public services are exposed through a reverse proxy (Nginx Proxy Manager) under **one
+base domain** — each service gets its own subdomain, `<service>.<domain>`, and the domain is
+customisable in `.env`:
+
+```bash
+NPM_BASE_DOMAIN=capstone.innotel.us
+```
+
+When set, the Control Center's Links page and the softphone's `/api/turnconfig` use these
+subdomain URLs automatically. When unset, everything falls back to `http://<host>:<port>`
+links.
+
+The dashboard itself is served at its **own** subdomain via `DASHBOARD_PUBLIC_URL`, i.e.
+`https://dashboard.<domain>` — the name the Authentik **Capstone Dashboard** application
+(`client_id: capstone-dashboard`) has as its launch URL *and* as the only `redirect_uri`
+its provider registers. `admin.<domain>` proxies to the same container as an alias. Keep
+`PUBLIC_BASE_URL` for dograh's advertised origin — the two are deliberately separate vars
+so the dashboard can move without breaking dograh.
+
+Create one NPM proxy host per row (one wildcard Let's Encrypt certificate covers all of them
+when `NPM_WILDCARD_CERT=1` + DNS credentials are set; otherwise NPM issues one cert per host
+and handles renewal):
+
+| NPM host | Forward to | Notes |
+|---|---|---|
+| `app.<domain>` | `http://<host>:3010` | Capstone Voice App (dograh web UI) |
+| `api.<domain>` | `http://<host>:8000` | Capstone Voice API (host-mode uvicorn) |
+| `auth.<domain>` | `http://<AUTHENTIK_UPSTREAM_HOST>:9000` | Authentik SSO / user management — the IdP every other gate points at. This stack runs none of its own: the shared Cerulean Authentik serves it, named by `AUTHENTIK_UPSTREAM_HOST` (unset = a stack with its own IdP, i.e. `<host>`) |
+| `voice.<domain>` | `https://<host>:8089` — or `http://<host>:8088` for plain-`ws` upstream | WebRTC signaling, path `/ws`, **Websocket Support ON**; see below |
+| `dashboard.<domain>` | `http://<host>:8096` | Capstone Control Center (`DASHBOARD_PUBLIC_URL`; the OIDC-bound name) |
+| `admin.<domain>` | `http://<host>:8096` | Capstone Control Center (alias) |
+| `pbx.<domain>` | `http://<host>:14014` | FreePBX GUI (+ AvantFAX at `/fax`) — via the `pbx-sso` gateway; the GUI's own `:8083` is loopback-only |
+| `capstone.innotel.us` (apex) | dograh per its config | dograh's origin (`PUBLIC_BASE_URL` / `BACKEND_API_ENDPOINT`) — the apex is NOT the dashboard |
+| `subscribe.<domain>` | `http://<SUBSCRIBE_UPSTREAM_HOST>:3040` | The estate's subscribe portal — the box behind `subscribe.innotel.us`, which renders this zone's pricing/checkout page from the `Host` header and reads each price live from Magnate. It is **not** this stack's box; a sync must never point it here (that is the 502 fixed on 24 Sep 2026) |
+| `n8n.<domain>` | `http://<host>:14010` | n8n workflows — via the `n8n-sso` gateway; webhooks (`/webhook/*`) are exempt, the editor is not |
+| `grist.<domain>` | `http://<host>:14011` | Grist documents — via the `grist-sso` gateway; nothing is exempt, its API runs in single-identity mode |
+| `grafana.<domain>` | `http://<host>:14012` | Grafana dashboards (provisioned from this repo) — via the `grafana-sso` gateway; it holds the port the SigNoz UI had |
+| `workflow.<domain>` | `http://<host>:14013` | Workflow Studio — via the `workflow-sso` gateway |
+| `dns.internal.innotel.us` | `http://<host>:14015` | Technitium console — via the `technitium-sso` gateway (the container is Cerulean's; its own `:5380` answers only on loopback + the docker0 gateway) |
+
+Every gateway above is an `oauth2-proxy` sidecar; the apps behind them have no
+OIDC of their own and their local logins are switched off, which is why their
+ports are bound to `127.0.0.1`. `scripts/verify-sso.py` is the committed
+regression test: it creates a throwaway Authentik identity, drives a real OIDC
+flow through each gateway, asserts the session opens the app, asserts an identity
+outside `SSO_REQUIRED_GROUP` is refused, and asserts each app port answers on
+loopback and refuses on the LAN (exit 0 pass / 1 fail / 2 cannot run).
+| `nocodb.<domain>` | `http://<host>:8080` | NocoDB |
+| `portal.<domain>` *(optional)* | `http://<host>:3000` | PBX Customer Portal (Next.js) — enable with `docker compose --profile portal up -d` |
+| `turn.<domain>` *(optional)* | `http://<host>:3478` | TCP-only via NPM; UDP STUN/TURN still needs direct NAT forwarding (see TURN section) |
+
+**WebRTC / WSS (`voice.<domain>`)** — this is what the in-browser Softphone uses:
+
+- Scheme **`wss`** (SSL) with **Websocket Support** enabled.
+- Forward to `https://<host>:8089/ws` (Asterisk's HTTP-TLS listener). If your NPM validates
+  upstream certificates and balks at the PBX's self-signed integration cert, forward to
+  `http://<host>:8088/ws` instead — plain-`ws` upstream, same `/ws` signaling handler.
+- The browser connects to `wss://voice.<domain>/ws`; no self-signed warning because NPM's
+  Let's Encrypt certificate terminates TLS.
+
+### Certificates & DNS — Cerulean (TrustOps)
+
+Certificates for every `capstone.innotel.us` host are owned by **Cerulean** (the stack's
+TrustOps platform): it issues **one wildcard Let's Encrypt certificate**
+(`*.capstone.innotel.us` + apex) via DNS-01 against the shared BIND, exports it into NPM
+(`cerulean-capstone.innotel.us-wildcard`), and attaches it to every proxy host. Renewals
+refresh the same NPM certificate in place — NPM never requests per-host certs for these
+names. The same model covers `*.magnate.innotel.us` and `*.cerulean.innotel.us`. DNS
+records for every subdomain live in the shared `innotel.us` BIND zone (managed through
+Cerulean), not in per-platform providers.
+
+NPM records that exported certificate under the **apex alone** (`domain_names ==
+[capstone.innotel.us]`) even though its SANs carry `*.capstone.innotel.us` — so a lookup by
+name cannot see the wildcard in it. `scripts/npm-proxy-hosts.py` therefore asks the edge
+what it actually presents (`zone_wildcard_cert`: a verified handshake against the apex,
+whose certificate's SANs must name the wildcard) and reuses the certificate each host
+already carries; a certificate that has lapsed is a `FAIL`, never a silent re-issue. That
+is why `--check` here reports no missing certificate and a plain run writes nothing at all.
+
+### Automate proxy-host creation via the NPM API
+
+`scripts/npm-proxy-hosts.py` creates/updates every row above through NPM's REST API — no UI
+clicks. It logs in (`NPM_ADMIN_EMAIL` / `NPM_ADMIN_PASSWORD` or a minted `NPM_API_TOKEN`),
+reuses the certificate a host already carries and only issues one when it must
+(`NPM_LETSENCRYPT_EMAIL`; one **wildcard** cert for all hosts when `NPM_WILDCARD_CERT=1` +
+DNS credentials are set — and with no credentials it reuses the zone's exported wildcard
+instead of asking for per-host certs), and prunes stale `*.<domain>`
+hosts. Idempotent: GET-first, writes only when state differs; scoped to the base domain so
+unrelated NPM hosts are never touched.
+
+```bash
+python3 scripts/npm-proxy-hosts.py --check     # verify only, exit 1 if out of sync
+python3 scripts/npm-proxy-hosts.py             # create/update + prune
+python3 scripts/npm-proxy-hosts.py --no-prune  # never delete hosts
+python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
+python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088  # plain-ws upstream (voice.<domain>)
+python3 scripts/npm-proxy-hosts.py --wildcard \
+    --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
+```
+
+**Wildcard certificates (default, recommended)** — with `NPM_WILDCARD_CERT=1` (now the
+default in `.env.example`) plus a DNS provider saved in NPM (`NPM_DNS_PROVIDER` = provider
+slug, `NPM_DNS_PROVIDER_CREDENTIALS` = credential id), the script issues **one** certificate
+covering `*.capstone.innotel.us` **and** the apex via DNS-01 and attaches it to every proxy
+host automatically. One cert to renew, zero per-host requests. If the DNS credentials aren't
+configured it warns and falls back to per-host HTTP-01 certs.
+
+The `voice.<domain>` host forwards to `https://<host>:8089` with WebSocket support ON by
+default — pass `--ws-scheme http --ws-port 8088` if your NPM validates upstream certificates
+(self-signed PBX cert). The `turn.<domain>` row stays out of scope: NPM's stream-forwarding
+API is separate and UDP STUN/TURN still needs direct NAT forwarding regardless.
+
+### Cerulean Authentik forward auth on every proxy host
+
+By default the script injects an nginx `auth_request` snippet into every web-UI proxy host
+(the apex + `app` dograh UI, FreePBX/AvantFAX, n8n, Grist, Grafana, Workflow Studio), so
+**all logins flow through Cerulean SSO** before each service's own login page is reachable.
+One domain-level proxy provider (`Cerulean NPM Forward Auth`) covers every `*.<domain>`
+host; provision it idempotently with `scripts/authentik_bootstrap.py` (API mode via
+`AUTHENTIK_TOKEN`, or `--emit-shell | docker exec -i cerulean-authentik ak shell`).
+
+The `api`/`voice`/`auth`/`dashboard`+`admin` hosts stay open by design: the API and WS
+signaling carry machine traffic, `dashboard.<domain>` is the OIDC `redirect_uri` target
+(the Control Center does its own OIDC login with the `capstone-dashboard` client), and
+`auth.<domain>` is the IdP itself. Opt out with `NPM_FORWARD_AUTH=0` or exclude hosts with
+`NPM_FORWARD_AUTH_EXCLUDE=key1,key2`.
+
+The sign-in redirect always targets the public `https://auth.<domain>` (set
+`NPM_AUTHENTIK_URL` to override), while NPM reaches the embedded outpost directly at
+`http://<upstream>:9000` — routing the outpost through NPM's own vhosts would loop.
+The injected outpost `location` forwards `X-Forwarded-Host/Proto/For`: a custom location
+does **not** inherit NPM's generated `location /` headers, and the forward-auth provider
+runs in `forward_domain` mode where the outpost identifies the target app from the
+forwarded host (without them it logs "failed to detect a forward URL from nginx").
+
+> **The embedded outpost's `authentik_host` must equal the provider's `external_host`.**
+> Authentik's embedded outpost ignores `authentik_host_browser`
+> ([#5922](https://github.com/goauthentik/authentik/issues/5922)), so `authentik_host` is
+> what the browser is redirected to. If it points at a different Authentik vhost (e.g. the
+> global `auth.innotel.us`) then `/application/o/authorize/` runs on an origin that does
+> not own the provider and rejects the `redirect_uri` — the user sees **"Redirect URI
+> Error"** on `capstone.innotel.us`. `scripts/authentik_bootstrap.py` pins both fields to
+> `https://auth.<NPM_BASE_DOMAIN>`; re-run it after changing domains, and restart
+> `cerulean-authentik` so the embedded outpost reloads its config.
+
+### Control Center login (dashboard OIDC)
+
+The Control Center has its own Authentik provider (`capstone-dashboard`) and must be
+returned to **its own** host after login. `dashboard-api` resolves its `redirect_uri` as:
+`DASHBOARD_AUTHENTIK_REDIRECT_URI` → a legacy `AUTHENTIK_REDIRECT_URI` that already points
+at `/api/auth/callback` → `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback` (or
+directly the browser host when no proxy domain is set). It deliberately **ignores**
+dograh's `AUTHENTIK_REDIRECT_URI` (`…/api/v1/auth/oidc/callback`) — that value is dograh's
+and would send the operator to the voice app instead of the dashboard after login (see
+`dashboard-backend/app/hosts.py::callback_url`).
+
+`dashboard-api` must also authenticate as **that** application, not as dograh's: it reads
+`DASHBOARD_AUTHENTIK_ISSUER_URL` / `_CLIENT_ID` / `_CLIENT_SECRET`, which
+`docker-compose.yml` feeds to `AUTHENTIK_ISSUER_URL` / `AUTHENTIK_CLIENT_ID` /
+`AUTHENTIK_CLIENT_SECRET` inside the container. Leaving them empty disables the gate
+(open API), so set all three on any host with an auth stack. The issuer is
+`https://auth.<NPM_BASE_DOMAIN>/application/o/capstone-dashboard/`, and the provider's
+redirect URI is `https://dashboard.<NPM_BASE_DOMAIN>/api/auth/callback` — strict, exactly
+one entry.
+
+### Voice app login (dograh OIDC): "Sign-in could not be completed"
+
+The voice app (dograh) signs operators in through its own Authentik application —
+client id `dograh`, redirect URI `https://dograh.<NPM_BASE_DOMAIN>/api/v1/auth/oidc/callback`,
+issuer `https://auth.<domain>/application/o/dograh/`. Two independent failures produce the
+same useless browser message, and each looks like the other from the UI:
+
+`scripts/doctor-signin.sh` walks all three gates read-only and names the broken one:
+
+```bash
+./scripts/doctor-signin.sh --url https://capstone.innotel.us
+```
+
+**1. The credential is a `vault://` reference that nothing resolved.** `.env` may hold
+`AUTHENTIK_CLIENT_SECRET=vault://cerulean/capstone#AUTHENTIK_CLIENT_SECRET`. Compose
+interpolates `.env` literally, so `docker-compose.yml`'s
+`AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"` hands the *reference string* to
+the container as the client secret. The authorize leg still succeeds (Authentik issues a
+code), and the API logs only:
+
+```
+WARNING | auth.py:254 | OIDC sign-in failed verification: Token exchange rejected by the identity provider
+```
+
+which names neither cause. **Always start this stack through `scripts/compose-vault.sh`**
+(it resolves references with `scripts/vault-env.py` and hands compose the resolved file):
+
+```bash
+scripts/compose-vault.sh --check                    # resolve, change nothing
+scripts/compose-vault.sh up -d dograh-api dograh-ui
+```
+
+A plain `docker compose up` regresses this silently. Note `--env-file` *replaces* `.env` as
+the interpolation source, which is why the wrapper writes a complete copy rather than a
+fragment.
+
+The resolved copy is the interpolation source **only while `.env` still holds `vault://`
+references** — that is the whole reason it exists. `scripts/boot-stack.sh` now enforces that:
+with no references left in `.env` it boots from `.env` and *names* any leftover resolved copy
+instead of reading it. Measured on 16 Oct, and the reason for the change: the stack had been
+booted from a four-hour-old `data/.env.resolved` that carried a **different**
+`AUTHENTIK_CLIENT_SECRET` than `.env`, so the value in `.env` never reached the boot at all
+(`docker compose config` renders identically for both files here, which is what made it
+invisible — the difference surfaces the moment a key only `.env` has becomes interpolated).
+
+Confirm what the container actually holds — never trust the `.env`:
+
+```bash
+docker exec dograh-api python3 -c "import os,hashlib;\
+ v=os.environ.get('AUTHENTIK_CLIENT_SECRET','');\
+ print(len(v), hashlib.sha256(v.encode()).hexdigest()[:12], v.startswith('vault://'))"
+```
+
+The correct value is Authentik's, and can be read from its own database (hash, not value):
+
+```bash
+docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
+  "SELECT length(client_secret), encode(sha256(client_secret::bytea),'hex') FROM authentik_providers_oauth2_oauth2provider WHERE client_id='dograh';"
+```
+
+**2. The login entry must hand the browser to the IdP.** `/api/v1/auth/oidc/login` has to
+answer a **3xx** carrying the Authentik `authorize` URL *and* `set-cookie:
+dograh_oidc_state=…`. If it answers **200** with Authentik's HTML and no cookie, something
+resolved the redirect server-side and served the IdP's page on the app's own origin — the
+sign-in looks like a page that does nothing, and the state/PKCE cookie is dropped with it.
+Two independent things stand between that and the browser:
+
+* `scripts/npm-proxy-hosts.py` puts a `location /api/v1/auth/oidc` on every app origin
+  (`OIDC_PATH`), so the OIDC legs reach the API on port 8000 without entering the UI proxy
+  at all. This is the one that does not depend on an image being current;
+* the UI proxy's own `redirect: "manual"` change fixes any other route that answers 3xx.
+  If the running UI predates it, rebuild the image. (The `000N` labels in this file are the
+  old patch numbers: those fixes are commits in `dograh/upstream` now and `dograh/patches/`
+  no longer exists, but the changelog and the smoke tests still name them that way.)
+
+Check the entry point an operator actually opens, not just the API's own host: every name
+the app answers on reaches the API through the same UI proxy, so the apex can fail where
+the API host succeeds (measured: `api.` → 307 + cookie, while `capstone.`/`app.`/`dograh.` →
+200 with Authentik's HTML).
+
+```bash
+for h in capstone dograh app api; do
+  printf '== %s: ' "$h"
+  curl -si "https://$h.capstone.innotel.us/api/v1/auth/oidc/login" | head -1
+done   # apex and api. want 307; app./dograh. want 302 to the apex, which answers 307
+```
+
+`python3 scripts/npm-smoke-test.py` asserts the same thing end to end: it walks each origin's
+entry until it reaches the IdP's `/application/o/authorize/`, so the 200-with-a-page that a
+swallowed redirect produces cannot pass. It also runs the dead-end probe below on each of
+those origins, because the entry walk alone passes on a stale UI image — the edge route sends
+the sign-in to the API whatever UI is behind it.
+
+**A patch only helps if the image that ships it is the one running.** `DOGRAH_API_IMAGE` and
+`DOGRAH_UI_IMAGE` are independent pins, so a `.env` that points the API at a locally built
+`dograh-local/dograh-api:capstone` while leaving the UI on the registry's `:latest` runs a
+patched API behind an unpatched proxy — exactly the split the edge route above exists to
+survive. Pin both, and follow `docker-compose.dograh-build.yml`: **both images build on the
+Capstone host** (`NEXT_BUILD_FS_CACHE=0` plus `--build-arg NODE_BUILD_HEAP_MB=2048`, ~6 min),
+so the pin is a build of this checkout instead of whatever a registry tag happens to be.
+
+**A pin is only as good as the image behind it.** Which image is running is one
+`docker inspect` away, and whether it carries a patch is one `md5sum` — the cheapest way
+to settle "was that rebuild ever shipped?":
+
+```bash
+ssh root@<capstone-host> "docker inspect -f '{{.Image}} {{.Created}}' dograh-api"
+ssh root@<capstone-host> "docker exec dograh-api md5sum /app/api/services/auth/oidc_auth.py"
+md5sum dograh/upstream/api/services/auth/oidc_auth.py   # the patched tree — must match
+```
+
+Measured on 28 Sep: the API image had been built on the 26th, two days before
+`dograh/patches/0006`, so those two hashes differed for `oidc_auth.py` and
+`api/routes/auth.py` and matched for every other file the patches touch. That is what a
+half-shipped patch set looks like — no error, no failed check, and a running service that
+is simply not the one the repo describes.
+
+A registry tag cannot stand in for the UI pin: those images are built from the
+`innotelinc/dograh` fork's `main`, which carries the fork's own customizations and not
+`dograh/patches/`, so no tag of it has the OIDC session handling. A `.env` with
+`DOGRAH_UI_IMAGE` unset runs that image, and it renders the dead-end page below for every
+signed-in user while a signed-out visitor sees the sign-in form as usual.
+
+**An unpatched UI is one request away from being obvious.** The dead-end branch only renders
+when the middleware lets the request through, which needs a session cookie to be *present* —
+so a cookie the API will reject is enough to tell a patched UI from a stale one, with no
+account and nothing to undo:
+
+```bash
+curl -s -H 'Cookie: dograh_auth_token=probe' https://<zone>/workflow \
+  | grep -c 'Authentication required'
+# want 0. 1 means the UI predates dograh/patches/0001: the backend reports
+# auth_provider=oidc (see the health check above), the pre-0001
+# getServerAccessToken() answers null for that session, and the page renders its
+# dead-end branch instead of the agent list. The same request without the cookie
+# is a 307 to /auth/login either way, which is why it cannot show this.
+```
+
+**The UI build needs more memory than the dev container is allowed.** `development` is
+capped at 4 GiB, and webpack's persistent cache — one in-memory generation of every module,
+held for the whole build — puts `next build` over it (peak 4.4 GiB, cgroup OOM mid-compile,
+right after "Creating an optimized production build"). `dograh/patches/0007` turns that cache
+off for image builds (`NEXT_BUILD_FS_CACHE=0` in `ui/Dockerfile`), which is what brings the
+build under the cap; cap the heap with `--build-arg NODE_BUILD_HEAP_MB=2048` and nothing else
+on the stack has to be stopped for it.
+
+The Capstone host builds it too, and no longer needs anything shipped to it: re-measured on
+16 Oct with the stack stopped, `next build` finished at a 2048 MB heap in **6 min 05 s** end
+to end (285 MB image, exit 0) — the same build had been killed at ~117 s on that host before
+`NEXT_BUILD_FS_CACHE=0` reached the image. Build the api and the ui **one at a time**: a
+13 GiB host does not want both under way while it also serves the stack.
+
+**The state cookie has to reach the host that finishes the sign-in.** It is written when
+the browser starts the flow and read back at the provider's registered `redirect_uri`, and
+those are only the same host by chance. This deployment registers the **apex**
+(`AUTHENTIK_REDIRECT_URI=https://<zone>/api/v1/auth/oidc/callback`, registered on the Dograh
+provider alongside the older `dograh.` name) and the edge sends `app.`/`dograh.` sign-ins
+there first, so the cookie is host-only *by design* — which is what the check below shows.
+`dograh/patches/0006-…patch` widens it only where it can name a parent covering both hosts
+(a callback four labels or more, e.g. `dograh.<zone>` → `.<zone>`); it deliberately does not
+widen a three-label host, whose parent is the organisation domain shared with the rest of
+the estate.
+
+```bash
+curl -si https://capstone.innotel.us/api/v1/auth/oidc/login \
+  | grep -iE '^(location|set-cookie)'
+# want: location …/application/o/authorize/?…redirect_uri=https%3A%2F%2Fcapstone.innotel.us%2F…
+#       set-cookie: dograh_oidc_state=…; HttpOnly; …; Secure   (no Domain — see above)
+```
+
+The trap is changing one without the other: an `AUTHENTIK_REDIRECT_URI` on a host the edge
+does not route sign-ins to — or `OIDC_CANONICAL_SUB` in `scripts/npm-proxy-hosts.py` naming a
+different host than the callback — gets a code and then loses the cookie, which renders as
+`expired` rather than as anything an operator can act on.
+
+Admission is a third gate after the token exchange: `AUTHENTIK_ALLOWED_GROUPS`
+(`cerulean-platform` here) is enforced by `api/services/auth/oidc_auth.py`, and
+`AUTHENTIK_ADMIN_EMAILS` grants admin. A user outside the allowed group completes the
+handshake and is then refused, so check membership when the token exchange is provably fine:
+
+```bash
+docker exec <authentik-postgres> psql -U authentik -d authentik -tAc \
+  "SELECT u.email FROM authentik_core_user u JOIN authentik_core_user_groups gu ON gu.user_id=u.id \
+    JOIN authentik_core_group g ON g.group_uuid=gu.group_id WHERE g.name='cerulean-platform';"
+```
+
+**3b. “Already signed in” is a property of the ORIGIN, not of the estate.** Authentik sets
+`authentik_session` host-only, so two names for the same instance are two cookie jars. Every
+app in this stack therefore uses **one** origin — `auth.cerulean.innotel.us` — for the
+Control Center (`DASHBOARD_AUTHENTIK_ISSUER_URL`), dograh (`AUTHENTIK_ISSUER_URL`) and the
+oauth2-proxy gateways (`SSO_AUTHENTIK_BASE`). A second app opened in the same browser gets a
+code back without a login form:
+
+```bash
+# one sign-in, then authorize another app with the same cookie jar
+curl -si "https://auth.cerulean.innotel.us/application/o/authorize/?client_id=capstone-dashboard&…" \
+  | grep -i '^location'   # want: …/api/auth/callback?code=…
+```
+
+The session lifetime is the login stage's `session_duration` (a session cookie when it is
+`seconds=0`). It is `days=30` here, set through the API:
+
+```bash
+curl -s -H "Authorization: Bearer $AUTHENTIK_TOKEN" \
+  https://auth.capstone.innotel.us/api/v3/stages/user_login/<uuid>/ | jq -r .session_duration
+```
+
+Apps whose issuer is a *different* Authentik host (`auth.zeus`, `auth.monarch`,
+`auth.innotel`, …) share that session too, because the Authentik **server** sets
+`AUTHENTIK_COOKIE_DOMAIN=.innotel.us` (Cerulean's compose on .71; both the `authentik-server`
+and `authentik-worker` services carry it). It is an environment setting on the IdP host, not
+something the API can write, so a recreated IdP must keep it:
+
+```bash
+docker exec cerulean-authentik python -c "import os,django; \
+  os.environ.setdefault('DJANGO_SETTINGS_MODULE','authentik.root.settings'); django.setup(); \
+  from django.conf import settings; print(settings.SESSION_COOKIE_DOMAIN)"   # want .innotel.us
+```
+
+One sign-in then authorizes an app on any of those names — the cookie is `Domain=.innotel.us`,
+not host-only. A browser that still holds an older host-only cookie keeps working and picks up
+the shared one at its next sign-in.
+
+**4. Provisioning can fail *after* admission succeeds.** The callback inserts a local row
+keyed on the provider subject and then writes the address onto it. The address carries a
+unique index, so an address already held by another row used to abort the sign-in with a
+`UniqueViolationError` that reached the browser as the same generic message. Two facts
+matter here: the subject is `sha256("{user_id}-{install_id}")` (`User.uid` in
+`authentik/core/models.py`), so **rebuilding Authentik — or recreating one account —
+changes the subject**, and a stored subject that no longer matches is the expected result
+of a provider rebuild rather than corruption. Since
+`dograh/patches/0004-adopt-an-existing-email-instead-of-failing-sign-in.patch`, only the
+*address* is refused in that case and the person is signed in under the new subject.
+
+```bash
+# which of the two outcomes the callback chose (neither is a failure)
+docker logs --since 10m dograh-api 2>&1 | grep -iE "UniqueViolation|already belongs|adopted"
+
+# the authoritative subject for an address — compare this, never the uuid
+# (uid is what the provider puts in `sub`; the uuid is a different value)
+docker exec <authentik-worker> /manage.py shell <<'PY'
+from authentik.core.models import User
+for u in User.objects.filter(email="someone@example.com"):
+    print(u.id, u.uid)
+PY
+```
+
+No admin API token is needed for the check above, and if one is wanted for the smoke test
+below, mint it the same way (`Token.objects.create(user=User.objects.get(username="akadmin"),
+intent=TokenIntents.INTENT_API, description="…")` — `Token.key` is the raw value). The
+end-to-end check needs no knowledge of `sub` at all:
+
+```bash
+AUTHENTIK_TOKEN=<authentik api token> python3 scripts/ci/sso-smoke.py
+# RESULT: a real sign-in completes — authorize -> callback -> token -> authenticated request.
+# The token may come from .env instead of the environment. The script mints its own password
+# for the temporary identity it creates (and deletes), and answers 0 pass / 1 fail /
+# 2 cannot-run — a skip, so CI can run it off-LAN. `DOGRAH_BASE` names the zone to test.
+```
+
+### Authentik groups per stack (and per-stack access)
+
+`scripts/authentik_bootstrap.py` creates one Authentik **Group** per product
+(`Capstone`, `Cerulean`, `Zeus`, …) and ties every application to its stack through
+Authentik's `Application.group` field, so the portal tiles are grouped by product. The
+app tie alone does **not** gate access — that is what `--enforce-access` adds.
+
+```bash
+python3 scripts/authentik_bootstrap.py --enforce-access --dry-run   # print the plan
+python3 scripts/authentik_bootstrap.py --enforce-access             # seed + bind + verify
+python3 scripts/authentik_bootstrap.py --release-access             # remove the bindings
+python3 scripts/authentik_bootstrap.py --access-report              # review who reaches what
+```
+
+The review table lists every stack with its application/gated counts and members, then a
+user × stack reachability matrix (`●` reachable, `·` denied, `–` means the stack has no
+provider-backed application to reach). It also names the tiles-only applications (no provider, nothing to
+gate) and warns about any provider-backed application that is still **ungated**, i.e.
+reachable by every authenticated user.
+
+The same inventory is rendered on the Control Center's **Health → Stack SSO & access**
+panel (`GET /authentik/access`, session-gated). It needs `AUTHENTIK_TOKEN` for
+dashboard-api — already in `.env` — plus `AUTHENTIK_PUBLIC_URL` (or `AUTHENTIK_API_URL`
+when the container cannot reach the public `auth.<domain>` vhost, with
+`AUTHENTIK_API_INSECURE=1` to skip TLS verification on a direct address). The token never
+leaves the backend: the browser only receives the aggregated result.
+
+With enforcement on, an authenticated user only reaches the stacks they belong to instead
+of every product in the portal. Two things make this safe:
+
+- **Accounts that must keep access are seeded before the binding is written** — every
+  superuser, machine/service identity (`type` in `internal`, `service_account`,
+  `internal_service_account`), member of a stack's legacy admin group
+  (`STACK_LEGACY_GROUPS`), and the operator allowlist (`STACK_KEEP_ACCESS`). Authentik has
+  **no superuser bypass** once an application carries a group binding: a superuser outside
+  the bound group fails `/core/applications/<slug>/check_access/`, so a missed seed locks
+  an admin out.
+- **The result is verified**: after binding, the script calls `check_access` for every
+  seeded account on every gated application and fails loudly if anyone cannot reach a
+  stack they were seeded for.
+
+Two gotchas learned the hard way: applications with **no provider** (plain portal tiles
+like `zeus`, `jellyfin-ldap`) are skipped — there is no login flow to gate; and the
+`/core/applications/` list endpoint **filters by the calling token's own access**, so the
+script passes `superuser_full_list=true` (without it a superuser token sees a one-row list
+and enforcement silently applies to nothing).
+
+### Verify the public surface
+
+`scripts/npm-smoke-test.py` checks every proxy host through the **public** edge with strict
+certificate verification: DNS + TLS validity, gated hosts must redirect to the Authentik
+sign-in (and answer the outpost ping through their own vhost), open hosts must serve
+without a bounce. For gated hosts it also **walks the forward-auth handshake** — `/start`
+must reach `/application/o/authorize/` on the sign-in host itself, and that call must not
+return 400 — which catches the cross-domain `authentik_host` misconfiguration behind the
+"Redirect URI Error" page. It ends with **one request that names a stale voice UI**: it
+fetches `/workflow` with a cookie the API will reject and reads the body — a patched image
+resolves the cookie as the session and renders the page, a build from the registry's `main`
+renders the pre-patch "Authentication required" dead end instead, and both answer 200.
+
+Exit codes match `scripts/ci/sso-smoke.py`: **0** every host healthy, **1** a host failed
+(the last line names them: `FAIL n/N host(s) unhealthy: …`), **2** the edge did not answer
+at all — no route to the estate, which is a **skip**, not a pass:
+
+```bash
+python3 scripts/npm-smoke-test.py          # config from .env (NPM_BASE_DOMAIN / NPM_AUTHENTIK_URL)
+python3 scripts/npm-smoke-test.py --base-domain capstone.innotel.us --timeout 10
+```
+
+CI runs it as the `npm-smoke` job on the nightly schedule, on top of push and PR; a skip
+(exit 2) is a notice and only a named failure fails the build.
+
+### Guard the images against drift
+
+Configuration cannot tell whether the stack is serving this repo's build: `dograh/upstream`
+is a gitignored clone of the fork, which carries our customizations as commits on top of
+`upstream/main`, so any image built from a different tree — a registry tag, or a build made
+before the last sync — passes every config check and still renders the pre-patch dead end.
+`npm-smoke-test.py` sees that once, through the edge; `scripts/ci/check-dograh-image-drift.py`
+sees all of it, at the images themselves. It hashes the `api/**` and `pipecat/**` files our
+delta touches in the running `dograh-api` against the tree (a path our delta *removes* must
+be absent from the image; a path upstream added after this clone's base is not our delta and
+is reported as such rather than compared), and asks `dograh-ui` for the two
+things patch `0001` changes in its **compiled** output (the home page's OIDC branch, and
+the workflow page's removed dead end — `.next/` holds a build, so a source hash cannot be
+compared there):
+
+```bash
+python3 scripts/ci/check-dograh-image-drift.py       # 0 = match, 1 = drift, 2 = cannot look
+```
+
+Same exit-code convention as above: 2 means no clone, no docker, or the containers are not
+running on this host, which the `dograh-image-drift` CI job reports as a skip (a hosted
+runner cannot reach the stack); a runner with a route to it turns the job into a gate.
+
+The file names a compose *service* (`dograh-api`, `dograh-ui`), and which container that
+became depends on the layout: `dograh-api` where the compose file sets `container_name`,
+`dograh-api-1` where the voice platform runs as its own project. The check resolves it the
+way `scripts/doctor-signin.sh` does — the name, then `<name>-1`, then whatever running
+container carries an image of that name — and prints the container it inspected, so this
+host no longer SKIPs a check that could have run. `DOGRAH_API_CONTAINER` /
+`DOGRAH_UI_CONTAINER` still override the resolution and are taken as given, so a typo in
+one of them SKIPs rather than inspecting a different container.
+
+## Boot (the `capstone.service` unit)
+
+`systemd/capstone.service` is a thin wrapper: the sequence itself is
+`scripts/boot-stack.sh`. That split is deliberate — which services the unit may
+start depends on how the host is laid out, and the two layouts need different
+commands:
+
+| Layout | What boot does |
+|---|---|
+| **Split** (the usual deployment here) | `dograh/upstream` is present, so the voice platform is started first as its **own** compose project (`dograh`, with `data/.env.dograh` + `docker-compose.dograh-capstone.yml`), and the capstone run then names only the services no other project claims: `tts-shim dashboard dashboard-api pbx-sso prometheus grafana grafana-sso otel-collector searxng sandbox-api sandbox-runner-1 n8n-sso grist-sso workflow-sso workflow-studio`. |
+| **Standalone** (no checkout) | One project: the capstone run starts the whole file. |
+
+Naming `postgres`, `redis`, `minio`, `dograh-api`, `dograh-ui`, `speaches` or
+`grist` in the capstone run makes compose abort on a container-name or host-port
+collision **before it reaches any service** — which is what a broken boot looks
+like, with nothing named and no service started. The list is load-bearing rather
+than tidiness, and a host can replace it with `CAPSTONE_BOOT_SERVICES`
+(space-separated, in the environment or in `/etc/capstone/boot.env`).
+
+Both runs pass `--pull=never`: a boot must not depend on registry access, and a
+tag that no longer exists has to fail loudly here instead of quietly changing
+which build a service runs. That is why every `*_IMAGE` override in `.env` has
+to be a *published* tag (`.env.example` documents the pair that is; the stale
+`minio/minio:latest` and `dograh-local/*` values this stack once carried are what
+the pull failure in that failure mode was).
+
+The capstone run ends in `up -d --wait`, so the unit's exit status is the health
+of the stack: non-zero unless every service with a healthcheck is healthy and
+every `depends_on` condition is met. The one-shots (`sandbox-certs`,
+`healthprobe`) are dependencies of listed services, exit 0, and do not decide
+the unit's fate.
+
+The app doors matter as much as the apps: `n8n.<domain>`, `grist.<domain>` and
+`workflow.<domain>` are routed by the edge to their `*-sso` gateways on
+14010/14011/14013, the apps behind them are loopback-only, and `n8n`/`grist`
+themselves are the voice project's — so a boot that starts the apps but not the
+gateways leaves those three names answering 502 at the edge.
+
+Two env files, and the difference matters:
+
+- `data/.env.resolved` is what the unit hands to compose. It is **generated**
+  from `.env` by `scripts/compose-vault.sh` (`scripts/setup.sh` and
+  `scripts/redeploy-dashboard.sh` run it too) so `vault://` references are
+  already values when a service reads them. Anything added to that file by hand
+  is **wiped on the next resolve**, so host-specific values belong in `.env`:
+  that is where `OTEL_GRPC_PORT`/`OTEL_HTTP_PORT`/`OTEL_INTERNAL_METRICS_PORT`/
+  `OTEL_SPAN_METRICS_PORT` and `GRAFANA_HTTP_PORT` live on this box, which is how
+  Capstone's collector and Grafana sit beside the voice stack's SigNoz on
+  4317/4318/8888/8889 and 3301.
+- `data/.env.dograh` is the voice platform's own env file, for its project. It is
+  **complete by construction**: every variable the upstream compose and
+  `docker-compose.dograh-capstone.yml` interpolate is set in it explicitly, so a
+  boot cannot silently fall back to a default buried in the upstream file (a
+  missing key renders as an empty string, which compose does not report). Two
+  things in it are load-bearing rather than cosmetic: the `api`/`ui` image pins
+  have to be the pair this database's schema revision belongs to (pin both or
+  neither — see "A patch only helps if the image that ships it is the one
+  running"), and the credentials at the bottom are the values the existing
+  volumes and services were created with, not fresh secrets — read the notes
+  there before rotating one.
+
+Check a change to either file without a reboot — the render itself is the check:
+
+```bash
+docker compose --project-directory dograh/upstream -p dograh \
+  -f dograh/upstream/docker-compose.yaml -f docker-compose.dograh-capstone.yml \
+  --env-file data/.env.dograh --profile tunnel config --format json \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d["services"]), "services render")'
+```
+
+Compare that render against the running containers (`docker inspect … .Config.Env`)
+when you need to know whether the file still describes what is deployed: every
+compose-declared key has to match, and anything only in the container is baked
+into its image.
+
+And check the boot path without a reboot — `--dry-run` prints both compose runs and
+changes nothing. Its exit status is only meaningful on a host that is already up: with
+the containers stopped, compose refuses to simulate starting their dependencies and
+exits 1 (`dependency failed to start: container … exited (0)`), which reads as a broken
+boot path when nothing is wrong. A cold boot is verified by the real thing —
+`systemctl start capstone.service`, which is exit 0 when the stack is healthy.
+
+```bash
+scripts/boot-stack.sh --dry-run
+# after a real boot: active (exited), both compose runs SUCCESS
+systemctl status capstone.service
+```
+
+## Observability
+
+Three containers and no trace store. The collector ingests OTLP, converts each
+span into a metric and drops the span; Prometheus stores the metrics; Grafana
+charts them from dashboards that live in this repo.
+
+| Container | Loopback port(s) | Role |
+|---|---|---|
+| `otel-collector` | `4317` gRPC, `4318` HTTP, `8888` own metrics, `8889` span metrics, `13133` health | OTLP ingest for dograh and n8n; `spanmetrics` connector |
+| `prometheus` | `9090` | the metrics store; scrapes `otel-collector:8889`, `otel-collector:8888`, `tts-shim:8880`, itself |
+| `grafana` | `3301` | charts `grafana/dashboards/*.json`; public door `grafana.<domain>` → `grafana-sso` (`14012`) |
+| `tts-shim` | `8881` | serves its own `tts_shim_*` metrics on `/metrics` |
+
+### How the distroless containers get a healthcheck
+
+`otel-collector` and every SSO gateway run single-binary distroless images — no
+shell, no libc, no `wget` — so a Docker healthcheck had nothing to execute
+inside them. The daemon reported them as `running` with no health signal, which
+the Control Center reads as **Warning** (see `status_and_score()` in
+`dashboard-backend/app/main.py`). A one-shot `healthprobe` service fixes that
+without touching the app images: it is
+`gcr.io/distroless/static-debian12:debug`, whose busybox is static by
+construction (it runs in a libc-less image), and it copies that binary into the
+`probe-bin` volume. Each of those services mounts the volume read-only at
+`/probe` and probes its own loopback endpoint with it:
+
+| Service | Probe | Answers |
+|---|---|---|
+| `grafana-sso`, `pbx-sso`, … | `/probe/busybox wget -q http://127.0.0.1:4180/ping` | `200 OK` from oauth2-proxy's own liveness endpoint — no upstream call, no session-store access |
+| `otel-collector` | `/probe/busybox wget -q http://127.0.0.1:13133/` | `200` from the collector's `health_check` extension while it is serving; `503` when its own health fails |
+
+Both are **liveness only**: an upstream that answers 500 does not make the
+gateway unhealthy, and only the collector's own health gates its row. The
+one-shot exits 0, so it is hidden from the Control Center like the other
+one-shots (`ONE_SHOT` in `dashboard-backend/app/main.py`).
+
+Port `3301` is deliberately the port the SigNoz UI held: the NPM proxy host, the
+Control Center's catalog and any firewall rule keep pointing at the same number,
+and only the upstream behind it changed. Nothing is stored per span, so a
+single-call investigation reads **metrics, not traces** — the panel names below
+are the trace-shaped view of the same numbers.
+
+### What each metric is, and which panel shows it
+
+`grafana/dashboards/pipeline-latency.json` (dashboard *Interview Pipeline
+Latency*, provisioned and therefore read-only — edit the JSON and re-deploy):
+
+| Panel | Metric | Notes |
+|---|---|---|
+| Interview pipeline latency by stage | `traces_span_metrics_duration_milliseconds_bucket{span_name=~"$stage"}` | the collector's span→metric output; `stage` is a dashboard variable listing every `span_name` seen (`llm-*`, `tts`, `stt`, `turn-N`, `conversation`) |
+| STT stage latency | same series, `span_name="stt"` | p50/p95 |
+| LLM stage latency by node | same series, `span_name=~"llm-.*"` | one line per pipeline node |
+| TTS time to first audio (shim) | `tts_shim_ttfa_seconds_bucket{engine,cache}` | measured in the shim, per engine and per cache hit/miss |
+| TTS cache hit rate | `tts_shim_cache_lookups_total{result="hit"}` | the fixed interview script is what makes this high |
+| Synthesis time and spend (shim) | `tts_shim_synthesis_seconds_bucket`, `tts_shim_requests_total` | engine wall time, excluding cache hits |
+| Ingest health (collector) | `otelcol_receiver_accepted_spans_total`, `otelcol_receiver_refused_spans_total`, `otelcol_connector_spans_total` | refused > 0 means spans are being dropped before they become metrics |
+
+The old dashboard's TTS panel read a span **attribute** (`metrics.ttfb`), which
+no longer exists once spans are not stored; that number is now the shim's own
+`tts_shim_ttfa_seconds` histogram. Two collector details are worth knowing before
+changing anything there:
+
+- **Durations are milliseconds**, because `spanmetrics` in the pinned
+  `otel/opentelemetry-collector-contrib:0.161.0` has no `unit` key — hence
+  `..._duration_milliseconds_bucket` in every panel. Newer contrib builds are
+  scheduled to flip the unit to seconds, which would silently rename every
+  series, so the version pin is deliberate.
+- **`explicit.buckets` is scaled to nanoseconds of the emitted unit** (a bucket
+  written as `5` renders as `le="5e-06"`, swallowing a 250 ms span into `+Inf`),
+  so the ladder in `otel-collector-config.yaml` is written as milliseconds × 1e6.
+
+`OTEL_LOGS_EXPORTER` is `none` in `.env`: with a metrics-only collector, exporting
+logs only produced per-batch drop warnings. `SIGNOZ_OTLP_ENDPOINT` is still the
+name dograh's fork reads for its trace exporter — it points at this collector,
+not at SigNoz.
+
+### Checking it by hand
+
+```bash
+# every scrape target UP? (over an SSH tunnel: ssh -L 9090:127.0.0.1:9090 root@<host>)
+curl -s http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=up' | grep -o '"health":"[^"]*"'
+
+# do spans become metrics at all? (0 is normal until the first call)
+curl -s http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=sum(traces_span_metrics_calls_total)'
+
+# is anything being refused before conversion?
+curl -s http://127.0.0.1:9090/api/v1/query \
+  --data-urlencode 'query=sum(rate(otelcol_receiver_refused_spans_total[5m]))'
+
+# the shim's own view
+curl -s http://127.0.0.1:8881/health
+curl -s http://127.0.0.1:8881/metrics | grep '^tts_shim_ttfa_seconds_count'
+```
+
+`scripts/smoke-test.sh` runs the same checks as part of the stack smoke test, and
+if a call's audio is cut mid-sentence the dashboard is the first place to look —
+see [Troubleshooting](#interview-voice-cuts-off-early--sounds-truncated).
+
+## Blocking invalid SIP registrations (fail2ban)
+
+The PBX publishes 5060/udp to the internet, so it is scanned continuously: in a
+single few-hour window the `full` log carried **2 321 rejected requests**, led by
+`172.110.223.87` (1 550), `172.110.223.118` (992) and `5.39.57.91` (498). Every one
+is an attacker-chosen SIP message that Asterisk has to parse, identify and reject.
+Host-side fail2ban drops them.
+
+```bash
+sudo scripts/install-fail2ban.sh              # install + start + verify
+sudo scripts/install-fail2ban.sh --status     # jails, counters, live bans
+sudo scripts/install-fail2ban.sh --dry-run    # render the config, change nothing
+sudo scripts/install-fail2ban.sh --uninstall  # stop and remove the jails
+```
+
+| Piece | Where | What it does |
+|---|---|---|
+| Jails | `pbx/fail2ban/jail.local.in` → `/etc/fail2ban/jail.local` | `asterisk-security`, `asterisk-registration`, `recidive` |
+| Filters | `pbx/fail2ban/filter.d/` | Asterisk security events; rejected requests in `full` |
+| Action | `pbx/fail2ban/action.d/docker-user.conf` | ban → `iptables -I DOCKER-USER` |
+| Log source | `asterisk-logs` volume → `/var/log/asterisk` | `security` + `full`, read straight off disk |
+| Asterisk side | `pbx/entrypoint-dograh.sh` | adds `security => security` to `logger_logfiles_custom.conf` |
+
+**Policy — one invalid attempt, 48 hours.** `maxretry = 1`, `bantime = 172800`,
+`findtime = 3600`: the first rejected registration from an address drops all of
+its traffic for two days. Loopback and the detected LAN are exempt (`ignoreip`),
+because the only thing a 48h ban is likely to catch otherwise is the operator's
+own desk phone. Three fresh bans inside a week escalate to 30 days via `recidive`.
+
+**Why `DOCKER-USER` and not `INPUT`.** Every PBX port is *published* by Docker:
+packets are DNAT'd to the container and then traverse the FORWARD path, where
+Docker inserts `-j DOCKER-USER` as the first rule. A stock `iptables`/`iptables-multiport`
+ban lands in `INPUT`, never sees those packets, and the scanner keeps hammering
+Asterisk while fail2ban reports it as banned. The action inserts at the head of
+`DOCKER-USER`, ahead of Docker's own accepts and its conntrack accept, so the
+48h ban is real — and it applies to every published port on the host, not just SIP.
+
+Verify:
+
+```bash
+sudo scripts/install-fail2ban.sh --status
+#   asterisk-registration … Currently banned: 2  Banned IP list: 172.110.223.87 …
+iptables -S DOCKER-USER | grep DROP          # one rule per banned address
+
+# Prove the filter against the PBX's own captured attack traffic (expect 0 missed):
+docker exec pbx-freepbx bash -c 'grep -E "failed for .[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+" /var/log/asterisk/full | tail -300' > /tmp/attacks.log
+fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.conf
+
+# End-to-end: append a rejected REGISTER for a TEST-NET-3 address and watch it
+# get dropped (then unban it) — see the CI job for the exact line.
+```
+
+**AMI answers on the host LAN IP only.** Two independent things keep it that way,
+and only one of them actually stops a client:
+
+- **The port binding.** `docker-compose.yml` publishes `5038` on the host LAN IP
+  (`PJSIP_MEDIA_ADDRESS`) — never `0.0.0.0`, never a docker address (project
+  rule: README → Addressing). The portal dials that same LAN IP, so the bind and
+  the target agree. On a shared Zeus PBX the port belongs to that stack
+  (`zeus/docker-compose.full.yml`), which still publishes it on
+  `0.0.0.0` and needs the same pin.
+- **The AMI ACL.** The image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's
+  AMI user, so any address that could reach the port could also authenticate
+  against it. `pbx/entrypoint-dograh.sh` now narrows `[pbxportal]` to loopback
+  plus this host's LAN subnet, idempotently, on every boot:
+
+  ```bash
+  docker exec pbx-freepbx asterisk -rx "manager show user pbxportal" | tail -3
+  #  0:  deny - 0.0.0.0/0.0.0.0
+  #  1:  allow - 127.0.0.1/255.255.255.255
+  #  2:  allow - 192.168.1.0/255.255.255.0   (PJSIP_LOCAL_NET)
+  ```
+
+  The ACL is the half that decides, and what it decides on is the source
+  address. The portal dials the host LAN IP, the host masquerades that
+  connection, and Asterisk sees the LAN address — which the LAN permit admits.
+  A client that reaches Asterisk by any other route is refused
+  (`SecurityEvent="FailedACL"`). Same user, same secret, opposite outcomes — so
+  check the address a client's packets carry before touching the secret.
+
+  A scanner that clears the ACL — through the router's forward, or the Zeus
+  stack's own binding — lands in the security log as `Service="AMI"` /
+  `RequestType="Action: NONE"` and is banned by the `asterisk-security` jail
+  (see the filter's `RequestBadFormat` entry).
+
+The ordering is load-bearing: Asterisk honours the **last** matching ACL entry,
+so the permits must come *after* the deny. Put them before it and every AMI login
+fails — including the stack's own clients — which is exactly what happened on the
+first attempt at this change.
+
+Two related fixes ship with it, both aimed at the same problem — a PBX that is
+busy rather than serving calls:
+
+- **UCP AMI credential converge.** The image's entrypoint wrote `UCPMGRPASS` only
+  when the row was empty, then rewrote `manager_custom.conf` to the current
+  secret. On an existing MariaDB volume those disagree, so the UCP NodeJS server
+  authenticated as `ucp_events` with a stale password forever: Asterisk rejected
+  every attempt and the node process pinned a core restarting (**measured live:
+  100 % CPU, 72 restarts**). `pbx/entrypoint-dograh.sh` now converges the DB
+  value onto the real secret and bounces UCP only when it changed.
+- **The `security` log channel.** Enabled through
+  `logger_logfiles_custom.conf` — the include FreePBX keeps when it regenerates
+  `logger.conf` on Apply Config — so the security events survive a GUI reload.
+
+> The jails read the `pbx-asterisk-logs` volume. If the freepbx service has never
+> been recreated since this change, run
+> `docker compose --profile standalone up -d freepbx` first (the entrypoint then
+> adds the channel, ~2 min).
+
+## Troubleshooting
+
+### `PBX error` on every agent (the PBX container is stopped)
+
+The bundled `freepbx` service sits behind `profiles: ["standalone"]`. Compose
+**stops** a profile-gated service whenever you run `docker compose up` without
+that profile, so a routine `docker compose up -d` (to deploy another service)
+takes the PBX down while leaving `dashboard-api` up. Every PBX action is a
+`docker exec`, and Docker answers a stopped container with
+`409 … is not running`; before the self-healing change that surfaced as
+`PBX error` on every Agents row, a `502` from `GET /extensions`, and `upstream
+error 502` for `voice.<domain>` in the NPM smoke test (which is also why CI can
+fail on a host that is only a proxy in front of the stopped box).
+
+Recovery, in order:
+
+```bash
+# 1. Bring the profile-gated PBX back (via the vault wrapper if .env holds refs)
+docker compose --profile standalone up -d freepbx
+
+# 2. Confirm it is up and Asterisk inside it answers
+docker ps --filter label=com.docker.compose.service=freepbx
+docker exec pbx-freepbx asterisk -rx 'core show version'
+```
+
+The Control Center now self-heals this: the first PBX action starts the
+container (`PBX_START_WAIT_S`, default 60s, `0` = fail fast) and a background
+watchdog recovers it within `PBX_WATCHDOG_INTERVAL` (default 60s, `0` =
+disabled) even when nothing is calling the API. The Agents page shows a
+dismissible notice that clears itself once the PBX is stable. A `fwconsole
+reload` that collides with one already in flight (FreePBX serialises reloads
+with its own lock — the `capstone-pbx-sync` timer and another page's repair are
+routine partners) is waited out and retried rather than reported as a failed
+repair: tune the wait with `PBX_RELOAD_MAX_WAIT` (default 60s, `0` = fail fast)
+and the retry gap with `PBX_RELOAD_POLL` (default 2s). The dashboard's
+docker-derived `/health`, `/services` and `/stats` caches are refreshed on a
+background timer (`DASHBOARD_CACHE_WARM_INTERVAL`, default 5s, `0` disables) so
+a slow `docker stats` walk can no longer turn a healthy endpoint into a
+reverse-proxy timeout. If the container starts and immediately exits, the error
+reports the exit code and the tail of its logs instead of an opaque `409`. To
+avoid the outage in the first place, always include the profile:
+`docker compose --profile standalone up -d`.
+
+### A dashboard code change isn't live
+
+Both Control Center images (`dashboard-api`, `dashboard`) are built from source,
+so editing `dashboard-backend/app` or `dashboard/src` does nothing to the running
+stack until they are rebuilt and recreated. The symptom is a fix that "landed"
+but the deployed API still behaves — or errors — like the old code (for example
+still returning Docker's raw `409 … is not running` after the PBX self-healing
+change).
+
+```bash
+scripts/redeploy-dashboard.sh          # rebuild + restart, only if sources changed
+scripts/redeploy-dashboard.sh --check  # exit 1 if a deploy is pending (CI-friendly)
+scripts/redeploy-dashboard.sh --force  # rebuild unconditionally
+```
+
+The script is hash-gated: it stamps the dashboard sources after a successful
+deploy and touches no Docker when they match. `install-capstone.sh` enables
+`capstone-dashboard-redeploy.timer`, which runs it every 5 minutes, so the
+running API does not lag the repo.
+
+**Bases: upstream first, pinned fallback.** Both Dockerfiles take their base as
+a build arg, and `scripts/local-bases.sh` resolves it. The canonical upstream tag
+(`python:3.12-slim`, `node:20-alpine`, `nginx:1.27-alpine`) is preferred, pulled
+with the host's Docker Hub login and retagged as `capstone-base/<role>:local`; a
+tag already on the host is reused, so a repeat build makes no registry call. If
+upstream cannot be obtained the previously pinned image is used and named on
+stderr ("python <- capstone-base/python:local (pinned fallback…)"), so a 429 can
+never block a deploy. When docker.io refuses the pull, the same tag is requested
+from `mirror.gcr.io` or `public.ecr.aws` — verified identical id and digest —
+with `CAPSTONE_BASE_MIRRORS` overriding the list.
+
+The nginx fallback is this repo's own image: `dashboard/nginx-base.Dockerfile`
+builds it from `alpine` with nginx, `envsubst` and the template-rendering
+entrypoint, labelled with the hash of those files so editing
+`dashboard/nginx-base/*` rebuilds it instead of reusing a stale base.
+
+```bash
+./scripts/local-bases.sh            # resolve + print the BUILD ARGS
+./scripts/local-bases.sh --print    # print the names only (CI; no Docker)
+```
+
+**One image at a time.** The two images are hashed separately, so a
+backend-only change rebuilds only `dashboard-api` and a UI-only change only
+`dashboard` — the other keeps running untouched.
+
+**Our own version tags.** Each build is also tagged with the checkout's short
+SHA (`capstone-dashboard-api:970d6f8`, `capstone-dashboard:970d6f8`) beside the
+moving `:local` tag, so the image a given release ran is still addressable after
+the next deploy moves `:local`. `data/.dashboard-redeploy.stamp.images` records
+the two hashes and that version.
+
+**Images are published to GHCR.** A successful deploy also runs
+`scripts/publish-dashboard.sh`, which pushes both images to
+`ghcr.io/innotelinc/capstone/capstone-dashboard{,-api}:<sha>` and `:latest`, so
+another host can pull the release instead of rebuilding it. Credentials come
+from `GHCR_USERNAME`/`GHCR_TOKEN` or, failing that, from the Vault path
+`cerulean/capstone/docker` (keys `GHCR_USERNAME`, `GHCR_TOKEN`; the Docker Hub
+login is kept beside them as `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`). No
+credentials is a printed skip, never a failed deploy, and `--no-push` suppresses
+the step.
+
+Both packages are **public**, so a host can pull them without any credential —
+verified by an anonymous `docker pull` with an empty `DOCKER_CONFIG`. Publishing
+still needs the GHCR login. To check visibility, pull anonymously rather than
+probing `/v2/…` directly: an unauthenticated manifest request answers 401 until
+an anonymous pull token is exchanged, which looks like a private package but is
+not.
+
+```bash
+tmp=$(mktemp -d)
+DOCKER_CONFIG=$tmp docker pull ghcr.io/innotelinc/capstone/capstone-dashboard:latest
+rm -rf $tmp
+```
+
+```bash
+scripts/publish-dashboard.sh --dry-run   # show the tags it would push
+scripts/publish-dashboard.sh --require   # fail when it cannot publish
+```
+
+### A caller hears "user busy" and no interview starts
+
+Symptom, from the outside: the DID answers with a busy tone (or a single click) instead of the
+agent's greeting. From the inside there is **no workflow run at all**, or a run that is
+created and completed in the same second with `call_duration_seconds: 0`.
+
+Cause: the organization's model configuration had `llm`, `stt` and `embeddings` bound to the
+managed `dograh` provider, so every call start performs a credit check against
+`MPS_API_URL`. That URL is deliberately unreachable on this box (`http://127.0.0.1:9` —
+services.dograh.com is not used here), the check raised
+`Could not verify Dograh credits. Please try again.` as a **fatal** `call_start` error, and
+dograh deleted the channel immediately, which the carrier reports to the caller as busy.
+
+Confirm it in the run's own log rather than in the container log (the container line is a
+one-liner and scrolls away):
+
+```bash
+docker exec dograh-postgres-1 psql -U postgres -d postgres -c \
+  "select id, logs from workflow_runs order by id desc limit 1" | grep -i credit
+# {"type": "rtf-pipeline-error", "payload": {"error": "Could not verify Dograh credits.
+#  Please try again.", "fatal": true, "processor": "call_start"}, ...}
+```
+
+Fix: point `llm`/`stt`/`embeddings` at local or gateway connections (see "Voice models"
+above), never at `dograh`. The check is skipped entirely once no role names that provider, so
+calls start without any hosted round-trip.
+
+### Interview (or any call) cut off at a fixed time
+
+Upstream dograh ends a call at **300 s** unless the workflow sets
+`max_call_duration` — that was the original "interview cut off at 5 minutes".
+The fork makes the cap configurable (and `0` = no limit); see `dograh/README.md`
+"Call length" for the env knobs. Per workflow:
+
+- **Control Center** → **Workflows** → *Edit prompts*: the **Call length limit**
+  field sets seconds (`0` = no limit; empty = deployment default). Saving
+  publishes the change, so the next call uses it.
+- The shipped interview workflows default to **no limit**
+  (`workflow_configurations.max_call_duration = 0`); `scripts/dograh_wire.py`
+  re-applies that on every run.
+- Verify what a call actually ran: the run's `cost_info.call_duration_seconds`
+  in dograh, or the `duration_s` key the webhook sends to the grader.
+
+### Interview voice cuts off early / sounds truncated
+
+The interviewer's TTS is cut mid-sentence when the mock candidate's next line starts while
+it's still speaking (the candidate loop plays continuously and each line interrupts the
+agent — `allow_interrupt` is on by design). Check and fix in this order:
+
+1. **Widen the candidate's silence gap** — the gap between candidate lines is the
+   interviewer's speaking floor:
+
+   ```bash
+   python3 scripts/gen_loops.py --gap 8   # 8s instead of the default 4s
+   ```
+
+   Regenerate, then re-place the test call (`scripts/place_call.py`). If the interviewer's
+   answers are long, use 10–12s.
+2. **Confirm which side cuts** — run the call and watch the Grafana **Interview Pipeline
+   Latency** dashboard (`grafana.<domain>`, or `:3301` locally): a TTS latency spike that ends abruptly right
+   before the cut means the next candidate line won the interrupt race.
+3. **Upstream knobs** (dograh platform): the user-turn stop timeout
+   (`user_turn_stop_timeout`, default 5s of silence) and the per-node `allow_interrupt` flag
+   govern turn boundaries. These live in the dograh fork, not this repo — patch and re-sync
+   via the release workflow if needed.
+
+### Editing an AI-generated agent's topic
+
+The dograh web UI does not expose prompt/topic editing for imported agents — the "topic" you
+typed in the Workflow Studio is baked into the workflow's node prompts (the `globalNode`
+persona + each `startCall`/`agentNode` prompt), so changing it means regenerating or editing
+the workflow itself:
+
+- **Per-call, without editing the agent**: every prompt reads `{{initial_context.*}}`
+  variables (`role`, `company`, `student_difficulty`, `focus_topics`, `interviewer_name`,
+  `student_name`, …) — pass them when placing a call and the agent adapts without any edit.
+- **Shipped agents** (`dograh/*-workflow.json`): edit the prompt text in the JSON, then
+  re-import + re-wire:
+
+  ```bash
+  python3 scripts/dograh_wire.py --env-file .env   # idempotent re-import
+  ```
+
+- **AI-generated agents** — three authoring surfaces, all writing to the same dograh
+  workflow:
+  - **Control Center** (`admin.<domain>`, port `8096`): open the agent under **Agents** →
+    *Edit workflow prompts*, or **Workflows** → *Edit prompts*. Edits are saved and
+    **published** in one step. This is the quickest path for a text tweak.
+  - **Workflow Studio** (`workflow.<domain>`, port `8090`): regenerate from a new
+    description and import as a new agent, or enter an existing **workflow id** to update
+    it in place (the import button re-points the workflow's existing number, or registers
+    the next free extension for a new one).
+  - **Shipped agents** (`dograh/*-workflow.json`): edit the JSON prompt text, then re-import
+    + re-wire with `python3 scripts/dograh_wire.py --env-file .env` (idempotent).
+
+  The dograh UI itself is intentionally read-only for prompts: it's the telephony
+  configuration surface.
+
+## Verification
+
+```bash
+./scripts/smoke-test.sh
+./scripts/smoke-e2e.sh --no-boot
+```
+
+Checks cover every container's health, the **Dograh API (`:8000`)** and **Dograh UI
+(`:3010`)**, the local TTS shim (Piper), Speaches Whisper transcription, OmniRoute completions, n8n, Grist,
+the observability containers (Grafana, Prometheus, OTel ingest), ARI, the Dograh dialplan, the media WebSocket wiring, and — when
+`DOGRAH_API_TOKEN` is in `.env` — the Dograh telephony wiring itself: the three agent
+workflows imported, the Asterisk ARI configuration present in the dograh UI, and extensions
+8000/8001/8002 bound to their agents. The ARI checks dial the host LAN IP
+(`DOGRAH_ARI_ENDPOINT`, else `PJSIP_MEDIA_ADDRESS`, else the route-selected address) — 8088 is
+not on loopback, so a loopback probe would report a healthy PBX as down.
+
+## Live/install USB and offline installation
+
+Release `v2.2` includes an x86_64 live/install ISO that boots on both **legacy BIOS** and
+**UEFI** (Secure Boot must be disabled). It boots into an Xfce desktop (autologin as the
+live `user` account) with two launchers. Both the **live session** and the finished system
+come up with **LAN DHCP automatically enabled** on any connected ethernet interface (`en*` /
+`eth*`, via NetworkManager + netplan), so they can reach the network simply by being plugged
+in.
+
+- **Download Capstone v2** — fetch the release deployment payload and the offline Docker
+  image bundle into `~/capstone-offline-bundle`.
+- **Install Capstone v2** — install Capstone. From the live session this installs to a
+  **target disk** (partition, format, copy the system, install GRUB, then set up Docker +
+  the Capstone service). On an already-installed Linux system it installs into that system
+  (`/opt/capstone`).
+
+Installing from the live session destroys all data on the selected target disk; the
+installer asks for typed confirmation (`YES`) before doing anything. Booting the live
+session alone never touches any disk.
+
+The image bakes in Docker (`docker.io`) so the installed system has a container runtime even
+with no internet; the offline bundle supplies the images. The deployment payload is also
+baked into the ISO, so an offline install only needs the Docker image bundle from the USB
+medium.
+
+Download the verified ISO and checksum from the GitHub releases page for this repository,
+then write it to a USB device:
+
+```bash
+sha256sum -c capstone-v2-live-amd64.iso.sha256
+sudo dd if=capstone-v2-live-amd64.iso of=/dev/sdX bs=16M status=progress conv=fsync
+```
+
+Replace `/dev/sdX` with the whole USB device, not a partition. Boot the target computer from
+the USB, wait for the desktop, and launch **Install Capstone v2**. For a fully offline
+install, also copy the offline bundle (`capstone-v2-deployment.tar.gz`,
+`docker-images-v2-part*.tar.gz`, `SHA256SUMS`) to a FAT32 partition of the USB stick — the
+installer detects and stages it automatically.
+
+### Persistent live USB (choose the drive + what to do with it)
+
+The plain `dd` write above boots a read-only live session. On a 64 GB stick (or larger) you
+can instead run `scripts/make-persistent-usb.sh` **with no arguments** — it lists the
+available drives and lets you pick the target, then asks what you want to do with it:
+
+```text
+1) Persistent live USB + data drive   live session saves across reboots; ~50 GB data disk
+2) Plain live USB                     read-only live session, ISO only
+3) Wipe & format a data drive         no ISO — erase the drive as one ext4 volume
+```
+
+Option 1 writes the ISO, creates an 8 GiB `persistence` overlay partition so the live
+session saves across reboots (packages, config and home survive power-off), and carves the
+remaining ~50 GB into a normal ext4 **`CAPSTONE_DATA`** drive for software, downloads, or as
+an install target.
+
+```bash
+sudo scripts/make-persistent-usb.sh               # interactively pick drive + action
+sudo scripts/make-persistent-usb.sh /dev/sdX       # non-interactive: persistent + data
+sudo ACTION=plain  scripts/…/make-persistent-usb.sh /dev/sdX   # ISO only
+sudo ACTION=data   scripts/…/make-persistent-usb.sh /dev/sdX   # wipe & format a data drive
+# env overrides:  PERSIST_MB=16384  DATA_LABEL=DATA  ISO=/path/capstone.iso
+```
+
+Resulting layout (option 1):
+
+| partition | label | size | purpose |
+|---|---|---|---|
+| 1 | (ISO) | ~4 GB | read-only live boot medium |
+| 2 | `persistence` | 8 GiB (default) | live-session overlay — saves across reboots |
+| 3 | `CAPSTONE_DATA` | rest (~50 GB) | normal ext4 data drive |
+
+The ISO is built with `persistence` on the kernel cmdline (see
+`scripts/build-live-usb.sh`), so any Capstone ISO written by this helper boots
+persistently. The `CAPSTONE_DATA` drive is not part of the overlay — mount it when you want
+it: `sudo mount /dev/sdX3 /mnt/data`.
+
+After the install, the **installed system** boots straight into the Capstone stack (systemd
+enables Docker + the Capstone service on first boot) with DHCP networking on every ethernet
+interface. The login user is **`capstone`** (password **`capstone`** — change it after first
+login, or pre-set `CAPSTONE_USER` / `CAPSTONE_PASSWORD` when running
+`install-capstone.sh` manually).
+
+### Reset a forgotten / broken login password
+
+If the `capstone` user's password doesn't work after an install (common when the install was
+interrupted or the chroot bootstrap didn't complete), reset it from the live USB:
+
+1. Boot the machine from the Capstone live USB again and wait for the desktop.
+2. Open a terminal and find the installed root partition:
+
+   ```bash
+   lsblk
+   ```
+
+3. Mount the installed root (adjust the device if your root is not `/dev/sda2`) and chroot
+   into it:
+
+   ```bash
+   sudo mount /dev/sda2 /mnt
+   sudo mount --bind /dev    /mnt/dev
+   sudo mount --bind /dev/pts /mnt/dev/pts
+   sudo mount --bind /proc   /mnt/proc
+   sudo mount --bind /sys    /mnt/sys
+
+   sudo chroot /mnt /bin/bash
+   ```
+
+4. Inside the chroot, create/reset the login user and drop the live-session autologin (it
+   points at the live `user` account, which doesn't exist on the installed disk and can
+   block a clean greeter):
+
+   ```bash
+   useradd -m -s /bin/bash -G sudo,docker capstone 2>/dev/null || true
+   echo 'capstone:capstone' | chpasswd
+   rm -f /etc/lightdm/lightdm.conf.d/50-capstone-autologin.conf
+
+   exit
+   ```
+
+5. Unmount everything, then reboot into the installed system (without the USB):
+
+   ```bash
+   sudo umount /mnt/dev/pts 2>/dev/null; sudo umount /mnt/dev 2>/dev/null
+   sudo umount /mnt/proc; sudo umount /mnt/sys; sudo umount /mnt
+   sudo reboot
+   ```
+
+6. Log in as `capstone` / `capstone` and change the password right away with `passwd`.
+
+> **Still rejected?** Re-run the chroot steps above and confirm the user really got written
+> to disk: `grep capstone /mnt/etc/passwd /mnt/etc/shadow`. If the lines are missing, the
+> chroot bootstrap didn't reach the user-creation step during the original install.
+
+### Build the ISO
+
+On an Ubuntu 24.04 (Noble) build host:
+
+```bash
+sudo apt-get install -y live-build xorriso mtools genisoimage \
+  grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
+./scripts/build-offline-bundle.sh --deployment-only   # bakes the payload into the ISO
+./scripts/build-live-usb.sh
+```
+
+Output:
+
+```text
+dist/live-usb/capstone-v2-live-amd64.iso
+dist/live-usb/capstone-v2-live-amd64.iso.sha256
+```
+
+The builder uses Ubuntu Noble with GRUB 2 (El Torito for CD/BIOS), an added GRUB EFI image
+for UEFI, and an isohybrid MBR so the same ISO boots from a USB stick in both firmware
+modes.
+
+### Offline bundle
+
+Build the offline bundle (deployment payload + all platform Docker images, split into parts
+under 2 GB so they fit GitHub's upload limit):
+
+```bash
+./scripts/build-offline-bundle.sh
+```
+
+Download the same bundle from the release:
+
+```bash
+./scripts/fetch-offline-bundle.sh ~/capstone-offline-bundle
+```
+
+This verifies `SHA256SUMS`, unpacks the deployment payload, and reassembles the Docker image
+archives into `dist/docker-images-v2/`. Point `install-capstone.sh` at the result
+(`CAPSTONE_ASSET_DIR=~/capstone-offline-bundle`) and it loads images locally instead of
+pulling from the network. The core images bundled are: Postgres/pgvector, Redis, MinIO,
+Coturn, Dograh API, FreePBX/PBX Portal, the TTS shim (Piper), Speaches STT, OmniRoute, and the
+instrumented n8n image.
+
+## Release automation notes
+
+- `.github/workflows/sync-and-release.yml` detects dograh upstream updates, syncs the
+  source, and cuts a numbered release — daily and on demand. Every release is **full**: the
+  cut includes the deployment payload + source bundle, and two parallel jobs build and
+  upload the docker image bundle and the live ISO (each on its own VM). Set the
+  **`lightweight`** input for a quick test release that skips those two. The `force` input
+  cuts a release even if upstream hasn't moved.
+- `.github/workflows/release.yml` is the **tag-based** pipeline: pushing any `v*` tag builds
+  the Capstone-built images (n8n+OTel, Workflow Studio, Control Center dashboard + API),
+  publishes them to GHCR under the repo's own namespace
+  (`ghcr.io/<owner>/<repo>/capstone-*:<tag>` + `:latest`), and attaches the source bundle +
+  deployment payload to the GitHub Release for that tag.
+
+
+### Nightly disk cleanup
+
+`scripts/docker-cleanup.sh` (mirrored from ips, canonical there) runs nightly at
+04:17 via `/etc/cron.d/docker-cleanup`: build cache (2 GB kept), dangling and
+unreferenced images, containers exited for more than a day, and container logs
+over 50 MB (trimmed to 10 MB). Volumes are never touched. Run it manually with
+`DRY_RUN=1 scripts/docker-cleanup.sh` to preview.

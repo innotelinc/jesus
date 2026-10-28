@@ -1,0 +1,12 @@
+# The shim is a thin async proxy + cache + metrics exporter, so the dependency
+# list is deliberately short. Lower bounds rather than exact pins: the stack
+# builds this image locally, and a stale hard pin here fails a build for no
+# benefit. Piper is installed separately (see Dockerfile) because it is optional.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+prometheus-client>=0.20
+numpy>=1.26
+# Stateful resampling for Piper voices (16k/22.05k) up to 24 kHz without clicks
+# at chunk boundaries. The shim degrades to linear interpolation without it.
+soxr>=0.4

@@ -1,0 +1,1002 @@
+#!/usr/bin/env python3
+"""npm_proxy_hosts.py — keep Nginx Proxy Manager proxy hosts in sync with the stack.
+
+Idempotent; talks to the NPM REST API only (no UI clicks). Safe to re-run:
+every step GETs first and only writes when state differs.
+
+What it does:
+
+  1. auth      — login with NPM_ADMIN_EMAIL/NPM_ADMIN_PASSWORD (POST /api/tokens),
+                 or use a persistent NPM_API_TOKEN (NPM → Access → API Tokens)
+  2. sync      — for every service in the README "NPM proxy hosts" table,
+                 create-or-update its proxy host under NPM_BASE_DOMAIN
+                 (forward host/port from the compose port map)
+  3. ssl       — when NPM_LETSENCRYPT_EMAIL is set, reuse the certificate a
+                 host already carries, and create one only when it has none;
+                 force HTTPS either way. With --wildcard + DNS provider
+                 credentials (NPM_DNS_PROVIDER / NPM_DNS_PROVIDER_CREDENTIALS),
+                 ONE wildcard certificate covering "*.base + base" is issued
+                 via DNS-01 and attached to every proxy host instead.
+
+                 Reuse is the common case and it is deliberate: Cerulean (the
+                 estate's TrustOps platform) issues one wildcard per zone
+                 against the shared BIND and *exports* it into NPM, where it is
+                 recorded under the apex alone (`domain_names == [base]`) even
+                 though its certificate also names `*.base`. A sync that
+                 insisted on finding the `*.base` name in that list reported
+                 every host as having no certificate, and one that re-issued
+                 would have replaced the zone's shared certificate with a dozen
+                 per-host ones. See zone_wildcard_cert().
+
+Optional services (portal) are skipped unless listed in
+--include-optional / NPM_INCLUDE_OPTIONAL — they only exist when their
+compose profile is enabled. Note: a later run WITHOUT the include flag treats
+those hosts as stale and prunes them — pass --no-prune to keep them.
+
+The `voice` host forwards to Asterisk's HTTP-TLS listener (https://<host>:8089)
+with WebSocket support ON, which is what the in-browser Softphone connects to
+(wss://voice.<domain>/ws). If your NPM validates upstream certificates and balks
+at the PBX's self-signed integration cert, use --ws-scheme http --ws-port 8088
+(plain-ws upstream, same /ws signaling handler).
+
+Environment variables (real env wins, then the capstone .env, then defaults):
+
+  NPM_API_URL             NPM base URL            (http://127.0.0.1:81)
+  NPM_ADMIN_EMAIL         NPM admin login email   (required unless NPM_API_TOKEN)
+  NPM_ADMIN_PASSWORD      NPM admin login password(required unless NPM_API_TOKEN)
+  NPM_API_TOKEN           persistent NPM API token (optional; skips login)
+  NPM_BASE_DOMAIN         base domain, e.g. capstone.innotel.us  (required)
+  NPM_UPSTREAM_HOST       Docker host IP NPM forwards to
+                          (default: PJSIP_MEDIA_ADDRESS from .env)
+  AUTHENTIK_UPSTREAM_HOST host serving Authentik — what `auth.<domain>`
+                          forwards to (default: NPM_UPSTREAM_HOST, i.e. this
+                          stack runs its own IdP; a deployment that uses the
+                          shared Cerulean Authentik sets it to that host)
+  SUBSCRIBE_UPSTREAM_HOST host serving subscribe.<domain> — the estate's
+                          subscribe portal (the box behind subscribe.innotel.us),
+                          required, and never this stack's own upstream. The
+                          older name ZEUS_UPSTREAM_HOST is still read as a
+                          fallback.
+  NPM_LETSENCRYPT_EMAIL   email for Let's Encrypt certs
+                          (default: GRIST_ADMIN_EMAIL; empty → hosts without SSL)
+  NPM_INCLUDE_OPTIONAL    comma list of optional hosts: nocodb,portal (or "all")
+  NPM_WILDCARD_CERT       1/true → issue ONE wildcard cert (*.base + base) via
+                          DNS-01 and attach it to every host (or --wildcard)
+  NPM_DNS_PROVIDER        DNS provider slug for the wildcard cert, e.g.
+                          cloudflare, route53, digitalocean, dnsimple, duckdns
+                          (must be saved as a credential in NPM)
+  NPM_DNS_PROVIDER_CREDENTIALS  NPM credential id for the DNS provider
+                          (NPM → Credentials → the id in the row's URL/DB)
+
+Usage (from the repo root):
+
+  python3 scripts/npm-proxy-hosts.py                  # create/update + prune
+  python3 scripts/npm-proxy-hosts.py --check          # verify only, exit 1 if out of sync
+  python3 scripts/npm-proxy-hosts.py --no-prune       # never delete hosts
+  python3 scripts/npm-proxy-hosts.py --no-ssl         # skip certificates/HTTPS
+  python3 scripts/npm-proxy-hosts.py --include-optional nocodb,portal
+  python3 scripts/npm-proxy-hosts.py --ws-scheme http --ws-port 8088
+  python3 scripts/npm-proxy-hosts.py --wildcard \
+      --dns-provider cloudflare --dns-credentials 3   # one wildcard cert for all hosts
+
+Subdomains (each service gets <sub>.<NPM_BASE_DOMAIN>):
+
+  capstone.<domain> (apex) Capstone Voice App (dograh UI)    :3010
+  api.<domain>      Capstone Voice API (dograh API)           :8000
+  auth.<domain>     Authentik (SSO / user management)         :9000
+  voice.<domain>    WebRTC WSS signaling (softphone)          :8089 (WSS)
+  admin/dashboard.<domain>  Capstone Control Center            :8096
+  pbx.<domain>      FreePBX (+ AvantFAX at /fax)              :14014 (SSO gateway)
+  n8n/grist/omniroute/grafana/workflow.<domain>              :14010/14011/20128/14012/14013
+      (the SSO gateways' host ports; OmniRoute has no gateway and stays internal)
+  portal/nocodb.<domain>   optional profile services          :3000/8080
+
+SSO: there is no forward-auth gate any more — no host carries an nginx
+  auth_request, and this script never writes one. Surfaces that speak OIDC
+  (the Control Center, the voice app) use it directly; surfaces that do not
+  (FreePBX, n8n, Grist, Grafana, Workflow Studio, OmniRoute) are fronted by an
+  oauth2-proxy SSO gateway instead. Both are Authentik OIDC, and both close
+  the app's own login page. The voice app's OIDC legs are the exception that
+  needs saying twice: they are cut straight to the API — bypassing the app's own
+  UI proxy, so a sign-in never depends on that image being current — by a
+  location on each of the app's origins. See OIDC_PATH. The npm repo's
+  docs/stack.md covers the edge as a whole.
+
+The old pre-v3.11 names dograh-ui and ws are pruned as stale on the next run
+— pass --no-prune to keep them around. Neither dograh nor dashboard is pruned:
+dograh's .env AUTHENTIK_REDIRECT_URI is a live OIDC redirect target, and
+dashboard.<domain> is the Control Center's own host (the callback the Authentik
+"Capstone Dashboard" client registers), with admin.<domain> as its alias.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import socket
+import ssl
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+REPO = Path(__file__).resolve().parent.parent
+DEFAULT_API_URL = "http://127.0.0.1:81"
+
+# The proxy-host map — one entry per README "NPM proxy hosts" row.
+#   key       compose service label (used for --include-optional + pruning)
+#   sub       subdomain under NPM_BASE_DOMAIN (None → the apex domain)
+#   scheme    upstream scheme NPM forwards with (http/https)
+#   port      upstream host port
+#   websocket enable allow_websocket_upgrade (n8n/Grafana UIs + voice WSS)
+#   name      human label for PASS/FAIL output
+#   optional  only synced when explicitly included (compose profile services)
+#
+# The canonical Capstone subdomains: app/api/auth/voice/admin/pbx (the legacy
+# dograh-ui/ws names were folded into these in v3.11 and are pruned as stale on
+# the next sync; dograh/dashboard were kept as OIDC redirect aliases).
+HOSTS: list[dict[str, Any]] = [
+    # The apex serves the dograh UI (what users hit on capstone.innotel.us);
+    # the API lives at api.<domain>. Matches the long-standing NPM edge state.
+    {"key": "apex",      "sub": None,        "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (apex origin)"},
+    {"key": "api",       "sub": "api",       "scheme": "http",  "port": 8000,  "websocket": True,  "name": "Capstone Voice API"},
+    {"key": "app",       "sub": "app",       "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (dograh UI)"},
+    # auth.<domain> is the IdP that every other host's gate points at, and it is
+    # not necessarily this stack's host: the shared deployment runs ONE
+    # Authentik for the whole estate (Cerulean's, on 192.168.1.71 here) and this
+    # stack runs none, so AUTHENTIK_UPSTREAM_HOST names the box that does.
+    # Unset → NPM_UPSTREAM_HOST, which is right for a stack with its own IdP.
+    {"key": "auth",      "sub": "auth",      "scheme": "http",  "port": 9000,  "websocket": True,
+     "host_key": "AUTHENTIK_UPSTREAM_HOST", "name": "Authentik (SSO / user management)"},
+    {"key": "voice",     "sub": "voice",     "scheme": "https", "port": 8089,  "websocket": True,  "name": "WebRTC WSS signaling (softphone)"},
+    {"key": "admin",     "sub": "admin",     "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center"},
+    # dashboard.<domain> is the Control Center's canonical name: the Authentik
+    # "Capstone Dashboard" client it signs in as has it as its launch URL and
+    # as its ONLY registered redirect_uri (…/api/auth/callback). It must exist
+    # or OIDC login breaks; admin.<domain> is the alias.
+    {"key": "dashboard", "sub": "dashboard", "scheme": "http",  "port": 8096,  "websocket": True,  "name": "Capstone Control Center (OIDC redirect alias)"},
+    # Legacy alias kept so older integrations don't 404 after a sync.
+    {"key": "api-legacy", "sub": "backend.api", "scheme": "http", "port": 8000, "websocket": True, "name": "Capstone Voice API (legacy alias)"},
+    # dograh.<domain> is the pre-v3.11 name for the app, but .env still uses it
+    # as PUBLIC_BASE_URL / AUTHENTIK_REDIRECT_URI / AUTHENTIK_POST_LOGIN_REDIRECT,
+    # so it is a live OIDC redirect target, not stale: without this row a sync
+    # silently prunes it and the OIDC callback 404s. Unlike app./apex it carries
+    # no forward-auth gate — it is the landing target of the OIDC dance, and the
+    # app authenticates that callback itself (same as dashboard./admin.).
+    {"key": "dograh",    "sub": "dograh",    "scheme": "http",  "port": 3010,  "websocket": True,  "name": "Capstone Voice App (legacy OIDC redirect alias)"},
+    # SSO-gated rows: the port is the app's oauth2-proxy gateway (`<key>-sso` in
+    # docker-compose.yml), not the app's own — FreePBX, n8n, Grist, Grafana and the
+    # Workflow Studio have no OIDC of their own and the gateway is what performs
+    # the Authentik code flow in front of them. `gated` is the machine-readable
+    # form of that "via SSO gateway" in the name: npm-smoke-test.py reads it to
+    # decide whether an unauthenticated request must bounce into the IdP, so a
+    # host that is gated but not flagged here is reported healthy while serving
+    # its app to anyone. Absent = not gated.
+    {"key": "pbx",       "sub": "pbx",       "scheme": "http",  "port": 14014, "websocket": False, "gated": True, "name": "FreePBX (+ AvantFAX at /fax) — via SSO gateway"},
+    {"key": "n8n",       "sub": "n8n",       "scheme": "http",  "port": 14010, "websocket": True,  "gated": True, "name": "n8n — via SSO gateway"},
+    {"key": "grist",     "sub": "grist",     "scheme": "http",  "port": 14011, "websocket": False, "gated": True, "name": "Grist — via SSO gateway"},
+    # OmniRoute holds the LLM API key — docs/networking.md: keep it internal.
+    # No DNS record exists for it; sync only when explicitly included.
+    {"key": "omniroute", "sub": "omniroute", "scheme": "http",  "port": 20128, "websocket": False, "name": "OmniRoute", "optional": True},
+    # Grafana holds the port the SigNoz UI had (14012, and 3301 behind the
+    # gateway), so the name changed but nothing about the forward did.
+    {"key": "grafana",   "sub": "grafana",   "scheme": "http",  "port": 14012, "websocket": True,  "gated": True, "name": "Grafana — via SSO gateway"},
+    {"key": "workflow",  "sub": "workflow",  "scheme": "http",  "port": 14013, "websocket": False, "gated": True, "name": "Workflow Studio — via SSO gateway"},
+    # subscribe.<domain> is the estate's subscribe portal: the pricing/checkout
+    # page behind subscribe.innotel.us, which renders the per-zone page from the
+    # Host header and reads each price live from Magnate. It is neither this
+    # stack's box nor this stack's portal — every zone in the estate points at
+    # the same host — and forwarding this name at the Capstone/Dograh box is
+    # what produced the 502 fixed on 24 Sep 2026. So its host comes from
+    # SUBSCRIBE_UPSTREAM_HOST (ZEUS_UPSTREAM_HOST is the older name for it), and
+    # websocket stays off because it serves an ordinary page.
+    {"key": "subscribe", "sub": "subscribe", "scheme": "http", "port": 3040,
+     "websocket": False, "host_key": "SUBSCRIBE_UPSTREAM_HOST",
+     "name": "Subscribe portal (pricing / checkout)"},
+    {"key": "portal",    "sub": "portal",    "scheme": "http",  "port": 3000,  "websocket": False, "name": "PBX Portal", "optional": True},
+]
+
+
+# ── Media (recordings / transcripts) ────────────────────────────────────
+# Call recordings and transcripts live in MinIO, and the API hands the browser
+# URLs of the form MINIO_PUBLIC_ENDPOINT + /<bucket>/<key> — i.e.
+# https://<app host>/voice-audio/recordings/<id>.wav. Those URLs are unsigned
+# (the bucket is anonymous-read by design: services/filesystem/minio.py returns
+# `{public_endpoint}/{bucket}/{key}` and never signs), so the only thing they
+# need is to be routable: MinIO is published LAN-only and the edge is remote,
+# so each app origin proxies that one prefix to it.
+#
+# Reads only. The vendor's own deployment forwards the whole prefix, but this
+# bucket grants anonymous GetObject *and* PutObject, and the route is public —
+# so writes are refused here rather than left open on the internet. OPTIONS
+# stays allowed because the transcript is fetched with fetch(), which is
+# CORS-restricted when the UI is opened on a different one of the app hosts.
+MEDIA_PATH = "/voice-audio"
+MEDIA_PORT = 9200
+MEDIA_LOCATION_ADVANCED = "limit_except GET HEAD OPTIONS { deny all; }"
+# Which app origins also serve the media prefix. Shared with
+# npm-smoke-test.py, which probes this route through the edge — the failure it
+# guards against (the edge forwarding the prefix to a host that no longer runs
+# MinIO) is a 502 at transcript-download time, long after the sync looked fine.
+MEDIA_HOST_KEYS = {"apex", "app", "dograh"}
+
+
+def media_location(upstream: str) -> dict[str, Any]:
+    return {
+        "path": MEDIA_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": MEDIA_PORT,
+        "advanced_config": MEDIA_LOCATION_ADVANCED,
+    }
+
+
+# ── Cerulean SSO (the OIDC legs) ───────────────────────────────────────
+# A sign-in starts at /api/v1/auth/oidc/login and finishes at
+# /api/v1/auth/oidc/callback. Both are the *API's* routes, but on the app's own
+# origins /api/v1/* arrives through the UI's Next server first, and that proxy
+# was built to resolve redirects itself: it followed the 307 to the IdP
+# server-side and handed the browser a 200 carrying Authentik's HTML, so
+# clicking "Sign in with Cerulean" appeared to do nothing at all.
+# (dograh/patches/0001 gives the proxy `redirect: "manual"` — but that only
+# reaches a host in a rebuilt UI image, and a stale image is exactly what this
+# route exists to survive.)
+#
+# Cutting the prefix straight to the API at the edge removes the dependency:
+# the browser receives the 307, its Location and its Set-Cookie untouched.
+#
+# The provider registers exactly ONE redirect_uri, so the host that starts the
+# flow must be the host that finishes it. The canonical host below proxies the
+# prefix to the API itself; every other app origin hands the browser over to it
+# first, because the state/PKCE cookie is host-only until the API widens it
+# (dograh/patches/0006). Keep OIDC_CANONICAL_SUB in step with
+# AUTHENTIK_REDIRECT_URI in .env — a mismatch strands every sign-in on
+# `expired` at the callback.
+OIDC_PATH = "/api/v1/auth/oidc"
+OIDC_PORT = 8000
+OIDC_CANONICAL_SUB = None          # None → the apex domain
+OIDC_HOST_KEYS = {"apex", "app", "dograh"}
+
+
+def oidc_canonical_host(base_domain: str) -> str:
+    """The one name an Authentik sign-in completes on (see OIDC_CANONICAL_SUB)."""
+    if OIDC_CANONICAL_SUB is None:
+        return base_domain
+    return f"{OIDC_CANONICAL_SUB}.{base_domain}"
+
+
+def oidc_location(upstream: str) -> dict[str, Any]:
+    """The OIDC legs served by the API, skipping the app's own UI proxy."""
+    return {
+        "path": OIDC_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": OIDC_PORT,
+        "advanced_config": "",
+    }
+
+
+def oidc_handoff_location(canonical_host: str, upstream: str) -> dict[str, Any]:
+    """Send a sign-in started on an alias origin to the canonical one.
+
+    A 302 rather than a proxy: the state/PKCE cookie is host-only (the API only
+    widens it where it can infer a shared parent), so a flow that started on
+    `app.`/`dograh.` would leave its cookie there and come back to the canonical
+    host without it. `return` is answered before the location's proxy_pass, so
+    the forward fields exist only because NPM requires them.
+    """
+    return {
+        "path": OIDC_PATH,
+        "forward_scheme": "http",
+        "forward_host": upstream,
+        "forward_port": OIDC_PORT,
+        "advanced_config": f"return 302 https://{canonical_host}$request_uri;",
+    }
+
+
+def detect_lan_ip() -> str:
+    """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
+
+    The address a remote NPM edge can actually reach — never loopback, and
+    preferred over the docker-internal host.docker.internal alias.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))  # picks the default route, sends nothing
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    try:
+        out = subprocess.check_output(["hostname", "-I"], text=True, stderr=subprocess.DEVNULL)
+        for ip in out.split():
+            if ip and not ip.startswith("127."):
+                return ip.split("%")[0]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+class NpmError(Exception):
+    pass
+
+
+def load_env_file(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if not path.exists():
+        return env
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        env[key.strip()] = val.strip().strip('"').strip("'")
+    return env
+
+
+def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
+    """Resolve a setting: real env first, then the .env file, then default."""
+    return os.environ.get(key) or args.env.get(key) or default
+
+class NpmApi:
+    """Minimal Nginx Proxy Manager REST API client (stdlib only)."""
+
+    def __init__(self, base_url: str, token: str = ""):
+        self.base = base_url.rstrip("/")
+        self.token = token
+
+    def _call(self, method: str, path: str, body: Any = None) -> Any:
+        url = f"{self.base}{path}"
+        data = json.dumps(body).encode() if body is not None else None
+        headers = {"Accept": "application/json"}
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as e:
+            detail = (e.read() or b"").decode(errors="replace")[:300]
+            raise NpmError(f"{method} {path} → HTTP {e.code}: {detail}") from e
+
+    def login(self, identity: str, secret: str) -> None:
+        res = self._call("POST", "/api/tokens", {"identity": identity, "secret": secret})
+        token = (res or {}).get("token") or (res or {}).get("access_token") or ""
+        if not token:
+            raise NpmError("login response contained no token")
+        self.token = token
+
+    def proxy_hosts(self) -> list[dict]:
+        return self._call("GET", "/api/nginx/proxy-hosts") or []
+
+    def create_proxy_host(self, payload: dict) -> dict:
+        return self._call("POST", "/api/nginx/proxy-hosts", payload)
+
+    def update_proxy_host(self, pid: int, payload: dict) -> dict:
+        return self._call("PUT", f"/api/nginx/proxy-hosts/{pid}", payload)
+
+    def delete_proxy_host(self, pid: int) -> None:
+        self._call("DELETE", f"/api/nginx/proxy-hosts/{pid}")
+
+    def certificates(self) -> list[dict]:
+        return self._call("GET", "/api/nginx/certificates") or []
+
+    def create_certificate(self, payload: dict) -> dict:
+        return self._call("POST", "/api/nginx/certificates", payload)
+
+
+def build_payload(domain: str, h: dict, forward_host: str,
+                  cert_id: int | None, ssl: bool) -> dict:
+    return {
+        "domain_names": [domain],
+        "forward_scheme": h["scheme"],
+        "forward_host": forward_host,
+        "forward_port": h["port"],
+        "certificate_id": cert_id if ssl else None,
+        "ssl_forced": ssl,
+        "block_exploits": True,
+        "caching_enabled": False,
+        "allow_websocket_upgrade": h["websocket"],
+        "access_list_id": "0",
+        # Never a gate: identity is Authentik OIDC. Hosts without OIDC of their
+        # own are fronted by an oauth2-proxy SSO gateway, not an auth_request.
+        "advanced_config": "",
+        "meta": {"letsencrypt_agree": False, "dns_challenge": False},
+        "locations": h.get("locations", []),
+        "hsts_enabled": False,
+        "hsts_subdomains": False,
+        "http2_support": True,
+        "enabled": True,
+    }
+
+
+def covering_cert(certs_by_domain: dict[str, int], domain: str) -> int | None:
+    """A certificate whose *recorded* names cover `domain`, or None.
+
+    Exact first, then one wildcard label. A wildcard matches exactly ONE label,
+    so drop exactly the first: auth.capstone.innotel.us →
+    *.capstone.innotel.us (NOT *.innotel.us), and a four-label name is not
+    covered by its zone's wildcard at all.
+    """
+    cid = certs_by_domain.get(domain.lower())
+    if cid is not None:
+        return cid
+    labels = domain.split(".")
+    if len(labels) > 2:
+        return certs_by_domain.get("*." + ".".join(labels[1:]))
+    return None
+
+
+def wildcard_covers(name: str, zone: str) -> bool:
+    """Whether `*.zone` (+ the apex) covers `name` — one label, never two."""
+    name, zone = name.lower().strip("."), zone.lower().strip(".")
+    return name == zone or name.count(".") == zone.count(".") + 1 and name.endswith("." + zone)
+
+
+def edge_cert_names(host: str, port: int = 443, timeout: float = 8.0) -> set[str] | None:
+    """The DNS names the edge's certificate for `host` carries, or None.
+
+    Read out of a handshake that was verified against the system trust store,
+    exactly as a browser verifies it: a non-empty result means this host's HTTPS
+    is genuine and these are the names its certificate covers. An empty set
+    means the edge answered with a certificate that does not cover `host`. None
+    means the probe could not run from here (no DNS, no route) — a fact about
+    this runner, not about the certificate, and never read as "absent".
+    """
+    try:
+        socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return None
+    try:
+        with socket.create_connection((host, port), timeout=timeout) as raw:
+            context = ssl.create_default_context()
+            with context.wrap_socket(raw, server_hostname=host) as tls:
+                peer = tls.getpeercert()
+    except ssl.SSLCertVerificationError:
+        return set()
+    except (ssl.SSLError, OSError):
+        return None
+    return {value for kind, value in peer.get("subjectAltName", ()) if kind == "DNS"}
+
+
+def zone_wildcard_cert(certs_by_domain: dict[str, int], zone: str) -> int | None:
+    """The zone's wildcard certificate as NPM records it, or None.
+
+    Cerulean issues ONE wildcard per zone (`*.zone` + the apex) via DNS-01
+    against the shared BIND and exports it into NPM, where it is recorded under
+    the apex alone — `domain_names == [zone]` — even though its certificate
+    names every subdomain too. A name lookup cannot see it, which is how every
+    host in a zone came to be reported as having no certificate while serving
+    that very certificate. So ask the edge what it actually presents for the
+    apex and accept the certificate NPM holds only when its SANs really do carry
+    `*.zone`; an apex-only certificate is not this, and is left alone.
+    """
+    cid = certs_by_domain.get(zone.lower())
+    if cid is None:
+        return None
+    names = edge_cert_names(zone)
+    if names is None:
+        # No route from here: the certificate NPM holds for the apex is the one
+        # the zone's hosts serve, so that is the one to reuse.
+        return cid
+    return cid if f"*.{zone.lower()}" in {n.lower() for n in names} else None
+
+
+def cert_lapsed(certs_by_id: dict[int, dict], cid: int) -> str:
+    """The certificate's expiry when it has already passed, else "".
+
+    Returning the timestamp rather than a bool keeps the FAIL message useful:
+    a certificate can lapse, or be replaced with an unrelated renewed one that
+    no longer carries the name.
+    """
+    raw = str((certs_by_id.get(cid) or {}).get("expires_on") or "")
+    try:
+        when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return raw if when < datetime.now(timezone.utc) else ""
+
+
+def ensure_cert(api: NpmApi, domains: list[str], le_email: str,
+                dns_provider: str, dns_credentials: str,
+                check: bool, certs_by_domain: dict[str, int],
+                failed: list[str], certs_by_id: dict[int, dict] | None = None,
+                attached_id: int = 0, zone: str = "",
+                zone_cert: int | None = None) -> int | None:
+    """Return the cert id covering `domains`, creating one only when it must.
+
+    Reuse comes before issuance, in this order:
+
+      1. a certificate whose recorded names cover the name;
+      2. the zone's wildcard (see zone_wildcard_cert), for a host under it;
+      3. the certificate the host already carries — and a sync has no business
+         replacing a working certificate with a fresh per-host one, which is
+         exactly what the exported wildcard above would otherwise invite;
+      4. create one (HTTP-01, or DNS-01 with provider credentials).
+
+    In --check mode step 4 never writes: a certificate that is missing is a
+    FAIL, and so is one that is attached but has already lapsed. With DNS
+    provider credentials set, issues via DNS-01 (required for wildcard names);
+    otherwise uses the default HTTP-01 challenge.
+    """
+    for d in domains:
+        cid = covering_cert(certs_by_domain, d)
+        if cid is not None:
+            return cid
+    # The zone's wildcard covers a one-label subdomain of the zone and the zone
+    # itself — everything every row in HOSTS asks about except `backend.api.…`,
+    # which has a certificate of its own and matched above.
+    if zone_cert is not None and zone and all(wildcard_covers(d, zone) for d in domains):
+        return zone_cert
+    if attached_id and certs_by_id is not None:
+        lapsed = cert_lapsed(certs_by_id, attached_id)
+        if not lapsed:
+            return attached_id
+        print(f"FAIL the certificate {domains[0]} serves lapsed on {lapsed} — renew it "
+              f"(Cerulean exports the zone's wildcard; `npm-proxy-hosts.py` will not "
+              f"re-issue a certificate this deployment already has)", file=sys.stderr)
+        failed.append(domains[0])
+        if check:
+            return None
+    label = ", ".join(domains)
+    if check:
+        print(f"FAIL no Let's Encrypt certificate for {label}")
+        failed.append(domains[0])
+        return None
+    # NPM's certificate meta schema is strict (additionalProperties: false) and
+    # keeps the Let's Encrypt account email globally (Settings → Let's Encrypt),
+    # so a "letsencrypt_email"/"letsencrypt_agree" key here is a 400, not a
+    # setting — that is why issuing failed on this NPM version. Allowed keys:
+    # dns_challenge, dns_provider, dns_provider_credentials,
+    # propagation_seconds, key_type (+ certificate/certificate_key for manual).
+    # NPM_LETSENCRYPT_EMAIL still gates SSL on/off below; it just isn't sent.
+    meta: dict[str, Any] = {"dns_challenge": False, "key_type": "ecdsa"}
+    if dns_provider and dns_credentials:
+        meta.update({
+            "dns_challenge": True,
+            "dns_provider": dns_provider,
+            "dns_provider_credentials": dns_credentials,
+            "propagation_seconds": 60,
+        })
+    try:
+        cert = api.create_certificate({
+            "provider": "letsencrypt",
+            "domain_names": domains,
+            "meta": meta,
+        })
+        cid = cert.get("id")
+        for d in domains:
+            certs_by_domain[d.lower()] = cid
+        print(f"PASS requested Let's Encrypt certificate for {label} (id {cid})")
+        return cid
+    except (NpmError, urllib.error.URLError, OSError) as e:
+        print(f"FAIL could not create certificate for {label}: {e}", file=sys.stderr)
+        failed.append(domains[0])
+        return None
+
+
+# Fields NPM's PUT /api/nginx/proxy-hosts schema accepts — the GET response
+# carries extra read-only fields (id, timestamps, owner) that a v2.x API
+# rejects with "must NOT have additional properties", so updates must be
+# projected onto this whitelist before being sent.
+PUT_ALLOWED_KEYS = (
+    "domain_names",
+    "forward_scheme",
+    "forward_host",
+    "forward_port",
+    "certificate_id",
+    "ssl_forced",
+    "hide_headers",
+    "http2_support",
+    "hsts_enabled",
+    "hsts_subdomains",
+    "block_exploits",
+    "caching_enabled",
+    "allow_websocket_upgrade",
+    "access_list_id",
+    "advanced_config",
+    "locations",
+    "meta",
+    "enabled",
+)
+
+
+# A custom location NPM echoes back carries read-only fields (id, timestamps)
+# and NPM normalises whitespace, so a diff compares only the keys we manage and
+# canonicalises the two values that legitimately round-trip differently: the
+# path (leading/trailing slashes) and the advanced_config text.
+LOCATION_MANAGED_KEYS = (
+    "path",
+    "forward_scheme",
+    "forward_host",
+    "forward_port",
+    "advanced_config",
+)
+
+
+def normalize_locations(locations: Any) -> list[dict]:
+    out: list[dict] = []
+    for loc in locations or []:
+        if not isinstance(loc, dict):
+            continue
+        norm = {k: loc.get(k) for k in LOCATION_MANAGED_KEYS}
+        norm["forward_port"] = int(norm["forward_port"] or 0)
+        path = (norm["path"] or "").strip().strip("/")
+        norm["path"] = f"/{path}" if path else "/"
+        norm["advanced_config"] = "\n".join(
+            line.strip()
+            for line in (norm["advanced_config"] or "").splitlines()
+            if line.strip()
+        )
+        out.append(norm)
+    return sorted(out, key=lambda x: x["path"])
+
+
+def build_update_payload(existing: dict, want: dict) -> dict:
+    """Existing host fields we preserve, overridden by our desired state."""
+    payload = {k: existing[k] for k in PUT_ALLOWED_KEYS if k in existing}
+    payload.update(want)
+    # NPM may return meta with extra keys — keep whatever exists, but always
+    # carry the letsencrypt agreement flag the SSL flow needs.
+    meta = dict(existing.get("meta") or {})
+    meta.setdefault("letsencrypt_agree", False)
+    meta.setdefault("dns_challenge", False)
+    payload["meta"] = meta
+    payload.setdefault("locations", [])
+    return payload
+
+
+def desired(domain: str, h: dict, forward_host: str,
+            cert_id: int | None, ssl: bool) -> dict:
+    """The field values we own, used to diff an existing host against the map."""
+    return {
+        "domain_names": [domain],
+        "forward_scheme": h["scheme"],
+        "forward_host": forward_host,
+        "forward_port": h["port"],
+        "allow_websocket_upgrade": h["websocket"],
+        "ssl_forced": ssl,
+        "certificate_id": cert_id if cert_id else None,  # NPM wants null, not 0
+        "enabled": True,
+        # Never a gate: identity is Authentik OIDC. Hosts without OIDC of their
+        # own are fronted by an oauth2-proxy SSO gateway, not an auth_request.
+        "advanced_config": "",
+        "locations": h.get("locations", []),
+    }
+
+
+def main() -> int:
+    repo = Path(__file__).resolve().parent.parent
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--api-url", default=None, help="NPM base URL (env NPM_API_URL)")
+    parser.add_argument("--email", default=None, help="NPM admin email (env NPM_ADMIN_EMAIL)")
+    parser.add_argument("--password", default=None, help="NPM admin password (env NPM_ADMIN_PASSWORD)")
+    parser.add_argument("--api-token", default=None, help="persistent NPM API token (env NPM_API_TOKEN)")
+    parser.add_argument("--base-domain", default=None, help="base domain, e.g. capstone.innotel.us (env NPM_BASE_DOMAIN)")
+    parser.add_argument("--upstream-host", default=None, help="Docker host IP NPM forwards to (env NPM_UPSTREAM_HOST)")
+    parser.add_argument("--authentik-upstream-host", default=None,
+                        help="host serving Authentik for auth.<domain> (env AUTHENTIK_UPSTREAM_HOST; "
+                             "default NPM_UPSTREAM_HOST)")
+    parser.add_argument("--subscribe-upstream-host", default=None,
+                        help="host serving subscribe.<domain> — the estate's subscribe portal "
+                             "(env SUBSCRIBE_UPSTREAM_HOST, or the older ZEUS_UPSTREAM_HOST)")
+    parser.add_argument("--letsencrypt-email", default=None, help="email for Let's Encrypt certs (env NPM_LETSENCRYPT_EMAIL)")
+    parser.add_argument("--wildcard", action="store_true",
+                        help="issue ONE wildcard cert (*.base + base) via DNS-01 and attach it to every host (env NPM_WILDCARD_CERT)")
+    parser.add_argument("--dns-provider", default=None,
+                        help="DNS provider slug for the wildcard cert, e.g. cloudflare (env NPM_DNS_PROVIDER)")
+    parser.add_argument("--dns-credentials", default=None,
+                        help="NPM credential id for the DNS provider (env NPM_DNS_PROVIDER_CREDENTIALS)")
+    parser.add_argument("--include-optional", default=None, help="comma list of optional hosts: nocodb,portal (or 'all')")
+    parser.add_argument("--ws-scheme", choices=["http", "https"], default=None,
+                        help="upstream scheme for the voice.<domain> host (default https)")
+    parser.add_argument("--ws-port", type=int, default=None,
+                        help="upstream port for the voice.<domain> host (default 8089; use 8088 with --ws-scheme http)")
+    parser.add_argument("--no-ssl", action="store_true", help="skip certificates and HTTPS forcing")
+    parser.add_argument("--no-prune", action="store_true", help="never delete NPM hosts")
+    parser.add_argument("--check", action="store_true", help="verify only — no writes, exit 1 if out of sync")
+    parser.add_argument("--env-file", default=str(repo / ".env"), help="capstone .env path")
+    args = parser.parse_args()
+    args.env = load_env_file(Path(args.env_file))
+
+    api_url = args.api_url or cfg(args, "NPM_API_URL", DEFAULT_API_URL)
+
+    # Guard against a stale ambient NPM_* environment: cfg() lets the real
+    # environment win, so a leftover NPM_BASE_DOMAIN exported by another stack
+    # makes THIS script manage and PRUNE that other service's proxy hosts.
+    # Refuse instead of writing to a domain this repo does not own.
+    ambient_domain = (os.environ.get("NPM_BASE_DOMAIN") or "").strip().lstrip(".").lower()
+    env_domain = (args.env.get("NPM_BASE_DOMAIN") or "").strip().lstrip(".").lower()
+    if ambient_domain and env_domain and ambient_domain != env_domain and not args.base_domain:
+        print(f"FAIL NPM_BASE_DOMAIN={ambient_domain} is exported in the environment but this "
+              f"repo's .env says {env_domain} — refusing to touch {ambient_domain} hosts "
+              f"(unset the variable, or pass --base-domain explicitly).", file=sys.stderr)
+        return 1
+
+    base_domain = (args.base_domain or cfg(args, "NPM_BASE_DOMAIN", "")).strip().lstrip(".")
+    # Stack convention (central stack-lib.sh): explicit wins, else the LAN IP,
+    # else the PBX media address from .env.
+    explicit_upstream = args.upstream_host or cfg(args, "NPM_UPSTREAM_HOST", "")
+    upstream = explicit_upstream or detect_lan_ip() or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+    # Rows whose upstream is not this box name it here (see HOSTS): the shared
+    # Cerulean Authentik behind `auth.<domain>`, and the estate's subscribe
+    # portal behind `subscribe.<domain>`. SUBSCRIBE_UPSTREAM_HOST's older name
+    # is still honoured so an existing deployment (and the CI workflow that
+    # passes it) keeps working through the rename.
+    authentik_upstream = (args.authentik_upstream_host
+                          or cfg(args, "AUTHENTIK_UPSTREAM_HOST", "")).strip()
+    subscribe_upstream = (args.subscribe_upstream_host
+                          or cfg(args, "SUBSCRIBE_UPSTREAM_HOST", "")
+                          or cfg(args, "ZEUS_UPSTREAM_HOST", "")).strip()
+    if upstream and not explicit_upstream:
+        # Say it out loud. That fallback is THIS process's LAN address, which is
+        # only the right forward target when the stack runs here — run the sync
+        # from an edge or an admin box and every proxy host, the media prefix
+        # included, is pinned to that machine. Nothing reports it afterwards:
+        # the hosts keep answering, and only the transcript downloads 502, long
+        # after anyone is looking at the sync output.
+        print(f"WARN forwarding to this machine's LAN address {upstream} — no "
+              f"NPM_UPSTREAM_HOST / --upstream-host given. Only correct when the "
+              f"stack runs on this host; set NPM_UPSTREAM_HOST to the host that "
+              f"runs it to make the choice explicit.", file=sys.stderr)
+    le_email = args.letsencrypt_email or cfg(args, "NPM_LETSENCRYPT_EMAIL", "") or cfg(args, "GRIST_ADMIN_EMAIL", "")
+    include_raw = (args.include_optional or cfg(args, "NPM_INCLUDE_OPTIONAL", "")).lower()
+
+    if not base_domain:
+        print("FAIL NPM_BASE_DOMAIN is empty — set it in .env (e.g. capstone.innotel.us)", file=sys.stderr)
+        return 1
+    if not upstream:
+        print("FAIL NPM_UPSTREAM_HOST (or PJSIP_MEDIA_ADDRESS) is empty — set the Docker host IP in .env", file=sys.stderr)
+        return 1
+    if not subscribe_upstream:
+        print("FAIL SUBSCRIBE_UPSTREAM_HOST is empty (ZEUS_UPSTREAM_HOST is read as its older "
+              "name) — subscribe.<domain> is the estate's subscribe portal, the box behind "
+              "subscribe.innotel.us, and never this stack's own upstream", file=sys.stderr)
+        return 1
+    if subscribe_upstream == upstream:
+        print(f"WARN SUBSCRIBE_UPSTREAM_HOST={subscribe_upstream} is this stack's own "
+              f"NPM_UPSTREAM_HOST — subscribe.<domain> is a public pricing/checkout page "
+              f"served by the estate's portal elsewhere; pointing it at this box is what "
+              f"produced the 502 fixed on 24 Sep 2026", file=sys.stderr)
+
+    optional = {s.strip() for s in include_raw.split(",") if s.strip()}
+    if "all" in optional:
+        optional = {"portal"}
+
+    hosts = [dict(h) for h in HOSTS]
+    # Every origin that serves the app also serves its media prefix: the API's
+    # MINIO_PUBLIC_ENDPOINT is one of them (PUBLIC_BASE_URL = dograh.<domain>),
+    # and the others are the same UI under a different name, so a recording URL
+    # resolves whichever one the operator opened.
+    for h in hosts:
+        if h["key"] in MEDIA_HOST_KEYS:
+            h.setdefault("locations", [media_location(upstream)])
+        # The OIDC legs, on every origin that serves the app (see OIDC_PATH).
+        if h["key"] in OIDC_HOST_KEYS:
+            canonical = oidc_canonical_host(base_domain)
+            location = (
+                oidc_location(upstream)
+                if h["sub"] == OIDC_CANONICAL_SUB
+                else oidc_handoff_location(canonical, upstream)
+            )
+            h.setdefault("locations", []).append(location)
+        # A row may resolve its upstream from the environment rather than this
+        # box (see the auth and subscribe rows in HOSTS). An unset
+        # AUTHENTIK_UPSTREAM_HOST means this stack runs its own identity
+        # provider, which is where NPM already forwards `auth.<domain>`.
+        if h.get("host_key") == "AUTHENTIK_UPSTREAM_HOST":
+            h["forward_host"] = authentik_upstream or upstream
+        elif h.get("host_key") == "SUBSCRIBE_UPSTREAM_HOST":
+            h["forward_host"] = subscribe_upstream
+    if args.ws_scheme is not None or args.ws_port is not None:
+        for h in hosts:
+            if h["key"] == "voice":
+                if args.ws_scheme is not None:
+                    h["scheme"] = args.ws_scheme
+                if args.ws_port is not None:
+                    h["port"] = args.ws_port
+    if optional:
+        hosts = [h for h in hosts if not h.get("optional") or h["key"] in optional]
+    else:
+        hosts = [h for h in hosts if not h.get("optional")]
+
+    # Auth
+    api = NpmApi(api_url)
+    token = args.api_token or cfg(args, "NPM_API_TOKEN", "")
+    if token:
+        api.token = token
+    else:
+        identity = args.email or cfg(args, "NPM_ADMIN_EMAIL", "") or cfg(args, "NPM_EMAIL", "")
+        secret = args.password or cfg(args, "NPM_ADMIN_PASSWORD", "") or cfg(args, "NPM_PASSWORD", "")
+        if not identity or not secret:
+            print("FAIL NPM_ADMIN_EMAIL/NPM_ADMIN_PASSWORD (or NPM_API_TOKEN) required", file=sys.stderr)
+            return 1
+        try:
+            api.login(identity, secret)
+        except (NpmError, urllib.error.URLError, OSError) as e:
+            print(f"FAIL NPM login failed ({api_url}): {e}", file=sys.stderr)
+            return 1
+    print("PASS authenticated with Nginx Proxy Manager")
+
+    try:
+        existing_hosts = api.proxy_hosts()
+    except (NpmError, urllib.error.URLError, OSError) as e:
+        print(f"FAIL could not list NPM proxy hosts: {e}", file=sys.stderr)
+        return 1
+
+    # Domain → existing host
+    by_domain: dict[str, dict] = {}
+    for eh in existing_hosts:
+        for d in eh.get("domain_names") or []:
+            by_domain.setdefault(d.lower(), eh)
+
+    # Certificates: reuse a cert that already covers our domain. Indexed both
+    # ways — by the names NPM records, and by id, so a host's own certificate
+    # (and its expiry) can be read back.
+    certs_by_domain: dict[str, int] = {}
+    certs_by_id: dict[int, dict] = {}
+    try:
+        for c in api.certificates():
+            certs_by_id[c["id"]] = c
+            for d in c.get("domain_names") or []:
+                certs_by_domain.setdefault(d.lower(), c["id"])
+    except (NpmError, urllib.error.URLError, OSError) as e:
+        print(f"WARN could not list NPM certificates ({e}) — continuing without SSL")
+
+    ssl = not args.no_ssl and bool(le_email)
+    if not ssl and not args.no_ssl:
+        print("WARN NPM_LETSENCRYPT_EMAIL not set — creating hosts without SSL (pass --no-ssl to silence)")
+
+    # Wildcard mode: ONE cert covering "*.base + base" (issued via DNS-01 when
+    # DNS provider credentials are saved in NPM) and attached to every host. When
+    # the zone's wildcard is already in NPM — Cerulean exports one per zone —
+    # that is the certificate reused, and nothing is requested from Let's
+    # Encrypt at all: the credentials are only needed to ISSUE one.
+    wildcard = args.wildcard or cfg(args, "NPM_WILDCARD_CERT", "").lower() in {"1", "true", "yes", "on"}
+    dns_provider = args.dns_provider or cfg(args, "NPM_DNS_PROVIDER", "")
+    dns_credentials = args.dns_credentials or cfg(args, "NPM_DNS_PROVIDER_CREDENTIALS", "")
+    if wildcard and not ssl:
+        wildcard = False
+
+    # The certificate the zone serves under, when NPM holds it recorded as the
+    # apex (see zone_wildcard_cert) — every host below reuses it.
+    zone_cert = zone_wildcard_cert(certs_by_domain, base_domain) if ssl else None
+
+    created = updated = ok = pruned = 0
+    failed: list[str] = []
+    managed_domains: set[str] = set()
+
+    # The single wildcard cert: reuse the one the zone already has, else issue
+    # one when DNS provider credentials are saved in NPM. A certificate missing
+    # per host is caught in the loop below, host by host, which is the verdict
+    # that matters — this block only decides whether to ASK Let's Encrypt.
+    if wildcard:
+        wc_id = ensure_cert(api, [f"*.{base_domain}", base_domain], le_email,
+                            dns_provider, dns_credentials, args.check,
+                            certs_by_domain, failed, certs_by_id=certs_by_id)
+        if wc_id is None and not (dns_provider and dns_credentials):
+            print("WARN wildcard requested but NPM_DNS_PROVIDER / "
+                  "NPM_DNS_PROVIDER_CREDENTIALS unset and NPM holds no wildcard "
+                  "certificate for this zone — falling back to per-host HTTP-01 "
+                  "certificates", file=sys.stderr)
+
+    for h in hosts:
+        domain = base_domain if h["sub"] is None else f"{h['sub']}.{base_domain}"
+        managed_domains.add(domain)
+        label = h["name"]
+        existing = by_domain.get(domain.lower())
+
+        # Ensure a certificate for this domain. Reuse first: a recorded name,
+        # the zone's wildcard, or the certificate this host already carries.
+        cert_id = None
+        if ssl:
+            cert_id = ensure_cert(api, [domain], le_email, dns_provider, dns_credentials,
+                                  args.check, certs_by_domain, failed,
+                                  certs_by_id=certs_by_id, zone=base_domain,
+                                  zone_cert=zone_cert,
+                                  attached_id=int((existing or {}).get("certificate_id") or 0))
+            if cert_id is None:
+                if not args.check:
+                    continue
+                # --check only. A host that had no certificate used to be
+                # skipped outright, so EVERY other field on it went unchecked —
+                # which is how a /voice-audio upstream left pointing at the
+                # host the stack used to run on stayed invisible while the
+                # grader's transcript fetches 502'd. Keep the host's own
+                # certificate id so the missing cert isn't reported twice, and
+                # let the diff below report whatever else has drifted.
+                cert_id = (existing or {}).get("certificate_id") if existing else None
+
+        host_forward = h.get("forward_host") or upstream
+        want = desired(domain, h, host_forward, cert_id, ssl)
+        if existing is None:
+            if args.check:
+                print(f"FAIL {label} — proxy host {domain} missing")
+                failed.append(domain)
+                continue
+            try:
+                api.create_proxy_host(build_payload(domain, h, host_forward, cert_id, ssl))
+                created += 1
+                print(f"PASS {label} — created {domain} → {h['scheme']}://{host_forward}:{h['port']}")
+            except (NpmError, urllib.error.URLError, OSError) as e:
+                print(f"FAIL {label} — could not create {domain}: {e}", file=sys.stderr)
+                failed.append(domain)
+            continue
+
+        # Compare only the fields we manage (certificate_id normalised None/0).
+        diffs: list[str] = []
+        for k, v in want.items():
+            cur = existing.get(k)
+            if k == "certificate_id":
+                cur, v = int(cur or 0), int(v or 0)
+            elif k == "domain_names":
+                cur, v = sorted(cur or []), sorted(v)
+            elif k == "locations":
+                cur, v = normalize_locations(cur), normalize_locations(v)
+            if cur != v:
+                diffs.append(k)
+
+        if not diffs:
+            ok += 1
+            print(f"PASS {label} — {domain} already correct")
+            continue
+
+        if args.check:
+            print(f"FAIL {label} — {domain} out of date ({', '.join(diffs)})")
+            failed.append(domain)
+            continue
+        try:
+            api.update_proxy_host(existing["id"], build_update_payload(existing, want))
+            updated += 1
+            print(f"PASS {label} — updated {domain} ({', '.join(diffs)})")
+        except (NpmError, urllib.error.URLError, OSError) as e:
+            print(f"FAIL {label} — could not update {domain}: {e}", file=sys.stderr)
+            failed.append(domain)
+
+    # Prune: hosts under our base domain that are no longer in the map.
+    if not args.no_prune:
+        scope_suffix = f".{base_domain}"
+        for eh in existing_hosts:
+            doms = eh.get("domain_names") or []
+            in_scope = any(d.lower() == base_domain or d.lower().endswith(scope_suffix) for d in doms)
+            if not in_scope:
+                continue
+            if any(d.lower() in managed_domains for d in doms):
+                continue
+            if args.check:
+                print(f"FAIL stale NPM host would be pruned: {', '.join(doms)}")
+                failed.append(doms[0])
+                continue
+            try:
+                api.delete_proxy_host(eh["id"])
+                pruned += 1
+                print(f"PASS pruned stale NPM host {', '.join(doms)}")
+            except (NpmError, urllib.error.URLError, OSError) as e:
+                print(f"FAIL could not prune {', '.join(doms)}: {e}", file=sys.stderr)
+                failed.append(doms[0])
+
+    if args.check:
+        if failed:
+            print(f"FAIL {len(failed)} host(s) out of sync", file=sys.stderr)
+            return 1
+        print(f"PASS all {len(hosts)} proxy hosts in sync")
+        return 0
+
+    print(f"PASS sync complete — created {created}, updated {updated}, unchanged {ok}, pruned {pruned}, failed {len(failed)}")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

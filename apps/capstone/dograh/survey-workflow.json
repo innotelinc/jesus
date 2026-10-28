@@ -1,0 +1,89 @@
+{
+  "name": "Phone Survey",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Survey Taker Persona",
+        "prompt": "You are a friendly, neutral voice survey agent for {{initial_context.organization | fallback:our organization}}. Always speak in short, natural sentences — this is a phone call. Stay in character. Be respectful of the respondent's time, never push, and read questions verbatim in spirit without alarming them."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "Survey Trigger",
+        "enabled": true,
+        "trigger_path": "phone-survey"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Consent & Introduction",
+        "greeting_type": "text",
+        "greeting": "Hi {{initial_context.respondent_name | fallback:there}}, this is {{initial_context.agent_name | fallback:Robin}} from {{initial_context.organization | fallback:our organization}}. We're running a short survey — it takes about {{initial_context.duration | fallback:a few}} minutes. Do you have a quick minute to answer a few questions?",
+        "prompt": "# Role\nYou are starting a phone survey on behalf of {{initial_context.organization | fallback:our organization}}.\n\n# Consent\n- Ask if now is a good time; if not, ask for a better time or note they declined and END THE CALL politely.\n- Briefly state it's voluntary and anonymous/confidential per {{initial_context.privacy | fallback:our usual policy}}.\n\n# If they agree\n- Thank them, set expectations on length, and begin the first question (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": true,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-questions",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Ask Survey Questions",
+        "prompt": "# Role\nYou are the survey agent asking the questionnaire for {{initial_context.organization | fallback:our organization}}.\n\n# Questions to ask\nAsk one at a time, using {{initial_context.questions | fallback:this default set}} as the source:\n1. On a scale of 1-5, how would you rate {{initial_context.topic | fallback:your experience}}?\n2. What is working well?\n3. What could be improved?\n\nIf {{initial_context.questions}} is provided, ask exactly those questions in order, adapted to speech. Keep it to {{initial_context.duration | fallback:3-5}} minutes max.\n\n# How to run\n- One question at a time; acknowledge each answer briefly.\n- If the respondent wants to stop, thank them and END THE CALL.\n\n# When done\nThank them and move to close (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    },
+    {
+      "id": "node-close",
+      "type": "endCall",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Thank & Close",
+        "prompt": "# Role\nYou are the survey agent closing the call.\n\n# Closing\n- Thank the respondent for their time and answers.\n- Optionally mention how results are used (per {{initial_context.usage | fallback:our standard note}}).\n- Keep it to 1-2 sentences, then END THE CALL.",
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-questions",
+      "source": "node-start",
+      "target": "node-questions",
+      "data": {
+        "label": "consent_given",
+        "condition": "The respondent agreed to take the survey and you've begun asking questions.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-questions-close",
+      "source": "node-questions",
+      "target": "node-close",
+      "data": {
+        "label": "survey_complete",
+        "condition": "All questions are answered and you're ready to thank the respondent and close.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

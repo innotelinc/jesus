@@ -1,0 +1,25 @@
+[Unit]
+Description=Capstone — rebuild + restart the Control Center images when their source changed
+Documentation=https://capstone.innotel.us
+Requires=docker.service
+After=docker.service network-online.target capstone.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# WorkingDirectory is rewritten to the real repo root at install time by
+# scripts/install-capstone.sh (install_service). Do not hard-code a host path.
+WorkingDirectory=/PATH/TO/CAPSTONE
+
+# Both dashboard images are built from source, so a code change does nothing to
+# the running stack until they are rebuilt and the containers recreated. The
+# script is hash-gated: it compares the dashboard sources against the stamp left
+# by the last deploy and does nothing (no docker call) when they match. That is
+# why running it on a timer is cheap.
+ExecStart=/bin/bash scripts/redeploy-dashboard.sh
+
+# A build is slower than a compose restart; allow for a cold dependency cache.
+TimeoutStartSec=900s
+
+StandardOutput=journal
+StandardError=journal

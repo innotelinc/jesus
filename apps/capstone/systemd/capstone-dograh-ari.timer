@@ -1,0 +1,17 @@
+[Unit]
+Description=Capstone — dograh Stasis app healthcheck timer
+Documentation=https://capstone.innotel.us
+
+[Timer]
+# The probe is cheap (one `asterisk -rx` inside the PBX container) and does
+# nothing at all while the Stasis app is registered. The repair it can trigger
+# is heavier, so the cadence is deliberately slower than the freepbx-web
+# healthcheck: dograh's parking needs the PBX unreachable for the better part
+# of an hour, so re-checking every 10 minutes still recovers the range quickly
+# after ARI comes back without re-running the wire script on every tick.
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=capstone-dograh-ari.service
+
+[Install]
+WantedBy=timers.target

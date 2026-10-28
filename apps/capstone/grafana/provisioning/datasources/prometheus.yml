@@ -1,0 +1,17 @@
+# Grafana datasource: the stack's own Prometheus. This is the only datasource
+# — the ClickHouse-backed SigNoz store it replaced is gone.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # Pinned uid: the provisioned dashboards reference this datasource by uid,
+    # so a generated one would break every panel.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      httpMethod: POST

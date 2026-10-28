@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Throwaway target dir for dashboard-backend test deps (the deploy host is not
+# a dev box, so tests install into the tree instead of a venv):
+#   pip install --target dashboard-backend/.deps -r dashboard-backend/requirements.txt
+.deps/
+
+# Env / secrets
+.env
+*.env
+.env.local
+.env.bak
+.env.bak*
+.env.*.local
+
+# Node
+node_modules/
+
+# Docker
+*.log
+
+# Live USB build output
+.live-build/
+dist/live-usb/
+dist/source-bundle/
+dist/offline-bundle/
+
+# dograh platform source (cloned by scripts/setup.sh from
+# github.com/innotelinc/dograh; used for reference + optional build-from-source)
+dograh/upstream/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Repo-local generated/tracked artifacts
+
+# Failure screenshots from dashboard/e2e/smoke.mjs — regenerated per run, never
+# a tracked artifact.
+dashboard/e2e/artifacts/
+
+# Cerulean Vault token copies (data/vault/token/<product>.token) — live credentials.
+data/vault/token/
+data/vault/init/
+data/vault/file/
+data/.env.resolved
+# Host-local dump output (e.g. a `pg_dump` of the stack database) kept beside
+# the stack. The repo's own backup — pg_dumpall + volume tars + a git bundle —
+# goes to $HOME/capstone-backup (scripts/backup-capstone.sh); this path is not
+# written by anything here, so keeping it out of the tree also keeps database
+# content out of it.
+data/backups/
+# Backups of the resolved copy hold the same live credentials as the file they
+# back up, and are made by hand (compose-vault.sh writes atomically, no backup).
+# Ignored so a careless `git add data/` cannot stage one into the tree.
+data/.env.resolved.bak*
+# Control Center runtime state (e.g. the saved SMS transport) — host state,
+# not repo state.
+data/capstone/

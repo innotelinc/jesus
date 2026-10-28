@@ -1,0 +1,90 @@
+{
+  "name": "Business Receptionist",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Receptionist Persona",
+        "prompt": "You are a warm, professional voice receptionist for {{initial_context.company | fallback:the business}}. Always speak in short, natural sentences — this is a phone call, not an essay. Stay in character as the front-desk receptionist at all times. Be courteous, helpful, and calm no matter what the caller needs."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "Receptionist Trigger",
+        "enabled": true,
+        "trigger_path": "reception-answer"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Answer & Welcome",
+        "greeting_type": "text",
+        "greeting": "Thank you for calling {{initial_context.company | fallback:our office}}. This is {{initial_context.receptionist_name | fallback:Mia}}. How can I help you today?",
+        "prompt": "# Role\nYou are the receptionist answering an incoming call for {{initial_context.company | fallback:the business}}. The caller dialed your main line.\n\n# Rules\n- Warm, professional, and concise spoken responses; short, natural sentences.\n- Never put the caller on hold or transfer — you are the whole call.\n- Gather what the caller needs and help directly: people, departments, hours, directions, or take a message.\n\n# Opening flow\n1. Greet the caller and ask how you can help.\n2. When they state their need, move on to handling it (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": true,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-handle",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Handle the Caller's Need",
+        "prompt": "# Role\nYou are the receptionist now helping {{initial_context.caller_name | fallback:the caller}} with their request for {{initial_context.company | fallback:the business}}.\n\n# How to help (use the caller's stated need)\n- **People / departments**: answer who to contact and provide phone extensions or hours if supplied in initial_context; confirm the details.\n- **General info**: give hours, location/directions, or the standard answer clearly and courteously.\n- **Unknown or sensitive**: ask a targeted clarifying question (who, what department, what about). If you genuinely don't know, say you'll take a message (next node).\n- Speak in short, natural sentences. Never invent phone numbers or policies not provided in initial_context — if you lack specifics, take a message.\n\n# When ready\nConfirm the caller's need is handled, then proceed to wrap up (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    },
+    {
+      "id": "node-message",
+      "type": "agentNode",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Take a Message / Wrap Up",
+        "prompt": "# Role\nYou are the receptionist closing the call.\n\n# Message intake (when the caller wants to leave a message or you lack details)\n- Ask for their name, a call-back number, and the reason in one or two questions.\n- Repeat the name and number back to confirm.\n\n# Otherwise\n- If the need was handled, confirm satisfaction briefly.\n\n# Closing\n- Thank them for calling {{initial_context.company | fallback:the business}}.\n- Tell them the message will be passed along, if applicable.\n- Keep it to 2-3 sentences, then END THE CALL.",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-handle",
+      "source": "node-start",
+      "target": "node-handle",
+      "data": {
+        "label": "caller_need_stated",
+        "condition": "The caller has stated what they need and you are ready to help them.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-handle-message",
+      "source": "node-handle",
+      "target": "node-message",
+      "data": {
+        "label": "handling_complete",
+        "condition": "The need has been handled, or the caller wants to leave a message and the details are gathered.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

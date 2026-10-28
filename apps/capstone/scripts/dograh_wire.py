@@ -1,0 +1,930 @@
+#!/usr/bin/env python3
+"""dograh_wire.py — wire the dograh half of the capstone telephony integration.
+
+Idempotent; talks to the dograh REST API only (no SDK, no UI clicks). Safe to
+re-run: every step GETs first and only writes when state differs.
+
+What it does:
+
+  1. auth        — login (signup on first run), mint a durable X-API-Key and
+                   persist it to .env as DOGRAH_API_TOKEN
+  2. agents      — import the three interview agent workflows (dograh/*.json)
+                   if a workflow with the same name doesn't exist yet
+  3. config      — create-or-update the Asterisk ARI telephony configuration,
+                   which is what makes the PBX show up in the dograh UI under
+                   "Telephony Configurations". A configuration dograh parked
+                   itself (``inactive``, e.g. after the PBX was down long
+                   enough) is reactivated here — parking is one-way upstream,
+                   so nothing else ever clears it and calls routed into the
+                   Stasis app keep hanging up.
+  3c. tts        — point the agents' voice at the local Piper engine: the
+                   organization's model configuration is re-pointed at the
+                   local TTS shim (the ``speaches`` provider pipecat dials,
+                   with Piper behind it).
+                   Only the ``tts`` role is written — every other role is
+                   carried over as stored, and each names its own provider
+                   connection — and the write is validated by dograh against
+                   the endpoint, so a shim that is down is reported here
+                   rather than discovered on a live call.
+  4. extensions  — register extensions 8000/8001/8002 as phone numbers on that
+                   config, each bound to its interview workflow for inbound
+                   calls
+  5. verify      — print the resulting wiring table
+
+Environment variables (falls back to --env-file, then defaults):
+
+  DOGRAH_API_ENDPOINT     dograh API base URL      (http://127.0.0.1:8000)
+  DOGRAH_API_TOKEN        X-API-Key (persisted on first run)
+  DOGRAH_ADMIN_EMAIL      dograh UI login email    (ops@capstone.example)
+  DOGRAH_ADMIN_PASSWORD   dograh UI login password (required on first run)
+  DOGRAH_ADMIN_NAME       display name             (Capstone Ops)
+  DOGRAH_ARI_PASSWORD     ARI app password — MUST match pbx/asterisk/ari.conf
+  DOGRAH_ARI_ENDPOINT     Asterisk ARI URL         (http://<host LAN IP>:8088)
+  DOGRAH_ARI_APP_NAME     Stasis app name          (dograh)
+  DOGRAH_WS_CLIENT_NAME   media WS client name     (dograh)
+  DOGRAH_CONFIG_NAME      telephony config name    (Asterisk ARI (dograh))
+  DOGRAH_TTS_BASE_URL     local TTS shim endpoint  (http://127.0.0.1:8881/v1)
+  DOGRAH_TTS_MODEL        TTS engine name          (piper)
+  DOGRAH_TTS_VOICE        Piper voice id           (en_US-amy-medium)
+
+Usage (from the repo root):
+
+  python3 scripts/dograh_wire.py                 # wire everything
+  python3 scripts/dograh_wire.py --check         # verify only, exit 1 if incomplete
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import socket
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+DEFAULT_ENDPOINT = "http://127.0.0.1:8000"
+HEALTH_TIMEOUT_S = 120
+
+# extension → (workflow file, phone-number label in the dograh UI)
+# The workflow NAME is read from the JSON itself (authoritative), so re-imports
+# that change workflow ids never break routing (looked up by name).
+TRACKS: list[tuple[str, str, str]] = [
+    ("8000", "interview-workflow.json", "Mock Interview — IT Help Desk"),
+    ("8001", "devops-workflow.json", "Mock Interview — DevOps"),
+    ("8002", "sql-workflow.json", "Mock Interview — SQL"),
+    # Additions: Project Capstone's phone-assistant agents.
+    ("8003", "receptionist-workflow.json", "Business Receptionist — inbound"),
+    ("8004", "outbound-outreach-workflow.json", "Outbound Outreach — telemarketer"),
+    ("8005", "job-interview-workflow.json", "Job Interview — hiring"),
+    ("8006", "survey-workflow.json", "Phone Survey"),
+    ("8007", "gotv-polling-workflow.json", "Get Out The Vote Poll"),
+]
+
+
+def ari_password_problem(password: str) -> str:
+    """Why this ARI password cannot work, or ``""`` when it is usable.
+
+    dograh builds the ARI WebSocket URL by string interpolation —
+    ``ws://host:8088/ari/events?api_key=<user>:<password>&app=<app>`` — and a
+    ``#`` in the password ends the query string as a URI fragment. The client
+    then rejects the whole URL (``InvalidURI: fragment identifier is
+    meaningless``), so the ARI connection never comes up and the Stasis app is
+    never registered: every call the dialplan routes into it hangs up, with
+    nothing on the PBX side to explain it.
+
+    ``openssl rand -base64 24`` (what ``scripts/setup.sh`` generates) never
+    emits ``#``, so this only bites a hand-edited or re-generated password —
+    which is exactly when nobody is looking for it. Refusing to write one is
+    cheaper than diagnosing it from "registered: none".
+    """
+    if not password:
+        return ""
+    if "#" in password:
+        return (
+            "contains '#', which ends the ARI query string as a URI fragment — "
+            "dograh cannot connect with it (InvalidURI: fragment identifier is "
+            "meaningless). Use one without '#', e.g. `openssl rand -hex 24`"
+        )
+    if any(ch.isspace() for ch in password):
+        return (
+            "contains whitespace, which cannot survive the ARI URL and the "
+            "`password = ...` line in ari.conf"
+        )
+    return ""
+
+
+def parked_reason(config: dict) -> str:
+    """Why dograh parked this ARI config, or ``""`` when it is still active.
+
+    A parked (``inactive``) config is never retried on its own: the ARI manager
+    drops the connection and drops the row from its refresh, so the Stasis app
+    stays unregistered on the PBX and every call the dialplan routes into it
+    hangs up immediately (dashboard: "Calls to 8008 will drop"). Re-running
+    this script is the documented remedy, so the remedy has to be the thing
+    that clears the flag — otherwise it only "works" on a config that was
+    still active, which is the case that never needed it.
+
+    ``inactive_reason`` carries dograh's own words for the cause
+    (``ari-timeout: ...``), which is what tells an operator whether the PBX
+    side has actually been fixed before retrying.
+    """
+    if not config.get("inactive"):
+        return ""
+    return str(config.get("inactive_reason") or "reason not reported")
+
+
+# The voice the agents speak with. `speaches` is the provider pipecat dials for
+# an OpenAI-compatible TTS endpoint; the tts-shim in front of the engine speaks
+# that same contract, which is why selecting an engine here is a
+# model-configuration change and not a patch to the dograh fork. Piper is the
+# default: measured on this host it synthesizes a sentence at RTF ~0.3 against
+# ~0.8 for Kokoro, and its voice is loaded in-process so it needs no second
+# container. Kokoro stays selectable in the shim for A/B.
+SHIM_TTS_PROVIDER = "speaches"
+DEFAULT_TTS_BASE_URL = "http://127.0.0.1:8881/v1"
+DEFAULT_TTS_MODEL = "piper"
+DEFAULT_TTS_VOICE = "en_US-amy-medium"
+
+
+class ApiError(RuntimeError):
+    def __init__(self, status: int, body: str) -> None:
+        super().__init__(f"HTTP {status}: {body[:300]}")
+        self.status = status
+
+
+def _role(configuration: dict | None, role: str) -> dict:
+    """One role's section of a stored model configuration, or ``{}``."""
+    section = (configuration or {}).get(role)
+    return section if isinstance(section, dict) else {}
+
+
+def shim_connection(connections: list[dict] | None, base_url: str) -> dict | None:
+    """The provider connection that points at the local shim, or ``None``."""
+    for connection in connections or []:
+        if connection.get("provider") != SHIM_TTS_PROVIDER:
+            continue
+        settings = connection.get("connection_settings") or {}
+        if _same_url(settings.get("base_url"), base_url):
+            return connection
+    return None
+
+
+def _same_url(left: Any, right: Any) -> bool:
+    """URLs compare without their trailing slash, so `/v1` and `/v1/` agree."""
+    return str(left or "").rstrip("/") == str(right or "").rstrip("/")
+
+
+def shim_tts_problem(
+    configuration: dict | None,
+    connection: dict | None,
+    base_url: str,
+    model: str,
+    voice: str,
+) -> str:
+    """Why the agents do not speak with the local engine, or ``""`` when they do.
+
+    Pure, so the decision is testable without a dograh server. It reads the
+    *stored* configuration rather than the effective one: this is what the wire
+    script is about to rewrite, and "already right" has to mean the stored
+    value, or a re-run would rewrite the same thing on every pass.
+
+    Since model-configuration v3 a role names a provider *connection* rather
+    than carrying its own ``base_url``, so the connection is checked too — that
+    is where the shim's address actually lives now.
+    """
+    tts = _role(configuration, "tts")
+    if not tts:
+        return (
+            "no TTS engine is configured for the organization — the agents have "
+            "nothing to speak with, which is what a caller hears as an agent "
+            "that never responds"
+        )
+    if connection is None:
+        return (
+            f"no provider connection points at the local TTS shim "
+            f"({SHIM_TTS_PROVIDER} at {base_url})"
+        )
+    if tts.get("provider_connection_uuid") != connection.get("uuid"):
+        return (
+            f"TTS is bound to provider connection "
+            f"'{tts.get('provider_connection_uuid')}', not the local shim's "
+            f"'{connection.get('uuid')}' ({base_url})"
+        )
+    settings = tts.get("settings") or {}
+    if settings.get("model") != model:
+        return f"TTS model is '{settings.get('model')}', not '{model}'"
+    if voice and settings.get("voice") != voice:
+        return f"TTS voice is '{settings.get('voice')}', not '{voice}'"
+    return ""
+
+
+def shim_health_url(base_url: str) -> str:
+    """`http://host:8881/v1` → `http://host:8881/health` (the shim's own probe)."""
+    base = base_url.rstrip("/")
+    return (base[:-3] if base.endswith("/v1") else base) + "/health"
+
+
+def with_shim_tts(
+    configuration: dict, connection: dict, model: str, voice: str
+) -> dict:
+    """The same configuration with only its ``tts`` role pointed at the shim.
+
+    Every other role — llm, stt, embeddings, realtime and the fallback policy —
+    is carried over byte-for-byte, so re-pointing the voice cannot disturb the
+    rest of the pipeline. A configured ``speed`` is preserved.
+    """
+    body = json.loads(json.dumps(configuration))  # deep copy, JSON-safe
+    previous = _role(configuration, "tts").get("settings") or {}
+    settings: dict[str, Any] = {"model": model, "voice": voice}
+    if previous.get("speed") is not None:
+        settings["speed"] = previous["speed"]
+    body["tts"] = {
+        "settings": settings,
+        "provider_connection_uuid": connection["uuid"],
+    }
+    return body
+
+
+class Dograh:
+    """Minimal dograh REST client (X-API-Key or Bearer auth)."""
+
+    def __init__(self, endpoint: str) -> None:
+        self.base = endpoint.rstrip("/")
+        self.token: str | None = None  # X-API-Key
+        self.jwt: str | None = None  # Authorization: Bearer (login only)
+
+    def _headers(self) -> dict[str, str]:
+        h: dict[str, str] = {"Accept": "application/json"}
+        if self.token:
+            h["X-API-Key"] = self.token
+        elif self.jwt:
+            h["Authorization"] = f"Bearer {self.jwt}"
+        return h
+
+    def request(
+        self, method: str, path: str, body: Any | None = None
+    ) -> Any:
+        url = f"{self.base}{path}"
+        data = None
+        headers = self._headers()
+        if body is not None:
+            data = json.dumps(body).encode()
+            headers["Content-Type"] = "application/json"
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read()
+                return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as e:
+            raise ApiError(e.code, e.read().decode(errors="replace")) from e
+        except urllib.error.URLError as e:
+            raise ApiError(0, f"unreachable {url}: {e.reason}") from e
+
+    # ── health / auth ────────────────────────────────────────────────────────
+    def wait_healthy(self, timeout_s: int = HEALTH_TIMEOUT_S) -> None:
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            try:
+                self.request("GET", "/api/v1/health")
+                return
+            except ApiError:
+                time.sleep(3)
+        raise ApiError(0, f"dograh API not healthy after {timeout_s}s at {self.base}")
+
+    def login_or_signup(self, email: str, password: str, name: str) -> None:
+        """Login; signup on first run; raise a clear error on a wrong password."""
+        try:
+            res = self.request(
+                "POST", "/api/v1/auth/login", {"email": email, "password": password}
+            )
+        except ApiError as e:
+            if e.status != 401:
+                raise
+            # First run (or the account exists with another password).
+            try:
+                self.request(
+                    "POST",
+                    "/api/v1/auth/signup",
+                    {"email": email, "password": password, "name": name},
+                )
+            except ApiError as e2:
+                if e2.status != 409:  # 409 = already registered (password mismatch)
+                    raise
+                raise ApiError(
+                    401,
+                    f"login failed for {email} and the account already exists — "
+                    "DOGRAH_ADMIN_PASSWORD no longer matches the dograh UI password",
+                ) from e2
+            res = self.request(
+                "POST", "/api/v1/auth/login", {"email": email, "password": password}
+            )
+        self.jwt = (res or {}).get("token")
+        if not self.jwt:
+            raise ApiError(401, "login response had no token")
+
+    def mint_api_key(self, name: str) -> str:
+        res = self.request("POST", "/api/v1/user/api-keys", {"name": name})
+        key = (res or {}).get("api_key", "")
+        if not key:
+            raise ApiError(500, f"api-key response had no key: {res!r}")
+        return key
+
+    # ── workflows ────────────────────────────────────────────────────────────
+    def list_workflows(self) -> list[dict]:
+        res = self.request("GET", "/api/v1/workflow/summary")
+        return res if isinstance(res, list) else (res or {}).get("workflows", [])
+
+    def import_workflow(
+        self, name: str, definition: dict, configurations: dict | None = None
+    ) -> int:
+        body: dict = {"name": name, "workflow_definition": definition}
+        if configurations:
+            body["workflow_configurations"] = configurations
+        try:
+            res = self.request("POST", "/api/v1/workflow/create/definition", body)
+        except ApiError as e:
+            if not (configurations and 400 <= e.status < 500):
+                raise
+            # A dograh image built before the call-duration change rejects a
+            # max_call_duration of 0 (upstream caps it at 1200). Import the
+            # graph anyway and say so — failing the whole setup over an
+            # optional setting would be worse.
+            print(f"WARN agent '{name}' settings refused by dograh ({e}) — importing "
+                  "without them; the call-duration limit will still apply until "
+                  "the dograh image is rebuilt (docker-compose.dograh-build.yml)")
+            res = self.request(
+                "POST",
+                "/api/v1/workflow/create/definition",
+                {"name": name, "workflow_definition": definition},
+            )
+        wf_id = (res or {}).get("id")
+        if wf_id is None:
+            raise ApiError(500, f"workflow create response had no id: {res!r}")
+        return int(wf_id)
+
+    def workflow_configurations(self, workflow_id: Any) -> dict:
+        """The live workflow_configurations (masked secrets, but the numbers we
+        care about — max_call_duration — come through)."""
+        res = self.request("GET", f"/api/v1/workflow/fetch/{int(workflow_id)}")
+        return ((res or {}).get("workflow_configurations") or {})
+
+    def set_workflow_configurations(self, workflow_id: Any, configurations: dict) -> None:
+        """Apply configurations to an existing workflow and publish the change.
+
+        A PUT only saves a draft in dograh; publishing is what a bound agent
+        actually runs, so a config-only reconcile would otherwise be inert.
+        """
+        self.request(
+            "PUT",
+            f"/api/v1/workflow/{int(workflow_id)}",
+            {"workflow_configurations": configurations},
+        )
+        self.request("POST", f"/api/v1/workflow/{int(workflow_id)}/publish")
+
+    # ── telephony ────────────────────────────────────────────────────────────
+    def list_configs(self) -> list[dict]:
+        res = self.request("GET", "/api/v1/organizations/telephony-configs")
+        return (res or {}).get("configurations", [])
+
+    def config_body(self, cfg: dict) -> dict:
+        return {
+            "name": cfg["name"],
+            "is_default_outbound": False,
+            "config": {
+                "provider": "ari",
+                "ari_endpoint": cfg["ari_endpoint"],
+                "app_name": cfg["app_name"],
+                "app_password": cfg["app_password"],
+                "ws_client_name": cfg["ws_client_name"],
+                "from_numbers": [],
+            },
+        }
+
+    # ── the voice (model configuration, shape v3) ────────────────────────────
+    # The organization's model configuration moved off
+    # `…/organizations/model-configurations/v2` (byok, one blob per role) to the
+    # `model-connections` API: each role names a provider *connection* uuid and
+    # carries only its own settings. These are the endpoints the server serves
+    # today, so the reconcile can actually enforce the voice instead of erroring.
+    def provider_connections(self) -> list[dict]:
+        """The organization's provider connections (credentials stay masked)."""
+        res = self.request("GET", "/api/v1/model-connections/provider-connections")
+        return res if isinstance(res, list) else []
+
+    def create_provider_connection(
+        self, name: str, provider: str, connection_settings: dict
+    ) -> dict:
+        """Register a provider connection; returns the created row."""
+        return (
+            self.request(
+                "POST",
+                "/api/v1/model-connections/provider-connections",
+                {
+                    "name": name,
+                    "provider": provider,
+                    "connection_settings": connection_settings,
+                },
+            )
+            or {}
+        )
+
+    def default_model_configuration_uuid(self) -> Any:
+        """The uuid of the organization's default model configuration."""
+        res = self.request("GET", "/api/v1/model-connections/default") or {}
+        return res.get("model_configuration_uuid")
+
+    def model_configuration(self, uuid: str) -> dict:
+        """A named model configuration: ``configuration`` (v3) plus ``revision``."""
+        return (
+            self.request(
+                "GET", f"/api/v1/model-connections/model-configurations/{uuid}"
+            )
+            or {}
+        )
+
+    def save_model_configuration(
+        self, uuid: str, configuration: dict, revision: Any
+    ) -> dict:
+        """Write the v3 configuration. dograh validates it against the endpoints."""
+        return (
+            self.request(
+                "PATCH",
+                f"/api/v1/model-connections/model-configurations/{uuid}",
+                {"configuration": configuration, "revision": revision},
+            )
+            or {}
+        )
+
+    def phone_numbers(self, config_id: Any) -> list[dict]:
+        res = self.request(
+            "GET", f"/api/v1/organizations/telephony-configs/{config_id}/phone-numbers"
+        )
+        return (res or {}).get("phone_numbers", [])
+
+
+# ── .env helpers ─────────────────────────────────────────────────────────────
+def load_env_file(path: Path) -> dict[str, str]:
+    env: dict[str, str] = {}
+    if not path.exists():
+        return env
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        env[key.strip()] = val.strip().strip('"').strip("'")
+    return env
+
+
+def save_env_key(path: Path, key: str, value: str) -> None:
+    """Persist KEY=value to .env (replace existing active or commented line)."""
+    lines: list[str] = []
+    if path.exists():
+        lines = path.read_text().splitlines()
+
+    replaced = False
+    out: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not replaced and (
+            stripped.startswith(f"{key}=") or stripped.startswith(f"# {key}=")
+        ):
+            out.append(f"{key}={value}")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        if out and out[-1].strip():
+            out.append("")
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n")
+
+
+def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
+    """Resolve a setting: real env first, then .env file, then default."""
+    return os.environ.get(key) or args.env.get(key) or default
+
+
+def detect_lan_ip() -> str:
+    """This host's primary LAN IPv4 (stack convention: central stack-lib.sh).
+
+    The address a service dials is the LAN IP — never loopback (README →
+    Addressing).
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))  # picks the default route, sends nothing
+        ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    finally:
+        sock.close()
+    return ""
+
+
+def ari_dial_url(args: argparse.Namespace) -> str:
+    """The ARI REST base dograh should dial — the host LAN IP, not loopback.
+
+    8088 is published on the host LAN IP only (README → Addressing), so a
+    loopback endpoint here leaves dograh's ARI manager dialling an address
+    nothing listens on. DOGRAH_ARI_HOST/PORT wins when set (the shared-PBX
+    override), then PJSIP_MEDIA_ADDRESS, then the route-selected LAN IP.
+    """
+    host = (
+        cfg(args, "DOGRAH_ARI_HOST", "")
+        or cfg(args, "PJSIP_MEDIA_ADDRESS", "")
+        or detect_lan_ip()
+    )
+    if not host:
+        return ""
+    if "://" in host:  # a full URL was supplied
+        return host.rstrip("/")
+    port = cfg(args, "DOGRAH_ARI_PORT", "") or "8088"
+    return f"http://{host}:{port}"
+
+
+def main() -> int:
+    repo = Path(__file__).resolve().parent.parent
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--endpoint", default=None, help="dograh API base URL")
+    parser.add_argument(
+        "--env-file", default=str(repo / ".env"), help="capstone .env path"
+    )
+    parser.add_argument(
+        "--workflows-dir", default=str(repo / "dograh"), help="interview agent JSONs"
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="verify only — no writes, exit 1 if incomplete"
+    )
+    parser.add_argument(
+        "--health-timeout",
+        type=int,
+        default=HEALTH_TIMEOUT_S,
+        help=f"seconds to wait for the dograh API to come up (default {HEALTH_TIMEOUT_S})",
+    )
+    args = parser.parse_args()
+    args.env = load_env_file(Path(args.env_file))
+
+    endpoint = args.endpoint or cfg(args, "DOGRAH_API_ENDPOINT", DEFAULT_ENDPOINT)
+    api_token = cfg(args, "DOGRAH_API_TOKEN", "")
+    admin_email = cfg(args, "DOGRAH_ADMIN_EMAIL", "ops@capstone.example")
+    admin_password = cfg(args, "DOGRAH_ADMIN_PASSWORD", "")
+    admin_name = cfg(args, "DOGRAH_ADMIN_NAME", "Capstone Ops")
+    ari_password = cfg(args, "DOGRAH_ARI_PASSWORD", "")
+    ari_endpoint = cfg(args, "DOGRAH_ARI_ENDPOINT", "") or ari_dial_url(args)
+    if not ari_endpoint:
+        print(
+            "FAIL cannot resolve the ARI endpoint — set PJSIP_MEDIA_ADDRESS "
+            "(or DOGRAH_ARI_ENDPOINT) in .env; 8088 is LAN-only "
+            "(README → Addressing)"
+        )
+        return 1
+    app_name = cfg(args, "DOGRAH_ARI_APP_NAME", "dograh")
+    ws_client = cfg(args, "DOGRAH_WS_CLIENT_NAME", "dograh")
+    # Checked before anything is written: this script PUTs the password into the
+    # telephony config, so shipping a broken one would take a working range
+    # down. It also refuses to *diagnose* a live outage as a mystery.
+    if ari_password:
+        password_problem = ari_password_problem(ari_password)
+        if password_problem:
+            print(f"FAIL DOGRAH_ARI_PASSWORD {password_problem}")
+            return 1
+    config_name = cfg(args, "DOGRAH_CONFIG_NAME", "Asterisk ARI (dograh)")
+
+    api = Dograh(endpoint)
+    problems: list[str] = []
+
+    print(f"── dograh API {endpoint}")
+    try:
+        api.wait_healthy(args.health_timeout)
+    except ApiError as e:
+        print(f"FAIL dograh API unreachable: {e}")
+        return 1
+    print("PASS dograh API healthy")
+
+    # ── 1. auth ──────────────────────────────────────────────────────────────
+    if api_token:
+        api.token = api_token
+        try:
+            api.request("GET", "/api/v1/user/api-keys")
+            print("PASS DOGRAH_API_TOKEN valid")
+        except ApiError:
+            print("WARN DOGRAH_API_TOKEN invalid — re-authenticating")
+            api.token = None
+
+    if not api.token:
+        if not admin_password:
+            print(
+                "FAIL DOGRAH_ADMIN_PASSWORD required (no valid DOGRAH_API_TOKEN in "
+                f"{args.env_file})"
+            )
+            return 1
+        api.login_or_signup(admin_email, admin_password, admin_name)
+        api.token = api.mint_api_key("capstone-setup")
+        api.jwt = None
+        if not args.check:
+            save_env_key(Path(args.env_file), "DOGRAH_API_TOKEN", api.token)
+            print(f"PASS API key minted → persisted DOGRAH_API_TOKEN in {args.env_file}")
+        else:
+            print("PASS authenticated (key not persisted in --check mode)")
+
+    # ── 2. agents: import the interview workflows ────────────────────────────
+    wf_dir = Path(args.workflows_dir)
+    existing = {w.get("name"): w.get("id") for w in api.list_workflows()}
+    track_ids: dict[str, int | None] = {}
+    for ext, filename, _label in TRACKS:
+        path = wf_dir / filename
+        try:
+            doc = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            problems.append(f"agent workflow file {path}: {e}")
+            track_ids[ext] = None
+            continue
+        wf_name = doc.pop("name", None) or path.stem.replace("-", " ").title()
+        # Workflow-level settings live beside the graph, not inside it (they
+        # are a separate column on the workflow), so lift them out before the
+        # rest of the document is treated as the definition. The mock
+        # interviews ship max_call_duration=0 (no time limit) here.
+        wf_config = doc.pop("workflow_configurations", None) or None
+        definition = doc.get("workflow_definition", doc)
+        if wf_name in existing:
+            track_ids[ext] = existing[wf_name]
+            print(f"PASS agent '{wf_name}' already imported (id {existing[wf_name]})")
+            if wf_config and not args.check:
+                # Reconcile settings on an install that imported the workflow
+                # before the JSON changed — import alone is a no-op for these.
+                try:
+                    live = api.workflow_configurations(track_ids[ext])
+                    if any(live.get(k) != v for k, v in wf_config.items()):
+                        api.set_workflow_configurations(track_ids[ext], wf_config)
+                        settings = ", ".join(f"{k}={v}" for k, v in wf_config.items())
+                        print(f"PASS agent '{wf_name}' settings updated ({settings})")
+                except ApiError as e:
+                    problems.append(f"agent workflow '{wf_name}' settings: {e}")
+                    print(f"FAIL agent '{wf_name}' settings not applied: {e}")
+        elif args.check:
+            track_ids[ext] = None
+            problems.append(f"agent workflow '{wf_name}' not imported")
+        else:
+            track_ids[ext] = api.import_workflow(wf_name, definition, wf_config)
+            existing[wf_name] = track_ids[ext]
+            print(f"PASS agent '{wf_name}' imported (id {track_ids[ext]})")
+
+    # ── 3. ARI telephony configuration (shows up in the dograh UI) ───────────
+    config = next((c for c in api.list_configs() if c.get("name") == config_name), None)
+    if config is not None and not ari_password and not args.check:
+        # The PUT below would overwrite the stored app password with empty.
+        print("FAIL DOGRAH_ARI_PASSWORD is empty — refusing to reconcile the ARI "
+              "config (it would blank the app password that must match ari.conf)")
+        return 1
+    if config is None:
+        if args.check or not ari_password:
+            problems.append(f"telephony configuration '{config_name}' missing")
+        else:
+            config = api.request(
+                "POST",
+                "/api/v1/organizations/telephony-configs",
+                api.config_body(
+                    {
+                        "name": config_name,
+                        "ari_endpoint": ari_endpoint,
+                        "app_name": app_name,
+                        "app_password": ari_password,
+                        "ws_client_name": ws_client,
+                    }
+                ),
+            )
+            print(f"PASS ARI telephony config created ({config.get('id')})")
+    elif args.check:
+        # app_password is masked in responses, so presence is all we can verify.
+        print(f"PASS ARI telephony config present ({config['id']})")
+    else:
+        # The API masks app_password in responses, so PUT every run to
+        # reconcile credentials (same approach as ansible/dograh-ari.yml).
+        api.request(
+            "PUT",
+            f"/api/v1/organizations/telephony-configs/{config['id']}",
+            api.config_body(
+                {
+                    "name": config_name,
+                    "ari_endpoint": ari_endpoint,
+                    "app_name": app_name,
+                    "app_password": ari_password,
+                    "ws_client_name": ws_client,
+                }
+            ),
+        )
+        print(f"PASS ARI telephony config reconciled ({config['id']})")
+
+    if config is None:
+        # Can't register extensions without a config — report and bail.
+        print("FAIL no telephony configuration — extensions can't be registered")
+        for p in problems:
+            print(f"  PROBLEM: {p}")
+        return 1
+    config_id = config.get("id")
+
+    # ── 3a. un-park a config dograh disabled itself ──────────────────────────
+    # Parking is deliberately one-way upstream (a permanently broken PBX must
+    # not be retried forever), so nothing else will ever clear it. This is the
+    # step that makes re-running the wire script a real repair rather than a
+    # verification that reports the outage back at you.
+    parked = parked_reason(config)
+    if parked:
+        if args.check:
+            problems.append(
+                f"ARI telephony config '{config_name}' is parked (inactive): {parked}"
+            )
+            print(f"FAIL ARI telephony config is parked (inactive): {parked}")
+        else:
+            print(f"WARN ARI telephony config was parked by dograh: {parked}")
+            api.request(
+                "POST",
+                f"/api/v1/organizations/telephony-configs/{config_id}/reactivate",
+            )
+            print(
+                "PASS ARI telephony config reactivated — dograh reconnects on its "
+                "next poll (the PBX must have ARI reachable for it to stay up)"
+            )
+
+    # ── 3b. Stasis app name: dograh generates it (dograh_<hex>) and the PBX
+    # dialplan must route calls into THAT name, not the ARI username. Fetch it
+    # from the config detail and persist it so the entrypoint can inject it
+    # into extensions_custom.conf on every boot (and place_call can originate
+    # into it). Stable once created — a re-run preserves it.
+    stasis_app_name = ""
+    try:
+        detail = api.request(
+            "GET", f"/api/v1/organizations/telephony-configs/{config_id}"
+        )
+        stasis_app_name = ((detail or {}).get("credentials") or {}).get(
+            "stasis_app_name", ""
+        )
+    except ApiError:
+        stasis_app_name = ""
+    if stasis_app_name:
+        print(f"PASS Stasis app name: {stasis_app_name}")
+        if not args.check:
+            save_env_key(Path(args.env_file), "DOGRAH_STASIS_APP_NAME", stasis_app_name)
+    elif args.check:
+        problems.append("stasis_app_name not found on the telephony config")
+    else:
+        print("WARN stasis_app_name not exposed by the API — the PBX dialplan "
+              "must route into app_name instead")
+
+    # ── 3c. the voice: Piper, through the local shim ─────────────────────────
+    # An organization left on a cloud or managed TTS provider does not merely
+    # sound wrong: with no reachable key the synthesis call fails, and the caller
+    # hears an agent that never responds. The intended voice for this stack is
+    # the local one — Piper behind the tts-shim — so point the agents at it and
+    # let dograh's own validator prove the endpoint answers.
+    tts_base_url = cfg(args, "DOGRAH_TTS_BASE_URL", DEFAULT_TTS_BASE_URL)
+    tts_model = cfg(args, "DOGRAH_TTS_MODEL", DEFAULT_TTS_MODEL)
+    tts_voice = cfg(args, "DOGRAH_TTS_VOICE", DEFAULT_TTS_VOICE)
+    voice_label = f"{tts_model}/{tts_voice} at {tts_base_url}"
+    # Read either way — `--check` only skips the write.
+    config_uuid: Any = None
+    stored: dict = {}
+    connection: dict | None = None
+    try:
+        connections = api.provider_connections()
+        config_uuid = api.default_model_configuration_uuid()
+        if not config_uuid:
+            raise ApiError(
+                404, "no default model configuration is set for the organization"
+            )
+        stored = api.model_configuration(str(config_uuid))
+        connection = shim_connection(connections, tts_base_url)
+    except ApiError as e:
+        problems.append(f"model configuration: {e}")
+        print(f"FAIL model configuration unreadable: {e}")
+
+    if stored and connection is None and not args.check:
+        # No connection points at the shim yet (a fresh organization, or one
+        # wired by hand before this script existed). Register it, so the TTS
+        # write below has somewhere to point.
+        try:
+            connection = api.create_provider_connection(
+                f"{SHIM_TTS_PROVIDER} (tts-shim)",
+                SHIM_TTS_PROVIDER,
+                {"base_url": tts_base_url},
+            )
+            print(
+                f"PASS registered the local TTS provider connection "
+                f"'{connection.get('name')}' → {tts_base_url}"
+            )
+        except ApiError as e:
+            problems.append(f"TTS provider connection: {e}")
+            print(f"FAIL could not register the local TTS provider connection: {e}")
+
+    if stored:
+        tts_problem = shim_tts_problem(
+            stored.get("configuration"), connection, tts_base_url, tts_model, tts_voice
+        )
+        if not tts_problem:
+            print(f"PASS TTS is {tts_model} through the local shim ({voice_label})")
+        elif args.check or connection is None:
+            problems.append(f"TTS not on the local shim: {tts_problem}")
+            print(f"FAIL TTS not on the local shim: {tts_problem}")
+        else:
+            try:
+                api.save_model_configuration(
+                    str(config_uuid),
+                    with_shim_tts(
+                        stored["configuration"], connection, tts_model, tts_voice
+                    ),
+                    stored.get("revision"),
+                )
+                print(
+                    f"PASS TTS re-pointed at {tts_model} ({voice_label}) — "
+                    f"was {tts_problem}"
+                )
+            except ApiError as e:
+                problems.append(f"TTS not re-pointed: {e}")
+                print(f"FAIL TTS not re-pointed: {e}")
+                print(
+                    "     dograh probes the endpoint before it stores the config, so "
+                    "the shim has to answer first: curl -s "
+                    + shim_health_url(tts_base_url)
+                )
+
+    # ── 4. extensions 8000/8001/8002 → agents (inbound phone numbers) ────────
+    numbers = api.phone_numbers(config_id)
+    by_address = {n.get("address"): n for n in numbers}
+    for ext, _filename, label in TRACKS:
+        wf_id = track_ids.get(ext)
+        current = by_address.get(ext)
+        if wf_id is None:
+            problems.append(
+                f"extension {ext}: no imported agent workflow — not registered"
+            )
+            continue
+        if current is None:
+            if args.check:
+                problems.append(f"extension {ext} not registered as a phone number")
+                continue
+            api.request(
+                "POST",
+                f"/api/v1/organizations/telephony-configs/{config_id}/phone-numbers",
+                {
+                    "address": ext,
+                    "label": label,
+                    "inbound_workflow_id": wf_id,
+                    "is_active": True,
+                    "is_default_caller_id": False,
+                    "extra_metadata": {},
+                },
+            )
+            print(f"PASS extension {ext} → agent id {wf_id} ({label})")
+        elif current.get("inbound_workflow_id") != wf_id:
+            if args.check:
+                problems.append(
+                    f"extension {ext} bound to workflow "
+                    f"{current.get('inbound_workflow_id')} instead of {wf_id}"
+                )
+                continue
+            api.request(
+                "PUT",
+                f"/api/v1/organizations/telephony-configs/{config_id}/phone-numbers/{current['id']}",
+                {
+                    "label": label,
+                    "inbound_workflow_id": wf_id,
+                    "is_active": True,
+                },
+            )
+            print(f"PASS extension {ext} re-pointed → agent id {wf_id} ({label})")
+        else:
+            print(f"PASS extension {ext} → agent id {wf_id} ({label})")
+
+    # ── 5. report ────────────────────────────────────────────────────────────
+    print()
+    print("  Telephony wiring (dograh side):")
+    print(f"    config '{config_name}' → ARI {ari_endpoint} app='{app_name}' "
+          f"stasis='{stasis_app_name or app_name}' ws='{ws_client}'")
+    print(f"    voice: {voice_label}")
+    for ext, filename, label in TRACKS:
+        state = "✓" if track_ids.get(ext) is not None else "✗"
+        print(f"    {state} ext {ext} → {label} ({filename})")
+    if problems:
+        print()
+        for p in problems:
+            print(f"  PROBLEM: {p}")
+        return 1
+    print()
+    print("  dograh connects to Asterisk ARI on its own (ARI manager polls configs).")
+    print('  Verify on the PBX: docker exec pbx-freepbx asterisk -rx "ari show apps"')
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except ApiError as e:
+        print(f"FAIL dograh API error: {e}", file=sys.stderr)
+        raise SystemExit(1)

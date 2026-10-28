@@ -1,0 +1,89 @@
+{
+  "name": "Outbound Outreach",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Outreach Agent Persona",
+        "prompt": "You are a professional, upbeat voice outreach agent for {{initial_context.company | fallback:our organization}}. Always speak in short, natural sentences — this is a phone call, not an essay. Stay in character throughout. Be polite, concise, and respectful of the person's time; never pressure or talk over them."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "Outbound Outreach Trigger",
+        "enabled": true,
+        "trigger_path": "outbound-outreach"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Introduce & Open",
+        "greeting_type": "text",
+        "greeting": "Hi {{initial_context.contact_name | fallback:there}}, this is {{initial_context.agent_name | fallback:Avery}} from {{initial_context.company | fallback:our organization}}. Do you have a quick minute?",
+        "prompt": "# Role\nYou are making an outbound call on behalf of {{initial_context.company | fallback:our organization}} to {{initial_context.contact_name | fallback:the contact}}.\n\n# Rules\n- If they cannot talk, ask for a better time and offer to call back; if declined, END THE CALL politely.\n- If they can talk, briefly state the reason for the call (based on initial_context.offering or the campaign goal).\n\n# Opening flow\n1. Greet the contact by name and identify yourself and the organization.\n2. Ask if they have a minute.\n3. If yes, state the purpose and move to the pitch (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": true,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-pitch",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Present the Pitch",
+        "prompt": "# Role\nYou are the outreach agent presenting {{initial_context.offering | fallback:our offer or campaign}} to {{initial_context.contact_name | fallback:the contact}}.\n\n# How to present\n- Lead with the single most relevant benefit or the purpose of the call (from initial_context.offering / campaign goal).\n- Keep it to a couple of clear sentences.\n- Invite a question or reaction.\n- Do not read a long script or overwhelm with details; this is a voice call.\n\n# If they're interested\n- Answer their questions simply and truthfully; never invent facts.\n- Confirm whether they'd like more info or to take the next step.\n\n# If they decline or are not interested\n- Accept it graciously, thank them for their time, and END THE CALL.\n\n# When ready (engaged or a clear outcome)\nMove to gathering contact details or closing (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    },
+    {
+      "id": "node-close",
+      "type": "endCall",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Wrap Up & Hang Up",
+        "prompt": "# Role\nYou are the outreach agent closing the call with {{initial_context.contact_name | fallback:the contact}}.\n\n# If they wanted more info / a callback\n- Confirm a preferred callback time or how to reach them (phone/email) and repeat it back.\n\n# Closing\n- Thank them for their time.\n- Summarize any agreed next step in one sentence.\n- Keep it to 2-3 sentences, then END THE CALL.",
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-pitch",
+      "source": "node-start",
+      "target": "node-pitch",
+      "data": {
+        "label": "call_accepted",
+        "condition": "The contact has a minute and you have stated the purpose of the call.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-pitch-close",
+      "source": "node-pitch",
+      "target": "node-close",
+      "data": {
+        "label": "outcome_reached",
+        "condition": "The contact engaged (interest, another time, more info) or clearly declined, and the call is ready to close.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

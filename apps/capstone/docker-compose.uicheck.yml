@@ -1,0 +1,31 @@
+# The capstone UI-check sandbox.
+#
+# A node image that installs Playwright's Chromium and then sleeps, so a UI check can
+# `docker exec` into it; the capstone repo is mounted at /repo and the working directory
+# is the dashboard. It is a compose service rather than a `docker run` so that the image
+# is managed: an updated node:20-bookworm-slim becomes a recreate here, instead of the
+# "the container is not compose-managed" report that OnTrak Sync can only ask a person to
+# fix by hand.
+#
+# The project name is spelled out rather than defaulting to the directory (`capstone`),
+# because the sandbox is not part of the capstone stack: sharing the project name would
+# put this container in the same compose project as the twenty-four the stack runs, and
+# the next `docker compose --remove-orphans` would delete one or the other. An update
+# tool that recreates a project it can see the whole of is the point; one that sees two
+# definitions for one project is how a sandbox takes a stack down with it.
+#
+# The container name is fixed so the update-monitoring target keeps pointing at the same
+# container across a recreate.
+name: capstone-uicheck
+services:
+  uicheck:
+    image: node:20-bookworm-slim
+    container_name: uicheck
+    working_dir: /repo/dashboard
+    command:
+      - bash
+      - -c
+      - npx playwright install --with-deps chromium > /tmp/pw.log 2>&1; echo READY >> /tmp/pw.log; sleep infinity
+    volumes:
+      - /usr/src/projects/complete/2-voice/capstone:/repo
+    restart: "no"

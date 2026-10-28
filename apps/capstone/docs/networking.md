@@ -1,0 +1,198 @@
+# Networking & Port Forwarding
+
+How to expose the capstone stack to callers and operators. The stack splits
+into three tiers:
+
+1. **Nginx Proxy Manager** — reverse-proxy the web/API surfaces over HTTPS.
+2. **Router port-forward** — raw UDP/TCP for SIP/RTP telephony (and the NPM
+   entry itself).
+3. **Host-only** — credentials-bearing control/DB planes that must never be
+   exposed: bound to loopback, or to this host's LAN IP where the service that
+   dials them does (README → Addressing).
+
+The port inventory below is the actual published mapping from
+`docker-compose.yml` (the PBX/Asterisk service lives in the same file).
+
+---
+
+## 1. Nginx Proxy Manager — proxy hosts (HTTPS)
+
+Terminate TLS in NPM and forward to these local ports. Do **not** expose the
+raw port to the internet.
+
+The five services with no OIDC of their own (FreePBX, n8n, Grist, Grafana,
+Workflow Studio) are fronted by an **`oauth2-proxy` SSO gateway**, so the NPM
+host forwards to the gateway's port — not the app's. The app's own port is still
+published on the LAN (see `ips/docs/sign-in-posture.md`, open items); the
+gateway is what puts Cerulean Authentik in front of the public name.
+
+| Service | Host port | NPM forward-to | Suggested hostname |
+|---|---|---|---|
+| Capstone Voice App (dograh UI) | `3010` | `http://127.0.0.1:3010` | `app.<domain>` |
+| Capstone Voice API | `8000` (host-mode) | `http://127.0.0.1:8000` | `api.<domain>` |
+| Authentik (SSO) | `9000` | `http://127.0.0.1:9000` | `auth.<domain>` |
+| FreePBX web UI (+ AvantFAX at `/fax`) | `8083` | `http://127.0.0.1:14014` (`pbx-sso`) | `pbx.<domain>` |
+| n8n | `5678` | `http://127.0.0.1:14010` (`n8n-sso`) | `n8n.<domain>` |
+| Grist | `8484` | `http://127.0.0.1:14011` (`grist-sso`) | `grist.<domain>` |
+| Grafana | `3301` | `http://127.0.0.1:14012` (`grafana-sso`) | `grafana.<domain>` |
+| Workflow Studio | `8090` | `http://127.0.0.1:14013` (`workflow-sso`) | `workflow.<domain>` |
+| Capstone Control Center | `8096` | `http://127.0.0.1:8096` | `admin.<domain>` |
+| WebRTC WSS (softphone) | `8089` | `https://127.0.0.1:8089/ws` (WSS) | `voice.<domain>` |
+| OmniRoute dashboard (optional) | `20128` | `http://127.0.0.1:20128` | keep internal |
+
+Notes:
+
+- **Enable WebSockets** on the n8n and Grafana proxy hosts — their UIs use
+  WSS (and dograh's UI does too, if you proxy it).
+- **n8n public webhook** — dograh POSTs the grading webhook to
+  `http://127.0.0.1:5678` (same host), so it works internally today. Only
+  proxy n8n if you want remote editor access or webhooks from outside the
+  LAN.
+- **The media prefix (`/voice-audio`)** — recordings and transcripts live in
+  MinIO and the API hands out unsigned `MINIO_PUBLIC_ENDPOINT/<bucket>/<key>`
+  URLs, i.e. `https://<app host>/voice-audio/...`. The same vhost that serves
+  the UI proxies that one prefix, so `scripts/npm-proxy-hosts.py` attaches a
+  `location /voice-audio` forwarding to **this stack's** LAN address on `9200`
+  (`NPM_UPSTREAM_HOST`, else `PJSIP_MEDIA_ADDRESS`) — a host address, never
+  `localhost`, because the edge is a different machine. That address is an
+  input, not a constant: run the sync from this host, or set
+  `NPM_UPSTREAM_HOST`, because a sync from anywhere else pins the edge to
+  *that* machine. Drift there is quiet — the sync looks clean and the only
+  symptom is every transcript download 502ing at grading time, hours later.
+  `npm-proxy-hosts.py --check` reports it, and `npm-smoke-test.py` probes the
+  prefix through each app host.
+- **OmniRoute (`20128`)** holds the LLM API key and is bound to `127.0.0.1` and
+  this host's docker0 (`172.17.0.1`) — **not** the LAN. It stopped being reachable
+  by address when its host split from the stack, because the dashboard's own login
+  was turned off (`make gateway-auth-mode`, `requireLogin=false`) and the port's
+  reachability is then the only control. The door is the identity-aware proxy in
+  front of it, `192.168.1.71:20128`, which exempts `/v1` for inference clients and
+  requires Authentik for the dashboard. Keep **that** internal too: the dashboard
+  name is published with `/v1` refused at the edge. Consumers here dial
+  `host.docker.internal:20128`; a stack on another host pins the LAN address of
+  the proxy's host in `.env`. See `docs/operations.md` → Addressing, and
+  `5-dev/olympus/docs/gateway-sso.md`.
+
+  Only the gateway's host runs the `omniroute` service itself. It sits behind the
+  `gateway` compose profile — `docker compose --profile gateway up -d omniroute`
+  there, plain `docker compose up -d` everywhere else — so an app host cannot
+  quietly start a second gateway beside the real one. That mistake is invisible
+  from the outside: a second gateway answers requests the way a working one does
+  while holding no connections at all (`provider_connections`=0, every key
+  `401 invalid_api_key`), which is how a predecessor of this stack lost its
+  provider credentials to a `docker compose up -d` on the wrong host.
+- **dograh API (`8000`)** runs in host network mode on its original uvicorn
+  port — the PBX reaches it back via `host.docker.internal:8000` media
+  WebSocket and the n8n container calls it via the LAN IP. The **dograh UI
+  (`3010`)** is the separate Next.js frontend. `scripts/npm-proxy-hosts.py`
+  (invoked by `setup.sh`) creates the proxy hosts for all of the above
+  automatically.
+
+---
+
+## 2. Router port-forward — raw (telephony + NPM entry)
+
+These bypass NPM and go straight from the router to the host. The critical
+ones are SIP + RTP so an external carrier/softphone can reach Asterisk.
+
+The router itself — its DNS servers, the full forwarding table and the LAN
+reservations — is documented in `1-primary/cerulean/docs/router.md`. This
+section is the telephony half of that table; that file is the whole picture.
+
+| Port | Proto | Purpose |
+|---|---|---|
+| `5060` | UDP | SIP signalling |
+| `5061` | TCP | SIP over TLS (only if you do TLS trunks / WebRTC) |
+| `10101–10120` | UDP | RTP media (matches the compose mapping; ~10 concurrent calls) |
+| `80` / `443` | TCP | NPM itself (public HTTPS entry) |
+| `8089` | TCP | PJSIP WebSocket / WSS (browser/WebRTC softphones only) |
+| `3478` | TCP/UDP | Coturn TURN listener |
+| `49152–49251` | UDP | Coturn relay range |
+
+> ⚠️ Only the Asterisk-facing ports need router exposure. Do **not** forward
+> `8088` (ARI), `5038` (AMI), `5432` (postgres), `6379` (redis),
+> `9000`/`9001` (minio), `3301`, `8484`, `5678` — those are
+> credentials-bearing control/DB planes. They stay host-only (loopback or this
+> host's LAN IP, per README → Addressing) or go through NPM with auth, never
+> raw.
+
+### RTP note
+
+The RTP range is `10101-10120/udp` — 20 ports ≈ 10 concurrent calls,
+configurable via `FREEPBX_RTP_PORT_START` / `FREEPBX_RTP_PORT_END` in
+`.env`. `10000/tcp` in the same container is the FreePBX **Webmin** panel
+(configurable via `FREEPBX_WEBMIN_PORT`), not RTP; forward only the UDP
+range for media.
+
+---
+
+## 3. Host-only (no NPM, no router)
+
+Bound to `127.0.0.1`, or to this host's LAN IP where a service dials it there
+(README → Addressing), and never on `0.0.0.0`. The bind follows the client: a
+port reached at the LAN IP is published on `${PJSIP_MEDIA_ADDRESS}`, because
+that is the address the dialler actually uses.
+
+### Loopback (`127.0.0.1`)
+
+| Port | Service |
+|---|---|
+| `5432` | postgres |
+| `6379` | redis |
+| `9000` / `9001` | minio API / console |
+| `8881` | tts-shim (local TTS — Piper) |
+| `8001` | speaches STT (host `8001` → container `8000`) |
+| `4317` / `4318` | OTel gRPC / HTTP ingest |
+| `8888` / `8889` | otel-collector metrics |
+| `9090` | prometheus (the metrics store) |
+| `8881` | tts-shim (host port; the container listens on `8880`) |
+| `8080` | NocoDB (optional — switch off Grist to use it) |
+| `10000` (TCP) | FreePBX Webmin (optional) |
+| `3478` (TCP/UDP) | Coturn TURN listener |
+| `49152–49251` (UDP) | Coturn relay ports |
+| `3000` | pbx-portal (optional, `--profile portal`) |
+| `9000` / `9443` | Cerulean Authentik (SSO — proxy via `auth.<domain>`, do not expose raw) |
+
+Also bound on `127.0.0.1` **in addition to** the LAN IP: `8089` (PJSIP WebSocket
+/ WSS). WebRTC softphones dial the WSS at the LAN IP, and no client has been
+measured on the loopback leg yet, so it stays until one is (`ss -tnp | grep
+:8089`).
+
+### This host's LAN IP (`${PJSIP_MEDIA_ADDRESS}`)
+
+Reached by the services themselves and by the host-side scripts that probe and
+configure the PBX — a loopback probe here reports a healthy PBX as down, since
+nothing listens on `127.0.0.1`.
+
+| Port | Service |
+|---|---|
+| `8088` | Asterisk ARI (control plane — LAN only, never expose) |
+| `5038` | Asterisk AMI (LAN only, never expose) |
+
+---
+
+## Quick reference
+
+```
+Internet ──► Router
+              ├─ 5060/udp ───────────► Asterisk (SIP)
+              ├─ 10101-10120/udp ───► Asterisk (RTP)
+              ├─ 3478/tcp+udp ──────► Coturn (TURN)
+              └─ 49152-49251/udp ───► Coturn (relay)
+              └─ 443/tcp (HTTPS) ────► NPM ──► *-sso gateway ──► the app
+                                       │      (n8n 14010, grist 14011, grafana 14012,
+                                       │       workflow 14013, pbx 14014, technitium 14015)
+                                       └──► dograh-ui:3010 → api:8000 (your own NPM)
+```
+
+The apps in that first branch have no OIDC of their own and their local logins
+are switched off, so the gateway is the only door: their own ports (`:5678`,
+`:8484`, `:3301`, `:8090`) are bound to `127.0.0.1` and reachable on the LAN from
+nowhere.
+
+**Rule of thumb:** if a port is `127.0.0.1:`-bound in compose, it stays
+loopback. If it's `0.0.0.0:`-bound, it's a NPM proxy candidate (or, for
+telephony, a router forward). Asterisk's SIP/RTP/WS ports are the only ones
+that must cross the router raw. Host-mode services (Technitium) are the
+exception that compose cannot bind for you — they are restricted by their own
+settings instead (see `docs/operations.md`).

@@ -1,0 +1,134 @@
+{
+  "$schema_note": "Dograh http_api tool pack — Zeus portal actions (Phase 2). Conforms to dograh ToolModel / schemas/tool.py (HttpApiToolDefinition). Register each entry through Workflow Studio -> Tools or the dograh REST tool API; replace CREDENTIAL_UUID_ZEUS with the UUID of a stored dograh credential that sends the Zeus session as a header (e.g. type 'header', value 'pbx_session=<token>' — see zeus-tool-pack.md). Endpoints: zeus docs/portal-api.md.",
+  "tools": [
+    {
+      "name": "zeus_send_sms",
+      "description": "Send an SMS text message from the account's Zeus DID (VoIP.ms) to a destination phone number. Use when the caller asks you to text them or you must deliver a short message by SMS.",
+      "category": "http_api",
+      "definition": {
+        "schema_version": 1,
+        "type": "http_api",
+        "config": {
+          "method": "POST",
+          "url": "https://api.zeus.innotel.us/api/messages/send",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "credential_uuid": "CREDENTIAL_UUID_ZEUS",
+          "timeout_ms": 15000,
+          "body_template": {
+            "to_number": "{{to_number}}",
+            "from_did_id": "{{from_did_id}}",
+            "body": "{{body}}"
+          },
+          "parameters": [
+            {
+              "name": "to_number",
+              "type": "string",
+              "description": "Destination phone number in E.164 format, e.g. +13025551002.",
+              "required": true
+            },
+            {
+              "name": "from_did_id",
+              "type": "string",
+              "description": "The id of one of the caller's Zeus DIDs (ask them, or leave for the operator default).",
+              "required": true
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "description": "The SMS text to send (max 1600 characters).",
+              "required": true
+            }
+          ],
+          "preset_parameters": []
+        }
+      }
+    },
+    {
+      "name": "zeus_check_voicemail",
+      "description": "List the account's Zeus voicemail messages (newest first), including caller id/name, duration, transcript, and AI summary when present. Use before summarizing or acting on voicemail.",
+      "category": "http_api",
+      "definition": {
+        "schema_version": 1,
+        "type": "http_api",
+        "config": {
+          "method": "GET",
+          "url": "https://api.zeus.innotel.us/api/voicemail",
+          "headers": {},
+          "credential_uuid": "CREDENTIAL_UUID_ZEUS",
+          "timeout_ms": 15000,
+          "parameters": [
+            {
+              "name": "limit",
+              "type": "number",
+              "description": "How many voicemails to fetch (1-100, default 20).",
+              "required": false
+            }
+          ],
+          "preset_parameters": []
+        }
+      }
+    },
+    {
+      "name": "zeus_voicemail_summary",
+      "description": "Generate (or refresh) the AI summary of one Zeus voicemail from its transcript, then return it. Use when the caller wants to know what a voicemail said.",
+      "category": "http_api",
+      "definition": {
+        "schema_version": 1,
+        "type": "http_api",
+        "config": {
+          "method": "POST",
+          "url": "https://api.zeus.innotel.us/api/voicemail/summary",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "credential_uuid": "CREDENTIAL_UUID_ZEUS",
+          "timeout_ms": 30000,
+          "body_template": {
+            "voicemail_id": "{{voicemail_id}}"
+          },
+          "parameters": [
+            {
+              "name": "voicemail_id",
+              "type": "string",
+              "description": "The id of the voicemail to summarise (from zeus_check_voicemail).",
+              "required": true
+            }
+          ],
+          "preset_parameters": []
+        }
+      }
+    },
+    {
+      "name": "zeus_voicemail_listened",
+      "description": "Mark a Zeus voicemail as handled/listened so it stops showing as new. Call after the caller has dealt with a voicemail.",
+      "category": "http_api",
+      "definition": {
+        "schema_version": 1,
+        "type": "http_api",
+        "config": {
+          "method": "POST",
+          "url": "https://api.zeus.innotel.us/api/voicemail/listened",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "credential_uuid": "CREDENTIAL_UUID_ZEUS",
+          "timeout_ms": 15000,
+          "body_template": {
+            "voicemail_id": "{{voicemail_id}}"
+          },
+          "parameters": [
+            {
+              "name": "voicemail_id",
+              "type": "string",
+              "description": "The id of the voicemail to mark listened.",
+              "required": true
+            }
+          ],
+          "preset_parameters": []
+        }
+      }
+    }
+  ]
+}

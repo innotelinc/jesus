@@ -1,0 +1,561 @@
+import { useEffect, useRef, useState } from 'react';
+import { useResolvedTheme } from '../components/providers';
+import Button from '../components/Button';
+import { cn } from '../lib/utils';
+import { exportJSON } from '../lib/export';
+import Input from '../components/Input';
+import Select from '../components/Select';
+import {
+  api,
+  type SmsGatewayHealth,
+  type SmsTransport,
+  type SmsTransportChoice,
+  type SmsTransportState,
+} from '../lib/api';
+import {
+  NOTIFY_ON_OPTIONS,
+  settingsStore,
+  type AccessSettings,
+  type DashboardSettings,
+  type NotificationsSettings,
+  type ProfileSettings,
+} from '../lib/settings';
+
+/**
+ * Shared save machinery for every settings card: loads its slice from the
+ * browser-side settings store, tracks dirty/saved state, and persists through
+ * settingsStore on Save (which broadcasts SETTINGS_CHANGED_EVENT so live
+ * consumers like the dashboard poll interval react without a reload).
+ */
+function useSavableSettings<T extends object>(
+  load: () => T,
+  save: (value: T) => boolean,
+) {
+  const [value, setValue] = useState<T>(load);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const update = (patch: Partial<T>) => {
+    setValue(current => ({ ...current, ...patch }));
+    setDirty(true);
+    setSaved(false);
+  };
+
+  const saveNow = () => {
+    save(value);
+    setDirty(false);
+    setSaved(true);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setSaved(false), 5000);
+  };
+
+  return { value, update, save: saveNow, dirty, saved };
+}
+
+/** Save button + "saved." confirmation row shared by all settings cards. */
+function SaveRow({
+  saved,
+  dirty,
+  onSave,
+  label,
+}: {
+  saved: boolean;
+  dirty: boolean;
+  onSave: () => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-between pt-1">
+      <span
+        className={cn('text-xs transition-opacity', saved ? 'text-success opacity-100' : 'opacity-0')}
+        role="status"
+      >
+        Settings saved.
+      </span>
+      <Button size="sm" onClick={onSave} disabled={!dirty}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+function smsChoice(transport: SmsTransport): SmsTransportChoice {
+  if (transport === 'opensms') return 'local';
+  if (transport === 'auto') return 'auto';
+  return 'provider';
+}
+
+const SMS_SOURCE_LABEL: Record<SmsTransportState['source'], string> = {
+  env: 'container environment override',
+  state: 'saved here',
+  dotenv: '.env default',
+  default: 'built-in default',
+};
+
+export default function Settings() {
+  const { theme, setTheme } = useResolvedTheme();
+
+  const access = useSavableSettings<AccessSettings>(
+    settingsStore.loadAccess,
+    settingsStore.saveAccess,
+  );
+  const notifications = useSavableSettings<NotificationsSettings>(
+    settingsStore.loadNotifications,
+    settingsStore.saveNotifications,
+  );
+  const dashboard = useSavableSettings<DashboardSettings>(
+    settingsStore.loadDashboard,
+    settingsStore.saveDashboard,
+  );
+  const profile = useSavableSettings<ProfileSettings>(
+    settingsStore.loadProfile,
+    settingsStore.saveProfile,
+  );
+
+  // Server-side SMS transport: not a browser preference. The choice is written
+  // to the host state file the agent tools read, so it must come from the API.
+  const [sms, setSms] = useState<SmsTransportState | null>(null);
+  const [smsPick, setSmsPick] = useState<SmsTransportChoice>('provider');
+  const [smsStatus, setSmsStatus] = useState<'loading' | 'ready' | 'saving' | 'saved' | 'error'>('loading');
+  const [smsError, setSmsError] = useState('');
+  // Separate call: "configured" (URL + key) does not mean "ready" (a modem
+  // with a SIM), and a dead gateway must not hold up the card.
+  const [gateway, setGateway] = useState<SmsGatewayHealth | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    api.smsGateway()
+      .then(state => { if (live) setGateway(state); })
+      .catch(() => {
+        if (!live) return;
+        setGateway({
+          configured: false,
+          url: '',
+          health: { ok: false, detail: 'gateway status unavailable' },
+        });
+      });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    api.smsTransport()
+      .then(state => {
+        if (!live) return;
+        setSms(state);
+        setSmsPick(smsChoice(state.transport));
+        setSmsStatus('ready');
+      })
+      .catch((err: unknown) => {
+        if (!live) return;
+        setSmsError(err instanceof Error ? err.message : 'Could not load SMS settings');
+        setSmsStatus('error');
+      });
+    return () => { live = false; };
+  }, []);
+
+  const saveSms = async () => {
+    setSmsStatus('saving');
+    setSmsError('');
+    try {
+      const state = await api.setSmsTransport(smsPick);
+      setSms(state);
+      setSmsPick(smsChoice(state.transport));
+      setSmsStatus('saved');
+      api.smsGateway().then(setGateway).catch(() => {});
+      window.setTimeout(() => setSmsStatus(current => (current === 'saved' ? 'ready' : current)), 4000);
+    } catch (err: unknown) {
+      setSmsError(err instanceof Error ? err.message : 'Could not save the SMS transport');
+      setSmsStatus('error');
+    }
+  };
+
+  const smsDirty = !!sms && smsPick !== smsChoice(sms.transport);
+
+  const downloadLocalSettings = () => exportJSON({
+    exportedAt: new Date().toISOString(),
+    access: access.value,
+    notifications: notifications.value,
+    dashboard: dashboard.value,
+    profile: profile.value,
+  }, { filename: `capstone-personal-settings-${new Date().toISOString().slice(0, 10)}.json` });
+
+  const toggleNotifyOn = (label: string, enabled: boolean) => {
+    const set = new Set(notifications.value.notifyOn);
+    if (enabled) set.add(label);
+    else set.delete(label);
+    notifications.update({ notifyOn: [...set] });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Personal preferences, theme, notifications, and dashboard behavior.</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Appearance</h2>
+          <div>
+            <label className="text-sm font-medium">Theme</label>
+            <div className="mt-2 flex rounded-lg border bg-background p-1" role="group" aria-label="Theme selector">
+              <button
+                onClick={() => setTheme('dark')}
+                className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors', theme === 'dark' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+              >
+                Dark
+              </button>
+              <button
+                onClick={() => setTheme('light')}
+                className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors', theme === 'light' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+              >
+                Light
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Theme is applied immediately and remembered by this browser profile.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notifications</h2>
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              className="mt-1"
+              value={notifications.value.email}
+              onChange={e => notifications.update({ email: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="notifSlack"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={notifications.value.slackAlerts}
+              onChange={e => notifications.update({ slackAlerts: e.target.checked })}
+            />
+            <label htmlFor="notifSlack" className="text-sm cursor-pointer">Slack alerts</label>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Notify on</label>
+            <div className="flex flex-col gap-2">
+              {NOTIFY_ON_OPTIONS.map(label => (
+                <label key={label} className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border input accent-primary"
+                    checked={notifications.value.notifyOn.includes(label)}
+                    onChange={e => toggleNotifyOn(label, e.target.checked)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Delivery targets are stored with this browser's profile; alert routing
+            itself is handled by the alerts endpoints.
+          </p>
+          <SaveRow
+            saved={notifications.saved}
+            dirty={notifications.dirty}
+            onSave={notifications.save}
+            label="Save notification settings"
+          />
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Dashboard</h2>
+          <div>
+            <label className="text-sm font-medium">Auto-refresh interval (seconds)</label>
+            <Select
+              value={dashboard.value.autoRefreshSeconds}
+              options={[
+                { value: '15', label: '15' },
+                { value: '30', label: '30' },
+                { value: '60', label: '60' },
+                { value: '120', label: '120' },
+                { value: '0', label: 'Off' },
+              ]}
+              onChange={v => dashboard.update({ autoRefreshSeconds: v })}
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Applies to live polling immediately after saving — no reload needed.
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Default export format</label>
+            <Select
+              value={dashboard.value.exportFormat}
+              options={[
+                { value: 'csv', label: 'CSV' },
+                { value: 'json', label: 'JSON' },
+                { value: 'pdf', label: 'PDF (browser)' },
+              ]}
+              onChange={v => dashboard.update({ exportFormat: v as DashboardSettings['exportFormat'] })}
+              className="mt-1"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="compactView"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={dashboard.value.compactView}
+              onChange={e => dashboard.update({ compactView: e.target.checked })}
+            />
+            <label htmlFor="compactView" className="text-sm cursor-pointer">Compact table view</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="showTrends"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={dashboard.value.showTrends}
+              onChange={e => dashboard.update({ showTrends: e.target.checked })}
+            />
+            <label htmlFor="showTrends" className="text-sm cursor-pointer">Show trend indicators</label>
+          </div>
+          <SaveRow
+            saved={dashboard.saved}
+            dirty={dashboard.dirty}
+            onSave={dashboard.save}
+            label="Save dashboard settings"
+          />
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Profile</h2>
+          <div>
+            <label className="text-sm font-medium">Display name</label>
+            <Input
+              className="mt-1"
+              value={profile.value.displayName}
+              onChange={e => profile.update({ displayName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              className="mt-1"
+              value={profile.value.email}
+              onChange={e => profile.update({ email: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="showEmail"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={profile.value.showEmail}
+              onChange={e => profile.update({ showEmail: e.target.checked })}
+            />
+            <label htmlFor="showEmail" className="text-sm cursor-pointer">Show email on dashboard</label>
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+            Password, MFA, and account lifecycle are managed by the Cerulean Authentik account that signed you in.
+          </div>
+          <SaveRow
+            saved={profile.saved}
+            dirty={profile.dirty}
+            onSave={profile.save}
+            label="Save profile"
+          />
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">SMS delivery</h2>
+          <p className="text-xs text-muted-foreground">
+            Where agent and script SMS leaves from. Saved on the host and read by the dograh
+            <code className="mx-1 rounded bg-muted px-1">sms</code> tool and
+            <code className="mx-1 rounded bg-muted px-1">scripts/send_sms.py</code>.
+            A value in the container environment overrides this card; otherwise the saved
+            choice overrides the <code className="mx-1 rounded bg-muted px-1">.env</code> default.
+          </p>
+          <div>
+            <label className="text-sm font-medium">Send SMS via</label>
+            <Select
+              value={smsPick}
+              options={[
+                { value: 'provider', label: 'Provider — Zeus portal' },
+                { value: 'local', label: 'Local — OpenSMS phone' },
+                { value: 'auto', label: 'Auto — local, then provider' },
+              ]}
+              onChange={v => setSmsPick(v as SmsTransportChoice)}
+              disabled={smsStatus === 'loading' || smsStatus === 'saving'}
+              className="mt-1"
+            />
+          </div>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <span>OpenSMS gateway</span>
+              <span className={sms?.opensms.configured ? 'text-success' : 'text-warning'}>
+                {sms?.opensms.configured ? sms.opensms.url : 'not configured'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Gateway modem</span>
+              <span className={gateway?.health.ok ? 'text-success' : 'text-warning'}>
+                {gateway === null
+                  ? 'checking…'
+                  : gateway.health.ok
+                    ? `ready — ${gateway.health.backend ?? 'modem'}${
+                        typeof gateway.health.signal === 'number' ? ` (${gateway.health.signal}%)` : ''
+                      }`
+                    : gateway.health.detail || 'not ready'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span>Zeus portal</span>
+              <span className={sms?.zeus.configured ? 'text-success' : 'text-warning'}>
+                {sms?.zeus.configured ? sms.zeus.url : 'not configured'}
+              </span>
+            </div>
+            {sms && (
+              <p>
+                In force: <span className="text-foreground">{sms.transport}</span>{' '}
+                ({SMS_SOURCE_LABEL[sms.source]})
+              </p>
+            )}
+            {sms && !sms.opensms.configured && (
+              <p className="text-warning">
+                Local sends fail until OPENSMS_URL and OPENSMS_API_KEY are set on the host.
+              </p>
+            )}
+            {sms?.opensms.configured && gateway && !gateway.health.ok
+              && (smsPick === 'local' || smsPick === 'auto') && (
+              <p className="text-warning">
+                Local sends are unavailable right now — {gateway.health.detail || 'no modem'}.
+              </p>
+            )}
+            {sms?.source === 'env' && smsDirty && (
+              <p className="text-warning">
+                SMS_PROVIDER is set in the container environment and overrides this card.
+              </p>
+            )}
+            {smsError && <p className="text-danger">{smsError}</p>}
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span
+              className={cn('text-xs transition-opacity', smsStatus === 'saved' ? 'text-success opacity-100' : 'opacity-0')}
+              role="status"
+            >
+              Settings saved.
+            </span>
+            <Button size="sm" onClick={saveSms} disabled={!smsDirty || smsStatus === 'saving'}>
+              Save SMS transport
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Local Access Preferences</h2>
+          <p className="text-xs text-muted-foreground">These are browser-profile preferences only; Authentik remains the security authority.</p>
+          <div>
+            <label className="text-sm font-medium">Session timeout (minutes)</label>
+            <Select
+              value={access.value.sessionTimeout}
+              options={[
+                { value: '15', label: '15' },
+                { value: '30', label: '30' },
+                { value: '60', label: '60' },
+                { value: '120', label: '120' },
+              ]}
+              onChange={v => access.update({ sessionTimeout: v })}
+              className="mt-1"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="requireMfa"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={access.value.requireMfa}
+              onChange={e => access.update({ requireMfa: e.target.checked })}
+            />
+            <label htmlFor="requireMfa" className="text-sm cursor-pointer">Require MFA for admin actions</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="ipAllowList"
+              className="h-4 w-4 rounded border input accent-primary"
+              checked={access.value.ipAllowList}
+              onChange={e => access.update({ ipAllowList: e.target.checked })}
+            />
+            <label htmlFor="ipAllowList" className="text-sm cursor-pointer">IP allow list enforcement</label>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Allowed IP ranges</label>
+            <Input
+              className="mt-1"
+              placeholder="e.g. 192.168.1.0/24 (LAN subnet)"
+              value={access.value.ipRanges}
+              onChange={e => access.update({ ipRanges: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Comma-separated CIDR ranges stored with this browser profile for operator reference.
+              They do not replace server-side network policy.
+            </p>
+          </div>
+          <SaveRow
+            saved={access.saved}
+            dirty={access.dirty}
+            onSave={access.save}
+            label="Save access settings"
+          />
+        </div>
+
+        <div className="rounded-2xl border bg-card shadow-sm p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Data & privacy</h2>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>Usage metrics retention</span>
+              <span className="font-mono text-xs">30 days</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Diagnostic telemetry</span>
+              <span className="text-xs">Local only</span>
+            </div>
+          </div>
+          <div className="pt-2">
+            <Button variant="outline" size="sm" onClick={downloadLocalSettings}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+              Download my settings
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border bg-card shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Keyboard shortcuts</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          {[
+            { shortcut: '⌘K', action: 'Global search' },
+            { shortcut: '⌘R', action: 'Refresh dashboard' },
+            { shortcut: 'Escape', action: 'Close modal/drawer' },
+            { shortcut: '? ', action: 'Show shortcuts' },
+          ].map(item => (
+            <div key={item.shortcut} className="flex items-center justify-between">
+              <span className="text-muted-foreground">{item.action}</span>
+              <kbd className="h-7 min-w-[60px] rounded-md border bg-muted px-2 text-xs text-muted-foreground font-mono text-center">{item.shortcut}</kbd>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}

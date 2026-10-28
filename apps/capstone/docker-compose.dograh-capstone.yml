@@ -1,0 +1,337 @@
+# Capstone-side override for the upstream voice stack.
+#
+# The running voice platform is the upstream stack in dograh/upstream/
+# (docker-compose.yaml), deployed from a since-deleted /tmp/dograh checkout as
+# compose project `dograh`. This override is what lets the repo manage it
+# instead. It does four jobs:
+#
+#   1. `name: dograh` — pin the compose project name. Without it Compose derives
+#      the project from the checkout directory, orphans every running container
+#      and re-creates them against fresh (empty) volumes. With it, the existing
+#      containers, the `dograh_*` volumes and the `dograh_app-network` bridge are
+#      all adopted, so the agents, workflow runs and recordings are preserved.
+#
+#   2. Attach `api` to the Capstone `interview-net` bridge as well as the stack's
+#      own `app-network`. The voice agent's TTS provider connection points at the
+#      Capstone `tts-shim` by service name (http://tts-shim:8880/v1) because the
+#      upstream `api` service is bridge-networked, not host-networked, and so
+#      cannot reach the shim on the host's 127.0.0.1. Without this attachment a
+#      call is answered but the agent cannot speak — the caller just hears
+#      ringback. The provider URL is stored in the voice app's own configuration,
+#      written by scripts/dograh_wire.py; that script's input, DOGRAH_TTS_BASE_URL,
+#      is a Capstone `.env` value (the host-side shim address it translates into
+#      `http://tts-shim:8880/v1`). Nothing in data/.env.dograh sets it.
+#
+#   3. Default `api`/`ui` to the innotelinc fork images. The fork carries the
+#      telephony/TTS customizations this deployment depends on — most visibly the
+#      call-duration ceiling below, and Cerulean sign-in (note 8). The stock
+#      `dograhai/*` images carry neither.
+#
+#      These are defaults. The pins the deployment actually runs live in
+#      data/.env.dograh (`DOGRAH_API_IMAGE` / `DOGRAH_UI_IMAGE`), which this run
+#      passes as `--env-file`, and both name builds of THIS tree
+#      (`dograh-local/dograh-api:capstone`, `dograh-local/dograh-ui:capstone`):
+#      the api's files hash equal to the checkout (104 migrations including
+#      b3c1d9e4f7a2 — the revision this database is at) and the ui is built here
+#      too, so its compiled profile carries the OIDC session handling
+#      (`/auth/callback`, the home page's provider branch, no workflow dead end)
+#      rather than whatever a registry tag was built from. Both build on the
+#      Capstone host — see docker-compose.dograh-build.yml for the measured
+#      command and timings.
+#
+#      Do NOT repoint api at ghcr.io/innotelinc/dograh-api — the published fork
+#      api predates revision b3c1d9e4f7a2 (100 migrations, no such revision) and
+#      the API stops at startup on this database. Rebuild both images from the
+#      current checkout before moving the pair (docker-compose.dograh-build.yml).
+#
+#      Pin the pair together. An API built from one source behind a UI from
+#      another renders "Authentication required. Please refresh the page." for
+#      every signed-in user — see docs/operations.md, "A patch only helps if the
+#      image that ships it is the one running".
+#
+#   4. Allow unlimited-length calls. The interview workflows ship
+#      workflow_configurations.max_call_duration = 0 ("no limit"); the schema
+#      only accepts 0 when the deployment ceiling MAX_CALL_DURATION_SECONDS is
+#      itself 0. Without these the write is rejected with HTTP 422 ("Input
+#      should be greater than 0") and the interviews are capped.
+#
+#   5. Publish `ui` on the LAN. Upstream binds the UI to loopback
+#      (127.0.0.1:3010) because it expects an in-project nginx, under a profile,
+#      to front it on the docker network. This deployment runs no such nginx: the
+#      edge (Nginx Proxy Manager, on another host) is the only front door and it
+#      reaches the UI at <this host>:3010, so the bind has to be on the LAN —
+#      which is what the standalone layout's dograh-ui does (docker-compose.yml,
+#      `0.0.0.0:3010:3010`). With the loopback bind the apex, app.<domain> and
+#      dograh.<domain> all answer 502 from the edge.
+#
+#   6. Publish MinIO on the LAN at 9200 as well as upstream's loopback 9000/9001.
+#      The edge's `/voice-audio/` route (scripts/npm-proxy-hosts.py MEDIA_*, one
+#      per app origin) forwards to the *host's* LAN address on 9200 and refuses
+#      writes there, so the bucket has to be reachable on that port — the
+#      standalone layout's minio does exactly this
+#      (`${PJSIP_MEDIA_ADDRESS}:9200:9000`, docker-compose.yml). Upstream's own
+#      9000/9001 loopback publishes are left in place: the console and the
+#      host-side scripts use them.
+#
+#   7. Attach `n8n` and `grist` to `interview-net`, for the reason note 2 gives
+#      for `api`: their doors are the Capstone SSO gateways (`n8n-sso` → 14010,
+#      `grist-sso` → 14011), those gateways live on `interview-net`, and a
+#      container is only resolvable by name on networks it is attached to — so
+#      without this the doors answer 502 with `no such host n8n` in the gateway
+#      log, while the apps themselves are perfectly healthy on app-network.
+#
+#   8. Give `api` Cerulean's Authentik as its identity provider. Upstream's own
+#      compose passes none of these, so api/constants.py's default
+#      `AUTH_PROVIDER=local` wins and every `/api/v1/auth/oidc/*` route answers
+#      404 — the sign-in the edge is written around (npm-proxy-hosts.py OIDC_*)
+#      simply does not exist. The values live in data/.env.dograh and mirror the
+#      Capstone `.env`, because it is the same app and the same Authentik
+#      provider: the Dograh provider registers the apex callback
+#      (`https://capstone.innotel.us/api/v1/auth/oidc/callback`) and the older
+#      `dograh.` name, the edge sends `app.`/`dograh.` sign-ins to the apex first
+#      (OIDC_CANONICAL_SUB), and the state/PKCE cookie is host-only by design
+#      there — so `AUTHENTIK_REDIRECT_URI` and the edge's canonical host have to
+#      name the same host or every sign-in dies at the callback.
+#
+#      This is inert on the stock images (they have no OIDC code at all — see
+#      note 3, which is why the pair pins a fork build).
+#
+#
+#   9. Health checks for the two services upstream ships without one. Both ran
+#      as plain `Up`, so nothing could tell a wedged collector or a tunnel that
+#      had lost its edge connections from a working one:
+#
+#        - signoz-otel-collector: upstream publishes the OTLP HTTP receiver on
+#          4318, and its config declares no `health_check` extension, so there
+#          is no /health endpoint to poll. The image is Debian-based (it has
+#          bash) but carries no curl/wget/nc, so the check is a bash /dev/tcp
+#          HTTP probe of the receiver itself: any HTTP/1.x status line coming
+#          back proves the collector is accepting and parsing OTLP. A bodyless
+#          POST answers 415, which is a healthy answer.
+#        - cloudflared: the image is distroless and has no shell at all, so the
+#          probe has to be the container's own binary. `cloudflared tunnel
+#          --metrics 127.0.0.1:2000 ready` calls /ready on the metrics listener
+#          that the compose command already binds (0.0.0.0:2000) and exits
+#          non-zero when the tunnel has no edge connection -- exactly the
+#          failure this needs to catch.
+#
+#      Adding a health check recreates both containers, so the quick tunnel
+#      comes back with a NEW *.trycloudflare.com URL. Nothing pins that URL:
+#      BACKEND_API_ENDPOINT is the edge domain, and api/utils/tunnel.py re-reads
+#      the tunnel host from the metrics endpoint every time it is asked.
+# The upstream file itself is deliberately NOT edited — it is the fork's source
+# tree and the base for the api/ui image builds. Run the two together (this is
+# what scripts/boot-stack.sh runs for the voice platform, with --pull=never so a
+# boot cannot depend on registry access or silently change which build a service
+# runs):
+#
+#   docker compose --project-directory dograh/upstream -p dograh \
+#     -f dograh/upstream/docker-compose.yaml \
+#     -f docker-compose.dograh-capstone.yml \
+#     --env-file data/.env.dograh --profile tunnel up -d --pull=never
+#
+name: dograh
+
+services:
+  api:
+    # Fork image by default (see note 3). What this deployment runs is pinned in
+    # data/.env.dograh.
+    image: ${DOGRAH_API_IMAGE:-ghcr.io/innotelinc/dograh-api:latest}
+    environment:
+      # ── Unlimited call length (see note 4) ─────────────────────────────
+      # 0 = no ceiling, so a workflow may ask for max_call_duration=0.
+      MAX_CALL_DURATION_SECONDS: "${MAX_CALL_DURATION_SECONDS:-0}"
+      # Cap for workflows that don't set their own.
+      DEFAULT_MAX_CALL_DURATION_SECONDS: "${DEFAULT_MAX_CALL_DURATION_SECONDS:-300}"
+      # The concurrency rate limiter's slot age-out. Must stay >= the longest
+      # call you allow, or a live call's slot is purged and the org limit
+      # under-counts.
+      STALE_CALL_TIMEOUT_SECONDS: "${STALE_CALL_TIMEOUT_SECONDS:-7200}"
+      # ── Cerulean (Authentik) sign-in (see note 8) ─────────────────────────
+      # Without these the API runs AUTH_PROVIDER=local and the whole
+      # /api/v1/auth/oidc surface is a 404. Values come from data/.env.dograh,
+      # which mirrors the Capstone .env for this provider.
+      AUTH_PROVIDER: "${AUTH_PROVIDER:-local}"
+      AUTHENTIK_ISSUER_URL: "${AUTHENTIK_ISSUER_URL:-}"
+      AUTHENTIK_CLIENT_ID: "${AUTHENTIK_CLIENT_ID:-}"
+      AUTHENTIK_CLIENT_SECRET: "${AUTHENTIK_CLIENT_SECRET:-}"
+      AUTHENTIK_REDIRECT_URI: "${AUTHENTIK_REDIRECT_URI:-}"
+      AUTHENTIK_POST_LOGIN_REDIRECT: "${AUTHENTIK_POST_LOGIN_REDIRECT:-}"
+      AUTHENTIK_ADMIN_EMAILS: "${AUTHENTIK_ADMIN_EMAILS:-}"
+      # Admission by group membership (the 'groups' claim): an identity outside
+      # AUTHENTIK_ALLOWED_GROUPS completes the handshake and is then refused.
+      AUTHENTIK_ALLOWED_GROUPS: "${AUTHENTIK_ALLOWED_GROUPS:-}"
+      AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-oidc-shared}"
+      # ── Dograh's hosted model service (MPS) is not used here ──────────────
+      # Upstream defaults MPS_API_URL to https://services.dograh.com and mints a
+      # managed service key + Cloudonix SIP allocation per organization on the
+      # first authenticated request. This stack runs its own models (OmniRoute,
+      # Piper, Speaches), its own Asterisk/ARI telephony and its own service
+      # keys, so that call can only ever be a 429 and a warning in the log.
+      # Pointing it at the local discard port removes the third-party dependency
+      # and makes any future accidental call fail instantly, on this host,
+      # instead of reaching out. See scripts/dograh_wire.py for the local model
+      # configuration that replaces it.
+      MPS_API_URL: "${MPS_API_URL:-http://127.0.0.1:9}"
+      # ── AVA is not in this call path ──────────────────────────────────────
+      # The Zeus/AVA hand-off ("return the same channel to the operator when
+      # the interview ends") is off: these calls are dograh's alone, and the
+      # dialplan no longer stamps the AI_CONTEXT_TOKEN envelope it needs. The
+      # flag also gates the ARI manager's envelope read, so leaving it false
+      # removes one ARI round-trip (and a 404 warning) from every call.
+      ZEUS_RETURN_ENABLED: "${ZEUS_RETURN_ENABLED:-false}"
+    networks:
+      - app-network
+      - interview-net
+
+    # `!override`, not a merge: upstream's api waits on postgres, redis and its
+    # own minio, and the third of those is a service this project parks (see the
+    # minio note below). Listing the two that are still real keeps the project
+    # valid. The ordering api actually needs — the object store healthy before it
+    # starts — is what boot-stack.sh's object-store step provides now that the
+    # store is the capstone project's.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  ui:
+    # Fork image by default, for the same reason as api (see note 3), and pinned
+    # in the same place.
+    image: ${DOGRAH_UI_IMAGE:-ghcr.io/innotelinc/dograh-ui:latest}
+    # See note 5. `!override` replaces upstream's list rather than appending to
+    # it: two bindings of 3010 (loopback and LAN) collide at start.
+    ports: !override
+      - "0.0.0.0:3010:3010"
+
+  # See note 6. Upstream's minio is PARKED, exactly as `grist` is below and for
+  # the same reason: the object store belongs to the Capstone project
+  # (docker-compose.yml), whose minio service owns the container name, the media
+  # volume capstone_minio-data and the LAN publish the edge's /voice-audio route
+  # needs. Two projects cannot both create a container named `minio`, so leaving
+  # this one enabled made `boot-stack.sh`'s step 1 fail on every boot — with the
+  # missing image below when the capstone-owned container did not exist yet, and
+  #   Conflict. The container name "/minio" is already in use by container ...
+  # once it did. Under `set -e` that failure skipped step 2/2 entirely, which is
+  # how capstone.service ended up failed on ord-atheniq at 2026-10-27 06:53 while
+  # the stack itself stayed up on docker-restore.service and restart policies.
+  # Parked, upstream's service keeps its definition (and its port publish, which
+  # is only a duplicate of the capstone project's) but a `compose up` of this
+  # project steps over it, so the name can never be taken back. `api` no longer
+  # depends on it — see the depends_on override above — because a dependency on a
+  # parked service is an invalid project ("service \"api\" depends on undefined
+  # service \"minio\""). Upstream's image tag is also unpullable
+  # (REGISTRY=dograhai in data/.env.dograh), which is why enabling this profile
+  # would need an image override as well.
+  minio:
+    profiles: ["dograh-minio-legacy"]
+    image: "${MINIO_IMAGE:-ghcr.io/innotelinc/capstone/minio:RELEASE.2026-08-04T00-00-00Z}"
+    ports:
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:9200:9000"
+
+  # Parked, for the same reason as minio and n8n above: `speaches` (local Whisper
+  # STT, 127.0.0.1:8001) is the Capstone project's service and is in that
+  # project's boot working set, so upstream's copy here collides on the container
+  # name ("Conflict. The container name \"/speaches\" is already in use") — the
+  # next blocker step 2/3 hit once minio was parked. Nothing is lost by parking
+  # it: upstream's image, ports, model cache and healthcheck stay defined for
+  # anyone who enables the profile.
+  speaches:
+    profiles: ["dograh-speaches-legacy"]
+  # Parked with n8n above: upstream's one-shot workflow importer depends on that
+  # n8n, and a dependency on a parked service makes the whole project invalid
+  # ("service \"n8n-import\" depends on undefined service \"n8n\""). The Capstone
+  # project has its own n8n-import (n8n_import, restart=no) that imports into the
+  # n8n it also owns, so nothing is lost by stepping over this copy.
+  n8n-import:
+    profiles: ["dograh-n8n-legacy"]
+
+  # See note 7. `networks` merges by key, so app-network (upstream's own) stays
+  # and interview-net is added.
+  n8n:
+    # Parked for the same reason as minio above: the container name `n8n`, the
+    # image and the Grist key the grading workflow uses belong to the Capstone
+    # project's n8n service (docker-compose.yml), which is what is actually
+    # running — it already carries GRIST_API_KEY and its OTLP endpoint. A second
+    # definition here collides on the name, and that collision is what step 2/3 of
+    # the boot hit after minio was fixed
+    #   Conflict. The container name "/n8n" is already in use ...
+    # The env below stays with the definition so enabling the profile is a
+    # complete, working configuration.
+    profiles: ["dograh-n8n-legacy"]
+    networks:
+      - app-network
+      - interview-net
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://192.168.1.88:4318/v1/traces"
+      # The grader's Save-to-Grist node authenticates with the document's owner
+      # key: this Grist is single-identity only for the *web* UI, and its REST
+      # API answers 403 to a caller with no key on a doc it does not own.
+      GRIST_API_KEY: "${GRIST_API_KEY:-}"
+
+  # Grist belongs to the Capstone project (docker-compose.yml): that service
+  # owns the document store dashboard-api, n8n and grist-sso read, and its
+  # container_name is `grist`. Upstream's copy collides on that name and mounts
+  # the empty `dograh_grist_data` volume — exactly the state that made
+  # /interviews/reports answer 502 (Grist docCount=0, "invalid API key") while
+  # the real document sat untouched in `capstone_grist_data`. Park it behind a
+  # profile nothing enables so a `compose up` of this project cannot take the
+  # name back.
+  grist:
+    profiles: ["dograh-grist-legacy"]
+    networks:
+      - app-network
+      - interview-net
+
+  # Same reason as grist/n8n, and it is what makes the TTS voice work: the shim
+  # (`tts-shim`, in the Capstone project) lives on `interview-net` alone, so a
+  # Kokoro upstream on `app-network` alone is a name it cannot resolve —
+  # "Temporary failure in name resolution" in the shim log, and the engine
+  # answers 503. Joining this network puts `kokoro-fastapi` on the shim's DNS.
+  # `!override` drops upstream's single-network list rather than merging keys;
+  # the container keeps its app-network address for this project's own clients.
+  kokoro:
+    # Parked: this deployment's local voice is Piper inside `tts-shim`, and the
+    # repo's own note on the service says Kokoro is retired and opt-in
+    # ("start this only to A/B against Piper"). Upstream starts it unconditionally,
+    # which would put a PyTorch TTS of roughly 4 GiB into a container capped at
+    # 6144 MiB that already runs the PBX, n8n and the sandbox. Enabling the
+    # profile is one command: docker compose --profile dograh-kokoro-legacy up -d kokoro
+    profiles: ["dograh-kokoro-legacy"]
+    networks: !override
+      - app-network
+      - interview-net
+
+  # See note 9. Upstream declares no health check for either of these.
+  signoz-otel-collector:
+    healthcheck:
+      # `CMD` (not `CMD-SHELL`): the image's /bin/sh is dash, which has no
+      # /dev/tcp. bash is present, so the probe is spelled out and exec'd.
+      test:
+        - CMD
+        - bash
+        - -c
+        # `$$line` is a compose escape: compose would otherwise interpolate
+        # `$line` away at parse time and hand bash an empty string.
+        - 'exec 3<>/dev/tcp/127.0.0.1/4318 || exit 1; printf "POST /v1/traces HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" >&3; IFS= read -r -t 5 line <&3 || exit 1; case "$$line" in HTTP/1.*) exit 0;; esac; exit 1'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  cloudflared:
+    healthcheck:
+      # The one command the distroless image can run: /ready on its own
+      # metrics listener, non-zero when the tunnel has no edge connection.
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  # Owned by the Capstone compose project (its `interview-net`), where tts-shim
+  # and the Control Center live. External: this project only joins it.
+  interview-net:
+    external: true
+    name: interview-net
