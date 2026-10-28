@@ -1,0 +1,818 @@
+/**
+ * Prisma adapters (M0): the concrete side of the `TicketStore` and `AuditSink`
+ * ports that `ticket-service.ts` was written against.
+ *
+ * Two deliberate choices keep this testable and decoupled:
+ *
+ *  - The Prisma client is described structurally (`TicketPrismaClient`) rather
+ *    than imported from a generated client. The tix schema is a separate
+ *    database from the training app, so its client is generated per project;
+ *    the adapter only needs these six delegate methods and works against the
+ *    real client, a fake in tests, or a future repository layer.
+ *  - `toTicketRecord` / `toTicketCreate` and friends are pure, so the
+ *    date/omit conversions are unit-tested without a database.
+ *
+ * The chain is per tenant: `AuditEvent.seq` is the position inside that
+ * tenant's chain (`@@unique([tenantId, seq])`), not a global row number.
+ */
+
+import { createHash, randomUUID } from "node:crypto";
+
+import {
+  GENESIS_HASH,
+  appendAuditEvent,
+  verifyAuditChain,
+  type AuditChain,
+  type AuditEventInput,
+  type AuditRecord,
+  type AuditSink,
+  type HashFn,
+} from "./audit-chain";
+import { coercePauses, pausesToJson, type SlaPause } from "./sla-rules";
+import { FIELD_KEY_PATTERN } from "./form-rules";
+import {
+  TICKET_STATUSES,
+  isOpen,
+  priorityRank,
+  refSequence,
+  type MessageKind,
+  type TicketPriority,
+  type TicketStatus,
+  type TicketType,
+} from "./ticket-rules";
+import type {
+  InboxCountSnapshot,
+  InboxQuery,
+  InboxTicketPage,
+  SlaTicketRow,
+  TicketMessage,
+  TicketRecord,
+  TicketStore,
+} from "./ticket-service";
+
+/** SHA-256 hex digest — the default hash for every Innotel Labs audit chain. */
+export const sha256Hex: HashFn = (input) => createHash("sha256").update(input).digest("hex");
+
+/* -------------------------------------------------------------------------- */
+/*  Inbox query helpers                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** The open statuses, in the order the inbox treats them. */
+function openStatuses(): TicketStatus[] {
+  return TICKET_STATUSES.filter((status) => isOpen(status));
+}
+
+function closedStatuses(): TicketStatus[] {
+  return TICKET_STATUSES.filter((status) => !isOpen(status));
+}
+
+/** The statuses a filter is about; `all` is the caller's two-partition job. */
+function statusesFor(filter: InboxQuery["filter"]): TicketStatus[] {
+  if (filter.status === undefined || filter.status === "open") return openStatuses();
+  if (filter.status === "all") return [...openStatuses(), ...closedStatuses()];
+  return [filter.status];
+}
+
+/**
+ * The client scope as a `WHERE`: the named clients plus the work that names none,
+ * matching `canSeeClient`. `null` means the whole desk and adds nothing.
+ */
+function clientWhere(clientIds: readonly string[]): Record<string, unknown> {
+  return { OR: [{ clientId: null }, { clientId: { in: [...clientIds] } }] };
+}
+
+function inboxWhere(
+  tenantId: string,
+  filter: InboxQuery["filter"],
+  clientIds: readonly string[] | null,
+  statuses: readonly TicketStatus[]
+): Record<string, unknown> {
+  const where: Record<string, unknown> = { tenantId, status: { in: [...statuses] } };
+  const and: Record<string, unknown>[] = [];
+  if (clientIds !== null) and.push(clientWhere(clientIds));
+
+  if (filter.assigneeId === "unassigned") where.assigneeId = null;
+  else if (filter.assigneeId) where.assigneeId = filter.assigneeId;
+  if (filter.queueId) where.queueId = filter.queueId;
+  if (filter.priority) where.priority = filter.priority;
+
+  const search = filter.search?.trim();
+  if (search) {
+    and.push({
+      OR: [
+        { ref: { contains: search, mode: "insensitive" } },
+        { subject: { contains: search, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (and.length > 0) where.AND = and;
+  return where;
+}
+
+/** The inbox order over database rows: open first, urgent first, oldest-touched first. */
+function compareInboxRows(a: TicketRow, b: TicketRow): number {
+  const openDelta = Number(isOpen(b.status)) - Number(isOpen(a.status));
+  if (openDelta !== 0) return openDelta;
+  const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
+  if (priorityDelta !== 0) return priorityDelta;
+  const updatedDelta = a.updatedAt.getTime() - b.updatedAt.getTime();
+  if (updatedDelta !== 0) return updatedDelta;
+  return a.id.localeCompare(b.id);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Row shapes                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A `Message` row as Prisma returns it. Prisma hands back `Date` objects, while
+ * the domain layer (`TicketRecord`) speaks ISO strings so records survive a
+ * round-trip through JSON and an audit hash.
+ */
+export interface MessageRow {
+  id: string;
+  tenantId: string;
+  ticketId: string;
+  authorId: string | null;
+  kind: MessageKind;
+  body: string;
+  createdAt: Date;
+}
+
+/** A `Ticket` row, optionally with its messages included. */
+export interface TicketRow {
+  id: string;
+  tenantId: string;
+  ref: string;
+  subject: string;
+  description: string;
+  type: TicketType;
+  status: TicketStatus;
+  priority: TicketPriority;
+  requesterId: string;
+  assigneeId: string | null;
+  queueId: string | null;
+  /** The client the work is for (M4); absent on rows written before clients. */
+  clientId?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  firstResponseAt: Date | null;
+  resolvedAt: Date | null;
+  closedAt: Date | null;
+  /** Paused windows as stored JSON; validated on the way back in. */
+  slaPauses?: unknown;
+  /** Tags applied by hand or by a rule (M5). A `String[]` column, so absent on old rows. */
+  tags?: string[] | null;
+  /**
+   * The desk's own fields (M6). JSON, because the keys are the tenant's to choose and a
+   * column per field would be a migration per field. Validated on the way back in: a row
+   * written by hand, or by a version that stored something else, yields no values rather
+   * than a ticket that renders wrong.
+   */
+  customFields?: unknown;
+  messages?: MessageRow[];
+}
+
+/** An `AuditEvent` row. `seq` is the position within the tenant's chain. */
+export interface AuditEventRow {
+  id: string;
+  tenantId: string;
+  seq: number;
+  at: Date;
+  actor: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  detail: unknown;
+  prevHash: string;
+  recordHash: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Mappers (pure)                                                            */
+/* -------------------------------------------------------------------------- */
+
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function toIsoOrNull(value: Date | string | null): string | null {
+  return value === null ? null : toIso(value);
+}
+
+function fromIso(value: string): Date {
+  return new Date(value);
+}
+
+/** A `Ticket` row → the domain record, mapping dates to ISO strings. */
+export function toTicketRecord(row: TicketRow): TicketRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    ref: row.ref,
+    subject: row.subject,
+    description: row.description,
+    type: row.type,
+    status: row.status,
+    priority: row.priority,
+    requesterId: row.requesterId,
+    assigneeId: row.assigneeId,
+    queueId: row.queueId,
+    clientId: row.clientId ?? null,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+    firstResponseAt: toIsoOrNull(row.firstResponseAt ?? null),
+    resolvedAt: toIsoOrNull(row.resolvedAt),
+    closedAt: toIsoOrNull(row.closedAt),
+    pauses: coercePauses(row.slaPauses),
+    tags: row.tags ?? [],
+    ...(customValuesOf(row.customFields) ? { customFields: customValuesOf(row.customFields)! } : {}),
+    messages: (row.messages ?? []).map(toMessageRecord),
+  };
+}
+
+/** Stored values, if they are values: strings keyed by field key, and nothing else. */
+function customValuesOf(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof entry === "string" && FIELD_KEY_PATTERN.test(key)) out[key] = entry;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+export function toMessageRecord(row: MessageRow): TicketMessage {
+  return { id: row.id, kind: row.kind, body: row.body, authorId: row.authorId, createdAt: toIso(row.createdAt) };
+}
+
+/**
+ * The scalar fields of a new ticket. `id`, `tenantId`, `ref` and the timestamps
+ * are all supplied by the domain layer, so the database never invents them.
+ */
+export function toTicketCreate(ticket: TicketRecord) {
+  return {
+    id: ticket.id,
+    tenantId: ticket.tenantId,
+    ref: ticket.ref,
+    subject: ticket.subject,
+    description: ticket.description,
+    type: ticket.type,
+    status: ticket.status,
+    priority: ticket.priority,
+    requesterId: ticket.requesterId,
+    assigneeId: ticket.assigneeId,
+    queueId: ticket.queueId,
+    // The client the work is for (M4). Written once, at creation: which company
+    // a ticket belongs to is part of what the ticket *is*, so it is not in
+    // `toTicketUpdate` — moving work between clients would restate whose SLA,
+    // rate card and reports it answers to.
+    clientId: ticket.clientId ?? null,
+    createdAt: fromIso(ticket.createdAt),
+    updatedAt: fromIso(ticket.updatedAt),
+    firstResponseAt: ticket.firstResponseAt === null ? null : fromIso(ticket.firstResponseAt),
+    resolvedAt: ticket.resolvedAt === null ? null : fromIso(ticket.resolvedAt),
+    closedAt: ticket.closedAt === null ? null : fromIso(ticket.closedAt),
+    slaPauses: pausesToJson(ticket.pauses),
+    tags: [...(ticket.tags ?? [])],
+    customFields: { ...(ticket.customFields ?? {}) },
+  };
+}
+
+/**
+ * Only the mutable fields. A ticket's identity (`id`, `tenantId`, `ref`) and its
+ * creation time are immutable, so they are never sent in an `update`.
+ */
+export function toTicketUpdate(ticket: TicketRecord) {
+  return {
+    subject: ticket.subject,
+    description: ticket.description,
+    type: ticket.type,
+    status: ticket.status,
+    priority: ticket.priority,
+    requesterId: ticket.requesterId,
+    assigneeId: ticket.assigneeId,
+    queueId: ticket.queueId,
+    updatedAt: fromIso(ticket.updatedAt),
+    firstResponseAt: ticket.firstResponseAt === null ? null : fromIso(ticket.firstResponseAt),
+    resolvedAt: ticket.resolvedAt === null ? null : fromIso(ticket.resolvedAt),
+    closedAt: ticket.closedAt === null ? null : fromIso(ticket.closedAt),
+    slaPauses: pausesToJson(ticket.pauses),
+    // Tags are mutable: a rule may tag a ticket after the fact, and an agent may
+    // take a wrong tag off. They are not part of what the ticket *is*.
+    tags: [...(ticket.tags ?? [])],
+    // Custom fields are mutable for the same reason tags are — an agent correcting a
+    // location is ordinary work — and they are not part of the ticket's identity.
+    customFields: { ...(ticket.customFields ?? {}) },
+  };
+}
+
+/** A ticket's messages as insert rows; the caller decides whether to dedupe. */
+export function toMessageRows(ticket: TicketRecord) {
+  return ticket.messages.map((message) => ({
+    id: message.id,
+    tenantId: ticket.tenantId,
+    ticketId: ticket.id,
+    authorId: message.authorId,
+    kind: message.kind,
+    body: message.body,
+    createdAt: fromIso(message.createdAt),
+  }));
+}
+
+/** An audit record → a database row. `undefined` becomes `null` so it is stored. */
+export function toAuditRow(record: AuditRecord) {
+  return {
+    id: record.id,
+    tenantId: record.tenantId,
+    seq: record.seq,
+    at: fromIso(record.at),
+    actor: record.actor,
+    action: record.action,
+    targetType: record.targetType ?? null,
+    targetId: record.targetId ?? null,
+    detail: record.detail ?? null,
+    prevHash: record.prevHash,
+    recordHash: record.recordHash,
+  };
+}
+
+/**
+ * An audit row → a chain record. `null` becomes `undefined` again, which is the
+ * inverse of `toAuditRow`, so the canonical payload re-hashes identically.
+ */
+export function toAuditRecord(row: AuditEventRow): AuditRecord {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    seq: row.seq,
+    at: toIso(row.at),
+    actor: row.actor,
+    action: row.action,
+    targetType: row.targetType ?? undefined,
+    targetId: row.targetId ?? undefined,
+    detail: (row.detail ?? undefined) as Record<string, unknown> | undefined,
+    prevHash: row.prevHash,
+    recordHash: row.recordHash,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  The structural Prisma surface                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The subset of a generated Prisma client these adapters use. Declared with
+ * method syntax so a real client (whose arguments are far more specific) is
+ * assignable, and loose enough that a fake is trivial to write in tests.
+ */
+export interface TicketPrismaClient {
+  ticket: {
+    count(args: unknown): Promise<number>;
+    groupBy(args: unknown): Promise<Array<{ status: TicketStatus; _count: { _all: number } }>>;
+    findFirst(args: unknown): Promise<TicketRow | null>;
+    findMany(args: unknown): Promise<TicketRow[]>;
+    create(args: { data: unknown }): Promise<unknown>;
+    update(args: { where: { id: string }; data: unknown }): Promise<unknown>;
+    delete(args: { where: { id: string } }): Promise<unknown>;
+  };
+  ticketSequence: {
+    findUnique(args: unknown): Promise<{ tenantId: string } | null>;
+    update(args: unknown): Promise<{ value: number }>;
+    createMany(args: { data: unknown[]; skipDuplicates?: boolean }): Promise<unknown>;
+  };
+  message: {
+    createMany(args: { data: unknown[]; skipDuplicates?: boolean }): Promise<unknown>;
+  };
+  auditEvent: {
+    findMany(args: unknown): Promise<AuditEventRow[]>;
+    create(args: { data: unknown }): Promise<unknown>;
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  The store                                                                 */
+/* -------------------------------------------------------------------------- */
+
+export class PrismaTicketStore implements TicketStore {
+  constructor(private readonly db: TicketPrismaClient) {}
+
+  /**
+   * The next reference number for a tenant, held in one row.
+   *
+   * Reading every ticket's `ref` made a create O(tenant) — 18.7 s p95 at a
+   * million tickets. The mark is bootstrapped once from the highest existing ref
+   * (so a desk upgrading in place does not reissue numbers), then incremented
+   * atomically. It never moves backwards: a deleted ticket's reference is not
+   * reissued, which is safer than the old "gone refs are free" rule.
+   */
+  async nextTicketSeq(tenantId: string): Promise<number> {
+    await this.ensureTicketSequence(tenantId);
+    const row = await this.db.ticketSequence.update({
+      where: { tenantId },
+      data: { value: { increment: 1 } },
+      select: { value: true },
+    });
+    return row.value;
+  }
+
+  /**
+   * One bootstrap per tenant per process.
+   *
+   * The seed reads every existing ref to find the high-water mark, which at a
+   * million tickets is a full scan. That is a one-time upgrade cost, but without
+   * this map every concurrent first create paid it — eight workers scanning the
+   * same tenant before any of them wrote the mark. The scan stays because a
+   * deployment upgrading in place must not reissue a reference; what changes is
+   * that it happens once rather than once per worker.
+   */
+  private readonly bootstraps = new Map<string, Promise<void>>();
+
+  /**
+   * Create the tenant's mark if it is missing, seeded from the highest ref that
+   * already exists. `createMany` with `skipDuplicates` makes two processes
+   * converge on one row instead of racing an upsert.
+   */
+  private async ensureTicketSequence(tenantId: string): Promise<void> {
+    const existing = this.bootstraps.get(tenantId);
+    if (existing) return existing;
+    const task = this.bootstrapTicketSequence(tenantId);
+    this.bootstraps.set(tenantId, task);
+    try {
+      await task;
+    } catch (error) {
+      // A failed bootstrap is not a fact about the tenant; let the next create try.
+      this.bootstraps.delete(tenantId);
+      throw error;
+    }
+  }
+
+  private async bootstrapTicketSequence(tenantId: string): Promise<void> {
+    const existing = await this.db.ticketSequence.findUnique({ where: { tenantId }, select: { tenantId: true } });
+    if (existing) return;
+    const rows = await this.db.ticket.findMany({ where: { tenantId }, select: { ref: true } });
+    let highest = 0;
+    for (const row of rows) {
+      const seq = refSequence(row.ref);
+      if (seq > highest) highest = seq;
+    }
+    await this.db.ticketSequence.createMany({ data: [{ tenantId, value: highest }], skipDuplicates: true });
+  }
+
+  async listTickets(tenantId: string): Promise<TicketRecord[]> {
+    const rows = await this.db.ticket.findMany({
+      where: { tenantId },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+    return rows.map(toTicketRecord);
+  }
+
+  /**
+   * One database-level page of the worklist, ordered by id. The public API used
+   * to load every ticket (with its thread) and slice the array in memory; at a
+   * million tickets that read never returned. `take: limit + 1` is what says
+   * whether a next page exists without a second count query.
+   */
+  async listTicketPage(
+    tenantId: string,
+    options: { limit: number; after?: string | null }
+  ): Promise<{ tickets: TicketRecord[]; nextCursor: string | null }> {
+    const rows = await this.db.ticket.findMany({
+      where: { tenantId, ...(options.after ? { id: { gt: options.after } } : {}) },
+      orderBy: { id: "asc" },
+      take: options.limit + 1,
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+    const hasMore = rows.length > options.limit;
+    const page = hasMore ? rows.slice(0, options.limit) : rows;
+    return { tickets: page.map(toTicketRecord), nextCursor: hasMore ? page[page.length - 1].id : null };
+  }
+
+  /**
+   * One page of the agent inbox, filtered and ordered by Postgres.
+   *
+   * The old read loaded every ticket *with its thread* and filtered in
+   * JavaScript — fine at a hundred rows, and at a million it simply never came
+   * back. Three things bound it now: the filter is a `WHERE`, the order is an
+   * `ORDER BY`, and the row count is `limit`.
+   *
+   * “Open first” is not an enum order to lean on — `NEW` would otherwise sort
+   * above an urgent `PENDING` — so `all` is read as two partitions, open then
+   * closed, and the slice is taken across them in that order. Within a partition
+   * the statuses are read separately and merged in memory: each read then uses
+   * `[tenantId, status, priority, updatedAt]` to hand back a sorted prefix
+   * instead of sorting half the tenant.
+   */
+  async listInboxPage(tenantId: string, query: InboxQuery): Promise<InboxTicketPage> {
+    const groups: TicketStatus[][] = [];
+    if (query.filter.status === "all") groups.push(openStatuses(), closedStatuses());
+    else groups.push(statusesFor(query.filter));
+
+    let offset = Math.max(0, query.offset);
+    let take = Math.max(0, query.limit);
+    let total = 0;
+    const picked: TicketRow[] = [];
+
+    for (const statuses of groups) {
+      const where = inboxWhere(tenantId, query.filter, query.clientIds, statuses);
+      const count = await this.db.ticket.count({ where });
+      total += count;
+      if (take === 0 || offset >= count) {
+        offset = Math.max(0, offset - count);
+        continue;
+      }
+
+      const prefixes = await Promise.all(
+        statuses.map((status) =>
+          this.db.ticket.findMany({
+            where: { ...where, status },
+            // Matches `Ticket_tenantId_status_priority_updatedAt_idx` exactly; no
+            // id tiebreak here, because adding one would force a sort for a tie
+            // the screen cannot see.
+            orderBy: [{ priority: "desc" }, { updatedAt: "asc" }],
+            take: offset + take,
+            include: { messages: { orderBy: { createdAt: "asc" } } },
+          })
+        )
+      );
+      const merged = prefixes.flat().sort(compareInboxRows);
+      const slice = merged.slice(offset, offset + take);
+      picked.push(...slice);
+      take -= slice.length;
+      offset = 0;
+    }
+
+    return { tickets: picked.map(toTicketRecord), total };
+  }
+
+  /** The header's numbers, as aggregates over the scope. */
+  async countInbox(
+    tenantId: string,
+    options: { clientIds: readonly string[] | null }
+  ): Promise<InboxCountSnapshot> {
+    const base: Record<string, unknown> = { tenantId, ...(options.clientIds === null ? {} : clientWhere(options.clientIds)) };
+    const open = openStatuses();
+    const [grouped, unassigned, urgent] = await Promise.all([
+      this.db.ticket.groupBy({ by: ["status"], where: base, _count: { _all: true } }),
+      this.db.ticket.count({ where: { ...base, status: { in: open }, assigneeId: null } }),
+      this.db.ticket.count({ where: { ...base, status: { in: open }, priority: "URGENT" } }),
+    ]);
+
+    const byStatus: Record<TicketStatus, number> = { NEW: 0, OPEN: 0, PENDING: 0, RESOLVED: 0, CLOSED: 0 };
+    for (const row of grouped) {
+      if (row.status in byStatus) byStatus[row.status] = row._count?._all ?? 0;
+    }
+    return {
+      byStatus,
+      open: open.reduce((sum, status) => sum + byStatus[status], 0),
+      unassigned,
+      urgent,
+    };
+  }
+
+  /**
+   * Open work that carries an SLA policy — the rows an SLA count or tab is about.
+   * No thread, no description: the clock reads eleven columns.
+   */
+  async listSlaTickets(
+    tenantId: string,
+    options: { clientIds: readonly string[] | null }
+  ): Promise<SlaTicketRow[]> {
+    const rows = await this.db.ticket.findMany({
+      where: {
+        tenantId,
+        status: { in: openStatuses() },
+        slaPolicyId: { not: null },
+        ...(options.clientIds === null ? {} : clientWhere(options.clientIds)),
+      },
+      select: {
+        id: true,
+        ref: true,
+        subject: true,
+        status: true,
+        priority: true,
+        assigneeId: true,
+        clientId: true,
+        queueId: true,
+        createdAt: true,
+        updatedAt: true,
+        firstResponseAt: true,
+        resolvedAt: true,
+        slaPauses: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      ref: row.ref,
+      subject: row.subject,
+      status: row.status,
+      priority: row.priority,
+      assigneeId: row.assigneeId,
+      clientId: row.clientId ?? null,
+      queueId: row.queueId,
+      createdAt: toIso(row.createdAt),
+      updatedAt: toIso(row.updatedAt),
+      firstResponseAt: toIsoOrNull(row.firstResponseAt),
+      resolvedAt: toIsoOrNull(row.resolvedAt),
+      pauses: coercePauses(row.slaPauses),
+    }));
+  }
+
+  async findTickets(tenantId: string, ticketIds: readonly string[]): Promise<TicketRecord[]> {
+    if (ticketIds.length === 0) return [];
+    const rows = await this.db.ticket.findMany({
+      where: { tenantId, id: { in: [...ticketIds] } },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ticketIds
+      .map((id) => byId.get(id))
+      .filter((row): row is TicketRow => row !== undefined)
+      .map(toTicketRecord);
+  }
+
+  async findTicket(tenantId: string, ticketId: string): Promise<TicketRecord | null> {
+    const row = await this.db.ticket.findFirst({
+      where: { id: ticketId, tenantId },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+    return row ? toTicketRecord(row) : null;
+  }
+
+  async insertTicket(ticket: TicketRecord): Promise<void> {
+    await this.db.ticket.create({
+      data: { ...toTicketCreate(ticket), messages: { create: toMessageRows(ticket) } },
+    });
+  }
+
+  /**
+   * Write the ticket's current fields and append any messages it has gained.
+   * Messages are append-only, so `skipDuplicates` makes re-writing a thread
+   * safe: the ones already stored are ignored by primary key.
+   */
+  async updateTicket(ticket: TicketRecord): Promise<void> {
+    await this.db.ticket.update({ where: { id: ticket.id }, data: toTicketUpdate(ticket) });
+    const rows = toMessageRows(ticket);
+    if (rows.length > 0) await this.db.message.createMany({ data: rows, skipDuplicates: true });
+  }
+
+  /**
+   * Remove a ticket and, through the schema's cascades, its thread, links,
+   * escalations and satisfaction response with it.
+   *
+   * Deleted by id alone, like `updateTicket`: the service loads the ticket through
+   * `findTicket(tenantId, id)` first, so by the time this is reached the id is known
+   * to belong to the caller's tenant.
+   */
+  async deleteTicket(_tenantId: string, ticketId: string): Promise<void> {
+    await this.db.ticket.delete({ where: { id: ticketId } });
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  The durable audit sink                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How many times an append re-reads a tenant's chain before giving up.
+ *
+ * A collision is expected whenever a second process writes the same tenant, and
+ * each retry re-reads the chain, so the first is normally the only one needed.
+ */
+const APPEND_ATTEMPTS = 5;
+
+/**
+ * Is this a `@@unique([tenantId, seq])` collision?
+ *
+ * Checked structurally rather than by importing `PrismaClientKnownRequestError`:
+ * this adapter deliberately describes the client (see the header) so it works
+ * against a real client, a fake or a repository layer, and an import would put
+ * the generated client back in the way. Prisma's code for a unique violation is
+ * `P2002`.
+ */
+function isSequenceConflict(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
+}
+
+/**
+ * A per-tenant, hash-chained audit sink backed by Prisma.
+ *
+ * Each tenant's chain is loaded once, verified on load (a tampered history is
+ * refused rather than extended), then extended one record at a time. The new
+ * row is written before the in-memory chain advances, so a failed write cannot
+ * leave the cache ahead of the database.
+ *
+ * **One append at a time, per tenant.** The position in the chain is derived
+ * from the cached chain, so two appends racing for the same tenant both compute
+ * the *same* `seq` and one of them loses the insert to
+ * `@@unique([tenantId, seq])` — which is what the M7 load rehearsal found: under
+ * eight concurrent writers, replies failed with
+ * `Unique constraint failed on the fields: (tenantId, seq)` *after* their row
+ * had already been written, so the desk saw an error for work that had applied
+ * and no evidence of it existed on the chain. Neither half is acceptable.
+ *
+ * So an append is queued behind the previous one for that tenant, and the queue
+ * is keyed by tenant rather than held process-wide: two tenants must not wait on
+ * each other for a reason that is not theirs. A queued append that fails does
+ * not stop the ones behind it — each re-reads the chain, so the next one repairs
+ * the position rather than inheriting it.
+ */
+export class PrismaAuditSink implements AuditSink {
+  private readonly chains = new Map<string, AuditChain>();
+  private readonly tails = new Map<string, Promise<unknown>>();
+
+  constructor(
+    private readonly db: TicketPrismaClient,
+    private readonly hash: HashFn = sha256Hex,
+  ) {}
+
+  async append(event: AuditEventInput): Promise<void> {
+    const previous = this.tails.get(event.tenantId) ?? Promise.resolve();
+    // The queue continues past a failure: `appendNow` re-reads the chain from the
+    // database, so the next append starts from what is actually stored.
+    const queued = previous.then(
+      () => this.appendNow(event),
+      () => this.appendNow(event),
+    );
+    this.tails.set(event.tenantId, queued.catch(() => undefined));
+    await queued;
+  }
+
+  /**
+   * One append, retried if another process took this position first.
+   *
+   * The retry drops the cached chain before re-reading it: the whole point is
+   * that the cache is what went stale, so asking it again would recompute the
+   * same doomed `seq`.
+   */
+  private async appendNow(event: AuditEventInput): Promise<void> {
+    for (let attempt = 1; ; attempt += 1) {
+      const chain = await this.chainFor(event.tenantId);
+      const next = appendAuditEvent(chain, event, this.hash);
+      const record = next.events[next.events.length - 1];
+      try {
+        await this.db.auditEvent.create({ data: toAuditRow(record) });
+        this.chains.set(event.tenantId, next);
+        return;
+      } catch (error) {
+        this.chains.delete(event.tenantId);
+        if (!isSequenceConflict(error) || attempt >= APPEND_ATTEMPTS) throw error;
+      }
+    }
+  }
+
+  /** A detached copy of a tenant's chain, loading it from the database on first use. */
+  async load(tenantId: string): Promise<AuditChain> {
+    return structuredClone(await this.chainFor(tenantId));
+  }
+
+  /** Re-verify a tenant's persisted chain — the tamper check an auditor runs. */
+  async verify(tenantId: string): Promise<ReturnType<typeof verifyAuditChain>> {
+    const rows = await this.db.auditEvent.findMany({ where: { tenantId }, orderBy: { seq: "asc" } });
+    return verifyAuditChain(chainFromRows(rows), this.hash);
+  }
+
+  private async chainFor(tenantId: string): Promise<AuditChain> {
+    const cached = this.chains.get(tenantId);
+    if (cached) return cached;
+
+    const rows = await this.db.auditEvent.findMany({ where: { tenantId }, orderBy: { seq: "asc" } });
+    const chain = chainFromRows(rows);
+    const check = verifyAuditChain(chain, this.hash);
+    if (!check.ok) {
+      throw new Error(
+        `Audit chain for tenant ${tenantId} failed verification at ${check.brokenAt}: ${check.reason}.`,
+      );
+    }
+    this.chains.set(tenantId, chain);
+    return chain;
+  }
+}
+
+/**
+ * Reads a tenant's audit chain exactly as persisted — *without* verifying it.
+ *
+ * `PrismaAuditSink.load` deliberately refuses to return a chain that fails
+ * verification (appending to a broken chain would entrench the damage), but an
+ * assurance packet needs the opposite: it must be able to report that the chain
+ * did not verify rather than refuse to be produced at all. So the reader hands
+ * back whatever is stored, and the caller decides what that means.
+ */
+export class PrismaAuditReader {
+  constructor(private readonly db: TicketPrismaClient) {}
+
+  async read(tenantId: string): Promise<AuditChain> {
+    const rows = await this.db.auditEvent.findMany({ where: { tenantId }, orderBy: { seq: "asc" } });
+    return chainFromRows(rows);
+  }
+}
+
+/** Rebuild a chain from persisted rows. `head` is the last record, or genesis. */
+export function chainFromRows(rows: readonly AuditEventRow[]): AuditChain {
+  const events = rows.map(toAuditRecord);
+  return { events, head: events.length > 0 ? events[events.length - 1].recordHash : GENESIS_HASH };
+}
+
+/** A fresh event id for a caller that does not inject one (e.g. the email worker). */
+export function newAuditEventId(): string {
+  return randomUUID();
+}

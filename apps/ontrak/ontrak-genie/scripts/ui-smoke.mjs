@@ -1,0 +1,1388 @@
+#!/usr/bin/env node
+/**
+ * Browser smoke test for the UI, driven over the Chrome DevTools Protocol.
+ *
+ *   npm run ui:smoke
+ *
+ * There is no build step and no DOM test runner here on purpose, which leaves
+ * one gap: `node --check` proves the client *parses* but not that it runs. This
+ * opens the real UI in a real Chromium, clicks the things a person would click,
+ * and fails if the DOM code throws.
+ *
+ * It needs a browser to already be on the machine (Playwright's download is what
+ * this host has) and a running agent:
+ *
+ *   AGENT_UI_URL   default http://127.0.0.1:3400
+ *   WEB_TOKEN      read from the environment, then from .env
+ *   AGENT_UI_COOKIE  a session cookie, for a console behind sign-in
+ *   CHROME_PATH    only if the browser is somewhere unusual
+ *
+ * `AGENT_UI_URL` can be a deployment rather than a local server, and a deployment's
+ * console usually wants a session rather than a token — so `AGENT_UI_COOKIE` sets
+ * one (`ontrak_genie_session=…`, or the bare value) in the browser before the first
+ * page load. Without it, the checks that need an authenticated route report a skip
+ * naming the gate they met instead of failing on it. A check that cannot tell
+ * "signed out" from "broken" is a check somebody turns off.
+ *
+ * Uses Node's built-in WebSocket, so there is nothing to install.
+ */
+
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const BASE = (process.env.AGENT_UI_URL ?? "http://127.0.0.1:3400").replace(/\/+$/, "");
+const ROOT = path.resolve(import.meta.dirname, "..");
+
+/** Minimal .env reader, mirroring src/config.ts. */
+function envFromFile(key) {
+  try {
+    const raw = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
+    for (const line of raw.split("\n")) {
+      const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
+      if (match && match[1] === key) return (match[2] ?? "").trim();
+    }
+  } catch {
+    /* no .env is fine */
+  }
+  return "";
+}
+
+const TOKEN = process.env.WEB_TOKEN ?? envFromFile("WEB_TOKEN");
+/**
+ * A session cookie, for a console whose gate is a sign-in rather than a token.
+ *
+ * Accepted as `name=value` or as the value alone — the name is the console's own
+ * (`ontrak_genie_session`), so pasting what a browser's devtools shows is enough.
+ */
+const COOKIE_ENV = (process.env.AGENT_UI_COOKIE ?? "").trim();
+const COOKIE =
+  COOKIE_ENV === ""
+    ? null
+    : (() => {
+        const split = COOKIE_ENV.indexOf("=");
+        return split === -1
+          ? { name: "ontrak_genie_session", value: COOKIE_ENV }
+          : { name: COOKIE_ENV.slice(0, split).trim(), value: COOKIE_ENV.slice(split + 1).trim() };
+      })();
+
+function findChrome() {
+  const explicit = process.env.CHROME_PATH;
+  if (explicit && fs.existsSync(explicit)) return explicit;
+
+  const candidates = [];
+  const playwright = path.join(os.homedir(), ".cache", "ms-playwright");
+  try {
+    for (const entry of fs.readdirSync(playwright)) {
+      if (!entry.startsWith("chromium-")) continue;
+      for (const rel of ["chrome-linux64/chrome", "chrome-linux/chrome", "chrome-linux64/headless_shell"]) {
+        candidates.push(path.join(playwright, entry, rel));
+      }
+    }
+  } catch {
+    /* Playwright is not installed here */
+  }
+  candidates.push("/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome");
+
+  // Newest Playwright build first.
+  return candidates.sort().reverse().find((candidate) => fs.existsSync(candidate)) ?? null;
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* ------------------------------------------------------------------ CDP ---- */
+
+class Session {
+  #socket;
+  #nextId = 1;
+  #pending = new Map();
+  /** Runtime exceptions and console errors seen while the page was open. */
+  pageErrors = [];
+
+  constructor(socket) {
+    this.#socket = socket;
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id !== undefined) {
+        const pending = this.#pending.get(message.id);
+        if (!pending) return;
+        this.#pending.delete(message.id);
+        if (message.error) pending.reject(new Error(message.error.message));
+        else pending.resolve(message.result);
+        return;
+      }
+      if (message.method === "Runtime.exceptionThrown") {
+        const details = message.params?.exceptionDetails;
+        this.pageErrors.push(details?.exception?.description ?? details?.text ?? "unknown exception");
+      }
+      if (message.method === "Runtime.consoleAPICalled" && message.params?.type === "error") {
+        this.pageErrors.push(
+          (message.params.args ?? []).map((arg) => arg.value ?? arg.description ?? "").join(" "),
+        );
+      }
+    });
+  }
+
+  send(method, params = {}) {
+    const id = this.#nextId++;
+    return new Promise((resolve, reject) => {
+      this.#pending.set(id, { resolve, reject });
+      this.#socket.send(JSON.stringify({ id, method, params }));
+    });
+  }
+
+  /** Run an expression in the page and bring the value back. */
+  async evaluate(expression) {
+    const result = await this.send("Runtime.evaluate", {
+      expression: `(() => { ${expression} })()`,
+      awaitPromise: true,
+      returnByValue: true,
+      userGesture: true,
+    });
+    if (result.exceptionDetails) {
+      throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
+    }
+    return result.result?.value;
+  }
+
+  /** Wait for an expression to become truthy. */
+  async waitFor(expression, timeoutMs = 60_000, intervalMs = 400) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      if (await this.evaluate(`return Boolean(${expression});`)) return true;
+      if (Date.now() > deadline) return false;
+      await sleep(intervalMs);
+    }
+  }
+
+  close() {
+    this.#socket.close();
+  }
+}
+
+async function connect(port, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+      const targets = await response.json();
+      const page = targets.find((target) => target.type === "page" && target.webSocketDebuggerUrl);
+      if (page) {
+        const socket = new WebSocket(page.webSocketDebuggerUrl);
+        await new Promise((resolve, reject) => {
+          socket.addEventListener("open", resolve, { once: true });
+          socket.addEventListener("error", () => reject(new Error("could not attach to the page")), {
+            once: true,
+          });
+        });
+        return new Session(socket);
+      }
+    } catch {
+      /* the browser is still starting */
+    }
+    if (Date.now() > deadline) throw new Error("timed out waiting for the browser's debug endpoint");
+    await sleep(300);
+  }
+}
+
+/* --------------------------------------------------------------- checks ---- */
+
+let failures = 0;
+let checks = 0;
+
+async function check(label, fn) {
+  checks += 1;
+  try {
+    const outcome = await fn();
+    if (outcome === false) {
+      failures += 1;
+      console.log(`  ✗ ${label}`);
+    } else {
+      console.log(`  ✓ ${label}${typeof outcome === "string" ? ` — ${outcome}` : ""}`);
+    }
+  } catch (error) {
+    failures += 1;
+    console.log(`  ✗ ${label}\n      ${error.message}`);
+  }
+}
+
+/* ----------------------------------------------------------------- main ---- */
+
+const chromePath = findChrome();
+if (chromePath === null) {
+  console.log("No Chromium found. Install one (Playwright downloads to ~/.cache/ms-playwright)");
+  console.log("or point CHROME_PATH at a chrome binary. Skipping the UI smoke test.");
+  process.exit(0);
+}
+
+/**
+ * What this script's *own* requests carry.
+ *
+ * The page's requests take the session cookie by themselves; this process's do not,
+ * so a console behind sign-in has to be asked with the same credential the browser
+ * was given — otherwise the checks that read a route directly report "unauthorized"
+ * against a console that is answering perfectly well.
+ */
+const AUTH =
+  TOKEN !== ""
+    ? { Authorization: `Bearer ${TOKEN}` }
+    : COOKIE === null
+      ? {}
+      : { Cookie: `${COOKIE.name}=${COOKIE.value}` };
+
+const health = await fetch(`${BASE}/api/health`, {
+  headers: { ...AUTH },
+})
+  .then((response) => response.json())
+  .catch(() => null);
+
+if (health === null) {
+  console.error(`Could not reach the agent at ${BASE}. Start it first: npm start`);
+  process.exit(1);
+}
+if (health.authRequired && TOKEN === "" && COOKIE === null) {
+  console.error("The server requires WEB_TOKEN and none was found in the environment or .env.");
+  process.exit(1);
+}
+
+const approvalOn = (health.approval?.mode ?? "off") !== "off";
+console.log(`Browser   ${chromePath}`);
+console.log(`UI        ${BASE}`);
+console.log(`Approval  ${health.approval?.mode ?? "off"}${approvalOn ? " (will exercise the prompt)" : ""}`);
+console.log(`Sandbox   ${health.sandbox?.backend ?? "unknown"}`);
+console.log(
+  `Offline   ${health.offline ? `${(health.offline.models ?? []).join(", ")} @ ${health.offline.url}` : "not configured"}`,
+);
+console.log(`Chain     ${(health.fallbackModels ?? []).join(", ") || "none"}\n`);
+
+const port = 9400 + Math.floor(Math.random() * 400);
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), "agent-ui-smoke-"));
+const url = `${BASE}/${TOKEN === "" ? "" : `?token=${encodeURIComponent(TOKEN)}`}`;
+
+const chrome = spawn(
+  chromePath,
+  [
+    "--headless=new",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--no-first-run",
+    "--window-size=1400,900",
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${profile}`,
+    url,
+  ],
+  { stdio: ["ignore", "ignore", "pipe"] },
+);
+
+let session = null;
+try {
+  session = await connect(port);
+  await session.send("Runtime.enable");
+  await session.send("Page.enable");
+
+  /*
+   * The session first, then the page: Chrome was started on the URL above, so a
+   * cookie that has to be in place before `app.js` asks `/api/*` anything means
+   * setting it and loading the page again.
+   */
+  if (COOKIE !== null) {
+    await session.send("Network.enable");
+    /*
+     * `url` rather than `domain`: an address like 127.0.0.1 has no domain to set a
+     * cookie on, and asking for one is how a cookie silently fails to be sent. The
+     * answer is checked because `Network.setCookie` reports a refusal in its body
+     * instead of throwing, and a check that could not sign in would otherwise look
+     * like a check that found nothing.
+     */
+    const set = await session.send("Network.setCookie", {
+      name: COOKIE.name,
+      value: COOKIE.value,
+      url: `${BASE}/`,
+      path: "/",
+    });
+    if (set?.success !== true) {
+      console.error(
+        `The browser refused the ${COOKIE.name} cookie for ${BASE}: ${JSON.stringify(set)}`,
+      );
+      process.exit(1);
+    }
+    await session.send("Page.navigate", { url });
+  }
+
+  /*
+   * Boot is two things, and waiting on the first one alone is what used to make
+   * this script fail on a workspace that was perfectly fine: `index.html` carries
+   * the shell *before* `app.js` — a module — runs at all, and everything the
+   * checks below read arrives from `/api/*` after that. So the wait is for the
+   * wired shell (`.composer-hint` is built by `wire()`) and then for the first
+   * fetch it fires to land (the health row leaving "checking"). Probing the
+   * markup and calling it the app is how "no entries rendered" got reported for a
+   * workspace with files in it.
+   */
+  const booted = await session.waitFor(`
+    Boolean(document.querySelector('.composer-hint')) &&
+    !/^checking/i.test(document.querySelector('#gateway-label').textContent.trim())
+  `);
+  if (!booted) throw new Error("the UI never finished starting");
+
+  await check("the app boots and reaches its own API", async () => {
+    const label = await session.evaluate("return document.querySelector('#gateway-label').textContent;");
+    if (/unreachable|token/i.test(label)) throw new Error(`status says: ${label}`);
+    return label;
+  });
+
+  await check("the workspace tree loads", async () => {
+    // `loadFiles` is its own request, so it can land after the health row does.
+    await session.waitFor(`document.querySelectorAll('#files-list .file-entry').length > 0`, 15_000);
+    const count = await session.evaluate("return document.querySelectorAll('#files-list .file-entry').length;");
+    if (!count) throw new Error("no entries rendered");
+    return `${count} entries`;
+  });
+
+  await check("files the agent changed are marked", async () => {
+    const marked = await session.evaluate(
+      "return [...document.querySelectorAll('.file-entry.changed')].map((b) => b.textContent.trim());",
+    );
+    if (!Array.isArray(marked) || marked.length === 0) throw new Error("nothing is marked as changed");
+    return marked.slice(0, 3).join(", ");
+  });
+
+  await check("opening a changed file lands on its diff", async () => {
+    const opened = await session.evaluate(`
+      const button = document.querySelector('.file-entry.changed');
+      if (!button) return false;
+      button.click();
+      return true;
+    `);
+    if (!opened) throw new Error("no changed file to open");
+
+    const rendered = await session.waitFor(
+      `!document.querySelector('#viewer').classList.contains('hidden') &&
+       document.querySelectorAll('#viewer-diff .diff-line').length > 0`,
+      15_000,
+    );
+    if (!rendered) throw new Error("the diff view did not render");
+    return `${await session.evaluate("return document.querySelectorAll('#viewer-diff .diff-line').length;")} diff lines`;
+  });
+
+  await check("the viewer toggles between diff and file", async () => {
+    await session.evaluate("document.querySelector('#viewer-toggle').click();");
+    const fileShown = await session.waitFor(
+      `document.querySelector('#viewer-diff').classList.contains('hidden') &&
+       !document.querySelector('#viewer-body').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!fileShown) throw new Error("the raw file did not appear");
+
+    await session.evaluate("document.querySelector('#viewer-toggle').click();");
+    const diffShown = await session.waitFor(
+      `!document.querySelector('#viewer-diff').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!diffShown) throw new Error("the diff did not come back");
+
+    await session.evaluate("document.querySelector('#viewer-close').click();");
+    const closed = await session.waitFor(
+      `document.querySelector('#viewer').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!closed) throw new Error("the viewer did not close");
+    return "diff -> file -> diff -> close";
+  });
+
+  await check("the model selector is populated", async () => {
+    const options = await session.evaluate("return document.querySelector('#model').options.length;");
+    if (options < 2) throw new Error(`only ${options} option(s)`);
+    const selected = await session.evaluate("return document.querySelector('#model').value;");
+    if (health.modelSelection !== "auto") return `${options} models, default ${selected}`;
+
+    /*
+     * An account without a paid plan is served a model rather than choosing one
+     * (`src/modelSelect.ts`). The catalog is still what it is, so the select is
+     * still populated — what must not be reachable is the control itself, and the
+     * badge is what stands in its place. Asserting the hidden state rather than
+     * the population is the difference between this check passing for the wrong
+     * reason and it passing for the right one.
+     */
+    const shape = await session.evaluate(`return {
+      field: document.querySelector('#model-field').classList.contains('hidden'),
+      settings: document.querySelector('#chat-settings').classList.contains('hidden'),
+      badge: !document.querySelector('#model-auto').classList.contains('hidden'),
+      badgeText: document.querySelector('#model-auto').textContent.trim(),
+    };`);
+    if (!shape.field) throw new Error("an automatic account can still see the model picker");
+    if (!shape.settings) throw new Error("an automatic account can still open the chain settings");
+    if (!shape.badge) throw new Error("no model is shown for an account that cannot choose one");
+    if (!shape.badgeText.startsWith("auto")) {
+      throw new Error(`the badge does not say the model is automatic: ${shape.badgeText}`);
+    }
+    return `${options} models in the catalog, served ${shape.badgeText} with no picker`;
+  });
+
+  await check(`the approval badge matches the config (${health.approval?.mode ?? "off"})`, async () => {
+    const hidden = await session.evaluate(
+      "return document.querySelector('#approval-badge').classList.contains('hidden');",
+    );
+    if (approvalOn && hidden) throw new Error("approval is on but the badge is hidden");
+    if (!approvalOn && !hidden) throw new Error("approval is off but the badge is showing");
+    return approvalOn
+      ? await session.evaluate("return document.querySelector('#approval-badge').textContent;")
+      : "hidden, as configured";
+  });
+
+  await check("the sandbox status reflects the running config", async () => {
+    const text = await session.evaluate("return document.querySelector('#sandbox-label').textContent;");
+    const expected = health.sandbox?.backend === "docker" ? "sandboxed" : "host";
+    if (!text.includes(expected)) throw new Error(`label says "${text}", expected "${expected}"`);
+    return text;
+  });
+
+  await check('the offline fallback status reflects the config', async () => {
+    const text = await session.evaluate("return document.querySelector('#offline-label').textContent;");
+    if (health.offline) {
+      const expected = (health.offline.models ?? []).join(", ") || health.offline.url;
+      if (!text.includes(expected)) throw new Error(`label says "${text}", expected "${expected}"`);
+      return `${text} (configured)`;
+    }
+    if (/checking/i.test(text)) throw new Error(`label still says "${text}"`);
+    return `${text} (none configured)`;
+  });
+
+  await check("the model health row reflects the last check", async () => {
+    const text = await session.evaluate("return document.querySelector('#models-label').textContent;");
+    if (/checking/i.test(text)) throw new Error(`still says "${text}"`);
+    // The page re-reads health on a timer, so a check may have run between this
+    // script's own fetch and the render: accept any well-formed state.
+    if (!/^models \d+\/\d+ ready$/.test(text) && !/chain check off|not checked yet/.test(text)) {
+      throw new Error(`label says "${text}", which is not a state this row renders`);
+    }
+    return text;
+  });
+
+  await check("the per-chat offline opt-out is present and labelled", async () => {
+    const box = await session.evaluate(`const el = document.querySelector('#use-offline');
+      return { present: Boolean(el), checked: el?.checked ?? false, disabled: el?.disabled ?? true, labels: el?.labels?.length ?? 0 };`);
+    if (!box.present) throw new Error("the opt-out checkbox is missing");
+    if (box.labels === 0) throw new Error("the checkbox has no label");
+    if (Boolean(health.offline) === box.disabled) {
+      throw new Error(`disabled=${box.disabled} but an offline gateway is ${health.offline ? "" : "not "}configured`);
+    }
+    return health.offline ? `enabled, checked=${box.checked}` : "disabled, as nothing is configured";
+  });
+
+  await check("the chain box shows the chain the server would use", async () => {
+    const value = await session.evaluate("return document.querySelector('#fallbacks').value;");
+    const expected = (health.fallbackModels ?? []).join(",");
+    if (value !== expected) throw new Error(`chain box shows "${value}", expected "${expected}"`);
+    return value === "" ? "empty, as configured" : value;
+  });
+
+  await check("the model sweep panel opens and mirrors the server's last sweep", async () => {
+    await session.evaluate("document.querySelector('#sweep-open').click();");
+    const opened = await session.waitFor(
+      `!document.querySelector('#sweep').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!opened) throw new Error("the sweep dialog did not open");
+
+    // Opening re-reads the last sweep before it renders, so wait for a status.
+    const settled = await session.waitFor(
+      `document.querySelector('#sweep-status').textContent.trim() !== ''`,
+      10_000,
+    );
+    if (!settled) throw new Error("the sweep status line stayed empty");
+
+    // Read the same endpoint the panel read, from inside the page (the token
+    // lives in sessionStorage by now; the UI strips it from the address bar).
+    const panel = await session.evaluate(`
+      const token = sessionStorage.getItem('coding-agent-token') ?? '';
+      return fetch('/api/models/sweep', {
+        headers: token === '' ? {} : { Authorization: 'Bearer ' + token },
+      })
+        .then((response) => response.json())
+        .then((payload) => ({
+          status: document.querySelector('#sweep-status').textContent.trim(),
+          sections: document.querySelectorAll('#sweep-report .sweep-section').length,
+          running: payload.sweep.running === true,
+          total: payload.sweep.total,
+          results: Array.isArray(payload.sweep.results) ? payload.sweep.results.length : 0,
+        }));`);
+
+    const expected = panel.running
+      ? "probing "
+      : panel.results === 0
+        ? "Not run yet"
+        : `${panel.results} can drive the agent`;
+    if (!panel.status.includes(expected)) {
+      throw new Error(
+        `status says "${panel.status}", but the server reports ${JSON.stringify(panel)}`,
+      );
+    }
+    // The report is the point of the panel, so a finished sweep rendering nothing
+    // would mean the render silently did nothing.
+    if (panel.results > 0 && panel.sections === 0) {
+      throw new Error("the sweep has results, but the report rendered no sections");
+    }
+    return panel.status;
+  });
+
+  await check("the sweep panel is a labelled dialog that Escape closes", async () => {
+    const shape = await session.evaluate(`
+      const dialog = document.querySelector('#sweep');
+      return {
+        hidden: dialog.classList.contains('hidden'),
+        role: dialog.getAttribute('role'),
+        modal: dialog.getAttribute('aria-modal'),
+        labelled:
+          dialog.getAttribute('aria-labelledby') === 'sweep-title' &&
+          (document.querySelector('#sweep-title')?.textContent ?? '') !== '',
+        buttons: ['#sweep-run', '#sweep-run-all', '#sweep-close'].every((selector) =>
+          document.querySelector(selector) !== null,
+        ),
+      };`);
+
+    if (shape.hidden) throw new Error("the panel was already closed by the previous check");
+    if (shape.role !== "dialog" || shape.modal !== "true") {
+      throw new Error(`role=${shape.role} aria-modal=${shape.modal}`);
+    }
+    if (!shape.labelled) throw new Error("the dialog has no labelled title");
+    if (!shape.buttons) throw new Error("a run or close button is missing");
+
+    await session.evaluate(`
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return true;`);
+    const escaped = await session.waitFor(
+      `document.querySelector('#sweep').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!escaped) throw new Error("Escape did not close the sweep panel");
+
+    // And the close button, which is the way most people will do it.
+    await session.evaluate("document.querySelector('#sweep-open').click();");
+    await session.waitFor(`!document.querySelector('#sweep').classList.contains('hidden')`, 5_000);
+    await session.evaluate("document.querySelector('#sweep-close').click();");
+    const closed = await session.waitFor(
+      `document.querySelector('#sweep').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!closed) throw new Error("the close button did not close it");
+    return "opens, labelled, closes on Escape and on the button";
+  });
+
+  /**
+   * A sweep whose answer never reaches the picker leaves the report to be
+   * copy-pasted by hand, which is the thing it exists to stop. Both render from
+   * the same state, so they have to agree.
+   */
+  const auto = health.modelSelection === "auto";
+  await check(
+    auto
+      ? "the sweep says why a usable model cannot be selected here"
+      : "the models the sweep proved usable are reachable from the picker",
+    async () => {
+      const response = await fetch(`${BASE}/api/models/sweep`, { headers: { ...AUTH } });
+      const { sweep } = await response.json();
+      const usable = (sweep?.results ?? [])
+        .filter((result) => result.ok)
+        .map((result) => result.model);
+      if (usable.length === 0) return "the last report has no usable models";
+
+      const shape = await session.evaluate(`
+        document.querySelector('#sweep-open').click();
+        return {
+          rows: [...document.querySelectorAll('#sweep-report .sweep-row')].map((row) => ({
+            model: row.querySelector('.sweep-model').textContent.trim(),
+            use: row.querySelector('.sweep-use') !== null,
+            note: row.querySelector('.sweep-use-note') !== null,
+          })),
+        };`);
+
+      for (const model of usable) {
+        const row = shape.rows.find((entry) => entry.model.includes(model));
+        if (row === undefined) throw new Error(`${model} is usable but missing from the report`);
+        if (auto) {
+          // A sweep result is information here, not an action: the account is served
+          // its model and the server would ignore a pinned one. The row says that
+          // rather than offering a button that does nothing.
+          if (row.use) {
+            throw new Error(`${model} offers a "use" button an automatic account cannot act on`);
+          }
+          if (!row.note) {
+            throw new Error(`${model} is usable but does not say why it cannot be selected`);
+          }
+        } else if (!row.use) {
+          throw new Error(`${model} is usable but offers no way to select it`);
+        }
+      }
+
+      const marked = await session.evaluate(`
+        const usable = ${JSON.stringify(usable)};
+        const options = [...document.querySelectorAll('#model option')];
+        return usable.filter((model) =>
+          options.some((option) => option.value === model && option.textContent.includes('✓')),
+        ).length;`);
+
+      await session.evaluate("document.querySelector('#sweep-close').click();");
+      if (marked < usable.length) {
+        throw new Error(`${usable.length - marked} usable model(s) are unmarked in the picker`);
+      }
+      return auto
+        ? `${usable.length} usable model(s), each saying the account is served its model`
+        : `${usable.length} usable model(s) marked and selectable`;
+    },
+  );
+
+  /**
+   * The preview pane is where a file is watched while it is being written. A
+   * turn only opens it when a draft arrives, so what is checked here is the
+   * structure and the manual toggle - the drafting itself is covered by the
+   * server tests, which can script a stream that arrives in fragments.
+   */
+  await check("the workspace view opens from its tab and closes from the rail", async () => {
+    const opened = await session.evaluate(`
+      document.querySelector('#toggle-files').click();
+      const rail = document.querySelector('#rail');
+      const close = document.querySelector('#rail-close');
+      const strip = document.querySelector('#rail-tablist').getBoundingClientRect();
+      const box = close.getBoundingClientRect();
+      const own = document.querySelector('#files-close').getBoundingClientRect();
+      return {
+        view: rail.dataset.view,
+        open: rail.classList.contains('open'),
+        selected: document.querySelector('#rail-tab-workspace').getAttribute('aria-selected'),
+        label: close.getAttribute('aria-label'),
+        // Drawn means drawn: a control with a box, and inside the window it is in.
+        closeDrawn: box.width > 0 && box.height > 0 && box.right <= window.innerWidth + 1,
+        ownDrawn: own.width > 0 && own.height > 0 && own.right <= window.innerWidth + 1,
+        stripDrawn: strip.width > 0 && strip.height > 0,
+      };`);
+    if (!opened.open || opened.view !== "workspace") throw new Error("the workspace view did not open");
+    if (opened.selected !== "true") throw new Error("the workspace tab is not marked selected");
+    if (!opened.stripDrawn) throw new Error("the rail's tab strip is not drawn");
+    if (!opened.closeDrawn) throw new Error("the rail's close is not on screen");
+    if (!opened.ownDrawn) throw new Error("the workspace's own close is not on screen");
+    if (!/workspace/i.test(String(opened.label))) {
+      throw new Error(`the rail's close says “${opened.label}” over the workspace`);
+    }
+
+    const closed = await session.evaluate(`
+      document.querySelector('#rail-close').click();
+      const rail = document.querySelector('#rail');
+      return {
+        open: rail.classList.contains('open'),
+        expanded: document.querySelector('#toggle-files').getAttribute('aria-expanded'),
+        panel: document.querySelector('#files-panel').classList.contains('open'),
+      };`);
+    if (closed.open) throw new Error("the rail's close left the rail open");
+    if (closed.panel) throw new Error("the workspace panel is still open behind a closed rail");
+    if (closed.expanded !== "false") throw new Error("the toolbar button still claims the panel is open");
+
+    return "opens from the toolbar, closes from the rail, and both closes are drawn";
+  });
+
+  await check("the preview pane opens, closes and describes itself", async () => {
+    const closed = await session.evaluate(`
+      document.querySelector('#preview-close').click();
+      const pane = document.querySelector('#preview');
+      return {
+        open: pane.classList.contains('open'),
+        expanded: document.querySelector('#toggle-preview').getAttribute('aria-expanded'),
+      };`);
+    if (closed.open) throw new Error("the close button did not close the preview pane");
+    if (closed.expanded !== "false") throw new Error("the toggle still claims the pane is open");
+
+    const opened = await session.evaluate(`
+      document.querySelector('#toggle-preview').click();
+      const pane = document.querySelector('#preview');
+      return {
+        open: pane.classList.contains('open'),
+        labelled: (pane.getAttribute('aria-label') ?? '') !== '',
+        expanded: document.querySelector('#toggle-preview').getAttribute('aria-expanded'),
+        title: document.querySelector('#preview-title').textContent.trim(),
+        body: document.querySelector('#preview-body').textContent,
+        toggleHidden: document.querySelector('#preview-toggle').classList.contains('hidden'),
+      };`);
+
+    if (!opened.open || opened.expanded !== "true") throw new Error("the toggle did not open the pane");
+    if (!opened.labelled) throw new Error("the pane has no accessible name");
+
+    // Either nothing has been generated yet, or the pane is holding the last file
+    // the agent produced - an empty pane claiming a file would be the bug.
+    const empty = opened.title === "nothing generated yet";
+    if (empty && opened.body !== "") {
+      throw new Error(`the pane says nothing was generated, but shows ${opened.body.length} characters`);
+    }
+    if (!empty && opened.body.trim() === "") {
+      throw new Error(`the pane is titled ${opened.title} but has no content`);
+    }
+    // With no change to show there is nothing for the change/code button to do.
+    if (empty && !opened.toggleHidden) {
+      throw new Error("the show-change button is offered with no code on screen");
+    }
+    return empty ? "opens empty, closes, labelled" : `opens on ${opened.title}`;
+  });
+
+  /**
+   * The app itself, through the pane, end to end.
+   *
+   * Everything the pane used to show was about the *source*; this is the one
+   * check that proves the other half — that a project can be started from the
+   * console, that the pane reaches it, and that the document it renders is the
+   * app's rather than the console's. The app is a server written for the test, so
+   * the check needs no project in the workspace and no dependency on disk; the
+   * command is passed the way the agent would pass it.
+   *
+   * It starts through the API rather than by clicking "run" with no command,
+   * because the pane's own guess depends on what is in the workspace, and a smoke
+   * test that sometimes starts whatever happens to be there is a test that
+   * sometimes runs somebody's dev server.
+   */
+  await check("the preview runs the project and shows the app, not the code", async () => {
+    const api = (pathname, init = {}) =>
+      fetch(`${BASE}${pathname}`, {
+        ...init,
+        headers: { "Content-Type": "application/json", ...AUTH },
+      });
+
+    const marker = "GENIE_SMOKE_APP";
+    const command =
+      `node -e 'require("http").createServer((q,s)=>{` +
+      `s.writeHead(200,{"Content-Type":"text/html"});` +
+      `s.end("<!doctype html><html><body><h1>${marker}</h1></body></html>")` +
+      `}).listen(Number(process.env.PORT),"127.0.0.1")'`;
+
+    let started = false;
+    try {
+      const response = await api("/api/preview/start", {
+        method: "POST",
+        body: JSON.stringify({ command }),
+      });
+      const status = await response.json();
+      if (status.running !== true) {
+        throw new Error(`the preview did not start: ${status.error ?? status.log ?? "no reason given"}`);
+      }
+      started = true;
+
+      // Reach the app view the way a person does, from whichever mode the pane
+      // was left in.
+      const mode = await session.evaluate(`
+        const button = document.querySelector('#preview-run');
+        if (button.textContent.trim() === 'show code') button.click();
+        button.click();
+        return button.textContent.trim();`);
+      if (mode !== "show code") throw new Error(`the run button did not open the app view (says "${mode}")`);
+
+      const rendered = await session.waitFor(
+        `(() => {
+           const frame = document.querySelector('#preview-frame');
+           if (frame.classList.contains('hidden')) return false;
+           try { return (frame.contentDocument?.body?.textContent ?? '').includes(${JSON.stringify(marker)}); }
+           catch { return false; }
+         })()`,
+        20_000,
+      );
+      if (!rendered) throw new Error("the pane never rendered the running app");
+
+      const pane = await session.evaluate(`
+        return {
+          url: document.querySelector('#preview-app-url').textContent.trim(),
+          note: document.querySelector('#preview-app-note').textContent.trim(),
+          emptyHidden: document.querySelector('#preview-app-empty').classList.contains('hidden'),
+        };`);
+      if (!pane.emptyHidden) throw new Error("the pane still claims nothing is running");
+      if (!/\/preview\/ · port \d+/.test(pane.url)) throw new Error(`the pane does not say where the app is: "${pane.url}"`);
+      if (!pane.note.includes(command)) {
+        throw new Error("the pane does not say what it is running, so a wrong guess cannot be corrected");
+      }
+
+      /*
+       * The pane has no start or stop control any more: the server runs the app
+       * itself. This check starts it through the API because it has to inject a
+       * command into somebody's workspace, and stops it the same way — neither is
+       * a thing a person can do from the console.
+       */
+      return "started through the API, rendered in the frame";
+    } finally {
+      if (started) await api("/api/preview/stop", { method: "POST" }).catch(() => undefined);
+    }
+  });
+
+  /**
+   * Skills and memory: the read-only view of what the model is offered.
+   *
+   * The rows come from `/api/skills` — the same route the prompt path reads — so
+   * what is checked is that the panel draws *that* answer, in its order, and that
+   * the count agrees with what the server said. A panel of this kind has one
+   * failure that looks like success: it opens, it looks plausible, and the list
+   * inside it is empty because the response shape was guessed wrong.
+   *
+   * Opening and closing are checked here too, because the two handlers are the
+   * panel's own: Escape unwinds on a list in `wire()`, and the backdrop click is
+   * bound per panel. The open is a **real mouse click**, not `.click()`: which
+   * control gets focus back when the panel closes is remembered from the click
+   * (`noteDialogOpener`), so a programmatic click would prove the handler while
+   * skipping the half that decides where the keyboard goes next.
+   */
+  await check("the skills panel draws the menu the model is given", async () => {
+    const endpoint = (pathname) => fetch(`${BASE}${pathname}`, { headers: { ...AUTH } });
+
+    /*
+     * A deployment whose console is behind sign-in answers 401 here, and that is a
+     * property of the deployment rather than a fault in the panel: this check then
+     * reports a skip and names it, so the same script can be pointed at the live
+     * console (see `AGENT_UI_COOKIE` above) and tell a session apart from a bug
+     * instead of failing on somebody else's gate.
+     */
+    const answer = await endpoint("/api/skills");
+    if (answer.status === 401 || answer.status === 403) {
+      return `skipped: ${BASE}/api/skills answers ${answer.status} — the console needs a session (AGENT_UI_COOKIE, or a WEB_TOKEN) and none was supplied`;
+    }
+    if (!answer.ok) throw new Error(`/api/skills answered ${answer.status}`);
+    const info = await answer.json();
+    const skills = Array.isArray(info.skills) ? info.skills : [];
+
+    const clickControl = async (selector) => {
+      const centre = await session.evaluate(`
+        const el = document.querySelector('${selector}');
+        if (el === null) throw new Error('no ${selector}');
+        const r = el.getBoundingClientRect();
+        return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      `);
+      await session.send("Input.dispatchMouseEvent", {
+        type: "mousePressed", x: centre.x, y: centre.y, button: "left", buttons: 1, clickCount: 1,
+      });
+      await session.send("Input.dispatchMouseEvent", {
+        type: "mouseReleased", x: centre.x, y: centre.y, button: "left", buttons: 0, clickCount: 1,
+      });
+      await sleep(80);
+    };
+
+    // The button lives in the workspace panel, which is closed by default — so the
+    // two clicks a person makes are the two clicks checked here.
+    await clickControl("#toggle-files");
+    const workspaceOpen = await session.waitFor(
+      `document.querySelector('#files-panel').classList.contains('open')`,
+      5_000,
+    );
+    if (!workspaceOpen) throw new Error("the workspace panel did not open");
+
+    await clickControl("#skills-open");
+    const opened = await session.waitFor(
+      `!document.querySelector('#skills').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!opened) throw new Error("the skills panel did not open");
+
+    const drawn = await session.waitFor(
+      `document.querySelectorAll('#skills-list .skill-card').length === ${skills.length}`,
+      10_000,
+    );
+    if (!drawn) {
+      const seen = await session.evaluate(
+        "return document.querySelectorAll('#skills-list .skill-card').length;",
+      );
+      throw new Error(`the panel drew ${seen} rows, the route offered ${skills.length}`);
+    }
+
+    const rows = await session.evaluate(`
+      return [...document.querySelectorAll('#skills-list .skill-card')].map((card) => ({
+        name: (card.querySelector('.skill-name')?.textContent ?? '').trim(),
+        origin: (card.querySelector('.skill-origin')?.textContent ?? '').trim(),
+        description: (card.querySelector('.skill-description')?.textContent ?? '').trim(),
+        // The two write controls, as drawn: a remove button that appears anywhere
+        // the route did not allow one, or that is missing where it did, is the
+        // whole permission model disagreeing with itself.
+        remove: card.querySelector('.skill-remove') !== null,
+        removeLabel: (card.querySelector('.skill-remove')?.textContent ?? '').trim(),
+      }));
+    `);
+
+    for (const [index, skill] of skills.entries()) {
+      const row = rows[index] ?? {};
+      // The name is shown the way it is invoked, because that is what a person
+      // types and what the model is told to load.
+      if (row.name !== `/${skill.name}`) {
+        throw new Error(`row ${index} shows ${JSON.stringify(row.name)}, expected /${skill.name}`);
+      }
+      if (row.origin === "") throw new Error(`row ${index} does not say where the skill came from`);
+      if ((skill.description ?? "") !== "" && row.description !== skill.description) {
+        throw new Error(`row ${index} dropped the description the route sent`);
+      }
+      if (row.remove !== (skill.removable === true)) {
+        throw new Error(
+          `row ${index} (${skill.name}): removable=${skill.removable === true} but the remove control ${row.remove ? "is" : "is not"} drawn`,
+        );
+      }
+      if (row.remove && row.removeLabel !== "remove") {
+        throw new Error(`row ${index} says ${JSON.stringify(row.removeLabel)} before a click`);
+      }
+    }
+
+    /*
+     * The install field, which is the write half of the panel. What is checked here
+     * is the plumbing a person actually meets: a refusal arrives from the route, is
+     * shown where the field is, and installs nothing. The route itself — a real
+     * repository, provenance, removal, the refusals — is covered by
+     * `src/test/skills-route.test.ts`, because a browser check that downloads from
+     * GitHub would be a check that fails when GitHub is slow.
+     */
+    const install = await session.evaluate(`
+      const input = document.querySelector('#skills-repo');
+      input.value = 'not a repository';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#skills-install').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return Boolean(input.value);
+    `);
+    if (!install) throw new Error("the install field is not in the panel");
+
+    const refused = await session.waitFor(
+      `/owner\\/repo/.test(document.querySelector('#skills-install-note').textContent)`,
+      10_000,
+    );
+    if (!refused) {
+      const said = await session.evaluate(
+        "return (document.querySelector('#skills-install-note')?.textContent ?? '').trim();",
+      );
+      throw new Error(`the refusal was not shown in the panel (it says ${JSON.stringify(said)})`);
+    }
+    const stillSame = await session.evaluate(
+      `return document.querySelectorAll('#skills-list .skill-card').length === ${skills.length};`,
+    );
+    if (!stillSame) throw new Error("a refused install still changed the list");
+
+    // The memory is the other half of the panel, and it has to name the file:
+    // "remembered: yes" tells nobody where to look or how to correct it.
+    const memory = await session.evaluate(
+      "return (document.querySelector('#skills-memory')?.textContent ?? '').trim();",
+    );
+    if (!memory.includes("MEMORY.md")) throw new Error("the memory line does not name MEMORY.md");
+
+    // Escape closes it and hands focus back to the button that opened it, which
+    // is the contract every panel in here keeps (`leaveDialog`).
+    await session.evaluate(`
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return true;`);
+    const closed = await session.waitFor(
+      `document.querySelector('#skills').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!closed) throw new Error("Escape did not close the skills panel");
+
+    const back = await session.evaluate("return document.activeElement?.id ?? '';");
+    if (back !== "skills-open") throw new Error(`focus went to ${back || "nothing"}`);
+
+    // And the backdrop, which is the gesture a mouse reaches for (`layout:check`
+    // drives the drawer's scrim the same way).
+    await clickControl("#skills-open");
+    await session.evaluate("document.querySelector('#skills').click();");
+    const dismissed = await session.waitFor(
+      `document.querySelector('#skills').classList.contains('hidden')`,
+      5_000,
+    );
+    if (!dismissed) throw new Error("clicking the backdrop left the skills panel open");
+
+    return `${skills.length} skill row(s) with the route's own remove gating, the install field refusing what the route refuses, memory line, Escape and backdrop both close it`;
+  });
+
+  await check("accessibility basics are present", async () => {
+    const missing = await session.evaluate(`
+      const want = [
+        ['.skip-link', 'skip link'],
+        ['#input[aria-label]', 'labelled composer'],
+        ['#messages[role="log"]', 'conversation as a log'],
+        ['#live[aria-live="polite"]', 'live region'],
+        ['#viewer[role="dialog"][aria-modal="true"]', 'viewer dialog'],
+        ['#sessions[aria-label]', 'labelled session list'],
+        ['#fallbacks[aria-label]', 'labelled fallback chain'],
+        ['#use-offline', 'labelled offline opt-out'],
+        ['#settings[role="dialog"][aria-modal="true"]', 'chat settings dialog'],
+        ['#chat-settings[aria-controls="settings"]', 'settings toggle bound to its dialog'],
+        ['#toggle-files[aria-controls="files-panel"]', 'workspace toggle bound to its panel'],
+        ['#workspace-pick[aria-label]', 'labelled workspace picker'],
+        ['#files-clear[title]', 'labelled clear-workspace button'],
+        ['#sweep[role="dialog"][aria-modal="true"]', 'sweep dialog'],
+        ['#sweep-open[title]', 'labelled sweep button'],
+        ['#skills[role="dialog"][aria-modal="true"]', 'skills dialog'],
+        ['#skills-open[aria-controls="skills"]', 'skills button bound to its dialog'],
+        ['#skills-list', 'the skills list container'],
+        ['#skills-memory', 'the memory line'],
+        ['#preview[aria-label]', 'labelled preview pane'],
+        ['#toggle-preview[aria-controls="preview"]', 'preview toggle bound to the pane'],
+        ['#preview-status[role="status"]', 'preview status line'],
+      ];
+      return want.filter(([selector]) => !document.querySelector(selector)).map(([, name]) => name);
+    `);
+    if (missing.length > 0) throw new Error(`missing: ${missing.join(", ")}`);
+    return "skip link, labels, live region, dialog roles";
+  });
+
+  /**
+   * Wait for a turn to finish. The composer refuses input while streaming, so
+   * submitting too early is silently dropped - which looks exactly like the app
+   * being broken.
+   */
+  async function waitForIdle(timeoutMs = 240_000) {
+    const idle = await session.waitFor(
+      `!document.querySelector('#send').classList.contains('hidden') &&
+       document.querySelector('#stop').classList.contains('hidden')`,
+      timeoutMs,
+    );
+    if (!idle) throw new Error("the turn never finished");
+  }
+
+  if (approvalOn) {
+    /**
+     * Ask for a command, wait for its prompt, answer it, and hand back the
+     * prompt's summary. Counts the cards first so it always acts on the newest
+     * one rather than an earlier prompt still in the transcript.
+     */
+    async function approvalTurn(prompt, decision) {
+      await waitForIdle();
+
+      const before = await session.evaluate(
+        "return document.querySelectorAll('.approval').length;",
+      );
+
+      await session.evaluate(`
+        const input = document.querySelector('#input');
+        input.value = ${JSON.stringify(prompt)};
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('#composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        return true;
+      `);
+
+      const asked = await session.waitFor(
+        `document.querySelectorAll('.approval').length > ${before}`,
+        180_000,
+      );
+      if (!asked) throw new Error("no approval card appeared");
+
+      const summary = await session.evaluate(
+        "return [...document.querySelectorAll('.approval')].at(-1).querySelector('.approval-summary').textContent;",
+      );
+
+      const button = decision === "approve" ? ".btn-primary" : ".btn-danger";
+      const settledClass = decision === "approve" ? "approved" : "denied";
+      await session.evaluate(
+        `[...document.querySelectorAll('.approval')].at(-1).querySelector('${button}').click();`,
+      );
+
+      const settled = await session.waitFor(
+        `[...document.querySelectorAll('.approval')].at(-1).classList.contains('${settledClass}')`,
+        30_000,
+      );
+      if (!settled) throw new Error(`the card did not record the ${decision}`);
+
+      // Let the model finish its follow-up so the transcript is settled.
+      await waitForIdle();
+      return summary;
+    }
+
+    await check("denying a command stops it from running", async () => {
+      const summary = await approvalTurn(
+        "Run this shell command and report the output: echo ui-smoke-should-not-run",
+        "deny",
+      );
+
+      const refused = await session.waitFor(
+        `[...document.querySelectorAll('.tool-body')].some((n) => /denied/i.test(n.textContent))`,
+        60_000,
+      );
+      if (!refused) throw new Error("the refusal never appeared in the transcript");
+
+      const ran = await session.evaluate(
+        "return [...document.querySelectorAll('.tool-body')].some((n) => n.textContent.includes('ui-smoke-should-not-run') && !/denied/i.test(n.textContent));",
+      );
+      if (ran) throw new Error("the denied command ran anyway");
+
+      return summary;
+    });
+
+    await check("approving a command runs it, in the sandbox", async () => {
+      const marker = `ui-smoke-approved-${Math.random().toString(36).slice(2, 8)}`;
+      const summary = await approvalTurn(
+        `Run exactly this shell command with run_command, then stop: echo ${marker}`,
+        "approve",
+      );
+
+      const executed = await session.waitFor(
+        `[...document.querySelectorAll('.tool-body')].some((n) => n.textContent.includes('${marker}'))`,
+        120_000,
+      );
+      if (!executed) throw new Error("the approved command produced no output in the transcript");
+
+      if (health.sandbox?.backend === "docker") {
+        const inContainer = await session.evaluate(
+          `return [...document.querySelectorAll('.tool-body')].some((n) => n.textContent.includes('${marker}') && /ran in container/.test(n.textContent));`,
+        );
+        if (!inContainer) throw new Error("it ran, but not inside the sandbox container");
+        return `${summary} → output confirmed inside the container`;
+      }
+      return `${summary} → output confirmed (host backend)`;
+    });
+  } else {
+    console.log("  – skipping the approval flow (AGENT_APPROVAL is off)");
+  }
+
+  /**
+   * The pane is fed by events that exist only during a turn, so what it shows has
+   * to be recoverable from the transcript afterwards - otherwise a reload leaves an
+   * empty pane beside a conversation that plainly wrote a file. This runs one real
+   * write through the UI and then reloads the page.
+   */
+  await check("a written file is previewed live, highlighted, and restored after a reload", async () => {
+    await waitForIdle();
+
+    /**
+     * Wait for the turn, answering any approval it asks for.
+     *
+     * The prompt tells the model not to run anything, but a model that wants to
+     * try its own file will ask to, and a prompt nobody answers parks the turn and
+     * fails this check for the wrong reason. What it would run is a python script
+     * in the sandbox, which the suite already does elsewhere.
+     */
+    async function waitForIdleApproving(timeoutMs = 300_000) {
+      const deadline = Date.now() + timeoutMs;
+      for (;;) {
+        const done = await session.evaluate(
+          `return !document.querySelector('#send').classList.contains('hidden') &&
+           document.querySelector('#stop').classList.contains('hidden');`,
+        );
+        const sample = await session.evaluate(`
+          return {
+            live: document.querySelector('#preview').classList.contains('live'),
+            rows: document.querySelectorAll('#preview-diff .diff-line').length,
+          };`);
+        if (sample.live) liveSeen.live = true;
+        liveSeen.rows = Math.max(liveSeen.rows, sample.rows ?? 0);
+        if (done) return true;
+        await session.evaluate(`
+          const waiting = [...document.querySelectorAll('.approval')]
+            .filter((card) => card.dataset.settled !== '1');
+          for (const card of waiting) card.querySelector('.btn-primary')?.click();
+          return waiting.length;`);
+        if (Date.now() > deadline) return false;
+        await sleep(500);
+      }
+    }
+
+    // The live diff only exists while the write is arriving, so it has to be
+    // sampled during the turn rather than read afterwards.
+    const liveSeen = { live: false, rows: 0 };
+
+    const marker = `preview-${Math.random().toString(36).slice(2, 8)}`;
+    const prompt =
+      "Use write_file to create ui_smoke_preview.py containing exactly these two lines: " +
+      `# ${marker}\\nprint("${marker}"). Then stop - do not run anything.`;
+
+    await session.evaluate(`
+      const input = document.querySelector('#input');
+      input.value = ${JSON.stringify(prompt)};
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('#composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return true;`);
+
+    if (!(await waitForIdleApproving())) throw new Error("the write turn never finished");
+
+    const live = await session.evaluate(`
+      const body = document.querySelector('#preview-body');
+      return {
+        open: document.querySelector('#preview').classList.contains('open'),
+        title: document.querySelector('#preview-title').textContent.trim(),
+        text: body.textContent,
+        tokens: body.querySelectorAll('[class^="tok-"]').length,
+        chat: document.querySelector('#chat-title').textContent.trim(),
+      };`);
+
+    if (!live.title.includes(".py")) {
+      // The model did not write a file, so there is nothing to check this time.
+      return `skipped: the model wrote no file (pane shows \"${live.title}\")`;
+    }
+    if (!live.open) throw new Error("the pane did not open by itself when the draft arrived");
+    if (!live.text.includes(marker)) throw new Error(`the pane does not show the file's contents (${marker})`);
+    if (live.tokens === 0) throw new Error("the preview was not highlighted");
+
+    // Reload: the same tab, the same token, an empty module state.
+    await session.send("Page.reload");
+    const back = await session.waitFor(
+      `document.querySelector('#composer') !== null && document.querySelectorAll('.session').length > 0`,
+      30_000,
+    );
+    if (!back) throw new Error("the page did not come back after the reload");
+
+    const reopened = await session.evaluate(`
+      const want = ${JSON.stringify(live.chat.slice(0, 24))};
+      const button = [...document.querySelectorAll('.session')].find((node) =>
+        (node.querySelector('.session-title')?.textContent ?? '').startsWith(want));
+      if (button === undefined) return false;
+      button.click();
+      return true;`);
+    if (!reopened) throw new Error(`the chat \"${live.chat}\" is not in the sidebar after a reload`);
+
+    const restored = await session.waitFor(
+      `document.querySelector('#preview-title').textContent.trim() === ${JSON.stringify(live.title)} &&
+       document.querySelector('#preview-body').textContent.includes(${JSON.stringify(marker)})`,
+      30_000,
+    );
+    if (!restored) {
+      const now = await session.evaluate(
+        `return document.querySelector('#preview-title').textContent.trim() + " | " +
+         document.querySelector('#preview-body').textContent.slice(0, 60);`,
+      );
+      throw new Error(`the pane came back as: ${now}`);
+    }
+
+    // A whole call can arrive in one frame, in which case there is no window in
+    // which a diff could stream: report what was seen rather than failing on it.
+    const liveNote = liveSeen.live
+      ? `live diff streamed (${liveSeen.rows} rows at its peak)`
+      : "no mid-write window (the model sent the whole call at once)";
+
+    return `${live.title} — ${live.tokens} highlighted tokens, restored from the transcript; ${liveNote}`;
+  });
+
+  /**
+   * The change half of the pane, and deleting a file from the workspace.
+   *
+   * The check before this one wrote `ui_smoke_preview.py`, so this removes it:
+   * the suite aims to leave the workspace as it found it. The two clicks are the
+   * point - the first arms the button, the second deletes, and nothing happens on
+   * one click alone.
+   */
+  await check("the change is shown, and a file can be deleted from the viewer", async () => {
+    await waitForIdle();
+
+    const scratch = "ui_smoke_preview.py";
+    const inTree = await session.evaluate(`
+      return [...document.querySelectorAll('#files-list .file-entry')]
+        .some((node) => node.textContent.includes(${JSON.stringify(scratch)}));`);
+    if (!inTree) return "skipped: the previous check wrote no file to clean up";
+
+    await session.evaluate(`
+      const entry = [...document.querySelectorAll('#files-list .file-entry')]
+        .find((node) => node.textContent.includes(${JSON.stringify(scratch)}));
+      entry.click();
+      return true;`);
+
+    const opened = await session.waitFor(
+      `!document.querySelector('#viewer').classList.contains('hidden') &&
+       document.querySelector('#viewer-title').textContent.includes(${JSON.stringify(scratch)})`,
+      10_000,
+    );
+    if (!opened) throw new Error("the scratch file did not open in the viewer");
+
+    // A file the agent created should land on its change; if it did not, ask.
+    if ((await session.evaluate("return document.querySelectorAll('#viewer-diff .diff-line').length;")) === 0) {
+      await session.evaluate(`
+        const toggle = document.querySelector('#viewer-toggle');
+        if (!toggle.classList.contains('hidden') && toggle.textContent.trim() === 'show diff') toggle.click();
+        return true;`);
+      const shown = await session.waitFor(
+        `document.querySelectorAll('#viewer-diff .diff-line').length > 0`,
+        10_000,
+      );
+      if (!shown) throw new Error("a newly created file has no change to show");
+    }
+    const rows = await session.evaluate("return document.querySelectorAll('#viewer-diff .diff-line').length;");
+
+    await session.evaluate("document.querySelector('#viewer-delete').click();");
+    const armed = await session.evaluate(`
+      const button = document.querySelector('#viewer-delete');
+      return { armed: button.classList.contains('armed'), text: button.textContent.trim() };`);
+    if (!armed.armed) throw new Error("one click deleted without asking");
+    if (!/confirm/i.test(armed.text)) throw new Error(`the armed button says "${armed.text}"`);
+
+    await session.evaluate("document.querySelector('#viewer-delete').click();");
+    const gone = await session.waitFor(
+      `document.querySelector('#viewer').classList.contains('hidden') &&
+       ![...document.querySelectorAll('#files-list .file-entry')]
+         .some((node) => node.textContent.includes(${JSON.stringify(scratch)}))`,
+      15_000,
+    );
+    if (!gone) throw new Error("the file was not removed from the workspace");
+
+    // Really gone, not merely missing from the tree the page last drew.
+    const second = await session.evaluate(`
+      const token = sessionStorage.getItem('coding-agent-token') ?? '';
+      return fetch('/api/file?path=' + encodeURIComponent(${JSON.stringify(scratch)}), {
+        method: 'DELETE',
+        headers: token === '' ? {} : { Authorization: 'Bearer ' + token },
+      }).then((response) => response.status);`);
+    if (second !== 404) throw new Error(`a second delete returned ${second}, not 404`);
+
+    return `${rows} change rows shown, then deleted in two clicks`;
+  });
+
+  /**
+   * The clear-workspace button's two-click guard.
+   *
+   * Several checks above depend on the workspace tree, so this must not actually
+   * clear it: what is checked is the guard itself — one click arms the button and
+   * says so, and it falls back to `clear` on its own a few seconds later, so the
+   * folder cannot be wiped by brushing the button. The clear endpoint's own
+   * behaviour (keep dot-entries, drop the file history) is covered by the server
+   * tests, which can drive the filesystem directly.
+   */
+  await check("the clear-workspace button arms and disarms without clearing", async () => {
+    const present = await session.evaluate(`return document.querySelector('#files-clear') !== null;`);
+    if (!present) throw new Error("the clear button is missing from the file tree header");
+
+    const armed = await session.evaluate(`
+      const button = document.querySelector('#files-clear');
+      button.click();
+      return { armed: button.classList.contains('armed'), text: button.textContent.trim() };`);
+    if (!armed.armed) throw new Error("one click did not arm the clear button");
+    if (!/confirm/i.test(armed.text)) throw new Error(`the armed button says "${armed.text}"`);
+
+    const reset = await session.waitFor(
+      `document.querySelector('#files-clear').textContent.trim() === 'clear' &&
+       !document.querySelector('#files-clear').classList.contains('armed')`,
+      10_000,
+    );
+    if (!reset) throw new Error("the armed clear button never fell back to rest");
+    return "one click arms, and it disarms on its own";
+  });
+
+  /**
+   * The warning shown before a turn is derived from the last health check, so the
+   * two have to agree: a chain with something ready must not produce it, or it is
+   * noise the user learns to ignore.
+   */
+  await check("the pre-turn warning agrees with the chain health", async () => {
+    const current = await fetch(`${BASE}/api/health`, { headers: { ...AUTH } }).then((response) =>
+      response.json(),
+    );
+
+    const warned = await session.evaluate(
+      `return [...document.querySelectorAll('#messages .notice')].some((node) =>
+        /could not get a tool call out of anything in the chain/.test(node.textContent));`,
+    );
+
+    // Only entries this chat would actually use count, exactly as the server does.
+    const relevant = (current.modelHealth?.entries ?? []).filter((entry) => entry.offline !== true);
+    const usable = relevant.filter((entry) => entry.ok === true).length;
+
+    if (relevant.length > 0 && usable > 0 && warned) {
+      throw new Error(
+        `${usable} of ${relevant.length} chain models are ready, but a turn warned that nothing works`,
+      );
+    }
+    return `${usable}/${relevant.length} ready, warning ${warned ? "shown" : "not shown"}`;
+  });
+
+  await check("nothing threw in the browser console", async () => {
+    const noise = session.pageErrors.filter((entry) => !/favicon/i.test(entry));
+    if (noise.length > 0) throw new Error(noise.slice(0, 3).join(" | "));
+    return "clean";
+  });
+} finally {
+  session?.close();
+  chrome.kill("SIGKILL");
+  await sleep(300);
+  fs.rmSync(profile, { recursive: true, force: true });
+}
+
+console.log(`\n${checks - failures}/${checks} checks passed`);
+process.exit(failures === 0 ? 0 : 1);

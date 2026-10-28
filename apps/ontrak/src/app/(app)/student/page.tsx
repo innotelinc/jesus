@@ -1,0 +1,492 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import type { Platform } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { requireSession } from "@/lib/auth";
+import { evaluateScenario, loadAvailabilityContext, platformLabel } from "@/lib/availability";
+import { sweepExpiredAttempts } from "@/lib/scenarios";
+import { startAttempt } from "@/app/actions/student";
+import { isLabScenario, labDoorFromEnv, simulatedStartRefusal } from "@/lib/lab-rules";
+import { effectiveClassroom } from "@/lib/classroom-rules";
+import { feedbackLinks } from "@/lib/feedback-rules";
+import { clearedPassMark, scorePercent } from "@/lib/score-rules";
+import { Flash, PageHeader } from "@/components/PageHeader";
+import { Badge, Button, buttonClass, Card, EmptyState, ProgressBar } from "@/components/ui";
+import { formatDateTime, formatDuration, cn } from "@/lib/cn";
+import { getTranslator, type Translator } from "@/lib/i18n-server";
+
+export const metadata: Metadata = { title: "My scenarios" };
+
+const PLATFORM_TONE: Record<Platform, "amber" | "sky" | "pink"> = {
+  LINUX: "amber",
+  WINDOWS: "sky",
+  OFFICE: "pink",
+};
+
+const DIFFICULTY_TONE: Record<string, "teal" | "brand" | "amber" | "pink"> = {
+  FOUNDATION: "teal",
+  INTERMEDIATE: "brand",
+  ADVANCED: "amber",
+  EXPERT: "pink",
+};
+
+export default async function StudentHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ flash?: string; error?: string }>;
+}) {
+  const { flash, error } = await searchParams;
+  const user = await requireSession();
+  const t = await getTranslator();
+
+  // Where a student runs a lab-tagged scenario. One reader decides, and it answers three
+  // ways: a link to a peer deployment (the old behaviour), this app's own `/lab` (the
+  // port, stage 3), or nothing at all — in which case every card renders exactly as it did
+  // before the lab existed. A configured-but-refused address is also nothing here, and the
+  // control room's capabilities panel is where an operator reads why.
+  const door = labDoorFromEnv();
+  const labUrl = door.kind === "external" ? door.url : door.kind === "in-app" ? door.href : null;
+
+  // Reconcile clocks first so the page never shows a stale "in progress" card.
+  await sweepExpiredAttempts(user.id);
+
+  const [context, scenarios, running, history, assignments, classes] = await Promise.all([
+    loadAvailabilityContext(),
+    prisma.scenario.findMany({
+      where: { published: true },
+      include: { software: { include: { softwarePackage: true } } },
+      orderBy: [{ platform: "asc" }, { difficulty: "asc" }, { title: "asc" }],
+    }),
+    prisma.attempt.findMany({
+      where: { userId: user.id, status: "IN_PROGRESS" },
+      include: { scenario: { select: { title: true, platform: true, summary: true, timeLimitSec: true } } },
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.attempt.findMany({
+      where: { userId: user.id, status: { in: ["GRADED", "EXPIRED", "SUBMITTED"] } },
+      include: { scenario: { select: { title: true, platform: true, passScore: true } } },
+      orderBy: { submittedAt: "desc" },
+      take: 6,
+    }),
+    prisma.assignment.findMany({
+      where: {
+        scenario: { published: true },
+        OR: [{ studentId: user.id }, { cohort: { members: { some: { userId: user.id } } } }],
+      },
+      include: {
+        scenario: { select: { id: true, title: true, platform: true, timeLimitSec: true } },
+        cohort: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    // The classes this learner is in, because a funded class carries an AI classroom: the
+    // generated lesson the course is taught with, hosted by AthenIQ. Membership is read the
+    // same two ways the assignments above are — the roster, and a funded enrolment — since a
+    // sponsored seat is a class membership too.
+    prisma.cohort.findMany({
+      where: {
+        organizationId: { not: null },
+        OR: [
+          { members: { some: { userId: user.id } } },
+          { enrollments: { some: { userId: user.id } } },
+        ],
+      },
+      include: {
+        course: { select: { title: true, classroomUrl: true } },
+        organization: { select: { name: true } },
+      },
+      orderBy: [{ startsOn: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
+
+  // Students only see work that is actually runnable; the blocker list is for staff.
+  const available = scenarios
+    .map((scenario) => ({ scenario, availability: evaluateScenario(scenario, context) }))
+    .filter((entry) => entry.availability.available);
+
+  // Only the classes that actually have a classroom: an empty section on a learner's home is
+  // worse than none, and a class whose address was refused has a problem for its provider to
+  // fix (the tenancy's page says so) rather than a door for this page to draw.
+  const classrooms = classes
+    .map((klass) => ({
+      klass,
+      url: effectiveClassroom({ classroomUrl: klass.course?.classroomUrl ?? null }, klass).url,
+    }))
+    .filter((entry): entry is { klass: (typeof classes)[number]; url: string } => entry.url !== null);
+
+  // The funder's feedback instrument for a class (§4.5), where the provider has recorded one.
+  // A learner is the one asked for it, so this is where it belongs — and a class whose address
+  // was refused has a problem for its provider to fix (the tenancy's page says so) rather than
+  // a link for this page to draw.
+  const surveys = classes
+    .map((klass) => ({ klass, url: feedbackLinks(klass).trainee }))
+    .filter((entry): entry is { klass: (typeof classes)[number]; url: string } => entry.url !== null);
+
+  const assignedIds = new Set(assignments.map((assignment) => assignment.scenarioId));
+  const assignedScenarios = available.filter((entry) => assignedIds.has(entry.scenario.id));
+  const openScenarios = available.filter((entry) => !assignedIds.has(entry.scenario.id));
+
+  // Every attempt here is finished, and the server graded the expired ones too,
+  // so they count. A zero-point scenario simply has no percentage.
+  const graded = history.filter((attempt) => attempt.maxScore > 0);
+  // Each scenario carries its own pass mark; a hard-coded 70 would silently
+  // miscount any scenario an instructor set a different bar for. The comparison
+  // itself lives in `score-rules.ts`, so this count cannot disagree with the
+  // certificate or the webhook about the same attempt.
+  const passed = graded.filter((attempt) =>
+    clearedPassMark({
+      score: attempt.score,
+      maxScore: attempt.maxScore,
+      passScore: attempt.scenario.passScore,
+    }),
+  );
+  const average =
+    graded.length > 0
+      ? Math.round(graded.reduce((sum, attempt) => sum + (attempt.maxScore ? (attempt.score / attempt.maxScore) * 100 : 0), 0) / graded.length)
+      : 0;
+
+  return (
+    <div className="mx-auto max-w-6xl">
+      <PageHeader
+        eyebrow={t("student.welcome", { name: user.name.split(" ")[0] })}
+        title={t("student.title")}
+        description={t("student.description")}
+        actions={
+          <Link href="/student/results" className="text-sm font-semibold text-brand hover:underline">
+            {t("student.allResults")} →
+          </Link>
+        }
+      />
+      <Flash flash={flash} error={error} />
+
+      {/* Stats */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+        <Card className="p-5">
+          <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
+            {t("student.stat.available")}
+          </p>
+          <p className="mt-1 font-display text-3xl font-semibold text-ink">{available.length}</p>
+          <p className="mt-1 text-xs text-ink-faint">{t("student.stat.availableHint")}</p>
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
+            {t("student.stat.average")}
+          </p>
+          <p className="mt-1 font-display text-3xl font-semibold text-ink">{graded.length > 0 ? `${average}%` : "—"}</p>
+          <ProgressBar value={average} tone={average >= 70 ? "teal" : "amber"} className="mt-3" />
+        </Card>
+        <Card className="p-5">
+          <p className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
+            {t("student.stat.passed")}
+          </p>
+          <p className="mt-1 font-display text-3xl font-semibold text-teal">{passed.length}</p>
+          <p className="mt-1 text-xs text-ink-faint">{t("student.stat.passedHint", { count: graded.length })}</p>
+        </Card>
+      </div>
+
+      {/* Classrooms — the AI lesson a funded class is taught with */}
+      {classrooms.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-ink">{t("student.classrooms.title")}</h2>
+          <p className="text-sm text-ink-soft">{t("student.classrooms.hint")}</p>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {classrooms.map(({ klass, url }) => (
+              <li key={klass.id}>
+                <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <h3 className="font-display text-base font-semibold text-ink">
+                      {klass.course?.title ?? klass.name}
+                    </h3>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {[klass.name, klass.organization?.name].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  {/* A plain anchor: the classroom is another product's page, so the client
+                      router has nothing to navigate to here. */}
+                  <a href={url} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm")}>
+                    {t("student.classrooms.open")}
+                  </a>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* The funder's feedback — the trainee half of §4.5, and the only thing on this page
+          that belongs to the funder rather than to the learner's own training. */}
+      {surveys.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-ink">{t("student.feedback.title")}</h2>
+          <p className="text-sm text-ink-soft">{t("student.feedback.hint")}</p>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {surveys.map(({ klass, url }) => (
+              <li key={klass.id}>
+                <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <h3 className="font-display text-base font-semibold text-ink">
+                      {klass.course?.title ?? klass.name}
+                    </h3>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {[klass.name, klass.organization?.name].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <a href={url} target="_blank" rel="noreferrer" className={buttonClass("secondary", "sm")}>
+                    {t("student.feedback.open")}
+                  </a>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* In progress */}
+      {running.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-ink">{t("student.resume.title")}</h2>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            {running.map((attempt) => {
+              const left = Math.max(0, Math.floor((attempt.expiresAt.getTime() - Date.now()) / 1000));
+              const total = attempt.scenario.timeLimitSec || 1;
+              const used = Math.max(0, total - left);
+              return (
+                <li key={attempt.id}>
+                  <Card className="relative overflow-hidden p-5">
+                    <span className="absolute -top-8 -right-8 size-24 rounded-full gradient-brand opacity-15" aria-hidden />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={PLATFORM_TONE[attempt.scenario.platform]}>
+                        {platformLabel(attempt.scenario.platform)}
+                      </Badge>
+                      <Badge tone={left < 120 ? "danger" : "teal"}>
+                        <span className={cn("size-1.5 animate-pulse rounded-full", left < 120 ? "bg-pink" : "bg-teal")} />
+                        {t("student.resume.left", { time: formatDuration(left) })}
+                      </Badge>
+                    </div>
+                    <h3 className="mt-3 font-display text-base font-semibold text-ink">{attempt.scenario.title}</h3>
+                    <ProgressBar value={(used / total) * 100} tone={left < 120 ? "danger" : "brand"} className="mt-3" />
+                    <div className="mt-4 flex items-center gap-2">
+                      <Link
+                        href={`/student/attempt/${attempt.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-full gradient-brand px-4 py-2 text-xs font-semibold text-white shadow-card"
+                      >
+                        {t("student.resume.resume")}
+                      </Link>
+                      <a href={`/student/results/${attempt.id}`} className="text-xs font-semibold text-ink-soft hover:text-brand">
+                        {t("student.resume.details")}
+                      </a>
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Assigned */}
+      {assignedScenarios.length > 0 ? (
+        <section className="mt-10">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="font-display text-lg font-semibold text-ink">{t("student.assigned.title")}</h2>
+              <p className="text-sm text-ink-soft">{t("student.assigned.hint")}</p>
+            </div>
+          </div>
+          <ul className="mt-3 grid gap-4 md:grid-cols-2">
+            {assignedScenarios.map(({ scenario }) => {
+              const assignment = assignments.find((item) => item.scenarioId === scenario.id);
+              const overdue = assignment?.dueAt ? assignment.dueAt.getTime() < Date.now() : false;
+              return (
+                <li key={scenario.id}>
+                  <ScenarioCard
+                    scenario={scenario}
+                    labUrl={isLabScenario(scenario.tags) ? labUrl : null}
+                    badge={
+                      assignment?.dueAt ? (
+                        <Badge tone={overdue ? "danger" : "amber"}>
+                          {overdue
+                            ? t("student.assigned.overdue")
+                            : t("student.assigned.due", { when: formatDateTime(assignment.dueAt) })}
+                        </Badge>
+                      ) : (
+                        <Badge tone="brand">{assignment?.cohort?.name ?? t("student.assigned.assigned")}</Badge>
+                      )
+                    }
+                    note={assignment?.instructions}
+                    t={t}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Open catalog */}
+      <section className="mt-10">
+        <h2 className="font-display text-lg font-semibold text-ink">{t("student.open.title")}</h2>
+        <p className="text-sm text-ink-soft">{t("student.open.hint")}</p>
+
+        {openScenarios.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              title={t("student.open.empty.title")}
+              description={t("student.open.empty.description")}
+            />
+          </div>
+        ) : (
+          <ul className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {openScenarios.map(({ scenario }) => (
+              <li key={scenario.id}>
+                <ScenarioCard
+                  scenario={scenario}
+                  labUrl={isLabScenario(scenario.tags) ? labUrl : null}
+                  t={t}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Recent results */}
+      {history.length > 0 ? (
+        <section className="mt-10">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="font-display text-lg font-semibold text-ink">{t("student.recent.title")}</h2>
+            <Link href="/student/results" className="text-sm font-semibold text-brand hover:underline">
+              {t("student.recent.viewAll")} →
+            </Link>
+          </div>
+          <Card className="mt-3 overflow-hidden p-0">
+            <ul className="divide-y divide-line">
+              {history.map((attempt) => {
+                const percent = scorePercent(attempt.score, attempt.maxScore);
+                const ok = clearedPassMark({
+                  score: attempt.score,
+                  maxScore: attempt.maxScore,
+                  passScore: attempt.scenario.passScore,
+                });
+                return (
+                  <li key={attempt.id}>
+                    <Link
+                      href={`/student/results/${attempt.id}`}
+                      className="flex flex-wrap items-center gap-3 px-5 py-3.5 transition hover:bg-surface-muted/60"
+                    >
+                      <Badge tone={PLATFORM_TONE[attempt.scenario.platform]}>
+                        {platformLabel(attempt.scenario.platform)}
+                      </Badge>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{attempt.scenario.title}</span>
+                      <span className="text-xs text-ink-faint">
+                        {attempt.status === "EXPIRED" ? `${t("student.recent.timedOut")} · ` : ""}
+                        {formatDateTime(attempt.submittedAt ?? attempt.startedAt)}
+                      </span>
+                      <span className={cn("font-mono text-sm font-semibold", ok ? "text-teal" : "text-amber")}>
+                        {attempt.score}/{attempt.maxScore} ({percent}%)
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+type ScenarioCardData = {
+  id: string;
+  title: string;
+  summary: string;
+  objective?: string;
+  platform: Platform;
+  difficulty: string;
+  timeLimitSec: number;
+  tags: string[];
+};
+
+function ScenarioCard({
+  scenario,
+  badge,
+  note,
+  labUrl,
+  t,
+}: {
+  scenario: ScenarioCardData;
+  badge?: React.ReactNode;
+  note?: string | null;
+  /** Where to run this scenario on a real machine, when the lab offers one. */
+  labUrl?: string | null;
+  t: Translator;
+}) {
+  // The same rule `startAttempt` enforces server-side, asked here to decide which door
+  // this card draws. Both ask it because a rule only one of them checks is a rule a POST
+  // can walk past; the message itself is the refusal, so "is there one" is answer enough.
+  const labOnly = simulatedStartRefusal(scenario.tags) !== null;
+
+  return (
+    <Card className="flex h-full flex-col">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={PLATFORM_TONE[scenario.platform]}>{platformLabel(scenario.platform)}</Badge>
+        <Badge tone={DIFFICULTY_TONE[scenario.difficulty] ?? "brand"}>{scenario.difficulty.toLowerCase()}</Badge>
+        <Badge tone="neutral">{formatDuration(scenario.timeLimitSec)}</Badge>
+        {badge ? <span className="ml-auto">{badge}</span> : null}
+      </div>
+
+      <h3 className="mt-3 font-display text-lg font-semibold text-ink">{scenario.title}</h3>
+      <p className="mt-1.5 line-clamp-3 text-sm text-ink-soft">{scenario.summary}</p>
+
+      {note ? (
+        <p className="mt-3 rounded-xl2 border border-brand/20 bg-brand-soft/50 px-3 py-2 text-xs text-ink-soft">{note}</p>
+      ) : null}
+
+      {scenario.tags.length > 0 ? (
+        <ul className="mt-3 flex flex-wrap gap-1.5">
+          {scenario.tags.slice(0, 4).map((tag) => (
+            <li key={tag} className="rounded-full bg-surface-muted px-2.5 py-0.5 text-[11px] font-medium text-ink-faint">
+              #{tag}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {labOnly ? (
+        // One door, not two. A lab scenario has no simulated checks (they cannot be
+        // derived from its YAML), so the start button is not drawn at all — an attempt
+        // would grade nothing and still be filed as lab-graded. What replaces it is the
+        // truth: the lab grades this, and here is whether this deployment runs one.
+        <div className="mt-5 rounded-xl2 border border-line bg-surface-muted px-3 py-2.5">
+          <p className="text-xs font-semibold text-ink">{t("student.labOnly.title")}</p>
+          <p className="mt-1 text-xs text-ink-soft">
+            {labUrl ? t("student.labOnly.where") : t("student.labOnly.absent")}
+          </p>
+        </div>
+      ) : (
+        <form action={startAttempt} className="mt-5 pt-1">
+          <input type="hidden" name="scenarioId" value={scenario.id} />
+          <Button type="submit" className="w-full sm:w-auto">
+            {t("student.startScenario")}
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </Button>
+        </form>
+      )}
+
+      {labUrl ? (
+        // The other door to the same exercise: a real machine in the lab. Drawn only when
+        // the deployment turned the lab on and this scenario is tagged for it, so the
+        // simulation path is untouched everywhere else.
+        <a
+          href={labUrl}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+        >
+          {t("student.startRealMachine")} →
+        </a>
+      ) : null}
+    </Card>
+  );
+}

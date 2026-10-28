@@ -1,0 +1,271 @@
+import { redirect } from "next/navigation";
+
+import { requireActor } from "../../../lib/session";
+import {
+  actorHasPermission,
+  canAssignTicket,
+  canDeleteTicket,
+  canReplyToTicket,
+  canUpdateTicket,
+} from "../../../lib/access-rules";
+import { assigneeOptions, ASSIGNEE_ROLES } from "../../../lib/assignee-rules";
+import {
+  prisma,
+  clientServicesFor,
+  ticketServicesFor,
+  slaPolicyStoreFor,
+  linkServicesFor,
+  savedViewServicesFor,
+} from "../../../lib/db";
+import { canSeeClient } from "../../../lib/client-rules";
+import { claimOnView } from "../../../lib/claim-rules";
+import { AutoClaim } from "../../../components/AutoClaim";
+import { InboxPanes } from "../../../components/InboxPanes";
+import {
+  assignAction,
+  bulkAction,
+  claimTicketAction,
+  deleteTicketAction,
+  deleteViewAction,
+  replyAction,
+  saveViewAction,
+  setStatusAction,
+} from "../../actions/tickets";
+import { parseInboxFilter, type InboxSearchParams } from "../../../lib/inbox-view";
+import { atRiskOnly, sortForInbox, type InboxCounts } from "../../../lib/inbox-rules";
+import { slaFlagsByTicket, slaStatusFor } from "../../../lib/report-rules";
+import type { TicketRecord } from "../../../lib/ticket-service";
+import { AgentInbox } from "../../../components/AgentInbox";
+import { SavedViews } from "../../../components/SavedViews";
+import { TicketDetail, type TicketActions } from "../../../components/TicketDetail";
+
+export const metadata = { title: "Inbox" };
+
+/**
+ * Rows per page. Enough to fill a wide screen twice over without becoming the
+ * read the page used to do; the pager walks the rest on request.
+ */
+const INBOX_PER_PAGE = 50;
+
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function pageNumber(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? "1", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+/** The agent inbox: the filtered worklist on the left, the selected ticket on the right. */
+export default async function InboxPage({ searchParams }: { searchParams: Promise<InboxSearchParams> }) {
+  const actor = await requireActor();
+  // The worklist is tenant-wide, so it is a staff view; a requester belongs in
+  // the portal, which scopes every ticket through `canReadTicket`.
+  if (!actorHasPermission(actor, "ticket:read:any")) redirect("/portal");
+
+  const params = await searchParams;
+  const clients = clientServicesFor();
+  const store = ticketServicesFor().store;
+  const scope = await clients.scope(actor);
+  // One desk serving many clients means the worklist is scoped before it is
+  // read: an agent sees their clients' work and the work that names no client,
+  // never a third client's. The scope is a `WHERE` now, so the database counts
+  // and pages exactly the rows the reader may see rather than filtering after a
+  // whole-tenant read.
+  const clientIds = scope.kind === "assigned" ? scope.clientIds : null;
+  const filter = parseInboxFilter(params);
+  const now = new Date().toISOString();
+  const requestedPage = pageNumber(first(params.page));
+  const offset = (requestedPage - 1) * INBOX_PER_PAGE;
+
+  const [baseCounts, policies, views, staff] = await Promise.all([
+    store.countInbox(actor.tenantId, { clientIds }),
+    slaPolicyStoreFor().listForTenant(actor.tenantId),
+    savedViewServicesFor().list(actor),
+    // The desk's people, once for the page: they fill the assignment picker in the
+    // selection panel and the bulk toolbar alike, so one read answers both.
+    prisma.user.findMany({
+      where: { tenantId: actor.tenantId, active: true, role: { in: [...ASSIGNEE_ROLES] } },
+      select: { id: true, displayName: true, email: true },
+      orderBy: { displayName: "asc" },
+    }),
+  ]);
+  const assignees = assigneeOptions(staff);
+
+  // SLA flags are derived, not stored, so the counters need the open tickets that
+  // actually carry a policy — eleven columns, no threads — rather than the desk.
+  // A desk with no policy skips the read entirely.
+  const slaCandidates = policies.length === 0 ? [] : await store.listSlaTickets(actor.tenantId, { clientIds });
+  const candidateFlags = slaFlagsByTicket(slaCandidates, policies, now);
+  let slaAtRisk = 0;
+  let slaBreached = 0;
+  for (const flags of candidateFlags.values()) {
+    if (atRiskOnly(flags)) slaAtRisk += 1;
+    if (flags.breached) slaBreached += 1;
+  }
+  const counts: InboxCounts = { ...baseCounts, slaAtRisk, slaBreached };
+
+  // The default view pages in the database. An SLA tab is the one filter a
+  // `WHERE` cannot express (the clock is a policy plus time, not a column), so
+  // that view resolves the matching open tickets from the same policy-bearing
+  // set and pages the ids — still without reading a thread.
+  let tickets: TicketRecord[];
+  let total: number;
+  let page = requestedPage;
+  if (filter.sla) {
+    const matching = sortForInbox(
+      slaCandidates.filter((candidate) => {
+        const flags = candidateFlags.get(candidate.id);
+        return filter.sla === "at-risk" ? atRiskOnly(flags) : flags?.breached === true;
+      })
+    );
+    total = matching.length;
+    const ids = matching.slice(offset, offset + INBOX_PER_PAGE).map((candidate) => candidate.id);
+    tickets = await store.findTickets(actor.tenantId, ids);
+  } else {
+    const result = await store.listInboxPage(actor.tenantId, {
+      filter,
+      clientIds,
+      offset,
+      limit: INBOX_PER_PAGE,
+    });
+    tickets = result.tickets;
+    total = result.total;
+  }
+
+  // A page past the end (a stale link, or rows resolved while somebody read) falls
+  // back to the last page rather than showing an empty worklist that says “0”.
+  if (tickets.length === 0 && total > 0 && offset >= total) {
+    page = Math.max(1, Math.ceil(total / INBOX_PER_PAGE));
+    if (filter.sla) {
+      const matching = sortForInbox(
+        slaCandidates.filter((candidate) => {
+          const flags = candidateFlags.get(candidate.id);
+          return filter.sla === "at-risk" ? atRiskOnly(flags) : flags?.breached === true;
+        })
+      );
+      tickets = await store.findTickets(
+        actor.tenantId,
+        matching.slice((page - 1) * INBOX_PER_PAGE, page * INBOX_PER_PAGE).map((candidate) => candidate.id)
+      );
+    } else {
+      const result = await store.listInboxPage(actor.tenantId, {
+        filter,
+        clientIds,
+        offset: (page - 1) * INBOX_PER_PAGE,
+        limit: INBOX_PER_PAGE,
+      });
+      tickets = result.tickets;
+    }
+  }
+
+  const sla = slaFlagsByTicket(tickets, policies, now);
+  const requestedTicketId = first(params.ticket);
+  let selected = tickets.find((ticket) => ticket.id === requestedTicketId) ?? null;
+  // A ticket named in the URL stays open beside the list even when it is not on
+  // this page — a link to a ticket must not depend on which page it fell on.
+  if (!selected && requestedTicketId) {
+    const fetched = await store.findTicket(actor.tenantId, requestedTicketId);
+    if (fetched && canSeeClient(scope, fetched.clientId)) selected = fetched;
+  }
+  const links = selected ? await linkServicesFor().linkedTickets(actor.tenantId, selected.id) : [];
+
+  const flash = first(params.flash);
+  const error = first(params.error);
+
+  // The actions the selected ticket offers. This is the pair view's whole point: an
+  // agent working the list should be able to reply, resolve, reassign or delete the
+  // ticket they just clicked without opening its page — and the controls are gated by
+  // the same rules the ticket page uses. The service re-checks every one of them
+  // server-side, so what is rendered here is a courtesy, not the control.
+  const actions: TicketActions = {};
+  if (selected) {
+    if (canReplyToTicket(actor, selected)) actions.reply = replyAction;
+    if (canUpdateTicket(actor, selected)) actions.setStatus = setStatusAction;
+    if (canAssignTicket(actor, selected)) actions.assign = assignAction;
+    if (canDeleteTicket(actor, selected)) actions.delete = deleteTicketAction;
+  }
+  // Selecting a ticket in the pair view is opening it, so it takes it: the same rule the
+  // ticket page asks, so the two views cannot disagree about what "looking at" means.
+  const claim = selected ? claimOnView(actor, selected) : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-semibold text-ink">Inbox</h1>
+          <p className="text-sm text-ink-soft">
+            Open work first, most urgent first — resolved tickets never bury live ones.
+          </p>
+          {scope.kind === "assigned" ? (
+            <p className="text-sm text-ink-soft">
+              Scoped to your clients: this desk {scope.because}. Work that names no client stays visible.
+            </p>
+          ) : null}
+        </div>
+        <a
+          href="/inbox/new"
+          className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-ink hover:opacity-95"
+        >
+          New ticket
+        </a>
+      </div>
+
+      {flash ? (
+        <p className="rounded-xl2 border border-ok/40 bg-ok/10 px-4 py-3 text-sm text-ok">{flash}</p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="rounded-xl2 border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad">
+          {error}
+        </p>
+      ) : null}
+
+      <SavedViews
+        views={views}
+        activeFilter={filter}
+        actorId={actor.id}
+        canShare={actorHasPermission(actor, "ticket:update")}
+        saveAction={saveViewAction}
+        deleteAction={deleteViewAction}
+      />
+
+      {/* The worklist is the page; the ticket opens beside it. Wide screens get the pair
+          side by side with a divider either can move, and anything narrower stacks them so
+          neither is squeezed into an unreadable column. */}
+      {claim ? <AutoClaim ticketId={selected?.id ?? ""} claim={claim.claim} action={claimTicketAction} /> : null}
+      <InboxPanes
+        list={
+          <AgentInbox
+            tickets={tickets}
+            counts={counts}
+            total={total}
+            page={page}
+            perPage={INBOX_PER_PAGE}
+            filter={filter}
+            basePath="/inbox"
+            selectedId={selected?.id ?? null}
+            sla={sla}
+            assignees={assignees}
+            bulk={actorHasPermission(actor, "ticket:update") ? { action: bulkAction } : undefined}
+          />
+        }
+        detail={
+          selected ? (
+            <TicketDetail
+              ticket={selected}
+              actions={actions}
+              sla={slaStatusFor(selected, policies, now)}
+              links={links}
+              assignees={assignees}
+            />
+          ) : (
+            <p className="ot-note">
+              Select a ticket to see its conversation. The list on the left is every ticket in your scope, most urgent
+              first.
+            </p>
+          )
+        }
+      />
+    </div>
+  );
+}

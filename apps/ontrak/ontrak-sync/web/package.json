@@ -1,0 +1,25 @@
+{
+  "name": "ontrak-sync-web",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Ontrak Sync dashboard \u2014 Network package and container update monitoring",
+  "scripts": {
+    "dev": "next dev -p 8421",
+    "build": "next build",
+    "start": "next start -p 8421",
+    "typecheck": "tsc --noEmit",
+    "copy:check": "node scripts/copy-check.mjs",
+    "check": "npm run typecheck && npm run copy:check"
+  },
+  "dependencies": {
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,150 @@
+/**
+ * Agent inbox rules (M0): how the ticket list is filtered and ordered.
+ *
+ * A desk lives or dies by the ordering of its worklist, so this is pure and
+ * tested rather than buried in a component. The default order is: still-open
+ * work first, most urgent first, then oldest-touched first so nothing starves.
+ */
+
+import { isOpen, priorityRank, type TicketPriority, type TicketStatus } from "./ticket-rules";
+import type { TicketRecord } from "./ticket-service";
+
+export type InboxSlaFilter = "at-risk" | "breached";
+
+export interface InboxFilter {
+  /** `"open"` (the default) hides resolved and closed work; `"all"` shows everything. */
+  status?: TicketStatus | "open" | "all";
+  /** A specific assignee, or `"unassigned"` for the triage pile. */
+  assigneeId?: string | "unassigned";
+  queueId?: string;
+  /** A single priority — how the overview's “Urgent” count links to the work behind it. */
+  priority?: TicketPriority;
+  /** Case-insensitive match against the reference or subject. */
+  search?: string;
+  /** Restrict the worklist to tickets whose SLA needs attention. */
+  sla?: InboxSlaFilter;
+}
+
+/** The SLA roll-up flags `matchesFilter` needs; supplied by the caller. */
+export interface InboxSlaFlags {
+  atRisk: boolean;
+  breached: boolean;
+}
+
+function statusMatches(status: TicketStatus, filter: InboxFilter): boolean {
+  const wanted = filter.status ?? "open";
+  if (wanted === "all") return true;
+  if (wanted === "open") return isOpen(status);
+  return status === wanted;
+}
+
+export function matchesFilter(ticket: TicketRecord, filter: InboxFilter = {}, sla?: InboxSlaFlags | null): boolean {
+  if (!statusMatches(ticket.status, filter)) return false;
+
+  if (filter.assigneeId === "unassigned") {
+    if (ticket.assigneeId !== null) return false;
+  } else if (filter.assigneeId && ticket.assigneeId !== filter.assigneeId) {
+    return false;
+  }
+
+  if (filter.queueId && ticket.queueId !== filter.queueId) return false;
+
+  if (filter.priority && ticket.priority !== filter.priority) return false;
+
+  if (filter.search) {
+    const needle = filter.search.trim().toLowerCase();
+    if (needle) {
+      const haystack = `${ticket.ref} ${ticket.subject}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+  }
+
+  // A ticket with no policy has no SLA, so it can never appear in an SLA view —
+  // silently including it would make the filter look like it had missed work.
+  //
+  // “At risk” means a clock in its warning window and *not* already lapsed. A
+  // breached ticket is at risk in the loose sense — the clock roll-up sets
+  // `atRisk` for a breach as well — but the two views are how a lead splits the
+  // desk's lateness into “late” and “about to be late”, and a ticket appearing in
+  // both is a ticket counted twice by somebody triaging in a hurry.
+  if (filter.sla === "at-risk" && !atRiskOnly(sla)) return false;
+  if (filter.sla === "breached" && !(sla?.breached ?? false)) return false;
+
+  return true;
+}
+
+/**
+ * Order a worklist. Open tickets come before resolved ones (a resolved ticket
+ * still appearing above live work is the classic shared-inbox failure), then
+ * by descending priority, then oldest update first.
+ */
+export function sortForInbox<T extends Pick<TicketRecord, "status" | "priority" | "updatedAt">>(
+  tickets: readonly T[],
+): T[] {
+  return [...tickets].sort((a, b) => {
+    const openDelta = Number(isOpen(b.status)) - Number(isOpen(a.status));
+    if (openDelta !== 0) return openDelta;
+
+    const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
+    if (priorityDelta !== 0) return priorityDelta;
+
+    return a.updatedAt.localeCompare(b.updatedAt);
+  });
+}
+
+/**
+ * Is this ticket in its warning window and not yet lapsed?
+ *
+ * The one definition of “at risk”, shared by the filter and the counters so a
+ * number and the list it opens can never disagree.
+ */
+export function atRiskOnly(sla?: InboxSlaFlags | null): boolean {
+  return (sla?.atRisk ?? false) && !(sla?.breached ?? false);
+}
+
+export interface InboxCounts {
+  open: number;
+  unassigned: number;
+  urgent: number;
+  /** Open tickets whose clock is in its warning window and has not lapsed. */
+  slaAtRisk: number;
+  /** Open tickets whose SLA has already lapsed. */
+  slaBreached: number;
+  byStatus: Record<TicketStatus, number>;
+}
+
+/** The numbers an agent inbox header shows. */
+export function inboxCounts(
+  tickets: readonly TicketRecord[],
+  sla?: ReadonlyMap<string, InboxSlaFlags>,
+): InboxCounts {
+  const byStatus: Record<TicketStatus, number> = { NEW: 0, OPEN: 0, PENDING: 0, RESOLVED: 0, CLOSED: 0 };
+  let open = 0;
+  let unassigned = 0;
+  let urgent = 0;
+  let slaAtRisk = 0;
+  let slaBreached = 0;
+
+  for (const ticket of tickets) {
+    byStatus[ticket.status] += 1;
+    if (isOpen(ticket.status)) {
+      open += 1;
+      if (ticket.assigneeId === null) unassigned += 1;
+      if (isUrgent(ticket.priority)) urgent += 1;
+      const flags = sla?.get(ticket.id);
+      if (atRiskOnly(flags)) slaAtRisk += 1;
+      if (flags?.breached) slaBreached += 1;
+    }
+  }
+
+  return { open, unassigned, urgent, slaAtRisk, slaBreached, byStatus };
+}
+
+function isUrgent(priority: TicketPriority): boolean {
+  return priority === "URGENT";
+}
+
+/** The default inbox view: open, unassigned work first — the triage queue. */
+export function triageQueue(tickets: readonly TicketRecord[]): TicketRecord[] {
+  return sortForInbox(tickets.filter((ticket) => matchesFilter(ticket, { status: "open", assigneeId: "unassigned" })));
+}

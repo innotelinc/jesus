@@ -1,0 +1,90 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# OnTrak IT Support Training — the deployment overlay.
+#
+# `docker-compose.yml` describes the development stack. This sits on top of it
+# for an actual deployment, so it is always used as an overlay, never alone:
+#
+#   cp .env.production.example .env.production   # then fill it in
+#   make prod-up
+#
+# which is:
+#
+#   docker compose --env-file .env.production \
+#     -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Four things change, and each is the point of the file:
+#
+#   * **The images are pulled, not built.** `image:` names the release to fetch
+#     and `build: !reset null` removes the build context the development file
+#     declares, so a deployment needs no source tree, no toolchain and no minutes
+#     of CPU on the host — it fetches the artifact that was built and tested once,
+#     somewhere with the memory to do it. `ONTRAK_IMAGE_TAG` chooses the release, and
+#     it is one variable for all four product overlays, because a release publishes
+#     a single version for all of them. It defaults to `latest` — the build the
+#     last release published — and setting it in `.env.production` holds a
+#     deployment on one version instead. There is no per-product default left to
+#     drift out of step. Both the app and the migration need
+#     an image, because the migration runs in the builder stage and that stage is
+#     not in the app image by design.
+#   * The database is no longer published. Only the app needs it, and it reaches
+#     it over the compose network; a host port would hand Postgres to whatever
+#     else can reach the machine.
+#   * Secrets are required rather than defaulted. `.env` ships a development
+#     placeholder, and an app that quietly accepts that in a deployment is worse
+#     than one that refuses to start — so the two that matter are demanded here
+#     and startup fails without them.
+#   * Containers restart always, because a deployment is expected to come back by
+#     itself rather than wait for someone to notice.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  db:
+    restart: always
+    environment:
+      # No default on purpose: an unset password must stop the stack, not
+      # silently become the development one.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+    # `!override` replaces the base list rather than merging into it, so the
+    # development port mapping is genuinely dropped. `!reset []` would also
+    # clear it; being explicit about the intent reads better.
+    ports: !override []
+
+  migrate:
+    restart: "no"
+    image: ghcr.io/innotelinc/ontrak-training-migrate:${ONTRAK_IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+    environment:
+      DATABASE_URL: postgresql://ontrak:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}@db:5432/ontrak?schema=public
+
+  app:
+    restart: always
+    image: ghcr.io/innotelinc/ontrak-training:${ONTRAK_IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+    # The whole configuration comes from the production file, exactly as `.env`
+    # supplies it in development — the development file is not read at all.
+    env_file: !override [.env.production]
+    environment:
+      DATABASE_URL: postgresql://ontrak:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}@db:5432/ontrak?schema=public
+      # Required, with no fallback: this is the key that signs every session
+      # cookie, and the shipped development value is public knowledge.
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env.production - see .env.production.example}
+      NODE_ENV: production
+      STORAGE_DIR: ./storage/packages
+    ports: !override ["${ONTRAK_HTTP_PORT:-3000}:3000"]
+
+  # The demo data is deliberately left opt-in and untouched here: it still needs
+  # `--profile demo` to run, which is not something a deployment does by
+  # accident. It reads the production file so it would at least reach the right
+  # database if an operator asked for it.
+  seed:
+    # The builder-stage image the `migrate` service uses above: the seed script
+    # lives in the source tree, which the running app image deliberately does not
+    # carry. Reused rather than published as a third image.
+    image: ghcr.io/innotelinc/ontrak-training-migrate:${ONTRAK_IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+    env_file: !override [.env.production]
+    environment:
+      DATABASE_URL: postgresql://ontrak:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}@db:5432/ontrak?schema=public

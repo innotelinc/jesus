@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="en" data-scheme="operations">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      `viewport-fit=cover` so the console may paint under a notch and a home
+      indicator; the parts that must not be covered keep clear of them with
+      `env(safe-area-inset-*)`, which is what the layout below does.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>OnTrak Genie</title>
+    <!--
+      The family theme (Unity). Genie is a CodeOps console, so its house scheme is the
+      operations one and a person can still switch light/dark/system.
+
+      `unity-theme.js` is a *blocking* script on purpose: it has to run before the
+      first paint so that <html> already carries the remembered mode. Deferred, the
+      page would paint the default palette and then correct itself, which reads as a
+      flicker. Both files are byte-identical copies of the canonical theme.
+    -->
+    <link rel="stylesheet" href="/unity-theme.css" />
+    <script>window.UNITY_DEFAULT_SCHEME = "operations";</script>
+    <script src="/unity-theme.js"></script>
+    <link rel="stylesheet" href="/style.css" />
+    <!--
+      The chat surface: the conversation column, the composer, the command palette
+      and the follow-up chips. A layer *over* `style.css` rather than a rewrite — it
+      dresses the transcript and the two surfaces the console did not have, and
+      everything about it is built from the same Unity tokens, so light mode, dark
+      mode and the family theme are unaffected.
+    -->
+    <link rel="stylesheet" href="/chat-surface.css" />
+    <!--
+      The glass skin: the same three panes, the same conversation, a different
+      material. It is a layer over the two stylesheets above rather than a
+      rewrite — see the file's own header for why the wash, the equal columns and
+      the segmented toolbar are the whole of the change.
+    -->
+    <link rel="stylesheet" href="/liquid-glass.css" />
+  </head>
+  <body class="liquid">
+    <a class="skip-link" href="#input">Skip to the message box</a>
+
+    <div class="app">
+      <aside id="sidebar" class="sidebar" aria-label="Sessions and status">
+        <div class="sidebar-head">
+          <span class="brand">OnTrak Genie</span>
+          <button id="new-chat" class="btn-ghost" title="Start a new chat" aria-label="Start a new chat">+</button>
+          <!--
+            The drawer's own way out, on the head it belongs to. On a wide screen
+            the sidebar is a real column and this button is not rendered at all
+            (`.only-narrow`), so there is nothing to explain to a desktop user.
+          -->
+          <button
+            id="sidebar-close"
+            class="btn-ghost only-narrow"
+            title="Hide the chat list"
+            aria-label="Hide the chat list"
+          >
+            close
+          </button>
+        </div>
+        <!--
+          Two blocks a person can fold, and what they fold is remembered.
+
+          The chat list is the sidebar's reason to exist, so it starts open and
+          keeps the scroll; the status rows are a readout rather than a
+          workspace, and on a narrow sidebar a column of dots costs room a chat
+          title would use better. Native `<details>`, so the toggle is a real
+          control — Enter and Space work it, a screen reader announces
+          expanded/collapsed, and the console's own Tab trap sees it — and the
+          fold is kept in this browser rather than on the account, the trade the
+          theme already makes (see `wireSections` in `app.js`).
+        -->
+        <details id="section-chats" class="sidebar-section sidebar-chats" data-section="chats" open>
+          <summary class="section-head">
+            <span class="section-title">chats</span>
+            <span id="sessions-count" class="section-note muted"></span>
+          </summary>
+          <nav id="sessions" class="sessions" aria-label="Chat sessions"></nav>
+        </details>
+
+        <div class="sidebar-foot">
+          <details id="section-status" class="sidebar-section" data-section="status" open>
+            <summary class="section-head">
+              <span class="section-title">status</span>
+            </summary>
+            <div class="row">
+              <span class="status-dot" id="gateway-dot" aria-hidden="true"></span>
+              <span id="gateway-label" class="muted">checking gateway...</span>
+            </div>
+            <div class="row">
+              <span class="status-dot" id="sandbox-dot" aria-hidden="true"></span>
+              <span id="sandbox-label" class="muted">checking sandbox...</span>
+            </div>
+            <div class="row">
+              <span class="status-dot" id="models-dot" aria-hidden="true"></span>
+              <span id="models-label" class="muted">checking models...</span>
+              <button
+                id="sweep-open"
+                class="btn-ghost mini"
+                title="Ask the gateway which of its advertised models can actually make a tool call"
+              >
+                sweep
+              </button>
+            </div>
+            <div class="row">
+              <span class="status-dot" id="offline-dot" aria-hidden="true"></span>
+              <span id="offline-label" class="muted">checking offline fallback...</span>
+            </div>
+            <div class="row">
+              <span class="status-dot" id="usage-dot" aria-hidden="true"></span>
+              <span id="usage-label" class="muted">checking account usage...</span>
+            </div>
+          </details>
+          <!--
+            Who the console is signed in as, and the way out. Both come from
+            `/api/auth/status`, the one route that answers without a session.
+
+            The row stays hidden until the server reports an identity, because a
+            deployment with no provider — or one reached with a shared
+            `WEB_TOKEN` — has no session to end. A sign-out button that cannot
+            sign anybody out is worse than none: it teaches the wrong thing about
+            whether the credential is still live.
+          -->
+          <div class="row hidden" id="account-row">
+            <span id="account-label" class="muted"></span>
+            <button
+              id="sign-out"
+              class="btn-ghost mini"
+              title="End this session and go back to the sign-in gate"
+            >
+              sign out
+            </button>
+          </div>
+          <div id="workspace-label" class="muted mono"></div>
+          <div class="theme-row">
+            <div class="ot-theme" role="group" aria-label="Colour theme">
+              <button type="button" data-theme-mode="system">System</button>
+              <button type="button" data-theme-mode="light">Light</button>
+              <button type="button" data-theme-mode="dark">Dark</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <!--
+              Wide screens show the sidebar as a column and this button is
+              `display: none`; narrow ones turn the sidebar into an overlay, and
+              this is the only way to it. Its `aria-expanded` is pinned to the
+              drawer's real state by `toggleSidebar`, in both directions.
+            -->
+            <button
+              id="sidebar-toggle"
+              class="btn-ghost only-narrow"
+              title="Show the chat list and status"
+              aria-label="Show the chat list and status"
+              aria-controls="sidebar"
+              aria-expanded="false"
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+            <span id="chat-title" class="chat-title">New chat</span>
+          </div>
+          <div class="topbar-right">
+            <!--
+              One toolbar, two groups. The row used to be eight loose text
+              buttons of different widths, which read as a wall of words and
+              wrapped over the conversation on a laptop. Grouping them by what
+              they act on — the *panels* on the left, the *console's own
+              settings* on the right — gives the eye two shapes instead of
+              eight, and the segmented rail they sit on is the same control
+              vocabulary as the rail's own tabs.
+
+              The identifiers are unchanged: every id here is bound in app.js,
+              and this is a layer over the markup rather than a replacement for
+              it. `.ico` is decoration (`aria-hidden`) and `.lbl` is the word a
+              screen reader announces; below 1500px the words fold to their
+              icons, and each button's `title`/`aria-label` still names it.
+            -->
+            <div class="toolbar toolbar-status" role="group" aria-label="Session state">
+              <span id="gateway-badge" class="badge offline hidden" role="status"></span>
+              <span id="approval-badge" class="badge hidden"></span>
+              <!--
+                Up when the transcript on screen was shared with you. It says so
+                in words rather than only turning the composer off: a disabled
+                box with no reason beside it reads like a fault.
+              -->
+              <span id="share-badge" class="badge hidden" role="status"></span>
+              <!--
+                The model this deployment is serving, when the account does not
+                choose one. Shown instead of the picker rather than beside it:
+                the answer to "which model am I on?" should not be a menu the
+                person cannot use.
+              -->
+              <span id="model-auto" class="badge hidden" role="status"></span>
+              <label class="field" for="model" id="model-field">
+                <!-- A label a sighted person can read, but not one that takes
+                     a column of its own once the toolbar folds. -->
+                <span class="muted lbl">model</span>
+                <select id="model" class="select" aria-label="Model"></select>
+              </label>
+            </div>
+            <div class="toolbar toolbar-actions" role="group" aria-label="Panels and tools">
+              <button
+                id="toggle-files"
+                class="btn-ghost bar-item"
+                title="Toggle the workspace panel"
+                aria-label="Workspace"
+                aria-controls="files-panel"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">▦</span><span class="lbl">workspace</span>
+              </button>
+              <button
+                id="toggle-preview"
+                class="btn-ghost bar-item"
+                title="Run this project and watch it change as the agent edits it"
+                aria-label="Preview"
+                aria-controls="preview"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">▶</span><span class="lbl">preview</span>
+              </button>
+              <button
+                id="hosting-open"
+                class="btn-ghost bar-item"
+                title="Put this workspace on the network under *.DOMAIN — free on a port address, $5/mo or $50/yr for your own name"
+                aria-label="Publish"
+                aria-controls="hosting"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">⤴</span><span class="lbl">publish</span>
+              </button>
+              <button
+                id="terminal-open"
+                class="btn-ghost bar-item"
+                title="Run a shell command in this workspace"
+                aria-label="Terminal"
+                aria-controls="terminal"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">❯</span><span class="lbl">terminal</span>
+              </button>
+              <span class="toolbar-sep" aria-hidden="true"></span>
+              <button
+                id="addons-open"
+                class="btn-ghost bar-item"
+                title="The two agent add-ons and what is left to spend on each"
+                aria-label="Add-ons"
+                aria-controls="addons"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">✦</span><span class="lbl">add-ons</span>
+              </button>
+              <button
+                id="chat-settings"
+                class="btn-ghost bar-item"
+                title="This chat's model settings: fallback models, local fallback, step budget"
+                aria-label="Chat settings"
+                aria-controls="settings"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">⚙</span><span class="lbl">settings</span>
+              </button>
+              <button
+                id="appearance-open"
+                class="btn-ghost bar-item"
+                title="Light or dark, and the colour scheme"
+                aria-label="Appearance"
+                aria-controls="appearance"
+                aria-expanded="false"
+              >
+                <span class="ico" aria-hidden="true">◐</span><span class="lbl">appearance</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div id="messages" class="messages" role="log" aria-label="Conversation"></div>
+
+        <!--
+          How far into the step budget this message is. The agent works in a
+          bounded loop, so a long task has a shape the user can *see* rather than
+          only infer from the tool cards piling up. Hidden until the first step
+          arrives, and hidden again when the turn ends: it reports a turn, not a
+          chat, and an idle bar would be a claim about nothing.
+        -->
+        <div
+          id="turn-progress"
+          class="turn-progress hidden"
+          role="progressbar"
+          aria-label="Steps this message has used"
+          aria-valuemin="0"
+          aria-valuemax="30"
+          aria-valuenow="0"
+        >
+          <div class="turn-progress-track">
+            <div id="turn-progress-fill" class="turn-progress-fill"></div>
+          </div>
+          <span id="turn-progress-label" class="turn-progress-label mono"></span>
+        </div>
+
+        <form id="composer" class="composer" aria-label="Send a message">
+          <textarea
+            id="input"
+            rows="1"
+            aria-label="Message"
+            placeholder="Describe a change, ask a question, or paste an error..."
+          ></textarea>
+          <button type="submit" id="send" class="btn-primary">Send</button>
+          <button type="button" id="stop" class="btn-danger hidden">Stop</button>
+        </form>
+
+        <!--
+          The terminal, docked to the bottom of the column the conversation
+          lives in. Not an interactive shell: one command in, its combined output
+          out, through the same executor the agent's `run_command` uses. It says
+          so in the header rather than letting somebody discover it by trying to
+          run `vi`.
+        -->
+        <section id="terminal" class="terminal hidden" aria-label="Workspace terminal">
+          <div class="terminal-head">
+            <span class="brand">Terminal</span>
+            <span id="terminal-where" class="mono muted"></span>
+            <div class="terminal-actions">
+              <button id="terminal-clear" class="btn-ghost mini" title="Clear the output">
+                clear
+              </button>
+              <button id="terminal-close" class="btn-ghost mini" aria-label="Close the terminal">
+                close
+              </button>
+            </div>
+          </div>
+          <pre id="terminal-output" class="terminal-output mono" tabindex="0"></pre>
+          <form id="terminal-form" class="terminal-form">
+            <span class="terminal-prompt mono" aria-hidden="true">$</span>
+            <input
+              id="terminal-input"
+              class="terminal-input mono"
+              type="text"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              aria-label="Command to run in the workspace"
+              placeholder="npm test  ·  git status  ·  ls -la"
+            />
+            <button type="submit" id="terminal-run" class="btn-ghost mini">run</button>
+            <span id="terminal-busy" class="terminal-busy mono hidden" role="status">running…</span>
+          </form>
+        </section>
+      </main>
+
+      <!--
+        One rail, three views: the preview, the workspace and publishing.
+
+        They were three separate surfaces — the preview a grid column of its own,
+        the workspace a `position: fixed` overlay, publishing a centred dialog — so
+        two of them open at once put one window on top of another, and the
+        workspace covered the very toolbar it was opened from. They are views of a
+        single column now: `data-view` says which, `open` says whether, and a view
+        that is not the current one is not rendered — so there is nothing to
+        stack, and nothing of the console's own to bury.
+      -->
+      <aside id="rail" class="rail" aria-label="Preview, workspace and publishing">
+      <!--
+        The rail's tabs.
+
+        The three views were reached from three buttons in the top toolbar, which
+        is where the *console's* controls live — so which pane was showing could
+        only be read from a row of buttons at the very top of the window, and
+        closing one meant finding its button again. A tab strip in the rail itself
+        says which view is showing where the view is, and it always carries a
+        close: one at the end of the strip that closes whatever is showing, and
+        one in each view's own header. A view that cannot be closed from itself is
+        a view a person gets stuck in.
+
+        `role="tablist"` with roving tabindex, arrow keys and Home/End — the
+        keyboard pattern a tab strip is expected to have — and the tabs are the
+        `aria-controls` half of the three panels below.
+      -->
+      <div class="rail-tabs">
+        <div id="rail-tablist" class="rail-tablist" role="tablist" aria-label="The rail's views">
+          <button
+            id="rail-tab-preview"
+            class="rail-tab"
+            type="button"
+            role="tab"
+            data-view="preview"
+            aria-controls="preview"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            preview
+          </button>
+          <button
+            id="rail-tab-workspace"
+            class="rail-tab"
+            type="button"
+            role="tab"
+            data-view="workspace"
+            aria-controls="files-panel"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            workspace
+          </button>
+          <button
+            id="rail-tab-addons"
+            class="rail-tab"
+            type="button"
+            role="tab"
+            data-view="addons"
+            aria-controls="addons"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            add-ons
+          </button>
+          <button
+            id="rail-tab-publish"
+            class="rail-tab"
+            type="button"
+            role="tab"
+            data-view="publish"
+            aria-controls="hosting"
+            aria-selected="false"
+            tabindex="-1"
+          >
+            publish
+          </button>
+        </div>
+        <!-- One close for whatever is showing, in the strip's own corner: the
+             control that closes a view is where the view is, not only inside it. -->
+        <button id="rail-close" class="rail-close" type="button" aria-label="Close this view" title="Close this view">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <!--
+        The preview is a right-hand rail, not a strip under the conversation:
+        the code and the app it makes are read side by side with the transcript
+        that produced them, and the rail collapses to nothing (the toggle in the
+        top bar) rather than being a fixed height the conversation has to pay for.
+      -->
+      <aside
+        id="preview"
+        class="preview rail-view"
+        role="tabpanel"
+        tabindex="-1"
+        aria-label="The app and the code being generated"
+      >
+        <!--
+          The grip on the rail's inner edge. Drag it to trade width between the
+          conversation and the preview; ArrowLeft/ArrowRight do the same from the
+          keyboard, which is why it is a focusable separator rather than a bare
+          div. It is the one part of the rail that also has to exist *while*
+          collapsed, so its collapsed twin below is this control's other half.
+        -->
+        <div
+          id="preview-resize"
+          class="preview-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the preview pane"
+          tabindex="0"
+        ></div>
+        <div class="preview-head">
+          <span class="brand">Preview</span>
+          <span id="preview-title" class="mono muted">nothing generated yet</span>
+          <span id="preview-status" class="badge hidden" role="status"></span>
+          <div class="preview-actions">
+            <button
+              id="preview-run"
+              class="btn-ghost"
+              aria-pressed="true"
+              title="Switch between the running app and the code the agent is writing"
+            >
+              show app
+            </button>
+            <button
+              id="preview-toggle"
+              class="btn-ghost hidden"
+              aria-pressed="false"
+              title="Switch between the code and the change it made"
+            >
+              show change
+            </button>
+            <button
+              id="preview-open"
+              class="btn-ghost hidden"
+              title="Open this file in the workspace viewer"
+            >
+              open file
+            </button>
+            <button
+              id="preview-collapse"
+              class="btn-ghost"
+              title="Collapse the preview pane — the header stays one click away"
+              aria-controls="preview"
+              aria-expanded="true"
+            >
+              collapse
+            </button>
+            <button id="preview-close" class="btn-ghost" aria-label="Close the preview pane">
+              close
+            </button>
+          </div>
+        </div>
+        <div class="preview-content">
+          <div id="preview-app" class="preview-app hidden">
+            <div class="preview-app-bar">
+              <span id="preview-app-dot" class="preview-dot" aria-hidden="true"></span>
+              <span id="preview-app-url" class="mono muted">no app running</span>
+              <span id="preview-app-note" class="preview-app-note muted"></span>
+              <div class="preview-app-actions">
+                <button
+                  id="preview-app-log-toggle"
+                  class="btn-ghost hidden"
+                  aria-expanded="false"
+                  title="Show the app's own output"
+                >
+                  output
+                </button>
+              </div>
+            </div>
+            <pre id="preview-app-log" class="preview-app-log mono hidden" tabindex="0"></pre>
+            <iframe
+              id="preview-frame"
+              class="preview-frame hidden"
+              title="The app, running"
+              sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads"
+            ></iframe>
+            <p id="preview-app-empty" class="preview-app-empty muted">
+              The app appears here on its own once Genie builds one, and reloads as the files
+              change. Nothing to press.
+            </p>
+          </div>
+          <div id="preview-diff" class="preview-diff hidden"></div>
+          <pre id="preview-body" class="preview-body mono" tabindex="0"></pre>
+        </div>
+      </aside>
+
+      <aside
+        class="files rail-view"
+        id="files-panel"
+        role="tabpanel"
+        tabindex="-1"
+        aria-label="Workspace files"
+      >
+        <!--
+          The workspace's header, in two rows rather than one crowded line.
+
+          The controls were a single row of six, each with `margin-left: auto`
+          (the stylesheet's rule for a row's trailing button, applied to every
+          `mini`), so on a narrow rail they spread apart and `close` was pushed
+          past the edge — the one control that must never be missing. The row that
+          *navigates* (remote, skills, close) stays on the first line; the row that
+          *manages* the folder wraps under it, where crowding costs nothing.
+        -->
+        <div class="files-head">
+          <span class="brand">Workspace</span>
+          <div class="files-actions">
+            <button
+              id="remote-open"
+              class="btn-ghost mini"
+              title="Work on a folder on a server over SSH, or on a GitHub repository, with your own credentials"
+              aria-controls="remote"
+              aria-expanded="false"
+            >
+              remote
+            </button>
+            <button
+              id="skills-open"
+              class="btn-ghost mini"
+              title="See the skills the agent is offered here, and what this workspace remembers"
+              aria-controls="skills"
+              aria-expanded="false"
+            >
+              skills
+            </button>
+            <button id="files-close" class="btn-ghost mini pin-end" aria-label="Close the workspace panel" title="Close the workspace panel">
+              <span aria-hidden="true">×</span> close
+            </button>
+          </div>
+          <!-- What *changes* the folder, kept off the navigation row so neither
+               crowds the other out. -->
+          <div class="files-manage">
+            <span class="muted files-manage-label">this folder</span>
+            <button id="files-new" class="btn-ghost mini" title="Create a folder here">new folder</button>
+            <button
+              id="files-root"
+              class="btn-ghost mini"
+              title="Go to the working directory"
+              aria-label="Go to the working directory"
+            >
+              root
+            </button>
+            <button
+              id="files-clear"
+              class="btn-ghost mini"
+              title="Delete everything in this folder, keeping dot-files like .git"
+              aria-label="Clear this workspace folder"
+            >
+              clear
+            </button>
+          </div>
+        </div>
+        <div class="files-workspace">
+          <label class="field wide" for="workspace-pick">
+            <span class="muted">the agent works in</span>
+            <select id="workspace-pick" class="select" aria-label="The directory the agent works in"></select>
+          </label>
+          <p id="workspace-note" class="muted files-note"></p>
+        </div>
+        <!--
+          Saved projects: the named directories this account keeps. A project is
+          a *saved* choice of working directory, not a second kind of one —
+          opening it drives the picker above, so the agent, the tree and the
+          preview all follow without knowing this list exists.
+        -->
+        <div class="files-projects">
+          <div class="files-projects-head">
+            <span class="muted">projects</span>
+            <span class="files-projects-actions">
+              <button
+                id="project-upload"
+                class="btn-ghost mini"
+                title="Upload a project as a .zip: it is unpacked as a new project, opened, and its dependencies installed"
+              >
+                upload .zip
+              </button>
+              <button id="project-import" class="btn-ghost mini" title="Load a project bundle (.json) as a new project">
+                import
+              </button>
+              <button id="project-publish" class="btn-ghost mini" title="Create a GitHub or Atlas repository and save this project into it">
+                publish
+              </button>
+              <button id="project-new" class="btn-ghost mini" title="Create and open a new project">
+                new project
+              </button>
+            </span>
+            <!-- Hidden until asked for: the bundle is read in the page and POSTed back. -->
+            <input
+              id="project-import-file"
+              class="hidden"
+              type="file"
+              accept=".json,application/json"
+              aria-label="Choose a project bundle to load"
+            />
+            <!--
+              The archive itself is the request body — the file is handed to
+              `fetch` unread, so a 40 MB upload is not decoded into a string in the
+              page first, and is not re-encoded on the way out.
+            -->
+            <input
+              id="project-upload-file"
+              class="hidden"
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              aria-label="Choose a project archive to upload"
+            />
+          </div>
+          <div id="projects-list" class="projects-list" aria-label="Saved workspace projects"></div>
+          <!--
+            What the upload did: which folder was unwrapped, how many files
+            landed, what was left out, and every install step with its result. It
+            is a log rather than a sentence because a failed install is the case
+            that matters, and the installer's own words are the useful part.
+          -->
+          <pre id="project-import-log" class="files-import-log hidden" role="status" aria-live="polite"></pre>
+        </div>
+        <div id="files-path" class="files-path mono">.</div>
+        <div id="files-list" class="files-list"></div>
+      </aside>
+
+      <!--
+        The two agent add-ons.
+
+        Engineer and Uncensored Godmode are products with doors of their own, so
+        this view is a directory rather than a control panel: what each one costs a
+        run, how many are left, and where to buy more when there are none. The
+        balances are the control plane's own answer, which is the same one a run
+        spends against.
+      -->
+      <div
+            id="addons"
+            class="addons rail-view hidden"
+            role="tabpanel"
+            aria-labelledby="addons-title"
+            tabindex="-1"
+          >
+            <div class="viewer-head">
+              <span id="addons-title" class="mono">add-ons</span>
+              <div class="viewer-actions">
+                <button id="addons-close" class="btn-ghost" aria-label="Close add-ons">close</button>
+              </div>
+            </div>
+            <div class="viewer-content settings-form">
+              <p id="addons-status" class="muted settings-note"></p>
+              <div id="addons-list" class="addons-list"></div>
+            </div>
+          </div>
+
+      <div
+            id="hosting"
+            class="hosting rail-view hidden"
+            role="tabpanel"
+            aria-labelledby="hosting-title"
+            tabindex="-1"
+          >
+            <div class="viewer-head">
+              <span id="hosting-title" class="mono">publish &amp; host</span>
+              <div class="viewer-actions">
+                <button id="hosting-close" class="btn-ghost" aria-label="Close publishing">close</button>
+              </div>
+            </div>
+            <div class="viewer-content settings-form">
+              <p id="hosting-status" class="muted settings-note"></p>
+              <div id="hosting-plan" class="hosting-plan"></div>
+              <label class="field wide" for="hosting-name">
+                <span class="muted">your own name — leave empty for a free address on a port</span>
+                <div class="hosting-name-row">
+                  <input
+                    id="hosting-name"
+                    class="input-text"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="acme"
+                    aria-label="Your preview subdomain"
+                  />
+                  <span id="hosting-suffix" class="mono muted"></span>
+                </div>
+              </label>
+              <div class="hosting-actions">
+                <button id="hosting-publish" class="btn-primary">publish</button>
+                <button id="hosting-buy" class="btn-ghost hidden">get your own name</button>
+              </div>
+              <div id="hosting-list" class="hosting-list"></div>
+            </div>
+            </div>
+
+      </aside>
+
+      <!--
+        The rail, collapsed to an edge tab. Without it "collapsed" and "gone"
+        look the same: the only way back would be a button in a toolbar the user
+        has to find again, and the pane they just closed would read as one this
+        build does not have. So the control is always on screen, in the same
+        place, in both states.
+      -->
+      <button
+        id="preview-expand"
+        class="preview-expand hidden"
+        title="Open the preview pane"
+        aria-controls="preview"
+        aria-expanded="false"
+      >
+        <span class="preview-expand-glyph" aria-hidden="true">‹</span>
+        <span class="preview-expand-text">preview</span>
+      </button>
+
+      
+    </div>
+
+    <!--
+      The dimmer behind the sidebar when it is an overlay. Outside `.app` because
+      it is not a track in that grid, and inert to the tab order (`hidden`), so
+      the only thing a keyboard user can reach behind the drawer is the drawer.
+    -->
+    <div id="sidebar-scrim" class="scrim hidden"></div>
+
+    <!--
+      `tabindex="-1"` on all five panels is what lets the console put focus on the
+      panel itself when it opens, so a screen reader reads the title before the
+      controls and Tab then walks them (see `enterDialog` in `app.js`).
+    -->
+    <div
+      id="viewer"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="viewer-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="viewer-title" class="mono"></span>
+        <div class="viewer-actions">
+          <button id="viewer-toggle" class="btn-ghost hidden" aria-pressed="false" title="Switch between the change and the file">
+            show file
+          </button>
+          <button
+            id="viewer-delete"
+            class="btn-ghost hidden"
+            title="Delete this file from the workspace"
+          >
+            delete
+          </button>
+          <button id="viewer-close" class="btn-ghost" aria-label="Close file viewer">close</button>
+        </div>
+      </div>
+      <div class="viewer-content">
+        <div id="viewer-diff" class="viewer-diff hidden"></div>
+        <pre id="viewer-body" class="viewer-body" tabindex="0"></pre>
+      </div>
+    </div>
+
+    <div
+      id="settings"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="settings-title" class="mono">this chat's model settings</span>
+        <div class="viewer-actions">
+          <button id="settings-close" class="btn-ghost" aria-label="Close chat settings">close</button>
+        </div>
+      </div>
+      <div class="viewer-content settings-form">
+        <label class="field wide" for="fallbacks">
+          <span class="muted">fallback models — comma separated, tried in order</span>
+          <input
+            id="fallbacks"
+            class="input-text"
+            type="text"
+            aria-label="Fallback models, comma separated"
+            placeholder="none"
+            title="Models to try, in order, when the chosen one throttles or fails. The offline gateway is always tried last."
+          />
+        </label>
+        <label class="field check" for="use-offline">
+          <input id="use-offline" type="checkbox" checked />
+          <span class="muted">use the local gateway when the chain is exhausted</span>
+        </label>
+        <label class="field" for="steps">
+          <span class="muted">steps — most assistant turns for one message</span>
+          <input
+            id="steps"
+            class="input-num"
+            type="number"
+            min="1"
+            max="999"
+            step="1"
+            value="999"
+            inputmode="numeric"
+            aria-label="Maximum agent steps per message"
+            title="Maximum assistant turns the agent may take for one message"
+          />
+        </label>
+        <p id="settings-note" class="muted settings-note"></p>
+      </div>
+    </div>
+
+    <!--
+      Publishing a project to a repository that does not exist yet.
+
+      The one thing this dialog has to say out loud is what happens afterwards:
+      the project's directory *becomes* the clone. `origin` is set to the new
+      repository and the credential is used for the single push (never written into
+      `.git/config`), so the push and pull-request controls work from here on with
+      nothing else to configure — which is what "and carry on working" means.
+
+      The GitHub token is asked for per publish rather than kept: it is the
+      caller's own credential, the server holds it for the session only, and a
+      password field that forgets is the honest shape for that.
+    -->
+    <div
+      id="publish"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="publish-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="publish-title" class="mono">save this project to a repository</span>
+        <div class="viewer-actions">
+          <button id="publish-close" class="btn-ghost" aria-label="Close publish">close</button>
+        </div>
+      </div>
+      <div class="viewer-content settings-form">
+        <label class="field" for="publish-target">
+          <span class="muted">where</span>
+          <select id="publish-target" class="select" aria-label="Which forge to create the repository on">
+            <option value="github">GitHub — github.com</option>
+            <option value="atlas">Atlas — this deployment's forge</option>
+          </select>
+        </label>
+        <label class="field wide" for="publish-name">
+          <span class="muted">repository name</span>
+          <input
+            id="publish-name"
+            class="input-text"
+            type="text"
+            aria-label="Repository name"
+            placeholder="my-project"
+          />
+        </label>
+        <label class="field wide" for="publish-description">
+          <span class="muted">description</span>
+          <input
+            id="publish-description"
+            class="input-text"
+            type="text"
+            aria-label="Repository description"
+            placeholder="saved from Genie"
+          />
+        </label>
+        <label class="field check" for="publish-private">
+          <input id="publish-private" type="checkbox" checked />
+          <span class="muted">private</span>
+        </label>
+        <label class="field wide" id="publish-token-field" for="publish-token">
+          <span class="muted">GitHub token — used for this push, never stored in the project</span>
+          <input
+            id="publish-token"
+            class="input-text"
+            type="password"
+            autocomplete="off"
+            aria-label="GitHub token"
+            placeholder="ghp_… or github_pat_…"
+          />
+        </label>
+        <p id="publish-note" class="muted settings-note"></p>
+        <div class="viewer-actions publish-actions">
+          <button id="publish-go" class="btn-primary">save it there</button>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      Appearance. The controls live here; the preference belongs to
+      `unity-theme.js`, which paints <html> before the first frame — so this dialog
+      holds no state of its own and the buttons report what the document is doing
+      rather than what was clicked. That is what makes the deep link safe: two tabs
+      cannot disagree about which mode is on.
+    -->
+    <div
+      id="appearance"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="appearance-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="appearance-title" class="mono">appearance</span>
+        <div class="viewer-actions">
+          <button id="appearance-close" class="btn-ghost" aria-label="Close appearance">close</button>
+        </div>
+      </div>
+      <div class="viewer-content settings-form">
+        <div class="field wide">
+          <span class="muted">mode</span>
+          <div class="ot-theme" role="group" aria-label="Colour mode">
+            <button type="button" data-theme-mode="system">System</button>
+            <button type="button" data-theme-mode="light">Light</button>
+            <button type="button" data-theme-mode="dark">Dark</button>
+          </div>
+        </div>
+        <div class="field wide">
+          <span class="muted">scheme</span>
+          <div class="ot-theme" role="group" aria-label="Colour scheme">
+            <button type="button" data-theme-scheme="operations">Operations</button>
+            <button type="button" data-theme-scheme="soc">Security</button>
+            <button type="button" data-theme-scheme="desk">Desk</button>
+          </div>
+        </div>
+        <p class="muted settings-note">
+          Remembered in this browser rather than on the account, so the machine in
+          front of you answers the same way whoever signs in. Open it directly with
+          <span class="mono">?settings=appearance</span>.
+        </p>
+      </div>
+    </div>
+
+    
+
+    <!--
+      Skills and memory: what this agent is offered, and what this workspace has
+      learned.
+
+      The list is what *this caller* can use: the project's `.genie/skills`, the
+      account's, then the deployment's, most specific first (skill-roots.ts).
+
+      Installing from here writes into the signed-in account's own slice and
+      nobody else's, so a shared console does not let one person change what
+      everybody is offered; a deployment-wide skill stays an operator's copy or
+      `genie skills add` from a shell, which is why the note below names both. The
+      memory is *not* writable from here at all: it is a file the agent edits with
+      its own `remember` tool, through the same gate and diff as any other write.
+    -->
+    <div
+      id="skills"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="skills-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="skills-title" class="mono">skills &amp; memory</span>
+        <div class="viewer-actions">
+          <button id="skills-close" class="btn-ghost" aria-label="Close skills and memory">close</button>
+        </div>
+      </div>
+      <div class="viewer-content settings-form">
+        <p id="skills-status" class="muted settings-note"></p>
+
+        <!--
+          The blocks below fold, like the sidebar's sections and for the same
+          reason: this panel is three answers to three different questions, and a
+          person who came for one of them should not scroll past the others. They
+          start open — each is a distinct part of a short panel, and hiding an
+          install field behind a click is a feature nobody finds — so what the
+          fold buys here is room for the person who wants it, not a default the
+          console made for them.
+        -->
+        <details class="skills-block panel-block" id="section-skills-memory" data-section="skills-memory" open>
+          <summary class="section-head">
+            <h2 id="skills-memory-heading" class="remote-heading">what this workspace remembers</h2>
+          </summary>
+          <p id="skills-memory" class="muted settings-note"></p>
+        </details>
+
+        <details class="skills-block panel-block" id="section-skills-install" data-section="skills-install" open>
+          <summary class="section-head">
+            <h2 id="skills-install-heading" class="remote-heading">add one from GitHub</h2>
+          </summary>
+          <form id="skills-install" class="skills-install" autocomplete="off">
+            <label class="field wide" for="skills-repo">
+              <span class="muted">repository</span>
+              <div class="skills-install-row">
+                <input
+                  id="skills-repo"
+                  class="input-text"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="owner/repo"
+                  aria-label="GitHub repository holding the skill to install"
+                />
+                <button type="submit" id="skills-install-run" class="btn-primary">install</button>
+              </div>
+            </label>
+          </form>
+          <p id="skills-install-note" class="muted settings-note">
+            A skill is a markdown playbook from a public GitHub repository, and it
+            is installed into <em>your</em> account on this deployment — the lane
+            that sits above the shared one and below this project's own
+            <span class="mono">.genie/skills</span>, so nothing here changes what
+            anybody else is offered. For a skill the whole deployment should have,
+            an operator runs <span class="mono">genie skills add &lt;owner/repo&gt;</span>.
+          </p>
+        </details>
+
+        <details class="skills-block panel-block" id="section-skills-list" data-section="skills-list" open>
+          <summary class="section-head">
+            <h2 id="skills-list-heading" class="remote-heading">skills on offer</h2>
+          </summary>
+          <div id="skills-list" class="skills-list"></div>
+          <p class="muted settings-note">
+            The model sees that menu at the start of every turn and loads a playbook
+            when one fits the work. A skill kept in
+            <span class="mono">.genie/skills</span> travels with the code, so
+            everyone who clones this workspace gets it.
+          </p>
+        </details>
+      </div>
+    </div>
+
+    <!--
+      Remote workspaces: a folder on a server, and a repository on GitHub.
+
+      The credentials are the *caller's* and are held for this session only, which
+      is why the key and the token are fields on a panel that says so rather than
+      settings that get saved: nothing here is written into the workspace, and
+      closing the tab does not leave a credential behind for the next person at
+      this machine.
+    -->
+    <div
+      id="remote"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="remote-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="remote-title" class="mono">remote workspaces</span>
+        <div class="viewer-actions">
+          <button id="remote-close" class="btn-ghost" aria-label="Close remote workspaces">close</button>
+        </div>
+      </div>
+      <div class="viewer-content settings-form">
+        <p id="remote-status" class="muted settings-note"></p>
+
+        <!--
+          Three ways to get a working directory, and they are alternatives rather
+          than a sequence — so the SSH form opens and the other two are folded,
+          each behind a summary that names it. That is the whole of the default:
+          one click unfolds either one, and the fold is remembered per browser
+          (`wireSections`). On a phone this is the difference between a panel that
+          fits and three screens of forms nobody asked for yet.
+        -->
+        <details class="remote-block panel-block" id="section-remote-ssh" data-section="remote-ssh" open>
+          <summary class="section-head">
+            <h2 id="remote-ssh-heading" class="remote-heading">a folder on a server, over SSH</h2>
+          </summary>
+          <div class="remote-grid">
+            <label class="field" for="remote-host">
+              <span class="muted">host</span>
+              <input id="remote-host" class="input-text" type="text" autocomplete="off" placeholder="dev.example.com" />
+            </label>
+            <label class="field" for="remote-port">
+              <span class="muted">port</span>
+              <input id="remote-port" class="input-num" type="number" min="1" max="65535" step="1" inputmode="numeric" placeholder="22" />
+            </label>
+            <label class="field" for="remote-user">
+              <span class="muted">user</span>
+              <input id="remote-user" class="input-text" type="text" autocomplete="off" placeholder="deploy" />
+            </label>
+            <label class="field wide" for="remote-path">
+              <span class="muted">path on that host — absolute</span>
+              <input id="remote-path" class="input-text" type="text" autocomplete="off" placeholder="/srv/app" />
+            </label>
+            <label class="field" for="remote-password">
+              <span class="muted">password — used for this session only, never written to disk</span>
+              <input id="remote-password" class="input-text" type="password" autocomplete="new-password" />
+            </label>
+            <label class="field" for="remote-passphrase">
+              <span class="muted">the key's passphrase, when you connect with a key</span>
+              <input id="remote-passphrase" class="input-text" type="password" autocomplete="new-password" />
+            </label>
+            <label class="field wide" for="remote-key">
+              <span class="muted">or a private key — pasted, used for this session only. If you fill in both this and the password, the password is the one used.</span>
+              <!-- The placeholder is the real PEM header, with the hyphens written as
+                   character references: scripts/secret-scan.py flags the PEM shape
+                   wherever it appears, placeholders included, so the literal cannot be
+                   committed. It still renders as the dashes the student expects. -->
+              <textarea
+                id="remote-key"
+                class="input-text remote-key"
+                rows="3"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="&#45;&#45;&#45;&#45;&#45;BEGIN OPENSSH PRIVATE KEY&#45;&#45;&#45;&#45;&#45;"
+              ></textarea>
+            </label>
+          </div>
+          <div class="remote-actions">
+            <button id="remote-connect" class="btn-primary">connect folder</button>
+          </div>
+          <p class="muted files-note">
+            The folder is mounted inside the sandbox and becomes where the agent works, so its edits
+            land on the server and the preview runs the project there. Nothing is written into the
+            workspace: a password is handed to the mount and never written to disk, and a key is kept
+            for this session only and removed when you disconnect.
+          </p>
+        </details>
+
+        <details class="remote-block panel-block" id="section-remote-github" data-section="remote-github">
+          <summary class="section-head">
+            <h2 id="remote-github-heading" class="remote-heading">a repository on GitHub</h2>
+          </summary>
+          <div class="remote-grid">
+            <label class="field" for="remote-repo">
+              <span class="muted">repository — owner/name, or a GitHub URL</span>
+              <input id="remote-repo" class="input-text" type="text" autocomplete="off" placeholder="owner/name" />
+            </label>
+            <label class="field" for="remote-branch">
+              <span class="muted">branch to check out</span>
+              <input id="remote-branch" class="input-text" type="text" autocomplete="off" placeholder="the default branch" />
+            </label>
+            <label class="field wide" for="remote-token">
+              <span class="muted">token — needed for a private repository and to push</span>
+              <input id="remote-token" class="input-text" type="password" autocomplete="new-password" placeholder="ghp_…" />
+            </label>
+          </div>
+          <div class="remote-actions">
+            <button id="remote-clone" class="btn-primary">clone &amp; work in it</button>
+            <button id="remote-branch-new" class="btn-ghost" title="Create and check out a working branch in the clone">
+              new branch
+            </button>
+            <button id="remote-push" class="btn-ghost" title="Push a branch to GitHub with the token you supplied">
+              push
+            </button>
+            <button id="remote-pr" class="btn-ghost" title="Open a pull request for a pushed branch">pull request</button>
+          </div>
+          <p class="muted files-note">
+            The clone lands in the working directory and is edited in place, so the app can be previewed
+            as it changes. The token is supplied per git command and never written into
+            <span class="mono">.git/config</span>.
+          </p>
+        </details>
+
+        <details class="remote-block panel-block" id="section-remote-atlas" data-section="remote-atlas">
+          <summary class="section-head">
+            <h2 id="remote-atlas-heading" class="remote-heading">Atlas — the ecosystem's forge</h2>
+          </summary>
+          <p id="remote-atlas-status" class="muted files-note"></p>
+          <div class="remote-grid">
+            <label class="field" for="remote-forge-url">
+              <span class="muted">forge address</span>
+              <input id="remote-forge-url" class="input-text" type="text" autocomplete="off" placeholder="http://host:3000" />
+            </label>
+            <label class="field" for="remote-forge-user">
+              <span class="muted">user</span>
+              <input id="remote-forge-user" class="input-text" type="text" autocomplete="off" placeholder="root" />
+            </label>
+            <label class="field" for="remote-forge-secret">
+              <span class="muted">password or access token</span>
+              <input id="remote-forge-secret" class="input-text" type="password" autocomplete="new-password" />
+            </label>
+            <label class="field" for="remote-atlas-repo">
+              <span class="muted">repository to clone — owner/name</span>
+              <input id="remote-atlas-repo" class="input-text" type="text" autocomplete="off" placeholder="owner/name" />
+            </label>
+            <label class="field" for="remote-atlas-name">
+              <span class="muted">new project name</span>
+              <input id="remote-atlas-name" class="input-text" type="text" autocomplete="off" placeholder="my-project" />
+            </label>
+          </div>
+          <div class="remote-actions">
+            <button id="remote-atlas-connect" class="btn-primary">connect to Atlas</button>
+            <button id="remote-atlas-create" class="btn-ghost" title="Create the repository on the forge, clone it, and work in it">
+              create a project
+            </button>
+            <button id="remote-atlas-clone" class="btn-ghost" title="Clone a repository from the forge into the workspace">
+              clone
+            </button>
+            <button id="remote-atlas-run" class="btn-ghost" title="Run the project in the working directory and show the app">
+              run the project
+            </button>
+            <button id="remote-atlas-ssh" class="btn-ghost" title="Fill the SSH form in with Atlas's host, for working in a folder there">
+              folder on Atlas
+            </button>
+            <button id="remote-forge-branch" class="btn-ghost" title="Create and check out a working branch in the clone">
+              new branch
+            </button>
+            <button id="remote-forge-push" class="btn-ghost" title="Push a branch to the forge with the credential you supplied">
+              push
+            </button>
+            <button id="remote-forge-pr" class="btn-ghost" title="Open a pull request for a pushed branch">pull request</button>
+          </div>
+          <p class="muted files-note">
+            Atlas is an optional add-on — a subscription, or this deployment's own credential, is what grants it. These
+            are the Gitea endpoints, so any Gitea forge works here. A project created or cloned here becomes where the
+            agent works, so it can be run and previewed straight away.
+          </p>
+        </details>
+
+        <div id="remote-list" class="hosting-list" aria-label="Connected remote workspaces"></div>
+      </div>
+    </div>
+
+    <div
+      id="sweep"
+      class="viewer hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sweep-title"
+      tabindex="-1"
+    >
+      <div class="viewer-head">
+        <span id="sweep-title" class="mono">which models actually work</span>
+        <div class="viewer-actions">
+          <button id="sweep-run" class="btn-ghost" title="About two dozen models, spread across every provider">
+            run sample
+          </button>
+          <button id="sweep-run-all" class="btn-ghost" title="Every model that claims tool calling. Slower, and it will rate-limit some of them.">
+            run full sweep
+          </button>
+          <button id="sweep-close" class="btn-ghost" aria-label="Close the model sweep">close</button>
+        </div>
+      </div>
+      <div class="viewer-content">
+        <div id="sweep-status" class="muted"></div>
+        <div id="sweep-report" class="sweep-report"></div>
+      </div>
+    </div>
+
+    <div id="live" class="sr-only" role="status" aria-live="polite"></div>
+
+    <script>
+      /*
+       * The theme switch, wired to the shared script in the head. The buttons report
+       * the document's state rather than the click that asked for the change, so this
+       * control cannot end up showing a preference other than the one in force — which
+       * is what keeps it honest if the preference is changed from another tab.
+       */
+      (function () {
+        var api = window.UnityTheme || window.OntrakTheme;
+        if (!api) return;
+        // Two groups, one rule: every button carrying the attribute reports and
+        // sets the value the shared theme owns. The sidebar's switch and the
+        // Appearance dialog's are the same control in two places, so they cannot
+        // drift — and neither can a button added later.
+        var GROUPS = [
+          ["data-theme-mode", function () { return api.mode(); }, function (value) { api.setMode(value); }],
+          ["data-theme-scheme", function () { return api.scheme(); }, function (value) { api.setScheme(value); }],
+        ];
+        function paint() {
+          for (var g = 0; g < GROUPS.length; g++) {
+            var attribute = GROUPS[g][0];
+            var now = GROUPS[g][1]();
+            var all = document.querySelectorAll("[" + attribute + "]");
+            for (var i = 0; i < all.length; i++) {
+              all[i].setAttribute("aria-pressed", String(all[i].getAttribute(attribute) === now));
+            }
+          }
+        }
+        for (var g = 0; g < GROUPS.length; g++) {
+          (function (attribute, apply) {
+            var buttons = document.querySelectorAll("[" + attribute + "]");
+            for (var i = 0; i < buttons.length; i++) {
+              buttons[i].addEventListener("click", function () {
+                apply(this.getAttribute(attribute));
+              });
+            }
+          })(GROUPS[g][0], GROUPS[g][2]);
+        }
+        window.addEventListener("unity:theme", paint);
+        paint();
+      })();
+    </script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

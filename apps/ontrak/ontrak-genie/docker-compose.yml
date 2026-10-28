@@ -1,0 +1,121 @@
+# Agent UI, talking to a model gateway that lives on the LAN.
+#
+#   cp .env.example .env       (then edit it)
+#   docker compose up -d
+#   open http://127.0.0.1:3410/?token=<WEB_TOKEN>
+#
+# This is the **product-only** stack, for a laptop or a deployment of Genie by
+# itself. The family stack (`docker-compose.all.yml`, `make all-up`) also runs
+# Genie, and *it* is the owner of :3400 — see docs/family-operations.md. So this
+# file does not default to 3400: two stacks on one host with the same port is a
+# container that crash-loops on `EADDRINUSE` with nothing on screen saying why.
+# Set `ONTRAK_GENIE_PORT` to choose the port, in whichever of the two stacks you
+# are starting — the family stack reads the same variable for its own published
+# port, so one setting moves either one.
+#
+# The gateway is an external service (the stack's shared OmniRoute), not a
+# container declared here. A container in this file would only be reachable at
+# a Docker bridge address like 172.17.x.x, which nothing else on the network can
+# resolve or route to — so it is addressed by its real host instead. Which host
+# that is comes from the deployment's environment, never from this file.
+#
+# `network_mode: host` is deliberate and is the other half of that: this
+# container gets no bridge address at all. It talks to the gateway as a plain
+# network peer and publishes the UI on the host's own address, rather than being
+# reached through a NAT hop that Docker inserted.
+#
+# Host networking is also why the port has to be a variable here rather than a
+# `ports:` mapping: with no bridge address there is no mapping to change, so the
+# only way to move this stack off a port another stack holds is to change the
+# address the server binds. `PORT` below is therefore the deployment's to set.
+
+services:
+  agent:
+    build: .
+    # Named, so this stack and the family stack build the same image under the
+    # same tag instead of two anonymous ones. `main` is the dev tag and every
+    # build moves it; every build also stamps `sha-<commit>`, which is what says
+    # which tree an image came from. Set `ONTRAK_GENIE_IMAGE_TAG` to pin one.
+    image: innotel/ontrak-genie:${ONTRAK_GENIE_IMAGE_TAG:-main}
+    restart: unless-stopped
+    network_mode: host
+    # The whole of .env comes through as-is. A hand-maintained list of variables
+    # here is a list that silently falls out of date: the container then runs with
+    # the code's defaults instead, which is how the approval gate once came up
+    # "off" inside a container while .env said "risky". Optional, so `docker
+    # compose up` still works with no .env at all (the code's defaults apply).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Only the settings that must differ inside a container: the image's own
+      # filesystem layout, and the fact that this container is already the
+      # boundary, so run_command stays inside it rather than trying to nest
+      # Docker (there is no Docker socket here to nest into).
+      #
+      # `environment` wins over `env_file`, which is what makes these overrides
+      # hold even though .env has AGENT_WORKSPACE=./workspace and
+      # AGENT_SANDBOX=auto for the bare-node case.
+      HOST: "0.0.0.0"
+      PORT: "${ONTRAK_GENIE_PORT:-3410}"
+      AGENT_WORKSPACE: "/workspace"
+      AGENT_DATA_DIR: "/data"
+      AGENT_SANDBOX: "host"
+      # The app the agent runs, published on the host's own address.
+      #
+      # `network_mode: host` above is what makes this the honest thing to do
+      # here: with no bridge address there is no NAT hop, so a dev server bound
+      # to `0.0.0.0` inside this container is listening on the host's *own* LAN
+      # address — the preview panel names `http://<this host>:<port>`, and the
+      # gateway, a webhook or a phone on the same network can call it back. It
+      # is off by default (`AGENT_PREVIEW_HOST=loopback`): the published app is
+      # not behind the console's sign-in, so publishing is a decision, not a
+      # default. Turn it on with AGENT_PREVIEW_HOST=all and
+      # AGENT_PREVIEW_PUBLISH=true. AGENT_LAN_IP overrides the address Genie
+      # works out for itself.
+      AGENT_LAN_IP: "${AGENT_LAN_IP:-}"
+      AGENT_PREVIEW_HOST: "${AGENT_PREVIEW_HOST:-loopback}"
+      AGENT_PREVIEW_PUBLISH: "${AGENT_PREVIEW_PUBLISH:-false}"
+    volumes:
+      # The agent can only touch this directory.
+      - ./workspace:/workspace
+      # Sessions and transcripts. Named rather than bind-mounted so a rebuild or
+      # a `docker compose down` does not throw away the chats.
+      - agent-data:/data
+      # Cerulean Vault: when .env carries `vault://` references (see the
+      # "Cerulean Vault" section of .env.example), mount this stack's
+      # path-scoped token here and set VAULT_TOKEN_FILE to this path in .env.
+      # Cerulean writes it to ./data/vault/token/ontrak.token on the host that
+      # runs Vault. Uncomment when Vault is in use; a missing source file is a
+      # directory Docker creates, not a token, so this stays off by default.
+      # - ./data/vault/token/ontrak.token:/vault/token/ontrak.token:ro
+    # Deliberately the static shell, not /api/health: the shell is public by
+    # design (it has to render the token prompt), so this works whether or not
+    # WEB_TOKEN is set, and it answers "is this container serving?" without
+    # making a restart depend on the LAN gateway being up.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:${ONTRAK_GENIE_PORT:-3410}/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  agent-data:
+
+# If you would rather run a gateway in Docker than use one on the LAN, add it
+# back here — but publish and address it by a LAN address, not a service name:
+#
+#   omniroute:
+#     image: diegosouzapw/omniroute
+#     restart: unless-stopped
+#     ports:
+#       - "<gateway-host-address>:20128:20128"
+#     environment:
+#       OMNIROUTE_SERVER_HOST: "0.0.0.0"
+#       OMNIROUTE_DATA_DIR: "/data"
+#     volumes:
+#       - omniroute-data:/data
+#
+# volumes:
+#   omniroute-data:

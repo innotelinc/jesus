@@ -1,0 +1,1771 @@
+/*
+ * Genie's palette is the family's.
+ *
+ * `unity-theme.css` — linked from index.html, and a byte-identical copy of the
+ * canonical theme — owns the colours; Genie is a CodeOps console, so it wears the
+ * **operations** scheme. The names below are the ones this stylesheet's rules have
+ * always used, aliased onto the theme's tokens, which is what let the console gain
+ * light mode without every rule in this file being rewritten.
+ *
+ * `--ok` is deliberately *not* listed here. The theme already defines it, and
+ * `--ok: var(--ok)` is a cycle: the custom property would be invalid at
+ * computed-value time and take the colour down with it.
+ */
+:root {
+  --bg: var(--canvas);
+  --bg-panel: var(--surface);
+  --bg-raised: var(--surface-muted);
+  /* Hover has to read as "a little further from the page" in both modes, so it is
+     mixed from the ink rather than taken from a second, dark-only palette. */
+  --bg-hover: color-mix(in oklab, var(--ink) 9%, var(--surface-muted));
+  --border: var(--line);
+  --text: var(--ink);
+  --text-dim: var(--ink-soft);
+  --accent: var(--brand);
+  --accent-dim: var(--brand-ring);
+  --warn: var(--attention);
+  --err: var(--bad);
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: var(--font-sans);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+/*
+ * iOS Safari inflates body text when a phone is turned to landscape unless it is
+ * told not to. That is a reading aid on an article and a bug in a console: the
+ * line lengths, the diff columns and the wrapping were all chosen for the size
+ * that is set, so the size stays what it is set to.
+ */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.mono { font-family: var(--mono); }
+.muted { color: var(--text-dim); }
+.hidden { display: none !important; }
+
+/*
+ * Off by default, and switched on by the one media query that needs it: the
+ * controls that exist only in the narrow layout (the sidebar's drawer handle and
+ * its close button). Naming the rule once is what stops a control from being
+ * rendered on a desktop where the thing it acts on is not a drawer.
+ */
+.only-narrow { display: none; }
+
+/* Visible only to screen readers, for status announcements. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  background: var(--bg-raised);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+.skip-link:focus { left: 12px; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+ * Three tracks, the last of them `auto`. The preview rail is a grid child that
+ * is `display: none` while collapsed, so its track measures zero and the
+ * conversation gets the whole width; opening it (`display: flex`, below) is what
+ * gives the track its size. No JavaScript decides the layout — the class the
+ * toggle already sets does — so the rail cannot disagree with its own button.
+ * The workspace panel is `position: fixed`, which takes it out of this grid
+ * entirely; it stays the right-hand overlay it was.
+ */
+.app {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) auto;
+  height: 100vh;
+  /*
+   * `vh` is the tallest viewport a phone will ever show, which is not the height
+   * the page has while the browser's chrome is on screen — so a `100vh` console
+   * puts its composer under the address bar. `dvh` is the height that is true
+   * right now, and it is written second because an engine that does not know it
+   * drops the declaration and keeps the line above.
+   */
+  height: 100dvh;
+}
+
+/* --- sidebar --- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.sidebar-head, .files-head, .viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-weight: 600; letter-spacing: 0.01em; }
+
+/*
+ * The chat list is a foldable section rather than the sidebar's bare scroll
+ * region. The section owns the scroll, so folding it hands the room back to the
+ * status rows and the theme switch below; and its header is sticky, because a
+ * list long enough to scroll is exactly the one where the control that hides the
+ * list would otherwise be the thing that scrolled away.
+ */
+.sidebar-chats { flex: 1; overflow-y: auto; min-height: 0; }
+.sidebar-chats > .section-head { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
+.sessions { padding: 8px; }
+
+.session {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.session:hover { background: var(--bg-hover); color: var(--text); }
+.session.active { background: var(--bg-raised); border-color: var(--border); color: var(--text); }
+.session-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-meta { display: block; font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+/* A chat and what may be done to it: the row opacifies its controls on hover or
+   keyboard focus, so the list reads as titles until you reach for one. */
+.session-row { display: flex; align-items: stretch; gap: 2px; border-radius: 8px; margin-bottom: 4px; }
+.session-row .session { margin-bottom: 0; }
+.session-row.archived { opacity: 0.72; }
+.session-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding-right: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.session-row:hover .session-actions,
+.session-row:focus-within .session-actions { opacity: 1; }
+.session-action {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+.session-action:hover { background: var(--bg-hover); color: var(--text); }
+.session-action.danger:hover,
+.session-action.armed { color: var(--bad); border-color: currentColor; }
+.session-archived-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  margin-top: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.session-archived-toggle:hover { color: var(--text); background: var(--bg-hover); }
+
+.sidebar-foot { padding: 12px 14px; border-top: 1px solid var(--border); font-size: 12px; }
+/* The family's switch (`.ot-theme`, styled by unity-theme.css) sits under the status
+   rows in the sidebar foot. */
+.theme-row { margin-top: 10px; }
+.row { display: flex; align-items: center; gap: 7px; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-dim); flex: none;
+}
+.status-dot.ok { background: var(--ok); }
+.status-dot.warn { background: var(--warn); }
+.status-dot.bad { background: var(--err); }
+#workspace-label { margin-top: 6px; font-size: 11px; word-break: break-all; }
+
+/* The account row: the address says who, the button says out. The same trade the
+   sweep row makes — the label truncates so the control keeps its size. Without
+   `flex: none` a long address squeezes `sign out` onto two lines, which reads as
+   a link rather than as the way out, and grows the row with it. */
+#account-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#account-row .btn-ghost { flex: none; }
+
+/* --- folds: the sidebar's sections, and a panel's blocks --- */
+
+/*
+ * One shape for every foldable thing in the console: the sidebar's two sections
+ * and the blocks inside the Skills and Remote panels. Native `<details>`, so the
+ * control is the platform's own — Enter and Space work whenever the summary has
+ * focus, expanded/collapsed is announced rather than inferred, and the console's
+ * Tab trap (which walks the panel's own tab stops) sees it like any other
+ * control.
+ *
+ * The marker is drawn here instead of left to the engine because the two engines
+ * disagree about it, and a fold whose affordance looks different on a phone is a
+ * fold somebody will not find. `min-height` is not decoration either: `summary`
+ * is a target, and the console's own layout check holds every target to the
+ * WCAG 2.5.8 floor of 24px.
+ */
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--text-dim);
+}
+.section-head::-webkit-details-marker { display: none; }
+.section-head::before { content: "\25B8"; flex: none; font-size: 9px; line-height: 1; }
+details[open] > .section-head::before { content: "\25BE"; }
+.section-head:hover { color: var(--text); }
+.section-title { flex: none; }
+/* A count or a note beside the label: pushed to the far edge, and never upper-cased
+   with the label it follows. */
+.section-note { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+/* The sidebar's own labels: small, quiet, and out of the way of the content. */
+.sidebar-section > .section-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 0;
+}
+
+/*
+ * In a panel the summary *is* the block's heading, so it borrows the heading's
+ * type rather than the sidebar's, and the gap under it belongs to the heading
+ * only while the block is open — a closed block is a line of text, not a title
+ * with nothing under it.
+ */
+.panel-block > .section-head { min-height: 32px; }
+.panel-block > .section-head .remote-heading { margin: 0; }
+.panel-block[open] > .section-head { margin-bottom: 8px; }
+
+/* --- main --- */
+
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+/*
+ * The toolbar wraps, at every width rather than only on a phone.
+ *
+ * It used not to, and the row is wider than the conversation's column as soon as
+ * the rail is open: the last controls — `workspace`, `preview`, `publish` and
+ * `terminal` — were laid out past the end of their own track, under the rail,
+ * which paints after them. They were not merely clipped: they were unreachable,
+ * because the rail answered the click. Wrapping keeps every control inside the
+ * column it belongs to, whatever the rail's width.
+ */
+.topbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.topbar-left, .topbar-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  row-gap: 6px;
+  min-width: 0;
+}
+.chat-title {
+  font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.select {
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  max-width: 220px;
+}
+
+.btn-ghost, .btn-primary, .btn-danger {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  padding: 6px 11px;
+  cursor: pointer;
+  /*
+   * A button that moves when it is pressed is a button a person can feel they
+   * hit, and 120ms is short enough that it reads as the interface answering
+   * rather than as an animation. The colour is a transition too, because the
+   * hover and pressed states are cheap to interpolate and jarring when they snap.
+   * `prefers-reduced-motion` zeroes all of it at the foot of this file.
+   */
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+.btn-ghost:hover { background: var(--bg-hover); }
+/*
+ * A control that is *on* — an open panel, a pressed toggle — says so where it is,
+ * not only in a pane somewhere else. The three rail openers and the preview's two
+ * toggles all publish their state through `aria-expanded`/`aria-pressed`, which
+ * is what a screen reader announces and what this rule paints, so the visual and
+ * the announced state cannot disagree.
+ */
+.btn-ghost[aria-expanded="true"],
+.btn-ghost[aria-pressed="true"] {
+  background: color-mix(in oklab, var(--brand) 16%, var(--bg-raised));
+  border-color: color-mix(in oklab, var(--brand) 42%, var(--border));
+  color: var(--text);
+}
+/* Pressed is a half-pixel, not a bounce: the control stays where it is drawn. */
+.btn-ghost:active, .btn-primary:active, .btn-danger:active { transform: translateY(1px); }
+.btn-ghost:disabled, .btn-primary:disabled, .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost:disabled:active, .btn-primary:disabled:active, .btn-danger:disabled:active { transform: none; }
+/*
+ * The end of a row. This used to be `.btn-ghost.mini`'s own rule, which put
+ * `margin-left: auto` on *every* mini button — so a row of three spread itself
+ * across the width, and the last control in a cramped header was pushed past the
+ * edge. The push belongs to the control that ends the row (`pin-end`), or to the
+ * group that holds them (`.files-actions`), never to a button class.
+ */
+.pin-end { margin-left: auto; }
+/* The publish dialog's one action: right-aligned, because it commits something. */
+.publish-actions { justify-content: flex-end; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); font-weight: 500; }
+.topbar-right .field { display: flex; align-items: center; gap: 6px; }
+
+.badge {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--warn);
+  border: 1px solid color-mix(in oklab, var(--attention) 45%, transparent);
+  background: color-mix(in oklab, var(--attention) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+/* The offline badge is a live state, not a configuration hint, so it reads as
+   an alert rather than as the amber "approval: risky" chip. */
+.badge.offline {
+  color: var(--err);
+  border-color: color-mix(in oklab, var(--bad) 50%, transparent);
+  background: color-mix(in oklab, var(--bad) 12%, transparent);
+}
+
+/*
+ * A row's own small control.
+ *
+ * The 24px floor of WCAG 2.5.8 is met by the padding rather than by a `min-height`,
+ * so a row of them stays dense while every one of them is still a legal target —
+ * `layout:check` measures each one at three viewports and would fail otherwise.
+ * No `margin-left` here: see `.pin-end`.
+ */
+.btn-ghost.mini { padding: 3px 8px; font-size: 11px; line-height: 1.35; }
+
+/* Deleting a file is armed on the first click, not done by it. The button says
+   so, in the colour reserved for things that cannot be undone. */
+.btn-ghost.armed {
+  color: var(--err);
+  border-color: color-mix(in oklab, var(--bad) 50%, transparent);
+  background: color-mix(in oklab, var(--bad) 12%, transparent);
+}
+
+.sweep-report { padding: 4px 0 20px; }
+.sweep-section { margin-bottom: 18px; }
+.sweep-heading { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+.sweep-body {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.topbar-right .field.check { gap: 4px; }
+.field.check input { accent-color: var(--accent-dim); cursor: pointer; }
+.field.check input:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.input-text {
+  width: 190px;
+  min-width: 0;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.input-text::placeholder { color: var(--text-dim); }
+
+.input-num {
+  width: 62px;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger { background: var(--bad-soft); border-color: var(--bad); }
+.btn-danger:hover { filter: brightness(1.08); }
+
+/* --- messages --- */
+
+.messages { flex: 1; overflow-y: auto; padding: 22px 20px 8px; min-height: 0; }
+
+.empty { max-width: 460px; margin: 8vh auto 0; text-align: center; }
+.empty h2 { margin: 0 0 8px; font-weight: 600; }
+
+.msg { max-width: 860px; margin: 0 auto 18px; }
+
+.msg-user {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg-assistant { padding: 0 2px; line-height: 1.62; }
+.msg-assistant p { margin: 0 0 10px; }
+.msg-assistant > :last-child { margin-bottom: 0; }
+.msg-assistant h1, .msg-assistant h2, .msg-assistant h3 { margin: 16px 0 8px; font-size: 15px; }
+.msg-assistant .li { padding-left: 4px; margin: 3px 0; }
+.msg-assistant strong { font-weight: 600; }
+.msg-assistant a { color: var(--accent); }
+
+.msg-notice,
+.notice {
+  max-width: 860px;
+  margin: 0 auto 14px;
+  padding: 7px 11px;
+  border-left: 2px solid var(--warn);
+  background: color-mix(in oklab, var(--attention) 10%, transparent);
+  color: var(--text-dim);
+  font-size: 12.5px;
+  border-radius: 0 6px 6px 0;
+}
+
+.msg-error {
+  border: 1px solid var(--bad);
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-radius: 8px;
+  padding: 10px 13px;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+code.inline {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+pre.code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+.cursor::after {
+  content: "▍";
+  color: var(--accent);
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* --- tool cards --- */
+
+.tool {
+  max-width: 860px;
+  margin: 0 auto 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+.tool summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  list-style: none;
+}
+.tool summary::-webkit-details-marker { display: none; }
+.tool-name { color: var(--accent); }
+.tool-arg { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-stat { margin-left: auto; font-size: 11.5px; color: var(--text-dim); }
+
+.tool-content { border-top: 1px solid var(--border); }
+.tool > .tool-content > .tool-body { border-top: none; }
+
+.tool-raw > summary {
+  padding: 7px 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  list-style: none;
+}
+.tool-raw > summary::-webkit-details-marker { display: none; }
+.tool-raw > summary::before { content: "▸ "; }
+.tool-raw[open] > summary::before { content: "▾ "; }
+
+.tool-body {
+  margin: 0;
+  padding: 11px 13px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-sunken);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 340px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-dim);
+}
+
+/* --- diffs --- */
+
+.diff {
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.diff-head {
+  padding: 6px 12px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+}
+
+.diff-hunk-head {
+  padding: 5px 12px;
+  color: var(--text-dim);
+  background: color-mix(in oklab, var(--brand) 8%, transparent);
+  font-size: 11.5px;
+}
+
+.diff-line { display: flex; min-width: max-content; padding: 0 12px; }
+.diff-num {
+  flex: none;
+  width: 4ch;
+  text-align: right;
+  color: var(--text-dim);
+  opacity: 0.6;
+  user-select: none;
+}
+.diff-sign { flex: none; width: 2ch; text-align: center; user-select: none; }
+.diff-text { white-space: pre; padding-left: 4px; }
+
+.diff-line.add { background: color-mix(in oklab, var(--ok) 14%, transparent); }
+.diff-line.add .diff-sign, .diff-line.add .diff-text { color: var(--ok); }
+.diff-line.del { background: color-mix(in oklab, var(--bad) 14%, transparent); }
+.diff-line.del .diff-sign, .diff-line.del .diff-text { color: var(--bad); }
+.diff-line.ctx .diff-text { color: var(--text-dim); }
+
+/* --- approval prompts --- */
+
+.approval {
+  max-width: 860px;
+  margin: 0 auto 14px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--attention) 9%, transparent);
+  overflow: hidden;
+}
+.approval.approved { border-color: var(--ok); background: color-mix(in oklab, var(--ok) 9%, transparent); }
+.approval.denied { border-color: var(--err); background: color-mix(in oklab, var(--bad) 9%, transparent); }
+
+.approval-head { padding: 10px 13px; display: flex; flex-direction: column; gap: 4px; }
+.approval-title { font-weight: 600; }
+.approval-summary { font-size: 12px; color: var(--text-dim); word-break: break-word; }
+.approval-body:empty { display: none; }
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  border-top: 1px solid var(--border);
+}
+.approval-note { font-size: 12.5px; color: var(--text-dim); }
+
+/* --- viewer diff --- */
+
+.viewer-actions { display: flex; align-items: center; gap: 8px; }
+.viewer-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.viewer-diff { overflow: auto; min-height: 0; flex: 1; }
+.viewer-diff.hidden { display: none; }
+.viewer-note { padding: 14px 16px; margin: 0; }
+.diff-inline { border-bottom: none; }
+
+/* --- terminal --- */
+
+/*
+ * Docked to the bottom of the conversation column, like a terminal in an editor:
+ * the transcript is what you read, the shell is what you run, and they share the
+ * column rather than fighting for the right-hand side that the preview owns.
+ * Capped at 45vh so a wall of output can never push the composer off screen —
+ * the chat input is still the primary way to use this console.
+ */
+.terminal {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  max-height: 45vh;
+  min-height: 160px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.terminal.hidden { display: none; }
+.terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.terminal-head .brand { font-size: 12px; }
+#terminal-where { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+
+.terminal-output {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 14px;
+  overflow: auto;
+  background: var(--surface-sunken);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.terminal-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+.terminal-prompt { color: var(--text-dim); flex: none; }
+.terminal-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.terminal-input:focus { outline: none; border-color: var(--accent-dim); }
+.terminal-busy { flex: none; font-size: 11px; color: var(--warn); }
+.terminal-busy.hidden { display: none; }
+
+@media (max-width: 1080px) {
+  .terminal { max-height: 38vh; }
+}
+
+/* --- turn progress --- */
+
+/*
+ * Sits between the transcript and the composer, at the full width of the column
+ * the conversation lives in. Not in the top bar: that row is a toolbar of things
+ * you *act* on, and a live indicator whose length changes every few seconds would
+ * make the controls beside it jump. Here it reads as the bottom edge of the
+ * conversation, which is what it measures.
+ */
+.turn-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 20px 8px;
+  width: 100%;
+}
+.turn-progress.hidden { display: none; }
+.turn-progress-track {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+/*
+ * No transition on the width: each step is a discrete jump of one unit, and
+ * animating it would draw a glide through the space between two steps that the
+ * agent never occupied. It is a counter, not a loading shimmer.
+ */
+.turn-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.turn-progress-label {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- composer --- */
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 12px 20px 20px;
+  width: 100%;
+}
+
+#input {
+  flex: 1;
+  resize: none;
+  background: var(--bg-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  font: inherit;
+  line-height: 1.5;
+  max-height: 220px;
+  min-height: 42px;
+}
+#input:focus { outline: none; border-color: var(--accent-dim); }
+
+/* --- files --- */
+
+/*
+ * A view of the right-hand rail — see `.rail` — not the `position: fixed`
+ * overlay it used to be.
+ *
+ * As an overlay it landed on top of everything at once: the toolbar whose button
+ * opens it, the transcript, the composer and the preview. Its width is the rail's
+ * now, so what it costs the conversation is paid once, by one column.
+ */
+.files {
+  flex-direction: column;
+  background: var(--bg-panel);
+  min-height: 0;
+  width: min(360px, 92vw);
+}
+
+/*
+ * The header is two lines that never fight for one: the title and the controls
+ * that open something else stay on top, and the folder's own controls wrap under
+ * them. `flex-wrap` plus `min-width: 0` is what makes it fluid — at 360px the
+ * workspace reads as one row, at 280px as two, and at no width is a control
+ * clipped instead of wrapped.
+ */
+.files-head {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.files-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* The folder's own controls: secondary, on their own line, never crowding close. */
+.files-manage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+.files-manage-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.files-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.files-workspace .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.files-workspace .select { width: 100%; }
+.files-note { margin: 0; font-size: 11px; line-height: 1.45; word-break: break-all; }
+.files-note:empty { display: none; }
+
+/*
+  The log an upload leaves behind: what was unpacked, what was left out, and every
+  install step with its result. Monospace and wrapped because the lines are
+  commands and file names, and bounded in height because a failing installer can
+  print hundreds of them — the panel has to stay a panel.
+*/
+.files-import-log {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.files-import-log.hidden { display: none; }
+
+/* --- projects (inside the workspace panel) --- */
+
+.files-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.files-projects-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.files-projects-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.projects-list { display: flex; flex-direction: column; gap: 2px; max-height: 34vh; overflow-y: auto; }
+.projects-list:empty::after {
+  content: "No projects yet — make one to keep a workspace and its history together.";
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.project {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.project:hover { background: var(--bg-hover); color: var(--text); }
+.project.active { background: var(--bg-raised); border-color: var(--border); color: var(--text); }
+.project.missing { opacity: 0.6; }
+.project .project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project .project-tag { margin-left: auto; font-size: 10px; color: var(--text-dim); flex: none; }
+.project .project-gone { margin-left: auto; font-size: 10px; color: var(--warn); flex: none; }
+
+/* --- publish & host dialog --- */
+
+.hosting-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+}
+.hosting-plan .hosting-price { font-weight: 600; }
+.hosting-plan .hosting-price span { font-weight: 400; color: var(--text-dim); font-size: 11px; }
+.hosting-name-row { display: flex; align-items: stretch; gap: 0; }
+.hosting-name-row .input-text { flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.hosting-name-row #hosting-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+  background: var(--surface-sunken);
+  white-space: nowrap;
+}
+.hosting-actions { display: flex; align-items: center; gap: 8px; }
+.hosting-list { display: flex; flex-direction: column; gap: 6px; }
+.hosting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.hosting-row .hosting-host { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hosting-row .hosting-actions { margin-left: auto; flex: none; }
+
+/* --- remote workspaces (inside the remote dialog) --- */
+
+/*
+ * Two blocks, each a form and its own buttons, above the list of what is
+ * connected. The grid is `auto-fit` rather than fixed columns so the panel stays
+ * usable in the narrow viewport the whole console is designed for.
+ */
+.remote-block { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+.remote-block:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.remote-heading { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--text); }
+.remote-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 12px; }
+.remote-grid .field.wide { grid-column: 1 / -1; }
+.remote-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+/* A pasted key keeps its own line breaks and stays narrow enough to read. */
+.remote-key {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+.remote-state { flex: none; font-size: 11px; }
+.remote-state.warn-text { color: var(--warn); }
+
+/* --- skills & memory (inside the skills dialog) --- */
+
+/*
+ * The same two-block shape as the remote panel: what the thing is, then the list
+ * of them. Cards rather than rows for the skills, because a skill's description
+ * is a sentence and the row height that suits a name is exactly what truncates
+ * the part that decides whether you want it.
+ */
+.skills-block { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+.skills-block:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.skills-list { display: flex; flex-direction: column; gap: 8px; }
+/* The field and its button on one line, the way the hostname field does it. */
+.skills-install-row { display: flex; align-items: stretch; gap: 8px; }
+.skills-install-row .input-text { flex: 1; min-width: 0; }
+.skills-install-row .btn-primary { flex: none; }
+.skill-card {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+}
+.skill-head { display: flex; align-items: baseline; gap: 8px; }
+.skill-name { font-weight: 600; overflow-wrap: anywhere; }
+.skill-origin { margin-left: auto; flex: none; font-size: 11px; }
+.skill-description { margin: 4px 0 0; color: var(--text-dim); line-height: 1.45; }
+.skill-meta { margin: 6px 0 0; font-size: 11px; }
+/* Removal, at the foot of the card and out of the way of the playbook's own text.
+   The armed state is the shared `.btn-ghost.armed` rule, so the two-click guard
+   looks the same here as it does on a file or a session. */
+.skill-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+.files-path { padding: 8px 14px; font-size: 11px; color: var(--text-dim); border-bottom: 1px solid var(--border); word-break: break-all; }
+.files-list { flex: 1; overflow-y: auto; padding: 6px; min-height: 0; }
+
+.file-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.file-entry:hover { background: var(--bg-hover); color: var(--text); }
+.file-entry.changed { color: var(--text); }
+.file-entry .changed-mark {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.file-entry .size { margin-left: auto; font-size: 10.5px; opacity: 0.65; }
+.file-entry .glyph { opacity: 0.7; flex: none; }
+
+/* --- preview pane --- */
+
+/*
+ * Docked to the right of the conversation, and collapsible to nothing.
+ *
+ * It used to sit *under* the conversation, at a fixed height, on the reasoning
+ * that the workspace panel already owned the right-hand side. But the two are
+ * not the same kind of thing: the workspace is an overlay you consult and
+ * dismiss, while the preview is read *beside* the transcript that is producing
+ * it — a strip under the messages pushed the code and the app it makes apart.
+ * So it is a real column now, sized to the room it needs, and the top-bar toggle
+ * still opens and closes it (`display` flips), which is the whole of "collapsible".
+ */
+.preview {
+  flex-direction: column;
+  flex: none;
+  position: relative;
+  width: min(560px, 46vw);
+  min-width: 280px;
+  max-width: 85vw;
+  min-height: 0;
+  background: var(--bg-panel);
+}
+
+/*
+ * The drag grip, straddling the rail's inner border. It overhangs into the
+ * conversation by a few pixels so the pointer does not have to land exactly on a
+ * one-pixel border to grab it — the cost is a 4px strip of the transcript that is
+ * a resize handle rather than text, which is the usual trade for a split view.
+ */
+.preview-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 9px;
+  cursor: col-resize;
+  z-index: 6;
+  background: transparent;
+  touch-action: none;
+}
+.preview-resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 3px;
+  height: 44px;
+  margin-top: -22px;
+  border-radius: 2px;
+  background: var(--border);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.preview-resize:hover::after,
+.preview-resize:focus-visible::after,
+.preview-resize.dragging::after { opacity: 1; }
+.preview-resize:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* While the width is being dragged the pointer must stay a resize cursor
+   wherever it goes, and text must not select underneath it. */
+body.preview-resizing { cursor: col-resize; user-select: none; }
+body.preview-resizing * { cursor: col-resize !important; }
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  /* A narrow rail wraps its actions rather than clipping them: every control
+     here is a real one, and a button pushed off the edge is a feature the user
+     cannot reach — which is what "all the buttons, visible" has to mean. */
+  flex-wrap: wrap;
+  gap: 10px 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.preview-head .brand { font-size: 12px; }
+#preview-title { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+/*
+ * The collapsed rail's handle: a slim tab on the right edge, always on screen.
+ * Below the workspace overlay's z-index, so opening the file tree covers it the
+ * way it covers the rest of the page rather than floating over it.
+ */
+.preview-expand {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: var(--shadow-pop);
+}
+.preview-expand:hover { color: var(--text); background: var(--bg-hover); }
+.preview-expand.hidden { display: none; }
+.preview-expand-glyph { font-size: 14px; line-height: 1; }
+.preview-expand-text { writing-mode: vertical-rl; letter-spacing: 0.04em; }
+
+.preview-content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.preview-diff { overflow: auto; max-height: 55%; border-bottom: 1px solid var(--border); }
+.preview-diff.hidden { display: none; }
+
+/*
+ * The app view: the project running, filling the pane.
+ *
+ * The frame is given every pixel below the bar. A preview that is a window into
+ * a small box is not a preview — the layout the user is judging is the layout that
+ * has to fit, and the pane's own chrome is the only thing allowed to take space.
+ */
+.preview-app { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.preview-app-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+}
+.preview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text-dim);
+}
+.preview-dot.up { background: var(--ok); }
+.preview-dot.down { background: var(--warn); }
+#preview-app-url { flex: none; }
+.preview-app-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-app-actions { margin-left: auto; display: flex; align-items: center; gap: 7px; flex: none; }
+/*
+ * White, not the panel colour: whatever shows through before the app paints is
+ * the page's background, and the app's own idea of it is the one to trust.
+ */
+.preview-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+.preview-app-log {
+  margin: 0;
+  padding: 8px 12px;
+  max-height: 40%;
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-sunken);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.preview-app-empty { margin: 0; padding: 14px; font-size: 12.5px; }
+
+/*
+ * While a file is still arriving the change and the file are shown side by side:
+ * the point of the pane during a write is watching it take shape, and the diff
+ * against what was there before is the other half of that. The pane grows to give
+ * both columns room, then goes back to one column when the write lands.
+ */
+.preview.live { width: min(760px, 62vw); }
+.preview.live .preview-content { flex-direction: row; }
+.preview.live #preview-diff {
+  flex: 1;
+  min-width: 0;
+  max-height: none;
+  border-bottom: none;
+  border-right: 1px solid var(--border);
+}  .preview.live #preview-body { flex: 1; min-width: 0; }
+
+/*
+ * Wrapped, not scrolled sideways. This pane is narrow and the point of it is that
+ * you can read the file as it lands; a line that runs off the right edge asks you
+ * to scroll to see the half of it that matters.
+ */
+.preview-body {
+  margin: 0;
+  padding: 11px 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface-sunken);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings-form { gap: 14px; padding: 16px; overflow-y: auto; }
+.settings-form .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+.settings-form .field.check { flex-direction: row; align-items: center; gap: 8px; }
+.settings-form .input-text { width: 100%; }
+.settings-note { margin: 4px 0 0; font-size: 12px; line-height: 1.5; }
+.settings-note:empty { display: none; }
+/* The caret marks a file that is still arriving, not one that is finished. */
+.preview-body.generating::after {
+  content: "▍";
+  color: var(--accent);
+  animation: blink 1s steps(2) infinite;
+}
+
+/* --- the right-hand rail ------------------------------------------------ */
+
+/*
+ * One column, three views: the preview, the workspace and publishing.
+ *
+ * They used to be three surfaces — the preview a grid track of its own, the
+ * workspace a `position: fixed` overlay and publishing a centred dialog — so two
+ * of them open at once put one window on top of another. Here `data-view` says
+ * which view, `open` says whether there is one at all, and a view that is not the
+ * current one is not rendered: there is nothing to stack, so nothing of the
+ * console's own can end up underneath something else.
+ *
+ * It is the third grid track (`auto`), so it takes width from the conversation
+ * only while it is open, and it never paints over it — which is what "docked"
+ * means and what an overlay could not promise.
+ */
+.rail { display: none; }
+.rail > .rail-view { display: none; }
+.rail.open {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+}
+
+/*
+ * The tab strip, and the close that belongs to it.
+ *
+ * It is sticky at the rail's top: a long file list or a long log scrolls under
+ * it, and the control that leaves the view is the one control that must not
+ * scroll away with the content it is about. The tabs sit on a recessed track and
+ * the selected one is lifted onto the panel's own surface, which is the whole
+ * visual vocabulary of a tab — no border tricks and no second colour.
+ */
+.rail-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--ink) 4%, var(--bg-panel)),
+    var(--bg-panel)
+  );
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-width: 0;
+}
+
+.rail-tablist {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--ink) 7%, transparent);
+  /* A rail can be narrower than three labels; the strip scrolls rather than
+     wrapping, so the close button beside it never moves. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+.rail-tablist::-webkit-scrollbar { display: none; }
+
+.rail-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 5px 12px;
+  min-height: 26px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.rail-tab:hover { color: var(--text); background: color-mix(in oklab, var(--ink) 8%, transparent); }
+.rail-tab[aria-selected="true"] {
+  color: var(--text);
+  background: var(--bg-panel);
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    0 1px 2px color-mix(in oklab, var(--ink) 18%, transparent);
+}
+
+.rail-close {
+  margin-left: auto;
+  flex: none;
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.rail-close:hover {
+  background: color-mix(in oklab, var(--bad) 14%, var(--bg-raised));
+  border-color: color-mix(in oklab, var(--bad) 45%, var(--border));
+  color: var(--text);
+}
+
+/* A panel a tab opens is a panel the tab strip is about: no outline of its own
+   when it takes focus programmatically, but keep the ring for a real Tab. */
+.rail-view:focus { outline: none; }
+/*
+ * `flex: 1` is what makes a view as tall as the rail: the preview used to be the
+ * grid child itself, so the grid handed it the full height and nobody had to say
+ * so. A view inside the rail is a flex item along the column's main axis, where
+ * the default is to size to content — which drew the pane 131px tall once.
+ */
+.rail.open > .rail-view { flex: 1; min-height: 0; }
+.rail.open[data-view="preview"] > #preview,
+.rail.open[data-view="workspace"] > #files-panel,
+.rail.open[data-view="addons"] > #addons,
+.rail.open[data-view="publish"] > #hosting { display: flex; }
+
+/*
+ * Publishing, as a rail view rather than the centred dialog it was. It keeps the
+ * header/body split every panel in this console uses (`viewer-head`,
+ * `viewer-content`), so it reads as one of them rather than as a third thing.
+ */
+.hosting {
+  flex-direction: column;
+  width: min(560px, 46vw);
+  min-width: 320px;
+  max-width: 85vw;
+  min-height: 0;
+}
+
+/*
+ * The add-ons view: the same column shape as the publishing view, because it is the
+ * same thing — a head, a scrolling body, and no overlay. Without this the panel had
+ * the browser's own defaults for both direction and width, which is why it drew as
+ * an empty rail even after the selector above started rendering it.
+ */
+.addons {
+  flex-direction: column;
+  width: min(560px, 46vw);
+  min-width: 320px;
+  max-width: 85vw;
+  min-height: 0;
+}
+
+/* Token colours: the four kinds the highlighter emits, plus JSON keys. */
+.tok-comment { color: var(--ink-faint); font-style: italic; }
+.tok-string { color: var(--ok); }
+.tok-number { color: var(--tone-sentinel); }
+.tok-keyword { color: var(--accent); }
+.tok-key { color: var(--attention); }
+
+.badge.ok {
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 45%, transparent);
+  background: color-mix(in oklab, var(--ok) 12%, transparent);
+}
+.badge.bad {
+  color: var(--err);
+  border-color: color-mix(in oklab, var(--bad) 50%, transparent);
+  background: color-mix(in oklab, var(--bad) 12%, transparent);
+}
+
+/* --- sweep rows --- */
+
+.sweep-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.sweep-row .btn-ghost { flex: none; padding: 1px 7px; font-size: 11px; }
+.sweep-row .sweep-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sweep-status.stale { color: var(--warn); }
+
+/* --- viewer overlay --- */
+
+.viewer {
+  position: fixed;
+  inset: 6vh 6vw;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-pop);
+  z-index: 40;
+}
+/*
+ * The panel takes focus when it opens so its title is announced first, but it is
+ * a container rather than a control: drawing the 2px focus ring around the whole
+ * dialog would read as "the panel is selected", which is not what happened. The
+ * controls inside keep their own ring.
+ */
+.viewer:focus { outline: none; }
+#viewer-title { font-size: 12.5px; color: var(--text-dim); }
+.viewer-body {
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ========================================================================
+ * Sizing: tablets, then phones, then pointers that are fingers
+ * ========================================================================
+ *
+ * Three rules rather than one, because they answer three different questions.
+ *
+ * **1080px** is where the console stops having room for three columns: the
+ * preview rail leaves the grid for an overlay (below), and the toolbar is
+ * allowed to wrap — a control pushed past the right edge is a feature nobody can
+ * reach, which is exactly what this console already refuses to do inside the
+ * preview's own header.
+ *
+ * **720px** is where a width stops being a small window and starts being a
+ * phone: one column, and the sidebar leaves the flow to become a drawer.
+ *
+ * **Coarse pointers** are orthogonal to width — a tablet is wide and still
+ * touched — so target sizes and the 16px field minimum are keyed to the pointer
+ * rather than to the viewport. Nothing here is a second layout: the DOM, the ids
+ * and the wiring are identical on every device, and only the sizes change.
+ *
+ * There is deliberately no JavaScript in this: `matchMedia` in the app would be
+ * a second copy of a breakpoint that already exists here, and the two would
+ * drift the first time one was edited.
+ */
+
+@media (max-width: 1080px) {
+  /* Two tracks again — the rail becomes a drawer at this width, so it must not
+     reserve a third column that would squeeze the conversation. */
+  .app { grid-template-columns: 200px minmax(0, 1fr); }
+  /*
+   * The drawer starts *under* the toolbar rather than at the top of the window.
+   * The buttons that open it live up there, and a drawer that covers the control
+   * which opened it is a trap — which is exactly what it used to be. The height
+   * comes from `--topbar-h`, measured in `app.js`, because the toolbar wraps: how
+   * many rows it takes is a fact about the current width.
+   */
+  .rail.open {
+    position: fixed;
+    inset: var(--topbar-h, 0px) 0 0 auto;
+    width: min(520px, 92vw);
+    z-index: 25;
+    box-shadow: var(--shadow-pop);
+  }
+  .rail.open > .rail-view { width: 100%; min-width: 0; max-width: none; }
+  .preview-head { padding: 8px 12px; }
+}
+
+@media (max-width: 720px) {
+  /* One column: the sidebar is out of the flow and the preview is an overlay,
+     so the conversation owns the viewport instead of being squeezed between
+     two things that are not on screen. */
+  .app { grid-template-columns: minmax(0, 1fr); }
+
+  /*
+   * The sidebar becomes a drawer rather than a column. At 240px it was more than
+   * half of a phone's width — which is not a sidebar, it is the page.
+   *
+   * `visibility` is part of the transition on purpose: a drawer that is only
+   * translated off-screen is still in the tab order, and tabbing into a panel
+   * nobody can see is worse than the panel not being there. Hidden, it is also
+   * out of the accessibility tree, so a screen reader is offered the console
+   * rather than a menu it has no way to open.
+   */
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(300px, 86vw);
+    z-index: 35;
+    transform: translateX(-100%);
+    visibility: hidden;
+    /*
+     * `visibility` is transitioned with a delay and a zero duration, which is
+     * the only reason it is in the list at all: it flips *after* the slide is
+     * over when the drawer closes (so the slide is visible all the way out) and
+     * immediately when it opens (so it is never invisible on the way in).
+     */
+    transition: transform 180ms ease, visibility 0s linear 180ms;
+    box-shadow: var(--shadow-pop);
+    /* The drawer is the page's edge here, so it — not the page — keeps clear of
+       a notch and a home indicator. */
+    padding-left: env(safe-area-inset-left);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sidebar.open {
+    transform: none;
+    visibility: visible;
+    /* Made visible on the first frame of the slide, not halfway through it. */
+    transition: transform 180ms ease, visibility 0s;
+  }
+
+  /* Behind the drawer, above everything that is not a dialog. */
+  #sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 34;
+    background: rgb(0 0 0 / 0.45);
+  }
+  #sidebar-scrim.hidden { display: none; }
+
+  .only-narrow { display: inline-flex; align-items: center; }
+  /* Brand on the left, the two controls that act on it on the right. */
+  #new-chat { margin-left: auto; }
+  #sidebar-close { margin-left: 6px; }
+
+  /*
+   * The toolbar, which is where a phone pays for everything the console can do.
+   * Eleven controls at once, and at 44px each for a thumb, is four stacked rows
+   * and a fifth of the screen — so this is the one place the narrow layout
+   * changes what is *drawn* rather than only how wide it is.
+   *
+   *   row 1  the drawer handle and the chat's name
+   *   row 2  the model picker, on its own row because it is the one control
+   *          here that is a *value* rather than an action — squeezed into a
+   *          corner of a row it shows three characters of the model's name
+   *   row 3  the actions, tightened so they are one row on a 390px screen
+   *
+   * `appearance` is the single control not drawn, and only because it is the
+   * one with a second door on a phone: the drawer's theme switch is the same
+   * markup wired by the same script. The dialog itself is still one `/appearance`
+   * away in the palette and one `?settings=appearance` deep link away — which is
+   * asserted in `layout:check` rather than assumed, so "hidden" cannot quietly
+   * become "gone".
+   */
+  .topbar { padding: 8px 12px; gap: 8px; }
+  .topbar-left { flex: 1 1 auto; }
+  .topbar-right { flex: 1 1 100%; justify-content: flex-start; gap: 8px; }
+  .chat-title { max-width: none; flex: 1; }
+  #model-field { flex: 1 1 100%; }
+  #model-field .select { flex: 1; min-width: 0; max-width: none; }
+  #appearance-open { display: none; }
+  .topbar-right .btn-ghost { padding: 5px 8px; font-size: 12px; }
+  /* A badge is a sentence, not a label: it wraps instead of pushing the row
+     wider than the screen. */
+  .badge { max-width: 100%; white-space: normal; }
+
+  /* Full-bleed dialogs. 6vh of margin on a 640px-tall phone is a third of the
+     panel before anything is read, and a modal is already the screen's whole
+     business. */
+  .viewer { inset: 0; border: none; border-radius: 0; }
+  .viewer-head { padding: 10px 12px; flex-wrap: wrap; }
+  .viewer-actions { flex-wrap: wrap; gap: 6px; }
+  .settings-form { padding: 12px; }
+
+  /* The overlay rail is the viewport's width here, and its drag grip does
+     nothing below the docked breakpoint anyway — so it goes, rather than
+     sitting across the transcript as a 9px strip that swallows taps. */
+  .rail.open { width: 100vw; }
+  .preview-resize { display: none; }
+  .preview-head { padding: 8px 12px; }
+  .preview-app-bar, .preview-app-actions { flex-wrap: wrap; }
+
+  .files { width: 100vw; }
+  .file-entry, .project, .session { padding-top: 9px; padding-bottom: 9px; }
+
+  .turn-progress { padding: 0 12px 8px; }
+  .terminal { max-height: 50vh; min-height: 140px; }
+  .hosting-plan { flex-wrap: wrap; }
+
+  /* A phone in landscape is wide and short, so the welcome goes up rather than
+     pushing the composer off the bottom. */
+  .empty { margin-top: 4vh; }
+}
+
+/*
+ * A finger is not a mouse. WCAG 2.5.5 asks for 44px, and iOS Safari zooms the
+ * page in whenever a focused field's text is under 16px — which on a console
+ * whose height *is* the viewport is not a courtesy but a layout that jumps.
+ *
+ * This is keyed to the pointer and not the width on purpose: an iPad is 1024px
+ * wide and still touched, and a 1024px-wide touchscreen is where the small
+ * targets hurt most.
+ */
+@media (pointer: coarse) {
+  .btn-ghost, .btn-primary, .btn-danger, .select, .session, .file-entry, .project,
+  .session-archived-toggle, .followup, .palette-row {
+    min-height: 44px;
+  }
+  /* The mini controls live *inside* another control's row, where 44px each would
+     make the row twice as tall as the thing it acts on. 32px still clears the
+     WCAG 2.5.8 floor of 24px with room for a thumb. */
+  .btn-ghost.mini, .session-action, .sweep-row .btn-ghost { min-height: 32px; }
+  /* The family's switch is the theme's own component, so only its target grows. */
+  .ot-theme button { min-height: 40px; }
+
+  #input, .select, .input-text, .input-num, .terminal-input { font-size: 16px; }
+}
+
+/*
+ * No hover, so nothing may be *only* on hover. The session row reveals its
+ * rename/archive/delete controls on hover or keyboard focus; with neither, they
+ * would be permanently invisible and the row would look like a title.
+ */
+@media (hover: none) {
+  .session-actions { opacity: 1; }
+}
+
+/*
+ * Reduced motion is a preference, not a request for a shorter animation: it is
+ * asked for by people the animations make unwell. So everything stops instead of
+ * slowing — and `content`, which is not an animation, keeps the caret visible.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── the add-ons view ────────────────────────────────────────────────────────
+ * Two rows, each a product with a door of its own: the name and its open button on
+ * one line, what is left to spend underneath, and a buy button only when there is
+ * nothing left. The row is a directory entry, not a form — nothing here changes
+ * anything about the add-on. */
+.addons-list { display: grid; gap: 10px; }
+.addon {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line, var(--border, #2a2f37));
+  border-radius: 10px;
+}
+.addon__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.addon__note { margin: 0; color: var(--muted); font-size: 13px; }
+.addon__open, .addon__buy { justify-self: start; text-decoration: none; }

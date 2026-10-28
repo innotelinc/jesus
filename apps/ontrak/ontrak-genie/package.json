@@ -1,0 +1,41 @@
+{
+  "name": "ontrak-genie",
+  "version": "2.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "OnTrak Genie \u2014 the family's coding agent: a browser console and a terminal CLI that drive an agent over a sandboxed workspace, stream its tool calls, and gate risky commands behind a decision. An Innotel Labs product.",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "bin": {
+    "genie": "dist/cli/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "cli": "node dist/cli/main.js",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-timeout=60000 dist/test/*.test.js",
+    "check": "npm run typecheck && npm run build && npm run copy:check && npm test && npm run layout:check && npm run ui:smoke",
+    "gateway": "npx -y omniroute",
+    "gateway:docker": "docker run --rm -p 20128:20128 diegosouzapw/omniroute",
+    "sandbox:build": "docker build -t coding-agent-sandbox:latest sandbox",
+    "provider:add": "node scripts/add-provider.mjs",
+    "model:health": "node scripts/model-health.mjs",
+    "offline:check": "node scripts/offline-check.mjs",
+    "draft:check": "node scripts/draft-check.mjs",
+    "approvals": "node scripts/approvals.mjs",
+    "tenancy:check": "node scripts/verify-tenancy.mjs",
+    "copy:check": "node scripts/copy-check.mjs",
+    "live:check": "node scripts/offline-check.mjs && node scripts/draft-check.mjs",
+    "ui:smoke": "node scripts/ui-smoke.mjs",
+    "layout:check": "node scripts/layout-check.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

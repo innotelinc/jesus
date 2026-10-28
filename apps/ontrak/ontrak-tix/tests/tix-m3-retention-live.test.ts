@@ -1,0 +1,197 @@
+/**
+ * OnTrak Tix M3 live test: the retention sweep through the *running* app.
+ *
+ *   ONTRAK_TIX_BASE_URL=http://127.0.0.1:3001 ONTRAK_TIX_CRON_SECRET=… \
+ *     npx tsx --tsconfig tests/tsconfig.json --test tests/tix-m3-retention-live.test.ts
+ *
+ * The unit suite proves the sweep's rules and the service's behaviour, and the
+ * Postgres test proves it against a real database and real files. Neither of
+ * them proves the *endpoint*: that the secret is checked, that `?tenant=` scopes
+ * the run, that the scheduler's JSON says what happened, and that a real file on
+ * the app's own evidence directory is gone afterwards. That is what this does —
+ * it POSTs to the running server exactly as a cron would.
+ *
+ * Opt-in twice over (`ONTRAK_TIX_BASE_URL` and `ONTRAK_TIX_CRON_SECRET`), and it
+ * provisions its own throwaway tenant, so it never touches the demo seed. The address
+ * must be this machine's, or the run must say otherwise: `ONTRAK_TIX_BASE_URL` is also
+ * how a deployment records its own public name, so a filled-in `.env` would otherwise
+ * point a sweep that *deletes files* at the real desk. See `support/live-target.ts`.
+ *
+ * Both the test and the app resolve evidence paths from the same working
+ * directory (`ontrak-tix/`), which is what lets this assert on the actual file
+ * the server removed.
+ */
+
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { writeFile, mkdir, rm, access } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { test } from "node:test";
+
+import { PrismaClient } from "@prisma/client";
+
+import { liveRefusal } from "./support/live-target";
+
+const BASE_URL = process.env.ONTRAK_TIX_BASE_URL;
+const SECRET = process.env.ONTRAK_TIX_CRON_SECRET;
+/** Why this run must not drive the desk, or null when it may — see support/live-target.ts. */
+const BASE_REFUSAL = liveRefusal("ONTRAK_TIX_BASE_URL", BASE_URL);
+
+/** Connect, or return null so the test can skip cleanly. */
+async function connect(): Promise<PrismaClient | null> {
+  const db = new PrismaClient();
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return db;
+  } catch {
+    await db.$disconnect().catch(() => undefined);
+    return null;
+  }
+}
+
+/**
+ * POST the scheduler's endpoint the way a cron would.
+ *
+ * `secret` is `null` — not `undefined` — for "carry no credential", and it is not a
+ * defaulted parameter on purpose. A default applies when the argument is
+ * `undefined`, so `sweep("", undefined)` meant to send *no* credential would have
+ * quietly sent the real one; the unauthenticated case below was asserting 401
+ * against an authenticated request and passing for the wrong reason. That is the
+ * one assertion in this file whose whole job is to prove an unauthenticated caller
+ * is refused, so it is worth it being explicit about which one it sends.
+ */
+async function sweep(query = "", secret: string | null = SECRET ?? null): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (secret) headers.Authorization = `Bearer ${secret}`;
+  return fetch(`${BASE_URL}/api/incidents/retention-sweep${query}`, { method: "POST", headers });
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("a cron run of the sweep endpoint purges a real expired artifact through the app", async (t) => {
+  if (!BASE_URL) {
+    t.skip("set ONTRAK_TIX_BASE_URL to run the live retention sweep test");
+    return;
+  }
+  if (BASE_REFUSAL) {
+    t.skip(BASE_REFUSAL);
+    return;
+  }
+  if (!SECRET) {
+    t.skip("set ONTRAK_TIX_CRON_SECRET (the app's `ONTRAK_TIX_CRON_SECRET`) to authorise the sweep");
+    return;
+  }
+  const db = await connect();
+  if (!db) {
+    t.skip("no Postgres reachable — set DATABASE_URL and run npm run setup");
+    return;
+  }
+
+  const evidenceRoot = resolve(process.env.ONTRAK_TIX_EVIDENCE_DIR ?? ".ontrak-tix-evidence");
+  const slug = `sweep-live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  let tenantId = "";
+
+  try {
+    const tenant = await db.tenant.create({ data: { name: "Sweep Live Test", slug } });
+    tenantId = tenant.id;
+    const agent = await db.user.create({
+      data: { tenantId: tenant.id, email: `agent-${slug}@test`, displayName: "Sam Agent", role: "AGENT" },
+    });
+    const incident = await db.incident.create({
+      data: {
+        tenantId: tenant.id,
+        ref: "INC-000001",
+        title: "Compromised bastion host",
+        summary: "A key was used from an unfamiliar address.",
+        severity: "SEV2",
+        phase: "CONTAINED",
+        impact: "EXTENSIVE",
+        urgency: "CRITICAL",
+        detectedAt: new Date("2026-09-20T08:00:00.000Z"),
+        declaredAt: new Date("2026-09-20T09:00:00.000Z"),
+      },
+    });
+
+    // An artifact whose window closed years ago, with its bytes written where the
+    // app's own store looks for them (content-addressed, read-only, as if stored).
+    const bytes = new TextEncoder().encode("bastion host kerberos log — sweep live test");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const key = `evidence/${tenant.id}/${incident.id}/${sha256}`;
+    const path = join(evidenceRoot, ...key.split("/"));
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, bytes, { mode: 0o444 });
+
+    const artifact = await db.evidenceArtifact.create({
+      data: {
+        tenantId: tenant.id,
+        incidentId: incident.id,
+        key,
+        sha256,
+        bytes: bytes.byteLength,
+        contentType: "text/plain",
+        mode: "COMPLIANCE",
+        retainUntil: new Date("2026-09-19T00:00:00.000Z"),
+        lockedAt: new Date("2016-09-19T00:00:00.000Z"),
+        createdBy: agent.id,
+      },
+    });
+    assert.equal(await exists(path), true, "the bytes are on disk before the sweep");
+
+    // Two different refusals, and they have to be told apart: a caller with no
+    // credential is turned away before anything runs (401), while a caller who has
+    // one and names a tenant that does not exist gets 404. Sending no credential to
+    // the second case would make both 401 and prove nothing about tenant
+    // resolution.
+    assert.equal((await sweep("", null)).status, 401, "an unauthenticated sweep must be refused");
+    assert.equal((await sweep("?tenant=nope")).status, 404, "a credentialed sweep of an unknown tenant is not found");
+
+    // A dry run reports the purge and changes nothing at all.
+    const dry = await sweep(`?tenant=${slug}&dryRun=1`);
+    assert.equal(dry.status, 200);
+    const dryBody = (await dry.json()) as { dryRun: boolean; purged: number; bytesFreed: number };
+    assert.equal(dryBody.dryRun, true);
+    assert.equal(dryBody.purged, 1);
+    assert.equal(dryBody.bytesFreed, bytes.byteLength);
+    assert.equal(await exists(path), true, "a dry run leaves the bytes alone");
+    assert.equal((await db.evidenceArtifact.findUnique({ where: { id: artifact.id } }))?.purgedAt, null);
+
+    // The real run: the app removes the file, stamps the tombstone and records it.
+    const run = await sweep(`?tenant=${slug}`);
+    assert.equal(run.status, 200);
+    const body = (await run.json()) as {
+      purged: number;
+      bytesFreed: number;
+      tenants: { tenant: string; considered: number; purged: number; held: number }[];
+    };
+    assert.equal(body.purged, 1);
+    assert.equal(body.bytesFreed, bytes.byteLength);
+    assert.deepEqual(body.tenants, [{ tenant: slug, considered: 1, purged: 1, retained: 0, held: 0 }]);
+    assert.equal(await exists(path), false, "the server removed the bytes from its own evidence directory");
+    assert.notEqual((await db.evidenceArtifact.findUnique({ where: { id: artifact.id } }))?.purgedAt, null);
+
+    // The record explains the deletion, and the run itself is on the chain.
+    const events = await db.incidentEvent.findMany({ where: { incidentId: incident.id }, orderBy: { at: "asc" } });
+    assert.equal(events.filter((event) => event.summary.startsWith("Artifact purged:")).length, 1);
+    const audited = await db.auditEvent.findMany({ where: { tenantId: tenant.id } });
+    assert.equal(audited.filter((event) => event.action === "incident.evidence.purge").length, 1);
+    assert.equal(audited.filter((event) => event.action === "incident.retention.sweep").length, 1);
+    assert.equal(audited.find((event) => event.action === "incident.retention.sweep")?.actor, "system:retention-sweep");
+
+    // Safe to schedule hourly: the second run has nothing left to do.
+    const again = await sweep(`?tenant=${slug}`);
+    const againBody = (await again.json()) as { purged: number };
+    assert.equal(againBody.purged, 0);
+  } finally {
+    await db.tenant.delete({ where: { slug } }).catch(() => undefined);
+    await db.$disconnect().catch(() => undefined);
+    // Only this throwaway tenant's subtree: the demo tenant keeps its evidence.
+    if (tenantId) await rm(join(evidenceRoot, "evidence", tenantId), { recursive: true, force: true }).catch(() => undefined);
+  }
+});

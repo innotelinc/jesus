@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "../theme/unity-theme.css";
+
+/*
+ * OnTrak Tix — styles.
+ *
+ * Every colour comes from the shared theme above (`src/theme/unity-theme.css`, a
+ * checked byte-identical copy of `theme/unity-theme.css`). This file does one job:
+ * it maps Tailwind's utility names onto the theme's semantic tokens, and adds no
+ * palette of its own. A component that names a raw colour is a component that will
+ * look wrong the first time somebody switches to light mode.
+ *
+ * Tix sits in the **desk** scheme — the violet family it and the training range
+ * already shared — and gets light and dark from the same tokens everyone else uses.
+ *
+ * The classes say what a thing *is*: `text-bad`, `bg-attention`, `border-ok`. The
+ * old hue-named spellings (`bg-pink`, `text-amber`, `border-teal`, …) still resolve
+ * to exactly the same values so nothing that used them broke, but the codebase no
+ * longer uses them — a class named after a colour is a class that cannot be
+ * re-themed, and reading `text-teal` where the meaning is "healthy" is how a
+ * light-mode bug gets written by somebody who never saw the alias table.
+ */
+
+@theme inline {
+  --font-display: var(--font-sans);
+  --font-mono: var(--mono);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ring: var(--brand-ring);
+  /* Text that sits *on* a solid brand fill. Never `text-brand-ink`: in the dark desk
+     scheme the brand is a light violet, and white on it measures about 2.4:1. */
+  --color-brand-ink: var(--brand-ink);
+
+  /* Status, by role. This is the vocabulary: a class says what a thing *is*, so the
+     same markup reads correctly in any scheme. */
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-bad: var(--bad);
+  --color-attention: var(--attention);
+  --color-unknown: var(--unknown);
+
+  /* The product tones, for the family marks. */
+  --color-tone-its: var(--tone-its);
+  --color-tone-tix: var(--tone-tix);
+  --color-tone-sentinel: var(--tone-sentinel);
+  --color-tone-sync: var(--tone-sync);
+
+  /* Legacy aliases → semantic tokens.
+
+     These resolve to exactly the same values, so nothing broke when Unity landed.
+     They are kept because a class named after a hue cannot be re-themed: the day the
+     desk scheme is not violet these names are lies, and the fix has to be a rename or
+     a second meaning. New code uses the names above. */
+  --color-pink: var(--bad);
+  --color-amber: var(--attention);
+  --color-teal: var(--ok);
+  --color-sky: var(--info);
+  --color-lime: var(--tone-its);
+
+  --radius-xl2: var(--radius);
+  --radius-xl3: var(--radius-lg);
+}
+
+@layer base {
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* One focus ring for the whole product, on the theme's brand colour, so a
+     keyboard user can see where they are in light and dark alike. */
+  :focus-visible {
+    outline: 2px solid var(--brand-ring);
+    outline-offset: 2px;
+  }
+}
+
+@utility card-surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── the sign-in gate ────────────────────────────────────────────────────
+ * The gate and its chrome — `.page`, `.masthead`, `.gate`, `.gate__mark`,
+ * `.footer`, `.sso-button` — all come from the shared theme, so this desk's front
+ * door and the other products' are the same door, and cannot drift apart. Nothing
+ * about the sign-in page is defined here.
+ *
+ * The markup is plain class names rather than Tailwind utilities for the same
+ * reason: it is the family's shape, not this page's.
+ */

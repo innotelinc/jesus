@@ -1,0 +1,1347 @@
+/**
+ * Console HTTP surface (S0/S1): the pages, wired to the service without adding a
+ * single decision.
+ *
+ * The same split as `oidc-http.ts` and `saml-http.ts`: this file moves bytes and
+ * renders, the service resolves the session and decides, and the rules module builds
+ * the HTML. It is a pure function over plain request/response shapes — no framework,
+ * no `node:http` — so every page and every POST is tested with no socket, and the
+ * `node:http` adapter is a translation over it rather than a second implementation.
+ *
+ * Four choices worth stating out loud:
+ *
+ *  - **The session travels in the same cookie the OIDC endpoints read.** One login,
+ *    one session: a console that kept its own would be a second place to sign in and
+ *    a second place to forget to sign out.
+ *  - **Every page is `no-store`.** These pages carry a factor's state and, once, a
+ *    shared secret; a cached console is a console somebody else's browser can page
+ *    back to.
+ *  - **A state change is a POST, and a POST that finished redirects.** Removing a
+ *    factor answers `303` to `/console/mfa` with the outcome in a flash, so a refresh
+ *    re-fetches a page rather than re-removing a factor.
+ *  - **The one secret that is shown is shown in a body, never in a location.** A
+ *    newly minted TOTP secret is rendered into the response to the POST that asked
+ *    for it. It is not put in a query string, and not in a redirect, for the same
+ *    reason the integrations console in Tix keeps a minted token in a cookie: a URL
+ *    ends up in history, in `Referer` and in a proxy log.
+ */
+
+import type { HttpRequest, HttpResponse } from "./oidc-http";
+import { SESSION_COOKIE, SESSION_HEADER } from "./oidc-http";
+import type { ServiceResult } from "./identity-service";
+import { filterFrom, type TriageFilter } from "./alert-triage-rules";
+import {
+  CONSOLE_PATHS,
+  consoleErrorPage,
+  consoleSignedOutPage,
+  renderAlerts,
+  renderCompliance,
+  renderControlCenter,
+  renderCoverage,
+  renderDirectory,
+  renderEnforcement,
+  renderIntel,
+  renderMfa,
+  renderOverview,
+  renderPolicies,
+  renderProvisioning,
+  renderReviews,
+  renderSignIn,
+  type ConsoleAlertsView,
+  type ConsoleComplianceView,
+  type ConsoleControlCenterView,
+  type ConsoleCoverageView,
+  type ConsoleDirectoryView,
+  type ConsoleEnforcementView,
+  type ConsoleIntelView,
+  type ConsoleMfaView,
+  type ConsoleOverviewView,
+  type ConsolePoliciesView,
+  type ConsoleProvisioningView,
+  type ConsoleReviewsView,
+  type ConsoleSignInView,
+  type ConsoleSyncReportView,
+} from "./console-rules";
+import type { CompliancePacket } from "./assurance-packet";
+import { packetCsv, packetPdf } from "./packet-export";
+import { UPSTREAM_STATE_COOKIE, readCallback } from "./upstream-rules";
+import type { WebAuthnRegistrationResponse } from "./webauthn-rules";
+import type { WebAuthnRegistrationOptions } from "./webauthn-service";
+
+/**
+ * The pages this router serves, as the service offers them.
+ *
+ * A port rather than the class so a test can hand in a stub, and so the HTTP layer
+ * never grows a reason to reach for anything else the service can do — the console
+ * counterpart of `OidcEndpoints`.
+ */
+export interface ConsoleEndpoints {
+  /**
+   * The sign-in page's view.
+   *
+   * The page is reachable by anybody and shows nothing about any account — it only
+   * tells the renderer whether this deployment federates to a provider, and whose.
+   */
+  signInView(): Promise<ServiceResult<ConsoleSignInView>>;
+  /**
+   * The provider door. `start` is the redirect *to* the provider (with the sealed state as
+   * a cookie); `callback` is the reply, and answers with the session id for the HTTP layer
+   * to put in the cookie — the transport owns the cookie, and a service that wrote response
+   * headers would be the second place a session could be started.
+   */
+  upstreamStart(
+    returnTo: string | null,
+    secure: boolean,
+  ): Promise<ServiceResult<{ redirectTo: string; cookie: string }>>;
+  /**
+   * The origin the provider returns the browser to, or `null` when none is configured.
+   *
+   * Asked before starting a flow rather than after: the two hosts have to agree for the
+   * sealed attempt to survive the round trip, and when they do not the browser can be sent
+   * to the right one first. Optional, so an endpoints stub in a test stays a stub.
+   */
+  upstreamRedirectOrigin?(): string | null;
+  upstreamCallback(input: {
+    code: string;
+    state: string;
+    stateCookie: string | null;
+    userAgent: string | null;
+    ipAddress: string | null;
+  }): Promise<ServiceResult<{ sessionId: string; redirectTo: string; clearCookie: string }>>;
+  overview(sessionId: string): Promise<ServiceResult<ConsoleOverviewView>>;
+  provisioning(sessionId: string): Promise<ServiceResult<ConsoleProvisioningView>>;
+  /** The directories this organization reads, and what their last runs did. */
+  directory(sessionId: string): Promise<ServiceResult<ConsoleDirectoryView>>;
+  connectDirectory(
+    sessionId: string,
+    input: {
+      name: string;
+      source: string;
+      settings: Record<string, string>;
+      conflictPolicy: string;
+      defaultRole: string;
+      secret: string | null;
+    },
+  ): Promise<ServiceResult<{ name: string }>>;
+  removeDirectory(sessionId: string, connectionId: string): Promise<ServiceResult<{ name: string }>>;
+  /** `dryRun` writes nothing, so it is safe for the page to render the plan in place. */
+  syncDirectory(sessionId: string, connectionId: string, dryRun: boolean): Promise<ServiceResult<ConsoleSyncReportView>>;
+  /**
+   * The access-review register (S2), with one review's list when `reviewId` names it.
+   *
+   * One read for the register and one for the review, from the same service, so the count
+   * in the table and the list below it cannot disagree about the same review.
+   */
+  reviews(sessionId: string, reviewId: string | null): Promise<ServiceResult<ConsoleReviewsView>>;
+  /** Open a review. The list is snapshotted at this moment by the service, not here. */
+  openReview(
+    sessionId: string,
+    input: { name: string; scopeKind: string; scopeValue: string; reviewerId: string; windowDays: number },
+  ): Promise<ServiceResult<{ name: string }>>;
+  /** Answer one identity on a review. `note` is optional; the decision is not. */
+  attestReview(
+    sessionId: string,
+    input: { reviewId: string; identityId: string; decision: string; note: string | null },
+  ): Promise<ServiceResult<{ reviewId: string; decision: string }>>;
+  closeReview(sessionId: string, reviewId: string): Promise<ServiceResult<{ name: string }>>;
+  cancelReview(sessionId: string, reviewId: string): Promise<ServiceResult<{ name: string }>>;
+  createReviewSchedule(
+    sessionId: string,
+    input: { name: string; scopeKind: string; scopeValue: string; reviewerId: string; intervalDays: number },
+  ): Promise<ServiceResult<{ name: string }>>;
+  setReviewScheduleEnabled(sessionId: string, scheduleId: string, enabled: boolean): Promise<ServiceResult<{ name: string }>>;
+  removeReviewSchedule(sessionId: string, scheduleId: string): Promise<ServiceResult<{ name: string }>>;
+  /** The indicators this organization matches against (S3), and what the last push did. */
+  intel(sessionId: string): Promise<ServiceResult<ConsoleIntelView>>;
+  /**
+   * Read a paste of feed text. `source` names the feed; `text` is the box's contents.
+   *
+   * The *format* is not parsed here: `console-http.ts` moves bytes, and the grammar an
+   * operator types into belongs with the rules that classify what they typed.
+   */
+  ingestIntel(
+    sessionId: string,
+    input: { source: string; text: string },
+  ): Promise<ServiceResult<ConsoleIntelView>>;
+  withdrawIntel(
+    sessionId: string,
+    indicatorId: string,
+  ): Promise<ServiceResult<{ value: string; source: string }>>;
+  /**
+   * The Guard queue (S4), narrowed by the request's filter and with one alert opened when
+   * `subjectId` names it.
+   *
+   * The filter arrives already read, because which query-string values are meaningful belongs
+   * with the rules that define the queue rather than with the layer that moves bytes.
+   */
+  alerts(sessionId: string, filter: TriageFilter, subjectId: string | null): Promise<ServiceResult<ConsoleAlertsView>>;
+  /** Somebody has seen it. `null` is allowed: seeing something needs no excuse. */
+  acknowledgeAlert(sessionId: string, alertId: string, note: string | null): Promise<ServiceResult<{ ruleName: string }>>;
+  /** Somebody decided it is handled; a reason is required by the service, not by this layer. */
+  closeAlert(sessionId: string, alertId: string, note: string): Promise<ServiceResult<{ ruleName: string }>>;
+  /**
+   * Hand it to somebody (S3).
+   *
+   * Whether the named identity *may* hold an alert is a rule about people rather than a rule
+   * about HTTP, so an empty or unusable `assigneeId` reaches the service and comes back named.
+   */
+  assignAlert(
+    sessionId: string,
+    alertId: string,
+    assigneeId: string,
+  ): Promise<ServiceResult<{ ruleName: string; assigneeLabel: string | null }>>;
+  /** Give it back to the queue. */
+  unassignAlert(sessionId: string, alertId: string): Promise<ServiceResult<{ ruleName: string }>>;
+  /**
+   * Create a mute (S4): a bounded window in which a known detection is not raised.
+   *
+   * An administrator's act, and the service is what refuses anybody else — the page hides the
+   * section, but a link is not an access control and this router adds none. The window's length
+   * and the "name something" rule are the service's, so the page cannot record a mute the
+   * pipeline would ignore.
+   */
+  addSuppression(
+    sessionId: string,
+    input: {
+      name: string;
+      ruleIds: string;
+      sourceAddresses: string;
+      assets: string;
+      devices: string;
+      identityIds: string;
+      startsAt: string;
+      endsAt: string;
+    },
+  ): Promise<ServiceResult<{ name: string }>>;
+  /** Remove a mute (S4). The row goes; the chain keeps the fact that it existed. */
+  removeSuppression(sessionId: string, ruleId: string): Promise<ServiceResult<{ name: string }>>;
+  /**
+   * The control center (S3/S4): detection and prevention on one read-only screen.
+   *
+   * Read-only like compliance, and the reason it is on the endpoints port rather than the
+   * service alone: the cockpit is one of the console's pages and has to be reachable the way
+   * the others are, from a session.
+   */
+  controlCenter(sessionId: string): Promise<ServiceResult<ConsoleControlCenterView>>;
+  /** The compliance posture summary (S4). Read-only: it writes nothing and grants nothing. */
+  compliance(sessionId: string): Promise<ServiceResult<ConsoleComplianceView>>;
+  /**
+   * The detection-coverage map (S3). Read-only, and derived from the rulebook rather than
+   * from a store: it reports what detection reads, gaps included.
+   */
+  coverage(sessionId: string): Promise<ServiceResult<ConsoleCoverageView>>;
+  /**
+   * The posture as a signed assurance packet, in the family's shared format (S4).
+   *
+   * Read-only like the page it is built from, and built *from* it: the packet carries
+   * the same rows, so the document and the screen cannot disagree about a control. The
+   * route renders it as JSON (the record), CSV or PDF (2.2); the service returns the
+   * one record all three are made from.
+   */
+  compliancePacket(sessionId: string): Promise<ServiceResult<CompliancePacket>>;
+  /**
+   * The prevention register (S4): what is in force, what is waiting and what has ended.
+   *
+   * A page only an administrator may read, and the service is what refuses anybody else —
+   * the nav hides the link, but a link is not an access control and this router adds none.
+   */
+  enforcement(sessionId: string): Promise<ServiceResult<ConsoleEnforcementView>>;
+  /**
+   * Propose an action. The rails decide whether it applies now or waits for an approver; the
+   * outcome says which, so the page can tell the operator what actually happened.
+   */
+  proposeEnforcement(
+    sessionId: string,
+    input: { action: string; alertId: string; reason: string; targets: string; permanent: boolean },
+  ): Promise<ServiceResult<{ outcome: string }>>;
+  /** A second administrator's approval. The service refuses the requester's own. */
+  approveEnforcement(sessionId: string, actionId: string): Promise<ServiceResult<{ outcome: string }>>;
+  /** Lift an action by hand. Always allowed: see `liftEnforcement` in the service. */
+  liftEnforcement(sessionId: string, actionId: string, reason: string): Promise<ServiceResult<{ outcome: string }>>;
+  /** Write the policy the rails are judged against. */
+  setEnforcementPolicy(
+    sessionId: string,
+    input: {
+      protectedTargets: string;
+      maxTargets: number;
+      maxActionsPerHour: number;
+      defaultTtlSeconds: number;
+      allowPermanent: boolean;
+      requireSecondApprover: boolean;
+    },
+  ): Promise<ServiceResult<{ outcome: string }>>;
+  /** The session policies the organization has, one card per scope. */
+  policies(sessionId: string): Promise<ServiceResult<ConsolePoliciesView>>;
+  /** Write the baseline or one role's override; the scope is echoed for the flash. */
+  setPolicy(
+    sessionId: string,
+    input: { scope: string; requireMfa: boolean; maxSessionSeconds: number; idleTimeoutSeconds: number },
+  ): Promise<ServiceResult<{ scope: string }>>;
+  /**
+   * Mint a connector token. The plaintext is in the *result*, never in a redirect:
+   * a token in a `Location` header ends up in browser history, in `Referer` and in a
+   * proxy log, which is where a credential must never be.
+   */
+  mintScimToken(
+    sessionId: string,
+    label: string | null,
+  ): Promise<ServiceResult<{ view: ConsoleProvisioningView; plaintext: string; label: string }>>;
+  revokeScimToken(
+    sessionId: string,
+    tokenId: string,
+  ): Promise<ServiceResult<{ view: ConsoleProvisioningView; label: string }>>;
+  mfaView(sessionId: string): Promise<ServiceResult<ConsoleMfaView>>;
+  beginTotp(sessionId: string, label: string | null): Promise<ServiceResult<ConsoleMfaView>>;
+  confirmTotp(sessionId: string, code: string): Promise<ServiceResult<ConsoleMfaView>>;
+  removeFactors(sessionId: string): Promise<ServiceResult<{ removed: number }>>;
+  beginWebAuthn(sessionId: string): Promise<ServiceResult<WebAuthnRegistrationOptions>>;
+  finishWebAuthn(
+    sessionId: string,
+    input: { challengeId: string; label: string | null; response: WebAuthnRegistrationResponse },
+  ): Promise<ServiceResult<{ credentialId: string }>>;
+  removeCredential(sessionId: string, credentialId: string): Promise<ServiceResult<{ removed: number }>>;
+  logout(sessionId: string): Promise<ServiceResult<{ revoked: number }>>;
+}
+
+/** The query parameter that marks a request as already bounced to the canonical host. */
+const VIA_PARAM = "via";
+
+const NOT_FOUND: HttpResponse = {
+  status: 404,
+  headers: { "content-type": "application/json; charset=utf-8" },
+  body: JSON.stringify({ error: "not_found" }),
+};
+
+function html(status: number, body: string): HttpResponse {
+  return { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }, body };
+}
+
+function json(status: number, value: unknown, headers: Record<string, string> = {}): HttpResponse {
+  return {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...headers,
+    },
+    body: JSON.stringify(value),
+  };
+}
+
+function redirect(location: string, headers: Record<string, string | string[]> = {}): HttpResponse {
+  // `303` rather than `302`: the answer to a POST is a GET, and saying so is what
+  // stops a refresh from repeating the change.
+  return { status: 303, headers: { location, "cache-control": "no-store", ...headers }, body: "" };
+}
+
+function methodNotAllowed(allowed: readonly string[]): HttpResponse {
+  return {
+    status: 405,
+    headers: { allow: allowed.join(", "), "content-type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ error: "invalid_request", error_description: `Use ${allowed.join(" or ")}.` }),
+  };
+}
+
+function header(request: HttpRequest, name: string): string {
+  const wanted = name.toLowerCase();
+  for (const [key, value] of Object.entries(request.headers)) {
+    if (key.toLowerCase() === wanted && value !== undefined) return value;
+  }
+  return "";
+}
+
+/** The session the browser presented, from the cookie or the server-to-server header. */
+function sessionOf(request: HttpRequest): string {
+  return (request.cookies?.[SESSION_COOKIE] ?? header(request, SESSION_HEADER) ?? "").trim();
+}
+
+/**
+ * A refusal's status code.
+ *
+ * A message about a session is `401` — the fix is to sign in again — and one about
+ * permission is `403`; everything else is a bad request. The console says the same
+ * sentence either way, because the sentence is what a person acts on.
+ */
+export function consoleErrorStatus(message: string): number {
+  // Deliberately narrow. "The session is not usable" is about *this* request's
+  // credential; a policy complaint that merely contains the word "session" is a bad
+  // request, and answering it with `401` would tell a signed-in administrator to sign
+  // in again instead of reading the field it named.
+  if (/sign in|no session|session does not exist|session is not usable/i.test(message)) return 401;
+  if (/administer|allowed/i.test(message)) return 403;
+  return 400;
+}
+
+/**
+ * A refusal, as a page — except a session refusal, which is a bounce to the door.
+ *
+ * An absent or stale `sentinel_session` cookie is not a console fault: it is a person
+ * who is not signed in. Answering that with a `401` page read as broken two ways. It
+ * asserted the browser "is signed in … with the cookie, and it is no longer valid" to
+ * somebody who had sent no cookie at all, and it left them on an error page instead of
+ * the one screen that can fix it — the error page's own advice was "open the sign-in
+ * page in a browser and sign in again", which is a redirect this file can simply do.
+ *
+ * The cookie is expired on the way out, so a session that no longer exists stops being
+ * sent back on every request.
+ */
+function failure(message: string): HttpResponse {
+  const status = consoleErrorStatus(message);
+  if (status === 401) return redirect(CONSOLE_PATHS.signIn, { "set-cookie": clearCookie() });
+  const page = consoleErrorPage(message, status);
+  return html(status, page.html);
+}
+
+/** Render a view, or answer the refusal as a page. */
+function respond<T>(result: ServiceResult<T>, render: (value: T) => HttpResponse): HttpResponse {
+  return result.ok ? render(result.value) : failure(result.error);
+}
+
+/** The form parameters of a POST: an already-parsed body, or a form-encoded one. */
+function formParams(request: HttpRequest): Record<string, string> {
+  const params: Record<string, string> = {};
+  const contentType = header(request, "content-type").toLowerCase();
+  if (!request.body) return params;
+  if (contentType.includes("application/json")) {
+    try {
+      const parsed = JSON.parse(request.body) as unknown;
+      if (parsed && typeof parsed === "object") {
+        for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof value === "string") params[key] = value;
+        }
+      }
+    } catch {
+      return params;
+    }
+    return params;
+  }
+  for (const [key, value] of new URLSearchParams(request.body)) params[key] = value;
+  return params;
+}
+
+/** The JSON body of the WebAuthn finish step, kept whole rather than flattened. */
+function jsonBody(request: HttpRequest): Record<string, unknown> | null {
+  if (!request.body) return null;
+  try {
+    const parsed = JSON.parse(request.body) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function flashFrom(url: URL): string | null {
+  const value = url.searchParams.get("flash");
+  return value === null ? null : value;
+}
+
+function errorFrom(url: URL): string | null {
+  const value = url.searchParams.get("error");
+  return value === null ? null : value;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Routes                                                                    */
+/* -------------------------------------------------------------------------- */
+
+async function handleHome(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.overview(sessionId);
+  return respond(result, (view) => html(200, renderOverview(view)));
+}
+
+async function handleControlCenterPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.controlCenter(sessionId);
+  return respond(result, (view) => html(200, renderControlCenter(view, flashFrom(url), errorFrom(url))));
+}
+
+async function handleProvisioningPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.provisioning(sessionId);
+  return respond(result, (view) => html(200, renderProvisioning(view, null, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Mint a token and show it in this response.
+ *
+ * Rendered rather than redirected, exactly like the TOTP secret: the value is shown
+ * once, in a body, and a refresh re-POSTs (minting a second token, which is a
+ * deliberate act rather than an accident).
+ */
+async function handleMintToken(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const label = formParams(request).label?.trim() || null;
+  const result = await endpoints.mintScimToken(sessionId, label);
+  return respond(result, (value) =>
+    html(200, renderProvisioning(value.view, { plaintext: value.plaintext, label: value.label })),
+  );
+}
+
+async function handleRevokeToken(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const tokenId = formParams(request).tokenId ?? "";
+  if (!tokenId) return failure("Choose a token first.");
+  const result = await endpoints.revokeScimToken(sessionId, tokenId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.provisioning}?flash=${encodeURIComponent(`Revoked ${result.value.label}. A connector holding it is refused from now on.`)}`,
+  );
+}
+
+async function handleDirectoryPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.directory(sessionId);
+  return respond(result, (view) => html(200, renderDirectory(view, null, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Connect a directory.
+ *
+ * The settings are read as a flat form and kept as a flat map, because that is what they
+ * are: a URL, a tenant id, a host. An empty field is *absent* rather than an empty string,
+ * so the reader's `setting()` refuses by name instead of calling `https://`.
+ */
+async function handleConnectDirectory(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const settings: Record<string, string> = {};
+  for (const key of ["url", "nextKey", "auth", "clientId", "tokenUrl", "scope"]) {
+    const value = params[key]?.trim();
+    if (value) settings[key] = value;
+  }
+
+  const result = await endpoints.connectDirectory(sessionId, {
+    name: params.name ?? "",
+    source: params.source ?? "",
+    settings,
+    conflictPolicy: params.conflictPolicy ?? "preferDirectory",
+    defaultRole: params.defaultRole ?? "AGENT",
+    secret: params.secret?.trim() ? params.secret : null,
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.directory}?flash=${encodeURIComponent(`Connected ${result.value.name}. Preview a sync before you run one.`)}`,
+  );
+}
+
+async function handleRemoveDirectory(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const connectionId = formParams(request).connectionId ?? "";
+  if (!connectionId) return failure("Choose a connection first.");
+  const result = await endpoints.removeDirectory(sessionId, connectionId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.directory}?flash=${encodeURIComponent(
+      `Removed ${result.value.name}. The identities it provisioned stay, switched on: a sync is not what deletes a person.`,
+    )}`,
+  );
+}
+
+/**
+ * Run a sync, or preview one.
+ *
+ * A preview is rendered into this response and a real sync redirects, and the difference
+ * is deliberate: a preview is safe to repeat (a refresh re-runs it and shows the same
+ * plan), while a real sync that answered with a body would sync again on every refresh.
+ * The result of a real run is in the flash and in the run table below it.
+ */
+async function handleSyncDirectory(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const connectionId = params.connectionId ?? "";
+  if (!connectionId) return failure("Choose a connection first.");
+  const dryRun = params.dryRun === "1" || params.dryRun === "true";
+
+  const result = await endpoints.syncDirectory(sessionId, connectionId, dryRun);
+  if (!result.ok) return failure(result.error);
+  if (!dryRun) {
+    return redirect(`${CONSOLE_PATHS.directory}?flash=${encodeURIComponent(result.value.detail)}`);
+  }
+
+  const view = await endpoints.directory(sessionId);
+  return respond(view, (page) => html(200, renderDirectory(page, result.value)));
+}
+
+async function handleReviewsPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.reviews(sessionId, url.searchParams.get("review"));
+  return respond(result, (view) => html(200, renderReviews(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Open a review.
+ *
+ * A redirect to the register rather than a rendered body, for the same reason connecting a
+ * directory is: a state change that answered with a body would open a second review on
+ * every refresh, and the second one would cover the same people and look identical.
+ */
+async function handleOpenReview(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.openReview(sessionId, {
+    name: params.name ?? "",
+    scopeKind: params.scopeKind ?? "ORGANIZATION",
+    scopeValue: params.scopeValue ?? "",
+    reviewerId: params.reviewerId ?? "",
+    windowDays: Number(params.windowDays),
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?flash=${encodeURIComponent(
+      `Opened ${result.value.name}. Every person on its list starts undecided, and undecided is not an approval.`,
+    )}`,
+  );
+}
+
+/**
+ * Answer one identity on a review.
+ *
+ * The decision goes back to the service, which carries a revocation out before it records
+ * it; a refusal here is that refusal's own sentence rather than one this layer invented.
+ */
+async function handleAttestReview(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const reviewId = params.reviewId ?? "";
+  const identityId = params.identityId ?? "";
+  if (!reviewId) return failure("Choose a review first.");
+  if (!identityId) return failure("Choose the person this decision is about.");
+
+  const result = await endpoints.attestReview(sessionId, {
+    reviewId,
+    identityId,
+    decision: params.decision ?? "",
+    note: params.note?.trim() ? params.note : null,
+  });
+  if (!result.ok) return failure(result.error);
+  const said = result.value.decision === "REVOKED" ? "Revoked" : "Kept";
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?review=${encodeURIComponent(result.value.reviewId)}&flash=${encodeURIComponent(
+      `${said}. The decision is on the evidence chain against your identity.`,
+    )}`,
+  );
+}
+
+async function handleCloseReview(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const reviewId = formParams(request).reviewId ?? "";
+  if (!reviewId) return failure("Choose a review first.");
+  const result = await endpoints.closeReview(sessionId, reviewId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?review=${encodeURIComponent(reviewId)}&flash=${encodeURIComponent(
+      `Closed ${result.value.name}. Undecided items stay on the record as undecided.`,
+    )}`,
+  );
+}
+
+async function handleCancelReview(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const reviewId = formParams(request).reviewId ?? "";
+  if (!reviewId) return failure("Choose a review first.");
+  const result = await endpoints.cancelReview(sessionId, reviewId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?flash=${encodeURIComponent(`Cancelled ${result.value.name}. Its list is kept: an abandoned review is what a register is for.`)}`,
+  );
+}
+
+async function handleCreateReviewSchedule(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.createReviewSchedule(sessionId, {
+    name: params.name ?? "",
+    scopeKind: params.scopeKind ?? "ORGANIZATION",
+    scopeValue: params.scopeValue ?? "",
+    reviewerId: params.reviewerId ?? "",
+    intervalDays: Number(params.intervalDays),
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?flash=${encodeURIComponent(
+      `Scheduled ${result.value.name}. It opens its first review when it falls due, and only if this deployment's scheduler is running.`,
+    )}`,
+  );
+}
+
+async function handleToggleReviewSchedule(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const scheduleId = params.scheduleId ?? "";
+  if (!scheduleId) return failure("Choose a schedule first.");
+  const enabled = params.enabled === "1" || params.enabled === "true";
+  const result = await endpoints.setReviewScheduleEnabled(sessionId, scheduleId, enabled);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?flash=${encodeURIComponent(
+      `${enabled ? "Resumed" : "Paused"} ${result.value.name}. ${enabled ? "A pause does not skip a period: a missed run opens one review and says it was late." : ""}`,
+    )}`,
+  );
+}
+
+async function handleRemoveReviewSchedule(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const scheduleId = formParams(request).scheduleId ?? "";
+  if (!scheduleId) return failure("Choose a schedule first.");
+  const result = await endpoints.removeReviewSchedule(sessionId, scheduleId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.reviews}?flash=${encodeURIComponent(`Removed ${result.value.name}. The reviews it already opened stay.`)}`,
+  );
+}
+
+async function handleIntelPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.intel(sessionId);
+  return respond(result, (view) => html(200, renderIntel(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Take a paste of indicators and render what happened to it.
+ *
+ * Rendered in place rather than redirected, because the *refusals* are the answer: a feed of
+ * four hundred lines usually has a few the classifier will not take, and a `303` would leave
+ * the operator with a count and no way to find the lines. Re-POSTing on a refresh re-reads the
+ * same box, and because an indicator's id is derived from its value that is a refresh rather
+ * than a duplicated feed.
+ */
+async function handleIngestIntel(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.ingestIntel(sessionId, {
+    source: params.source ?? "",
+    text: params.rows ?? "",
+  });
+  return respond(result, (view) => html(200, renderIntel(view)));
+}
+
+async function handleWithdrawIntel(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const indicatorId = formParams(request).indicatorId ?? "";
+  if (!indicatorId) return failure("Choose an indicator first.");
+  const result = await endpoints.withdrawIntel(sessionId, indicatorId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.intel}?flash=${encodeURIComponent(
+      `Withdrew ${result.value.value} from ${result.value.source}. Alerts already raised keep it on their record: the escalation they were judged on has to stay reviewable.`,
+    )}`,
+  );
+}
+
+/**
+ * Create a mute.
+ *
+ * A redirect rather than a rendered body, for the same reason acknowledging an alert is: it is
+ * a state change, and a state change that answered with a body would happen again on a refresh.
+ * The refusals a person actually reads (an empty matcher, a window longer than a week) are the
+ * service's own sentence, not a restatement here.
+ */
+async function handleAddSuppression(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.addSuppression(sessionId, {
+    name: params.name ?? "",
+    ruleIds: params.ruleIds ?? "",
+    sourceAddresses: params.sourceAddresses ?? "",
+    assets: params.assets ?? "",
+    devices: params.devices ?? "",
+    identityIds: params.identityIds ?? "",
+    startsAt: params.startsAt ?? "",
+    endsAt: params.endsAt ?? "",
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?flash=${encodeURIComponent(
+      `Silencing “${result.value.name}” for its window. A detection it catches is recorded on the chain rather than raised.`,
+    )}`,
+  );
+}
+
+async function handleRemoveSuppression(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const ruleId = formParams(request).ruleId ?? "";
+  if (!ruleId) return failure("Choose a window first.");
+  const result = await endpoints.removeSuppression(sessionId, ruleId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?flash=${encodeURIComponent(
+      `Removed “${result.value.name}”. What it already silenced stays on the evidence chain.`,
+    )}`,
+  );
+}
+
+async function handleAlertsPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.alerts(sessionId, filterFrom(url.searchParams), url.searchParams.get("alert"));
+  return respond(result, (view) => html(200, renderAlerts(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Acknowledge an alert.
+ *
+ * A redirect rather than a rendered body for the same reason removing a factor is: it is a
+ * state change, and a state change that answered with a body would happen again on a
+ * refresh. The alert is named in the target so the operator comes back to the one they were
+ * reading rather than to the top of the queue.
+ */
+async function handleAcknowledgeAlert(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const alertId = params.alertId ?? "";
+  if (!alertId) return failure("Choose an alert first.");
+  const note = params.note?.trim() ? params.note : null;
+
+  const result = await endpoints.acknowledgeAlert(sessionId, alertId, note);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?alert=${encodeURIComponent(alertId)}&flash=${encodeURIComponent(
+      `Acknowledged ${result.value.ruleName}. It stays open until somebody closes it with a reason, and a repeat keeps refreshing it.`,
+    )}`,
+  );
+}
+
+/**
+ * Close an alert.
+ *
+ * A blank reason reaches the service, which refuses it by name, rather than being caught
+ * here: the minimum length is a rule about an incident record and it lives with the record.
+ */
+async function handleCloseAlert(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const alertId = params.alertId ?? "";
+  if (!alertId) return failure("Choose an alert first.");
+
+  const result = await endpoints.closeAlert(sessionId, alertId, params.note ?? "");
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?flash=${encodeURIComponent(
+      `Closed ${result.value.ruleName}. The reason is on the evidence chain against your identity.`,
+    )}`,
+  );
+}
+
+async function handleAssignAlert(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const alertId = params.alertId ?? "";
+  if (!alertId) return failure("Choose an alert first.");
+
+  // A blank choice reaches the service, which refuses it by name, for the same reason a blank
+  // close reason does: it is a rule about an incident record, not a rule about a form.
+  const result = await endpoints.assignAlert(sessionId, alertId, params.assigneeId ?? "");
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?alert=${encodeURIComponent(alertId)}&flash=${encodeURIComponent(
+      `Assigned ${result.value.ruleName} to ${result.value.assigneeLabel ?? "somebody"}. The handover is on the organization's evidence chain against your identity.`,
+    )}`,
+  );
+}
+
+/**
+ * Take the owner off an alert.
+ *
+ * Its own path rather than an "assign to nobody": the two read differently on the chain, and a
+ * form whose meaning depended on leaving a select blank is one that gets submitted wrong.
+ */
+async function handleUnassignAlert(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const alertId = params.alertId ?? "";
+  if (!alertId) return failure("Choose an alert first.");
+
+  const result = await endpoints.unassignAlert(sessionId, alertId);
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.alerts}?alert=${encodeURIComponent(alertId)}&flash=${encodeURIComponent(
+      `Took the owner off ${result.value.ruleName}. It is back in the queue for whoever picks it up next.`,
+    )}`,
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Enforcement (S4)                                                          */
+/* -------------------------------------------------------------------------- */
+
+async function handleEnforcementPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.enforcement(sessionId);
+  return respond(result, (view) => html(200, renderEnforcement(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Propose an action.
+ *
+ * A blank action, target box or alert reaches the service and comes back named rather than
+ * being refused here: what a proposal requires is a rule about a decision, and it lives with
+ * the decision. Only the two values a form cannot express — the checkbox and the numbers —
+ * are read here, and a blank number is passed through as `NaN` rather than defaulted, so the
+ * policy validator is the one that says the value is wrong.
+ *
+ * A redirect, not a rendered body: applying an action changes what is in force, and a state
+ * change that answered with a body would happen again on a refresh.
+ */
+async function handleProposeEnforcement(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.proposeEnforcement(sessionId, {
+    action: params.action ?? "",
+    alertId: params.alertId ?? "",
+    reason: params.reason ?? "",
+    targets: params.targets ?? "",
+    permanent: params.permanent === "1",
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.enforcement}?flash=${encodeURIComponent(result.value.outcome)}`);
+}
+
+async function handleApproveEnforcement(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const actionId = formParams(request).actionId ?? "";
+  if (!actionId) return failure("Choose an action first.");
+  const result = await endpoints.approveEnforcement(sessionId, actionId);
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.enforcement}?flash=${encodeURIComponent(result.value.outcome)}`);
+}
+
+async function handleLiftEnforcement(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const actionId = params.actionId ?? "";
+  if (!actionId) return failure("Choose an action first.");
+  const result = await endpoints.liftEnforcement(sessionId, actionId, params.reason ?? "");
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.enforcement}?flash=${encodeURIComponent(result.value.outcome)}`);
+}
+
+async function handleSetEnforcementPolicy(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.setEnforcementPolicy(sessionId, {
+    protectedTargets: params.protectedTargets ?? "",
+    maxTargets: Number(params.maxTargets ?? ""),
+    maxActionsPerHour: Number(params.maxActionsPerHour ?? ""),
+    defaultTtlSeconds: Number(params.defaultTtlSeconds ?? ""),
+    allowPermanent: params.allowPermanent === "1",
+    requireSecondApprover: params.requireSecondApprover === "1",
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.enforcement}?flash=${encodeURIComponent(result.value.outcome)}`);
+}
+
+async function handleCompliancePage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.compliance(sessionId);
+  return respond(result, (view) => html(200, renderCompliance(view, flashFrom(url), errorFrom(url))));
+}
+
+async function handleCoveragePage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.coverage(sessionId);
+  return respond(result, (view) => html(200, renderCoverage(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * The signed compliance packet (S4/2.2), as a file.
+ *
+ * Served as a download rather than rendered, because the artefact's whole purpose is to
+ * leave this system: it is what gets attached to an audit response or an insurance
+ * renewal, and it is verifiable by whoever receives it without an account here.
+ *
+ * `?format=csv` and `?format=pdf` are the same signed record rendered for a spreadsheet
+ * and for a printed page (2.2). JSON stays the default and the only format that is a
+ * document in its own right: the other two are views of it, so they carry its hashes and
+ * signature rather than re-signing anything. An unknown format is refused *after* the
+ * session check, so an unauthenticated probe learns nothing about the routing.
+ */
+async function handleCompliancePacket(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.compliancePacket(sessionId);
+  if (!result.ok) return failure(result.error);
+
+  const packet = result.value;
+  const format = (url.searchParams.get("format") ?? "json").toLowerCase();
+  const stamp = packet.generatedAt.replace(/[:.]/g, "-");
+
+  if (format === "csv") {
+    return {
+      status: 200,
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="sentinel-compliance-${stamp}.csv"`,
+        "cache-control": "no-store",
+      },
+      body: packetCsv(packet),
+    };
+  }
+  if (format === "pdf") {
+    return {
+      status: 200,
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="sentinel-compliance-${stamp}.pdf"`,
+        "cache-control": "no-store",
+      },
+      // The PDF writer produces ASCII only, so this Latin-1 decoding is lossless and
+      // the bytes the browser receives are the bytes the writer computed.
+      body: latin1(packetPdf(packet)),
+    };
+  }
+  if (format !== "json") {
+    return json(400, {
+      error: "invalid_request",
+      error_description: `Format "${format}" is not one of json, csv or pdf.`,
+    });
+  }
+  return json(200, packet, {
+    "content-disposition": `attachment; filename="sentinel-compliance-${stamp}.json"`,
+  });
+}
+
+/** A byte buffer as the string a `node:http` response body expects. */
+function latin1(bytes: Uint8Array): string {
+  let out = "";
+  for (let index = 0; index < bytes.length; index += 0x2000) {
+    out += String.fromCharCode(...bytes.subarray(index, index + 0x2000));
+  }
+  return out;
+}
+
+async function handlePoliciesPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.policies(sessionId);
+  return respond(result, (view) => html(200, renderPolicies(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Save one scope's policy.
+ *
+ * An unchecked checkbox is absent from the body rather than `false`, so
+ * "no second factor" has to be read as *not `on`* rather than as a value that
+ * arrived. The numbers are parsed here and judged by the rules: a blank field
+ * becomes `0`, which the policy validator refuses by name rather than silently
+ * clamping — a control somebody meant to tighten should never be quietly rounded.
+ */
+async function handleSetPolicy(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const params = formParams(request);
+  const result = await endpoints.setPolicy(sessionId, {
+    scope: params.scope ?? "",
+    requireMfa: params.requireMfa === "on" || params.requireMfa === "true",
+    maxSessionSeconds: Number(params.maxSessionSeconds),
+    idleTimeoutSeconds: Number(params.idleTimeoutSeconds),
+  });
+  if (!result.ok) return failure(result.error);
+  return redirect(
+    `${CONSOLE_PATHS.policies}?flash=${encodeURIComponent(`Saved the ${result.value.scope} policy; every new session is judged by it.`)}`,
+  );
+}
+
+async function handleMfaPage(url: URL, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.mfaView(sessionId);
+  return respond(result, (view) => html(200, renderMfa(view, flashFrom(url), errorFrom(url))));
+}
+
+/**
+ * Start a TOTP enrollment and show the secret in this response.
+ *
+ * Rendered rather than redirected, because the alternative is the secret in a URL.
+ * A refresh re-POSTs and starts a fresh enrollment, which is a restart rather than a
+ * mistake: the code the user was looking at belongs to the secret they were just
+ * shown, and `beginEnrollment` discards any pending one.
+ */
+async function handleBeginTotp(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const label = formParams(request).label?.trim() || null;
+  const result = await endpoints.beginTotp(sessionId, label);
+  return respond(result, (view) => html(200, renderMfa(view)));
+}
+
+async function handleConfirmTotp(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const code = formParams(request).code ?? "";
+  const result = await endpoints.confirmTotp(sessionId, code);
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.mfa}?flash=${encodeURIComponent("The authenticator app is enrolled, and the session policy is satisfied.")}`);
+}
+
+async function handleRemoveFactors(sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.removeFactors(sessionId);
+  if (!result.ok) return failure(result.error);
+  // The flash is deliberately blunt about the consequence: under the default policy
+  // this identity now owes a second factor, so the session that asked for this is
+  // about to stop working — including for the page it is redirecting to.
+  return redirect(
+    `${CONSOLE_PATHS.mfa}?flash=${encodeURIComponent(
+      `Removed ${result.value.removed} factor(s). Every session for this identity is now refused until a factor is enrolled again.`,
+    )}`,
+  );
+}
+
+async function handleRemoveCredential(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const credentialId = formParams(request).credentialId ?? "";
+  if (!credentialId) return failure("Choose a security key first.");
+  const result = await endpoints.removeCredential(sessionId, credentialId);
+  if (!result.ok) return failure(result.error);
+  return redirect(`${CONSOLE_PATHS.mfa}?flash=${encodeURIComponent("That security key was removed.")}`);
+}
+
+async function handleBeginWebAuthn(sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.beginWebAuthn(sessionId);
+  if (!result.ok) return json(consoleErrorStatus(result.error), { error: result.error });
+  return json(200, result.value);
+}
+
+async function handleFinishWebAuthn(request: HttpRequest, sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const body = jsonBody(request);
+  if (!body) return json(400, { error: "The registration body is not JSON." });
+  const challengeId = typeof body.challengeId === "string" ? body.challengeId : "";
+  const response = body.response;
+  if (!challengeId) return json(400, { error: "A challenge is required." });
+  if (!response || typeof response !== "object") return json(400, { error: "A credential is required." });
+
+  const result = await endpoints.finishWebAuthn(sessionId, {
+    challengeId,
+    label: typeof body.label === "string" && body.label.trim() ? body.label.trim() : null,
+    response: response as unknown as WebAuthnRegistrationResponse,
+  });
+  if (!result.ok) return json(consoleErrorStatus(result.error), { error: result.error });
+  return json(200, { ok: true, credentialId: result.value.credentialId });
+}
+
+async function handleLogout(sessionId: string, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.logout(sessionId);
+  const page = result.ok
+    ? html(200, consoleSignedOutPage())
+    : (() => {
+        const refused = consoleErrorPage(result.error, consoleErrorStatus(result.error));
+        return html(refused.status, refused.html);
+      })();
+  // The cookie is expired either way: a session that could not be ended is not one
+  // to keep sending back.
+  return { ...page, headers: { ...page.headers, "set-cookie": clearCookie() } };
+}
+
+/** Expiring the cookie is part of the answer: a live session id would just be re-used. */
+function clearCookie(): string {
+  return `${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`;
+}
+
+/**
+ * The session cookie a successful sign-in sets.
+ *
+ * `Secure` is decided from the request rather than hard-coded, because the two ways
+ * this console is reached disagree: a browser arrives over TLS at the proxy and sends
+ * `x-forwarded-proto: https`, while a deployment on a LAN is plain HTTP. A `Secure`
+ * cookie on the latter is a cookie the browser refuses to store, which presents as a
+ * login that appears to succeed and leaves you still signed out.
+ *
+ * `SameSite=Lax` is the CSRF posture: the sign-in POST is same-site, and a
+ * cross-site form cannot read this cookie.
+ *
+ * No `Max-Age`: the session's own expiry in the database is the authority, and a
+ * cookie that outlived it would just be an id the console keeps refusing.
+ */
+function sessionCookie(sessionId: string, secure: boolean): string {
+  return (
+    `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax` + (secure ? "; Secure" : "")
+  );
+}
+
+/** Whether the browser reached us over TLS, however the console is bound locally. */
+function requestIsSecure(request: HttpRequest): boolean {
+  const forwarded = header(request, "x-forwarded-proto").split(",")[0]?.trim().toLowerCase();
+  if (forwarded) return forwarded === "https";
+  return request.url.toLowerCase().startsWith("https://");
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Sign in                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The sign-in page.
+ *
+ * A `GET` only. The console has no password leg any more — a `POST` here is not a sign-in
+ * attempt, it is a path the product does not serve, and the router answers it the same way
+ * it answers any other unsupported method.
+ */
+async function handleSignInPage(url: URL, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  const result = await endpoints.signInView();
+  return respond(result, (view) =>
+    html(200, renderSignIn({ ...view, error: errorFrom(url), flash: flashFrom(url) })),
+  );
+}
+
+/**
+ * Hand the browser to the provider.
+ *
+ * `returnTo` is a path, and the service re-validates it on the way back rather than trusting
+ * it here — it is sealed into the cookie, but it still makes the round trip through a browser.
+ */
+async function handleUpstreamStart(
+  url: URL,
+  endpoints: ConsoleEndpoints,
+  request: HttpRequest,
+): Promise<HttpResponse> {
+  // A sign-in started at an address the provider will not return to is a login with a
+  // known-dead ending: the sealed attempt is a cookie on *this* host, and the callback
+  // arrives at the registered one, where that cookie does not exist. Somebody who typed the
+  // LAN address or the IP did nothing wrong and would get "that sign-in could not be
+  // completed" for it. The deployment knows the one address that works, so the browser is
+  // handed there before anything is sealed.
+  //
+  // `via` is what keeps this from becoming a loop: if the bounce lands somewhere that is
+  // still not the canonical host — a proxy that does not pass the public `Host` through —
+  // the flow proceeds and the provider's own answer is the answer.
+  const canonical = endpoints.upstreamRedirectOrigin?.() ?? null;
+  if (canonical && canonical !== url.origin && !url.searchParams.has(VIA_PARAM)) {
+    const bounce = new URL(`${canonical}${url.pathname}`);
+    bounce.search = url.search;
+    bounce.searchParams.set(VIA_PARAM, url.host);
+    return redirect(bounce.toString());
+  }
+
+  const result = await endpoints.upstreamStart(url.searchParams.get("returnTo"), requestIsSecure(request));
+  if (!result.ok) return failure(result.error);
+  return redirect(result.value.redirectTo, { "set-cookie": result.value.cookie });
+}
+
+/**
+ * Take the provider's answer.
+ *
+ * Two cookies leave here and one header carries them: the sealed state is cleared, and the
+ * session is set. Both are written with `Max-Age` and neither contains a comma, so joining
+ * them is unambiguous — which is the one property that makes a single `Set-Cookie` header
+ * safe to use for two cookies.
+ */
+async function handleUpstreamCallback(
+  url: URL,
+  endpoints: ConsoleEndpoints,
+  request: HttpRequest,
+): Promise<HttpResponse> {
+  const read = readCallback(url.searchParams);
+  if (!read.ok) return failure(read.error);
+
+  const result = await endpoints.upstreamCallback({
+    code: read.code,
+    state: read.state,
+    stateCookie: request.cookies?.[UPSTREAM_STATE_COOKIE] ?? null,
+    userAgent: header(request, "user-agent") || null,
+    ipAddress: header(request, "x-forwarded-for").split(",")[0]?.trim() || null,
+  });
+  if (!result.ok) return failure(result.error);
+
+  // Two cookies leave here, and each gets its own header rather than sharing one behind a
+  // comma. A spent attempt is worth clearing, and a session the browser quietly drops half
+  // of is a sign-in that appears to work and leaves nobody signed in.
+  return redirect(result.value.redirectTo, {
+    "set-cookie": [result.value.clearCookie, sessionCookie(result.value.sessionId, requestIsSecure(request))],
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  The router                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Route one console request. Pure and total: every input produces a response, and
+ * the only awaited work is the service call itself. A request for a path this file
+ * does not serve is a `404`, which is what lets the OIDC, SAML and console routers
+ * share one server.
+ */
+export async function routeConsole(request: HttpRequest, endpoints: ConsoleEndpoints): Promise<HttpResponse> {
+  let url: URL;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return json(400, { error: "invalid_request", error_description: "The request URL is not absolute." });
+  }
+
+  const method = request.method.toUpperCase();
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const sessionId = sessionOf(request);
+  const get = (handler: () => Promise<HttpResponse>): Promise<HttpResponse> =>
+    method === "GET" ? handler() : Promise.resolve(methodNotAllowed(["GET"]));
+  const post = (handler: () => Promise<HttpResponse>): Promise<HttpResponse> =>
+    method === "POST" ? handler() : Promise.resolve(methodNotAllowed(["POST"]));
+
+  switch (path) {
+    // The bare host used to answer `{"error":"not_found"}`, which is what a person
+    // typing the hostname saw: a console that looked broken from the front door. It
+    // is a redirect now, so the domain is a way in rather than a dead end. Only GET
+    // is claimed here — everything else at `/` still falls through to the other
+    // routers, so nothing about the OIDC or SAML surfaces changes.
+    //
+    // It redirects to `/console` rather than straight to the sign-in form, because the
+    // person who typed the hostname has a session or does not and this target answers
+    // both: the console renders, or the signed-out page renders with the sign-in link
+    // on it. Pointing at the form would show a login to somebody already inside.
+    case "/":
+      return get(() => Promise.resolve(redirect(CONSOLE_PATHS.home)));
+    case CONSOLE_PATHS.signIn:
+      return get(() => handleSignInPage(url, endpoints));
+    case CONSOLE_PATHS.upstreamStart:
+      return get(() => handleUpstreamStart(url, endpoints, request));
+    case CONSOLE_PATHS.upstreamCallback:
+      return get(() => handleUpstreamCallback(url, endpoints, request));
+    case CONSOLE_PATHS.home:
+      return get(() => handleHome(url, sessionId, endpoints));
+    case CONSOLE_PATHS.controlCenter:
+      return get(() => handleControlCenterPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.provisioning:
+      return get(() => handleProvisioningPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.mintToken:
+      return post(() => handleMintToken(request, sessionId, endpoints));
+    case CONSOLE_PATHS.revokeToken:
+      return post(() => handleRevokeToken(request, sessionId, endpoints));
+    case CONSOLE_PATHS.policies:
+      // One path, two verbs: the page and the form that changes it. Splitting them
+      // would mean a second URL to keep in the nav and in a bookmark.
+      return method === "GET"
+        ? handlePoliciesPage(url, sessionId, endpoints)
+        : method === "POST"
+          ? handleSetPolicy(request, sessionId, endpoints)
+          : Promise.resolve(methodNotAllowed(["GET", "POST"]));
+    case CONSOLE_PATHS.directory:
+      return get(() => handleDirectoryPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.directoryConnect:
+      return post(() => handleConnectDirectory(request, sessionId, endpoints));
+    case CONSOLE_PATHS.directoryRemove:
+      return post(() => handleRemoveDirectory(request, sessionId, endpoints));
+    case CONSOLE_PATHS.directorySync:
+      return post(() => handleSyncDirectory(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviews:
+      return get(() => handleReviewsPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewOpen:
+      return post(() => handleOpenReview(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewAttest:
+      return post(() => handleAttestReview(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewClose:
+      return post(() => handleCloseReview(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewCancel:
+      return post(() => handleCancelReview(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewSchedule:
+      return post(() => handleCreateReviewSchedule(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewScheduleToggle:
+      return post(() => handleToggleReviewSchedule(request, sessionId, endpoints));
+    case CONSOLE_PATHS.reviewScheduleRemove:
+      return post(() => handleRemoveReviewSchedule(request, sessionId, endpoints));
+    case CONSOLE_PATHS.intel:
+      return get(() => handleIntelPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.intelIngest:
+      return post(() => handleIngestIntel(request, sessionId, endpoints));
+    case CONSOLE_PATHS.intelWithdraw:
+      return post(() => handleWithdrawIntel(request, sessionId, endpoints));
+    case CONSOLE_PATHS.alerts:
+      return get(() => handleAlertsPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.alertAcknowledge:
+      return post(() => handleAcknowledgeAlert(request, sessionId, endpoints));
+    case CONSOLE_PATHS.alertClose:
+      return post(() => handleCloseAlert(request, sessionId, endpoints));
+    case CONSOLE_PATHS.alertAssign:
+      return post(() => handleAssignAlert(request, sessionId, endpoints));
+    case CONSOLE_PATHS.alertUnassign:
+      return post(() => handleUnassignAlert(request, sessionId, endpoints));
+    case CONSOLE_PATHS.suppressionAdd:
+      return post(() => handleAddSuppression(request, sessionId, endpoints));
+    case CONSOLE_PATHS.suppressionRemove:
+      return post(() => handleRemoveSuppression(request, sessionId, endpoints));
+    case CONSOLE_PATHS.coverage:
+      return get(() => handleCoveragePage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.enforcement:
+      return get(() => handleEnforcementPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.enforcementPropose:
+      return post(() => handleProposeEnforcement(request, sessionId, endpoints));
+    case CONSOLE_PATHS.enforcementApprove:
+      return post(() => handleApproveEnforcement(request, sessionId, endpoints));
+    case CONSOLE_PATHS.enforcementLift:
+      return post(() => handleLiftEnforcement(request, sessionId, endpoints));
+    case CONSOLE_PATHS.enforcementPolicy:
+      return post(() => handleSetEnforcementPolicy(request, sessionId, endpoints));
+    case CONSOLE_PATHS.compliance:
+      return get(() => handleCompliancePage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.compliancePacket:
+      return get(() => handleCompliancePacket(url, sessionId, endpoints));
+    case CONSOLE_PATHS.mfa:
+      return get(() => handleMfaPage(url, sessionId, endpoints));
+    case CONSOLE_PATHS.totpBegin:
+      return post(() => handleBeginTotp(request, sessionId, endpoints));
+    case CONSOLE_PATHS.totpConfirm:
+      return post(() => handleConfirmTotp(request, sessionId, endpoints));
+    case CONSOLE_PATHS.removeAll:
+      return post(() => handleRemoveFactors(sessionId, endpoints));
+    case CONSOLE_PATHS.webauthnBegin:
+      return post(() => handleBeginWebAuthn(sessionId, endpoints));
+    case CONSOLE_PATHS.webauthnFinish:
+      return post(() => handleFinishWebAuthn(request, sessionId, endpoints));
+    case CONSOLE_PATHS.webauthnRemove:
+      return post(() => handleRemoveCredential(request, sessionId, endpoints));
+    case CONSOLE_PATHS.logout:
+      return post(() => handleLogout(sessionId, endpoints));
+    default:
+      return NOT_FOUND;
+  }
+}

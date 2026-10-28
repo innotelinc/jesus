@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en" data-scheme="operations">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OnTrak — IT support training, ticketing and incident evidence</title>
+  <meta name="description" content="OnTrak is the self-hosted IT support platform family: browser-based training against deliberately broken machines, an MSP service desk with incident response, and the identity and intrusion protection around both.">
+  <meta property="og:title" content="OnTrak — IT support training, ticketing and incident evidence">
+  <meta property="og:description" content="Train the people, run the work, protect both. A self-hosted IT support platform family: graded simulations, an MSP service desk with insurance-grade incident evidence, and an IdP + IDS/IPS platform.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0b0d10">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ctext x='32' y='43' font-family='ui-monospace, monospace' font-size='26' font-weight='700' text-anchor='middle' fill='%23fb923c'%3EOT%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="unity-theme.css">
+  <script>window.UNITY_DEFAULT_SCHEME = "operations";</script>
+  <script src="unity-theme.js"></script>
+  <style>:root {
+      --p-bg: var(--canvas);
+      --p-bg-elevated: var(--surface-muted);
+      --p-surface: var(--surface);
+      --p-surface-hover: var(--surface-sunken);
+      --p-border: var(--line);
+      --p-text: var(--ink);
+      --p-text-secondary: var(--ink-soft);
+      --p-text-muted: var(--ink-faint);
+      --p-accent: var(--brand);
+      --p-accent-hover: var(--brand-ring);
+      --p-accent-tint: var(--brand-soft);
+      --p-gold: var(--attention);
+      --p-success: var(--ok);
+      --radius-md: var(--radius);
+      --ease: cubic-bezier(.2, .8, .2, 1);
+    }
+
+    
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--p-bg); color: var(--p-text);
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--p-accent-tint); }
+    a { color: var(--p-accent); text-decoration: none; }
+    a:hover { color: var(--p-accent-hover); }
+    code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+    .topbar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 72%, transparent); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--p-border); }
+    .topbar-inner { display: flex; align-items: center; gap: 20px; height: 60px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: 0.04em; color: var(--p-text); }
+    .brand:hover { color: var(--p-text); }
+    .brand .mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--p-bg-elevated); border: 1px solid var(--p-border); color: var(--p-accent); font-size: 12px; font-weight: 700; letter-spacing: -0.02em; }
+    .topbar nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .topbar nav a { color: var(--p-text-secondary); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 14px; transition: color .15s var(--ease), background .15s var(--ease); }
+    .topbar nav a:hover { color: var(--p-text); background: var(--p-surface-hover); }
+    .topbar .gh { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 7px 14px; color: var(--p-text); font-size: 14px; transition: border-color .15s var(--ease), background .15s var(--ease); }
+    .topbar .gh:hover { border-color: var(--p-accent); background: var(--p-accent-tint); color: var(--p-text); }
+    @media (max-width: 720px) { .topbar nav a:not(.gh) { display: none; } }
+
+    .hero { position: relative; overflow: hidden; padding: 88px 0 64px; }
+    .hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px 320px at 72% -10%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%), radial-gradient(500px 300px at 12% 108%, color-mix(in srgb, var(--ok) 5%, transparent), transparent 70%); pointer-events: none; }
+    .hero-inner { position: relative; max-width: 780px; }
+    .kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--p-accent-hover); background: var(--p-accent-tint); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 999px; padding: 5px 14px; margin: 0 0 24px; }
+    .kicker .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--p-success); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent); animation: pulse 2.4s var(--ease) infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); } 70% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--ok) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent); } }
+    h1 { font-size: clamp(2.2rem, 5.5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 20px; font-weight: 700; }
+    h1 .accent { color: var(--p-accent); }
+    .lede { font-size: 1.125rem; color: var(--p-text-secondary); max-width: 680px; margin: 0 0 32px; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: var(--radius-md); padding: 11px 20px; font-size: 15px; font-weight: 550; border: 1px solid transparent; cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease); }
+    .btn-primary { background: var(--p-accent); color: var(--brand-ink); font-weight: 600; }
+    .btn-primary:hover { background: var(--p-accent-hover); color: var(--brand-ink); }
+    .btn-secondary { border-color: var(--p-border); color: var(--p-text); background: transparent; }
+    .btn-secondary:hover { border-color: var(--p-accent); background: var(--p-accent-tint); color: var(--p-text); }
+    .quickstart { display: flex; align-items: center; gap: 14px; background: var(--p-bg-elevated); border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 12px 16px; max-width: 700px; font-size: 13.5px; margin-bottom: 10px; }
+    .quickstart code { color: var(--p-text); white-space: pre; overflow-x: auto; display: block; }
+    .quickstart code .c { color: var(--p-text-muted); }
+    .quickstart .copy { margin-left: auto; flex: 0 0 auto; background: transparent; border: 1px solid var(--p-border); color: var(--p-text-secondary); border-radius: var(--radius-sm); font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; transition: border-color .15s var(--ease), color .15s var(--ease); }
+    .quickstart .copy:hover { border-color: var(--p-accent); color: var(--p-text); }
+    .quickstart .copy.copied { color: var(--p-success); border-color: var(--p-success); }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 56px 0 0; }
+    .stat { background: var(--p-bg-elevated); border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 16px; }
+    .stat .n { font-size: 1.28rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stat .n em { font-style: normal; color: var(--p-accent); }
+    .stat .l { font-size: 13px; color: var(--p-text-muted); margin-top: 2px; }
+
+    section { padding: 60px 0; }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+    .sec-head h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0; }
+    .sec-head p { color: var(--p-text-muted); margin: 0; font-size: 14.5px; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card { border: 1px solid var(--p-border); background: var(--p-bg-elevated); border-radius: var(--radius-md); padding: 18px; transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; } .card:hover { transform: translateY(-2px); border-color: var(--p-accent); box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--brand) 40%, transparent); }
+    .card h3 { margin: 0 0 8px; font-size: 1.02rem; letter-spacing: -0.01em; }
+    .card p { margin: 0; color: var(--p-text-secondary); font-size: 14px; }
+    .card code { font-size: 12.5px; color: var(--p-text); background: var(--p-surface); border: 1px solid var(--p-border); border-radius: var(--radius-sm); padding: 1px 5px; }
+    .card ul { margin: 8px 0 0; padding-left: 18px; color: var(--p-text-secondary); font-size: 14px; }
+    .card li { margin-bottom: 4px; }
+    .tag { display: inline-block; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--p-accent-hover); background: var(--p-accent-tint); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 999px; padding: 2px 9px; margin-bottom: 10px; }
+    .tag.muted { color: var(--p-text-muted); background: var(--p-surface); border-color: var(--p-border); }
+
+    table.why { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+    table.why th, table.why td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--p-border); vertical-align: top; }
+    table.why th { color: var(--p-text-muted); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
+    table.why td:first-child { color: var(--p-text-secondary); width: 42%; }
+    table.why tr:last-child td { border-bottom: 0; }
+    .table-card { border: 1px solid var(--p-border); background: var(--p-bg-elevated); border-radius: var(--radius-md); overflow: hidden; }
+
+    footer { border-top: 1px solid var(--p-border); margin-top: 60px; padding: 22px 0 40px; color: var(--p-text-muted); font-size: 13px; }
+    footer .links { margin-top: 6px; }
+    footer .credits { border-top: 1px dashed var(--p-border); margin-top: 16px; padding-top: 12px; font-size: 12px; line-height: 1.7; }
+  </style>
+</head>
+<body class="liquid">
+  <header class="topbar">
+    <div class="wrap">
+      <div class="topbar-inner">
+        <a class="brand" href="https://innotelinc.github.io/OnTrak/">
+          <span class="mark" aria-hidden="true">OT</span>
+          <span>OnTrak</span>
+        </a>
+        <nav>
+          <a href="#family">The family</a>
+          <a href="#tix">OnTrak Tix</a>
+          <a href="#training">Training</a>
+          <a href="#genie">Genie</a>
+          <a href="#roadmap">Roadmap</a>
+          <a class="gh" href="https://github.com/innotelinc/OnTrak">GitHub ↗</a>
+        </nav>
+        <div class="ot-theme" role="group" aria-label="Colour theme" data-unity-switch><button type="button" data-theme-mode="system" aria-pressed="false">System</button><button type="button" data-theme-mode="light" aria-pressed="false">Light</button><button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-inner">
+        <p class="kicker"><span class="pulse" aria-hidden="true"></span> TrainingOps · self-hosted · Innotel Labs</p>
+        <h1>Train the people, run the work, and keep the <span class="accent">evidence</span>.</h1>
+        <p class="lede">
+          OnTrak is one repository for the IT support operation: a browser-based training
+          platform that grades work against deliberately broken machines, a service desk
+          that runs the real tickets and carries an insurer-grade evidence trail through
+          incident response — and, after both, the identity and intrusion protection they
+          share. Every part is self-hosted, every privileged act is audited, and the record
+          that survives is one an auditor can verify.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/innotelinc/OnTrak">View on GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/innotelinc/OnTrak/tree/main/ontrak-tix#quick-start">Quick start — Tix</a>
+          <a class="btn btn-secondary" href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a>
+        </div>
+        <div class="quickstart">
+          <code id="qs"><span class="c"># OnTrak Tix — the service desk</span>
+git clone https://github.com/innotelinc/OnTrak.git &amp;&amp; cd OnTrak/ontrak-tix
+npm install &amp;&amp; npm run setup &amp;&amp; npm run dev   <span class="c"># http://localhost:3000</span></code>
+          <button class="copy" data-copy="#qs" type="button">Copy</button>
+        </div>
+        <div class="quickstart">
+          <code id="qs-training"><span class="c"># OnTrak IT Support Training</span>
+npm install &amp;&amp; npm run docker:db &amp;&amp; npm run setup &amp;&amp; npm run dev</code>
+          <button class="copy" data-copy="#qs-training" type="button">Copy</button>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="n"><em>7</em> products</div><div class="l">Training · Tix · Sentinel · Sync · Portal · Genie · Lab — the complete TrainingOps suite</div></div>
+        <div class="stat"><div class="n">Graded <em>live</em> state</div><div class="l">Linux, Windows and Office simulations</div></div>
+        <div class="stat"><div class="n">Hash-chained <em>audit</em></div><div class="l">Every privileged action, append-only</div></div>
+        <div class="stat"><div class="n"><em>One</em> identity layer</div><div class="l">OIDC/SAML + SCIM, local fallback</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>Why OnTrak</h2>
+        <p>The answers that decide whether the platform is usable on a real desk.</p>
+      </div>
+      <div class="table-card">
+        <table class="why">
+          <thead>
+            <tr><th scope="col">Problem</th><th scope="col">OnTrak answer</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Practice ranges are built for a demo, not for a class — and every rebuild is another day of work.</td>
+              <td>Simulations are authored once as versioned templates with checkable objectives; a student gets a fresh clone per attempt and the same grader every time.</td>
+            </tr>
+            <tr>
+              <td>"Did they fix it?" graded by hand does not scale, and two instructors grade differently.</td>
+              <td>Objectives are evaluated against live system state on the server. Any correct fix passes — including the ones the author did not think of — and the score is recomputed server-side, never trusted from the browser.</td>
+            </tr>
+            <tr>
+              <td>A single-desk helpdesk breaks the moment it serves a second client: work runs together and SLAs stop meaning anything.</td>
+              <td>Clients, contacts, per-client SLAs and per-client rate cards, with a scope that shows an agent only the clients they are assigned to — and work that names no client stays visible to the whole desk.</td>
+            </tr>
+            <tr>
+              <td>An incident that becomes a claim, an audit or a lawsuit needs a record that was not assembled after the fact.</td>
+              <td>Incident evidence is written under object lock, notification wording is recorded as it was actually sent, and the assurance packet is signed — so the story cannot be edited later, by anyone.</td>
+            </tr>
+            <tr>
+              <td>Billing rebuilt from a timesheet is a dispute waiting to happen.</td>
+              <td>Hours are priced by a snapshot stored on the entry itself, invoices are stamped once and cannot be issued twice, and a credit note is the only path back.</td>
+            </tr>
+            <tr>
+              <td>Training, ticketing and security tooling each invent their own identity and evidence layer.</td>
+              <td>One identity layer, one evidence format, one audit chain: the training record and the incident packet an insurer reads are built from the same signed, tamper-evident shape.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="family">
+      <div class="sec-head">
+        <h2>The OnTrak family</h2>
+        <p>Products added one at a time. Each stands alone, each has its own landing page, and together they close the loop.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">v1 shipped</span>
+          <h3>OnTrak IT Support Training</h3>
+          <p>A browser-based, automatically-graded training platform for IT support: Linux, Windows and Office simulations that read live system state, plus the course, attempt and certificate machinery around them.</p>
+          <ul>
+            <li>Driver-and-adapter seams per simulated platform</li>
+            <li>Objectives evaluated server-side; a correct fix is a correct fix</li>
+            <li>Completion records issued, printable and exportable as a packet</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">M4 in progress</span>
+          <h3>OnTrak Tix</h3>
+          <p>An MSP-grade service desk: tickets, SLAs, queues, canned responses, time and billing, incident response with objection-locked evidence, playbooks, war-room comms and a signed assurance packet.</p>
+          <ul>
+            <li>Multi-client scoping with "act as client" guardrails</li>
+            <li>Retention sweeps that run on a schedule and prove what they purged</li>
+            <li>Attainment reporting and a survey answered by someone with no account</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag muted">Planned</span>
+          <h3>OnTrak Sentinel</h3>
+          <p>The identity provider and intrusion prevention platform for the family: OIDC/SAML and SCIM for the products, plus detection and containment with an approval gate on anything that acts.</p>
+          <ul>
+            <li>One identity layer, adopted back by Tix and Training</li>
+            <li>Telemetry, alerts and a detection-coverage map</li>
+            <li>Every automated action audited and reversible</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">v0.1.0</span>
+          <h3>OnTrak Genie</h3>
+          <p>The browser console for a coding agent: the tool calls stream in as they are decided, the file being written renders live beside a diff of what is changing, and a command or a large overwrite waits for a click.</p>
+          <ul>
+            <li>One workspace jail — absolute paths and <code>../</code> escapes are refused</li>
+            <li>An approval gate between a plan and a changed machine</li>
+            <li><code>export</code> turns a workspace into a build request the factory manufactures</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">Active</span>
+          <h3>OnTrak Lab</h3>
+          <p>The hands-on half of the same training: the scenarios above, run on real machines rather than in a browser. A session is a Linux container or a Windows guest stood up on demand, graded from its live state, and torn down when the work is handed in.</p>
+          <ul>
+            <li>Real machines behind the same grading contract — a correct fix is a correct fix</li>
+            <li>An HTML5 console (SSH and RDP) in the browser, nothing to install</li>
+            <li>One family name, <code>lab.ontrak.technology</code>, in front of its own gateway</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">Active</span>
+          <h3>OnTrak Portal</h3>
+          <p>The centralized front door: one sign-in, then the products a role belongs in. Routes by role and authorizes nothing — every product re-checks the caller itself.</p>
+          <ul>
+            <li>Unified authentication across all family products</li>
+            <li>Role-based product discovery and routing</li>
+            <li>Local account fallback via OnTrak Sync</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">Active</span>
+          <h3>OnTrak Sync</h3>
+          <p>Network package and container update monitoring with approval workflows. Also owns the family's local account table for LAN deployments.</p>
+          <ul>
+            <li>Monitors package and container update status</li>
+            <li>Approval-gated updates with audit trail</li>
+            <li>Local account management and capability model</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="ecosystem">
+      <div class="sec-head">
+        <h2>The Innotel Ecosystem</h2>
+        <p>Every Innotel Labs product — one job per platform, platform services consumed by business functions.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">IdentityOps</span>
+          <h3>Authentik</h3>
+          <p>Single identity source for the entire Innotel Platform Stack — OIDC/OAuth2/SAML/SSO, MFA, SCIM provisioning, RBAC, and organizations. Every platform trusts the same identity.</p>
+          <a class="secondary" href="https://innotelinc.github.io/cerulean/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">SecretOps</span>
+          <h3>Cerulean Vault</h3>
+          <p>HashiCorp Vault KV v2 — the canonical secrets store. All secrets carry <code>vault://</code> references, never committed to repos. Secret rotation and auditing included.</p>
+          <a class="secondary" href="https://innotelinc.github.io/cerulean/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">TrustOps</span>
+          <h3>Cerulean</h3>
+          <p>Certificate lifecycle, ACME automation, PKI, and DNS with one wildcard cert per platform zone. All public hosts front the same Cerulean instance.</p>
+          <a class="secondary" href="https://innotelinc.github.io/cerulean/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">StorageOps</span>
+          <h3>ONYX</h3>
+          <p>Object storage, backups, snapshots, and object-lock (WORM) retention with legal hold. Per-tenant scoping via Vault paths.</p>
+          <a class="secondary" href="https://innotelinc.github.io/onyx/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">RevenueOps</span>
+          <h3>Magnate</h3>
+          <p>Billing, subscriptions, and entitlements. Checkout → webhook → Authentik <code>paid_users</code> group → access granted. Credit notes the only remedy.</p>
+          <a class="secondary" href="https://innotelinc.github.io/magnate/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">EdgeOps</span>
+          <h3>NPM Edge</h3>
+          <p>Public HTTP/S routing, TLS termination at the edge, and proxy host provisioning. Wildcard certs from Cerulean, CNAMEs from shared BIND.</p>
+          <a class="secondary" href="https://innotelinc.github.io/npm/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">MediaOps</span>
+          <h3>Monarch</h3>
+          <p>Streaming, media libraries, user profiles, and watch history. Free media auto-fetched; licensed media stays with the operator.</p>
+          <a class="secondary" href="https://innotelinc.github.io/monarch/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">VoiceOps</span>
+          <h3>Zeus</h3>
+          <p>VoIP, SIP, SMS, PBX, and PWA mobile client. SIP PBX with trunking, SMS gateway, and call routing with IVR.</p>
+          <a class="secondary" href="https://innotelinc.github.io/zeus/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">MailOps</span>
+          <h3>Oasis</h3>
+          <p>IMAP/SMTP mail server, CalDAV calendars, CardDAV contacts, and mail security with spam filtering and DMARC/DKIM/SPF.</p>
+          <a class="secondary" href="https://innotelinc.github.io/oasis/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">DocumentOps</span>
+          <h3>Signara</h3>
+          <p>Document signing, agreements, templates, audit trails, and legal holds. Sole signer of course certificates for the ecosystem.</p>
+          <a class="secondary" href="https://innotelinc.github.io/signara/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">AgentOps</span>
+          <h3>Capstone</h3>
+          <p>Voice AI agents, call screening, AI receptionists, speech processing, and telephony automation. Built on Zeus SIP foundation.</p>
+          <a class="secondary" href="https://innotelinc.github.io/capstone/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">CommunityOps</span>
+          <h3>Rizz Aura</h3>
+          <p>Leaderboards, reputation scoring, achievements, and cross-product ranking tables. Reputation can gate feature access across platforms.</p>
+          <a class="secondary" href="https://innotelinc.github.io/rizzaura/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">TransferOps</span>
+          <h3>zapit</h3>
+          <p>Ephemeral P2P transfer via WebRTC data channels — room codes, QR pairing, Zings (text snippets), relay fallback. Condition-keyed tracking (not alert-id keyed).</p>
+          <a class="secondary" href="https://innotelinc.github.io/zapit/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">LearningOps</span>
+          <h3>AthenIQ</h3>
+          <p>Course catalog, enrollment, assessments, AI interactive classrooms, and completion records. Emits evidence forwarded to Signara for signed certificates.</p>
+          <a class="secondary" href="https://innotelinc.github.io/atheniq/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">CodeOps</span>
+          <h3>Atlas</h3>
+          <p>Gitea repository hosting, CI/CD pipelines, issue/boards, package registry, and AI app builder via OmniRoute gateway.</p>
+          <a class="secondary" href="https://innotelinc.github.io/atlas/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">BuilderOps</span>
+          <h3>Distro</h3>
+          <p>Multi-tenant builder tenancy with per-user OmniRoute gateway keys, quota/usage enforcement, and spend tracking via Magnate integration.</p>
+          <a class="secondary" href="https://innotelinc.github.io/distro/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">FactoryOps</span>
+          <h3>Olympus</h3>
+          <p>Issue-to-PR automation with five factory workflows (prime, implement, validate, regress, triage), validation and safety, and operational visibility.</p>
+          <a class="secondary" href="https://innotelinc.github.io/olympus/">Landing page</a>
+        </div>
+        <div class="card">
+          <span class="tag">VideoOps</span>
+          <h3>PLUTUS</h3>
+          <p>Video ingestion, transcoding, catalog, and streaming delivery (HLS/DASH). Live streaming and AI video analysis.</p>
+          <a class="secondary" href="https://innotelinc.github.io/plutus/">Landing page</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="tix">
+      <div class="sec-head">
+        <h2>Inside OnTrak Tix</h2>
+        <p>The desk is the part most teams feel first, and the part with the most to get wrong.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>A worklist that respects a client boundary</h3>
+          <p>Inbox, saved views and SLA flags are all computed after the client scope is applied, so an agent cannot be shown a figure that includes a client they cannot open. Acting as a client is a permission, a reason on the record and one expiring window.</p>
+        </div>
+        <div class="card">
+          <h3>Promises written down, not remembered</h3>
+          <p>An SLA policy belongs to a client, a queue or the desk, and one resolver answers most-specific-first — reporting which rung won. Writing a promise is validated before it is in force and refused while tickets are still measured against it.</p>
+        </div>
+        <div class="card">
+          <h3>Incident response with evidence that holds</h3>
+          <p>Artifacts land under object lock, retention has a clock the desk cannot wind back early, notification wording is kept as sent, and the packet is signed. A scheduled sweep purges what the window has closed and records what it purged.</p>
+        </div>
+        <div class="card">
+          <h3>Hours that add up to an invoice</h3>
+          <p>Time is logged where the work is, priced by the client's rate card or the desk default with the rate snapshotted onto the entry, and exported as invoice-ready lines. Issuing an invoice freezes the entries it covers; a credit note is the remedy.</p>
+        </div>
+        <div class="card">
+          <h3>Reporting that cannot disagree with itself</h3>
+          <p>The desk-wide report and every client's scorecard come from one function, with a row for work that names no client — so the parts add up to the whole, and the first row is the one somebody can act on.</p>
+        </div>
+        <div class="card">
+          <h3>Every privileged act on the chain</h3>
+          <p>Sign-in, role changes, exports, purges, invoices, surveys and act-as windows are append-only, hash-chained audit events. If it mattered, it is in the record — and the record can be verified.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="training">
+      <div class="sec-head">
+        <h2>Inside OnTrak IT Support Training</h2>
+        <p>Practice that is graded by the machine, not by a mark scheme.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Simulations behind one interface</h3>
+          <p>Linux shell, Windows desktop and Office applications each implement the same driver contract, so a scenario author writes objectives once and the grader runs them the same way everywhere.</p>
+        </div>
+        <div class="card">
+          <h3>Grading that reads state</h3>
+          <p>A solve is a change on the simulated machine — a service started, a permission fixed, a file recovered — and the score is recomputed on the server from that state, whatever the browser claims.</p>
+        </div>
+        <div class="card">
+          <h3>Records a student can keep</h3>
+          <p>Passing an attempt issues a completion record with a printed certificate and a verifiable export packet, so the training outlives the session that produced it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="genie">
+      <div class="sec-head">
+        <h2>Inside OnTrak Genie</h2>
+        <p>The one surface in the family that shows an agent's work rather than its output.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>You see the edit before the edit exists</h3>
+          <p>Every tool call is on screen as it is decided, and the file being written is rendered character by character next to a live diff against the on-disk baseline — so the review happens while the change is still being made.</p>
+        </div>
+        <div class="card">
+          <h3>The gate is the only thing between a plan and a machine</h3>
+          <p>Commands and writes over a line threshold stop and wait for a click. Denying ends the turn cleanly rather than leaving it stalled, and the workspace it cannot leave is one directory.</p>
+        </div>
+        <div class="card">
+          <h3>Work that stops at the preview is work retyped</h3>
+          <p><code>export</code> assembles a build request from the workspace — file index, stack, entry point, the test command that actually exists — with no second model call, so a session that produced something worth shipping becomes factory input.</p>
+        </div>
+      </div>
+      <p style="margin-top:18px; color:var(--p-text-muted); font-size:14px;">
+        OnTrak Genie has its own landing page at <a href="./ontrak-genie/">ontrak-genie</a>,
+        and its role in the stack is written down in
+        <a href="https://github.com/innotelinc/OnTrak/blob/main/ontrak-genie/docs/stack.md">docs/stack.md</a>.
+      </p>
+    </section>
+
+    <section id="stack">
+      <div class="sec-head">
+        <h2>One stack, consumed not rebuilt</h2>
+        <p>OnTrak is a business platform in the Innotel Platform Stack — it consumes the shared services.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Identity &amp; access</h3>
+          <p>Sign-in is Authentik through Cerulean, with a local credential fallback so each app still deploys on its own. Roles and permissions are re-checked on the server for every privileged action.</p>
+        </div>
+        <div class="card">
+          <h3>Secrets &amp; trust</h3>
+          <p>Runtime secrets resolve from Cerulean Vault. Public hosts and the wildcard certificate come from Cerulean; nothing in the repo holds a key, a certificate or a real address.</p>
+        </div>
+        <div class="card">
+          <h3>Storage &amp; evidence</h3>
+          <p>Attachment and evidence bytes sit behind a storage port — local disk for a single node, an object-locked bucket for a desk that has to prove a record was never edited.</p>
+        </div>
+      </div>
+      <p style="margin-top:18px; color:var(--p-text-muted); font-size:14px;">
+        Boundaries — what OnTrak owns, consumes and deliberately does not own — are written down in
+        <a href="https://github.com/innotelinc/OnTrak/blob/main/docs/stack.md">docs/stack.md</a>.
+      </p>
+    </section>
+
+    <section id="roadmap">
+      <div class="sec-head">
+        <h2>Project structure &amp; roadmap</h2>
+        <p>Current layout across the 7 OnTrak family products and milestone trajectory.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <span class="tag">v1.0 – v1.2 · Shipped</span>
+          <h3>TrainingOps Core &amp; Real Drivers</h3>
+          <p>In-browser Linux, Windows 11, and Office simulators, WCAG AA accessibility sweep, instructor analytics, and real container/VM execution through <code>ontrak-lab/</code>.</p>
+        </div>
+        <div class="card">
+          <span class="tag">M1 – M6 · Shipped</span>
+          <h3>OnTrak Tix &amp; Incident Evidence</h3>
+          <p>Multi-client MSP desk, SLA resolution hierarchy, rate-card snapshotted billing, object-locked incident evidence, and signed assurance packets.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Active · Next</span>
+          <h3>Family Readiness &amp; S4 Prevention</h3>
+          <p>Unified capability health probes across Portal, Sync, Genie, and Lab; Sentinel S4 active containment with safe-list &amp; blast-radius enforcement.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div>© 2026 OnTrak — an Innotel Labs product. TrainingOps for the Innotel Platform Stack.</div>
+      <div class="links">
+        <a href="https://github.com/innotelinc/OnTrak">GitHub</a> ·
+        <a href="https://github.com/innotelinc/OnTrak/blob/main/README.md">README</a> ·
+        <a href="https://github.com/innotelinc/OnTrak/blob/main/ROADMAP.md">Roadmap</a> ·
+        <a href="https://github.com/innotelinc/OnTrak/blob/main/docs/stack.md">Stack role</a> ·
+        <a href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a>
+      </div>
+      <div class="credits">
+        Innotel Platform — <a href="https://innotelinc.github.io/cerulean/">Cerulean</a> (Trust) ·
+        <a href="https://innotelinc.github.io/onyx/">ONYX</a> (Storage) ·
+        <a href="https://innotelinc.github.io/magnate/">Magnate</a> (Revenue) ·
+        <a href="https://innotelinc.github.io/npm/">NPM Edge</a> ·
+        OnTrak (TrainingOps) ·
+        <a href="https://innotelinc.github.io/zeus/">Zeus</a> (VoiceOps) ·
+        <a href="https://innotelinc.github.io/oasis/">Oasis</a> (MailOps) ·
+        <a href="https://innotelinc.github.io/signara/">Signara</a> (DocumentOps) ·
+        <a href="https://innotelinc.github.io/atheniq/">AthenIQ</a> (LearningOps) ·
+        <a href="https://innotelinc.github.io/distro/">Distro</a> (BuilderOps) ·
+        <a href="https://innotelinc.github.io/verifier/">Verifier</a> (PlatformOps) ·
+        <a href="https://innotelinc.github.io/capstone/">Capstone</a> (AgentOps) ·
+        <a href="https://innotelinc.github.io/rizzaura/">Rizz Aura</a> (CommunityOps) ·
+        <a href="https://innotelinc.github.io/zapit/">zapit</a> (TransferOps) ·
+        <a href="https://innotelinc.github.io/monarch/">Monarch</a> (MediaOps) ·
+        <a href="https://innotelinc.github.io/atlas/">Atlas</a> (CodeOps) ·
+        <a href="https://innotelinc.github.io/olympus/">Olympus</a> (FactoryOps) ·
+        <a href="https://innotelinc.github.io/plutus/">PLUTUS</a> (VideoOps)
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('.copy');
+      if (!button) return;
+      var source = document.querySelector(button.dataset.copy);
+      if (!source) return;
+      navigator.clipboard.writeText(source.innerText).then(function () {
+        var original = button.textContent;
+        button.textContent = 'Copied';
+        button.classList.add('copied');
+        setTimeout(function () {
+          button.textContent = original;
+          button.classList.remove('copied');
+        }, 1400);
+      });
+    });
+  </script>
+  <script>(function(){
+  var api=window.UnityTheme||window.OntrakTheme;if(!api)return;
+  function paint(){var now=api.mode();var all=document.querySelectorAll('[data-theme-mode]');
+    for(var i=0;i<all.length;i++){all[i].setAttribute('aria-pressed',String(all[i].getAttribute('data-theme-mode')===now));}}
+  var buttons=document.querySelectorAll('[data-theme-mode]');
+  for(var i=0;i<buttons.length;i++){buttons[i].addEventListener('click',function(){api.setMode(this.getAttribute('data-theme-mode'));});}
+  window.addEventListener('unity:theme',paint);window.addEventListener('ontrak:theme',paint);paint();
+})();</script>
+</body>
+</html>

@@ -1,0 +1,1866 @@
+// OnTrak Tix — M0 schema draft.
+//
+// The M0 entities: the tenant boundary, staff and requesters, clients and
+// contacts, queues, the ticket with its append-only conversation, and the
+// hash-chained audit event. This is a design artifact for the separate OnTrak
+// Tix project; it is NOT yet generated or migrated, and it deliberately does
+// not share a database with the Training app or with OnTrak Sentinel.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Isolation boundary: an MSP, or one internal IT department. Every domain row
+/// carries a `tenantId`, and every server action checks it before writing.
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  /// The M7 AI-assist opt-in. Off unless this desk turned it on, so a tenant that
+  /// has never been to the integrations screen has no assistant in front of its
+  /// agents. Read per request; written only by `AssistSettingsService`.
+  assistEnabled Boolean @default(false)
+
+  users                 User[]
+  clients               Client[]
+  contacts              Contact[]
+  clientAssignments     ClientAssignment[]
+  clientActAsSessions   ClientActAsSession[]
+  queues                Queue[]
+  tickets               Ticket[]
+  audit                 AuditEvent[]
+  inbound               InboundMessage[]
+  slaPolicies           SlaPolicy[]
+  satisfaction          SatisfactionResponse[]
+  attachments           Attachment[]
+  escalations           SlaEscalation[]
+  canned                CannedResponse[]
+  templates             TicketTemplate[]
+  links                 TicketLink[]
+  notifications         Notification[]
+  notificationPrefs     NotificationPreference[]
+  savedViews            SavedView[]
+  securityAlerts        SecurityAlert[]
+  alertVerdicts         AlertVerdict[]
+  alertSuppressions     AlertSuppression[]
+  alertPromotions       AlertPromotion[]
+  identityConnection    IdentityConnection?
+  rules                 Rule[]
+  macros                Macro[]
+  knowledge             KnowledgeArticle[]
+  incidents             Incident[]
+  incidentEvents        IncidentEvent[]
+  playbookSteps         PlaybookStep[]
+  evidenceItems         EvidenceItem[]
+  evidenceArtifacts     EvidenceArtifact[]
+  custodyEntries        CustodyEntry[]
+  legalHolds            LegalHold[]
+  incidentNotifications IncidentNotification[]
+  incidentReviews       IncidentReview[]
+  reviewActions         IncidentReviewAction[]
+  commsTemplates        IncidentCommsTemplate[]
+  rateCards             RateCard[]
+  timeEntries           TimeEntry[]
+  clientSurveys         ClientSurvey[]
+  clientBranding        ClientBranding[]
+  taxRules              TaxRule[]
+  creditNotes           CreditNote[]
+  retainers             Retainer[]
+  rotaShifts            RotaShift[]
+  handoffs              Handoff[]
+  // The M6 integration surface: what an outside system may do (a token), where it
+  // is told about it (an endpoint), what happened when we told it (deliveries) and
+  // which monitored conditions are open as tickets (the RMM connector).
+  apiTokens             ApiToken[]
+  webhookEndpoints      ApiWebhookEndpoint[]
+  webhookDeliveries     ApiWebhookDelivery[]
+  rmmAlertLinks         RmmAlertLink[]
+  // Where the desk tells people, rather than an integration: the rooms on call
+  // already watches, and what it managed to say to each of them.
+  chatChannels          ChatChannel[]
+  chatDeliveries        ChatDelivery[]
+  // The desk's own shape: the fields it defines for its tickets, and the form each
+  // queue shows them on.
+  customFields          CustomField[]
+  queueForms            QueueForm[]
+  // The desk's own shape of authority (M6): roles it writes for itself, which
+  // can only ever narrow one of the four built-ins.
+  tenantRoles           TenantRole[]
+  // The M6 marketplace: the third-party connectors this desk has installed, each
+  // naming a manifest in `src/lib/connector-rules.ts`. First-party connectors are
+  // catalogued but never installed here, so a row here is always a third party.
+  connectorInstallations ConnectorInstallation[]
+
+  @@index([slug])
+}
+
+/// A staff account (admin/dispatcher/agent) or a requester who uses the portal.
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  displayName  String
+  role         Role     @default(REQUESTER)
+  /// The tenant role narrowing `role` (M6), if this desk has handed them one.
+  tenantRoleId String?
+  active       Boolean  @default(true)
+  /// Local sign-in fallback (`scrypt:salt:hash`). Superseded by the Sentinel IdP at M2.
+  passwordHash String?
+  /// The IdP's stable subject id once the user is provisioned through SSO/SCIM.
+  externalId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantRole  TenantRole?        @relation(fields: [tenantRoleId], references: [id], onDelete: SetNull)
+  requested   Ticket[]           @relation("TicketRequester")
+  assigned    Ticket[]           @relation("TicketAssignee")
+  messages    Message[]
+  attachments Attachment[]
+  savedViews  SavedView[]
+  clients     ClientAssignment[]
+  timeEntries TimeEntry[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+  @@index([tenantId, externalId])
+  @@index([tenantId, tenantRoleId])
+}
+
+enum Role {
+  ADMIN
+  DISPATCHER
+  AGENT
+  REQUESTER
+}
+
+/// A customer company. An internal IT desk has one; an MSP has many.
+model Client {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contacts      Contact[]
+  tickets       Ticket[]
+  assignments   ClientAssignment[]
+  slaPolicies   SlaPolicy[]
+  actAsSessions ClientActAsSession[]
+  rateCards     RateCard[]
+  timeEntries   TimeEntry[]
+  surveys       ClientSurvey[]
+  branding      ClientBranding?
+  taxRule       TaxRule?
+  creditNotes   CreditNote[]
+  retainers     Retainer[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+///
+/// Which staff serve which client (M4). The row is the scope: an agent who is
+/// not assigned to a client does not see its work, which is what "two clients
+/// without data bleed" has to mean somewhere a query can enforce.
+///
+model ClientAssignment {
+  id         String   @id @default(cuid())
+  tenantId   String
+  clientId   String
+  userId     String
+  assignedBy String
+  assignedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@index([tenantId, userId])
+}
+
+///
+/// An "act as client" window (M4): who assumed which client's view, why, and
+/// until when. A second window cannot start while one is open — two identities
+/// live in one session is how a mistake becomes an incident.
+///
+model ClientActAsSession {
+  id        String    @id @default(cuid())
+  tenantId  String
+  clientId  String
+  actorId   String
+  reason    String
+  startedAt DateTime  @default(now())
+  expiresAt DateTime
+  endedAt   DateTime?
+  endReason String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, actorId])
+}
+
+/// A person at a client; requesters and CCs are contacts.
+model Contact {
+  id        String   @id @default(cuid())
+  tenantId  String
+  clientId  String
+  name      String
+  email     String
+  createdAt DateTime @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client  Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@unique([tenantId, email])
+  @@index([clientId])
+}
+
+/// A worklist with routing rules and (from M1) an SLA policy.
+model Queue {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  slug      String
+  createdAt DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+  slaPolicies SlaPolicy[]
+  rotaShifts  RotaShift[]
+  handoffs    Handoff[]
+  forms       QueueForm[]
+
+  @@unique([tenantId, slug])
+}
+
+/// A field the desk defines for its own tickets (M6).
+///
+/// `key` is what a value is stored under and `label` is what a person reads. They are
+/// separate columns because a label gets renamed — “Room” becomes “Location” — and a rename
+/// must not orphan the answers already recorded under it. The key is therefore immutable
+/// once the field exists, and the service refuses to change it.
+///
+/// There is no delete: `archived` takes a field off new forms and leaves every ticket that
+/// answered it readable, which is the only behaviour consistent with an audit trail. A
+/// `(tenantId, key)` unique index is per tenant, because two desks may both have a
+/// `location` and neither is wrong.
+model CustomField {
+  id                String   @id @default(cuid())
+  tenantId          String
+  /// The stable key a value is stored under, e.g. `change_window`.
+  key               String
+  label             String
+  /// `TEXT` | `TEXTAREA` | `NUMBER` | `SELECT` | `CHECKBOX` | `DATE`.
+  type              String
+  /// The choices, for a `SELECT`; empty for every other type.
+  options           String[] @default([])
+  /// Whether new forms require it. A layout may require it regardless — that is what
+  /// “per-queue” has to mean — and may not un-require it.
+  requiredByDefault Boolean  @default(false)
+  placeholder       String   @default("")
+  helpText          String   @default("")
+  archived          Boolean  @default(false)
+  createdBy         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, archived])
+}
+
+/// The form a queue shows (M6).
+///
+/// One row per layout, with `sections` as JSON: the fields, their order and which of them
+/// this form requires. JSON rather than a join table because a layout is read and written
+/// whole — nobody edits “the third element of section two” — and a join table would make the
+/// common read three queries to reconstruct something that is one value.
+///
+/// `queueId` is NULL for the tenant's *default* form, which is what every queue without a
+/// layout of its own shows. The default row's id is derived from the tenant by the service,
+/// because `(tenantId, queueId)` cannot be unique while one half is NULL: Postgres treats
+/// NULLs as distinct, so a derived primary key is what makes two racing writes of the
+/// default collapse instead of both landing.
+model QueueForm {
+  id        String   @id @default(cuid())
+  tenantId  String
+  queueId   String?
+  sections  Json
+  updatedBy String
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue  Queue? @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, queueId])
+  @@index([tenantId])
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  tenantId    String
+  /// Human-facing reference, e.g. `TIX-000123`.
+  ref         String
+  subject     String
+  description String
+  type        TicketType     @default(INCIDENT)
+  status      TicketStatus   @default(NEW)
+  priority    TicketPriority @default(NORMAL)
+
+  queueId     String?
+  requesterId String
+  assigneeId  String?
+  clientId    String?
+  contactId   String?
+  /// The SLA policy in force. Tickets without one have no running clock.
+  slaPolicyId String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  /// The first public *agent* reply — the input to the response clock.
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  /// Windows during which the SLA clock is stopped, e.g. `[{"startedAt":"…","endedAt":null}]`
+  /// while the desk waits on the customer. An open pause has `endedAt === null`.
+  slaPauses       Json      @default("[]")
+  /// Tags applied by hand or by an M5 rule (`add_tag`). A scoring axis, not a
+  /// classification: a ticket may carry several or none.
+  tags            String[]  @default([])
+  /// The desk's own fields (M6), keyed by `CustomField.key`. JSON, because the keys are
+  /// the tenant's to choose and a column per field would be a migration per field; every
+  /// value is stored as a string whatever the field's type, so nothing that can read JSON
+  /// has to know about types. Nullable: a ticket raised before the desk defined any field
+  /// has none, and so does one raised on a desk that still has none.
+  customFields    Json?
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue        Queue?                @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  slaPolicy    SlaPolicy?            @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
+  requester    User                  @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee     User?                 @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  client       Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contact      Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  messages     Message[]
+  attachments  Attachment[]
+  escalations  SlaEscalation[]
+  satisfaction SatisfactionResponse?
+  linksFrom    TicketLink[]          @relation("LinkFrom")
+  linksTo      TicketLink[]          @relation("LinkTo")
+  timeEntries  TimeEntry[]
+
+  @@unique([tenantId, ref])
+  @@index([tenantId, status])
+  @@index([tenantId, assigneeId])
+  @@index([tenantId, queueId])
+  @@index([tenantId, slaPolicyId])
+  // The inbox and the public API page in id order within one tenant; without
+  // this, each page reads the tenant's whole index to sort it.
+  @@index([tenantId, id])
+  // The inbox page reads one status at a time in its own order (priority, then
+  // oldest-touched). The direction is part of the promise: the index is scanned
+  // forward for exactly this order, so Postgres hands back a sorted prefix and
+  // stops at fifty instead of sorting the first priority group to find them.
+  @@index([tenantId, status, priority(sort: Desc), updatedAt])
+}
+
+/// The reference high-water mark for one tenant.
+///
+/// `nextTicketSeq` used to read every ticket's `ref` on every create, which made a
+/// create O(tenant) and was the 18.7 s p95 in the load test. The mark is now one
+/// row: bootstrapped from the highest existing ref the first time it is needed,
+/// then incremented atomically. It never moves backwards, so a deleted ticket's
+/// number is not reissued.
+model TicketSequence {
+  tenantId  String   @id
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+enum TicketType {
+  INCIDENT
+  REQUEST
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// The immutable conversation thread: email, portal reply, internal note or
+/// system event. Rows are append-only — corrections are new messages.
+model Message {
+  id        String      @id @default(cuid())
+  tenantId  String
+  ticketId  String
+  authorId  String?
+  kind      MessageKind @default(PUBLIC_REPLY)
+  body      String
+  /// Normalized `Message-ID` of the mail this message came from, when it was
+  /// ingested rather than typed.
+  messageId String?
+  /// Normalized `Message-ID` this message answers, for threading.
+  inReplyTo String?
+  createdAt DateTime    @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?  @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([tenantId, messageId])
+}
+
+enum MessageKind {
+  PUBLIC_REPLY
+  INTERNAL_NOTE
+  SYSTEM
+}
+
+/// A first-response / resolution promise, scoped to a priority and optionally a
+/// queue. `calendar` holds the business-hours definition as JSON so a desk can
+/// change its hours without a migration.
+model SlaPolicy {
+  id                String          @id @default(cuid())
+  tenantId          String
+  name              String
+  /// `null` means "any priority" — the fallback policy.
+  priority          TicketPriority?
+  responseMinutes   Int
+  resolutionMinutes Int
+  /// `BusinessCalendar` as JSON (see `src/lib/sla-rules.ts`).
+  calendar          Json
+  /// Warn once this fraction of a target remains (0–1).
+  warningFraction   Float           @default(0.2)
+  queueId           String?
+  /// The client this policy is a promise to (M4). Null means the desk's own
+  /// default; a client policy outranks a queue or tenant one (resolveSlaPolicy).
+  clientId          String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue   Queue?   @relation(fields: [queueId], references: [id], onDelete: SetNull)
+  client  Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, priority])
+  @@index([tenantId, clientId])
+}
+
+/// One rung of an SLA escalation ladder, raised once per `(ticket, clock, level)`
+/// so a repeated sweep is idempotent. `audience` widens as the level rises.
+model SlaEscalation {
+  id             String    @id @default(cuid())
+  tenantId       String
+  ticketId       String
+  ticketRef      String
+  /// `response` or `resolution`.
+  kind           String
+  level          Int
+  /// `AGENT`, `DISPATCHER` or `MANAGER`.
+  audience       String
+  label          String
+  reason         String
+  /// `<ticketId>:<kind>:<level>` — the idempotency key.
+  dedupeKey      String
+  raisedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, raisedAt])
+}
+
+///
+/// A client's agreed price (M4). `clientId` null is the desk's own default card.
+/// **One card per client**, which the service enforces by replacing rather than
+/// accumulating — a nullable column cannot carry the uniqueness constraint that
+/// would say so, so the rule lives where the decision is made.
+///
+/// Per-client branding (M4). A desk that serves many clients is seen by each of
+/// them as *their* supplier, so the name, colour and voice a client reads have
+/// to be theirs. One row per client; the desk's own identity is the fallback.
+model ClientBranding {
+  id           String   @id @default(cuid())
+  tenantId     String
+  clientId     String   @unique
+  /// The name the client is called in their own notices and on their portal.
+  displayName  String
+  /// `#rrggbb`. A client's own colour, used on their pages and in their mail.
+  accentColor  String
+  /// `https:` or `data:image/...` only — a portal that fetches arbitrary URLs
+  /// leaks its visitors to whoever set them.
+  logoUrl      String?
+  /// The address a client's own people should write back to.
+  supportEmail String?
+  /// The wording appended to a notice sent on this client's behalf.
+  signature    String?
+  updatedBy    String
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+/// A tax rule: the desk's default, or one client's own (M4 billing depth).
+/// Field-for-field the same shape as `RateCard` — a nullable owner column —
+/// because the two are resolved the same way and one of them having a different
+/// notion of "the desk's default" would be a bug waiting to be written.
+model TaxRule {
+  id              String   @id @default(cuid())
+  tenantId        String
+  clientId        String?  @unique
+  label           String
+  /// Basis points (1/100th of a percent), so 8.25% is 825.
+  rateBasisPoints Int
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+/// A credit note: the only remedy for an invoice that was wrong. An invoiced
+/// entry is frozen, so a mistake is corrected by crediting money — never by
+/// editing what was billed. Refund and re-issue are two acts, and the record
+/// says which happened.
+model CreditNote {
+  id          String   @id @default(cuid())
+  tenantId    String
+  ref         String
+  invoiceRef  String
+  clientId    String?
+  currency    String
+  amountCents Int
+  reason      String
+  issuedBy    String
+  issuedAt    DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, ref])
+  @@index([tenantId, invoiceRef])
+}
+
+/// A retainer: money paid up front for a period, drawn down by the invoices
+/// issued inside it. The balance is a question answered from the ledger (what
+/// was funded, minus what invoices have drawn), never a stored counter that can
+/// drift from the invoices themselves.
+model Retainer {
+  id          String   @id @default(cuid())
+  tenantId    String
+  clientId    String
+  currency    String
+  fundedCents Int
+  periodStart DateTime
+  periodEnd   DateTime
+  note        String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, periodStart, periodEnd])
+  @@index([tenantId, clientId])
+}
+
+enum ShiftKind {
+  SHIFT
+  ON_CALL
+}
+
+/// One rota entry: an agent on a queue (or the desk) for a window, either
+/// working hours or on call. Overlap is refused for the same person, because a
+/// rota that double-books somebody is a rota nobody can be held to.
+model RotaShift {
+  id        String    @id @default(cuid())
+  tenantId  String
+  queueId   String?
+  userId    String
+  kind      ShiftKind @default(SHIFT)
+  startsAt  DateTime
+  endsAt    DateTime
+  note      String?
+  createdBy String
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue  Queue? @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startsAt])
+  @@index([tenantId, userId, startsAt])
+}
+
+/// A handoff: the record that work and its context changed hands at a moment,
+/// with what was still open named on it. The note is required — a handoff with
+/// nothing written down is the thing this table exists to prevent.
+model Handoff {
+  id             String   @id @default(cuid())
+  tenantId       String
+  queueId        String?
+  fromUserId     String
+  toUserId       String?
+  note           String
+  /// The work handed over, named by ticket reference so the next person can
+  /// open each one without guessing what "the usual" meant.
+  openTicketRefs String[]
+  at             DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  queue  Queue? @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, at])
+}
+
+model RateCard {
+  id               String   @id @default(cuid())
+  tenantId         String
+  clientId         String?
+  name             String
+  /// ISO-4217, upper case: a rate without a currency is not a price.
+  currency         String
+  /// Cents per hour, so money never sits in a float.
+  hourlyRateCents  Int
+  /// Bill in whole multiples of this many minutes, rounded up (0 = exact).
+  incrementMinutes Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client  Client?     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  entries TimeEntry[]
+
+  @@index([tenantId, clientId])
+}
+
+///
+/// Time worked (M4). The price is **snapshotted onto the row** — the minutes
+/// charged, the rate, the rounding that produced them and the currency — so a
+/// card that changes in March cannot restate February's invoice, and a card that
+/// is deleted cannot turn last quarter's bill into a guess.
+///
+/// An entry that went onto an issued invoice (`invoicedAt`, `invoiceRef`) is
+/// frozen: the service refuses to change or remove it, because a correction to
+/// something already billed is a credit note, not an edit.
+///
+model TimeEntry {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  ticketId             String?
+  clientId             String?
+  userId               String
+  /// The day the work happened, held at midnight UTC: a timesheet must not move
+  /// a day because the server is in another timezone.
+  workDate             DateTime
+  minutes              Int
+  /// Minutes charged, after the snapped rounding.
+  billedMinutes        Int?
+  billable             Boolean   @default(true)
+  rateCardId           String?
+  rateCentsPerHour     Int?
+  rateIncrementMinutes Int?
+  currency             String?
+  note                 String?
+  invoicedAt           DateTime?
+  invoiceRef           String?
+  /// Tax charged on this entry at the moment its invoice was issued, and the
+  /// rate that produced it. Held per entry for the same reason the rate is: the
+  /// invoice has to be re-readable, and a tax rule changed in April must not
+  /// restate what March was charged.
+  taxCents             Int?
+  taxRateBasisPoints   Int?
+  /// The retainer this entry's invoice drew down, when one covered the period.
+  retainerId           String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket   Ticket?   @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  client   Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rateCard RateCard? @relation(fields: [rateCardId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, workDate])
+  @@index([tenantId, clientId])
+  @@index([tenantId, ticketId])
+  @@index([tenantId, invoiceRef])
+}
+
+///
+/// A client-level satisfaction survey (M4). One per client per period, answered
+/// from a link by whoever holds the token — no portal account, because the person
+/// who owns the relationship is usually not the person who raised the ticket, and
+/// a survey behind a sign-in is answered by whoever happens to have one.
+///
+/// The unique key is `(client, period)` rather than a nullable column, so "asked
+/// twice about the same month" is something the database refuses rather than
+/// something the service has to remember to check.
+///
+model ClientSurvey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  clientId    String
+  /// The unguessable link; the token is the only credential the page needs.
+  token       String    @unique
+  /// The period being asked about, held at midnight UTC.
+  periodStart DateTime
+  periodEnd   DateTime
+  requestedBy String
+  requestedAt DateTime  @default(now())
+  /// 1–5, captured on response.
+  score       Int?
+  comment     String?
+  respondedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, periodStart, periodEnd])
+  @@index([tenantId, clientId])
+}
+
+/// A CSAT survey for one resolved ticket. The token is the unguessable link a
+/// requester follows; `respondedAt` is null until they answer.
+model SatisfactionResponse {
+  id          String    @id @default(cuid())
+  tenantId    String
+  ticketId    String    @unique
+  token       String    @unique
+  /// 1–5, captured on response.
+  score       Int?
+  comment     String?
+  requestedAt DateTime  @default(now())
+  respondedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, respondedAt])
+}
+
+/// Metadata for a file attached to a ticket. The bytes live in object storage;
+/// `storageKey` is the object's key and never leaves the server.
+model Attachment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  ticketId    String
+  messageId   String?
+  uploaderId  String?
+  filename    String
+  contentType String
+  byteSize    Int
+  storageKey  String   @unique
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploader User?  @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ticketId])
+}
+
+/// A reusable agent reply. The body may reference `{{ref}}`, `{{subject}}`,
+/// `{{requester}}` and `{{agent}}`, substituted when it is inserted into a reply.
+model CannedResponse {
+  id        String   @id @default(cuid())
+  tenantId  String
+  title     String
+  body      String
+  /// A short trigger, e.g. `reset`. Unique per tenant when set.
+  shortcut  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, title])
+  @@index([tenantId])
+}
+
+/// A reusable *starting point* for a new ticket — a name to pick, plus the
+/// subject/description/type/priority to prefill. Not a workflow: every field
+/// stays editable once applied.
+model TicketTemplate {
+  id          String         @id @default(cuid())
+  tenantId    String
+  name        String
+  subject     String
+  description String
+  type        TicketType     @default(INCIDENT)
+  priority    TicketPriority @default(NORMAL)
+  queueId     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+enum TicketLinkKind {
+  RELATED
+  DUPLICATE
+  PARENT
+  CHILD
+}
+
+/// A relation between two tickets, one row per direction. A merge records a
+/// `DUPLICATE` link so later readers are pointed at the survivor.
+model TicketLink {
+  id           String         @id @default(cuid())
+  tenantId     String
+  fromTicketId String
+  toTicketId   String
+  kind         TicketLinkKind @default(RELATED)
+  createdBy    String?
+  createdAt    DateTime       @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromTicket Ticket @relation("LinkFrom", fields: [fromTicketId], references: [id], onDelete: Cascade)
+  toTicket   Ticket @relation("LinkTo", fields: [toTicketId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fromTicketId, toTicketId, kind])
+  @@index([tenantId, fromTicketId])
+  @@index([tenantId, toTicketId])
+}
+
+/// An in-app staff notice, raised by the SLA sweep (and later other events).
+/// Addressed to a role audience so staffing can change without touching the
+/// escalation ladder; `dedupeKey` mirrors the escalation's own key.
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  /// `AGENT`, `DISPATCHER` or `MANAGER`.
+  audience  String
+  /// e.g. `sla.escalation`.
+  kind      String
+  title     String
+  body      String
+  ticketId  String?
+  ticketRef String?
+  dedupeKey String
+  /// The escalation ladder rung the notice came from, for per-user filtering.
+  level     Int?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey, audience])
+  @@index([tenantId, audience, readAt])
+}
+
+/// A named inbox filter. Private to its owner by default; a shared view is a
+/// desk convenience ("SLA breached", "My unassigned urgent") everyone can click.
+model SavedView {
+  id        String   @id @default(cuid())
+  tenantId  String
+  ownerId   String
+  name      String
+  /// The `InboxFilter` as JSON (status, assigneeId, queueId, search, sla).
+  filter    Json
+  shared    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner  User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, ownerId, name])
+  @@index([tenantId, shared])
+}
+
+/// A staff member's personal in-app notification setting: the minimum ladder
+/// level they want to see, and an off switch that never changes their role.
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  /// Only notices at this ladder level or above are shown (1 = everything).
+  minLevel  Int      @default(1)
+  muted     Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+}
+
+/// The email-ingestion ledger: one row per inbound message the worker has
+/// decided on. `dedupeKey` makes ingestion retry-safe (a message already here is
+/// a duplicate), and `ticketId` is the thread link a later reply resolves to.
+model InboundMessage {
+  id        String   @id @default(cuid())
+  tenantId  String
+  dedupeKey String
+  messageId String?
+  ticketId  String?
+  at        DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, messageId])
+}
+
+/// `SENTINEL` is OnTrak Sentinel itself, kept apart from `IPS` on purpose: a desk wants to
+/// know at a glance whether a detection came from the family's own platform or from somebody
+/// else's sensor, and a product that reported itself as a generic IPS would make that
+/// unanswerable about a queue somebody has to work.
+enum SecuritySource {
+  IDS
+  IPS
+  SIEM
+  EDR
+  NETWORK
+  SENTINEL
+}
+
+enum SecuritySeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// A normalized alert from the security stack (IDS/IPS/SIEM/EDR/network sensor).
+/// Receivers normalize, dedupe and enrich — see `src/lib/security-alert-rules.ts`
+/// and `security-alert-service.ts`. `dedupeKey` makes ingest at-least-once safe:
+/// a repeat bumps `occurrences` instead of creating a second row. `severity` is
+/// the sensor's own call; `triageSeverity` is raised when the alert lands on a
+/// business-critical asset or a privileged identity.
+model SecurityAlert {
+  id             String           @id @default(cuid())
+  tenantId       String
+  source         SecuritySource
+  severity       SecuritySeverity
+  triageSeverity SecuritySeverity
+  signature      String
+  description    String
+  externalId     String?
+
+  asset            String?
+  assetKnown       Boolean @default(false)
+  assetOwner       String?
+  /// `LOW` | `NORMAL` | `HIGH` | `CRITICAL`, narrowed on read.
+  assetCriticality String?
+  clientId         String?
+
+  identity           String?
+  identityKnown      Boolean @default(false)
+  identityName       String?
+  identityPrivileged Boolean @default(false)
+
+  sourceIp    String?
+  /// Where the raw vendor payload is stored. A reference, never the payload.
+  rawRef      String?
+  ///
+  /// The **rule set's own id** the detection was judged by, when the sender reports one.
+  /// OnTrak Sentinel calls it `rulebookVersion`, and it is the field that makes an old alert
+  /// explicable: a rule at version 3 in a corpus of four and the same rule at version 3 in a
+  /// corpus of forty are different claims, and a per-rule version cannot tell them apart.
+  rulebookVersion  String?
+  /// MITRE ATT&CK technique ids the detection maps to, upper-cased.
+  techniques       String[] @default([])
+  /// Indicators of compromise the evidence matched, when the sender reports a count.
+  threatIntelCount Int      @default(0)
+  ///
+  /// Where this alert stands with Sentinel's prevention (S5): `NONE`, `REQUESTED`, `PENDING`,
+  /// `APPLIED`, `REFUSED` or `FAILED`. Three different sentences — asked for, waiting for an
+  /// approver, refused by a rail — that a boolean could not tell apart, and the reason a desk
+  /// that read "pending" as "blocked" would stop watching a host nothing is blocking.
+  containmentState    String  @default("NONE")
+  /// Sentinel's action id, so the desk's record and the other register point at each other.
+  containmentActionId String?
+  dedupeKey   String
+  occurredAt  DateTime
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  occurrences Int      @default(1)
+  /// The ticket an alert was promoted to, set by the promotion rules (M2).
+  ticketId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, severity])
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, asset])
+}
+
+enum AlertVerdictKind {
+  FALSE_POSITIVE
+  BENIGN
+  TRUE_POSITIVE
+}
+
+/// A staff member's verdict on a detection signature. Two or more
+/// false-positive/benign verdicts inside the promotion policy's window suppress
+/// that signature, so the desk stops working the same noise. A `TRUE_POSITIVE`
+/// verdict is recorded for the history but never suppresses.
+model AlertVerdict {
+  id        String           @id @default(cuid())
+  tenantId  String
+  signature String
+  verdict   AlertVerdictKind
+  note      String?
+  by        String?
+  at        DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, signature])
+  @@index([tenantId, at])
+}
+
+/// A configured suppression: a signature, asset, identity or source the desk has
+/// decided never — or until a time — to promote. A suppression is recorded, not
+/// silently dropped: the alert stays visible in the stream with a reason.
+model AlertSuppression {
+  id        String    @id @default(cuid())
+  tenantId  String
+  /// `signature` | `asset` | `identity` | `source`, narrowed on read.
+  field     String
+  match     String
+  reason    String
+  /// Null means permanent.
+  until     DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, field])
+}
+
+/// The promotion decision an alert reached and, when it promoted, the ticket it
+/// became. One row per `(tenant, alert, decision)`; an `OBSERVE` outcome is
+/// transient and is never persisted.
+model AlertPromotion {
+  id        String   @id @default(cuid())
+  tenantId  String
+  alertId   String
+  /// `PROMOTE` | `SUPPRESS`, narrowed on read.
+  decision  String
+  reason    String
+  ticketId  String?
+  ticketRef String?
+  at        DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, alertId, decision])
+  @@index([tenantId, at])
+}
+
+enum IdentityProtocol {
+  OIDC
+  SAML
+}
+
+/// A tenant's identity provider (M2). One per tenant. The client secret is held
+/// out of band in the deployment's secret store — never in this row — so a
+/// database dump never leaks a usable credential. `roleMappings` is the
+/// group→role config as JSON (see `src/lib/identity-rules.ts`), so an org-chart
+/// change is configuration rather than a deploy.
+model IdentityConnection {
+  id             String           @id @default(cuid())
+  tenantId       String           @unique
+  protocol       IdentityProtocol
+  issuer         String
+  clientId       String
+  scopes         String[]
+  allowedDomains String[]
+  defaultRole    Role             @default(REQUESTER)
+  roleMappings   Json             @default("[]")
+  /// Refuse a sign-in whose assertion carries no second-factor evidence.
+  mfaRequired    Boolean          @default(false)
+  scimEnabled    Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+enum IncidentSeverity {
+  SEV1
+  SEV2
+  SEV3
+  SEV4
+}
+
+enum IncidentPhase {
+  DETECTED
+  TRIAGED
+  CONTAINED
+  ERADICATED
+  RECOVERED
+  REVIEWED
+}
+
+/// A declared incident (M3): a severity chosen from the impact×urgency matrix,
+/// a lifecycle phase, and the people accountable for it. Distinct from a ticket
+/// on purpose — an incident is an event with a commander, not a work item — but
+/// it may point at the ticket and the alert it was declared from.
+model Incident {
+  id       String           @id @default(cuid())
+  tenantId String
+  /// Human-facing reference, e.g. `INC-000007`.
+  ref      String
+  title    String
+  summary  String
+  severity IncidentSeverity
+  phase    IncidentPhase    @default(DETECTED)
+  /// The matrix inputs (`EXTENSIVE`…/`CRITICAL`…), kept as the evidence for the
+  /// severity call. Narrowed on read.
+  impact   String
+  urgency  String
+  ticketId String?
+  alertId  String?
+
+  commanderId String?
+  commsLeadId String?
+  scribeId    String?
+  liaisonId   String?
+
+  /// When the incident actually began, which is not when it was noticed.
+  detectedAt DateTime
+  declaredAt DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+  reviewedAt DateTime?
+
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events        IncidentEvent[]
+  steps         PlaybookStep[]
+  evidence      EvidenceItem[]
+  artifacts     EvidenceArtifact[]
+  custody       CustodyEntry[]
+  holds         LegalHold[]
+  notifications IncidentNotification[]
+  review        IncidentReview?
+  actions       IncidentReviewAction[]
+
+  @@unique([tenantId, ref])
+  @@index([tenantId, phase])
+  @@index([tenantId, severity])
+}
+
+enum PlaybookStepStatus {
+  PENDING
+  DONE
+  SKIPPED
+}
+
+/// One step of an incident's playbook (M3). The plan is derived from the
+/// incident's severity when the playbook is started, and frozen from then on —
+/// a later severity revision must not erase work already done. A skipped step is
+/// a recorded decision, not an omission.
+model PlaybookStep {
+  id          String             @id @default(cuid())
+  tenantId    String
+  incidentId  String
+  /// Stable key within the playbook, e.g. `contain`.
+  key         String
+  title       String
+  description String
+  phase       String
+  order       Int
+  status      PlaybookStepStatus @default(PENDING)
+  completedAt DateTime?
+  completedBy String?
+  note        String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, incidentId, key])
+  @@index([tenantId, incidentId, order])
+}
+
+/// A piece of evidence collected for an incident (M3). `reference` points at
+/// where the bytes live (a storage key or a URL) — never the payload itself —
+/// and `sha256` is the digest of those bytes, so a later copy can be shown to be
+/// the same bytes. The manifest digests these items together with the timeline.
+model EvidenceItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  incidentId  String
+  /// `LOG` | `SNAPSHOT` | `SCREENSHOT` | `FILE` | `NOTE` | `LINK`, narrowed on read.
+  kind        String
+  label       String
+  reference   String
+  sha256      String?
+  note        String?
+  collectedBy String
+  collectedAt DateTime @default(now())
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  custody  CustodyEntry[]
+
+  @@index([tenantId, incidentId, collectedAt])
+}
+
+/// An evidence artifact's bytes under object-lock (WORM) retention (M3).
+///
+/// The bytes live in the object store; this row is the lock — what it is, how
+/// big, its digest, the retention mode and the date the window closes. It is
+/// content-addressed and unique per tenant, so two collections of the same bytes
+/// cite one artifact and can never disagree about which bytes they mean.
+/// `purgedAt` is the only field that ever moves, and only when
+/// `objectPurgeDecision` allows it, which is why a purge leaves a visible mark
+/// instead of an empty reference nobody can explain.
+model EvidenceArtifact {
+  id          String    @id @default(cuid())
+  tenantId    String
+  incidentId  String
+  /// `evidence/<tenant>/<incident>/<sha256>` — derived from the content.
+  key         String
+  sha256      String
+  bytes       Int
+  contentType String
+  /// `COMPLIANCE` | `GOVERNANCE`, narrowed on read.
+  mode        String
+  /// When the retention window closes. Until then the bytes cannot be removed.
+  retainUntil DateTime
+  lockedAt    DateTime  @default(now())
+  createdBy   String
+  purgedAt    DateTime?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId, incidentId, lockedAt])
+}
+
+enum CustodyAction {
+  COLLECTED
+  TRANSFERRED
+}
+
+/// One hand-off in an evidence item's chain of custody (M3). Append-only, like
+/// the audit log: the trail is built as custody actually changes, so it can be
+/// walked and shown to be unbroken (each entry starts where the last ended)
+/// rather than asserted. `fromActor`/`toActor` are user ids or system labels.
+model CustodyEntry {
+  id         String        @id @default(cuid())
+  tenantId   String
+  incidentId String
+  evidenceId String
+  at         DateTime      @default(now())
+  action     CustodyAction
+  fromActor  String
+  toActor    String
+  /// Why custody moved. A hand-off with no reason is the answer an auditor
+  /// asks for, so the service requires one.
+  reason     String?
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  evidence EvidenceItem @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, incidentId, at])
+  @@index([tenantId, evidenceId, at])
+}
+
+/// A legal hold on an incident's evidence (M3). A hold overrides routine
+/// retention and purge: while one is active the record cannot be aged out, and
+/// releasing it is itself a recorded decision, so `releasedAt`/`releasedBy` are
+/// set rather than the row being deleted.
+model LegalHold {
+  id         String    @id @default(cuid())
+  tenantId   String
+  incidentId String
+  reason     String
+  placedBy   String
+  placedAt   DateTime  @default(now())
+  releasedBy String?
+  releasedAt DateTime?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, incidentId, placedAt])
+}
+
+/// One line of an incident timeline. Append-only: written as things happened,
+/// never reconstructed, and never edited — corrections are new events.
+model IncidentEvent {
+  id         String   @id @default(cuid())
+  tenantId   String
+  incidentId String
+  at         DateTime @default(now())
+  /// `declared` | `phase` | `role` | `note` | `playbook` | `evidence` |
+  /// `custody` | `hold`.
+  kind       String
+  actor      String
+  summary    String
+  detail     Json?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, incidentId, at])
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  WAIVED
+}
+
+/// A regulatory or contractual notification an incident owes (M3). The regime's
+/// authority, requirement and deadline are **copied in** when the duty is
+/// adopted, rather than looked up on read: what the desk notified stays readable
+/// after the rule it was measured against changes. `dueAt` is derived from the
+/// regime's clock (`detected` or `declared`), so the arithmetic is auditable.
+/// A tenant's own draft for an incident notification (M3 comms templates). A
+/// regime key it names is what it drafts; an empty list means it fits any duty.
+model IncidentCommsTemplate {
+  id        String    @id @default(cuid())
+  tenantId  String
+  label     String
+  /// Who the message goes to: `REGULATOR` | `CLIENT` | `AFFECTED` | `STAFF`.
+  audience  String
+  /// Regime keys from `src/lib/regulatory-rules.ts` this drafts, e.g. `gdpr-breach`.
+  regimes   String[]
+  subject   String
+  body      String
+  /// What a message of this kind must not forget, in one line.
+  guidance  String?
+  /// Retired rather than deleted, so a notice that cited it stays explainable.
+  retiredAt DateTime?
+  createdBy String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, label])
+  @@index([tenantId])
+}
+
+model IncidentNotification {
+  id          String             @id @default(cuid())
+  tenantId    String
+  incidentId  String
+  /// The regime's key in `src/lib/regulatory-rules.ts`, e.g. `nis2-incident`.
+  regime      String
+  label       String
+  authority   String
+  requirement String
+  /// Which incident timestamp the clock ran from: `detected` | `declared`.
+  clock       String
+  dueAt       DateTime
+  status      NotificationStatus @default(PENDING)
+
+  sentAt         DateTime?
+  sentBy         String?
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  /// The authority's own reference for the notice, so it can be cited later.
+  reference      String?
+  note           String?
+  /// The notice text as it went out, kept verbatim (`comms-rules.ts`).
+  message        String?
+  waivedAt       DateTime?
+  waivedBy       String?
+  /// A waiver is a decision, so it carries the reason it was made.
+  waiverReason   String?
+  createdAt      DateTime  @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, incidentId, regime])
+  @@index([tenantId, incidentId, dueAt])
+}
+
+enum ReviewActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  DROPPED
+}
+
+/// The published post-incident review (M3). One per incident, and publishing it
+/// is the act that closes the loop: a review with no actions is refused, because
+/// a post-mortem that creates no work is a document rather than a review.
+model IncidentReview {
+  id          String   @id @default(cuid())
+  tenantId    String
+  incidentId  String   @unique
+  findings    String
+  lessons     String?
+  publishedBy String
+  publishedAt DateTime @default(now())
+
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident               @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  actions  IncidentReviewAction[]
+}
+
+/// One trackable action from a review (M3): a title, an owner and a due date.
+/// `OVERDUE` is never stored — it is the comparison of `dueAt` with now, so an
+/// action cannot become late because somebody forgot to flag it.
+model IncidentReviewAction {
+  id          String             @id @default(cuid())
+  tenantId    String
+  incidentId  String
+  reviewId    String
+  title       String
+  ownerId     String
+  dueAt       DateTime
+  status      ReviewActionStatus @default(OPEN)
+  note        String?
+  completedAt DateTime?
+  completedBy String?
+  createdAt   DateTime           @default(now())
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  incident Incident       @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  review   IncidentReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, incidentId, status, dueAt])
+}
+
+/// Append-only, hash-chained evidence log. Rows are never updated or deleted.
+/// `seq` is the chain position *within the tenant's chain* (1-based), so each
+/// tenant verifies independently; `prevHash` links to the previous record and
+/// `recordHash` commits to this record's canonical payload. Matches the
+/// assurance model used across Innotel Labs.
+model AuditEvent {
+  id         String   @id @default(cuid())
+  tenantId   String
+  /// Position in this tenant's chain, starting at 1.
+  seq        Int
+  at         DateTime @default(now())
+  actor      String
+  action     String
+  targetType String?
+  targetId   String?
+  detail     Json?
+  prevHash   String
+  recordHash String
+  /// Optional signature over `recordHash` for periodic checkpoints.
+  signature  String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, seq])
+  @@index([tenantId, at])
+  @@index([action])
+}
+
+/// An automation rule (M5): a trigger, the conditions that narrow it, and the
+/// actions it takes. Conditions and actions are stored as JSON because a rule is
+/// read and written whole — a table per condition kind would turn "what does this
+/// rule say?" into a join, and the validation that matters happens in
+/// `rule-rules.ts` either way.
+model Rule {
+  id         String      @id @default(cuid())
+  tenantId   String
+  name       String
+  trigger    RuleTrigger @default(TICKET_CREATED)
+  /// `RuleCondition[]` — see `src/lib/rule-rules.ts`.
+  conditions Json        @default("[]")
+  /// `RuleAction[]` — see `src/lib/rule-rules.ts`.
+  actions    Json        @default("[]")
+  enabled    Boolean     @default(true)
+  /// Lower runs first; the first rule to set a field owns it.
+  position   Int         @default(0)
+  createdBy  String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, enabled, position])
+}
+
+/// A multi-step shortcut an agent runs on one ticket (M5). It shares the rule
+/// engine's action vocabulary — `RuleAction[]`, stored as JSON for the same
+/// reason a rule's are — but has no trigger and no conditions: a macro is the
+/// case where a person has already looked at the ticket and decided. Managing
+/// one is `rule:manage`; running it is `ticket:update`.
+model Macro {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String   @default("")
+  /// `RuleAction[]` — see `src/lib/rule-rules.ts`.
+  actions     Json     @default("[]")
+  enabled     Boolean  @default(true)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, enabled])
+}
+
+/// When a rule runs. Kept to the moments a desk actually automates, rather than
+/// to every write the application makes.
+enum RuleTrigger {
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_REPLIED
+}
+
+/// A knowledge-base article (M5). A `PUBLIC` article is offered to requesters in
+/// the portal before they raise a ticket; a `PRIVATE` one is staff-only. Tags are
+/// a plain string list because they are search words, not a classification, and
+/// the suggestion engine (pure, in `knowledge-rules.ts`) reads them directly.
+model KnowledgeArticle {
+  id         String              @id @default(cuid())
+  tenantId   String
+  title      String
+  body       String
+  visibility KnowledgeVisibility @default(PRIVATE)
+  tags       String[]            @default([])
+  createdBy  String
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, title])
+  @@index([tenantId, visibility])
+}
+
+/// Who may read an article. Public articles are shown to requesters in the
+/// portal; private ones are the desk's own notes.
+enum KnowledgeVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+/* -------------------------------------------------------------------------- */
+/*  M6 — the public API and webhooks                                          */
+/* -------------------------------------------------------------------------- */
+
+/// A bearer token an outside system uses to reach the public API (M6).
+///
+/// `tokenHash` is the primary lookup key and the only thing that identifies the
+/// token: the plaintext is returned once at creation and never stored, exactly as
+/// a credential is. `tokenPrefix` keeps the first few characters so a person can
+/// tell two tokens apart when deciding which one to revoke — which is the whole
+/// reason a leaked token is findable rather than merely invalid.
+///
+/// The rate limit lives on this row on purpose. A token is the unit that is
+/// limited, so its window travels with it rather than in a separate table that a
+/// second process could disagree with.
+model ApiToken {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  name               String
+  /// SHA-256 of the token. Never the token.
+  tokenHash          String    @unique
+  /// `tx1_…` — enough to recognise one, not enough to use one.
+  tokenPrefix        String
+  scopes             String[]
+  createdBy          String
+  createdAt          DateTime  @default(now())
+  /// Null means no expiry, which is a choice somebody made on purpose.
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  lastUsedAt         DateTime?
+  rateLimitPerMinute Int       @default(60)
+  /// The current fixed window, as a `DateTime`; null before the token's first use.
+  rateWindowStart    DateTime?
+  /// Requests counted inside that window. Stops growing at the limit plus one.
+  rateCount          Int       @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, revokedAt])
+}
+
+/// A registered destination for webhook deliveries (M6).
+///
+/// `secret` is the one credential in this schema stored in the clear, and the
+/// reason is stated rather than hidden: a delivery is signed with an HMAC, and an
+/// HMAC cannot be computed from a hash. It is shown once when it is created or
+/// rotated, and the deployment's job is to encrypt it at rest — see the note in
+/// `src/lib/webhook-rules.ts`.
+///
+/// `events` is a `String[]` rather than a join table because a subscription is
+/// read and written whole: "what does this endpoint want?" should be one row, not
+/// a query. Which strings are valid is the rules module's business.
+model ApiWebhookEndpoint {
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  url        String
+  /// `WebhookEvent[]` — see `src/lib/webhook-rules.ts`.
+  events     String[]
+  secret     String
+  enabled    Boolean   @default(true)
+  createdBy  String
+  createdAt  DateTime  @default(now())
+  disabledAt DateTime?
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries ApiWebhookDelivery[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, enabled])
+}
+
+/// One event's journey to one endpoint (M6): the delivery log.
+///
+/// The row is written **before** the attempt, so an event that arrived while the
+/// process was dying is still visible as one that was due, and `payload` is the
+/// exact bytes that were signed and sent — so "what did you send us?" is answered
+/// from the record rather than reconstructed from a ticket that has since
+/// changed. `EXHAUSTED` is a terminal state with a retry count, not a silent
+/// drop: five attempts over about half a day is the schedule, and the log says so.
+model ApiWebhookDelivery {
+  id             String                @id @default(cuid())
+  tenantId       String
+  endpointId     String
+  event          String
+  payload        String
+  status         WebhookDeliveryStatus @default(PENDING)
+  attemptCount   Int                   @default(0)
+  firstAttemptAt DateTime?
+  lastAttemptAt  DateTime?
+  /// Null when nothing answered — a timeout is not a status code.
+  lastStatusCode Int?
+  lastError      String?
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  endpoint ApiWebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  /// For the sweep that finds what is owed an attempt.
+  @@index([status, nextAttemptAt])
+}
+
+/// Where a delivery stands. Named for what a support engineer would ask: did it
+/// arrive, is it still trying, or did we give up?
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  RETRYING
+  EXHAUSTED
+}
+
+/// A monitored condition, and the ticket it is (or was last) open against (M6).
+///
+/// The table is keyed on the **condition**, not on the vendor's alert: the same
+/// check failing twice is one condition, and only `dedupeKey` can say so, because
+/// vendors disagree about whether a re-fire reuses an id. `state` is the
+/// condition's own state — `OPEN` or `RESOLVED` — which is what lets the next
+/// failure be recognized as a recurrence rather than a first sighting.
+///
+/// One condition can become several tickets over its life (`reopenCount` counts
+/// the recurrences), so the link carries `ticketId` **and** `ticketRef`: the id is
+/// what the connector acts on, the ref is what a person reads in a log.
+model RmmAlertLink {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// `source:host:check`, case-folded. The condition's identity.
+  dedupeKey   String
+  source      String
+  host        String
+  check       String
+  /// `OPEN` | `RESOLVED`, narrowed on read.
+  state       String    @default("OPEN")
+  /// `INFO` | `WARNING` | `CRITICAL`, narrowed on read. The worst seen while open.
+  severity    String    @default("WARNING")
+  /// The vendor's own id for the firing that opened (or last touched) this link.
+  externalId  String
+  ticketId    String
+  ticketRef   String
+  /// The vendor's latest message for this condition, verbatim.
+  lastSummary String
+  openedAt    DateTime
+  lastSeenAt  DateTime
+  resolvedAt  DateTime?
+  /// How many reports have folded into the current opening.
+  occurrences Int       @default(1)
+  /// How many times the condition cleared and failed again.
+  reopenCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, ticketId])
+  @@index([tenantId, state])
+}
+
+/// A chat room the desk posts to (M6): a Slack incoming webhook or a Teams
+/// connector, and the events it asked for.
+///
+/// `url` is a credential — anybody holding it can post into that room — so it is
+/// never written to the audit trail, and it is a column a deployment may want to
+/// encrypt at rest. The provider is decided at registration and not changeable: the
+/// hosts a provider owns are the whole of this connector's SSRF story, and
+/// re-pointing a channel at another provider is a new channel, not an edit.
+model ChatChannel {
+  id         String   @id @default(cuid())
+  tenantId   String
+  /// `SLACK` | `TEAMS`, narrowed on read.
+  provider   String
+  name       String
+  url        String
+  /// `WebhookEvent[]` — the same closed set the versioned API emits.
+  events     String[]
+  enabled    Boolean  @default(true)
+  createdBy  String
+  createdAt  DateTime @default(now())
+  disabledAt DateTime?
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries ChatDelivery[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, enabled])
+}
+
+/// One attempt at telling a room something (M6).
+///
+/// `status` reuses `WebhookDeliveryStatus` rather than defining a second enum with
+/// the same four members: the state machine is shared (`applyDeliveryAttempt`), and
+/// two enums is how two retry policies begin.
+model ChatDelivery {
+  id             String                @id @default(cuid())
+  tenantId       String
+  channelId      String
+  /// A subscribable event, or `test` for the console's on-demand message.
+  event          String
+  /// The exact bytes posted, kept so "what did the room actually see?" has an answer.
+  payload        String
+  status         WebhookDeliveryStatus @default(PENDING)
+  attemptCount   Int                   @default(0)
+  firstAttemptAt DateTime?
+  lastAttemptAt  DateTime?
+  /// Null when nothing answered — a timeout is not a status code.
+  lastStatusCode Int?
+  lastError      String?
+  nextAttemptAt  DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  /// For the sweep that finds what is owed an attempt.
+  @@index([status, nextAttemptAt])
+}
+
+/// A role this desk wrote for itself (M6).
+///
+/// It **narrows** one of the four built-in roles rather than replacing it: a holder is still an
+/// `AGENT` to every other part of the product — tenant isolation, the API token scopes, SCIM's
+/// role mapping — and this row says which of an agent's own powers they keep. A role is stored
+/// already intersected with its `baseRole`'s matrix, so the row cannot disagree with the rule
+/// that reads it. See `src/lib/role-rules.ts` for why that direction, and only that direction,
+/// is allowed.
+model TenantRole {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// Stable machine key, fixed once written: audit entries name the role by this, and a key
+  /// that changed would leave every past entry pointing at something that no longer answers.
+  key         String
+  name        String
+  description String?
+  baseRole    Role
+  /// The permissions this role keeps, each one also held by `baseRole`.
+  permissions String[]
+  /// Archived rather than deleted, so its holders fall back to their base role and the audit
+  /// trail still resolves the name.
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant  Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  holders User[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, archivedAt])
+}
+
+/// One third-party connector a desk has installed (M6).
+///
+/// The marketplace pattern: a connector is a manifest in `connector-rules.ts` (id,
+/// vendor, category, capabilities and the config fields it declares), and this row
+/// is the desk's *use* of one — the config it gave it, and whether it is on. The
+/// manifest is code and the installation is data, which is why this table names a
+/// `connectorId` rather than embedding the connector's definition: a manifest can
+/// gain a field without a migration, and the row is read back through the rules that
+/// judge it.
+///
+/// `connectorId` is fixed once written. Re-pointing an installation at another
+/// connector would silently re-interpret the config that belongs to the first, so
+/// that is a new installation rather than an edit.
+model ConnectorInstallation {
+  id          String    @id @default(cuid())
+  tenantId    String
+  /// The manifest id in the catalog. Fixed once written.
+  connectorId String
+  /// `Record<string, string>` — validated against the manifest before it is stored.
+  /// A secret field's value is here and nowhere else: never audited, never echoed.
+  config      Json
+  enabled     Boolean   @default(true)
+  installedBy String
+  installedAt DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  /// When it was switched off, so "off since when?" has an answer.
+  disabledAt  DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, connectorId])
+  @@index([tenantId, enabled])
+}
