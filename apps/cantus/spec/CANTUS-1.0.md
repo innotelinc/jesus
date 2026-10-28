@@ -855,6 +855,43 @@ standard exists for. Its rebinding cases must flush a real mapping table, and th
 one-sided cases must flush exactly one, because an implementation that only ever
 recovers when both ends move is not conformant to 8.7.
 
+### 15.1 Event-loop pump
+
+This subsection is normative for the reference stack's harness interface and
+informative for implementations: it does not describe the wire, it describes how
+a test drives a component without distorting the timings the tests assert.
+
+Every component that owns a socket — an endpoint, a relay, a NAT emulator —
+exposes one `pump` method with exactly three behaviours:
+
+| Call | Meaning |
+|---|---|
+| `pump()` | serve one **default slice** (20 ms), then return |
+| `pump(0)` | **drain**: serve everything already queued, then return at once |
+| `pump($t)` for `$t > 0` | serve for at most `$t` seconds, then return |
+
+`pump(0)` MUST NOT block, MUST NOT be a no-op, and MUST keep reading until the
+sockets are empty. A single `read` is not a drain: a component with a backlog
+falls further behind on every pass, so the drain has to clear the queue. A drain
+MUST also serve due timers, keepalives and media ticks — it is one loop
+iteration, not a skipped one. Passing no argument MUST NOT mean "run forever",
+and a negative budget MUST be treated as zero.
+
+A caller that owns the waiting MUST pump every component with `0` and sleep once
+per iteration, instead of asking each component to wait for its own small
+budget. The reason is measured, not stylistic: `select()` with a sub-millisecond
+timeout is rounded up to the host's timer granularity (~15 ms on Windows), so a
+loop that pumps five components with their own sub-millisecond budgets runs at
+about 20 Hz. In this stack that starved the relay — it serves a 100-packet/s
+media stream — and a `TERMINATE` queued behind media for 300-600 ms, which looks
+like a protocol failure and is not one. Draining raised the same loop to ~120 Hz
+and the `TERMINATE` is now forwarded 1-2 ms after it is sent.
+
+The consequence for conformance: an implementation whose components only offer
+a blocking pump cannot be timed by this suite, because the harness would spend
+its budget waiting inside components rather than between them. Expose the drain
+budget and the tests measure the protocol instead of the scheduler.
+
 ---
 
 ## Appendix A — Message summary

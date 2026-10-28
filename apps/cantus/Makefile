@@ -20,7 +20,7 @@ setup: ## Install the attribution guard hooks locally
 
 ## ---- Verify --------------------------------------------------------------
 
-test: ## Run the whole conformance suite (167 assertions)
+test: ## Run the whole conformance suite (189 assertions)
 	@total=0; fail=0; \
 	for f in t/*.t; do \
 	  out=$$(perl -Ilib "$$f" 2>&1); rc=$$?; \

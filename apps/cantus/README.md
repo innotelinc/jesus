@@ -13,7 +13,7 @@ no port range to open, and no way for a call to connect with silent audio.
 
 [![Perl 5.16+](https://img.shields.io/badge/perl-5.16%2B-39457e)](spec/CANTUS-1.0.md)
 [![Dependencies: none](https://img.shields.io/badge/dependencies-none-2ea043)](lib/Cantus)
-[![Assertions: 167](https://img.shields.io/badge/assertions-167%20passing-2ea043)](t)
+[![Assertions: 189](https://img.shields.io/badge/assertions-189%20passing-2ea043)](t)
 [![NAT: always on](https://img.shields.io/badge/traversal-always%20on-f5b95b)](spec/CANTUS-1.0.md)
 [![Landing page](https://img.shields.io/badge/landing-innotelinc.github.io%2Fcantus-2ea043)](https://innotelinc.github.io/cantus/)
 
@@ -48,7 +48,7 @@ A **standard** and a **working implementation of it**, in that order.
 - [lib/Cantus](lib/Cantus) — the reference stack: ~2,500 lines of Perl 5, core
   modules only. It places real calls over real UDP sockets.
 - [bin/cantus](bin/cantus) — `demo`, `selftest`, `encode`, `route-test`.
-- [t/](t) — 167 assertions across nine files, including calls behind a real NAT
+- [t/](t) — 189 assertions across ten files, including calls behind a real NAT
   middlebox whose mapping table is flushed mid-call.
 
 Nothing here wraps an existing voice stack, and no part of the wire protocol is
@@ -60,7 +60,7 @@ Perl 5.16+ with core modules only. No CPAN, no build step, no services.
 
 ```bash
 make setup                                        # install the attribution guard hooks
-make test                                         # 167 assertions, nine files
+make test                                         # 189 assertions, ten files
 
 perl -Ilib bin/cantus demo                        # one call, one socket, direct path
 perl -Ilib bin/cantus demo --nat symmetric        # both ends behind hard NAT, relay path
@@ -160,9 +160,10 @@ t/11-nat.t           11 assertions   symmetric -> relay, cone -> direct, media v
 t/12-rebind.t        14 assertions   both mappings lost -> relay -> direct, sub-second
 t/13-rebind-one.t    30 assertions   one-sided rebinding (caller, callee) + symmetric
 t/14-feedback.t      17 assertions   report format, peer-stall trigger, timer net
+t/15-pump.t          22 assertions   pump contract: drain, timed slice, default slice
 ```
 
-All 167 pass. The suite asserts behaviour, not logs: audio is verified by peak
+All 189 pass. The suite asserts behaviour, not logs: audio is verified by peak
 amplitude of the received PCM, `ACTIVE` is read from the state machine, and
 "the NAT dropped the probes" is a counter inside the middlebox.
 
@@ -183,7 +184,7 @@ cantus/
 ├── spec/                  # the normative standard
 ├── lib/Cantus/            # reference implementation (Perl 5, core only)
 ├── bin/cantus             # CLI: demo, selftest, encode, route-test
-├── t/                     # 167 assertions, real sockets
+├── t/                     # 189 assertions, real sockets
 ├── examples/              # routing documents
 ├── analysis/              # measured findings from the Asterisk tarball
 ├── docs/                  # stack role, architecture notes

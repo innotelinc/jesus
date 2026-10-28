@@ -11,6 +11,7 @@ use Time::HiRes qw(time);
 
 use Cantus::Wire ();
 use Cantus::Identity ();
+use Cantus::Pump ();
 
 sub new {
     my ($class, %a) = @_;
@@ -58,20 +59,16 @@ sub emit {
     $self->{on_event}->($rec);
 }
 
+# See Cantus::Pump and spec §15: pump(0) drains the queue and returns without
+# waiting; pump($t) serves for at most $t; pump() is one default slice.
 sub pump {
     my ($self, $seconds) = @_;
-    # A zero budget means "drain what is already queued, then return": the
-    # caller owns the waiting.  This keeps a busy relay from being throttled by
-    # the scheduling granularity of select() on the host.
-    my $drain = defined $seconds && $seconds <= 0;
-    my $until = time + (defined $seconds ? $seconds : 0.02);
+    my $until = Cantus::Pump::deadline($seconds);
     my $sel = IO::Select->new($self->{sock});
     while ($self->{running}) {
-        last if !$drain && time >= $until;
-        my $left = $until - time;
-        my @r = $sel->can_read(
-            $drain ? 0 : ($left > 0.01 ? 0.01 : ($left > 0 ? $left : 0)));
-        last if $drain && !@r;
+        last if Cantus::Pump::expired($seconds, $until);
+        my @r = $sel->can_read(Cantus::Pump::wait_for($seconds, $until - time));
+        last if Cantus::Pump::finished($seconds, \@r);
         for my $s (@r) {
             my $buf;
             my $peer = recv($s, $buf, 65535, 0);

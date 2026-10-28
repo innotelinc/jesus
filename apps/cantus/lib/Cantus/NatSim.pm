@@ -14,6 +14,8 @@ use IO::Select;
 use Socket qw(sockaddr_in inet_aton inet_ntoa);
 use Time::HiRes qw(time);
 
+use Cantus::Pump ();
+
 sub new {
     my ($class, %a) = @_;
     my $self = bless {
@@ -106,20 +108,19 @@ sub rebind {
     return $self->{rebinds};
 }
 
-# Drain the internal socket (outbound) and public sockets (inbound).  A zero
-# budget drains whatever is queued without waiting; the caller owns the wait.
+# Drain the internal socket (outbound) and public sockets (inbound).
+# See Cantus::Pump and spec §15: pump(0) drains the queue and returns without
+# waiting; pump($t) serves for at most $t; pump() is one default slice.
 sub pump {
     my ($self, $seconds) = @_;
-    my $drain = defined $seconds && $seconds <= 0;
-    my $until = time + (defined $seconds ? $seconds : 0.02);
+    my $until = Cantus::Pump::deadline($seconds);
     while (1) {
-        last if !$drain && time >= $until;
-        my $left = $until - time;
+        last if Cantus::Pump::expired($seconds, $until);
         my $sel = IO::Select->new($self->{sock});
         $sel->add($self->{cone}) if $self->{cone};
         $sel->add(values %{ $self->{pub} }) if %{ $self->{pub} };
-        my @ready = $sel->can_read($drain ? 0 : ($left > 0.01 ? 0.01 : $left));
-        last if $drain && !@ready;
+        my @ready = $sel->can_read(Cantus::Pump::wait_for($seconds, $until - time));
+        last if Cantus::Pump::finished($seconds, \@ready);
         for my $s (@ready) {
             my $buf;
             my $peer = recv($s, $buf, 65535, 0);

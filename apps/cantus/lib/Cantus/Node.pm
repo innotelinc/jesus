@@ -16,6 +16,7 @@ use Cantus::Session ();
 use Cantus::Media ();
 use Cantus::Reach ();
 use Cantus::Router ();
+use Cantus::Pump ();
 
 use constant {
     T_RING      => 32,
@@ -173,31 +174,31 @@ sub fire_timers {
     for my $t (sort { $a->{at} <=> $b->{at} } @due) { eval { $t->{cb}->() }; }
 }
 
+# See Cantus::Pump and spec §15: pump(0) drains timers, ticks and queued
+# datagrams without waiting; pump($t) serves for at most $t; pump() is one
+# default slice.  Timers and media ticks are served in every mode, including a
+# drain, because a drain is a loop iteration, not a no-op.
 sub pump {
     my ($self, $seconds) = @_;
-    # A zero budget means "serve timers, ticks and queued datagrams, then
-    # return": the caller owns the waiting.  Blocking per socket here costs a
-    # full scheduler tick on hosts whose select() rounds sub-millisecond
-    # timeouts up, which starves everything else in the loop.
-    my $drain = defined $seconds && $seconds <= 0;
-    my $until = defined $seconds ? time + $seconds : undef;
+    my $until = Cantus::Pump::deadline($seconds);
+    my $drain = Cantus::Pump::is_drain($seconds);
     my $sel = IO::Select->new($self->{sock});
     while ($self->{running}) {
-        last if !$drain && defined $until && time >= $until;
+        last if Cantus::Pump::expired($seconds, $until);
         $self->fire_timers;
         $self->keepalive_tick if time >= $self->{next_keepalive};
         $self->media_tick     if time >= $self->{next_media};
-        my $wait = 0.010;
+        my $wait = Cantus::Pump::MAX_WAIT;
         if (my $n = $self->next_time) {
             my $d = $n - time;
             $wait = $d if $d >= 0 && $d < $wait;
         }
-        if (!$drain && defined $until) {
+        unless ($drain) {
             my $left = $until - time;
             $wait = $left if $left < $wait;
         }
         my @r = $sel->can_read($drain ? 0 : ($wait > 0 ? $wait : 0));
-        last if $drain && !@r;
+        last if Cantus::Pump::finished($seconds, \@r);
         $self->recv_one for @r;
     }
 }
