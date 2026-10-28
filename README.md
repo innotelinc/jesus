@@ -126,7 +126,7 @@ one app's pipeline, not thirteen.
 | ontrak | `ontrak-ci.yml` |
 | ontrak-mcp | `ontrak-mcp-ci.yml` |
 | opensms-android | `opensms-android-ci.yml` |
-| rea | `rea-ci.yml` plus the thirteen `rea-*.yml` reusable workflows it calls |
+| rea | `rea-ci.yml` plus the fourteen `rea-*.yml` reusable workflows it calls |
 | telno | `telno-ci.yml` |
 | webmail | `webmail-ci.yml`, `webmail-tests.yml`, `webmail-perf-guard.yml` |
 
