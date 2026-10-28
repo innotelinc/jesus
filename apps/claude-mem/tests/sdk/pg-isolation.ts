@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Shared Postgres test isolation for the SDK integration suite.
+//
+// Each test runs in its own schema. The pool pins `search_path` via the
+// libpq `options` startup parameter, so EVERY pooled connection lands in
+// that schema deterministically — the value is set in the connection
+// startup packet before any query runs.
+//
+// This replaces the previous per-file harness, which set search_path with
+// a fire-and-forget `pool.on('connect', c => c.query('SET search_path...'))`
+// listener. That listener's query was not awaited, so the SDK's first
+// `CREATE TABLE` (during bootstrapServerPostgresSchema) could execute on a
+// freshly-acquired connection before the SET landed, intermittently failing
+// with `3F000: no schema has been selected to create in`.
+
+import pg from 'pg';
+import { createHash, randomBytes } from 'crypto';
+
+export function quoteIdentifier(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`;
+}
+
+/** Generate a fresh API key: the raw `cm_` token plus its sha256 hash. */
+export function newApiKey(): { raw: string; hash: string } {
+  const raw = `cm_${randomBytes(24).toString('hex')}`;
+  const hash = createHash('sha256').update(raw).digest('hex');
+  return { raw, hash };
+}
+
+/**
+ * Whether the test database offers pgvector, installing it in public when it
+ * does. A suite decides this before it is declared, so a database without
+ * pgvector reports its tests as skipped rather than passed. With
+ * CLAUDE_MEM_TEST_PGVECTOR=1 (CI's pgvector job) its absence is an error.
+ */
+export async function pgvectorAvailable(connectionString: string | undefined): Promise<boolean> {
+  let available = false;
+  if (connectionString) {
+    const client = new pg.Client({ connectionString });
+    await client.connect();
+    try {
+      if ((await client.query(`SELECT 1 FROM pg_available_extensions WHERE name = 'vector'`)).rows.length > 0) {
+        await client.query('CREATE EXTENSION IF NOT EXISTS vector SCHEMA public');
+        available = true;
+      }
+    } finally {
+      await client.end();
+    }
+  }
+  if (!available && process.env.CLAUDE_MEM_TEST_PGVECTOR === '1') {
+    throw new Error('CLAUDE_MEM_TEST_PGVECTOR=1, but the test database has no pgvector');
+  }
+  return available;
+}
+
+/**
+ * Create a fresh, uniquely-named schema and return its name. The name is
+ * `<prefix>_<uuid-with-underscores>`, i.e. only `[a-z0-9_]`, so it is safe
+ * to interpolate into the unquoted `-c search_path=` libpq option below.
+ */
+export async function createIsolatedSchema(
+  connectionString: string,
+  prefix: string
+): Promise<string> {
+  const schemaName = `${prefix}_${crypto.randomUUID().replaceAll('-', '_')}`;
+  const client = new pg.Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(`CREATE SCHEMA ${quoteIdentifier(schemaName)}`);
+  } finally {
+    await client.end();
+  }
+  return schemaName;
+}
+
+/**
+ * A pool whose every connection starts with `search_path` pinned to
+ * `schemaName`. Deterministic: the search_path is applied in the connection
+ * startup packet, so there is no window in which a query runs before it
+ * takes effect.
+ */
+export function poolForSchema(connectionString: string, schemaName: string): pg.Pool {
+  return new pg.Pool({ connectionString, options: `-c search_path=${schemaName}` });
+}
+
+/** Drop the isolated schema and everything in it. Best-effort. */
+export async function dropSchema(
+  connectionString: string,
+  schemaName: string
+): Promise<void> {
+  const client = new pg.Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(`DROP SCHEMA IF EXISTS ${quoteIdentifier(schemaName)} CASCADE`);
+  } finally {
+    await client.end();
+  }
+}
