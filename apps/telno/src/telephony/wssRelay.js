@@ -65,7 +65,12 @@ export function registerWssRelay(app) {
 
     let upstream;
     try {
-      upstream = new WebSocket(relayTarget(), {
+      // 'sip' is not decoration: chan_pjsip's websocket handler refuses an
+      // upgrade that does not ask for the subprotocol, answering 400 with "no
+      // protocols requested" in the switch log. With it missing every
+      // registration failed at the relay, which looked like bad credentials on
+      // the phone rather than a socket that was never accepted.
+      upstream = new WebSocket(relayTarget(), ['sip'], {
         // Loopback to the switch in this same container. Its certificate is the
         // self-signed one the browser just refused; verifying it here would only
         // re-refuse it, and this hop never leaves the container's network
