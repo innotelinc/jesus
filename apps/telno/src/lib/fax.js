@@ -95,7 +95,10 @@ function runGhostscript(input, output) {
 /** A plain-text body becomes a printable page, so no document is required. */
 function postscriptFor(text, stationId) {
   const escape = (line) => line.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-  const width = 86;
+  // Courier at 10pt is 6pt per character, and the printable area is 468pt wide
+  // (612pt page less 72pt margins on each side). 78 characters is what fits; a
+  // wider setting runs the text off the page, which is what a 86-column wrap did.
+  const width = 78;
   const lines = [];
   for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
     if (!raw.length) {
@@ -119,10 +122,13 @@ function postscriptFor(text, stationId) {
   pages.forEach((page, index) => {
     ps.push('/Helvetica findfont 10 scalefont setfont', '72 750 moveto');
     ps.push(`(${escape(`${header}   page ${index + 1} of ${pages.length}`)}) show`);
-    ps.push('72 726 moveto', '/Courier findfont 10 scalefont setfont');
+    ps.push('/Courier findfont 10 scalefont setfont');
     page.forEach((line, i) => {
-      if (i) ps.push('0 -14 rmoveto');
-      ps.push(`(${escape(line)}) show`);
+      // An absolute `moveto` per line. A relative `rmoveto` leaves the pen where
+      // the previous line ended, so every line after a full one starts further
+      // right than the last until the page is a diagonal mess.
+      ps.push(`72 ${726 - i * 14} moveto`);
+      if (line) ps.push(`(${escape(line)}) show`);
     });
     ps.push('showpage');
   });
@@ -263,7 +269,11 @@ export async function sendFax(id, actor = 'api') {
   }
   db_.run('UPDATE faxes SET pages = ?, error = ? WHERE id = ?', [pages || row.pages || 1, '', row.id]);
 
-  const digits = String(row.to_e164 || '').replace(/[^\d+]/g, '');
+  // Dial and present plain digits: a carrier matches its own number plan, and a
+  // leading `+` in the request URI or the From user is enough for some to refuse
+  // an otherwise authenticated call.
+  const digits = String(row.to_e164 || '').replace(/\D/g, '');
+  const callerId = String(row.from_e164 || digits).replace(/\D/g, '');
   const actionId = `fax-${row.id}`;
   byAction.set(actionId, row.id);
   setStatus(row.id, 'sending');
@@ -275,7 +285,7 @@ export async function sendFax(id, actor = 'api') {
     // The path is generated here, never taken from a request, so it cannot be
     // pointed at another file on the volume.
     Data: staged.path,
-    CallerID: `"${String(config.fax.stationId || 'Telno').replace(/"/g, '')}" <${row.from_e164 || digits}>`,
+    CallerID: `"${String(config.fax.stationId || 'Telno').replace(/"/g, '')}" <${callerId}>`,
     Variable: `TELNO_FAX_ID=${row.id}`,
     Async: 'true',
     ActionID: actionId,
@@ -298,17 +308,37 @@ export async function sendFax(id, actor = 'api') {
 
 /* ------------------------------------------------------------- AMI events -- */
 
+/**
+ * The switch's event names, which are not the ones you would guess.
+ *
+ * res_fax emits `FAXStatus` in capitals, and the completion events are
+ * `SendFAX` and `ReceiveFAX` — a listener waiting for `FaxStatus` hears nothing
+ * at all, which is how every transmission used to end up stuck at `sending`.
+ * Names are matched case-insensitively so an Asterisk that changes its casing
+ * does not silently break sending again.
+ */
+const FAX_STATUS = /^faxstatus$/i;
+const SEND_DONE = /^sendfax$/i;
+const RECEIVE_DONE = /^receivefax$/i;
+const ORIGINATE = /^originates?response$/i;
 const TERMINAL = /COMPLETE|SUCCESS|FAILED|ERROR/i;
+
+/** `fax_abc…` from a staged path like `/data/faxes/out/fax_abc….tif`. */
+export function faxIdFromStaged(file) {
+  const match = String(file || '').match(/[\\/]out[\\/](fax_[A-Za-z0-9]+)\.tiff?$/);
+  return match ? match[1] : '';
+}
 
 /**
  * Fax events arrive on the AMI session the platform already runs for calls.
- * A send is finished when res_fax reports a result, or — if the trunk drops the
- * call before it says anything — at hangup, which is then a failure with the
+ * A send is finished when res_fax says so — `SendFAX` on a page that went
+ * through, a status event naming a failure otherwise — or, if the trunk drops
+ * the call before it says anything, at hangup, which is then a failure with the
  * switch's own cause rather than a row stuck at `sending` forever.
  */
-export function onFaxEvent(msg) {
+export function onFaxEvent(msg, channel = null) {
   try {
-    if (msg.Event === 'OriginateResponse') {
+    if (ORIGINATE.test(msg.Event || '')) {
       const faxId = byAction.get(msg.ActionID);
       if (faxId) {
         byAction.delete(msg.ActionID);
@@ -321,24 +351,55 @@ export function onFaxEvent(msg) {
       return;
     }
 
-    if (msg.Event === 'FaxStatus') {
-      const faxId = byUniqueid.get(msg.Uniqueid) || String(msg['TELNO_FAX_ID'] || '') || '';
+    // A page that went out. The event names the file the switch just sent, so
+    // the row is identified from the switch's own record rather than from a
+    // channel id that may never have been reported back to us.
+    if (SEND_DONE.test(msg.Event || '')) {
+      const faxId = byUniqueid.get(msg.Uniqueid) || faxIdFromStaged(msg.FileName);
       if (!faxId) return;
-      const detail = msg.FaxStatusString || msg['FAXOPT(statusstr)'] || '';
-      const status = msg.FaxStatus || msg['FAXOPT(status)'] || '';
-      if (!TERMINAL.test(status) && !/complete|success|fail/i.test(detail)) return;
-      const pages = Number(msg.PagesTransferred || msg['FAXOPT(pages)'] || 0) || 0;
-      const failed = /fail|error/i.test(status) || /fail|error/i.test(detail);
+      const pages = Number(msg.PagesTransferred || 0) || 0;
+      const failed = pages === 0;
       lastStatus.set(msg.Uniqueid, failed ? 'failed' : 'sent');
       setStatus(faxId, failed ? 'failed' : 'sent', {
         pages: pages || undefined,
-        error: failed ? detail.slice(0, 240) || status.slice(0, 240) : '',
+        error: failed ? 'the far end accepted no pages' : '',
       });
       logEvent({
         actor: 'switch',
         action: failed ? 'fax.send_failed' : 'fax.sent',
         subject: faxId,
-        detail: `${pages || '?'} page(s) ${detail}`.trim(),
+        detail: `${pages || '?'} page(s) at ${msg.TransferRate || '?'} bps`,
+      });
+      return;
+    }
+
+    // A document that arrived. `ReceiveFAX` fires once the last page is on
+    // disk, which is the only reliable moment the file is complete.
+    if (RECEIVE_DONE.test(msg.Event || '')) {
+      ingestInbound(msg, channel);
+      return;
+    }
+
+    if (FAX_STATUS.test(msg.Event || '')) {
+      const isSend = String(msg.Operation || '').toLowerCase() === 'send';
+      const faxId = byUniqueid.get(msg.Uniqueid) || (isSend ? faxIdFromStaged(msg.FileName) : '') || '';
+      // A receive in progress is not a document yet: wait for `ReceiveFAX`.
+      if (!faxId) return;
+      byUniqueid.set(msg.Uniqueid, faxId);
+      const detail = String(msg.Status || msg.FaxStatusString || msg['FAXOPT(statusstr)'] || '');
+      const status = String(msg.FaxStatus || msg['FAXOPT(status)'] || '');
+      if (!TERMINAL.test(status) && !/fail|error|cancel/i.test(detail)) return;
+      const failed = /fail|error|cancel/i.test(detail) || /fail|error/i.test(status);
+      lastStatus.set(msg.Uniqueid, failed ? 'failed' : 'sent');
+      setStatus(faxId, failed ? 'failed' : 'sent', {
+        pages: Number(msg.PagesTransferred || 0) || undefined,
+        error: failed ? (detail || status).slice(0, 240) : '',
+      });
+      logEvent({
+        actor: 'switch',
+        action: failed ? 'fax.send_failed' : 'fax.sent',
+        subject: faxId,
+        detail: detail || status,
       });
       return;
     }
@@ -367,94 +428,172 @@ export function onFaxEvent(msg) {
 /* --------------------------------------------------------------- receive -- */
 
 /**
- * Read what the switch received.
+ * Turn a document the switch received into a row.
  *
- * The receipt file is written by the dialplan after ReceiveFax returns, so its
- * presence means the document is complete — reading the TIFF before that would
- * pick up a partial page. Successful documents are moved into the media store
- * and the receipt is deleted; a failed reception is recorded with the switch's
- * status so "the fax never arrived" has a reason attached.
+ * The trigger is the switch's own fax event, not a file the dialplan writes
+ * afterwards. That distinction matters: a receipt written by a later dialplan
+ * priority disappears whenever the far end hangs up first, which is exactly
+ * what a fax machine does — the document was received and then reported as
+ * nothing at all. res_fax's status event carries the file, the page count and
+ * the outcome, and it fires once the reception is complete.
+ *
+ * The file is recorded under `document` so the same document cannot be ingested
+ * twice by the event and by the sweep that catches up after a restart.
+ */
+function ingestInbound(msg, channel) {
+  const d = ensureFaxDirs();
+  const named = String(msg.FileName || '').trim();
+  let file = named && existsSync(named) ? named : '';
+  if (!file) {
+    const candidate = join(d.in, `${msg.Uniqueid}.tif`);
+    if (existsSync(candidate)) file = candidate;
+  }
+  // The event does not always name the file the same way the dialplan did: a
+  // receive on the second half of a channel can be reported under one unique id
+  // while the document is written under another. The newest unclaimed document
+  // in the inbox is the one this event is about.
+  if (!file) {
+    try {
+      const newest = readdirSync(d.in)
+        .filter((entry) => /\.tiff?$/i.test(entry))
+        .map((entry) => ({ entry, at: statSync(join(d.in, entry)).mtimeMs }))
+        .filter((item) => !db_.get('SELECT id FROM faxes WHERE document = ?', [item.entry]))
+        .sort((a, b) => b.at - a.at)[0];
+      if (newest) file = join(d.in, newest.entry);
+    } catch {
+      /* no inbox yet */
+    }
+  }
+  if (!file) return false;
+
+  const document = file.split(/[\\/]/).pop();
+  if (!document) return false;
+  if (db_.get('SELECT id FROM faxes WHERE document = ?', [document])) return true;
+
+  const statusText = String(msg.FaxStatusString || msg.FaxStatus || '').trim();
+  const bytes = (() => {
+    try {
+      return statSync(file).size;
+    } catch {
+      return 0;
+    }
+  })();
+  const pages = Number(msg.PagesTransferred || 0) || countPages(file) || (bytes > 0 ? 1 : 0);
+  const failed = /fail|error/i.test(statusText) || pages === 0;
+
+  const from = String(channel?.from || msg.RemotePartyID || msg.CallerIDNum || '').trim();
+  // The DID the dialplan wrote into the name, then the channel's own extension.
+  const stem = document.replace(/\.tiff?$/i, '');
+  const rawTo = String(stem.split('__')[1] || channel?.to || '').trim();
+  const number = rawTo ? db_.get('SELECT * FROM numbers WHERE e164 = ?', [rawTo]) : null;
+  const to = number?.e164 || rawTo;
+
+  if (!failed) {
+    const name = mediaName('fax', 'tif');
+    saveMedia(name, readFileSync(file));
+    db_.run(
+      `INSERT INTO faxes (id, direction, number_id, from_e164, to_e164, pages, status, subject, body, document, attachment, attachment_name, at, error)
+       VALUES (?, 'inbound', ?, ?, ?, ?, 'received', ?, '', ?, ?, ?, ?, '')`,
+      [newId('fax_'), number?.id || null, from, to, pages, 'Inbound fax', document, name, document, now()]
+    );
+    logEvent({ actor: 'switch', action: 'fax.received', subject: to || from, detail: `${pages} page(s)` });
+  } else {
+    db_.run(
+      `INSERT INTO faxes (id, direction, number_id, from_e164, to_e164, pages, status, subject, body, document, attachment, attachment_name, at, error)
+       VALUES (?, 'inbound', ?, ?, ?, ?, 'failed', ?, '', '', ?, '', '', ?, ?)`,
+      [newId('fax_'), number?.id || null, from, to, pages, 'Inbound fax failed', document, now(), statusText.slice(0, 240)]
+    );
+    logEvent({ actor: 'switch', action: 'fax.receive_failed', subject: to || from, detail: statusText });
+  }
+
+  // The row is the record now; the switch's copy is disposable.
+  try {
+    unlinkSync(file);
+  } catch {
+    /* the sweep will not see it a second time: document is stored */
+  }
+  return true;
+}
+
+/**
+ * Catch documents the events could not report — a restart mid-reception, or an
+ * AMI session that was down when the fax arrived. Anything left in the inbox
+ * that no row claims becomes a row of its own, so a received fax is never a
+ * file nobody can see.
  */
 export function sweepReceived() {
   if (!config.fax.enabled) return { ingested: 0 };
   const d = ensureFaxDirs();
   let ingested = 0;
-  let entries = [];
+  let names = [];
   try {
-    entries = readdirSync(d.status).filter((name) => name.endsWith('.done'));
+    names = readdirSync(d.in).filter((name) => /\.tiff?$/i.test(name));
   } catch {
     return { ingested: 0 };
   }
-
-  for (const entry of entries) {
-    const file = join(d.status, entry);
-    let line = '';
+  for (const name of names) {
+    const file = join(d.in, name);
     try {
-      line = readFileSync(file, 'utf8').trim();
+      // Young files may still be arriving from the switch. A fax that has just
+      // finished is usually complete within a second; this is a guard against
+      // reading a page while it is being written, not a wait for the fax.
+      if (Date.now() - statSync(file).mtimeMs < 25_000) continue;
     } catch {
       continue;
     }
-    const [kind, uniqueid, status, pages, caller, did] = line.split('|');
-    if (kind !== 'in' || !uniqueid) {
-      // An unreadable receipt is removed rather than retried forever.
-      try {
-        unlinkSync(file);
-      } catch {
-        /* nothing else to do */
-      }
-      continue;
+    if (db_.get('SELECT id FROM faxes WHERE document = ?', [name])) continue;
+    const pages = countPages(file) || 1;
+    const did = name.replace(/\.tiff?$/i, '').split('__')[1] || '';
+    const number = did ? db_.get('SELECT * FROM numbers WHERE e164 = ?', [did]) : null;
+    const media = mediaName('fax', 'tif');
+    saveMedia(media, readFileSync(file));
+    db_.run(
+      `INSERT INTO faxes (id, direction, number_id, from_e164, to_e164, pages, status, subject, body, document, attachment, attachment_name, at, error)
+       VALUES (?, 'inbound', ?, '', ?, ?, 'received', ?, '', ?, ?, ?, ?, '')`,
+      [newId('fax_'), number?.id || null, number?.e164 || did, pages, 'Inbound fax', name, media, name, now()]
+    );
+    try {
+      unlinkSync(file);
+    } catch {
+      /* nothing else to do */
     }
-
-    const document = join(d.in, `${uniqueid}.tif`);
-    const succeeded = /SUCCESS|COMPLETE/i.test(String(status || ''));
-    const pageCount = Number(pages) || 0;
-    const from = String(caller || '').trim();
-    const to = String(did || '').trim();
-    const number = to ? db_.get('SELECT * FROM numbers WHERE e164 = ?', [to]) : null;
-
-    if (succeeded && existsSync(document) && statSync(document).size > 0) {
-      const name = mediaName('fax', 'tif');
-      saveMedia(name, readFileSync(document));
-      const id = newId('fax_');
-      db_.run(
-        `INSERT INTO faxes (id, direction, number_id, from_e164, to_e164, pages, status, subject, body, document, attachment, attachment_name, at, error)
-         VALUES (?, 'inbound', ?, ?, ?, ?, 'received', ?, '', '', ?, ?, ?, '')`,
-        [
-          id,
-          number?.id || null,
-          from,
-          to,
-          pageCount || 1,
-          'Inbound fax',
-          name,
-          `${uniqueid}.tif`,
-          now(),
-        ]
-      );
-      ingested += 1;
-      logEvent({ actor: 'switch', action: 'fax.received', subject: to || from, detail: `${pageCount || '?'} page(s)` });
-    } else if (!succeeded) {
-      const id = newId('fax_');
-      db_.run(
-        `INSERT INTO faxes (id, direction, number_id, from_e164, to_e164, pages, status, subject, body, document, attachment, attachment_name, at, error)
-         VALUES (?, 'inbound', ?, ?, ?, ?, 'failed', ?, '', '', '', '', ?, ?)`,
-        [id, number?.id || null, from, to, pageCount || 0, 'Inbound fax failed', now(), String(status || 'no result').slice(0, 240)]
-      );
-      logEvent({ actor: 'switch', action: 'fax.receive_failed', subject: to || from, detail: String(status || '') });
-    }
-
-    // The receipt and the raw TIFF are both disposable once the document is in
-    // the media store: the row is now the record, and the copy is the one the
-    // console serves.
-    for (const path of [file, document]) {
-      try {
-        if (existsSync(path)) unlinkSync(path);
-      } catch {
-        /* the next sweep will not see the receipt again */
-      }
-    }
+    ingested += 1;
+    logEvent({ actor: 'switch', action: 'fax.received', subject: name, detail: `${pages} page(s), recovered by sweep` });
   }
   return { ingested };
+}
+
+/**
+ * A transmission the switch gave up on must not read as "sending" for ever.
+ *
+ * res_fax reports a result on its own events, but a refused media
+ * renegotiation or a call the carrier drops can end the channel without one —
+ * and a row stuck at `sending` tells the console a page is still on the wire
+ * when nothing is. The staged document's timestamp is when the transmission
+ * actually started, so a fax that was queued in the morning and sent at noon is
+ * judged from noon; the allowance is generous (a page of G.711 fax is slow, and
+ * a long document legitimately takes minutes).
+ */
+export function settleStuckSends() {
+  const rows = db_.all("SELECT id, at, pages FROM faxes WHERE direction = 'outbound' AND status = 'sending'");
+  let settled = 0;
+  for (const row of rows) {
+    let started = Number.NaN;
+    try {
+      started = statSync(stagedPath(row.id)).mtimeMs;
+    } catch {
+      started = Date.parse(row.at || '');
+    }
+    if (!Number.isFinite(started)) continue;
+    const allowance = (120 + Math.max(1, Number(row.pages) || 1) * 60) * 1000;
+    if (Date.now() - started < allowance) continue;
+    setStatus(row.id, 'failed', {
+      error: 'the switch ended the call before the fax completed — no result was reported',
+    });
+    logEvent({ actor: 'switch', action: 'fax.send_failed', subject: row.id, detail: 'stale send settled by the sweep' });
+    settled += 1;
+  }
+  return settled;
 }
 
 let sweeper = null;
@@ -466,6 +605,7 @@ export function startFax() {
   sweeper = setInterval(() => {
     try {
       sweepReceived();
+      settleStuckSends();
     } catch (err) {
       console.error('[fax] sweep failed', err.message);
     }
@@ -475,6 +615,7 @@ export function startFax() {
   // down: the receipt is still on the volume, so one sweep at boot catches up.
   try {
     sweepReceived();
+    settleStuckSends();
   } catch (err) {
     console.error('[fax] startup sweep failed', err.message);
   }
