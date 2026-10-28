@@ -116,6 +116,11 @@ COPY src ./src
 COPY --from=build /app/web/dist ./web/dist
 COPY scripts ./scripts
 
+# The base image is an argument, so a mirror or a pin can point it at an older
+# Node. Fail the build with the reason instead of shipping an image that dies on
+# its first import with "No such built-in module: node:sqlite".
+RUN node scripts/check-node.mjs
+
 COPY --from=switch /staging/usr/sbin/asterisk /usr/sbin/asterisk
 # Asterisk's own shared objects (libasteriskpj, libasteriskssl) live beside the
 # module directory, not inside it.
