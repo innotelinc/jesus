@@ -1,0 +1,109 @@
+#:import parse_color kivy.parser.parse_color
+#:import AppHomeBox screens.mainScr.AppHomeBox
+#:import SettingsBox screens.settings.SettingsBox
+#:import LogBox screens.logs.LogBox
+
+<BaseMDNavigationItem>
+    MDNavigationItemIcon:
+        icon: root.icon
+    MDNavigationItemLabel:
+        text: root.text
+
+MDScreen:
+    md_bg_color: self.theme_cls.backgroundColor
+
+    MainScreenBox: # main container
+        id: main_scr_box
+        orientation: 'vertical'
+        padding: 0 , self.top_pad, 0, 0
+        #spacing: dp(4)
+
+        MDTopAppBar:
+            type: "small"
+            theme_bg_color: "Custom"
+            md_bg_color: '#0a3580'
+            pos_hint: {"top": 1}
+
+            MDTopAppBarLeadingButtonContainer:
+                MDActionTopAppBarButton:
+                    icon: "menu"
+                    color: "white"
+                    on_release: nav_drawer.set_state("toggle")
+                MDActionTopAppBarButton:
+                    id: top_back_btn
+                    icon: "arrow-left"
+                    color: "white"
+                    opacity: 0
+                    disabled: True
+                    on_release: app.back_button_action()
+            MDTopAppBarTitle:
+                text: "OpenSMS"
+                color: "white"
+            MDTopAppBarTrailingButtonContainer:
+                MDActionTopAppBarButton:
+                    id: right_dot_menu
+                    icon: "dots-vertical"
+                    color: "white"
+                    opacity: 0
+                    disabled: True
+
+        MDFloatLayout:
+
+            MDNavigationLayout:
+
+                MDScreenManager:
+                    id: screen_manager
+
+                    MDScreen:
+                        name: "SMS"
+                        on_enter: app.on_main_screen_entry()
+                        AppHomeBox:
+                            id: home_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+
+                    MDScreen:
+                        name: "Settings"
+                        on_enter: app.on_settings_entry()
+                        SettingsBox:
+                            id: settings_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+
+                    MDScreen:
+                        name: "Logs"
+                        on_enter: log_scr.log_show(right_dot_menu, top_back_btn)
+                        on_leave: log_scr.on_log_scr_exit(right_dot_menu)
+                        LogBox:
+                            id: log_scr
+                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+
+                MDNavigationDrawer:
+                    id: nav_drawer
+                    radius: 0, dp(16), dp(16), 0
+
+                    MDNavigationDrawerMenu:
+                        MDNavigationDrawerLabel:
+                            text: "Operations"
+                        MDNavigationDrawerItem:
+                            on_release: app.goto_logs_screen()
+                            MDNavigationDrawerItemLeadingIcon:
+                                icon: "file"
+                            MDNavigationDrawerItemText:
+                                text: "Logs"
+                            #MDNavigationDrawerItemTrailingText:
+                            #    text: "24"
+                        MDNavigationDrawerDivider:
+
+            MDNavigationBar:
+                id: btm_nav_bar
+                pos: 0, main_scr_box.bottom_pad
+                on_switch_tabs: app.on_switch_tabs(*args)
+
+                BaseMDNavigationItem
+                    icon: "api"
+                    text: "SMS"
+                    active: True
+
+                BaseMDNavigationItem
+                    icon: "wrench"
+                    text: "Settings"
+
