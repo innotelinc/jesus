@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cantus — Voice Platform</title>
+  <meta name="description" content="Cantus is a realtime voice standard built around one socket: no SIP, no SDP, no port range, and a call that either connects or says why it did not.">
+  <meta property="og:title" content="Cantus — Voice Platform">
+  <meta property="og:description" content="A realtime voice standard on one socket, with NAT traversal that is always on and cannot fail silently. Specified from scratch, proven by 167 assertions over real sockets.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://innotelinc.github.io/cantus/">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Cpath d='M20 40V24m0 8h6a4 4 0 0 0 0-8h-6m18 0v16' stroke='%2322d3ee' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --p-bg: #0b0d10;
+      --p-bg-elevated: #12151a;
+      --p-surface: #181c22;
+      --p-surface-hover: #1f242c;
+      --p-border: #262c35;
+      --p-text: #f4f7fb;
+      --p-text-secondary: #cdd6e0;
+      --p-text-muted: #a8b2bf;
+      --p-accent: #22d3ee;
+      --p-accent-hover: #67e8f9;
+      --p-accent-tint: rgba(34, 211, 238, 0.12);
+      --p-gold: #f5b544;
+      --p-success: #3ddc84;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --ease: cubic-bezier(.2, .8, .2, 1);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--p-bg); color: var(--p-text);
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--p-accent-tint); }
+    a { color: var(--p-accent); text-decoration: none; }
+    a:hover { color: var(--p-accent-hover); }
+    code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+    .topbar { position: sticky; top: 0; z-index: 10; background: rgba(10, 14, 19, 0.72); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid var(--p-border); }
+    .topbar-inner { display: flex; align-items: center; gap: 20px; height: 60px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: 0.04em; color: var(--p-text); }
+    .brand:hover { color: var(--p-text); }
+    .brand .mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--p-bg-elevated); border: 1px solid var(--p-border); font-size: 15px; color: var(--p-accent); }
+    .topbar nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    .topbar nav a { color: var(--p-text-secondary); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 14px; transition: color .15s var(--ease), background .15s var(--ease); }
+    .topbar nav a:hover { color: var(--p-text); background: var(--p-surface-hover); }
+    .topbar .gh { display: inline-flex; align-items: center; gap: 8px; margin-left: 8px; border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 7px 14px; color: var(--p-text); font-size: 14px; transition: border-color .15s var(--ease), background .15s var(--ease); }
+    .topbar .gh:hover { border-color: var(--p-accent); background: var(--p-accent-tint); color: var(--p-text); }
+
+    .hero { position: relative; overflow: hidden; padding: 92px 0 64px; }
+    .hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px 320px at 70% -10%, rgba(34, 211, 238, 0.14), transparent 70%), radial-gradient(500px 300px at 15% 110%, rgba(245, 181, 68, 0.06), transparent 70%); pointer-events: none; }
+    .hero-inner { position: relative; max-width: 760px; }
+    .kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--p-accent-hover); background: var(--p-accent-tint); border: 1px solid rgba(34, 211, 238, 0.3); border-radius: 999px; padding: 5px 14px; margin: 0 0 24px; }
+    .kicker .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--p-success); box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.5); animation: pulse 2.4s var(--ease) infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0.45); } 70% { box-shadow: 0 0 0 9px rgba(61, 220, 132, 0); } 100% { box-shadow: 0 0 0 0 rgba(61, 220, 132, 0); } }
+    h1 { font-size: clamp(2.2rem, 5.5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 20px; font-weight: 700; }
+    h1 .accent { color: var(--p-accent); }
+    .lede { font-size: 1.125rem; color: var(--p-text-secondary); max-width: 660px; margin: 0 0 32px; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: var(--radius-md); padding: 11px 20px; font-size: 15px; font-weight: 550; border: 1px solid transparent; cursor: pointer; transition: background .15s var(--ease), border-color .15s var(--ease); }
+    .btn-primary { background: var(--p-accent); color: #0a0e13; font-weight: 600; }
+    .btn-primary:hover { background: var(--p-accent-hover); color: #0a0e13; }
+    .btn-secondary { border-color: var(--p-border); color: var(--p-text); background: transparent; }
+    .btn-secondary:hover { border-color: var(--p-accent); background: var(--p-accent-tint); color: var(--p-text); }
+    .quickstart { display: flex; align-items: center; gap: 14px; background: var(--p-bg-elevated); border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 12px 16px; max-width: 680px; font-size: 13.5px; }
+    .quickstart code { color: var(--p-text); white-space: nowrap; overflow-x: auto; }
+    .quickstart code .c { color: var(--p-text-muted); }
+    .quickstart .copy { margin-left: auto; flex: 0 0 auto; background: transparent; border: 1px solid var(--p-border); color: var(--p-text-secondary); border-radius: var(--radius-sm); font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; transition: border-color .15s var(--ease), color .15s var(--ease); }
+    .quickstart .copy:hover { border-color: var(--p-accent); color: var(--p-text); }
+    .quickstart .copy.copied { color: var(--p-success); border-color: var(--p-success); }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 52px 0 0; }
+    .stat { background: var(--p-bg-elevated); border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 16px; }
+    .stat .n { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .stat .n em { font-style: normal; color: var(--p-accent); }
+    .stat .l { font-size: 13px; color: var(--p-text-muted); margin-top: 2px; }
+
+    section { padding: 56px 0; }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 26px; flex-wrap: wrap; }
+    .sec-head h2 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0; }
+    .sec-head p { color: var(--p-text-muted); margin: 0; font-size: 14.5px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .card { border: 1px solid var(--p-border); background: var(--p-bg-elevated); border-radius: var(--radius-md); padding: 18px; }
+    .card h3 { margin: 0 0 6px; font-size: 1.02rem; }
+    .card p { margin: 0; color: var(--p-text-secondary); font-size: 14px; }
+    .card code { font-size: 12.5px; color: var(--p-accent); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--p-border); vertical-align: top; }
+    th { color: var(--p-text-muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+    td:first-child { color: var(--p-text-secondary); }
+    td strong { color: var(--p-text); }
+
+    pre.term { background: var(--p-bg-elevated); border: 1px solid var(--p-border); border-radius: var(--radius-md); padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; color: var(--p-text-secondary); }
+    pre.term .k { color: var(--p-accent); }
+    pre.term .g { color: var(--p-success); }
+    pre.term .y { color: var(--p-gold); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap">
+      <div class="topbar-inner">
+        <a class="brand" href="/cantus/">
+          <span class="mark">◇</span>
+          <span>cantus</span>
+        </a>
+        <nav>
+          <a href="https://github.com/innotelinc/cantus/blob/main/spec/CANTUS-1.0.md">The standard</a>
+          <a href="https://github.com/innotelinc/cantus/blob/main/README.md">Docs</a>
+          <a class="gh" href="https://github.com/innotelinc/cantus">GitHub ↗</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="hero-inner">
+        <div class="kicker"><span class="pulse"></span> Voice · protocol first</div>
+        <h1>Cantus — <span class="accent">one socket</span>, always a path.</h1>
+        <p class="lede">
+          A realtime voice standard that replaces SIP, SDP and RTP with a single 5-tuple,
+          typed negotiation, and traversal that is on from the first packet. A call either
+          connects and you hear it, or it tells you why not — there is no third outcome.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/innotelinc/cantus">View on GitHub</a>
+          <a class="btn btn-secondary" href="https://github.com/innotelinc/cantus/blob/main/spec/CANTUS-1.0.md">Read the standard</a>
+        </div>
+        <div class="quickstart">
+          <code id="qs"><span class="c">$</span> git clone https://github.com/innotelinc/cantus &amp;&amp; cd cantus &amp;&amp; make test</code>
+          <button class="copy" id="copy" type="button">copy</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="n"><em>1</em> port</div><div class="l">signalling, media, probing, registration</div></div>
+          <div class="stat"><div class="n"><em>300</em> ms</div><div class="l">to commit a relay path, not to fail</div></div>
+          <div class="stat"><div class="n"><em>167</em></div><div class="l">assertions over real sockets</div></div>
+          <div class="stat"><div class="n"><em>0</em></div><div class="l">CPAN dependencies</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>Why Cantus</h2>
+        <p>Each answer is normative in the standard, not a policy in a config file.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>"It connected, but nobody can hear anything."</h3>
+          <p>Impossible by construction: signalling and media share one 5-tuple, so one NAT mapping serves the call and the two address views cannot disagree.</p>
+        </div>
+        <div class="card">
+          <h3>Traversal is six knobs you must reconcile.</h3>
+          <p>Reach is always on. The relay mapping opens at startup with registration, so the fallback exists before anyone dials — and <code>ice_support=no</code> is not a default here.</p>
+        </div>
+        <div class="card">
+          <h3>A call should not open 10,000 UDP ports.</h3>
+          <p>One port carries everything. There is no port range to open, no second address to rewrite, and nothing to keep aligned in a firewall.</p>
+        </div>
+        <div class="card">
+          <h3>SDP negotiation is 2,580 lines of glue.</h3>
+          <p>Capability sets are ordered data: one round trip, caller's order wins, no re-offer, no <code>UPDATE</code>, no <code>PRACK</code>.</p>
+        </div>
+        <div class="card">
+          <h3>Every path decision is invisible.</h3>
+          <p>Direct, relay, failover and recovery are events with timings. The suite asserts them, and <code>cantus demo</code> prints them.</p>
+        </div>
+        <div class="card">
+          <h3>You have to trust the <code>From</code> header.</h3>
+          <p>Identity is a key: every signed message proves the node, not the field it typed in.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>What it actually does</h2>
+        <p>Measured against the Asterisk 22.11.0 release tarball, not against an impression.</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th></th><th>Asterisk 22.11.0</th><th>Cantus 1.0</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ports per call</td><td>signalling + 10,000–20,000/udp</td><td><strong>1</strong></td></tr>
+          <tr><td>Traversal</td><td>opt-in ICE, 6 knobs, <code>ice_support=no</code></td><td><strong>always on, zero config</strong></td></tr>
+          <tr><td>If traversal fails</td><td>call connects, audio silent</td><td><strong>relay path, audio flows</strong></td></tr>
+          <tr><td>Negotiation</td><td>SDP text, re-offers</td><td>typed set, 1 round trip</td></tr>
+          <tr><td>Config</td><td>101 sample <code>.conf</code> files</td><td>1 routing document</td></tr>
+          <tr><td>Stack size</td><td>55,858 lines of SIP</td><td>2,494 lines, no deps</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>Behind a hard NAT, and back again</h2>
+        <p>Both endpoints behind a real middlebox whose mapping table is flushed mid-call.</p>
+      </div>
+      <pre class="term"><span class="k">path</span>          direct  (relay carried the outage, then direct recovered)
+<span class="k">audio</span>         421 frames received, peak amplitude 6000
+<span class="k">direct/relay</span>  417 / 4 frames
+<span class="k">rebinding</span>     nat table flushed; fallback=yes, direct restored at 1.23s
+<span class="k">continuity</span>    0 frames on the relay, 390 after recovery, call dropped: no
+<span class="g">PASS</span></pre>
+      <p style="color:var(--p-text-muted); font-size:14px; margin:14px 0 0;">
+        Detected in 420–600&nbsp;ms from the peer's own reports and our own reception,
+        not from a fixed 2&nbsp;s timer. Failover, recovery, and the call never leaves
+        <code>ACTIVE</code>.
+      </p>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>The pieces</h2>
+        <p>A standard, a reference stack that proves it, and the suite that keeps it honest.</p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>The standard</h3>
+          <p>Wire format, handshake, negotiation, call machine, Reach, media, identity, routing, reason codes, conformance suite. Normative, and small enough to read in one sitting.</p>
+        </div>
+        <div class="card">
+          <h3>The reference stack</h3>
+          <p>Perl 5, core modules only. Real UDP sockets, a real relay, a real NAT middlebox in the test path. It runs anywhere Perl runs, including this machine.</p>
+        </div>
+        <div class="card">
+          <h3>The conformance suite</h3>
+          <p>167 assertions: audio verified by amplitude, <code>ACTIVE</code> read from the state machine, NAT drops counted inside the middlebox.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div style="max-width:1080px; margin:0 auto; padding:0 24px; margin-top:52px; border-top:1px solid var(--p-border); padding-top:18px; color:var(--p-text-muted); font-size:13px;">
+        <div>© 2026 Darnel Hunter · Cantus 1.0 · AGPL-3.0-only</div>
+        <div style="margin-top:6px;">
+          <a href="https://github.com/innotelinc/cantus">GitHub</a> ·
+          <a href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('copy');
+      var src = document.getElementById('qs');
+      if (!btn || !src) return;
+      btn.addEventListener('click', function () {
+        var text = src.textContent.replace(/^\$\s*/, '');
+        var done = function () {
+          btn.textContent = 'copied';
+          btn.classList.add('copied');
+          setTimeout(function () { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, done);
+        } else {
+          done();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

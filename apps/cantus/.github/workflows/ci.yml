@@ -1,0 +1,99 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ci.yml — conformance suite + repository posture on every push and PR.
+#
+# The suite drives real UDP sockets: it places calls through a real relay,
+# behind a real NAT middlebox, flushes mapping tables mid-call and verifies the
+# audio that arrives. Nothing here is mocked, so a red build means the
+# protocol stopped working, not that a mock drifted.
+#
+# The attribution guard runs in its own workflow (attribution-guard.yml).
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: Conformance suite (perl ${{ matrix.perl }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        perl: ["5.36", "5.38"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+
+      - name: Show version
+        run: perl -V:version
+
+      - name: Run the suite
+        run: prove -Ilib t/ 2>&1
+
+      - name: Self test
+        run: perl -Ilib bin/cantus selftest
+
+      - name: Encode round-trip
+        run: |
+          set -euo pipefail
+          perl -Ilib bin/cantus encode hello >/dev/null
+          perl -Ilib bin/cantus route-test examples/routes.json >/dev/null
+          echo "cli: ok"
+
+  structure:
+    name: Repository structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Required files
+        run: |
+          set -euo pipefail
+          for f in README.md LICENSE .env.example .gitignore \
+                   docs/stack.md web/landing/index.html \
+                   .githooks/guard-lib .githooks/commit-msg .githooks/pre-commit \
+                   .github/workflows/attribution-guard.yml \
+                   spec/CANTUS-1.0.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::missing required file: $f"
+              exit 1
+            fi
+          done
+          echo "structure: ok"
+
+      - name: .gitignore covers .env
+        run: |
+          set -euo pipefail
+          grep -q '^\.env' .gitignore || { echo "::error::.gitignore does not list .env"; exit 1; }
+          echo "gitignore: ok"
+
+      - name: Landing sanity
+        run: |
+          set -euo pipefail
+          f=web/landing/index.html
+          grep -qi '<title>' "$f"    || { echo "::error::landing has no <title>"; exit 1; }
+          grep -qi 'og:title' "$f"   || { echo "::error::landing has no og:title"; exit 1; }
+          grep -qi 'data:image/svg+xml' "$f" || { echo "::error::landing has no inline SVG favicon"; exit 1; }
+          echo "landing: ok"
+
+      - name: Guard is operable
+        run: |
+          set -euo pipefail
+          bash -c 'source .githooks/guard-lib && guard_selftest'
+          echo "guard: ok"

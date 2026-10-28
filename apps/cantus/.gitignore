@@ -1,0 +1,23 @@
+# Secrets / local environment — never commit these.
+.env
+.env.*
+!.env.example
+data/
+*.sqlite
+*.sqlite3
+*.log
+tmp/
+
+# Vendored upstream evidence: the Asterisk tarball is 26 MB and reproducibly
+# downloadable. The SHA-256 used for the analysis is recorded in
+# analysis/asterisk-22-findings.md, so the artefact is fetchable, not shipped.
+vendor/*.tar.gz
+vendor/asterisk-*/
+vendor/
+
+# Perl build residue
+blib/
+Makefile.old
+pm_to_blib
+*.bak
+*.swp

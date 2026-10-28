@@ -1,0 +1,231 @@
+#!/usr/bin/perl
+# Cantus 1.0 reference implementation — command line.
+use strict;
+use warnings;
+use FindBin;
+use lib "$FindBin::Bin/../lib";
+use Getopt::Long qw(GetOptions);
+
+use Cantus::Wire ();
+use Cantus::Caps ();
+use Cantus::Media ();
+use Cantus::Reach ();
+use Cantus::Router ();
+use Cantus::Session ();
+use Cantus::Scenario ();
+
+my $VERSION = '1.0.0';
+
+my $cmd = shift @ARGV // 'help';
+
+if ($cmd eq 'version' || $cmd eq '--version') {
+    print "cantus $VERSION (wire token cantus/1, port 7443/udp)\n";
+    exit 0;
+}
+if ($cmd eq 'help' || $cmd eq '--help' || $cmd eq '-h') {
+    print <<"USAGE";
+cantus $VERSION — a realtime voice standard built around one socket
+
+  cantus demo [--nat none|cone|symmetric] [--rebind] [--quiet] [--media SECONDS]
+      Run a relay and two endpoints, place a real call over real sockets,
+      and report the path that was chosen and the audio that arrived.
+      --rebind flushes the NAT tables mid-call and shows the failover to the
+      relay and the return to a direct path.
+
+  cantus route-test <document.json> [--to AOR] [--from AOR] [--hour HH:MM]
+      Evaluate a routing document offline.  Nothing is executed.
+
+  cantus encode hello|invite|media
+      Print the wire encoding of a sample message.
+
+  cantus selftest
+      In-process checks of framing, negotiation and routing.
+
+USAGE
+    exit 0;
+}
+
+if ($cmd eq 'demo') {
+    my ($nat, $quiet, $media, $verbose, $rebind) = ('none', 0, 1.2, 0, 0);
+    GetOptions('nat=s' => \$nat, 'quiet' => \$quiet, 'media=f' => \$media,
+               'verbose' => \$verbose, 'rebind' => \$rebind);
+    die "cantus: --rebind needs a middlebox (--nat cone or symmetric)\n"
+        if $rebind && $nat eq 'none';
+    die "cantus: --nat must be none, cone or symmetric\n"
+        unless $nat =~ /^(none|cone|symmetric)$/;
+
+    printf "cantus $VERSION — demo, nat=%s\n\n", $nat;
+    my $scenario = Cantus::Scenario->new(
+        nat   => $nat,
+        trace => sub {
+            my ($who, $ev) = @_;
+            return if $quiet;
+            return if !$verbose && ($ev->{kind} // '') eq 'forward';
+            printf "  %7.3fs  %-11s %s\n", $ev->{t} // 0, $who, _describe($ev, $who);
+        },
+    );
+    my $r = $scenario->run(
+        media_seconds => $rebind ? ($media > 9 ? $media : 9) : $media,
+        ($rebind ? (rebind_at => 0.5) : ()),
+    );
+
+    print "\n";
+    if (!$r->{ok}) {
+        printf "FAILED: %s\n", $r->{error} // 'media did not arrive';
+        exit 1;
+    }
+    printf "  call          %s\n", $r->{call};
+    printf "  codec         %s\n", $r->{codec} // '?';
+    my $note = $r->{path} eq 'relay' ? '  (direct was not usable, relay carried it)'
+             : $r->{fell_back}      ? '  (relay carried the outage, then direct recovered)'
+             :                        '  (no relay needed)';
+    printf "  path          %s%s\n", $r->{path}, $note;
+    printf "  audio         %d frames received, peak amplitude %d\n", $r->{frames}, $r->{peak};
+    printf "  direct/relay  %d / %d frames\n", $r->{direct_frames}, $r->{relay_frames};
+    printf "  ended         %s\n", $r->{ended} ? 'clean' : 'unclean';
+    if ($rebind) {
+        printf "  rebinding     nat table flushed; fallback=%s, direct restored %s\n",
+            $r->{fell_back} ? 'yes' : 'no',
+            defined $r->{recovered_at} ? sprintf('at %.2fs', $r->{recovered_at}) : 'never';
+        printf "  continuity    %d frames on the relay, %d after recovery, call dropped: %s\n",
+            $r->{relay_frames}, $r->{frames} - ($r->{frames_at_recovery} // 0),
+            $r->{premature_end} ? 'yes' : 'no';
+    }
+    if (my $st = $r->{relay_stats}) {
+        printf "  relay         %d forwarded, %d dropped, %d endpoints\n",
+            @$st{qw(forwarded dropped endpoints)};
+    }
+    if (my %ns = %{ $r->{nat_stats} || {} }) {
+        printf "  nat           %s: %d dropped unsolicited, %d forwarded\n",
+            $_, $ns{$_}{dropped}, $ns{$_}{forwarded} for sort keys %ns;
+    }
+    if ($rebind && !defined $r->{recovered_at}) {
+        print "\nFAILED: the call never returned to a direct path\n";
+        exit 1;
+    }
+    print "\nPASS\n";
+    exit 0;
+}
+
+if ($cmd eq 'route-test') {
+    my $file = shift @ARGV or die "usage: cantus route-test <document.json>\n";
+    my ($to, $from, $hour) = ('support\@example.net', 'alice\@example.net', undef);
+    GetOptions('to=s' => \$to, 'from=s' => \$from, 'hour=s' => \$hour);
+    my $router = Cantus::Router->new;
+    open my $fh, '<', $file or die "cantus: $file: $!\n";
+    my $doc = do { local $/; <$fh> };
+    close $fh;
+    $router->load($doc);
+    my $now = time;
+    if (defined $hour) {
+        my ($h, $m) = split /:/, $hour;
+        my @t = localtime($now);
+        $now = $now - ($t[2] * 3600 + $t[3] * 60 + $t[4]) + $h * 3600 + ($m // 0) * 60;
+    }
+    my $d = $router->decide({ to => $to, from => $from, now => $now, verified => 1, calls => 0 });
+    printf "route   %s\n", $d->{route} // '(default)';
+    my @chain = map { my ($k) = keys %$_; $k } @{ $d->{actions} };
+    printf "actions %s\n", join(' -> ', @chain);
+    exit 0;
+}
+
+if ($cmd eq 'encode') {
+    my $what = shift @ARGV // 'hello';
+    if ($what eq 'hello') {
+        my $f = {
+            21 => Cantus::Wire::S('cantus/1'),
+            1  => Cantus::Wire::S('alice@demo'),
+            24 => Cantus::Wire::B("\x01" x 32),
+            9  => Cantus::Wire::B(Cantus::Caps::encode(Cantus::Caps::loopback_set())),
+            4  => Cantus::Wire::V(1),
+        };
+        _hexdump('HELLO', Cantus::Wire::msg_encode(1, $f));
+    }
+    elsif ($what eq 'invite') {
+        my $f = {
+            1  => Cantus::Wire::S('alice@demo'),
+            2  => Cantus::Wire::S('bob@demo'),
+            3  => Cantus::Wire::S('0123456789abcdef0123456789abcdef'),
+            6  => Cantus::Wire::V(1),
+            9  => Cantus::Wire::B(Cantus::Caps::encode(Cantus::Caps::loopback_set())),
+            12 => Cantus::Wire::B(Cantus::Reach::cands_encode(
+                    { kind => 0, ip => '203.0.113.7', port => 7443, priority => 100,
+                      token => 'ABCDEFGH' })),
+            4  => Cantus::Wire::V(1),
+        };
+        _hexdump('INVITE', Cantus::Wire::msg_encode(3, $f));
+    }
+    else {
+        my ($payload) = Cantus::Media::pcm_frame(samples => 960);
+        _hexdump('MEDIA', Cantus::Wire::media_encode(
+            stream => 0, tag => 0x1234, seq => 1000, ts => 48000,
+            codec => 1, flags => 4, payload => substr($payload, 0, 40),
+        ));
+    }
+    exit 0;
+}
+
+if ($cmd eq 'selftest') {
+    my @checks;
+    my $ok = sub { my ($name, $pass) = @_; push @checks, [ $name, $pass ? 1 : 0 ] };
+
+    my $v = Cantus::Wire::varint_encode(2**40 + 17);
+    my $pos = 0;
+    $ok->('varint round-trip', Cantus::Wire::varint_decode($v, \$pos) == 2**40 + 17);
+
+    my $m = Cantus::Wire::media_encode(stream=>0, tag=>7, seq=>1, ts=>960, codec=>2, flags=>0, payload=>'abc');
+    $ok->('media round-trip', (Cantus::Wire::media_decode($m))->{payload} eq 'abc');
+
+    my $agreed = Cantus::Caps::negotiate(
+        [ { name => 'opus/48000/2', ptime => 20, params => {} },
+          { name => 'pcm-s16/48000/1', ptime => 20, params => {} } ],
+        [ { name => 'pcm-s16/48000/1', ptime => 20, params => {} },
+          { name => 'opus/48000/2', ptime => 20, params => {} } ],
+    );
+    $ok->('caller codec precedence', ($agreed->{name} // '') eq 'opus/48000/2');
+
+    my $r = Cantus::Router->new(doc => Cantus::Router::default_doc);
+    $ok->('routing default', $r->decide({ to => 'x@y', from => 'a@b' })->{route} eq 'answer-all');
+
+    my $s = Cantus::Session->new(call => 'c', role => 'caller', peer => 'p');
+    $s->fire('invite_sent');
+    $s->fire('accept_recv');
+    $ok->('session reaches ACTIVE', $s->commit_path('relay') && $s->is_active);
+
+    my $fail = grep { !$_->[1] } @checks;
+    printf "%-28s %s\n", $_->[0], $_->[1] ? 'ok' : 'FAIL' for @checks;
+    print $fail ? "\nFAIL ($fail)\n" : "\nPASS\n";
+    exit($fail ? 1 : 0);
+}
+
+print "cantus: unknown command '$cmd' (try: cantus help)\n";
+exit 2;
+
+sub _describe {
+    my ($ev, $who) = @_;
+    my $k = $ev->{kind} // '?';
+    return "incoming call=$ev->{call} from=$ev->{from}" if $k eq 'incoming';
+    return "accepted call=$ev->{call} codec=$ev->{codec}" if $k eq 'accepted' && $ev->{codec};
+    return "path $ev->{path} committed at $ev->{ms}ms" if $k eq 'path';
+    return "ended call=$ev->{call} reason=$ev->{reason}" if $k eq 'ended';
+    return "registered $ev->{id} at $ev->{addr} handle=$ev->{handle}" if $k eq 'registered' && $who eq 'relay';
+    return "registered handle=$ev->{handle} observed=$ev->{observed}" if $k eq 'registered';
+    return "nat $ev->{mode} at $ev->{at}" if $k eq 'nat';
+    return "invite call=$ev->{call} to=$ev->{to}" if $k eq 'invite';
+    return "rebinding to relay after $ev->{after_ms}ms of silence" if $k eq 'rebind';
+    return "$k call=$ev->{call}" if $k eq 'ringing';
+    return join(' ', $k, map { "$_=$ev->{$_}" } grep { !/^(t|kind|who)$/ } sort keys %$ev);
+}
+
+sub _hexdump {
+    my ($label, $bytes) = @_;
+    printf "%s — %d octets\n", $label, length $bytes;
+    my $off = 0;
+    while ($off < length $bytes) {
+        my $chunk = substr($bytes, $off, 16);
+        my $hex = join ' ', map { sprintf '%02X', ord } split //, $chunk;
+        my $asc = join '', map { /[\x20-\x7e]/ ? $_ : '.' } split //, $chunk;
+        printf "%04X  %-47s  %s\n", $off, $hex, $asc;
+        $off += 16;
+    }
+}
