@@ -5,6 +5,11 @@ runs:
   steps:
     - shell: bash
       run: |
+        # monorepo-port: install where this action lives, not at the repository
+        # root, so the same file works in omniroute's own repo and in a tree
+        # that carries omniroute one directory down.
+        cd "$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+
         # No `set -e` here: the whole job of this script is to look at npm ci's exit
         # status, and `set -e` would end it on the first failure.
         #
