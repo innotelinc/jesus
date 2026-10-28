@@ -317,7 +317,11 @@ for my $pair (@order) {
     $expected{$dest} = $out;
 
     my $old = '';
-    if (-f $dest) { open my $oh, '<', $dest or die "$dest: $!\n"; local $/; $old = <$oh>; close $oh }
+    if (-f $dest) {
+        open my $oh, '<', $dest or die "$dest: $!\n";
+        local $/; $old = <$oh>; close $oh;
+        $old =~ s/\r\n/\n/g;    # the checkout may be CRLF; that is not a difference
+    }
     next if $old eq $out;
 
     if ($CHECK) {
