@@ -56,10 +56,19 @@ export default function Settings() {
   const [twilioToken, setTwilioToken] = useState('');
   const [twilioFrom, setTwilioFrom] = useState('');
   const [smsTo, setSmsTo] = useState('');
+  const [smsFrom, setSmsFrom] = useState('');
+  const [smsProviderChoice, setSmsProviderChoice] = useState('');
   const [testingSms, setTestingSms] = useState(false);
   const [backups, setBackups] = useState({ status: null, items: [] });
   const [backupBusy, setBackupBusy] = useState('');
   const [restoring, setRestoring] = useState(null);
+
+  // The SMS choice is a vault key, so the select mirrors what the server says
+  // rather than what was last clicked — a reload or a second operator cannot
+  // leave it showing the wrong provider.
+  useEffect(() => {
+    setSmsProviderChoice(status?.channels?.sms?.preference || '');
+  }, [status?.channels?.sms?.preference]);
 
   // Branding is its own request: it is white-label configuration, not part of
   // the operator status the rest of this page reads.
@@ -388,6 +397,22 @@ export default function Settings() {
       toast.error('Test failed', err.message);
     } finally {
       setTestingMail(false);
+    }
+  };
+
+  /** The choice is one vault key; `''` removes it and lets the channel decide. */
+  const chooseSmsProvider = async (value) => {
+    setSmsProviderChoice(value);
+    try {
+      if (value) await api.put('/system/vault/SMS_PROVIDER', { value });
+      else await api.del('/system/vault/SMS_PROVIDER');
+      await load();
+      toast.success(
+        value ? `Texts will leave through ${value === 'voipms' ? 'your own number' : 'Twilio'}` : 'Back to automatic',
+        value ? 'It applies to the next code, with no restart.' : 'The number this platform holds comes first, then Twilio.'
+      );
+    } catch (err) {
+      toast.error('Could not change the SMS provider', err.message);
     }
   };
 
@@ -767,24 +792,71 @@ export default function Settings() {
 
       <Card
         title="Text messages"
-        subtitle="Verification codes go to a handset through Twilio"
+        subtitle="Verification codes go to a handset from your own number, or through Twilio"
         actions={
           <Badge tone={smsStatus.configured ? 'success' : 'neutral'} dot>
-            {smsStatus.configured ? `twilio · ${smsStatus.source}` : 'Not configured'}
+            {smsStatus.configured ? `${smsStatus.provider} · ${smsStatus.source}` : 'Not configured'}
           </Badge>
         }
       >
         <p className="tiny muted" style={{ marginTop: 0 }}>
-          All three values come from the Twilio console: the Account SID and Auth token from the dashboard, and a
-          sender number the account owns. They are stored encrypted here, like the mail keys, and a stored change takes
-          effect on the next code with no redeploy. The environment still works as a fallback for a .env-only install.
+          A code is one short message, so it can leave from a number this platform already holds. That is the VoIP.ms DID
+          below, and it is what customers see when the text arrives. Twilio stays the alternative for an install without a
+          number of its own. Either way the credentials are stored encrypted here and take effect on the next code.
         </p>
         {smsStatus.configured ? null : (
           <p className="tiny dim" style={{ marginTop: 0 }}>
-            Still needed: <span className="mono">{(smsStatus.missing || []).join(', ') || 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM'}</span>
-            . Until all three are stored, codes are written to the container log instead of being texted.
+            Still needed: <span className="mono">{(smsStatus.missing || []).join(', ')}</span>. Until that is stored, codes are
+            written to the container log and handed back in the wizard instead of being texted.
           </p>
         )}
+        <div className="stack" style={{ gap: 10, padding: '12px 14px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+          <div className="row wrap" style={{ gap: 12, alignItems: 'flex-end' }}>
+            <div style={{ flex: '1 1 220px' }}>
+              <Select
+                label="Send texts with"
+                value={smsProviderChoice}
+                onChange={(event) => chooseSmsProvider(event.target.value)}
+              >
+                <option value="">Automatically — my number first, then Twilio</option>
+                <option value="voipms">My own number (VoIP.ms)</option>
+                <option value="twilio">Twilio</option>
+              </Select>
+            </div>
+            <div style={{ flex: '2 1 260px' }}>
+              <Input
+                label="Text codes from this number"
+                placeholder={
+                  secretByName('VOIPMS_SMS_DID')
+                    ? `Stored ${secretByName('VOIPMS_SMS_DID').hint}`
+                    : smsStatus.providers?.voipms?.from || '+1 415 555 0123'
+                }
+                hint={
+                  smsStatus.providers?.voipms?.configured
+                    ? `Texting from ${smsStatus.from || 'that number'}`
+                    : 'A DID on the VoIP.ms account with SMS enabled'
+                }
+                value={smsFrom}
+                onChange={(event) => setSmsFrom(event.target.value)}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              icon="check"
+              loading={savingSecret === 'VOIPMS_SMS_DID'}
+              onClick={() => storeSecret('VOIPMS_SMS_DID', smsFrom, 'the number texts come from')}
+            >
+              {secretByName('VOIPMS_SMS_DID') ? 'Replace number' : 'Store number'}
+            </Button>
+          </div>
+          <p className="tiny dim" style={{ margin: 0 }}>
+            {smsStatus.providers?.voipms?.configured
+              ? 'Ready: codes leave through VoIP.ms from the number above.'
+              : 'Connect VoIP.ms under Numbers from VoIP.ms first — the API username, password and this SMS-enabled DID are all it takes.'}
+          </p>
+        </div>
+        <strong className="tiny" style={{ display: 'block', marginTop: 16 }}>Or through Twilio</strong>
         <div className="grid two">
           <div className="stack">
             <Input
@@ -848,7 +920,7 @@ export default function Settings() {
               placeholder={secretByName('TWILIO_FROM') ? `Stored ${secretByName('TWILIO_FROM').hint}` : '+15551234567'}
               hint={
                 secretByName('TWILIO_FROM')
-                  ? `Codes are texted from ${smsStatus.from || 'the stored number'}`
+                  ? `Texts would come from ${smsStatus.providers?.twilio?.from || 'the stored number'}`
                   : 'A number or messaging service SID the Twilio account owns'
               }
               value={twilioFrom}

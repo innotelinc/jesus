@@ -1,7 +1,8 @@
 import { config } from '../../config.js';
+import { db_ } from '../../db/index.js';
 import { getSecret } from '../vault.js';
 import { normalizeNumber, formatNumber } from '../e164.js';
-import { HttpError } from '../errors.js';
+import { HttpError, badRequest } from '../errors.js';
 
 /**
  * The number provider.
@@ -215,6 +216,73 @@ export async function orderNumber(e164, { routing = '', pop, dialTime, cnam, bil
     note,
   });
   return { did, routing: target, raw: body };
+}
+
+/* --------------------------------------------------------------------- sms -- */
+
+const SMS_FROM_KEY = 'VOIPMS_SMS_DID';
+
+/**
+ * Which DID a text comes from.
+ *
+ * A verification code is one message to one handset, and the sender has to be a
+ * number this platform actually holds with SMS switched on. The vault names it
+ * when an operator cares which one; otherwise the first DID bought through the
+ * console is used, which is what an install holding a single number ends up
+ * with anyway. `source` is reported so the console can say where it came from
+ * rather than implying the choice was deliberate.
+ */
+export function smsFrom() {
+  const stored = getSecret(SMS_FROM_KEY);
+  if (stored) return { did: stored, source: 'vault' };
+  const environment = String(config.voipms.smsDid || '');
+  if (environment) return { did: environment, source: 'environment' };
+  const row = db_.get(
+    "SELECT e164 FROM numbers WHERE provider = 'voipms' AND released_at IS NULL ORDER BY COALESCE(rented_at, '') , created_at LIMIT 1"
+  );
+  return row ? { did: row.e164, source: 'number' } : { did: '', source: 'none' };
+}
+
+/**
+ * VoIP.ms texts US and Canadian numbers, written as NANPA (10 digits) or E.164.
+ * The API call takes NANPA, so a +1 is stripped and anything else is refused in
+ * this platform's own words rather than sent to be rejected by the carrier.
+ */
+const smsDestination = (number) => {
+  const digits = String(number || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
+  if (digits.length === 10) return digits;
+  return '';
+};
+
+/**
+ * One text, from this platform's own DID.
+ *
+ * `did`, `dst` and `message` are the whole of the provider's contract here; the
+ * message ceiling is 160 characters, and a code is far shorter than that. A
+ * longer notice is refused instead of being cut in half, because a truncated
+ * code is worse than no text at all.
+ */
+export async function sendSmsMessage({ to, text, from = '' }) {
+  const sender = String(from || smsFrom().did || '');
+  const did = providerDid(sender);
+  const dst = smsDestination(to);
+  if (!did) {
+    throw badRequest(
+      'No number to text from. Store VOIPMS_SMS_DID in Settings → Text messages — an SMS-enabled DID on the VoIP.ms account.'
+    );
+  }
+  if (!dst) {
+    throw badRequest(
+      'VoIP.ms texts US and Canadian numbers only. Use the handset in international form, for example +1 415 555 0123.'
+    );
+  }
+  const message = String(text || '');
+  if (!message) throw badRequest('A text needs a message');
+  if (message.length > 160) throw badRequest('An SMS is limited to 160 characters');
+
+  const body = await call('sendSMS', { did, dst, message });
+  return { delivered: true, provider: 'voipms', did, dst, raw: body };
 }
 
 /** Release a DID back to the provider. This cannot be undone. */

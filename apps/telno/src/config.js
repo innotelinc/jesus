@@ -288,6 +288,9 @@ export const config = {
     // Where a newly bought DID rings: a routing string such as
     // `account:100001_telno`. Empty means every order has to name one.
     routing: env.VOIPMS_ROUTING || '',
+    // The DID verification codes are texted from. Empty means the first DID
+    // bought through the console is used; the vault value wins over this one.
+    smsDid: env.VOIPMS_SMS_DID || '',
     pop: int(env.VOIPMS_POP, 1),
     // 1 = per minute, 2 = flat monthly. Flat is what an unlimited plan sells.
     billingType: int(env.VOIPMS_BILLING_TYPE, 2),
@@ -333,6 +336,8 @@ export const config = {
     mailjetUrl: env.MAILJET_API_URL || 'https://api.mailjet.com',
     // An operator's choice, normally stored in the vault instead.
     emailProvider: String(env.EMAIL_PROVIDER || '').toLowerCase(),
+    // Which provider texts: voipms, twilio, or empty for "whoever is ready".
+    smsProvider: String(env.SMS_PROVIDER || '').toLowerCase(),
     smtpUrl: env.SMTP_URL || '',
     twilioSid: env.TWILIO_ACCOUNT_SID || '',
     twilioToken: env.TWILIO_AUTH_TOKEN || '',

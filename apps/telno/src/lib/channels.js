@@ -1,5 +1,6 @@
 import { config } from '../config.js';
 import { getSecret } from './vault.js';
+import { sendSmsMessage, smsFrom, voipmsConfigured } from './carriers/voipms.js';
 
 /**
  * Outbound mail and SMS is plug-and-play: the platform picks a provider per
@@ -100,6 +101,48 @@ const twilioChannel = {
     return { delivered: true, provider: 'twilio', id: sent?.sid || null };
   },
 };
+
+/**
+ * SMS from the platform's own DID, which is what an install running on VoIP.ms
+ * wants: the code arrives from the number the customer already knows, and no
+ * second provider has to be paid for a message of sixty characters.
+ */
+const voipmsSmsChannel = {
+  name: 'voipms',
+  async send({ channel, to, code, body }) {
+    if (channel !== 'sms') return { delivered: false, provider: 'voipms', error: 'sms_only' };
+    if (!voipmsConfigured()) return { delivered: false, provider: 'voipms', error: 'voipms_not_configured' };
+    try {
+      const result = await sendSmsMessage({
+        to,
+        text:
+          body ||
+          `Your ${config.directory.canonical} verification code is ${code}. It expires in ${Math.round(
+            config.directory.otpTtlSeconds / 60
+          )} minutes.`,
+      });
+      return { delivered: true, provider: 'voipms', from: `+1${result.did}` };
+    } catch (err) {
+      // The carrier's own reason (an unverified DID, a refused destination) is
+      // the only thing that tells an operator what to change.
+      return { delivered: false, provider: 'voipms', error: err.message };
+    }
+  },
+};
+
+const SMS_PROVIDER_KEY = 'SMS_PROVIDER';
+
+/**
+ * Who an operator asked to text, when they asked. Empty means "whoever is ready".
+ *
+ * Choice beats presence, the same rule email follows: storing Twilio afterwards
+ * does not quietly take the channel back from the DID that was chosen for it.
+ */
+export const smsPreference = () =>
+  String(getSecret(SMS_PROVIDER_KEY) || config.notify.smsProvider || '').toLowerCase();
+
+/** A provider that has everything it needs: credentials and a sender. */
+export const voipmsSmsReady = () => voipmsConfigured() && !!smsFrom().did;
 
 /**
  * One text, for a test send or a notice. Goes through whichever provider the
@@ -332,6 +375,12 @@ export function providerFor(channel) {
   }
   // Stored credentials are enough on their own: a key pasted into Settings must
   // not need a redeploy before a code can reach a handset.
+  const chosen = smsPreference();
+  if (chosen === 'voipms') return voipmsSmsChannel;
+  if (chosen === 'twilio') return twilioChannel;
+  // Nothing chosen: the DID the platform already pays for goes first, and Twilio
+  // stays the alternative for an install that has no number of its own.
+  if (voipmsSmsReady()) return voipmsSmsChannel;
   if (twilioConfigured() || config.notify.channel === 'twilio') return twilioChannel;
   return consoleChannel;
 }
@@ -414,19 +463,46 @@ export const channelStatus = () => {
         },
       },
     },
-    sms: {
-      provider: providerFor('sms').name,
-      configured: twilioConfigured(),
-      source: twilioSource(),
-      // The number codes would come from, so an operator can see which one the
-      // carrier is actually texting as. Never the credentials themselves.
-      from: twilioCredentials().from,
-      // A SID and token without a sender cannot send, and the screen should say
-      // which of the three is missing rather than one flat "not configured".
-      missing: (() => {
-        const { sid, token, from } = twilioCredentials();
-        return [!sid && 'TWILIO_ACCOUNT_SID', !token && 'TWILIO_AUTH_TOKEN', !from && 'TWILIO_FROM'].filter(Boolean);
-      })(),
-    },
+    sms: (() => {
+      const provider = providerFor('sms').name;
+      const sender = smsFrom();
+      const twilio = twilioCredentials();
+      return {
+        provider,
+        configured: provider === 'voipms' ? voipmsSmsReady() : provider === 'twilio' ? twilioConfigured() : false,
+        // What the operator asked for, which may differ from what is delivering.
+        preference: smsPreference(),
+        source: provider === 'voipms' ? sender.source : twilioSource(),
+        // The number codes would come from, so an operator can see which one the
+        // carrier is actually texting as. Never the credentials themselves.
+        from: provider === 'voipms' ? sender.did : twilio.from,
+        // A half-filled configuration has to say which part is missing rather
+        // than one flat "not configured" that leaves the wrong field blamed.
+        missing:
+          provider === 'voipms'
+            ? [
+                !voipmsConfigured() && 'VoIP.ms API username and password (Settings → Numbers from VoIP.ms)',
+                !sender.did && 'VOIPMS_SMS_DID',
+              ].filter(Boolean)
+            : provider === 'twilio'
+              ? [
+                  !twilio.sid && 'TWILIO_ACCOUNT_SID',
+                  !twilio.token && 'TWILIO_AUTH_TOKEN',
+                  !twilio.from && 'TWILIO_FROM',
+                ].filter(Boolean)
+              : ['a VoIP.ms number with SMS enabled, or TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_FROM'],
+        providers: {
+          voipms: { configured: voipmsSmsReady(), from: sender.did, source: sender.source },
+          twilio: {
+            configured: twilioConfigured(),
+            from: twilio.from,
+            source: twilioSource(),
+            missing: [!twilio.sid && 'TWILIO_ACCOUNT_SID', !twilio.token && 'TWILIO_AUTH_TOKEN', !twilio.from && 'TWILIO_FROM'].filter(
+              Boolean
+            ),
+          },
+        },
+      };
+    })(),
   };
 };
