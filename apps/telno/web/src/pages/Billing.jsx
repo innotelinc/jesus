@@ -329,17 +329,77 @@ export default function Billing() {
     }
   };
 
-  /** Re-read the webhook's event list. Cheap: one Stripe read, no probe. */
+  /**
+   * Re-read the webhook's event list. Cheap: one Stripe read, no probe.
+   *
+   * A single unanswered read is not evidence of anything: this host's DNS has
+   * blackholed api.stripe.com for a second and then resolved it fine, and a
+   * strip that flashes on every blip teaches people to ignore it. So an
+   * unreachable answer is asked once more before it is published, and only a
+   * network that stays down gets to put a warning on the screen.
+   */
   const refreshWebhook = async () => {
+    const read = () => api.get('/billing/payments/webhook').then((data) => data.webhook).catch(() => null);
     try {
-      const data = await api.get('/billing/payments/webhook');
-      setWebhook(data.webhook);
+      let next = await read();
+      if (next?.state === 'unreachable') {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        next = await read();
+      }
+      if (next) setWebhook(next);
     } catch {
-      // The strip is a convenience. A read that fails because Stripe is down is
-      // already described by the strip's own text, so it must not raise a toast
-      // over the work the operator came here to do.
+      // The strip is a convenience. A read that fails is already described by
+      // the strip's own text, so it must not raise a toast over the work the
+      // operator came here to do.
     }
   };
+
+  /**
+   * Keep the strip honest while the screen is open.
+   *
+   * The endpoint's event list lives in Stripe's dashboard, so it can change
+   * without anything here noticing: someone tidies the list, or a paused
+   * endpoint stays paused, and the first sign is a month of plan charges that
+   * never reached a customer. Reloading the page was the only way to find out.
+   *
+   * The poll is deliberately modest. It runs only while this screen is mounted
+   * and only while the tab is visible — a Billing tab left open overnight in a
+   * background window asks Stripe nothing. It re-reads immediately when the tab
+   * comes back, which is the moment someone is looking at it again. Ticks are
+   * chained rather than set on an interval, so a slow answer cannot stack
+   * requests, and a deployment with no Stripe key answers from memory without
+   * calling Stripe at all.
+   */
+  useEffect(() => {
+    const POLL_MS = 60_000;
+    let timer = null;
+    let stopped = false;
+
+    const tick = async () => {
+      if (document.visibilityState === 'visible') await refreshWebhook();
+      if (!stopped) timer = setTimeout(tick, POLL_MS);
+    };
+
+    timer = setTimeout(tick, POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      clearTimeout(timer);
+      // Come back with a current answer, then resume the cadence.
+      refreshWebhook().finally(() => {
+        if (!stopped) timer = setTimeout(tick, POLL_MS);
+      });
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    // refreshWebhook only calls setWebhook, so the first render's copy is enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Close the gap the test just reported.

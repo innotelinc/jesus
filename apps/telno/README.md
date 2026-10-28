@@ -541,6 +541,12 @@ one press and not a hunt through a dialog. A paused endpoint, a webhook still on
 without webhook read access and a host that cannot reach Stripe each say so in their own words, since
 their fixes are in different places. A healthy endpoint draws nothing at all.
 
+It keeps reading, so a change made in the Stripe dashboard shows up without a reload: once a minute
+while the screen is open and the tab is visible, and immediately when the tab comes back. A hidden tab
+asks Stripe nothing. A single unanswered read is retried before it is allowed to warn — this host has
+blackholed `api.stripe.com` for a second and then resolved it fine, and a strip that flashes on every
+blip teaches people to ignore it.
+
 ### Devices check themselves in
 
 Every handset, gateway, ATA or door phone gets a `dv_…` token when it is added on the Estate screen

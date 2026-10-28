@@ -422,6 +422,8 @@ button, input, select, textarea {
   border: 1px solid rgba(251, 191, 36, 0.32);
   background: var(--warning-soft);
   color: var(--text);
+  /* It can arrive on its own now that the page polls, so it should not pop. */
+  animation: rise 200ms ease-out;
 }
 .inline-notice.good { border-color: rgba(52, 211, 153, 0.3); background: var(--success-soft); }
 .inline-notice.bad { border-color: rgba(251, 113, 133, 0.32); background: var(--danger-soft); }
