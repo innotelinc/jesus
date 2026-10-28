@@ -20,6 +20,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # The oldest Perl this stack claims to support. The README says so, the pump
+  # job installs exactly it, and a step below refuses to let the two drift.
+  PERL_MIN: "5.16"
+
 jobs:
   suite:
     name: Conformance suite (perl ${{ matrix.perl }})
@@ -53,6 +58,53 @@ jobs:
           perl -Ilib bin/cantus encode hello >/dev/null
           perl -Ilib bin/cantus route-test examples/routes.json >/dev/null
           echo "cli: ok"
+
+  # The pump contract is the one interface the suite's own timing depends on:
+  # `pump(0)` must drain and return, or the harness goes back to waiting inside
+  # five components and the relay starves behind its own queue. That regression
+  # is invisible in a passing suite -- it shows up as flaky timings -- so it gets
+  # its own job on the oldest Perl we support rather than being one file inside
+  # a matrix that only runs current releases.
+  pump:
+    name: Pump contract on the minimum Perl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install the minimum Perl
+        id: perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ env.PERL_MIN }}
+
+      - name: Fail if a newer Perl was substituted
+        # A min-version job that quietly runs a current perl proves nothing, so
+        # the resolved version is checked rather than trusted.
+        run: |
+          set -euo pipefail
+          got="${{ steps.perl.outputs['perl-version'] }}"
+          perl -V:version
+          case "$got" in
+            "${PERL_MIN}"*) echo "running perl $got, as required" ;;
+            *) echo "::error::expected perl ${PERL_MIN}.x, the action resolved '$got'"
+               exit 1 ;;
+          esac
+
+      - name: The README claim and the enforced minimum must agree
+        # Otherwise the badge drifts to a version this job does not test, or the
+        # minimum moves while the README keeps advertising the old one.
+        run: |
+          set -euo pipefail
+          grep -q "Perl ${PERL_MIN}+" README.md || {
+            echo "::error::README no longer claims Perl ${PERL_MIN}+ — fix the claim or the minimum"
+            exit 1
+          }
+          echo "README claim matches CI: Perl ${PERL_MIN}+"
+
+      - name: Run the pump contract test
+        run: prove -v -Ilib t/15-pump.t
 
   structure:
     name: Repository structure

@@ -892,6 +892,13 @@ a blocking pump cannot be timed by this suite, because the harness would spend
 its budget waiting inside components rather than between them. Expose the drain
 budget and the tests measure the protocol instead of the scheduler.
 
+The reference stack pins the contract in `t/15-pump.t`, and CI runs that file on
+the oldest Perl the stack supports, not only on current releases. The reason is
+that a drain degrading to a single `read` — or to a blocking wait — leaves every
+assertion in the suite passing and only makes the timings flaky, so the failure
+has to be caught where it is cheap to read rather than traced through a media
+gap later.
+
 ---
 
 ## Appendix A — Message summary
