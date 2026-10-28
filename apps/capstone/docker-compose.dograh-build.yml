@@ -1,0 +1,87 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Capstone — OPTIONAL build-from-source override for dograh api + ui
+#
+# By default the stack runs the prebuilt ghcr.io/innotelinc/dograh-api and
+# ghcr.io/innotelinc/dograh-ui images. Use this file to build BOTH the api
+# and ui from the dograh source (cloned by ./scripts/setup.sh into
+# dograh/upstream) when those images aren't published yet.
+#
+# One-time preparation (the api image build needs the pipecat submodule and
+# takes 15-25 minutes; the ui build needs npm and also takes a while):
+#
+#   git -C dograh/upstream submodule update --init --recursive
+#
+# Nothing else is needed: our fixes to dograh are commits on innotelinc/dograh
+# main, so the clone already carries them (OIDC session handling, the workflow
+# pages, the memory-capped UI build). They used to be patches applied by
+# scripts/apply-dograh-patches.sh; see innotelinc/dograh FORKING.md.
+#
+# On a memory-constrained host the UI build can be capped instead of being
+# OOM-killed (Next's webpack pass and its type-check are run sequentially):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     build --build-arg NODE_BUILD_HEAP_MB=3072 dograh-ui
+#
+# Build + start dograh-api and dograh-ui from that source (the rest of the
+# stack is unaffected — keep using docker-compose.yml):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     up -d --build dograh-api dograh-ui
+#
+# While this override file is on the compose command, the locally built images
+# (tagged dograh-local/dograh-api:capstone / dograh-local/dograh-ui:capstone)
+# replace the pulled images.
+#
+# ── MEASURED: the Capstone host builds the UI itself (2026-10-16) ────────────
+# This file used to say "build the UI on a host with room (.46) and ship the
+# image", because on .30 the build died at the same point every time — ~117 s
+# in, during webpack's PackFileCacheStrategy pass, right after "Creating an
+# optimized production build" — with exit 137 (SIGKILL) while the host had
+# ~13 GB free, and freeing 10 GB by hand did not move the failure point. That
+# is the signature of webpack's *cache*, not of memory, and the fix is in the
+# tree: `ui/Dockerfile` sets NEXT_BUILD_FS_CACHE=0, so the build holds no
+# in-memory generation of every module.
+#
+# Re-measured on .30 (2 cores / 13 GiB) with the stack stopped and the heap
+# capped — the same command the docs give:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     build --build-arg NODE_BUILD_HEAP_MB=2048 dograh-ui
+#   # npm ci 92 s, next build ~3 min, 285 MB image, 6 min 05 s end to end,
+#   # exit 0 — no kill, no OOM
+#
+# So build it here: a host that runs this repo needs no shipping step at all.
+# Keep the "one at a time" rule — the api build is pip/uv, and both at once
+# still exceeds what a 13 GiB host wants to give.
+#
+# ── MEASURED: the dev container is capped too (2026-09-28) ──────────────────
+# `development` runs inside a 4 GiB cgroup (the post-incident limits), and the
+# UI build hit the same wall there: cgroup OOM at a 4.4 GiB peak, right after
+# "Creating an optimized production build". The cause is webpack's persistent
+# cache — Next sets `maxMemoryGenerations: Infinity` for production, so one
+# in-memory generation of every module is held for the whole build — and an
+# image build gets nothing from a cache that dies with its layer. ui/Dockerfile
+# now sets NEXT_BUILD_FS_CACHE=0; with that and a heap cap
+# the build fits the 4 GiB container with nothing else stopped:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dograh-build.yml \
+#     build --build-arg NODE_BUILD_HEAP_MB=2048 dograh-ui    # ~6 min, no OOM
+#
+# The same command builds it on the Capstone host too (measurement above), so
+# the image only has to be shipped to a host that cannot build it at all.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  dograh-api:
+    build:
+      context: ./dograh/upstream
+      dockerfile: api/Dockerfile
+    image: dograh-local/dograh-api:capstone
+    pull_policy: build
+
+  dograh-ui:
+    build:
+      context: ./dograh/upstream
+      dockerfile: ui/Dockerfile
+    image: dograh-local/dograh-ui:capstone
+    pull_policy: build

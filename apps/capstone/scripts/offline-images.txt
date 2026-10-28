@@ -1,0 +1,32 @@
+# Capstone core platform images for the offline bundle.
+# "capstone-n8n-otel:local", "capstone-dashboard:local" and
+# "capstone-dashboard-api:local" are built locally from their Dockerfiles
+# (capstone-workflow-studio:local is built the same way — add it here if you
+# need the Workflow Studio offline).
+
+pgvector/pgvector:pg17
+redis:7
+# ghcr.io/innotelinc/capstone/minio is the repo mirror of the community CE
+# build pgsty/minio (published by the release workflow; upstream minio/minio is
+# no longer anonymously pullable — see docker-compose.yml minio service).
+ghcr.io/innotelinc/capstone/minio:RELEASE.2026-08-04T00-00-00Z
+coturn/coturn:latest
+ghcr.io/innotelinc/dograh-api:latest
+ghcr.io/innotelinc/dograh-ui:latest
+ghcr.io/innotelinc/pbx-portal:latest-fullstack
+ghcr.io/remsky/kokoro-fastapi-cpu:latest
+ghcr.io/speaches-ai/speaches:latest-cpu
+diegosouzapw/omniroute:latest
+ghcr.io/goauthentik/server:2025.6.3
+docker.io/library/postgres:16-alpine
+docker.io/library/redis:7-alpine
+capstone-n8n-otel:local
+capstone-dashboard:local
+capstone-dashboard-api:local
+
+# `healthprobe` copies busybox out of this image into the `probe-bin` volume that
+# the oauth2-proxy healthchecks execute. The compose file runs with --pull=never,
+# so a host that does not already have it fails the whole boot on
+# `No such image: gcr.io/distroless/static-debian12:debug` — and that failure
+# used to loop forever under Restart=on-failure.
+gcr.io/distroless/static-debian12:debug

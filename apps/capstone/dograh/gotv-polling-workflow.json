@@ -1,0 +1,89 @@
+{
+  "name": "Get Out The Vote Poll",
+  "nodes": [
+    {
+      "id": "node-global",
+      "type": "globalNode",
+      "position": { "x": 0, "y": 360 },
+      "data": {
+        "name": "Pollster Persona",
+        "prompt": "You are a courteous, neutral Voter Assistance agent conducting a get-out-the-vote poll for {{initial_context.organization | fallback:our organization}}. Always speak in short, natural sentences — this is a phone call. Stay nonpartisan, respectful, and factual. Never argue with the respondent, never endorse a candidate, and respect anyone who asks to be removed."
+      }
+    },
+    {
+      "id": "node-trigger",
+      "type": "trigger",
+      "position": { "x": 0, "y": 120 },
+      "data": {
+        "name": "GOTV Poll Trigger",
+        "enabled": true,
+        "trigger_path": "gotv-poll"
+      }
+    },
+    {
+      "id": "node-start",
+      "type": "startCall",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "name": "Introduce & Consent",
+        "greeting_type": "text",
+        "greeting": "Hi {{initial_context.voter_name | fallback:there}}, this is {{initial_context.agent_name | fallback:Alex}} with a short nonpartisan voter check on behalf of {{initial_context.organization | fallback:our organization}}. It'll only take a minute — may I continue?",
+        "prompt": "# Role\nYou are starting a nonpartisan get-out-the-vote poll.\n\n# Consent\n- Ask if now is a good time; if not, offer to call back later or politely END THE CALL.\n- If they say they are on a do-not-call list or ask to stop, apologize and END THE CALL immediately.\n\n# Rules\n- Remain neutral; no candidate endorsement.\n\n# If they agree\n- Thank them and begin the poll questions (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "delayed_start": false,
+        "delayed_start_duration": 2,
+        "extraction_enabled": true,
+        "pre_call_fetch_mode": "disabled"
+      }
+    },
+    {
+      "id": "node-questions",
+      "type": "agentNode",
+      "position": { "x": 300, "y": 0 },
+      "data": {
+        "name": "Ask Voter Questions",
+        "prompt": "# Role\nYou are the pollster asking a short set of voter questions for {{initial_context.organization | fallback:our organization}}.\n\n# Questions (ask one at a time)\nUse {{initial_context.questions | fallback:this default set}} if provided; otherwise ask:\n1. Do you plan to vote in the upcoming election?\n2. Do you know where your polling place is, or do you plan to vote by mail?\n3. Is there anything that might keep you from voting?\n4. If asked, can briefly share nonpartisan voting/registration information per {{initial_context.resources | fallback:your available resources}}.\n\n# Rules\n- Neutral and helpful; answer practical questions (deadlines, location, mail-in) when you can.\n- Do not discuss candidates or endorse anything.\n- Respect a desire to end the call.\n\n# When done\nThank them and move to close (next node).",
+        "allow_interrupt": true,
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    },
+    {
+      "id": "node-close",
+      "type": "endCall",
+      "position": { "x": 600, "y": 0 },
+      "data": {
+        "name": "Thank & Close",
+        "prompt": "# Role\nYou are the pollster closing the call.\n\n# Closing\n- Thank the respondent for their time.\n- Optionally remind them of the next key date (per initial_context.deadline if provided) without endorsing anything.\n- Keep it to 1-2 sentences, then END THE CALL.",
+        "add_global_prompt": true,
+        "extraction_enabled": true
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-questions",
+      "source": "node-start",
+      "target": "node-questions",
+      "data": {
+        "label": "consent_given",
+        "condition": "The respondent agreed to continue and you've begun the poll questions.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    },
+    {
+      "id": "edge-questions-close",
+      "source": "node-questions",
+      "target": "node-close",
+      "data": {
+        "label": "poll_complete",
+        "condition": "The poll questions are asked and you're ready to thank the respondent and close.",
+        "transition_speech": "",
+        "transition_speech_type": "text"
+      }
+    }
+  ],
+  "viewport": { "x": 0, "y": 0, "zoom": 1 }
+}

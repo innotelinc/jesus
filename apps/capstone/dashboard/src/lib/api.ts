@@ -1,0 +1,529 @@
+import type {
+  Service,
+  Port,
+  Secret,
+  Alert,
+  User,
+  ResourceLink,
+  HealthMatrixEntry,
+  Incident,
+  ConfigPolicy,
+  AuditEntry,
+  DashboardStats,
+  Entitlement,
+  StackAccessStatus,
+  PbxRecovery,
+} from '../types';
+import { dashboardBaseUrl } from './config';
+import type { Verdict } from './utils';
+
+async function getJSON<T>(path: string): Promise<T> {
+  const response = await fetch(`${dashboardBaseUrl}${path}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (response.status === 401) {
+    // Cerulean gate: no (or expired) session → send the user through the
+    // Authentik login flow, then back to the page they were on.
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
+  if (!response.ok) {
+    throw new Error(`Dashboard API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE'): Promise<T> {
+  const response = await fetch(`${dashboardBaseUrl}${path}`, {
+    method,
+    headers: { Accept: 'application/json' },
+  });
+  if (response.status === 401) {
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail || `Dashboard API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function postJSON<T>(path: string, body: unknown, method = 'POST'): Promise<T> {
+  const response = await fetch(`${dashboardBaseUrl}${path}`, {
+    method,
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (response.status === 401) {
+    window.location.href = `${dashboardBaseUrl}/auth/login?next=${encodeURIComponent(window.location.pathname)}`;
+    throw new Error('Session required');
+  }
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null);
+    throw new Error(detail?.detail || `Dashboard API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function deleteJSON<T>(path: string): Promise<T> {
+  return sendJSON<T>(path, 'DELETE');
+}
+
+export interface ServiceLogs {
+  service: string;
+  lines: string[];
+}
+
+export interface PbxExtension {
+  extension: string;
+  callerId: string;
+  /** False when the auth section is missing — the device cannot sign in. */
+  hasPassword: boolean;
+  authUser: string;
+  registered?: boolean;
+  contactUri?: string | null;
+  builtIn?: boolean;
+  dids?: string[];
+  /**
+   * Completeness of the three pjsip sections this extension is made of. The
+   * AOR is restored on load; a missing auth section is reported, because its
+   * password cannot be reconstructed.
+   */
+  pbx?: {
+    status: 'provisioned' | 'partial';
+    auth?: boolean;
+    aor?: boolean;
+    detail?: string;
+  };
+}
+
+export interface PbxExtensionUpdate {
+  callerId?: string;
+  password?: string;
+  dids?: string[];
+}
+
+export interface ExtensionCall {
+  time: string;
+  src: string;
+  dst: string;
+  direction: 'in' | 'out';
+  peer: string;
+  disposition: string;
+  durationSeconds: number;
+  billableSeconds: number;
+  viaChannel: string;
+}
+
+export interface PbxExtensionCreate {
+  extension: string;
+  password: string;
+  callerId?: string;
+  dids?: string[];
+}
+
+export interface Agent {
+  id: number;
+  extension: string;
+  address: string;
+  label: string;
+  workflowId?: number | null;
+  workflowName?: string;
+  active: boolean;
+  pbx?: {
+    status: 'provisioned' | 'partial' | 'not-provisioned' | 'error';
+    customExtension?: boolean | null;
+    inboundRoute?: boolean | null;
+    dialplan?: boolean | null;
+    detail?: string | null;
+  };
+}
+
+export interface AgentWorkflow {
+  id: number;
+  name: string;
+  status?: string;
+}
+
+/** A prompt-bearing node of a dograh workflow (editable without the canvas). */
+export interface WorkflowNode {
+  id: string;
+  type: string;
+  name: string;
+  prompt: string;
+  greeting?: string;
+}
+
+export interface Workflow {
+  id: number;
+  name: string;
+  status?: string;
+  nodes?: WorkflowNode[];
+  /** Seconds until dograh ends the call; 0 = no limit; null = dograh's default. */
+  maxCallDuration?: number | null;
+}
+
+export type WorkflowMode = 'ai' | 'guided' | 'blank';
+
+export interface WorkflowCreate {
+  name: string;
+  mode: WorkflowMode;
+  description?: string;
+  role?: string;
+  goal?: string;
+  prompt?: string;
+  useCase?: string;
+}
+
+export interface WorkflowUpdate {
+  name?: string;
+  nodes?: Array<{ id: string; name?: string; prompt?: string; greeting?: string }>;
+  /** Seconds until dograh ends the call; 0 = no limit. Omitted = unchanged. */
+  maxCallDuration?: number;
+}
+
+export interface WorkflowStatusUpdate {
+  status: 'active' | 'archived';
+  /** Archive even when agents are still bound (they keep the binding, unused). */
+  force?: boolean;
+}
+
+/** How (or whether) a dograh workflow's calls get graded. */
+export interface WorkflowGrading {
+  /** false only when the workflow's state couldn't be read at all. */
+  available: boolean;
+  /** false when the workflow has no post-call webhook; enabling adds one. */
+  has_webhook: boolean;
+  enabled: boolean;
+  /** custom = a generated plan, builtin = the grader's track rubric, off = skipped. */
+  mode: 'custom' | 'builtin' | 'off' | 'none';
+  endpoint: string;
+  /** false when the webhook node itself is switched off in dograh's canvas. */
+  webhook_enabled?: boolean;
+  /** The generated rubric (empty on the built-in rubric). */
+  plan: string;
+  meta: {
+    title?: string;
+    dimensions?: Array<{ key: string; label: string; weight: number | null }>;
+    pass_score?: number | null;
+    review_score?: number | null;
+    model?: string;
+    generated_at?: string;
+  };
+  error?: string;
+}
+
+export interface GradableWorkflow extends AgentWorkflow {
+  grading: WorkflowGrading;
+}
+
+export interface GradingUpdate {
+  enabled?: boolean;
+  /** Write a fresh plan even when one already exists. */
+  regenerate?: boolean;
+}
+
+export interface GradingResult {
+  id: number;
+  name: string;
+  /** true when enabling grading appended the grader's webhook to the workflow. */
+  addedWebhook?: boolean;
+  grading: WorkflowGrading;
+}
+
+/** Dialplan → ARI wiring health for Control-Center-created numbers. */
+export interface StasisHealth {
+  /** The Stasis app the generated dialplan routes into (dograh_<hex>). */
+  expected: string;
+  /** ARI applications Asterisk currently has registered. */
+  registered: string[];
+  /** true = wired up, false = mismatch (calls drop), null = couldn't check. */
+  ok: boolean | null;
+  /** Agent extensions outside the static 8000-8007 set. */
+  dynamicExtensions: string[];
+  detail?: string;
+}
+
+export type DeployMode = 'standalone' | 'addon';
+
+export interface DeployModePbx {
+  container: string | null;
+  /** running / exited / created / absent — `absent` means compose never made it. */
+  state: string;
+}
+
+/** The PBX this deployment is in, and what the host has to work with. */
+export interface DeployModeState {
+  mode: DeployMode;
+  /** The boot-time default from .env, which the switch overrides. */
+  envMode: DeployMode;
+  /** true when the mode came from the switch's own record, not from .env. */
+  recorded: boolean;
+  statePath: string;
+  pbx: { shared: DeployModePbx; bundled: DeployModePbx };
+  applied?: boolean;
+  previous?: DeployMode;
+  persisted?: boolean;
+  warnings?: string[];
+  /** Set when the switch needs the host (a container compose never created). */
+  command?: string | null;
+  detail?: string;
+}
+
+export type SmsTransport = 'zeus' | 'opensms' | 'auto';
+export type SmsTransportChoice = 'provider' | 'local' | 'auto';
+
+/** Provider vs local SMS, and what this host has configured for each. */
+export interface SmsTransportState {
+  transport: SmsTransport;
+  /** Where the choice came from: env > state (this card) > .env default. */
+  source: 'env' | 'state' | 'dotenv' | 'default';
+  statePath: string;
+  choices: SmsTransport[];
+  opensms: { configured: boolean; url: string };
+  zeus: { configured: boolean; url: string };
+  saved?: boolean;
+}
+
+/**
+ * One SMS in a conversation. Inbound rows come from the phone's poller and
+ * carry `from`/`received_at`; replies sent from this page carry `to`/`sent_at`.
+ * Rows written before the inbox existed have no `direction` — treat those as
+ * inbound, which is what the log was until then.
+ */
+export interface SmsMessage {
+  id: string;
+  direction?: 'in' | 'out';
+  from?: string;
+  to?: string;
+  body: string;
+  received_at?: string;
+  sent_at?: string;
+  sim?: number;
+  transport?: string;
+  status?: string;
+}
+
+/** The inbound log plus the answers sent from this Control Center. */
+export interface SmsInboxState {
+  /** False when CAPSTONE_SMS_INBOUND_TOKEN is unset (the phone cannot post). */
+  enabled: boolean;
+  token_set: boolean;
+  count: number;
+  messages: SmsMessage[];
+}
+
+export interface SmsSendResult {
+  ok: boolean;
+  to: string;
+  /** 'modem' or 'pjsip' — which path the phone actually used. */
+  transport: string;
+  status: string;
+  /** False when the reply was sent but could not be appended to the log. */
+  recorded: boolean;
+}
+
+/** Whether the local gateway can actually send right now (modem, SIM, signal). */
+export interface SmsGatewayHealth {
+  configured: boolean;
+  url: string;
+  health: {
+    ok: boolean;
+    backend?: string | null;
+    detail?: string;
+    signal?: number | null;
+    operator?: string | null;
+  };
+}
+
+export interface AgentsResponse {
+  mode: DeployMode;
+  configured: boolean;
+  agents: Agent[];
+  stasis?: StasisHealth;
+  /** Present when this load brought a stopped PBX container back. */
+  pbxAutoStart?: { startedAt: string; waitedSeconds: number };
+  error?: string;
+}
+
+export interface AgentCreate {
+  address: string;
+  label: string;
+  workflowId?: number | null;
+}
+
+export interface AgentUpdate {
+  label?: string;
+  workflowId?: number | null;
+  active?: boolean;
+}
+
+export interface DimensionScore {
+  name: string;
+  score: number | null;
+  evidence: string;
+}
+
+export interface InterviewReport {
+  id: number;
+  track: string;
+  trackLabel: string;
+  prospect: string;
+  phone: string;
+  runId: string;
+  score: number | null;
+  verdict: Verdict;
+  dimensions: DimensionScore[];
+  strengths: string[];
+  improvements: string[];
+  transcript: string;
+  parseError: string;
+  /** Which grading plan scored this call (absent on pre-Rubric-column rows). */
+  rubric?: Partial<ReportRubric>;
+  /** Soft-deleted from the Control Center: kept in Grist, restorable. */
+  deleted: boolean;
+}
+
+/** The rubric a report was graded with, as stamped by the n8n grader. */
+export interface ReportRubric {
+  /** `plan` = a generated plan; `builtin` = the grader's per-track rubric. */
+  source: 'plan' | 'builtin';
+  title: string;
+  model: string;
+  generatedAt: string;
+  passScore: number | null;
+  reviewScore: number | null;
+  dimensions: Array<{ key: string; label: string; weight: number | null }>;
+}
+
+export interface InterviewReportsResponse {
+  configured: boolean;
+  docId: string;
+  reports: InterviewReport[];
+  error?: string;
+}
+
+/** Result of a delete / restore / purge over interview reports. */
+export interface InterviewReportWrite {
+  status: string;
+  ids: number[];
+  count: number;
+}
+
+export interface Me {
+  authenticated: boolean;
+  name: string | null;
+  email: string | null;
+}
+
+export interface AlertEscalation {
+  reason?: string;
+  assignTo?: string;
+}
+
+export const api = {
+  me: () => getJSON<Me>('/auth/me'),
+  services: () => getJSON<Service[]>('/services'),
+  ports: () => getJSON<Port[]>('/ports'),
+  secrets: () => getJSON<Secret[]>('/secrets'),
+  alerts: () => getJSON<Alert[]>('/alerts'),
+  acknowledgeAlert: (id: string) =>
+    sendJSON<Alert>(`/alerts/${encodeURIComponent(id)}/acknowledge`, 'POST'),
+  resolveAlert: (id: string) =>
+    sendJSON<Alert>(`/alerts/${encodeURIComponent(id)}/resolve`, 'POST'),
+  escalateAlert: (id: string, body: AlertEscalation) =>
+    postJSON<Alert>(`/alerts/${encodeURIComponent(id)}/escalate`, body),
+  users: () => getJSON<User[]>('/users'),
+  links: () => getJSON<ResourceLink[]>('/links'),
+  health: () => getJSON<HealthMatrixEntry[]>('/health'),
+  /** PBX self-healing state + recovery history, on its own poll cadence. */
+  pbxHealth: () => getJSON<PbxRecovery>('/pbx/health'),
+  /** Per-stack SSO / access inventory from the Cerulean Authentik instance. */
+  authentikAccess: () => getJSON<StackAccessStatus>('/authentik/access'),
+  incidents: () => getJSON<Incident[]>('/incidents'),
+  policies: () => getJSON<ConfigPolicy[]>('/policies'),
+  audit: () => getJSON<AuditEntry[]>('/audit'),
+  stats: () => getJSON<DashboardStats>('/stats'),
+  entitlements: () => getJSON<Entitlement>('/entitlements'),
+  serviceLogs: (id: string, tail = 200) =>
+    getJSON<ServiceLogs>(`/services/${encodeURIComponent(id)}/logs?tail=${tail}`),
+  restartService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/restart`, 'POST'),
+  startService: (id: string) => sendJSON<{ status: string; service: string }>(`/services/${encodeURIComponent(id)}/start`, 'POST'),
+  extensions: () => getJSON<PbxExtension[]>('/extensions'),
+  createExtension: (body: PbxExtensionCreate) =>
+    postJSON<{ status: string; extension: string }>('/extensions', body),
+  updateExtension: (ext: string, body: PbxExtensionUpdate) =>
+    postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`, body, 'PATCH'),
+  deleteExtension: (ext: string) =>
+    deleteJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}`),
+  rotateExtensionPassword: (ext: string, password: string) =>
+    postJSON<{ status: string; extension: string }>(`/extensions/${encodeURIComponent(ext)}/password`, { password }),
+  extensionCalls: (ext: string) =>
+    getJSON<ExtensionCall[]>(`/extensions/${encodeURIComponent(ext)}/calls`),
+  agents: () => getJSON<AgentsResponse>('/agents'),
+  agentWorkflows: () => getJSON<AgentWorkflow[]>('/agents/workflows'),
+  /** Which PBX this deployment reads and writes (standalone vs Zeus add-on). */
+  deployMode: () => getJSON<DeployModeState>('/deploy-mode'),
+  setDeployMode: (mode: DeployMode) => postJSON<DeployModeState>('/deploy-mode', { mode }),
+  /** Provider (Zeus) vs local (OpenSMS) SMS for every agent and script. */
+  smsTransport: () => getJSON<SmsTransportState>('/sms-transport'),
+  /** Live modem status from the local gateway (separate so it never blocks). */
+  smsGateway: () => getJSON<SmsGatewayHealth>('/sms-gateway'),
+  setSmsTransport: (transport: SmsTransportChoice) =>
+    postJSON<SmsTransportState>('/sms-transport', { transport }),
+  /** Replies the phone received, plus the answers already sent from here. */
+  smsInbox: (limit = 200) => getJSON<SmsInboxState>(`/sms-inbound?limit=${limit}`),
+  /** Answer through the phone that received the message (not `SMS_PROVIDER`). */
+  sendSms: (to: string, body: string) => postJSON<SmsSendResult>('/sms-outbound', { to, body }),
+  workflows: () => getJSON<AgentWorkflow[]>('/workflows'),
+  workflow: (id: number) => getJSON<Workflow>(`/workflows/${id}`),
+  createWorkflow: (body: WorkflowCreate) => postJSON<Workflow>('/workflows', body),
+  updateWorkflow: (id: number, body: WorkflowUpdate) =>
+    postJSON<Workflow>(`/workflows/${id}`, body, 'PUT'),
+  setWorkflowStatus: (id: number, body: WorkflowStatusUpdate) =>
+    postJSON<Workflow>(`/workflows/${id}/status`, body, 'PUT'),
+  /** Which workflows get graded + the plan each one is graded with. */
+  gradingWorkflows: () => getJSON<{ workflows: GradableWorkflow[] }>('/grading/workflows'),
+  enableGrading: (id: number, body: GradingUpdate = {}) =>
+    postJSON<GradingResult>(`/grading/workflows/${id}`, body),
+  disableGrading: (id: number) =>
+    deleteJSON<GradingResult>(`/grading/workflows/${id}`),
+  createAgent: (body: AgentCreate) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>('/agents', body),
+  updateAgent: (id: number, body: AgentUpdate) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}`, body, 'PUT'),
+  /** Re-apply one agent's FreePBX rows without changing the agent (repairs Partial). */
+  syncAgent: (id: number) =>
+    postJSON<{ agent: Agent; mode: string; warnings: string[] }>(`/agents/${id}/sync`, {}),
+  deleteAgent: (id: number) =>
+    deleteJSON<{ status: string; id: number; warnings: string[] }>(`/agents/${id}`),
+  /** Un-park the ARI config and re-assert the dialplan's Stasis app name. */
+  recoverStasis: () =>
+    postJSON<{ status: 'recovered' | 'pending'; app: string; registered: string[]; warnings: string[] }>(
+      '/agents/stasis/recover', {},
+    ),
+  /** Deleted rows are hidden unless `includeDeleted` (the reports page toggle). */
+  interviewReports: (includeDeleted = false) =>
+    getJSON<InterviewReportsResponse>(
+      includeDeleted ? '/interviews/reports?includeDeleted=1' : '/interviews/reports',
+    ),
+  deleteInterviewReport: (id: number) =>
+    deleteJSON<{ status: string; id: number }>(`/interviews/reports/${id}`),
+  deleteInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/delete', { ids }),
+  restoreInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/restore', { ids }),
+  purgeInterviewReports: (ids: number[]) =>
+    postJSON<InterviewReportWrite>('/interviews/reports/purge', { ids }),
+};
+
+/**
+ * Indicates whether the aggregator is configured at all. When it isn't
+ * (local development without a backend), consumers transparently fall back to
+ * sample data instead of flashing errors.
+ */
+export function isBackendConfigured(): boolean {
+  return dashboardBaseUrl.trim().length > 0;
+}

@@ -1,0 +1,75 @@
+[Unit]
+Description=Capstone Voice AI Agent Platform
+Documentation=https://capstone.innotel.us
+Requires=docker.service
+After=docker.service network-online.target
+
+# A failure no retry can fix must not become a restart loop. Each cycle
+# re-runs `docker compose up -d`, which restarts the n8n importer too —
+# its CLI holds a full core for ~25 s. OBSERVED 2026-10-20: a missing
+# healthprobe image looped for hours and halved TTS synthesis speed.
+# Give up after five attempts in five minutes (both go in [Unit]:
+# StartLimitIntervalSec is read from [Unit] only).
+StartLimitIntervalSec=300
+StartLimitBurst=5
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# WorkingDirectory is rewritten to the real repo root at install time by
+# scripts/install-capstone.sh (install_service). Do not hard-code a host path —
+# a stale path here is why the unit refused to start for anyone who moved the
+# repo (docker compose runs relative to this directory, so it needs .env too).
+WorkingDirectory=/PATH/TO/CAPSTONE
+
+# The boot sequence lives in the repo (scripts/boot-stack.sh), not in ExecStart
+# lines, because which services this unit may start depends on how the host is
+# laid out: the voice platform usually runs as its own compose project
+# (`dograh`), which already owns postgres/redis/minio/dograh-api/dograh-ui/
+# speaches/grist — naming those here makes compose abort on a container-name or
+# port collision *before reaching any service*, and a standalone install instead
+# needs the whole file started. The script picks the right shape, reads the
+# vault-resolved env file, and passes --pull=never so a boot never depends on
+# registry access.
+# Optional host file: `CAPSTONE_BOOT_SERVICES="<space-separated services>"`
+# replaces the list this repo curates, so a host with a different working set
+# (or a deliberately-down service) does not have to edit the unit or the script.
+# The leading `-` is what keeps a missing file from failing the unit.
+EnvironmentFile=-/etc/capstone/boot.env
+ExecStart=/usr/bin/env bash scripts/boot-stack.sh
+
+# Same project, same env file: stop is `docker compose down --remove-orphans` for
+# this stack. The voice platform's project is deliberately left running, exactly
+# as it was when this unit stopped it by hand.
+ExecStop=/usr/bin/env bash scripts/boot-stack.sh --stop
+
+# If any container crashes after boot, restart the whole stack.
+# Docker compose itself is idempotent — already-running services
+# are left alone, only dead ones are recreated.
+Restart=on-failure
+RestartSec=15s
+
+# A failure that no retry can fix must not turn into a 15-second loop. Each
+# cycle below re-runs `docker compose up -d`, which restarts every one-shot in
+# the stack — and the n8n importer, whose `n8n import:workflow` CLI runs for ~25 s
+# at a full core, is one of them. OBSERVED 2026-10-20: `healthprobe`'s image
+# (`gcr.io/distroless/static-debian12:debug`) was missing, every boot failed on
+# it, and the loop ran for hours on a 2-vCPU box — it held one core permanently
+# and roughly halved TTS synthesis speed. Give up after five attempts in five
+# minutes so `systemctl status` shows the failure instead of hiding it in a
+# spinning journal.
+
+# Generous: a cold boot ends in `up -d --wait`, and FreePBX alone has
+# start_period=60s plus a final `core restart now` that can push its first
+# healthy past 90s. A rebuilt container image (dashboard-api) adds its build time
+# to the same budget on a single-core box.
+TimeoutStartSec=1800s
+TimeoutStopSec=120s
+
+# Log to journal (default)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

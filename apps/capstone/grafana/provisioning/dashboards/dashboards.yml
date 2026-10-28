@@ -1,0 +1,16 @@
+# Loads every dashboard JSON in /var/lib/grafana/dashboards (mounted from
+# ./grafana/dashboards). Provisioned dashboards are read-only in the UI, which
+# is deliberate: they are versioned in this repo, not clicked into existence.
+apiVersion: 1
+
+providers:
+  - name: capstone
+    orgId: 1
+    folder: Capstone
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

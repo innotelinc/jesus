@@ -1,0 +1,16 @@
+[Unit]
+Description=Capstone — periodic dograh → FreePBX sync timer
+Documentation=https://capstone.innotel.us
+
+[Timer]
+# Reconciliation safety net, NOT the primary path: creating or editing an agent
+# in the Control Center syncs the PBX immediately over the dashboard API.
+# This timer only catches drift (a PBX container restart, a hand-edit, a
+# dograh change made outside the dashboard), so it runs once shortly after boot
+# and then every 12 hours instead of hammering the FreePBX API every 2 minutes.
+OnBootSec=10min
+OnUnitActiveSec=12h
+Unit=capstone-pbx-sync.service
+
+[Install]
+WantedBy=timers.target

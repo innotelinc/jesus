@@ -1,0 +1,254 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# sync-and-release.yml — detect dograh upstream updates, sync the dograh
+# platform source used by this repo (reapplying Capstone customizations),
+# then cut a new numbered Capstone release.
+#
+# Schedule: daily at 04:17 UTC (adjust to taste), or run manually via
+# "Run workflow" (supports a force input to release even when upstream
+# hasn't moved).
+#
+# Required secrets:
+#   FORK_SYNC_SECRET — a GitHub PAT with write access to TWO repositories:
+#
+#     1. innotelinc/dograh — the fork this workflow pushes the rebuilt tree to.
+#        The workflow's GITHUB_TOKEN only covers capstone itself, so a PAT is
+#        required to push to the fork at all.
+#
+#        It must ALSO carry workflow-file permission. The fork carries workflow
+#        files (`.github/workflows/build-api-image.yml` and friends), and
+#        GitHub refuses a push that creates or updates a workflow file from a
+#        token without it:
+#
+#          ! [remote rejected] rebuilt -> main (refusing to allow a Personal
+#          Access Token to create or update workflow `...` without `workflow` scope)
+#
+#        That is a plain git push rejection, so the job dies with "failed to
+#        push some refs" and no release is cut — silently, every day, until
+#        someone reads the log.
+#
+#     2. innotelinc/capstone — the `release` job below reuses this token for
+#        `gh release create`, which publishes to THIS repo. A token scoped only
+#        to the fork clears the push and then fails on the release.
+#
+#     So, for a fine-grained PAT: select both repositories, give each
+#     Contents: Read and write, and give innotelinc/dograh additionally
+#     Workflows: Read and write. A classic PAT needs just `repo` + `workflow`,
+#     which cover both.
+#
+# Release versioning (bump from last release):
+#   upstream minor bump → Capstone minor bump  (v2.0 → v2.1)
+#   upstream major bump → Capstone major bump  (v2.0 → v3.0)
+#
+# Asset policy (hosted runners):
+#   • Every release (scheduled + default manual) is FULL: the release job cuts
+#     the release with the lightweight deployment payload + source bundle,
+#     then two parallel jobs build+upload each heavy artifact on their own VM:
+#       - release-images → docker image bundle (~14 GB peak; disk-freed first)
+#       - release-iso    → live ISO (~7 GB live-build chroot + ISO)
+#   Each separate VM comfortably fits its artifact, which is why the two heavy
+#   builds are split rather than combined in one job.
+#   • Set the `lightweight` dispatch input to skip the two heavy builds for a
+#     quick manual test release.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Sync dograh fork & release
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Cut a release even if upstream hasn't moved"
+        type: boolean
+        default: false
+      lightweight:
+        description: "Skip the docker image bundle + live ISO (quick test release only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-and-release
+  cancel-in-progress: false
+
+jobs:
+  sync-fork:
+    name: Detect & sync dograh fork
+    runs-on: ubuntu-latest
+    outputs:
+      synced: ${{ steps.sync.outputs.synced }}
+      bump: ${{ steps.sync.outputs.bump }}
+      upstream_old: ${{ steps.sync.outputs.upstream_old }}
+      upstream_new: ${{ steps.sync.outputs.upstream_new }}
+      conflicts: ${{ steps.sync.outputs.conflicts }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run fork sync
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.FORK_SYNC_SECRET }}
+        run: |
+          chmod +x scripts/sync-dograh-fork.sh
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            ./scripts/sync-dograh-fork.sh --push --force
+          else
+            ./scripts/sync-dograh-fork.sh --push
+          fi
+
+  # A release cut with `github.token` mints a v* tag with GITHUB_TOKEN, and
+  # GitHub does not run workflows for events a GITHUB_TOKEN creates — so the
+  # tag never reaches release.yml and the Capstone images/artifacts for a
+  # scheduled release are never published. Cutting with FORK_SYNC_SECRET (a
+  # real PAT) makes the tag a normal user event and release.yml fires.
+  release:
+    name: Bump version & cut release
+    needs: sync-fork
+    if: needs.sync-fork.outputs.synced == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_url: ${{ steps.cut.outputs.release_url }}
+    env:
+      GH_TOKEN: ${{ secrets.FORK_SYNC_SECRET || github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compute next release version
+        id: version
+        env:
+          BUMP: ${{ needs.sync-fork.outputs.bump }}
+        run: |
+          LAST="$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo v1.0.0)"
+          LAST="${LAST#v}"
+          MAJOR="${LAST%%.*}"
+          REST="${LAST#*.}"
+          MINOR="${REST%%.*}"
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1)); MINOR=0
+          else
+            MINOR=$((MINOR + 1))
+          fi
+          echo "last release: v$LAST → next: v${MAJOR}.${MINOR}"
+          echo "version=v${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
+
+      - name: Build source bundle
+        run: ./scripts/build-source-bundle.sh
+
+      - name: Build deployment payload
+        run: ./scripts/build-offline-bundle.sh --deployment-only
+
+      - name: Cut release
+        id: cut
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          UP_OLD: ${{ needs.sync-fork.outputs.upstream_old }}
+          UP_NEW: ${{ needs.sync-fork.outputs.upstream_new }}
+          CONFLICTS: ${{ needs.sync-fork.outputs.conflicts }}
+          LITE: ${{ github.event.inputs.lightweight }}
+        run: |
+          if [ "$LITE" = "true" ]; then
+            EXTRA="**Lightweight release**: deployment payload + source bundle only."
+          else
+            EXTRA="**Full release**: includes the docker image bundle and live ISO, built and uploaded by parallel jobs in this run."
+          fi
+          if [ -n "$CONFLICTS" ]; then
+            CONFLICTS_LINE="3-way merge conflicts kept fork versions — review: $CONFLICTS"
+          else
+            CONFLICTS_LINE="no merge conflicts — clean reapply"
+          fi
+          NOTES=$(cat <<NOTESEOF
+          Capstone **$VERSION** — dograh platform source synced to upstream **$UP_NEW** (was $UP_OLD) and Capstone customizations reapplied.
+
+          **This release was generated automatically** by the sync-and-release workflow after detecting an upstream dograh update.
+
+          **Highlights:**
+          - Synced to the latest dograh-hq/dograh main; Capstone customizations (self-hosted interview stack, Asterisk/FreePBX ARI wiring, NPM-fronted hostnames, systemd autostart, nightly DB backup) reapplied on top.
+          - $EXTRA
+
+          **Upstream change:** $UP_OLD → $UP_NEW ($CONFLICTS_LINE)
+          NOTESEOF
+          )
+          gh release create "$VERSION" \
+            dist/offline-bundle/capstone-v2-deployment.tar.gz \
+            dist/offline-bundle/SHA256SUMS \
+            dist/source-bundle/capstone-source-bundle.tar.gz \
+            dist/source-bundle/capstone-source-bundle.tar.gz.sha256 \
+            --title "Capstone $VERSION" \
+            --notes "$NOTES"
+          echo "release_url=$(gh release view "$VERSION" --json url -q .url)" >> "$GITHUB_OUTPUT"
+
+  # ── Docker image bundle (separate VM so its ~14 GB peak doesn't crowd the
+  # ISO build). Runs on every release by default (scheduled included), unless
+  # the `lightweight` dispatch input is set. Uploads the image parts plus the
+  # deployment tarball and SHA256SUMS (clobbering the lightweight ones so the
+  # shipped payload + checksums stay consistent).
+  release-images:
+    name: Build & upload docker image bundle
+    needs: [sync-fork, release]
+    if: needs.sync-fork.outputs.synced == 'true' && github.event.inputs.lightweight != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          sudo docker system prune -af 2>/dev/null || true
+          df -h / | tail -1
+      - name: Build docker image bundle
+        run: ./scripts/build-offline-bundle.sh
+      - name: Upload image bundle + refreshed checksums
+        run: |
+          shopt -s nullglob
+          gh release upload "$VERSION" \
+            dist/offline-bundle/docker-images-v2-part*.tar.gz \
+            dist/offline-bundle/capstone-v2-deployment.tar.gz \
+            dist/offline-bundle/SHA256SUMS --clobber
+
+  # ── Live ISO (separate VM: ~7 GB live-build chroot + ~2 GB ISO).
+  release-iso:
+    name: Build & upload live ISO
+    needs: [sync-fork, release]
+    if: needs.sync-fork.outputs.synced == 'true' && github.event.inputs.lightweight != 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          df -h / | tail -1
+      - name: Install live-build ISO toolchain
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y live-build xorriso mtools genisoimage \
+            grub-efi-amd64-bin grub-pc-bin isolinux syslinux-common
+      # The ISO bakes the deployment payload, so produce it first.
+      - name: Build deployment payload
+        run: ./scripts/build-offline-bundle.sh --deployment-only
+      - name: Build live ISO
+        run: sudo ./scripts/build-live-usb.sh
+      - name: Upload live ISO
+        run: |
+          gh release upload "$VERSION" \
+            dist/live-usb/capstone-v2-live-amd64.iso \
+            dist/live-usb/capstone-v2-live-amd64.iso.sha256 --clobber
+
+  summarize:
+    name: Summarize release
+    needs: [sync-fork, release, release-images, release-iso]
+    if: always() && needs.sync-fork.outputs.synced == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::notice::Fork synced: ${{ needs.sync-fork.outputs.upstream_old }} → ${{ needs.sync-fork.outputs.upstream_new }} (${{ needs.sync-fork.outputs.bump }})"
+          echo "::notice::Release: ${{ needs.release.outputs.version }} — ${{ needs.release.outputs.release_url }}"
+          echo "::notice::Image bundle: ${{ needs.release-images.result }} | Live ISO: ${{ needs.release-iso.result }}"
+          exit 0

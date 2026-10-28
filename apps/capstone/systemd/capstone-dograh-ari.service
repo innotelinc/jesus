@@ -1,0 +1,28 @@
+[Unit]
+Description=Capstone — dograh Stasis app healthcheck + auto-recovery
+Documentation=https://capstone.innotel.us
+Requires=docker.service
+After=docker.service network-online.target capstone.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# WorkingDirectory is rewritten to the real repo root at install time by
+# scripts/install-capstone.sh (install_service). Do not hard-code a host path.
+WorkingDirectory=/PATH/TO/CAPSTONE
+
+# Asterisk routes every dograh extension into Stasis(<stasis app name>). No ARI
+# client registered under that name means the call hangs up immediately, and the
+# usual cause is dograh's one-way parking policy: a config that failed to
+# connect long enough is marked inactive and never retried on its own. This runs
+# the recovery script, which re-runs scripts/dograh_wire.py (reactivating a
+# parked config) when the app is missing and ARI is reachable.
+ExecStart=/usr/bin/env bash scripts/dograh-ari-recover.sh recover
+
+# A repair run re-runs dograh_wire.py, which waits up to HEALTH_TIMEOUT_S (120)
+# for the dograh API before giving up — plus the registration wait. Give the
+# unit room to finish rather than being killed mid-repair.
+TimeoutStartSec=300s
+
+StandardOutput=journal
+StandardError=journal
