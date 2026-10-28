@@ -1701,6 +1701,10 @@ check(
 // that cannot write, a webhook left on an old host, a secret that is not the
 // one Stripe signs with.
 
+// Stored in the vault, so rejections recorded before it was written have a
+// timestamp to be measured against. The earlier wrong-signature checks in this
+// run would otherwise look like a rotated secret that nobody rotated.
+await call('PUT', '/api/system/vault/STRIPE_WEBHOOK_SECRET', { value: 'whsec_smoke_rotated' });
 const connected = await call('POST', '/api/billing/payments/test', {});
 const checkOf = (result, id) => result.body.checks?.find((entry) => entry.id === id);
 
@@ -1821,6 +1825,75 @@ check(
     hookAfterRepair.body.webhook.missing.length === 0 &&
     hookAfterRepair.body.webhook.repairable === false,
   hookAfterRepair.body.webhook
+);
+
+// A rotated secret is the one failure no local check can see: the stored value
+// is well formed and verifies its own signature, because it is compared with
+// itself. The evidence is a delivery Stripe already sent that failed, so the
+// status carries the shape check and the rejections recorded since the secret
+// was stored.
+await call('PUT', '/api/system/vault/STRIPE_WEBHOOK_SECRET', { value: 'whsec_smoke_rotated' });
+const secretOk = await call('GET', '/api/billing/payments/webhook');
+check(
+  'the status reports a signing secret that works',
+  secretOk.body.webhook?.secretState === 'ok' && secretOk.body.webhook.rejections.count === 0,
+  secretOk.body.webhook
+);
+
+const rejectedBody = JSON.stringify({ id: 'evt_rotated_secret', type: 'invoice.paid', data: { object: {} } });
+const rejectedStamp = Math.floor(Date.now() / 1000);
+const wrongDigest = createHmac('sha256', 'whsec_someone_elses')
+  .update(`${rejectedStamp}.${rejectedBody}`)
+  .digest('hex');
+const rejectedCall = await fetch(`${base}/api/public/stripe/webhook`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', 'stripe-signature': `t=${rejectedStamp},v1=${wrongDigest}` },
+  body: rejectedBody,
+});
+await rejectedCall.text();
+const rotatedSecret = await call('GET', '/api/billing/payments/webhook');
+check(
+  'a delivery that fails to verify is reported as a rotated secret',
+  rotatedSecret.body.webhook?.secretState === 'rejected' &&
+    rotatedSecret.body.webhook.rejections.count >= 1 &&
+    /not the one Stripe is signing with/.test(rotatedSecret.body.webhook.secretDetail || ''),
+  rotatedSecret.body.webhook
+);
+const rotatedTest = await call('POST', '/api/billing/payments/test', {});
+check(
+  'the full test names the same deliveries, and still passes the secret itself',
+  checkOf(rotatedTest, 'webhook-secret')?.state === 'pass' &&
+    checkOf(rotatedTest, 'webhook-rejections')?.state === 'fail',
+  rotatedTest.body.checks?.map((entry) => `${entry.id}:${entry.state}`)
+);
+
+await call('PUT', '/api/system/vault/STRIPE_WEBHOOK_SECRET', { value: 'sk_test_pasted_by_mistake' });
+const malformed = await call('GET', '/api/billing/payments/webhook');
+check(
+  'a pasted API key is reported as not being a signing secret',
+  malformed.body.webhook?.secretState === 'malformed' && /whsec_/.test(malformed.body.webhook.secretDetail || ''),
+  malformed.body.webhook
+);
+
+// Storing a fresh secret answers for the past: rejections older than it are
+// history, not evidence about the value in place now. Without this, a corrected
+// deployment would carry a warning forever.
+await call('PUT', '/api/system/vault/STRIPE_WEBHOOK_SECRET', { value: 'whsec_smoke_rotated' });
+const afterReset = await call('GET', '/api/billing/payments/webhook');
+check(
+  'rejections older than the stored secret stop counting',
+  afterReset.body.webhook?.secretState === 'ok' && afterReset.body.webhook.rejections.count === 0,
+  afterReset.body.webhook
+);
+// Restored to the value the rest of the run signs with, so the replay checks
+// below still verify. A fresh write also re-bases the evidence, which is what
+// keeps a corrected secret from being warned about forever.
+await call('PUT', '/api/system/vault/STRIPE_WEBHOOK_SECRET', { value: 'whsec_smoke' });
+const backToEnv = await call('GET', '/api/billing/payments/webhook');
+check(
+  'a rewritten secret answers for the past and verifies again',
+  backToEnv.body.webhook?.secretState === 'ok' && backToEnv.body.webhook.rejections.count === 0,
+  backToEnv.body.webhook
 );
 
 // A paused endpoint delivers nothing. It is not "fine" and repair is not the
