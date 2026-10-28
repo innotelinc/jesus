@@ -5,6 +5,7 @@ import {
   applyCheckoutSession,
   checkoutForAccount,
   checkoutForInvoice,
+  mirrorStripeInvoiceCharge,
   paymentPage,
   tokenValid,
   verifyWebhook,
@@ -173,6 +174,23 @@ export default async function payRoutes(app) {
           ip: request.ip,
         });
         return { received: true, ...result };
+      }
+
+      // Stripe billed the plan. The gate already knows; the ledger does not, and
+      // a customer whose history is empty while their card is charged every
+      // month is the one thing a billing panel must never show.
+      if (type === 'invoice.paid' || type === 'invoice.payment_succeeded') {
+        const charge = mirrorStripeInvoiceCharge(session, { eventType: type, actor: 'stripe' });
+        logEvent({
+          actor: 'stripe',
+          action: 'billing.plan_charge_webhook',
+          subject: String(session?.id || ''),
+          detail: charge.recorded
+            ? `${(charge.amountCents / 100).toFixed(2)} ${charge.currency} · ${charge.note}`
+            : `not recorded · ${charge.reason}`,
+          ip: request.ip,
+        });
+        return { received: true, charge };
       }
 
       if (type !== 'checkout.session.completed' && type !== 'checkout.session.async_payment_succeeded') {

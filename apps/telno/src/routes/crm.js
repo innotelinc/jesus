@@ -8,6 +8,7 @@ import {
   createTicket,
   crmOverview,
   customerDetail,
+  customerRow,
   listCustomers,
   listTickets,
   recordPayment,
@@ -15,6 +16,8 @@ import {
   updateCustomer,
   updateTicket,
 } from '../lib/crm.js';
+import { syncSubscriptionCharges } from '../lib/payments.js';
+import { badRequest } from '../lib/errors.js';
 import * as v from '../lib/validate.js';
 import { db_ } from '../db/index.js';
 
@@ -93,6 +96,28 @@ export default async function crmRoutes(app) {
     });
     reply.status(201);
     return { payment };
+  });
+
+  /**
+   * Ask Stripe what it has already collected for this customer's plan.
+   *
+   * The webhook mirrors a charge as it happens; this is the repair for the
+   * charges that happened before it was listening, and the answer to "the panel
+   * says they paid nothing but Stripe says otherwise". Idempotent: the second
+   * press adds nothing.
+   */
+  app.post('/crm/customers/:id/payments/sync', { preHandler: requireWrite }, async (request) => {
+    customerRow(request.params.id);
+    const result = await syncSubscriptionCharges({ accountId: request.params.id, actor: actorOf(request) });
+    if (!result.ok) {
+      const reasons = {
+        no_subscription: 'That customer has no plan, so there is nothing at Stripe to read.',
+        no_stripe_customer: 'That plan was not bought by card, so Stripe holds no charges for it.',
+        stripe_not_configured: 'Add the Stripe secret key in Settings → Vault first.',
+      };
+      throw badRequest(reasons[result.error] || `Stripe could not be read: ${result.error}`);
+    }
+    return result;
   });
 
   /* -------------------------------------------------------------- tickets -- */

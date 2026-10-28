@@ -39,8 +39,12 @@ const SUBSCRIPTION_EVENTS = [
   'customer.subscription.deleted',
   'invoice.payment_failed',
 ];
+// What Stripe collected for a plan. Without these the customer keeps paying and
+// their history stays empty, which is worse than a visible failure: the panel
+// says they have paid nothing while Stripe sends receipts every month.
+const LEDGER_EVENTS = ['invoice.paid'];
 const WEBHOOK_EVENTS = PAYMENT_EVENTS;
-export const webhookEventList = () => [...PAYMENT_EVENTS, ...SUBSCRIPTION_EVENTS];
+export const webhookEventList = () => [...PAYMENT_EVENTS, ...SUBSCRIPTION_EVENTS, ...LEDGER_EVENTS];
 const MIN_CHARGE_CENTS = 50;
 
 /** Key from the vault first, environment second — the console can rotate it. */
@@ -441,6 +445,212 @@ export function applyCheckoutSession(session) {
   return { paid, reference, invoices: ids.length, sessionId: session?.id || '' };
 }
 
+/* ----------------------------------------------------------- plan charges -- */
+
+/**
+ * A plan's money, written into the platform's own ledger.
+ *
+ * A subscription is billed by Stripe: the card is charged on the renewal date
+ * and the platform learns only that the period moved. That left a card customer
+ * paying every month with nothing collected against them — the panel could show
+ * a live plan and an empty history at the same time, and neither number was
+ * wrong. Since a bill for rent does not carry the plan charge (it is settled by
+ * the subscription), this row is the only record the money moved.
+ *
+ * It is deliberately not attached to a local invoice. The plan line on a bill
+ * is marked as covered by the subscription, so attaching the charge would make
+ * the ledger claim a rent invoice had been paid with plan money.
+ *
+ * Idempotent by construction: the reference is Stripe's own invoice id and the
+ * ledger has a unique index on it, so a retried webhook and a backfill of the
+ * same charge can never record it twice.
+ */
+
+/** The subscription an invoice belongs to, in either API version's shape. */
+const invoiceSubscriptionId = (invoice) => {
+  const candidates = [invoice?.subscription, invoice?.parent?.subscription_details?.subscription];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate) return candidate;
+    if (candidate && typeof candidate.id === 'string' && candidate.id) return candidate.id;
+  }
+  return '';
+};
+
+const objectId = (value) => (typeof value === 'string' ? value : value?.id || '');
+
+/** Our subscription row behind a Stripe invoice, or null when it is not ours. */
+function subscriptionForInvoice(invoice) {
+  const stripeSubscriptionId = invoiceSubscriptionId(invoice);
+  if (stripeSubscriptionId) {
+    const row = db_.get('SELECT * FROM subscriptions WHERE stripe_subscription_id = ?', [stripeSubscriptionId]);
+    if (row) return row;
+  }
+  const stripeCustomerId = objectId(invoice?.customer);
+  if (stripeCustomerId) {
+    const row = db_.get(
+      'SELECT * FROM subscriptions WHERE stripe_customer_id = ? ORDER BY created_at DESC LIMIT 1',
+      [stripeCustomerId]
+    );
+    if (row) return row;
+  }
+  // A backfill can carry an invoice whose parent hides the subscription; the
+  // customer's own email is the last honest way to find them.
+  const email = String(invoice?.customer_email || '').trim();
+  if (email) {
+    const account = db_.get('SELECT id FROM accounts WHERE lower(email) = lower(?)', [email]);
+    if (account) {
+      const row = db_.get(
+        'SELECT * FROM subscriptions WHERE account_id = ? ORDER BY created_at DESC LIMIT 1',
+        [account.id]
+      );
+      if (row) return row;
+    }
+  }
+  return null;
+}
+
+/**
+ * The service period a charge covers, in the words a customer reads.
+ *
+ * The line's period is the month of service; the invoice's own period is when
+ * the invoice was raised, which for a first payment can be the same minute. So
+ * the line wins, and a period that covers one day is printed as one day rather
+ * than "Oct 28 – Oct 28".
+ */
+const chargePeriod = (invoice) => {
+  const line = invoice?.lines?.data?.[0]?.period || {};
+  const start = Number(line.start || invoice?.period_start || 0);
+  const end = Number(line.end || invoice?.period_end || 0);
+  if (!start) return '';
+  const day = (seconds) =>
+    new Date(seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (!end || day(start) === day(end)) return day(start);
+  return `${day(start)} – ${day(end)}`;
+};
+
+const chargeStamp = (invoice) => {
+  const seconds = Number(invoice?.status_transitions?.paid_at || invoice?.created || 0);
+  return seconds ? new Date(seconds * 1000).toISOString() : now();
+};
+
+/**
+ * Record one paid Stripe invoice against the subscription it belongs to.
+ *
+ * Returns `recorded: false` with a reason for everything it declines: a charge
+ * for an account we do not know, a zero-value invoice, or one already in the
+ * ledger. A caller (the webhook, the backfill) therefore never has to guess.
+ */
+export function mirrorStripeInvoiceCharge(invoice, { eventType = '', actor = 'stripe' } = {}) {
+  const stripeInvoiceId = String(invoice?.id || '');
+  if (!stripeInvoiceId) return { recorded: false, reason: 'no_invoice_id' };
+
+  const subscription = subscriptionForInvoice(invoice);
+  if (!subscription?.account_id) return { recorded: false, reason: 'unknown_subscription' };
+
+  const amount = Math.round(Number(invoice?.amount_paid ?? invoice?.total ?? 0));
+  if (!Number.isFinite(amount) || amount <= 0) return { recorded: false, reason: 'nothing_collected' };
+
+  const existing = db_.get("SELECT id FROM payments WHERE method = 'stripe' AND reference = ?", [stripeInvoiceId]);
+  if (existing) return { recorded: false, reason: 'already-recorded', paymentId: existing.id };
+
+  const period = chargePeriod(invoice);
+  const note = [`Plan — ${subscription.plan_name || 'Subscription'}`, period].filter(Boolean).join(' · ').slice(0, 500);
+  const id = newId('pay_');
+  const receivedAt = chargeStamp(invoice);
+  const result = db_.run(
+    `INSERT OR IGNORE INTO payments
+       (id, account_id, invoice_id, amount_cents, currency, method, reference, note, received_at, created_by)
+     VALUES (?, ?, NULL, ?, ?, 'stripe', ?, ?, ?, ?)`,
+    [
+      id,
+      subscription.account_id,
+      amount,
+      String(invoice.currency || subscription.currency || 'USD').toUpperCase(),
+      stripeInvoiceId,
+      note,
+      receivedAt,
+      actor,
+    ]
+  );
+  if (!result.changes) {
+    const raced = db_.get("SELECT id FROM payments WHERE method = 'stripe' AND reference = ?", [stripeInvoiceId]);
+    return { recorded: false, reason: 'already-recorded', paymentId: raced?.id || '' };
+  }
+
+  const payment = db_.get('SELECT * FROM payments WHERE id = ?', [id]);
+  logEvent({
+    actor,
+    action: 'billing.plan_charge',
+    subject: subscription.plan_name || subscription.account_id,
+    detail: `${(amount / 100).toFixed(2)} ${payment.currency} · ${stripeInvoiceId}${period ? ` · ${period}` : ''}` +
+      `${eventType ? ` · ${eventType}` : ''}`,
+  });
+  return {
+    recorded: true,
+    amountCents: amount,
+    currency: payment.currency,
+    note,
+    stripeInvoiceId,
+    accountId: subscription.account_id,
+    paymentId: id,
+  };
+}
+
+/**
+ * Backfill what Stripe already collected for one account.
+ *
+ * A webhook only mirrors what happens after it is registered, so a customer who
+ * paid before that has a live plan and an empty history. This asks Stripe for
+ * the account's paid invoices and records the ones missing, which also repairs
+ * an endpoint that was subscribed to the wrong events for a while.
+ */
+export async function syncSubscriptionCharges({ accountId = '', limit = 24, actor = 'operator' } = {}) {
+  const subscription = db_.get(
+    'SELECT * FROM subscriptions WHERE account_id = ? ORDER BY created_at DESC LIMIT 1',
+    [String(accountId || '')]
+  );
+  if (!subscription) return { ok: false, error: 'no_subscription' };
+  if (!subscription.stripe_customer_id) return { ok: false, error: 'no_stripe_customer' };
+  if (!stripeConfigured()) return { ok: false, error: 'stripe_not_configured' };
+
+  const page = await stripeRequest('GET', '/v1/invoices', {
+    customer: subscription.stripe_customer_id,
+    limit: Math.min(Math.max(Number(limit) || 24, 1), 100),
+  });
+  if (!page.ok) return { ok: false, error: page.error };
+
+  const invoices = (page.data?.data || []).filter(
+    (invoice) => invoice && (invoice.status === 'paid' || invoice.paid === true)
+  );
+  const payments = [];
+  const skipped = [];
+  for (const invoice of invoices) {
+    const mirrored = mirrorStripeInvoiceCharge(invoice, { eventType: 'backfill', actor });
+    if (mirrored.recorded) payments.push(mirrored);
+    else skipped.push({ id: String(invoice.id || ''), reason: mirrored.reason });
+  }
+
+  logEvent({
+    actor,
+    action: 'billing.plan_charges_synced',
+    subject: subscription.plan_name || subscription.account_id,
+    detail: `scanned ${invoices.length} paid Stripe invoice(s) · recorded ${payments.length}`,
+  });
+  return {
+    ok: true,
+    scanned: invoices.length,
+    recorded: payments.length,
+    skipped,
+    payments: payments.map((entry) => ({
+      id: entry.paymentId,
+      amountCents: entry.amountCents,
+      currency: entry.currency,
+      reference: entry.stripeInvoiceId,
+      note: entry.note,
+    })),
+  };
+}
+
 /* ------------------------------------------------------------------- test -- */
 
 /** The URL Stripe has to call, built from the same base as the notice links. */
@@ -621,6 +831,7 @@ export async function testConnection() {
         const missingSubscriptions = SUBSCRIPTION_EVENTS.filter((event) => !wildcard && !events.includes(event));
         const problems = [];
         if (match.status && match.status !== 'enabled') problems.push(`its status is ${match.status}`);
+        const missingLedger = LEDGER_EVENTS.filter((event) => !wildcard && !events.includes(event));
         if (missing.length) problems.push(`it is not subscribed to ${missing.join(' or ')}`);
         add(
           'webhook-endpoint',
@@ -640,6 +851,16 @@ export async function testConnection() {
           missingSubscriptions.length
             ? `Not subscribed to ${missingSubscriptions.join(', ')} — the portal will not learn about lapsed or canceled subscriptions until it does.`
             : 'Renewals, cancellations and failed payments reach the portal gate.'
+        );
+        // The gate can be right while the ledger is empty: a plan charge is only
+        // mirrored when Stripe announces it, and nothing else asks.
+        add(
+          'webhook-ledger',
+          'Plan charges reach the ledger',
+          missingLedger.length ? 'warn' : 'pass',
+          missingLedger.length
+            ? `Not subscribed to ${missingLedger.join(', ')} — card payments for a plan will not appear against the customer until it is, which is why the customer panel has a Sync button.`
+            : 'What Stripe collects for a plan is recorded against the customer.'
         );
       }
     }

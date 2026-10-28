@@ -224,6 +224,24 @@ function migrate(db) {
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_stripe_invoice ON payments (invoice_id) WHERE method = 'stripe' AND invoice_id IS NOT NULL"
   );
+  // A plan charge mirrored from Stripe has no local invoice to hang uniqueness
+  // on: its identity is Stripe's own invoice id, kept as the reference. The
+  // partial index is what makes a retried webhook, and a backfill of a charge
+  // the webhook already recorded, the same row instead of two. A database that
+  // already carries the same charge twice was edited by hand or by an older
+  // build, so it is reported rather than failed on at boot.
+  const duplicateCharge = db
+    .prepare(
+      "SELECT reference FROM payments WHERE method = 'stripe' AND invoice_id IS NULL AND reference <> '' GROUP BY reference HAVING COUNT(*) > 1 LIMIT 1"
+    )
+    .get();
+  if (!duplicateCharge) {
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_stripe_charge ON payments (reference) WHERE method = 'stripe' AND invoice_id IS NULL AND reference <> ''"
+    );
+  } else {
+    console.warn(`[db] leaving duplicate Stripe charge ${duplicateCharge.reference}; not indexing it`);
+  }
   const settled = db
     .prepare(
       `SELECT i.id, i.account_id, i.email, i.amount_cents, i.currency, i.paid_at, i.payment_ref

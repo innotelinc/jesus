@@ -490,14 +490,24 @@ against the endpoint secret in constant time with the timestamp checked, the inv
 with the payment reference kept as a receipt, and a suspended account is reinstated immediately
 rather than at the next sweep. Marking paid is idempotent: a replayed event is a no-op.
 
+A **plan** is billed by Stripe, not by an invoice here, so its money needs its own path: the same
+webhook records `invoice.paid` as a payment against the customer — what the plan is, the period it
+covered and Stripe's `in_…` id as the receipt. It is deliberately not attached to a local bill,
+because a bill's plan line is already marked as covered by the subscription and attaching the charge
+would claim rent had been paid with plan money. The reference column carries a partial unique index,
+so a retried event and the `invoice.payment_succeeded` flavour of the same collection are the same
+row. Anything Stripe collected before the endpoint was listening is pulled in with **Sync from
+Stripe** on the customer's Billing tab (`POST /api/crm/customers/:id/payments/sync`), which is
+idempotent and also repairs an endpoint subscribed to the wrong events.
+
 To switch it on:
 
 1. Stripe → Developers → API keys → copy the secret key, and paste it into **Settings → Vault** as
    `STRIPE_SECRET_KEY` (or set it in `.env`). A vault key wins over the environment, so it can be
    rotated without a rebuild.
 2. Stripe → Developers → Webhooks → add `https://<your-host>/api/public/stripe/webhook` for
-   `checkout.session.completed` and `checkout.session.async_payment_succeeded`, then store its signing
-   secret as `STRIPE_WEBHOOK_SECRET` the same way.
+   `checkout.session.completed`, `checkout.session.async_payment_succeeded` and `invoice.paid`, then
+   store its signing secret as `STRIPE_WEBHOOK_SECRET` the same way.
 3. Make sure `PUBLIC_URL` is the address customers actually reach: the links in the email are built
    from it.
 
