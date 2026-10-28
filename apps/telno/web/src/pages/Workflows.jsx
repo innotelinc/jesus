@@ -10,27 +10,23 @@ import {
   PageHeader,
   Select,
   Stat,
-  Textarea,
   Input,
   useToast,
 } from '../ui.jsx';
 
 const STATUS_TONE = { active: 'success', paused: 'warning', draft: 'neutral' };
-const STEP_TYPES = ['dial', 'transfer', 'voicemail', 'sms', 'email', 'webhook', 'tag', 'wait'];
 
-const parseSteps = (text) =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [type, label, target] = line.split('|').map((part) => (part || '').trim());
-      return { type, label, target };
-    })
-    .filter((step) => step.type);
+const emptyStep = () => ({ type: 'dial', label: '', target: '' });
 
-const SAMPLE = 'dial | Ring the on-call rotation | 220\nwait | 30 second ring time | 30\nvoicemail | Fall back to voicemail | 220';
-
+/**
+ * Workflows, built from recipes rather than from a mini-language.
+ *
+ * The old form asked for `dial | Ring the desk | 220` one line at a time, and a
+ * typo was a silent failure. Now a recipe creates a working flow in one click,
+ * each step is a row with a picker for its kind, and every field stays editable
+ * afterwards. The raw syntax has not gone away — it is what gets saved — but
+ * nobody has to recall it to build an automation.
+ */
 export default function Workflows() {
   const toast = useToast();
   const [items, setItems] = useState([]);
@@ -38,7 +34,8 @@ export default function Workflows() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
-  const [form, setForm] = useState({ name: '', trigger: 'inbound', steps: SAMPLE });
+  const [catalog, setCatalog] = useState({ workflows: [], triggers: [], stepTypes: [], agents: [], voices: [], languages: [] });
+  const [form, setForm] = useState({ name: '', trigger: 'inbound', steps: [emptyStep()] });
 
   const load = async () => {
     try {
@@ -54,6 +51,12 @@ export default function Workflows() {
 
   useEffect(() => {
     load();
+    api
+      .get('/presets')
+      .then((data) => setCatalog(data))
+      .catch(() => {
+        /* the editor still works with a picker and no recipes */
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -103,14 +106,35 @@ export default function Workflows() {
     }
   };
 
+  const applyRecipe = (id) => {
+    const recipe = (catalog.workflows || []).find((entry) => entry.id === id);
+    if (!recipe) return;
+    setForm({
+      name: recipe.name,
+      trigger: recipe.trigger,
+      steps: recipe.steps.map((step) => ({ ...step })),
+    });
+  };
+
+  const updateStep = (index, patch) =>
+    setForm((current) => ({
+      ...current,
+      steps: current.steps.map((step, i) => (i === index ? { ...step, ...patch } : step)),
+    }));
+
   const create = async () => {
     setBusy('new');
     try {
-      const data = await api.post('/workflows', { ...form, steps: parseSteps(form.steps) });
+      const steps = form.steps.filter((step) => step.type);
+      if (!steps.length) {
+        toast.error('Add at least one step', 'A workflow with no steps has nothing to do.');
+        return;
+      }
+      const data = await api.post('/workflows', { name: form.name, trigger: form.trigger, steps });
       setItems((list) => [...list, data.workflow]);
       load();
       setOpen(false);
-      setForm({ name: '', trigger: 'inbound', steps: SAMPLE });
+      setForm({ name: '', trigger: 'inbound', steps: [emptyStep()] });
       toast.success('Workflow created', 'Activate it when the steps look right.');
     } catch (err) {
       toast.error('Could not create the workflow', err.message);
@@ -121,6 +145,8 @@ export default function Workflows() {
 
   const successRate = (workflow) =>
     workflow.runs ? Math.round((workflow.successCount / workflow.runs) * 100) : null;
+
+  const typeLabel = (type) => (catalog.stepTypes || []).find((entry) => entry.type === type)?.label || type;
 
   return (
     <>
@@ -134,7 +160,7 @@ export default function Workflows() {
         <Stat label="Active" value={summary?.active ?? '—'} foot={`${items.length} total`} />
         <Stat label="Runs" value={summary?.runs?.toLocaleString() ?? '—'} foot="All time" />
         <Stat label="Failing" value={summary?.failing ?? '—'} foot="Last run failed" tone={summary?.failing ? 'var(--danger)' : undefined} />
-        <Stat label="Step types" value={STEP_TYPES.length} foot="Validated on every run" />
+        <Stat label="Recipes" value={(catalog.workflows || []).length} foot="Ready-made starting points" />
       </div>
 
       <Card bodyClass="tight">
@@ -210,7 +236,7 @@ export default function Workflows() {
           </div>
         ) : (
           <Empty icon="flow" title="No workflows yet" action={<Button variant="primary" onClick={() => setOpen(true)}>Build one</Button>}>
-            A workflow is a list of typed steps fired by an inbound call, schedule or webhook.
+            Start from a recipe — missed-call text-back, after-hours, escalation — and edit the steps it gives you.
           </Empty>
         )}
       </Card>
@@ -218,8 +244,9 @@ export default function Workflows() {
       {open ? (
         <Modal
           title="New workflow"
-          subtitle="One step per line: type | label | target"
+          subtitle="Start from a recipe, then change anything you like"
           onClose={() => setOpen(false)}
+          wide
           footer={
             <>
               <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
@@ -230,21 +257,74 @@ export default function Workflows() {
           }
         >
           <div className="stack">
-            <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Missed call → SMS" />
-            <Select label="Trigger" value={form.trigger} onChange={(e) => setForm({ ...form, trigger: e.target.value })}>
-              <option value="inbound">Inbound call</option>
-              <option value="outbound">Outbound call</option>
-              <option value="schedule">Schedule</option>
-              <option value="webhook">Webhook</option>
-              <option value="manual">Manual</option>
+            <Select label="Recipe" value="" onChange={(event) => applyRecipe(event.target.value)}>
+              <option value="">Choose a starting point…</option>
+              {(catalog.workflows || []).map((recipe) => (
+                <option key={recipe.id} value={recipe.id}>{recipe.name}</option>
+              ))}
             </Select>
-            <Textarea
-              label="Steps"
-              rows={6}
-              value={form.steps}
-              onChange={(e) => setForm({ ...form, steps: e.target.value })}
-              hint={`Types: ${STEP_TYPES.join(', ')}. An unknown type fails the run instead of silently passing.`}
-            />
+            {(catalog.workflows || []).length ? (
+              <p className="tiny dim">
+                A recipe fills the name, trigger and steps below. Nothing is locked: every field stays editable, and
+                what is created is an ordinary workflow.
+              </p>
+            ) : null}
+
+            <div className="grid two">
+              <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Missed call → text back" />
+              <Select label="Trigger" value={form.trigger} onChange={(e) => setForm({ ...form, trigger: e.target.value })}>
+                {(catalog.triggers || [{ value: 'inbound', label: 'An inbound call arrives' }]).map((trigger) => (
+                  <option key={trigger.value} value={trigger.value}>{trigger.label}</option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="field-label">Steps</span>
+              {form.steps.map((step, index) => (
+                <div key={index} className="card" style={{ padding: 10 }}>
+                  <div className="grid two" style={{ gap: 8 }}>
+                    <Select
+                      label="Do this"
+                      value={step.type}
+                      onChange={(event) => updateStep(index, { type: event.target.value })}
+                    >
+                      {(catalog.stepTypes || [{ type: 'dial', label: 'Call a number or extension' }]).map((entry) => (
+                        <option key={entry.type} value={entry.type}>{entry.label}</option>
+                      ))}
+                    </Select>
+                    <Input
+                      label="Target"
+                      value={step.target}
+                      onChange={(event) => updateStep(index, { target: event.target.value })}
+                      placeholder={step.type === 'wait' ? '30' : step.type === 'email' ? 'team@example.com' : step.type === 'webhook' ? 'https://…' : '220'}
+                      className="mono"
+                    />
+                  </div>
+                  <div className="row" style={{ gap: 8, marginTop: 8, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                      <Input
+                        label="What it does"
+                        value={step.label}
+                        onChange={(event) => updateStep(index, { label: event.target.value })}
+                        placeholder={typeLabel(step.type)}
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon="trash"
+                      aria-label="Remove step"
+                      disabled={form.steps.length === 1}
+                      onClick={() => setForm((current) => ({ ...current, steps: current.steps.filter((_, i) => i !== index) }))}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button size="sm" variant="ghost" icon="plus" onClick={() => setForm((current) => ({ ...current, steps: [...current.steps, emptyStep()] }))}>
+                Add a step
+              </Button>
+            </div>
           </div>
         </Modal>
       ) : null}

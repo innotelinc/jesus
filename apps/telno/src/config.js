@@ -69,6 +69,41 @@ export const config = {
     staleAfterSec: Math.max(60, int(env.DEVICE_STALE_AFTER_SEC, 900)),
   },
 
+  // Desk phones fetch their configuration from this platform, so a handset with
+  // nothing on it can be brought up by MAC alone: Option 66 (or the phone's
+  // provisioning URL field) points here, and the phone asks for its own file.
+  // `telno.tel` is the address printed in the console, and the SIP domain a
+  // handset registers against.
+  provisioning: {
+    enabled: bool(env.PROVISIONING_ENABLED, true),
+    baseUrl: String(env.PROVISIONING_URL || 'http://telno.tel').replace(/\/+$/, ''),
+    sipDomain: (env.PROVISIONING_SIP_DOMAIN || env.SIP_DOMAIN || 'telno.tel').toLowerCase(),
+    sipPort: int(env.PROVISIONING_SIP_PORT, 5060),
+    // A device that has never checked in still gets a config once its MAC is in
+    // the inventory; this token gates the public endpoint so a stranger cannot
+    // enumerate extensions by guessing MAC addresses.
+    requireToken: bool(env.PROVISIONING_REQUIRE_TOKEN, false),
+  },
+
+  // Fax: the switch is the fax machine. res_fax negotiates T.38 with the carrier
+  // and falls back to G.711 passthrough (spandsp) when T.38 is refused, so a fax
+  // rides the same SIP trunk as voice and costs nothing per page — no carrier
+  // fax API, no per-page fee.
+  fax: {
+    enabled: bool(env.FAX_ENABLED, true),
+    // Where received documents wait to be ingested, and where an outbound
+    // document is staged before the switch sends it.
+    dir: env.FAX_DIR || '',
+    t38: bool(env.FAX_T38, true),
+    maxRate: int(env.FAX_MAX_RATE, 14400),
+    minRate: int(env.FAX_MIN_RATE, 2400),
+    // The station ID the receiving machine prints, and the header on a send.
+    stationId: env.FAX_STATION_ID || 'Telno',
+    maxPages: Math.max(1, int(env.FAX_MAX_PAGES, 50)),
+    // How often the platform looks for documents the switch has finished with.
+    sweepSeconds: Math.max(5, int(env.FAX_SWEEP_SECONDS, 15)),
+  },
+
   telephony: {
     enabled: bool(env.TELEPHONY_ENABLED, true),
     // Asterisk Manager Interface — the control plane's only path into the switch.
@@ -92,8 +127,13 @@ export const config = {
     // and a SIP parser reads a digit-leading host as a malformed IPv4 address
     // (sip.js rejects the whole message), so a call would ring the browser and
     // never be offered to the operator.
+    // SIP_DOMAIN/SIP_URI_DOMAIN wins, then the provisioning domain (telno.tel),
+    // then the public host. A deployment that hands out `sip:100@telno.tel` has
+    // to put the same name in every URI, or a handset shows the raw host.
     sipDomain:
       env.SIP_DOMAIN ||
+      env.SIP_URI_DOMAIN ||
+      env.PROVISIONING_SIP_DOMAIN ||
       (() => {
         try {
           return new URL(env.PUBLIC_URL || 'http://localhost').hostname;

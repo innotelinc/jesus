@@ -47,6 +47,9 @@ export default function Voice() {
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState('');
   const [form, setForm] = useState(BLANK);
+  // Presets and choices, so a new agent is not five blank fields: a persona, a
+  // voice and a language are all picked from real lists.
+  const [catalog, setCatalog] = useState({ agents: [], voices: [], languages: [] });
 
   const load = async () => {
     try {
@@ -62,10 +65,31 @@ export default function Voice() {
 
   useEffect(() => {
     load();
+    api
+      .get('/presets')
+      .then((data) => setCatalog({ agents: data.agents || [], voices: data.voices || [], languages: data.languages || [] }))
+      .catch(() => {
+        /* the editor still works without presets */
+      });
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** A preset is a working persona: greeting, script and voice, all editable. */
+  const applyPreset = (id) => {
+    const preset = (catalog.agents || []).find((entry) => entry.id === id);
+    if (!preset) return;
+    setForm((current) => ({
+      ...current,
+      name: preset.name,
+      voice: preset.voice,
+      language: preset.language,
+      greeting: preset.greeting,
+      prompt: preset.prompt,
+      recordInbound: !!preset.recordInbound,
+    }));
+  };
 
   const openEditor = (agent) => {
     setEditing(agent || 'new');
@@ -254,6 +278,12 @@ export default function Voice() {
           }
         >
           <div className="stack">
+            <Select label="Start from a preset" value="" onChange={(event) => applyPreset(event.target.value)}>
+              <option value="">Choose a persona…</option>
+              {(catalog.agents || []).map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.name}</option>
+              ))}
+            </Select>
             <div className="grid two">
               <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Reception — English" />
               <Select label="Status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -264,12 +294,20 @@ export default function Voice() {
             </div>
             <div className="grid two">
               <Select label="Voice" value={form.voice} onChange={(e) => setForm({ ...form, voice: e.target.value })}>
-                <option value="aria">aria</option>
-                <option value="marcus">marcus</option>
-                <option value="sofia">sofia</option>
-                <option value="nora">nora</option>
+                {(catalog.voices?.length ? catalog.voices : [
+                  { value: 'aria', label: 'aria' },
+                  { value: 'marcus', label: 'marcus' },
+                  { value: 'sofia', label: 'sofia' },
+                  { value: 'nora', label: 'nora' },
+                ]).map((voice) => (
+                  <option key={voice.value} value={voice.value}>{voice.label}</option>
+                ))}
               </Select>
-              <Input label="Language" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} placeholder="en-US" />
+              <Select label="Language" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+                {(catalog.languages?.length ? catalog.languages : [{ value: 'en-US', label: 'English (United States)' }]).map((language) => (
+                  <option key={language.value} value={language.value}>{language.label}</option>
+                ))}
+              </Select>
             </div>
             <div className="grid two">
               <Input label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="telno-voice-1" />

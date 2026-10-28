@@ -5,6 +5,7 @@ import { hashPassword } from './lib/security.js';
 import { logEvent } from './lib/audit.js';
 import { startTelephony } from './telephony/index.js';
 import { startLineEvents } from './routes/softphone.js';
+import { startFax } from './lib/fax.js';
 import { writeConfigs } from './telephony/provision.js';
 import { startReminderSweep } from './lib/reminders.js';
 import { startRentalSweep } from './lib/rentals.js';
@@ -12,6 +13,7 @@ import { startMonthlyInvoicing } from './lib/invoicing.js';
 import { applyStagedRestore, startBackupSchedule, setRestoreHandler } from './lib/backup.js';
 import { seedCommerce } from './lib/subscriptions.js';
 import { seedBrand } from './lib/brand.js';
+import { ensureConnectedSystems } from './lib/systems.js';
 import { writeFirstRunPassword } from './lib/firstRun.js';
 import { sendWelcome } from './lib/onboarding.js';
 import { randomBytes } from 'node:crypto';
@@ -82,6 +84,9 @@ seedCommerce();
 // The brand defaults are rows too: a white-label deployment edits them in
 // Settings, and a restart must never overwrite that edit.
 seedBrand();
+// The consoles this platform sits beside — including the interview dashboard,
+// which owns its own records — are linked rather than remembered.
+ensureConnectedSystems();
 
 // Generate Asterisk configuration up front so a fresh container can register
 // endpoints before anyone opens the UI.
@@ -98,6 +103,10 @@ if (process.argv.includes('--provision-only')) {
 }
 
 startTelephony();
+// Fax reception is handed over as a receipt file by the dialplan, so a sweep
+// turns what the switch already received into rows — including anything that
+// arrived while the API was restarting.
+startFax();
 // Line events (a call ringing, a call parked) drive the push that wakes a
 // phone. They are followed from boot because the phone that is not in the
 // console is the one that most needs the call.

@@ -49,6 +49,9 @@ const numberView = (row, extra = {}) => ({
   nextBillingAt: row.next_billing_at || null,
   rentedAt: row.rented_at || null,
   releasedAt: row.released_at || null,
+  // How a call to this number is answered: voice, straight to the fax machine,
+  // or voice with T.38 detection handing a fax call over mid-ring.
+  faxMode: row.fax_mode || 'voice',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   ...extra,
@@ -237,6 +240,10 @@ export default async function registryRoutes(app) {
     if (body.carrier !== undefined) patch.carrier = v.str(body.carrier, { name: 'carrier', max: 80, required: false });
     if (body.region !== undefined) patch.region = v.str(body.region, { name: 'region', max: 120, required: false });
     if (body.timezone !== undefined) patch.timezone = v.str(body.timezone, { name: 'timezone', max: 60, required: false });
+    // Fax on this number is a routing decision, and it rewrites the dialplan:
+    // 'fax' answers as a machine, 'auto' answers voice and takes a T.38 call
+    // over when the far end turns out to be one.
+    if (body.faxMode !== undefined) patch.fax_mode = v.oneOf(body.faxMode, ['voice', 'fax', 'auto'], 'faxMode');
     if (body.trust !== undefined) patch.trust_score = v.integer(body.trust, { name: 'trust', min: 0, max: 100 });
     // Handing a number to a customer, or taking it back: by account email, like
     // every other assignment in the console, and '' releases it.

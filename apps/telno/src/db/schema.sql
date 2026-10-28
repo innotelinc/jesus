@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS numbers (
   next_billing_at    TEXT,
   rented_at          TEXT,
   released_at        TEXT,
+  -- How a call to this number is answered: as voice, or straight into the fax
+  -- machine. 'auto' answers voice and hands the call to the fax receiver when
+  -- the caller's terminal negotiates T.38, which is what a fax modem does.
+  fax_mode     TEXT NOT NULL DEFAULT 'voice' CHECK (fax_mode IN ('voice', 'fax', 'auto')),
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -444,6 +448,30 @@ CREATE TABLE IF NOT EXISTS messages (
   sent_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_messages_sent ON messages (sent_at DESC);
+
+-- Internal secure messaging: a message between two people on this platform,
+-- carried by nothing but this database. There is no carrier, no per-message fee
+-- and no third party in the path, which is the whole point of it. The body is
+-- sealed (AES-256-GCM) before it is written, so a copy of the database file is
+-- not a copy of the conversations in it.
+CREATE TABLE IF NOT EXISTS secure_messages (
+  id          TEXT PRIMARY KEY,
+  -- One conversation, named by both participants in a stable order.
+  thread_id   TEXT NOT NULL,
+  direction   TEXT NOT NULL DEFAULT 'outbound' CHECK (direction IN ('inbound', 'outbound')),
+  -- Who wrote it and who it is for, as platform identities (email or extension).
+  from_label  TEXT NOT NULL DEFAULT '',
+  to_label    TEXT NOT NULL DEFAULT '',
+  account_id  TEXT REFERENCES accounts (id) ON DELETE SET NULL,
+  extension   TEXT NOT NULL DEFAULT '',
+  body_cipher TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT 'delivered'
+              CHECK (status IN ('queued', 'delivered', 'read', 'failed')),
+  read_at     TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_secure_messages_thread ON secure_messages (thread_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_secure_messages_account ON secure_messages (account_id, created_at DESC);
 
 -- Billing. Money is integer minor units, never floats, so invoice totals cannot
 -- drift when they are summed.

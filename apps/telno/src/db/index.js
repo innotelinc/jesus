@@ -144,6 +144,14 @@ function migrate(db) {
     ['accounts', 'phone', "TEXT NOT NULL DEFAULT ''"],
     ['accounts', 'phone_verified_at', 'TEXT'],
     ['accounts', 'welcome_sent_at', 'TEXT'],
+    // v21: fax on the switch. A number says whether it answers as voice or as a
+    // fax machine, and a fax row records why a transmission failed instead of
+    // only that it did.
+    ['numbers', 'fax_mode', "TEXT NOT NULL DEFAULT 'voice'"],
+    ['faxes', 'error', "TEXT NOT NULL DEFAULT ''"],
+    // The switch's own file for a fax: the TIFF staged for a send, or the
+    // document a receive produced, so the row points at the artefact.
+    ['faxes', 'station_id', "TEXT NOT NULL DEFAULT ''"],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {

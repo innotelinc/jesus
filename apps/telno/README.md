@@ -691,3 +691,32 @@ Still outstanding, in the order it matters:
 - Voicemail prompts and IVR audio are files on the switch (`custom/telno-<extension>`); recording
   management is out of scope for this version.
 - One container, one tenant. Multi-tenant isolation would need a tenancy key on the registry tables.
+
+## Fax, desk phones and internal messaging
+
+**Fax is a call, not an API.** `res_fax` (with spandsp) runs on the switch and uses the SIP trunk voice
+already uses. T.38 is preferred and G.711 passthrough is the fallback, so a fax works with a carrier that
+refuses T.38 — and nothing is billed per page, because no carrier fax service is involved.
+
+- A number's `faxMode` decides how it answers: `voice`, `fax` (straight to the machine) or `auto`
+  (answer as a line and hand the call over the moment the far end negotiates T.38).
+- Inbound documents are written to the data volume by the dialplan and turned into rows by a sweep, so a
+  fax that arrived while the API was restarting is not lost.
+- Outbound: a PDF, a scan or a typed page is rasterised to TIFF with ghostscript and transmitted with
+  `SendFax`. A refusal is recorded on the row with the switch's own reason.
+
+**Desk phones provision themselves at `telno.tel`.** Point DHCP Option 66 (or the phone's provisioning
+URL) at `https://telno.tel` and a handset fetches `/<vendor>/<mac>.cfg` by MAC — Yealink, Grandstream and
+Polycom are generated. The SIP account in the config registers as `sip:<extension>@telno.tel` on UDP 5060,
+which is the listener the switch actually has. A MAC that is not in the inventory is 404, so the endpoint
+cannot be used to enumerate extensions. Each fetch rotates the check-in token, so the file is the only
+copy of it.
+
+**Internal secure messaging** is the zero-cost channel: messages between people on this deployment are
+sealed with AES-256-GCM before they are stored, delivered in the app, and carried by nobody else. There is
+no carrier and no per-message fee — the alternative is a paid gateway that meters both ends of the same
+message. Each participant sees only their own copy.
+
+**Workflows and voice agents start from recipes.** Instead of typing a mini-language from memory, pick a
+recipe (missed-call text-back, after-hours, escalation, appointment booking, support triage) and edit the
+steps it gives you. Every field stays editable; what is created is an ordinary workflow or agent.

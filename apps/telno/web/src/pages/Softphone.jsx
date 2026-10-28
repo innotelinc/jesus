@@ -194,6 +194,37 @@ export default function Softphone() {
   const keepRef = useRef(keep);
   const callRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
+  // Call progress and audio routing. A dial that says only "dialing" until it
+  // connects leaves the operator unable to tell ringing from a dead line, so the
+  // SIP responses are surfaced as words; and the remote audio is its own element
+  // so volume and output device can be controlled at all.
+  const [outcome, setOutcome] = useState(null);
+  const [volume, setVolume] = useState(1);
+  const [sinkId, setSinkId] = useState('');
+  const remoteAudioRef = useRef(null);
+  const outcomeAtRef = useRef({ at: 0, code: 0 });
+
+  // Every way an outbound call can end without being answered, in plain words.
+  const CALL_REFUSALS = {
+    404: 'That number is not reachable',
+    408: 'The other end never replied',
+    480: 'Nobody answered',
+    486: 'The line is busy',
+    487: 'The call was cancelled',
+    488: 'No compatible codec',
+    503: 'The trunk is not available',
+    603: 'The call was declined',
+  };
+
+  const reportOutcome = (code, fallback = 'The call did not connect') => {
+    // The same refusal arrives twice — once as a SIP response and again when the
+    // session terminates — and two identical errors read as two failures.
+    if (Date.now() - outcomeAtRef.current.at < 4000 && outcomeAtRef.current.code === (code || 0)) return;
+    outcomeAtRef.current = { at: Date.now(), code: code || 0 };
+    const text = CALL_REFUSALS[code] || fallback;
+    setOutcome({ code: code || 0, text });
+    toast.error(text, code ? `The switch heard ${code}.` : 'No response from the far end.');
+  };
 
   const loadDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -202,11 +233,48 @@ export default function Softphone() {
       setDevices({
         mics: list.filter((d) => d.kind === 'audioinput'),
         cams: list.filter((d) => d.kind === 'videoinput'),
+        outputs: list.filter((d) => d.kind === 'audiooutput'),
       });
     } catch {
       /* permission not granted yet: the pickers stay empty until it is */
     }
   }, []);
+
+  /**
+   * Route the call's audio to a chosen output.
+   *
+   * `setSinkId` is what makes a speakerphone a speakerphone: without it every
+   * call plays into whichever device the browser picked, which on a laptop is a
+   * headset nobody plugged in. A browser that does not implement it (Safari)
+   * keeps the system default and says so instead of pretending.
+   */
+  const applyOutput = async (deviceId) => {
+    const audio = remoteAudioRef.current;
+    if (audio && typeof audio.setSinkId === 'function') {
+      try {
+        await audio.setSinkId(deviceId || '');
+        setSinkId(deviceId || '');
+      } catch (err) {
+        toast.error('Could not switch output', err.message);
+      }
+      return;
+    }
+    setSinkId(deviceId || '');
+  };
+
+  /** Prefer a real speaker when there is one; otherwise cycle the outputs. */
+  const toggleSpeaker = async () => {
+    const outputs = devices.outputs || [];
+    if (!outputs.length) return;
+    const speaker = outputs.find((d) => /speaker|speakerphone|external|display/i.test(d.label || ''));
+    const next = speaker && speaker.deviceId !== sinkId ? speaker : outputs.find((d) => d.deviceId !== sinkId) || outputs[0];
+    await applyOutput(next?.deviceId || '');
+  };
+
+  useEffect(() => {
+    const audio = remoteAudioRef.current;
+    if (audio) audio.volume = volume;
+  }, [volume]);
 
   useEffect(() => {
     (async () => {
@@ -351,6 +419,9 @@ export default function Softphone() {
     setSharing(false);
     setSecure(null);
     setElapsed(0);
+    // Reset here too: a completed call must not make the next failed dial look
+    // like it was answered, or the refusal would never be reported.
+    startedAtRef.current = 0;
     sendPresence('idle', '');
     wsRef.current?.send(JSON.stringify({ type: 'bye' }));
   }, [sendPresence, stopMedia]);
@@ -488,6 +559,10 @@ export default function Softphone() {
               if (remoteVideoRef.current) {
                 remoteVideoRef.current.srcObject = remote;
                 remoteVideoRef.current.play?.().catch(() => {});
+              }
+              if (remoteAudioRef.current) {
+                remoteAudioRef.current.srcObject = remote;
+                remoteAudioRef.current.play?.().catch(() => {});
               }
               const local = new MediaStream();
               pc.getSenders().forEach((sender) => sender.track && local.addTrack(sender.track));
@@ -636,7 +711,7 @@ export default function Softphone() {
   useEffect(() => {
     const space = parkSpaceRef.current;
     if (!space || regState !== 'registered') return;
-    if (call?.state === 'incall' || call?.state === 'dialing') return;
+    if (call?.state === 'incall' || call?.state === 'dialing' || call?.state === 'ringing') return;
     // Claimed before dialing: the space is one attempt, not a number to redial
     // every time the call state changes.
     parkSpaceRef.current = '';
@@ -737,7 +812,21 @@ export default function Softphone() {
       sessionDescriptionHandlerOptions: { constraints: media },
     });
     constraintsRef.current = media;
+    // The far end talks back in SIP responses before it answers: 180 and 183 are
+    // "it is ringing", and a refusal has its own code. Without these a dial sits
+    // on "dialing" through a busy signal and reports nothing at all.
+    inviter.delegate = {
+      onProgress: (response) => {
+        const code = response?.message?.statusCode;
+        if (code === 180 || code === 183) {
+          setCall((current) => (current && current.state === 'dialing' ? { ...current, state: 'ringing' } : current));
+        }
+      },
+      onReject: (response) => reportOutcome(response?.message?.statusCode),
+      onRedirect: () => reportOutcome(302, 'The number has been redirected'),
+    };
     setCall({ state: 'dialing', direction: 'outbound', peer: target });
+    setOutcome(null);
     setSecure(null);
     sendPresence('dialing', target);
     wsRef.current?.send(JSON.stringify({ type: 'dial', to: target, video: settings.video }));
@@ -755,6 +844,12 @@ export default function Softphone() {
             remoteVideoRef.current.srcObject = remote;
             remoteVideoRef.current.play?.().catch(() => {});
           }
+          // Audio plays through its own element so the volume slider and the
+          // speaker switch act on the call and nothing else.
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remote;
+            remoteAudioRef.current.play?.().catch(() => {});
+          }
           const local = new MediaStream();
           pc.getSenders().forEach((sender) => sender.track && local.addTrack(sender.track));
           localStreamRef.current = local;
@@ -764,7 +859,11 @@ export default function Softphone() {
         }
       }
       if (state === 'Terminated') {
+        // A call that ends before it was answered is a refusal, not a call that
+        // happened: say why once, from the inviter's own response.
+        if (!startedAtRef.current) reportOutcome(inviter.inviteResponse?.message?.statusCode);
         sessionRef.current = null;
+        startedAtRef.current = 0;
         stopMedia();
         setCall(null);
         setSecure(null);
@@ -1261,6 +1360,32 @@ export default function Softphone() {
                 <Button variant="ghost" icon={muted ? 'micOff' : 'mic'} onClick={toggleMute} disabled={!inCall}>
                   {muted ? 'Unmute' : 'Mute'}
                 </Button>
+                <span className="row" style={{ gap: 6, alignItems: 'center' }} title="Call volume">
+                  <Icon name="volume" size={14} />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.02"
+                    value={volume}
+                    onChange={(event) => setVolume(Number(event.target.value))}
+                    aria-label="Call volume"
+                    style={{ width: 96 }}
+                  />
+                </span>
+                <Button
+                  variant={sinkId ? 'primary' : 'ghost'}
+                  icon="speaker"
+                  onClick={toggleSpeaker}
+                  disabled={!inCall || !(devices.outputs || []).length || typeof remoteAudioRef.current?.setSinkId !== 'function'}
+                  title={
+                    typeof remoteAudioRef.current?.setSinkId === 'function'
+                      ? 'Route the call to another output device'
+                      : 'This browser cannot choose an output device'
+                  }
+                >
+                  Speaker
+                </Button>
                 <Button variant="ghost" icon={cameraOn ? 'video' : 'videoOff'} onClick={toggleCamera} disabled={!inCall || !status.video}>
                   Camera
                 </Button>
@@ -1275,17 +1400,28 @@ export default function Softphone() {
               )}
 
               <div className="softphone-stage">
-                <video ref={remoteVideoRef} className="remote" autoPlay playsInline />
+                {/* Audio is its own element: volume and output device act on the call. */}
+                <audio ref={remoteAudioRef} autoPlay playsInline />
+                <video ref={remoteVideoRef} className="remote" autoPlay playsInline muted />
                 <video ref={localVideoRef} className="local" autoPlay playsInline muted />
                 {!call ? (
                   <div className="stage-hint">
                     <Icon name="phone" size={20} />
                     <span>Ready on {session.extension.extension}</span>
+                    {outcome ? (
+                      <span className="tiny" style={{ color: 'var(--danger)' }}>
+                        Last call: {outcome.text}{outcome.code ? ` (${outcome.code})` : ''}
+                      </span>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="stage-badge">
                     <Badge tone={call.state === 'incall' ? 'success' : 'warning'} dot={call.state === 'incall' ? 'live' : 'warn'}>
-                      {call.state === 'incall' ? fmtDuration(elapsed) : call.state}
+                      {call.state === 'incall'
+                        ? fmtDuration(elapsed)
+                        : call.state === 'ringing'
+                          ? (call.direction === 'outbound' ? 'Ringing…' : 'Incoming')
+                          : 'Dialing…'}
                     </Badge>
                     {call.direction === 'inbound' ? <Badge tone="info">inbound</Badge> : null}
                     {secure ? <Badge tone="success">DTLS-SRTP</Badge> : null}
