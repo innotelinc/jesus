@@ -118,6 +118,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - run: npm run audit:deps
@@ -218,6 +219,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - name: Restore ESLint file cache
         uses: actions/cache@v6
@@ -327,6 +329,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       # Dead-code, cognitive-complexity, type-coverage foram promovidos ao job
       # quality-gate (bloqueante) na Fase 7 INT — não rodam aqui para evitar duplo custo.
@@ -443,6 +446,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:docs-all
       # Previously-orphaned contract gates (existed as files, never wired anywhere).
@@ -479,6 +483,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - name: markdownlint (docs + root, advisory)
         run: npx --yes markdownlint-cli2 "docs/**/*.md" "*.md" "!docs/i18n" "!docs/research" || true
       - name: Vale prose lint (Microsoft style, advisory)
@@ -511,6 +516,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: node scripts/i18n/check-ui-keys-coverage.mjs --threshold=65
       # #8463: a rewritten English value used to leave its 39 translations behind
@@ -539,6 +545,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: node scripts/i18n/check-glossary-consistency.mjs --locale=zh-CN
       - run: node scripts/i18n/check-glossary-consistency.mjs --locale=zh-TW
@@ -670,6 +677,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       # NOTE: the webpack `.build/next/cache` actions/cache step was removed with the
@@ -722,6 +730,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - name: Download Next.js build artifact
@@ -817,6 +826,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - name: Download Next.js build artifact
@@ -888,6 +898,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       # QW-d (plano mestre): fonte única — o MESMO npm script dos runs locais (adiciona o
@@ -948,6 +959,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - name: Install Bun (Windows)
         if: runner.os == 'Windows'
@@ -986,6 +998,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       # The second test runner (CLAUDE.md: "Both test runners must pass") — was never
       # wired into CI until the 2026-06-09 quality audit (Fase 6A.2).
@@ -1035,6 +1048,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - name: Download all shard coverage
         uses: actions/download-artifact@v8
@@ -1285,6 +1299,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - name: Cache Playwright browsers
@@ -1360,6 +1375,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - name: Integration tests (shard ${{ matrix.shard }}/2)
@@ -1385,6 +1401,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - run: npm run test:security
@@ -1413,6 +1430,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - run: npm run test:ecosystem
@@ -1442,6 +1460,7 @@ jobs:
         with:
           node-version: ${{ env.CI_NODE_VERSION }}
           cache: npm
+          cache-dependency-path: apps/omniroute/package-lock.json
       - uses: ./apps/omniroute/.github/actions/npm-ci-retry
       - run: npm run check:node-runtime
       - run: npm run test:protocols:e2e

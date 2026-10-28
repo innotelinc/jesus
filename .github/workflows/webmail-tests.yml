@@ -45,6 +45,7 @@ jobs:
           # no .nvmrc or "engines" field to read it from.
           node-version: 22
           cache: npm
+          cache-dependency-path: apps/webmail/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -70,6 +71,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: apps/webmail/package-lock.json
 
       - name: Install dependencies
         run: npm ci
