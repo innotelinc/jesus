@@ -110,11 +110,45 @@ patient once.
 
 ## CI
 
-GitHub only runs workflows from the **root** `.github/workflows`. The workflows each project
-shipped with are preserved inside its directory (for example
-[apps/cantus/.github/workflows/ci.yml](apps/cantus/.github/workflows/ci.yml)) but will not trigger
-from here. Until they are ported to path-filtered root workflows, the standalone repositories
-remain the places where those pipelines run.
+GitHub only runs workflows from the **root** `.github/workflows`, so each app's test workflow has a
+copy there, and only that copy runs. Every one is path-filtered: a push that touches one app starts
+one app's pipeline, not thirteen.
+
+| App | Root workflows |
+|---|---|
+| cantus | `cantus-ci.yml` |
+| capstone | `capstone-ci.yml` |
+| claude-mem | `claude-mem-ci.yml`, `claude-mem-ods-native.yml`, `claude-mem-windows.yml` |
+| dograh | `dograh-api-tests.yml`, `dograh-pre-pr-drift-check.yml` |
+| freebuff | `freebuff-ci.yml` |
+| genie-soulforge | `genie-soulforge-ci.yml` |
+| omniroute | `omniroute-ci.yml` |
+| ontrak | `ontrak-ci.yml` |
+| ontrak-mcp | `ontrak-mcp-ci.yml` |
+| opensms-android | `opensms-android-ci.yml` |
+| rea | `rea-ci.yml` plus the thirteen `rea-*.yml` reusable workflows it calls |
+| telno | `telno-ci.yml` |
+| webmail | `webmail-ci.yml`, `webmail-tests.yml`, `webmail-perf-guard.yml` |
+
+The originals stay in `apps/<app>/.github/workflows` as the source of truth. The root copies are
+**generated** from them by [tools/port-workflows.pl](tools/port-workflows.pl), which handles the
+only things the extra directory level changes: the `on:` path filters, a job-wide
+`working-directory: apps/<app>`, `./` references to each app's local actions and reusable
+workflows, `github.workspace`, `hashFiles()` globs, and per-app concurrency groups.
+
+```sh
+perl tools/port-workflows.pl          # rewrite the root copies
+perl tools/port-workflows.pl --check  # exit 1 if they are stale
+```
+
+Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
+says so in its first comment.
+
+**Release, publish, deploy, and Pages workflows are deliberately not ported.** In a monorepo a push
+to `main` would publish thirteen artefacts, thirteen images and thirteen Pages sites instead of one,
+and several of them target per-repository state that does not exist here. They remain in
+`apps/<app>/.github/workflows` to document each project's release process; releases still run from
+the standalone repositories.
 
 ## Updating a project from its standalone repository
 

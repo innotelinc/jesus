@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATED FILE — edit the source, not this copy.
+#
+#   source:      apps/claude-mem/.github/workflows/ods-native.yml
+#   regenerate:  perl tools/port-workflows.pl
+#
+# The copy exists because GitHub only reads workflows from the repository root.
+# This one runs only when apps/claude-mem/** changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: "claude-mem: Native ODS integration"
+
+on:
+  pull_request:
+    paths: ['apps/claude-mem/ods/**', '.github/workflows/claude-mem-ods-native.yml']
+  push:
+    branches: [main]
+    paths: ['apps/claude-mem/ods/**', '.github/workflows/claude-mem-ods-native.yml']
+
+defaults:
+  run:
+    working-directory: apps/claude-mem
+
+permissions:
+  contents: read
+
+jobs:
+  native-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/checkout@v4
+        with:
+          repository: Osmantic/ODS
+          ref: c99f52822f2c37813fd880004f964ca83dfc5a35
+          path: apps/claude-mem/fixtures/ods
+          sparse-checkout: |
+            ods/extensions/services/pixel-agent
+            ods/installers/lib
+      - name: Native adapter and reversible installer
+        env:
+          ODS_TEST_REPO: ${{ github.workspace }}/apps/claude-mem/fixtures/ods
+        run: node --test ods/test/native.test.mjs ods/test/install.test.mjs
+      - name: Prepare native ODS sources
+        run: node ods/install.mjs --ods-dir fixtures/ods
+      - name: ODS ingress capture, recall and replay
+        env:
+          ODS_TEST_ROOT: ${{ github.workspace }}/apps/claude-mem/fixtures/ods/ods
+        run: node --test ods/test/ingress.test.mjs

@@ -1,0 +1,543 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATED FILE — edit the source, not this copy.
+#
+#   source:      apps/capstone/.github/workflows/ci.yml
+#   regenerate:  perl tools/port-workflows.pl
+#
+# The copy exists because GitHub only reads workflows from the repository root.
+# This one runs only when apps/capstone/** changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ci.yml — static analysis on push and pull requests, plus the live gates.
+#
+# The ShellCheck job runs over every tracked shell script (scripts/*.sh plus
+# the .githooks helpers) with bash semantics. The repo is maintained at zero
+# findings: intentional patterns (dynamic .env source, the $ASTERISK
+# command-string split, node -e template literals) are documented with inline
+# shellcheck directives, so this job fails the build if a commit reintroduces
+# any warning, error, or note.
+#
+# The secret-scan job is the backstop the pre-commit hook names: the hook sees
+# only the added lines of one commit, so this scans the whole tracked tree.
+#
+# Three jobs look at the running estate rather than the tree — sso-smoke,
+# dograh-image-drift and npm-smoke. They exit 2 when they cannot reach it,
+# which is reported as a skip: a hosted runner has no route to the stack, so
+# that is the expected outcome there, and a runner with one turns each into a
+# gate. Because their failures are time-dependent (a certificate, an expired
+# token, an image rebuilt from the wrong tag) they also run on the schedule
+# below, not only when someone pushes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: "capstone: CI"
+
+on:
+  push:
+    paths:
+      - "apps/capstone/**"
+      - ".github/workflows/capstone-ci.yml"
+    branches: [main]
+  pull_request:
+    paths:
+      - "apps/capstone/**"
+      - ".github/workflows/capstone-ci.yml"
+  # The SSO job below talks to live hosts, so an operator needs to be able to
+  # re-run it on its own (after rotating the token, or when the provider was
+  # down during the last push) without inventing a commit to trigger it.
+  workflow_dispatch:
+  # The live jobs (sso-smoke, dograh-image-drift, npm-smoke) exist for the
+  # failures a push is not there to see: a certificate that rotates into the
+  # wrong chain, a forward_host that loses its upstream, the sign-in token
+  # expiring, an image rebuilt from the registry's tag. They run daily so one of
+  # those is caught by the schedule instead of by a user. The static jobs run
+  # with them — a daily re-scan of the tree costs a runner and nothing else.
+  schedule:
+    - cron: "23 6 * * *"
+
+defaults:
+  run:
+    working-directory: apps/capstone
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ShellCheck tracked shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files '*.sh' '.githooks/*')
+          echo "Checking ${#scripts[@]} scripts"
+          docker run --rm -v "$PWD":/mnt:ro -w /mnt \
+            koalaman/shellcheck:v0.10.0 -s bash "${scripts[@]}"
+
+  # The pre-commit hook only reads the ADDED lines of what is being committed, so
+  # a credential already in the tree — one that predates the hook, or one that
+  # arrived in a file the hook had no reason to rescan — is invisible to it. This
+  # job is the other half .githooks/secret-scan.sh points at: the whole tracked
+  # tree at every push. It is the same scanner, so it flags exactly what the hook
+  # would have, with the value masked; a rule exemption (test fixtures, a
+  # NEXT_PUBLIC_ value the framework inlines, a fetch mode) applies here too, and
+  # none of them can hide a provider-key shape.
+  secret-scan:
+    name: Credential scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Scan every tracked file for literal secrets
+        run: python3 scripts/secret-scan.py
+
+  pbx-converge:
+    name: PBX converge tool
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Unit tests for the per-context dialplan merge tool
+        run: python3 -m unittest discover -s pbx/tests -v
+
+      - name: Convergence smoke (capstone fragments are self-stable)
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          touch "$tmp/extensions_custom.conf"
+          python3 pbx/asterisk_converge.py --target "$tmp/extensions_custom.conf" \
+            --source pbx/asterisk/extensions_custom.conf --owner capstone \
+            --append from-internal-custom
+          python3 pbx/asterisk_converge.py --target "$tmp/extensions_custom.conf" \
+            --source pbx/asterisk/extensions_custom.conf --owner capstone \
+            --append from-internal-custom --check
+
+  # Zeus portal API client (add-on mode, Phase 2): stdlib client implementing
+  # the zeus docs/portal-api.md contract. Tests mock urlopen — no network, no
+  # Zeus, no .env required.
+  zeus-client:
+    name: Zeus portal API client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Unit tests for the Zeus portal API client
+        run: python3 -m unittest discover -s scripts/tests -v
+
+  # Magnate entitlement gate for the dograh route sync: dry-runs the REAL
+  # sync_dograh_routes.py --check through every gate state (standalone,
+  # disabled, entitled, not-entitled, plan 404, unauthorized abort,
+  # unreachable fail-open) against stubbed dograh/FreePBX/Magnate HTTP
+  # servers and a fake `docker` — no PBX, no Magnate, no network required.
+  dograh-sync-gate:
+    name: Route sync Magnate gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dry-run every Magnate gate state
+        run: python3 scripts/test_dograh_routes_gate.py
+
+  # Sign-in is the one path where every failure — a credential that was never
+  # resolved, a proxy that follows a redirect server-side, group admission, a
+  # provisioning crash — renders as the same browser message, "Sign-in could
+  # not be completed". Reading the config therefore proves nothing; the chain
+  # has to be walked. scripts/ci/sso-smoke.py walks it with a temporary
+  # identity (deleted afterwards) and, because the provider subject is derived
+  # from the user id, a second pass puts the same address under a NEW subject —
+  # the collision that used to abort provisioning with a UniqueViolationError.
+  #
+  # It exits 2 when it CANNOT run — no token secret, or an identity provider
+  # this runner cannot reach — which is reported as a skip, not a pass: a
+  # hosted runner cannot resolve auth.cerulean.innotel.us, so a skip is the
+  # expected outcome there. Only a real failure (exit 1) fails the build. Give
+  # a runner with a route to the stack AUTHENTIK_TOKEN and this becomes a gate.
+  sso-smoke:
+    name: SSO sign-in chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Walk a real sign-in: fresh identity, then its address under a new subject"
+        env:
+          AUTHENTIK_TOKEN: ${{ secrets.AUTHENTIK_TOKEN }}
+          DOGRAH_BASE: ${{ vars.DOGRAH_BASE || 'https://dograh.pbx.it.com' }}
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/ci/sso-smoke.py || rc=$?
+          case "$rc" in
+            0) echo "::notice::the sign-in chain completed end to end" ;;
+            2) echo "::notice::skipped — no AUTHENTIK_TOKEN secret, or this runner cannot reach the identity provider" ;;
+            *) echo "::error::the sign-in chain is broken — see the log above"; exit "$rc" ;;
+          esac
+
+  # The running stack can drift from this repo in a way no static check sees:
+  # dograh/upstream is gitignored and this repo's fixes to it are commits on the
+  # fork. An image built from the registry's ghcr.io tag — or one built before
+  # the last sync — answers every config check in this file and still renders
+  # the pre-fix dead end. This job hashes the files our delta touches in the
+  # running dograh-api against the fork's tree, and asks dograh-ui for the
+  # compiled output of the OIDC fix.
+  #
+  # It exits 2 when it cannot look — no clone, no docker, or the containers are
+  # not running here — reported as a skip, not a pass, exactly like the SSO job
+  # above. Only real drift (exit 1) fails the build.
+  dograh-image-drift:
+    name: Dograh image drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare the running images against the fork's tree
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/ci/check-dograh-image-drift.py || rc=$?
+          case "$rc" in
+            0) echo "::notice::the running dograh images carry the fork's tree" ;;
+            2) echo "::notice::skipped — no fork clone, no docker, or the containers do not run on this runner" ;;
+            *) echo "::error::a running dograh image drifted from the fork's tree — see the log above"; exit "$rc" ;;
+          esac
+
+  # Every hostname in this estate is reached through the NPM edge, and the edge
+  # fails in ways a single push cannot see: a certificate, a forward_host that
+  # lost its upstream, an origin serving the wrong UI image. This walks every
+  # host through the public edge (strict TLS, no certificate skipping), reads
+  # each answer, and names the one request that separates a patched voice UI
+  # from a registry-built one (scripts/npm-smoke-test.py). Reporting WHICH host
+  # failed is the point of putting it on the schedule rather than leaving it to
+  # whoever notices — the script's last line is exactly that list.
+  #
+  # Exit 2 = the edge did not answer at all (no route to the estate, the
+  # hosted-runner case) → a skip. Exit 1 = a named host failed → the build.
+  npm-smoke:
+    name: NPM edge smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Probe every proxy host through the edge
+        env:
+          # `capstone.innotel.us` is a redirect-only alias at the edge — the
+          # proxy hosts live under `pbx.it.com`, so a probe against the alias
+          # resolves DNS and then dies on the TLS handshake for every host it
+          # derives. Override with the `NPM_BASE_DOMAIN` repository variable on
+          # a deployment that serves the stack on another domain.
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'pbx.it.com' }}
+        run: |
+          set -uo pipefail
+          log=$(mktemp)
+          rc=0
+          python3 scripts/npm-smoke-test.py --base-domain "$NPM_BASE_DOMAIN" 2>&1 | tee "$log" || rc=$?
+          case "$rc" in
+            0) echo "::notice::every proxy host answered" ;;
+            2) echo "::notice::skipped — this runner has no route to the estate" ;;
+            *)
+              failed=$(sed -n 's/.*unhealthy: //p' "$log" | tail -1)
+              echo "::error title=NPM edge smoke::host(s) unhealthy: ${failed:-see the log above}"
+              exit "$rc"
+              ;;
+          esac
+
+  # Cerulean tenant gate: the Authentik group-NAME → tenant-slug matching that
+  # decides whether a signed-in user may use the control center at all (the
+  # dashboard's own "no tenant here" gate). The tenant gate itself is pure
+  # stdlib, but the same directory holds the route-level API tests, which
+  # import fastapi/httpx and pass over silently in a bare interpreter — 46 of
+  # 230 cases were being skipped here. Installing the module's own requirements
+  # first makes them run instead of skip.
+  dashboard-tenant-gate:
+    name: Dashboard tenant gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dashboard-api dependencies
+        run: python3 -m pip install --quiet -r dashboard-backend/requirements.txt
+
+      - name: Unit tests for the tenant gate + the API routes
+        run: python3 -m unittest discover -s dashboard-backend/tests -v
+
+  dashboard-build:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/capstone/dashboard
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/capstone/dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `lint` was declared in package.json with no eslint dependency and no
+      # config, so it could only ever fail; the config is committed now and this
+      # is what keeps it honest.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check + production build (tsc && vite build)
+        run: npm run build
+
+  # The unit tests mount pages against mocked modules and never run the built
+  # bundle in a real browser, so a page can be green there and still fail where
+  # an operator looks: a chunk that 404s, a route that no longer matches, a
+  # render that throws on real JSON. This loads the production bundle in
+  # headless Chromium (dashboard/e2e/smoke.mjs), stubs the aggregator, and
+  # asserts the operator entry points actually paint — with no uncaught error
+  # and no failed request behind them. It is hermetic (no estate, no backend),
+  # so it always runs rather than skipping like the live jobs above.
+  #
+  # Point it at a real deployment with CAPSTONE_BASE (and CAPSTONE_COOKIE to
+  # walk it authenticated); a base this runner cannot reach is reported as a
+  # skip (exit 2), matching scripts/ci/sso-smoke.py.
+  dashboard-ui-smoke:
+    name: Dashboard browser smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/capstone/dashboard
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/capstone/dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the production bundle
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Walk the operator pages in a real browser
+        run: npm run smoke
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-ui-smoke-artifacts
+          path: apps/capstone/dashboard/e2e/artifacts
+          if-no-files-found: ignore
+
+  # Regression guard: user-facing hosts must never be localhost or docker
+  # bridge IPs. setup.sh's old LAN-IP detector picked docker0's 172.17.0.1 and
+  # baked it into .env, which leaked into every dashboard link, port host, and
+  # the softphone STUN/TURN config; the dashboard's fallback data also shipped
+  # docker-subnet (10.42.x) hosts. This job fails if any of that class of
+  # value reappears in the files where it is never legitimate (comments and
+  # historical changelog entries are fine, which is why the greps are scoped).
+  config-guard:
+    name: No docker-IP / localhost leaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Dashboard fallback data has no docker-bridge IPs or localhost links
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if grep -nE "10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.|http://localhost:[0-9]+" "$f"; then
+              echo "::error file=$f::docker-bridge IP or localhost link in dashboard fallback data"
+              bad=1
+            fi
+          done < <(git ls-files 'dashboard/src/**')
+          exit $bad
+
+      - name: Env template has no docker-bridge IPs outside comments
+        run: |
+          set -euo pipefail
+          bad=0
+          # Comment lines (e.g. the detector explainer in .env.example) may
+          # mention 172.16.0.0/12 / 172.17.0.1 as examples; values may not.
+          if hits=$(grep -nE '10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.' <(grep -vE '^\s*#' .env.example)); then
+            echo "$hits"
+            echo "::error file=.env.example::docker-bridge IP in env template value"
+            bad=1
+          fi
+          exit $bad
+
+      - name: Landing pages have no docker-bridge IPs or localhost links
+        run: |
+          set -euo pipefail
+          bad=0
+          while IFS= read -r f; do
+            if grep -nE "10\.42\.|172\.(1[6-9]|2[0-9]|3[01])\.|http://localhost:[0-9]+" "$f"; then
+              echo "::error file=$f::docker-bridge IP or localhost link in landing page"
+              bad=1
+            fi
+          done < <(git ls-files 'web/**')
+          exit $bad
+
+      # The project rule (README → Addressing): a service target is this host's
+      # LAN IP — never a docker-bridge address. This job keeps that true where
+      # targets are defined, so a docker address cannot quietly come back in as
+      # the address one service dials another. Comments are stripped before the
+      # match, and CIDRs are left alone: scripts/install-fail2ban.sh keeps
+      # 172.16.0.0/12 + 10.0.0.0/8 on purpose as *firewall exemptions*, not
+      # service addresses.
+      - name: Service targets carry no docker addresses
+        run: |
+          set -euo pipefail
+          bad=0
+          # A docker-bridge address used as a value (not a CIDR range, not a
+          # comment). The trailing group rejects 172.16.0.0/12 style ranges.
+          #
+          # Published-port bindings are excluded: `- "172.17.0.1:20128:20128"`
+          # is a LISTEN address, not a target. The rule this job enforces is
+          # about the address one service dials another through (README →
+          # Addressing); omniroute's host-gateway binding is deliberate — it is
+          # what lets a bridge container reach it at host.docker.internal
+          # without exposing the dashboard on the LAN. What the exclusion looks
+          # for is the `ip:hostport:containerport` shape only, so a target
+          # written either way (`KEY=value` or `- KEY=value`) is still caught.
+          while IFS= read -r f; do
+            if hits=$(sed 's/#.*//' "$f" \
+                 | grep -vE '^[[:space:]]*-[[:space:]]*["'"'"']?[0-9.]+:[0-9]+:[0-9]+(/(udp|tcp))?["'"'"']?[[:space:]]*$' \
+                 | grep -nE '(172\.(1[6-9]|2[0-9]|3[01])\.|10\.42\.)[0-9]{1,3}\.[0-9]{1,3}([^0-9/]|$)'); then
+              echo "::error file=$f::docker-bridge address used as a service target"
+              echo "$hits"
+              bad=1
+            fi
+          done < <(git ls-files 'docker-compose*.yml' pbx scripts .env.example)
+          exit $bad
+
+      # The same rule from the other side: a voice-path target may not be a
+      # docker alias, a loopback name, or a compose service name either — the
+      # address a service dials is the host LAN IP (README → Addressing). Scoped
+      # to the fragments Asterisk itself loads and to the keys that carry a
+      # voice-path target, so the `host.docker.internal` targets other services
+      # keep on purpose (with `extra_hosts: host-gateway`) stay untouched.
+      - name: Voice-path targets are the host LAN IP
+        run: |
+          set -euo pipefail
+          bad=0
+
+          # A fragment Asterisk loads must not name the docker alias: the PBX
+          # container carries no extra_hosts entry, so ast_sockaddr_resolve fails
+          # and STUN/media die silently. `;` is the comment leader in Asterisk
+          # conf files. pbx/entrypoint-dograh.sh is deliberately out of scope —
+          # it is the code that repairs a leftover alias.
+          while IFS= read -r f; do
+            if hits=$(sed 's/;.*//' "$f" | grep -nE 'host\.docker\.internal'); then
+              echo "::error file=$f::docker alias in a fragment Asterisk loads"
+              echo "$hits"
+              bad=1
+            fi
+          done < <(git ls-files pbx/asterisk)
+
+          # A key that carries a voice-path target holds the LAN IP, a reference
+          # to a variable that does (PJSIP_MEDIA_ADDRESS / LAN_IP /
+          # dograh_lan_ip), or nothing at all. Anything else — a service name,
+          # localhost, a docker alias — is exactly the failure this exists to
+          # stop. ansible/group_vars is in scope because it is where the ARI
+          # endpoint is set, and the playbook PUTs that value on every run: a
+          # loopback default there silently reverses the whole rule. The same
+          # goes for DOGRAH_ARI_ENDPOINT, the endpoint dograh's ARI manager
+          # dials.
+          keys='ASTERISK_AMI_HOST|DOGRAH_ARI_HOST|DOGRAH_ARI_ENDPOINT|DOGRAH_WS_URI|PJSIP_MEDIA_ADDRESS|PJSIP_STUN_TURN_ADDR|NPM_UPSTREAM_HOST|dograh_ari_endpoint|dograh_lan_ip'
+          while IFS= read -r f; do
+            if hits=$(sed 's/#.*//' "$f" \
+                        | grep -E "^[[:space:]]*(${keys})[[:space:]]*[:=]" \
+                        | sed -E "s/^[[:space:]]*(${keys})[[:space:]]*[:=][[:space:]]*//; s/[\"' ]//g" \
+                        | grep -vE '^\$|^$|192\.168\.|PJSIP_MEDIA_ADDRESS|LAN_IP|dograh_lan_ip'); then
+              echo "::error file=$f::voice-path target is not the host LAN IP"
+              printf '  %s\n' "$hits"
+              bad=1
+            fi
+          done < <(git ls-files 'docker-compose*.yml' .env.example ansible/group_vars)
+          exit $bad
+
+      # The same rule from the host side: the scripts that probe and configure
+      # the PBX dial the address the services dial. 8088 has no loopback leg any
+      # more, so `127.0.0.1:8088` in a script either reports a healthy PBX as
+      # down (the smoke tests) or writes an unreachable endpoint into dograh's
+      # telephony config (dograh_wire.py). They resolve it instead —
+      # DOGRAH_ARI_ENDPOINT, then DOGRAH_ARI_HOST/PORT, then
+      # PJSIP_MEDIA_ADDRESS, then the route-selected LAN IP. 8089 keeps a
+      # loopback leg and is deliberately not matched.
+      - name: Host-side scripts dial the LAN IP, not loopback
+        run: |
+          set -euo pipefail
+          bad=0
+          # A probe made INSIDE the container is not dialing from here, and is
+          # the only correct way to ask whether ARI is listening there (8088 is
+          # published on the host LAN IP; the container's own loopback is the
+          # other view of the same socket). Those lines are skipped, so the
+          # rule keeps meaning "the address a script dials from the host"
+          # instead of flagging the probe that script depends on. The line
+          # numbers stay the file's own because the filter runs after `-n`.
+          while IFS= read -r f; do
+            if hits=$(grep -nE '(127\.0\.0\.1|localhost):8088' "$f" | grep -vE 'docker exec'); then
+              echo "::error file=$f::script dials ARI on loopback — 8088 is published on the host LAN IP"
+              echo "$hits"
+              bad=1
+            fi
+          done < <(git ls-files scripts)
+          exit $bad
+
+  # The two halves of "a fix landed but the live site still errors": the repo
+  # may be ahead of what is deployed (a stale image), or the edge itself may be
+  # broken (a 502 on one host, an SSO banner that never resolves). Neither
+  # shows up in a build, so this job runs both edge-facing checks together:
+  #
+  #   • redeploy-dashboard.sh --check — is the committed dashboard source in
+  #     sync with the last deploy? A hosted runner has no deploy stamp, so this
+  #     only reports on a runner that has one (the edge box); drift there is a
+  #     warning, because the redeploy timer reconciles it — the hard failure is
+  #     reserved for the smoke test below.
+  #   • npm-smoke-test.py — DNS, TLS, the SSO gate and the media prefix for
+  #     every proxy host, through the public edge. Exit 2 (a hosted runner
+  #     cannot resolve the edge) is a SKIP, matching scripts/ci/sso-smoke.py;
+  #     only a real failure (exit 1) fails the build.
+  edge-drift-smoke:
+    name: Deploy drift + NPM edge smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Is the deployed dashboard in sync with the source?
+        run: |
+          set -uo pipefail
+          rc=0
+          scripts/redeploy-dashboard.sh --check || rc=$?
+          case "$rc" in
+            0) echo "::notice::dashboard sources match the last deploy" ;;
+            1) echo "::warning::a dashboard deploy is pending — the running images lag the repo (the redeploy timer reconciles it)" ;;
+            *) echo "::error::redeploy-dashboard --check failed (exit $rc)"; exit "$rc" ;;
+          esac
+
+      - name: Walk every NPM proxy host through the public edge
+        env:
+          NPM_BASE_DOMAIN: ${{ vars.NPM_BASE_DOMAIN || 'pbx.it.com' }}
+          NPM_UPSTREAM_HOST: ${{ vars.NPM_UPSTREAM_HOST }}
+          # The two rows that are not this stack's box: the shared Cerulean
+          # Authentik, and the estate's subscribe portal. They are only used to
+          # explain a 5xx here (a wrong value changes a note, not a verdict),
+          # but a stale one misreports which upstream is down.
+          AUTHENTIK_UPSTREAM_HOST: ${{ vars.AUTHENTIK_UPSTREAM_HOST }}
+          SUBSCRIBE_UPSTREAM_HOST: ${{ vars.SUBSCRIBE_UPSTREAM_HOST || vars.ZEUS_UPSTREAM_HOST }}
+          ZEUS_UPSTREAM_HOST: ${{ vars.ZEUS_UPSTREAM_HOST }}
+        run: |
+          set -uo pipefail
+          rc=0
+          python3 scripts/npm-smoke-test.py --base-domain "$NPM_BASE_DOMAIN" || rc=$?
+          case "$rc" in
+            0) echo "::notice::every proxied host answered" ;;
+            2) echo "::notice::skipped — this runner cannot resolve $NPM_BASE_DOMAIN" ;;
+            *) echo "::error::the edge has an unhealthy host — see the log above"; exit "$rc" ;;
+          esac
