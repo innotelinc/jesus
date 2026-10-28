@@ -226,6 +226,31 @@ export default function Customers() {
     }
   };
 
+  /**
+   * Ask Stripe for the plan charges it already collected.
+   *
+   * A subscription is billed by Stripe, so the webhook is what normally writes
+   * the money into the ledger. This is the repair for the charges from before the
+   * webhook was listening — a customer can have paid for months with nothing
+   * recorded against them.
+   */
+  const syncStripeCharges = async () => {
+    if (!selectedId) return;
+    setBusy('stripe-sync');
+    try {
+      const result = await api.post(`/crm/customers/${selectedId}/payments/sync`, {});
+      toast.success(
+        result.recorded ? `${result.recorded} charge${result.recorded === 1 ? '' : 's'} added` : 'Already up to date',
+        `${result.scanned} paid invoice${result.scanned === 1 ? '' : 's'} at Stripe`
+      );
+      await areload();
+    } catch (err) {
+      toast.error('Could not read Stripe', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
   const createTicket = async () => {
     setBusy('ticket');
     try {
@@ -647,20 +672,40 @@ export default function Customers() {
                     </div>
 
                     <div>
-                      <h3 style={{ fontSize: '0.8125rem', marginBottom: 6 }}>Payments collected</h3>
+                      <div className="row wrap" style={{ gap: 8, marginBottom: 6 }}>
+                        <h3 style={{ fontSize: '0.8125rem' }}>Payments collected</h3>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon="refresh"
+                          loading={busy === 'stripe-sync'}
+                          style={{ marginLeft: 'auto' }}
+                          onClick={syncStripeCharges}
+                        >
+                          Sync from Stripe
+                        </Button>
+                      </div>
                       {detail.billing.payments.length ? (
                         <div className="stack" style={{ gap: 6 }}>
                           {detail.billing.payments.map((row) => (
                             <div key={row.id} className="row" style={{ gap: 8 }}>
                               <span className="tiny">{dateOf(row.receivedAt)}</span>
                               <Badge tone={row.method === 'refund' || row.amountCents < 0 ? 'danger' : 'success'}>{row.method}</Badge>
-                              <span className="tiny dim">{row.reference || row.note || 'no reference'}</span>
+                              <span className="tiny dim" style={{ minWidth: 0 }}>
+                                {row.note || 'no note'}
+                                {row.reference ? (
+                                  <span style={{ fontFamily: 'var(--mono)', marginLeft: 6 }}>{row.reference}</span>
+                                ) : null}
+                              </span>
                               <strong className="tiny" style={{ marginLeft: 'auto' }}>{money(row.amountCents, row.currency)}</strong>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="tiny dim">Nothing collected yet.</p>
+                        <p className="tiny dim">
+                          Nothing collected yet. Plan fees are charged by card at Stripe, so press Sync to pull what
+                          Stripe has already taken.
+                        </p>
                       )}
                     </div>
                   </div>

@@ -288,7 +288,7 @@ for a live device — only a real check-in moves them.
 | GET | `/public/pay/invoice/:id?t=` | signed link from a notice: creates a Stripe Checkout Session and 303s to it; a forged token is 403, an unconfigured Stripe is an HTML page, not a crash |
 | GET | `/public/pay/account/:id?t=` | the same for a billing account, with one line per unpaid invoice and one charge for the whole balance |
 | GET | `/public/pay/return?status=paid\|canceled` | the page Stripe sends the customer back to; no console, no scripts |
-| POST | `/public/stripe/webhook` | Stripe's callback, signature-verified: marks the named invoices paid (receipt in `paymentRef`), reinstates a suspended account, and is idempotent on replay |
+| POST | `/public/stripe/webhook` | Stripe's callback, signature-verified: marks the named invoices paid (receipt in `paymentRef`), records `invoice.paid` for a plan against the customer's ledger (reference is Stripe's own `in_…` id, so a retry or the other flavour of the same event adds nothing), reinstates a suspended account, and is idempotent on replay |
 | GET/POST/PATCH/DELETE | `/estate/sites[/:id]` | sites with counts derived from their devices, status and last contact |
 | GET/POST | `/estate/devices` | real inventory rows: handset, gateway, ata, conference, door; `?site=&kind=&status=` |
 | PATCH/DELETE | `/estate/devices/:id` | re-site, re-extension, change status or firmware, remove; MACs are unique |
@@ -537,6 +537,7 @@ CRM owns are tickets, ticket notes, customer notes and payments.
 | PATCH | `/crm/customers/:id` | operator | contact details only — `name`, `company`, `phone`, `address`, `city`, `country`, `website`. The email is the account identity, so it is not editable here |
 | POST | `/crm/customers/:id/notes` | operator | `{ body }`; a private note about the customer |
 | POST | `/crm/customers/:id/payments` | operator | `{ amountCents, invoiceId?, method, reference?, note?, receivedAt? }`; a negative amount is a refund, and a payment covering an open invoice settles it with the payment as the receipt |
+| POST | `/crm/customers/:id/payments/sync` | operator | ask Stripe for the plan's paid invoices and record the ones missing from the ledger; returns `scanned`, `recorded`, `skipped[]` and the rows added. Idempotent, so pressing it twice adds nothing |
 | GET | `/crm/tickets?state=&priority=&category=&assignee=&q=&account=&limit=&offset=` | staff | the queue plus its counts; `state=open` means open **or** pending |
 | GET | `/crm/tickets/:id` | staff | the ticket with its conversation, oldest first |
 | POST | `/crm/tickets` | operator | `{ subject, description?, accountId?, category?, priority?, assignee?, numberId?, dueAt? }` |

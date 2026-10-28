@@ -102,6 +102,41 @@ if (!base) {
       if (path.startsWith('/v1/checkout/sessions/') && path.endsWith('/expire')) {
         return send({ id: path.split('/')[4], object: 'checkout.session', status: 'expired' });
       }
+      // What a card-billed subscriber's history is rebuilt from: the paid invoice
+      // and one that is still open, so the backfill has to filter, not just copy.
+      if (path === '/v1/invoices') {
+        const paidAt = Math.floor(Date.now() / 1000) - 26 * 24 * 3600;
+        return send({
+          object: 'list',
+          data: [
+            {
+              id: 'in_smoke_backfill_1',
+              object: 'invoice',
+              status: 'paid',
+              paid: true,
+              amount_paid: 7900,
+              currency: 'usd',
+              customer: 'cus_test_smoke_1',
+              subscription: 'sub_test_smoke_1',
+              billing_reason: 'subscription_create',
+              period_start: paidAt,
+              period_end: paidAt + 30 * 24 * 3600,
+              status_transitions: { paid_at: paidAt },
+            },
+            {
+              id: 'in_smoke_backfill_open',
+              object: 'invoice',
+              status: 'open',
+              paid: false,
+              amount_paid: 0,
+              amount_due: 7900,
+              currency: 'usd',
+              customer: 'cus_test_smoke_1',
+              subscription: 'sub_test_smoke_1',
+            },
+          ],
+        });
+      }
       return send({
         id: `cs_test_${stripeCalls.length}`,
         object: 'checkout.session',
@@ -3059,6 +3094,102 @@ check(
     entitledBody.entitlement?.plan?.slug === 'business' &&
     entitledBody.entitlement?.features?.includes('video-calling'),
   entitledBody.entitlement
+);
+
+// What Stripe collects for a plan is money, and money belongs in the ledger:
+// a bill for rent never carries the plan charge, so without these rows the panel
+// shows a customer paying every month and nothing collected from them.
+console.log('\nPlan charges in the ledger');
+const planPaidAt = Math.floor(Date.now() / 1000) - 3600;
+const planChargeEvent = subscriptionEvent('invoice.paid', {
+  id: 'in_smoke_plan_1',
+  object: 'invoice',
+  status: 'paid',
+  paid: true,
+  amount_paid: 7900,
+  currency: 'usd',
+  customer: 'cus_test_smoke_1',
+  subscription: 'sub_test_smoke_1',
+  billing_reason: 'subscription_create',
+  period_start: planPaidAt,
+  period_end: planPaidAt + 30 * 24 * 3600,
+  status_transitions: { paid_at: planPaidAt },
+});
+const planCharge = await postStripeEvent(planChargeEvent);
+const planRows = async () => {
+  const detail = await call('GET', `/api/crm/customers/${signedUp.body.account?.id}`);
+  return (detail.body.billing?.payments || []).filter((row) => row.reference === 'in_smoke_plan_1');
+};
+const recordedPlan = await planRows();
+check(
+  'a paid plan invoice is recorded against the customer',
+  planCharge.status === 200 &&
+    planCharge.body.charge?.recorded === true &&
+    recordedPlan.length === 1 &&
+    recordedPlan[0].amountCents === 7900 &&
+    recordedPlan[0].method === 'stripe' &&
+    /^Plan — /.test(recordedPlan[0].note || ''),
+  { webhook: planCharge.body, rows: recordedPlan }
+);
+
+// Stripe retries an event it did not see a 200 for, and sends both a paid and a
+// succeeded flavour of the same collection.
+const planChargeRetry = await postStripeEvent(planChargeEvent);
+const succeededFlavour = await postStripeEvent(planChargeEvent.replace('invoice.paid', 'invoice.payment_succeeded'));
+check(
+  'a retried plan charge is never recorded twice',
+  planChargeRetry.body.charge?.recorded === false &&
+    succeededFlavour.body.charge?.recorded === false &&
+    (await planRows()).length === 1,
+  { retry: planChargeRetry.body.charge, succeeded: succeededFlavour.body.charge }
+);
+
+const foreignCharge = await postStripeEvent(
+  subscriptionEvent('invoice.paid', {
+    id: 'in_smoke_foreign_1',
+    object: 'invoice',
+    status: 'paid',
+    amount_paid: 5000,
+    currency: 'usd',
+    customer: 'cus_someone_else',
+    subscription: 'sub_someone_else',
+  })
+);
+check(
+  'a paid invoice for an account we do not know is ignored',
+  foreignCharge.status === 200 && foreignCharge.body.charge?.recorded === false &&
+    foreignCharge.body.charge?.reason === 'unknown_subscription',
+  foreignCharge.body
+);
+
+const emptyCharge = await postStripeEvent(
+  subscriptionEvent('invoice.paid', {
+    id: 'in_smoke_empty_1',
+    object: 'invoice',
+    status: 'open',
+    amount_paid: 0,
+    currency: 'usd',
+    customer: 'cus_test_smoke_1',
+    subscription: 'sub_test_smoke_1',
+  })
+);
+check(
+  'an invoice that collected nothing adds no money',
+  emptyCharge.body.charge?.recorded === false && emptyCharge.body.charge?.reason === 'nothing_collected',
+  emptyCharge.body
+);
+
+const backfilled = await call('POST', `/api/crm/customers/${signedUp.body.account?.id}/payments/sync`, {});
+check(
+  'the panel can pull the plan charges Stripe already collected',
+  backfilled.status === 200 && backfilled.body.scanned === 1 && backfilled.body.recorded === 1,
+  backfilled.body
+);
+const backfilledAgain = await call('POST', `/api/crm/customers/${signedUp.body.account?.id}/payments/sync`, {});
+check(
+  'a second sync adds nothing, so pressing the button twice is safe',
+  backfilledAgain.status === 200 && backfilledAgain.body.recorded === 0 && backfilledAgain.body.scanned === 1,
+  backfilledAgain.body
 );
 
 // A failed renewal is what the gate exists for on an established account.
