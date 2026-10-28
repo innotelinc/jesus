@@ -513,7 +513,8 @@ export default function Customers() {
                       <dt>Plan</dt>
                       <dd>{detail.subscription ? `${detail.subscription.planName} · ${money(detail.subscription.priceCents, detail.subscription.currency)}/${detail.subscription.interval}` : 'No plan'}</dd>
                       <dt>Renews</dt>
-                      <dd>{detail.subscription?.currentPeriodEnd ? dateOf(new Date(detail.subscription.currentPeriodEnd * 1000)) : '—'}</dd>
+                      {/* The API hands back an ISO instant, not an epoch second. */}
+                      <dd>{detail.subscription?.currentPeriodEnd ? dateOf(detail.subscription.currentPeriodEnd) : '—'}</dd>
                       <dt>Verified</dt>
                       <dd>
                         {detail.profile.emailVerifiedAt ? 'Email' : 'Email not proved'}
@@ -599,6 +600,16 @@ export default function Customers() {
 
                 {view === 'billing' ? (
                   <div className="stack">
+                    {/* A card subscription is collected by Stripe and deliberately
+                        gets no statement here, so an empty list next to "$0.00
+                        collected" would read as a customer who never paid. Say
+                        which half of the bill this table is. */}
+                    {detail.subscription?.stripeSubscriptionId ? (
+                      <p className="tiny dim" style={{ margin: 0 }}>
+                        The {detail.subscription.planName} fee is charged to the card on file at Stripe and is not on a
+                        statement here. Rent and any one-off charges are billed below.
+                      </p>
+                    ) : null}
                     <div className="table-wrap">
                       {detail.billing.invoices.length ? (
                         <table className="table">
