@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
-import { db_, now } from '../db/index.js';
+import { db_, newId, now } from '../db/index.js';
 import { getSecret } from './vault.js';
 import { logEvent } from './audit.js';
 
@@ -385,6 +385,27 @@ export function markInvoicePaid(invoice, { sessionId = '', paymentRef = '', at =
       WHERE id = ?`,
     [at, sessionId || invoice.stripe_session_id || '', paymentRef || '', invoice.id]
   );
+  // Collecting is a row, not just a status. The invoice says what is owed; the
+  // payment says what arrived, by what reference. Without it a customer's
+  // history could show a bill marked paid and no record of the money, and a
+  // staff refund would have nothing to reverse.
+  db_.run(
+    `INSERT OR IGNORE INTO payments
+       (id, account_id, invoice_id, amount_cents, currency, method, reference, note, received_at, created_by)
+     VALUES (?, ?, ?, ?, ?, 'stripe', ?, '', ?, ?)`,
+    [
+      newId('pay_'),
+      invoice.account_id ||
+        db_.get('SELECT id FROM accounts WHERE lower(email) = lower(?)', [invoice.email || ''])?.id ||
+        null,
+      invoice.id,
+      invoice.amount_cents,
+      invoice.currency || 'USD',
+      paymentRef || sessionId || '',
+      at,
+      actor,
+    ]
+  );
   logEvent({
     actor,
     action: 'billing.paid_online',
@@ -394,6 +415,7 @@ export function markInvoicePaid(invoice, { sessionId = '', paymentRef = '', at =
   });
   return { changed: true, invoiceNo: invoice.invoice_no };
 }
+
 
 /**
  * Apply a completed Checkout Session: exactly the invoices it names, and only

@@ -216,6 +216,43 @@ function migrate(db) {
     console.warn(`[db] leaving ${duplicatePlans.invoice_id} with more than one plan line; not indexing it`);
   }
 
+  // Money that moved before the ledger existed. A bill marked paid with no
+  // payment row is a gap the customer panel would show as "settled for free",
+  // so each one gets its row once. The partial unique index is what makes the
+  // backfill idempotent, and what stops two Stripe events ever paying one bill
+  // twice on the ledger.
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_stripe_invoice ON payments (invoice_id) WHERE method = 'stripe' AND invoice_id IS NOT NULL"
+  );
+  const settled = db
+    .prepare(
+      `SELECT i.id, i.account_id, i.email, i.amount_cents, i.currency, i.paid_at, i.payment_ref
+         FROM invoices i
+        WHERE i.status = 'paid'
+          AND NOT EXISTS (SELECT 1 FROM payments p WHERE p.invoice_id = i.id AND p.method = 'stripe')`
+    )
+    .all();
+  if (settled.length) {
+    const ownerOf = db.prepare('SELECT id FROM accounts WHERE lower(email) = lower(?)');
+    const insertPayment = db.prepare(
+      `INSERT OR IGNORE INTO payments
+         (id, account_id, invoice_id, amount_cents, currency, method, reference, note, received_at, created_by)
+       VALUES (?, ?, ?, ?, ?, 'stripe', ?, 'backfilled from a bill already marked paid', ?, 'system')`
+    );
+    for (const row of settled) {
+      insertPayment.run(
+        newId('pay_'),
+        row.account_id || ownerOf.get(row.email || '')?.id || null,
+        row.id,
+        row.amount_cents,
+        row.currency || 'USD',
+        row.payment_ref || '',
+        row.paid_at || now()
+      );
+    }
+    console.log(`[db] recorded ${settled.length} payment(s) for bills already marked paid`);
+  }
+
   const current = db.prepare("SELECT value FROM settings WHERE key = 'schema_version'").get();
   if (!current) {
     db.prepare("INSERT INTO settings (key, value) VALUES ('schema_version', '2')").run();

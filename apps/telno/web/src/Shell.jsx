@@ -42,6 +42,9 @@ const GROUPS = [
   {
     label: 'Business',
     items: [
+      // The operator's customer panel: one identity with its plan, lines, bills,
+      // calls and tickets joined. Staff only — a customer has their own portal.
+      { path: '/customers', label: 'Customers', icon: 'users' },
       { path: '/billing', label: 'Billing', icon: 'card' },
       { path: '/plans', label: 'Plans', icon: 'tag' },
       { path: '/estate', label: 'Estate', icon: 'building' },
@@ -68,6 +71,7 @@ const MOBILE = [
   { path: '/calls', label: 'Calls', icon: 'calls' },
   { path: '/voicemail', label: 'Inbox', icon: 'voicemail' },
   { path: '/numbers', label: 'Numbers', icon: 'numbers' },
+  { path: '/customers', label: 'Customers', icon: 'users' },
   { path: '/operations', label: 'Ops', icon: 'terminal' },
 ];
 

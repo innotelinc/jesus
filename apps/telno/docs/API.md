@@ -517,6 +517,38 @@ Stripe drives the lifecycle through the same webhook as invoices:
 `customer.subscription.updated` / `deleted` move status and period end, and
 `invoice.payment_failed` marks the subscription past due.
 
+## Customers (staff only)
+
+The operator's customer panel. A **customer** session is refused here with `403
+forbidden`: their own surface is `/me`. Reads need the `registry:read` scope,
+writes `registry:write`, and both need operator or owner.
+
+Nothing in this section is a second copy of the billing data: the plan is the
+subscription that was sold, the balance is the sum of unpaid invoices, the lines
+are the numbers, and the calls are the switch's own records. The only rows the
+CRM owns are tickets, ticket notes, customer notes and payments.
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | `/crm/overview` | staff | customers, MRR, outstanding and past due, collected this month, ticket pressure |
+| GET | `/crm/meta` | staff | categories, priorities, states, payment methods, plans, assignees |
+| GET | `/crm/customers?q=&state=&plan=&sort=&limit=&offset=` | staff | the directory; `state` is `active`, `past_due`, `suspended`, `tickets`, `unverified` or `no_plan`; `sort` is `attention`, `recent`, `balance`, `tickets` or `name` |
+| GET | `/crm/customers/:id` | staff | the 360 view: profile, plan and entitlement, lines, invoices with their items, payments, calls, tickets, notes and one merged activity timeline |
+| PATCH | `/crm/customers/:id` | operator | contact details only — `name`, `company`, `phone`, `address`, `city`, `country`, `website`. The email is the account identity, so it is not editable here |
+| POST | `/crm/customers/:id/notes` | operator | `{ body }`; a private note about the customer |
+| POST | `/crm/customers/:id/payments` | operator | `{ amountCents, invoiceId?, method, reference?, note?, receivedAt? }`; a negative amount is a refund, and a payment covering an open invoice settles it with the payment as the receipt |
+| GET | `/crm/tickets?state=&priority=&category=&assignee=&q=&account=&limit=&offset=` | staff | the queue plus its counts; `state=open` means open **or** pending |
+| GET | `/crm/tickets/:id` | staff | the ticket with its conversation, oldest first |
+| POST | `/crm/tickets` | operator | `{ subject, description?, accountId?, category?, priority?, assignee?, numberId?, dueAt? }` |
+| PATCH | `/crm/tickets/:id` | operator | `state`, `priority`, `category`, `assignee`, `dueAt`, `numberId`, `subject`; every change writes a system note |
+| POST | `/crm/tickets/:id/notes` | operator | `{ body, kind }`; `note` counts as the first response, `internal` does not |
+
+**Money is a row.** `payments` records what was collected, how and when. Stripe's
+webhook writes one when it settles an invoice, and bills already marked paid before
+the table existed are backfilled once at boot. A partial unique index on
+`(invoice_id)` for `stripe` rows makes both idempotent, so two webhook deliveries
+cannot pay one bill twice.
+
 ## AI
 
 | Method | Path | Auth | Notes |

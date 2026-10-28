@@ -597,6 +597,29 @@ edit is live on both sides at once and there is no second copy to keep in step.
   create or edit is posted to the subscriber system of record with its feature list, so the pricing
   page here and billing elsewhere cannot drift. No webhook configured is a normal state, not an error.
 
+## The customer panel (CRM)
+
+**Customers** in the console is the operator's view of one person: everything the platform already
+knows, joined, so answering the phone takes one screen instead of six. It is staff only — a
+subscriber's own surface is the portal, and `/api/crm` answers them `403`.
+
+- **It is derived, not duplicated.** The plan is the subscription that was sold, the balance is the
+  sum of unpaid invoices, the lines are the numbers and their rent, and the calls are the switch's
+  records. Nothing here re-enters billing, so the panel cannot disagree with a customer's bill.
+- **The only records it owns** are the three things the platform could not already know: a **ticket**
+  (a complaint, a bill query, a service change, a port, an outage), an operator's **private note**, and
+  a **payment** — money that actually moved, outside the card flow.
+- **Money is a row, not a status.** Stripe's webhook writes a payment when it settles an invoice, and
+  bills marked paid before the ledger existed are backfilled once at boot. A transfer or cheque is
+  recorded against the invoice it settles, so the bill reconciles without anyone reconstructing what
+  the money was for. A negative amount is a refund.
+- **The queue is worked, not listed.** Tickets sort by what is waiting on us: open before resolved,
+  urgent before normal, past due before both. Every state change writes a system note, so a ticket's
+  history explains itself. The first reply stops the response clock; an internal note does not.
+- **One timeline.** Signups, plan changes, numbers rented and released, invoices issued and paid,
+  payments, tickets and notes merge into a single activity feed in date order — built by reading those
+  rows, so it cannot drift from them.
+
 ## The public site, and white-label
 
 A visitor who is not signed in lands on the marketing site at `/` (also `/welcome`), not on a login
