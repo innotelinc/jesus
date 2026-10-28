@@ -45,11 +45,25 @@ sub getline {
     return $line;
 }
 
+# Windows cannot represent < > : " | ? * or control characters in a filename,
+# and one project's history names session directories like
+# "03-03-09:09-add-console-log". Map those bytes to '-' so the tree checks out
+# on NTFS; every other path is left exactly as it was.
+sub sanitize {
+    my ($path) = @_;
+    $path =~ s/[<>:"|?*\x00-\x1f]/-/g;
+    return $path;
+}
+
 # fast-export C-quotes paths that contain spaces or other awkward bytes.
 sub prepend {
     my ($path) = @_;
-    return '"' . $prefix . '/' . substr($path, 1) if $path =~ /^"/;
-    return "$prefix/$path";
+    # A quoted path keeps its quotes: sanitising the body must not eat the
+    # closing quote, or fast-import sees an unterminated string.
+    if ($path =~ /^"(.*)"$/s) {
+        return '"' . $prefix . '/' . sanitize($1) . '"';
+    }
+    return $prefix . '/' . sanitize($path);
 }
 
 while (defined(my $line = getline())) {
