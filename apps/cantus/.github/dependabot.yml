@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# dependabot.yml — keep the workflow actions from drifting behind again.
+#
+# `github-actions` is the only ecosystem that applies here. This repository is a
+# Perl reference stack plus a static landing page: there is no package manifest
+# for Dependabot to parse, and the things that look like versions are not
+# dependencies — the Perl minimum and the assertion count are deliberate
+# choices, so no bot gets to move them.
+#
+# Major updates are deliberately NOT ignored. `actions/checkout@v4` declaring a
+# deprecated Node runtime was exactly this drift, and it was a major-version
+# signal; ignoring majors would have kept the depot pins current while leaving
+# the runtime eight months behind.
+#
+# Dependabot's commits carry `Signed-off-by: dependabot[bot]
+# <support@github.com>`, which .githooks/guard-lib allowlists, so its pull
+# requests pass the attribution guard the same way a hand-written commit does.
+# ═══════════════════════════════════════════════════════════════════════════
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Enough to keep five actions current without burying a review queue.
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+    # One PR per week for all actions: they are reviewed together anyway, and a
+    # single red build is easier to attribute than four overlapping ones.
+    groups:
+      actions:
+        patterns:
+          - "*"

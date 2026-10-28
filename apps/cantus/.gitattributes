@@ -1,0 +1,8 @@
+# The guard hooks and workflows are bash — CRLF makes them unrunnable, and the
+# conformity audit compares guard-lib byte-for-byte against the generator.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.tar.gz binary

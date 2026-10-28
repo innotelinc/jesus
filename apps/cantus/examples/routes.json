@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "default": { "reject": 3 },
+  "routes": [
+    {
+      "name": "vip-direct",
+      "when": { "to": "boss@example.net", "verified": true },
+      "then": [ { "answer": {} }, { "bridge": { "to": "queue.vip" } } ]
+    },
+    {
+      "name": "support-hours",
+      "when": {
+        "to": "support@*",
+        "weekday": ["mon", "tue", "wed", "thu", "fri"],
+        "time": "09:00-17:00",
+        "limit": 20
+      },
+      "then": [ { "answer": {} }, { "bridge": { "to": "queue.support" } } ]
+    },
+    {
+      "name": "support-after-hours",
+      "when": { "to": "support@*" },
+      "then": [ { "forward": { "to": "voicemail@example.net" } } ]
+    },
+    {
+      "name": "everything-else",
+      "when": {},
+      "then": [ { "reject": 2 } ]
+    }
+  ]
+}
