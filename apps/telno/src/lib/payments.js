@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
 import { db_, newId, now } from '../db/index.js';
-import { getSecret } from './vault.js';
+import { getSecret, listSecrets } from './vault.js';
 import { logEvent } from './audit.js';
 
 /**
@@ -669,6 +669,89 @@ const loopback = (url) => {
 };
 
 /**
+ * Stripe's webhook signing secrets are `whsec_` followed by the secret. The
+ * length floor is deliberately low: this is here to catch the wrong credential
+ * — an `sk_` key, a `whsec_` with nothing after it — not to second-guess a
+ * secret Stripe issued.
+ */
+const SECRET_SHAPE = /^whsec_.{4,}$/;
+
+/**
+ * Sign a throwaway body exactly as Stripe does, and put it through the verifier
+ * the live endpoint uses. This is local crypto: no key, no request, no money.
+ */
+function selfSign(secret) {
+  const stamp = Math.floor(Date.now() / 1000);
+  const raw = JSON.stringify({ id: 'evt_connection_test', type: 'checkout.session.completed' });
+  const digest = createHmac('sha256', secret).update(`${stamp}.${raw}`).digest('hex');
+  return verifyWebhook(raw, `t=${stamp},v1=${digest}`, secret);
+}
+
+/**
+ * Is the stored signing secret a signing secret at all?
+ *
+ * Three failures look the same from the outside — every event rejected — and
+ * each has its own fix: nothing stored, the wrong credential pasted (an API key
+ * instead of a signing secret, or a truncated copy), or a value that cannot
+ * produce a signature the verifier accepts.
+ */
+export function webhookSecretCheck(secret = webhookSecret()) {
+  if (!secret) {
+    return {
+      state: 'missing',
+      detail:
+        "No STRIPE_WEBHOOK_SECRET — Stripe's events would all be rejected and no invoice would ever be marked paid.",
+    };
+  }
+  if (!SECRET_SHAPE.test(secret)) {
+    return {
+      state: 'malformed',
+      detail: `The stored value (${maskKey(secret)}) is not a webhook signing secret — Stripe's begin whsec_. An API key or a truncated copy cannot verify an event, so every delivery would be rejected.`,
+    };
+  }
+  return selfSign(secret).ok
+    ? { state: 'ok', detail: `A signature made with the stored secret verifies (${maskKey(secret)}).` }
+    : { state: 'unusable', detail: 'The stored secret does not verify its own signature — re-copy it from the endpoint in Stripe.' };
+}
+
+/** When the stored signing secret was last written, if it lives in the vault. */
+const webhookSecretUpdatedAt = () =>
+  listSecrets().find((entry) => entry.name === WEBHOOK_NAME)?.updatedAt || '';
+
+/**
+ * The only proof that the stored secret is the one Stripe actually signs with:
+ * a delivery that arrived and did not verify. A secret rotated in the dashboard
+ * looks perfect to every local check — it is only wrong against Stripe's copy —
+ * so rejections recorded by the live endpoint are the evidence.
+ *
+ * Rejections older than the stored secret are left out on purpose. Junk sent to
+ * a public URL, or a rejection from before the secret was corrected, says
+ * nothing about the value in place now, and counting it would keep a fixed
+ * deployment warned forever.
+ */
+export function recentWebhookRejections({ days = 7, since = webhookSecretUpdatedAt() } = {}) {
+  // With the secret in the environment there is no write time to use, so the
+  // process start stands in for it: this process has been using this value for
+  // its whole life, and what was rejected before it started says nothing.
+  const floor = since || new Date(Date.now() - process.uptime() * 1000).toISOString();
+  const count = db_.get(
+    "SELECT COUNT(*) AS n FROM events WHERE action = 'billing.webhook_rejected' AND at >= ?",
+    [floor]
+  );
+  const last = db_.get(
+    "SELECT at, detail FROM events WHERE action = 'billing.webhook_rejected' AND at >= ? ORDER BY id DESC LIMIT 1",
+    [floor]
+  );
+  return {
+    days,
+    since: floor,
+    count: Number(count?.n || 0),
+    lastAt: last?.at || null,
+    lastError: last?.detail || '',
+  };
+}
+
+/**
  * Proves the stored credentials against Stripe itself.
  *
  * A key being present is not the same as a key that works, and a webhook that
@@ -784,28 +867,22 @@ export async function testConnection() {
     }
   }
 
-  if (!secret) {
-    add(
-      'webhook-secret',
-      'Webhook signing secret',
-      'fail',
-      'No STRIPE_WEBHOOK_SECRET — Stripe\'s events would all be rejected and no invoice would ever be marked paid.'
-    );
-  } else {
-    // The secret is ours to test: sign a throwaway body the same way Stripe
-    // does and put it through the verifier the live endpoint uses.
-    const stamp = Math.floor(Date.now() / 1000);
-    const raw = JSON.stringify({ id: 'evt_connection_test', type: 'checkout.session.completed' });
-    const digest = createHmac('sha256', secret).update(`${stamp}.${raw}`).digest('hex');
-    const verdict = verifyWebhook(raw, `t=${stamp},v1=${digest}`);
-    add(
-      'webhook-secret',
-      'Webhook signing secret',
-      verdict.ok ? 'pass' : 'fail',
-      verdict.ok
-        ? `A signature made with the stored secret verifies (${maskKey(secret)}).`
-        : `The stored secret does not verify its own signature: ${verdict.error}.`
-    );
+  // One implementation of the check, shared with the status the Billing screen
+  // polls: a secret that is missing, malformed or unusable fails here too.
+  const secretCheck = webhookSecretCheck(secret);
+  add('webhook-secret', 'Webhook signing secret', secretCheck.state === 'ok' ? 'pass' : 'fail', secretCheck.detail);
+  if (secretCheck.state === 'ok') {
+    // A local signature proves the secret works; only Stripe knows whether it is
+    // the current one, and a rejection it has already sent is that proof.
+    const rejected = recentWebhookRejections();
+    if (rejected.count) {
+      add(
+        'webhook-rejections',
+        'Recent deliveries verified',
+        'fail',
+        `${rejected.count} call(s) from Stripe failed verification since this secret was stored (${rejected.lastError || 'bad_signature'}, last ${rejected.lastAt}). This secret is not the one Stripe signs with — copy it again from the endpoint.`
+      );
+    }
   }
 
   if (reachable) {
@@ -967,7 +1044,29 @@ export async function repairWebhookEndpoint({ actor = 'system' } = {}) {
  */
 export async function webhookEventStatus() {
   const url = webhookUrl();
-  const empty = { url, endpointId: null, endpointUrl: null, events: 0, total: REQUIRED_WEBHOOK_EVENTS.length };
+  const check = webhookSecretCheck();
+  const rejections = recentWebhookRejections();
+  // A secret rotated in Stripe looks perfect locally — it is well-formed and
+  // verifies its own signature, because it is being compared with itself. The
+  // only evidence is a delivery that arrived and failed, which the live
+  // endpoint already records.
+  const secretState = check.state !== 'ok' ? check.state : rejections.count ? 'rejected' : 'ok';
+  const secret = {
+    secretState,
+    secretDetail:
+      check.state === 'ok' && rejections.count
+        ? `${rejections.count} call(s) from Stripe failed verification since this secret was stored (${rejections.lastError || 'bad_signature'}, last ${rejections.lastAt}). The stored secret is not the one Stripe is signing with.`
+        : check.detail,
+    rejections,
+  };
+  const empty = {
+    url,
+    endpointId: null,
+    endpointUrl: null,
+    events: 0,
+    total: REQUIRED_WEBHOOK_EVENTS.length,
+    ...secret,
+  };
 
   if (!stripeConfigured()) {
     return {
@@ -1052,6 +1151,7 @@ export async function webhookEventStatus() {
     repairable: !disabled && missing.length > 0,
     checkedAt: now(),
     detail,
+    ...secret,
   };
 }
 

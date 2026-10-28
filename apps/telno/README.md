@@ -547,6 +547,16 @@ asks Stripe nothing. A single unanswered read is retried before it is allowed to
 blackholed `api.stripe.com` for a second and then resolved it fine, and a strip that flashes on every
 blip teaches people to ignore it.
 
+The same read covers the signing secret, because a secret rotated in Stripe's dashboard fails nothing
+locally: the stored value is well formed and verifies its own signature, since it is being compared
+with itself. The one honest signal is a delivery that arrived and did not verify, which the endpoint
+already records, so the strip reports calls rejected *since this secret was stored* — a stale secret
+looks exactly like a rotated one, and it says so above the totals instead of waiting for someone to
+press Test. Rejections older than the current secret are ignored on purpose: junk aimed at a public
+URL, or a failure from before the secret was corrected, says nothing about the value in place now, and
+counting it would warn a fixed deployment forever. A missing, malformed (an `sk_…` key pasted in) or
+self-verifying-failed secret is caught too.
+
 ### Devices check themselves in
 
 Every handset, gateway, ATA or door phone gets a `dv_…` token when it is added on the Estate screen

@@ -538,18 +538,30 @@ export default function Billing() {
   // What the strip says before anyone presses a button. Healthy and
   // unconfigured both stay quiet — a platform with no Stripe key does not have a
   // webhook problem, and a working endpoint is not news.
-  const hookAttention = !!webhook && webhook.state !== 'ok' && webhook.state !== 'all_events' && webhook.state !== 'unconfigured';
-  const hookTone =
-    webhook?.state === 'missing' || webhook?.state === 'not_registered' || webhook?.state === 'disabled' || webhook?.state === 'unreadable'
-      ? 'bad'
-      : 'warn';
-  const hookTitle = {
-    missing: 'Stripe is not sending every event this platform needs',
-    not_registered: 'No Stripe webhook points at this install',
-    disabled: 'The Stripe webhook is switched off',
-    unreadable: 'Stripe would not list webhook endpoints',
-    unreachable: 'Could not reach Stripe to read the webhook',
-  }[webhook?.state] || 'Stripe webhook';
+  //
+  // A bad secret outranks a bad event list. Missing events only cost the events
+  // they name; a secret that does not verify costs every delivery Stripe sends,
+  // including the ones that would have paid an invoice.
+  const hookSecretIssue =
+    !!webhook && webhook.state !== 'unconfigured' && !!webhook.secretState && webhook.secretState !== 'ok';
+  const hookEndpointIssue =
+    !!webhook && ['missing', 'not_registered', 'disabled', 'unreadable', 'unreachable'].includes(webhook.state);
+  const hookAttention = hookSecretIssue || hookEndpointIssue;
+  const hookTone = webhook?.state === 'unreachable' && !hookSecretIssue ? 'warn' : 'bad';
+  const hookTitle = hookSecretIssue
+    ? {
+        rejected: 'Stripe is calling, but the signature no longer verifies',
+        missing: 'No webhook signing secret is stored',
+        malformed: 'The stored webhook value is not a signing secret',
+        unusable: 'The stored signing secret cannot verify a signature',
+      }[webhook.secretState] || 'Stripe webhook signing secret'
+    : {
+        missing: 'Stripe is not sending every event this platform needs',
+        not_registered: 'No Stripe webhook points at this install',
+        disabled: 'The Stripe webhook is switched off',
+        unreadable: 'Stripe would not list webhook endpoints',
+        unreachable: 'Could not reach Stripe to read the webhook',
+      }[webhook?.state] || 'Stripe webhook';
   // What the missing events actually cost, named on the screen. "invoice.paid is
   // missing" means nothing to an operator; "a plan payment will not reach the
   // customer's history" means they can decide whether to fix it now.
@@ -562,6 +574,13 @@ export default function Billing() {
         .filter(Boolean)
         .join('; ')
     : '';
+  // A secret problem is a Vault job, so the strip says what to replace rather
+  // than offering a repair button that cannot touch it.
+  const hookBody = hookSecretIssue
+    ? `${webhook.secretDetail} Until it is fixed, nothing Stripe sends is accepted: invoices stay unpaid and plan charges never reach a customer's history.`
+    : webhook?.state === 'missing' && hookImpact
+      ? `${webhook.detail} Until it is fixed, ${hookImpact}.`
+      : webhook?.detail || '';
 
   const fields = (
     <div className="stack">
@@ -631,13 +650,9 @@ export default function Billing() {
           <Icon name="alert" size={18} />
           <div className="notice-text">
             <strong>{hookTitle}</strong>
-            <span>{
-              webhook.state === 'missing' && hookImpact
-                ? `${webhook.detail} Until it is fixed, ${hookImpact}.`
-                : webhook.detail
-            }</span>
+            <span>{hookBody}</span>
           </div>
-          {webhook.repairable ? (
+          {webhook.repairable && !hookSecretIssue ? (
             <Button variant="primary" size="sm" loading={repairing} onClick={repairStripe}>
               Add missing events
             </Button>
