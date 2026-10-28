@@ -160,9 +160,13 @@ function searchView(entry, country) {
 /**
  * Available DIDs, by area code or prefix.
  *
- * `search_type` is starts / contains / ends, and the query is the area code (or
- * any run of digits) an operator is looking for. US searches are scoped by state
- * and Canadian ones by province, which is what the provider's two methods take.
+ * The parameter is `type` — starts, contains or ends — and the API refuses the
+ * whole search with `missing_type` when it is absent. It was sent as
+ * `search_type`, which reads like the field name and is not one: every search
+ * on a live account failed with that refusal until it was corrected here.
+ *
+ * US searches are scoped by state and Canadian ones by province, which is what
+ * the provider's two methods take.
  */
 export async function searchNumbers({ country = 'US', region = '', query = '', searchType = 'starts', limit = 25 } = {}) {
   const iso = String(country || 'US').toUpperCase();
@@ -177,7 +181,7 @@ export async function searchNumbers({ country = 'US', region = '', query = '', s
 
   const body = await call(method, {
     [iso === 'CA' ? 'province' : 'state']: region ? String(region).toUpperCase() : undefined,
-    search_type: searchType,
+    type: searchType,
     query: String(query || '').trim(),
   });
 
