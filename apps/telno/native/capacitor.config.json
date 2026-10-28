@@ -1,0 +1,21 @@
+{
+  "appId": "us.innotel.scif",
+  "appName": "SCIF",
+  "webDir": "www",
+  "server": {
+    "url": "https://telno.services/softphone?window=1&scif=1",
+    "cleartext": false,
+    "allowNavigation": ["telno.services", "*.telno.services"]
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0b0d12",
+    "limitsNavigationsToAppBoundDomains": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#0b0d12"
+    }
+  }
+}

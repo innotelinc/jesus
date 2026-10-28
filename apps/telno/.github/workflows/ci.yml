@@ -1,0 +1,52 @@
+# CI — build the UI and run the end-to-end suite.
+#
+# The smoke suite starts its own server on a random port and stubs the payment
+# and mail providers, so it needs no database, no switch and no network: it is
+# the whole reason this repository can be verified from a clean clone.
+#
+#   npm run smoke   ~= the job below, locally.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Build and end-to-end checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the console
+        run: npm run build
+
+      - name: Run the end-to-end suite
+        run: npm run smoke
+
+      - name: Fail if the skeleton drifted
+        # The suite asserts behavior; this asserts the two files that decide
+        # whether a deployment can even boot are still parseable.
+        run: |
+          node --check src/index.js
+          node --check scripts/smoke.mjs

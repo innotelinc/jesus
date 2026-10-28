@@ -1,0 +1,20 @@
+node_modules/
+data/
+# The iOS project is generated ("npx cap add ios") and shaped by
+# native/scripts, so it is never committed: a .xcodeproj in the repository means
+# a merge conflict on every file added and every version bumped.
+native/ios/
+native/build/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+web/dist/
+reports-*.json
+insp-*.json
+err.txt
+*.log
+server.pid
+.tmp/
+screenshots/

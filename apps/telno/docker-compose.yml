@@ -1,0 +1,182 @@
+name: telno
+
+services:
+  telno:
+    build:
+      context: .
+      # Point these at a mirror when the Docker Hub registry is unreachable:
+      #   NODE_IMAGE=mirror.gcr.io/library/node:24-bookworm-slim docker compose build
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+        SWITCH_IMAGE: ${SWITCH_IMAGE:-debian:bookworm}
+    image: telno:latest
+    container_name: telno
+    restart: unless-stopped
+
+    # A readable hostname on purpose. Docker's default is a hex container id,
+    # and a SIP parser reads a digit-leading host as a broken IPv4 address —
+    # the switch would put it in Contact headers and a browser would drop the
+    # message. "telno" is also what AMI and the CLI show.
+    hostname: ${TELNO_HOSTNAME:-telno}
+
+    # The switch runs on the host's own network stack.
+    #
+    # Host networking is what a real switch wants: the web port, SIP and the
+    # RTP media range all land directly on the host's addresses, so a reverse
+    # proxy reaches the app over a plain host socket and no SDP/RTP address has
+    # to be rewritten on the way through Docker's NAT.
+    #
+    # It also avoids a real failure: a Docker published port is terminated by
+    # the host's userland proxy, and on a virtualized network that duplicates
+    # frames (VMware bridging a guest onto a host link, for example) that extra
+    # TCP endpoint desyncs and resets a third to a half of the proxy's upstream
+    # requests, which surfaces as intermittent 502s in front of a healthy app.
+    #
+    # On Docker Desktop for Mac or Windows host networking is limited, so use
+    # the published-port form instead: comment out network_mode, then restore
+    #    ports:
+    #      - "${TELNO_PORT:-8080}:8080"
+    #      - "${SOFTPHONE_PORT:-8089}:8089"
+    #      - "10000-10100:10000-10100/udp"
+    network_mode: host
+
+    # Web/API 8080, browser softphone signalling 8089 (SIP over secure
+    # WebSocket), media 10000-10100/udp and AMI 5038 are all on the host now.
+
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # SIP domain used in From/To headers. Defaults to the PUBLIC_URL host.
+      SIP_DOMAIN: ${SIP_DOMAIN:-}
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-US}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@telno.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DIRECTORY_DOMAINS: ${DIRECTORY_DOMAINS:-telno.directory,num.directory,number.directory,directory.telno.services,directory.pbx.services,directory.pbx.technology}
+      DIRECTORY_CANONICAL: ${DIRECTORY_CANONICAL:-telno.directory}
+      NOTIFY_CHANNEL: ${NOTIFY_CHANNEL:-console}
+      NOTIFY_FROM: ${NOTIFY_FROM:-directory@telno.directory}
+      # Email provider: resend | mailjet. Keys are normally stored in the vault
+      # (Settings → Email delivery); these are for a .env-only deployment.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAILJET_API_KEY: ${MAILJET_API_KEY:-}
+      MAILJET_API_SECRET: ${MAILJET_API_SECRET:-}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      # The address a browser must use for the switch's WebSocket. Leave empty
+      # to derive it from the request host (right for a same-host deployment).
+      SOFTPHONE_WSS_URL: ${SOFTPHONE_WSS_URL:-}
+      SOFTPHONE_VIDEO: ${SOFTPHONE_VIDEO:-true}
+      SOFTPHONE_ENABLED: ${SOFTPHONE_ENABLED:-true}
+      # Desk-phone provisioning: a handset fetches its config by MAC from this
+      # URL (DHCP Option 66), and registers as sip:<extension>@<domain>.
+      PROVISIONING_ENABLED: ${PROVISIONING_ENABLED:-true}
+      PROVISIONING_URL: ${PROVISIONING_URL:-https://telno.tel}
+      PROVISIONING_SIP_DOMAIN: ${PROVISIONING_SIP_DOMAIN:-}
+      PROVISIONING_SIP_PORT: ${PROVISIONING_SIP_PORT:-5060}
+      # Fax on the switch: res_fax with spandsp over the SIP trunk voice already
+      # uses. No carrier fax API, no per-page charge.
+      FAX_ENABLED: ${FAX_ENABLED:-true}
+      FAX_T38: ${FAX_T38:-true}
+      FAX_STATION_ID: ${FAX_STATION_ID:-Telno}
+      FAX_DIR: ${FAX_DIR:-}
+      FAX_MAX_RATE: ${FAX_MAX_RATE:-14400}
+      # Apple push for the native app: the VoIP push that rings a locked iPhone.
+      # The .p8 belongs on the data volume — set APNS_KEY_PATH to it, never put
+      # the key itself in .env. Without a key the platform still works and the
+      # Voice card says why the phone will not ring.
+      APNS_ENABLED: ${APNS_ENABLED:-false}
+      APNS_KEY_PATH: ${APNS_KEY_PATH:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-us.innotel.scif}
+      APNS_ENVIRONMENT: ${APNS_ENVIRONMENT:-development}
+      APNS_RING_ON_DIAL: ${APNS_RING_ON_DIAL:-true}
+      # Parking: an unanswered call waits in a numbered space so a phone that was
+      # asleep can dial it and join. Only a line with a registered phone parks.
+      PARKING_ENABLED: ${PARKING_ENABLED:-true}
+      PARKING_LOT: ${PARKING_LOT:-telno}
+      PARKING_START: ${PARKING_START:-7001}
+      PARKING_END: ${PARKING_END:-7099}
+      PARKING_RING_SECONDS: ${PARKING_RING_SECONDS:-12}
+      PARKING_TIMEOUT: ${PARKING_TIMEOUT:-35}
+      PARKING_MOH: ${PARKING_MOH:-default}
+      # TURN is optional: without it, calls still work on ordinary NATs.
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+      # Address browsers actually reach this switch on. Empty derives it from
+      # PUBLIC_URL; set it when the public URL is loopback (a laptop that only
+      # exposes the container through published ports).
+      ASTERISK_EXTERNAL_ADDRESS: ${ASTERISK_EXTERNAL_ADDRESS:-}
+      # Billing automation. The defaults live in the code; these pass a .env
+      # change through to the container so the ladder and the dunning policy can
+      # be changed without editing the image.
+      REMINDER_DAYS: ${REMINDER_DAYS:-1,3,7,14,30}
+      REMINDER_GAP_HOURS: ${REMINDER_GAP_HOURS:-20}
+      ESCALATION_ENABLED: ${ESCALATION_ENABLED:-true}
+      FINAL_NOTICE_DAYS: ${FINAL_NOTICE_DAYS:-30}
+      SUSPEND_GRACE_DAYS: ${SUSPEND_GRACE_DAYS:-14}
+      # Card payment for the pay button. Both values are better kept in the
+      # vault (Settings → Vault); these are here for a .env-only deployment.
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Numbers are bought, routed and released at VoIP.ms. Both API values are
+      # better kept in the vault (Settings → Vault); these pass a .env-only
+      # deployment through.
+      VOIPMS_API_USERNAME: ${VOIPMS_API_USERNAME:-}
+      VOIPMS_API_PASSWORD: ${VOIPMS_API_PASSWORD:-}
+      VOIPMS_ROUTING: ${VOIPMS_ROUTING:-}
+      VOIPMS_POP: ${VOIPMS_POP:-1}
+      VOIPMS_BILLING_TYPE: ${VOIPMS_BILLING_TYPE:-2}
+      VOIPMS_DIAL_TIME: ${VOIPMS_DIAL_TIME:-60}
+      VOIPMS_CNAM: ${VOIPMS_CNAM:-false}
+      VOIPMS_DID_MONTHLY_CENTS: ${VOIPMS_DID_MONTHLY_CENTS:-0}
+      VOIPMS_CURRENCY: ${VOIPMS_CURRENCY:-USD}
+      # Backups of the data volume: database, recordings and a manifest. The
+      # schedule is what makes this a real protection rather than a button; keep
+      # at least two archives, because one copy can be the good one and the bad
+      # state. Set BACKUP_INTERVAL_HOURS=0 to take them by hand only.
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+      BACKUP_DIR: ${BACKUP_DIR:-}
+      # A production boot refuses an http public URL on a real hostname, since
+      # session cookies are marked secure. Set this only when TLS is terminated
+      # in front of the container and the browser still speaks http to it.
+      ALLOW_INSECURE_PUBLIC_URL: ${ALLOW_INSECURE_PUBLIC_URL:-false}
+      # Session, API-key and AMI secrets are generated once and stored in the
+      # data volume, so they survive restarts without being configured.
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+
+    # The image runs unprivileged (USER telno, uid 999) — the same uid the
+    # volumes are given. A volume written by an older, root-running image needs
+    # one chown, and the entrypoint prints that exact command rather than
+    # failing obscurely.
+    volumes:
+      - telno-data:/data                 # database, secrets, recordings, backups
+      - telno-asterisk:/etc/asterisk     # generated switch configuration
+      - telno-spool:/var/spool/asterisk  # voicemail
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+    # A slim control plane: Node is capped at 192 MB and the whole container
+    # comfortably fits in 512 MB including Asterisk.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+    # Host networking is the default here, so this file never mixes
+    # network_mode with published ports — Docker rejects that combination.
+    # Switch modes by editing the service above, not by layering another file.
+
+volumes:
+  telno-data:
+  telno-asterisk:
+  telno-spool:
