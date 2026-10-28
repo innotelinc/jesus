@@ -34,7 +34,7 @@ jobs:
       matrix:
         perl: ["5.36", "5.38"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
     name: Pump contract on the minimum Perl
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -110,7 +110,7 @@ jobs:
     name: Repository structure
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
