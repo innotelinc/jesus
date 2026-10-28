@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Slim all-in-one telephony platform, API and worldwide phonebook registry",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "node --watch src/index.js",
