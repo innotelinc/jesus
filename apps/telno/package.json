@@ -9,8 +9,11 @@
   },
   "scripts": {
     "dev": "node --watch src/index.js",
+    "predev": "node scripts/check-node.mjs",
     "dev:web": "vite --config web/vite.config.js",
     "start": "node src/index.js",
+    "prestart": "node scripts/check-node.mjs",
+    "check:node": "node scripts/check-node.mjs",
     "build": "vite build --config web/vite.config.js",
     "seed": "node src/seed.js",
     "smoke": "node scripts/smoke.mjs",

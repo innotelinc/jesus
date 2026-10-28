@@ -103,6 +103,11 @@ docker compose exec telno node src/seed.js
 
 ### Without Docker
 
+Node 24 is required, and nothing will let you find that out the hard way: `npm install` refuses to
+build the tree on an older runtime (`.npmrc` sets `engine-strict`), `npm run dev` and `npm start` run a
+small guard first, and the image fails its build rather than shipping a container that cannot import
+`node:sqlite`. `nvm use` reads the version from `.nvmrc`.
+
 ```bash
 npm install
 npm run build

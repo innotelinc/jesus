@@ -13,10 +13,14 @@ import { createHmac } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import { finalNoticeEmail, invoiceEmail, reminderEmail, suspensionEmail } from '../src/lib/mail.js';
+import { meetsFloor } from '../src/lib/node-version.js';
 import { payUrlForInvoice } from '../src/lib/payments.js';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * Two modes:
@@ -421,6 +425,46 @@ const SAMPLE_PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\
 const encode = encodeURIComponent;
 
 console.log(`\nTelno smoke test → ${base}\n`);
+
+// ----------------------------------------------------------------- runtime --
+// The floor is declared once, in package.json, and enforced in the three places
+// it can be crossed: npm refuses the install (.npmrc), the image refuses the
+// build (Dockerfile), and the guard refuses a start. They all read the same
+// module, so these checks are about one definition rather than three numbers.
+const manifestEngines = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).engines?.node;
+check('the runtime floor is declared in the manifest', manifestEngines === '>=24.0.0', manifestEngines);
+check(
+  'the running Node satisfies it',
+  meetsFloor(process.versions.node, manifestEngines),
+  process.versions.node
+);
+check(
+  'a Node 22 runtime does not, at any patch level',
+  meetsFloor('22.13.0', manifestEngines) === false &&
+    meetsFloor('22.19.5', manifestEngines) === false &&
+    meetsFloor('23.11.1', manifestEngines) === false,
+  ['22.13.0', '22.19.5', '23.11.1']
+);
+check(
+  'a newer major does, because a floor is a minimum and not a range',
+  meetsFloor('25.1.0', manifestEngines) === true && meetsFloor('24.0.0', manifestEngines) === true,
+  ['25.1.0', '24.0.0']
+);
+const oldGuard = spawnSync(process.execPath, [join(repoRoot, 'scripts/check-node.mjs'), '--version', '22.13.0'], {
+  encoding: 'utf8',
+});
+check(
+  'the start guard refuses an old runtime and names the real cause',
+  oldGuard.status === 1 && /node:sqlite/.test(oldGuard.stderr) && /\.nvmrc/.test(oldGuard.stderr),
+  oldGuard.stderr.trim().split('\n')[0]
+);
+const fineGuard = spawnSync(process.execPath, [join(repoRoot, 'scripts/check-node.mjs')], { encoding: 'utf8' });
+check('and passes on this one', fineGuard.status === 0, fineGuard.stderr);
+check(
+  'npm is set to refuse the install rather than warn',
+  /engine-strict\s*=\s*true/.test(readFileSync(join(repoRoot, '.npmrc'), 'utf8')),
+  '.npmrc'
+);
 
 // ------------------------------------------------------------------ public --
 const health = await call('GET', '/api/healthz');
