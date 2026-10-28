@@ -16,7 +16,13 @@ import { logEvent } from '../lib/audit.js';
 import { telephonyStatus } from '../telephony/index.js';
 import { activeChannel, channelStatus, deliverNotice } from '../lib/channels.js';
 import { invoiceEmail } from '../lib/mail.js';
-import { payUrlForInvoice, paymentStatus, testConnection } from '../lib/payments.js';
+import {
+  payUrlForInvoice,
+  paymentStatus,
+  repairWebhookEndpoint,
+  testConnection,
+  webhookUrl,
+} from '../lib/payments.js';
 import { ladder, reminderHistory, runReminderSweep, sendReminderNow } from '../lib/reminders.js';
 import { monthPeriod } from '../lib/rentals.js';
 import { maskPhone, maskText, maskedExtensions, maskedNumberIds } from '../lib/scif.js';
@@ -1169,6 +1175,29 @@ export default async function workspaceRoutes(app) {
             .filter((entry) => entry.state === 'fail')
             .map((entry) => entry.id)
             .join(', '),
+      ip: request.ip,
+    });
+    return result;
+  });
+
+  // The gap the test reports, closed: an endpoint in Stripe that is missing an
+  // event this platform needs gets it, and keeps every event it had. Safe to
+  // press twice — the second press finds nothing missing.
+  app.post('/billing/payments/webhook/repair', { preHandler: requireWrite }, async (request) => {
+    const result = await repairWebhookEndpoint({ actor: request.account.email });
+    if (!result.ok) {
+      const reasons = {
+        stripe_not_configured: 'Add the Stripe secret key in Settings → Vault first.',
+        not_registered: `No endpoint points at ${webhookUrl()}. Add it in Stripe → Developers → Webhooks, then run this again.`,
+      };
+      throw badRequest(reasons[result.error] || `Stripe could not be updated: ${result.error}`);
+    }
+    logEvent({
+      actor: request.account.email,
+      action: 'billing.webhook_repair',
+      detail: result.changed
+        ? `added ${result.added.join(', ')} · ${result.endpointId}`
+        : `nothing to do (${result.reason})`,
       ip: request.ip,
     });
     return result;

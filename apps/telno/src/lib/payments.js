@@ -44,7 +44,8 @@ const SUBSCRIPTION_EVENTS = [
 // says they have paid nothing while Stripe sends receipts every month.
 const LEDGER_EVENTS = ['invoice.paid'];
 const WEBHOOK_EVENTS = PAYMENT_EVENTS;
-export const webhookEventList = () => [...PAYMENT_EVENTS, ...SUBSCRIPTION_EVENTS, ...LEDGER_EVENTS];
+const REQUIRED_WEBHOOK_EVENTS = [...PAYMENT_EVENTS, ...SUBSCRIPTION_EVENTS, ...LEDGER_EVENTS];
+export const webhookEventList = () => [...REQUIRED_WEBHOOK_EVENTS];
 const MIN_CHARGE_CENTS = 50;
 
 /** Key from the vault first, environment second — the console can rotate it. */
@@ -757,11 +758,17 @@ export async function testConnection() {
         'metadata[connectionTest]': 'true',
       });
       if (!probe.ok) {
+        // A network failure and a refusal are different problems with different
+        // fixes. Telling an operator to re-scope their key because the host
+        // could not reach Stripe sends them to the wrong screen.
+        const offline = String(probe.error).startsWith('network:');
         add(
           'checkout',
           'Can create a payment page',
           'fail',
-          `Stripe refused the session: ${probe.error}. A restricted key needs write access to Checkout sessions.`
+          offline
+            ? `Could not reach ${config.payments.apiUrl} — ${String(probe.error).replace('network: ', '')}. The key answered the balance call, so this host's path to Stripe is the problem, not the key's permissions. Try again before changing anything.`
+            : `Stripe refused the session: ${probe.error}. A restricted key needs write access to Checkout sessions.`
         );
       } else {
         const expired = probe.data?.id
@@ -892,6 +899,57 @@ export async function testConnection() {
         ? `Working, with ${warned.length} thing${warned.length === 1 ? '' : 's'} to confirm: ${warned.map((check) => check.label.toLowerCase()).join(', ')}.`
         : 'Every Stripe check passed — the Pay now button will work.',
   };
+}
+
+/**
+ * Add the events this platform needs to the endpoint Stripe has for it.
+ *
+ * The endpoint's event list lives in Stripe's dashboard, so it drifts: a feature
+ * starts needing an event, or someone tidies the list by hand. The connection
+ * test can see the gap and cannot close it, which leaves an operator copying
+ * names out of a dialog. This closes it — and it adds to the list rather than
+ * replacing it, because replacing is how a working endpoint silently loses an
+ * event and the money it recorded stops arriving.
+ */
+export async function repairWebhookEndpoint({ actor = 'system' } = {}) {
+  if (!stripeConfigured()) return { ok: false, error: 'stripe_not_configured' };
+  const list = await stripeRequest('GET', '/v1/webhook_endpoints', { limit: 100 });
+  if (!list.ok) return { ok: false, error: list.error };
+
+  const wanted = webhookUrl();
+  const match = (list.data?.data || []).find(
+    (entry) => String(entry.url || '').replace(/\/+$/, '') === wanted
+  );
+  if (!match) return { ok: false, error: 'not_registered', url: wanted };
+
+  const before = match.enabled_events || [];
+  const wildcard = before.includes('*');
+  const missing = REQUIRED_WEBHOOK_EVENTS.filter((event) => !before.includes(event));
+  const settled = { ok: true, endpointId: match.id, url: match.url, before, added: [] };
+  if (wildcard || !missing.length) {
+    return {
+      ...settled,
+      changed: false,
+      reason: wildcard ? 'all_events' : 'nothing_missing',
+      after: before,
+    };
+  }
+
+  const params = {};
+  [...before, ...missing].forEach((event, index) => {
+    params[`enabled_events[${index}]`] = event;
+  });
+  const sent = await stripePost(`/v1/webhook_endpoints/${encodeURIComponent(match.id)}`, params);
+  if (!sent.ok) return { ok: false, error: sent.error, endpointId: match.id };
+
+  const after = sent.data?.enabled_events || [];
+  logEvent({
+    actor,
+    action: 'billing.webhook_repaired',
+    subject: match.url,
+    detail: `added ${missing.join(', ')}`,
+  });
+  return { ...settled, changed: true, after, added: missing };
 }
 
 /* ------------------------------------------------------------------ pages -- */

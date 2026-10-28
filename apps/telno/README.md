@@ -522,7 +522,15 @@ immediately, the webhook secret by signing a throwaway body and putting it throu
 the live endpoint uses, and the registered endpoint by matching the URL and the two payment events
 from Stripe's own list. Each row says `pass`, `check` or `fail` with the specific fix — an endpoint
 left pointing at last week's host, a revoked key, or a `PUBLIC_URL` of `localhost` that Stripe can
-never call are the failures a green badge would otherwise hide.
+never call are the failures a green badge would otherwise hide. A probe that cannot reach Stripe
+says that, and not that the key lacks permission: the two have different fixes.
+
+**Add missing events** in the same dialog closes the gap the check reports. It asks Stripe for the
+endpoint and appends whatever this deployment needs — `invoice.paid` for plan charges, the
+subscription lifecycle events for the portal gate — keeping every event already there. Replacing the
+list instead of adding to it is how an endpoint silently loses an event, so it never does that. It is
+idempotent: pressing it on a complete endpoint reports that nothing was missing, and an endpoint
+subscribed to `*` is left alone.
 
 ### Devices check themselves in
 

@@ -52,6 +52,13 @@ const mailjetCalls = [];
 // Set to make the stub report a different registered webhook URL, so the
 // connection test's "points at an old host" path is exercised.
 let stripeEndpointUrl = '';
+// What the registered endpoint is subscribed to. A stand-in that can never
+// change would pass a repair test without proving the repair did anything.
+let stripeEndpointEvents = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+// A path to drop instead of answering, for the network-failure checks. Stripe
+// timing out and Stripe refusing a key are different failures with different
+// fixes, and only a dropped connection exercises the first one.
+let stripeDropPath = '';
 
 if (!base) {
   const port = 8100 + Math.floor(Math.random() * 800);
@@ -76,6 +83,11 @@ if (!base) {
         response.writeHead(status, { 'content-type': 'application/json' });
         response.end(JSON.stringify(payload));
       };
+      if (stripeDropPath && path.startsWith(stripeDropPath)) {
+        stripeDropPath = '';
+        request.socket.destroy();
+        return;
+      }
       const presented = Buffer.from(String(request.headers.authorization || '').replace(/^Basic /, ''), 'base64')
         .toString('utf8')
         .split(':')[0];
@@ -94,9 +106,26 @@ if (!base) {
               object: 'webhook_endpoint',
               url: stripeEndpointUrl || `${base}/api/public/stripe/webhook`,
               status: 'enabled',
-              enabled_events: ['checkout.session.completed', 'checkout.session.async_payment_succeeded'],
+              enabled_events: stripeEndpointEvents,
             },
           ],
+        });
+      }
+      if (request.method === 'POST' && path.startsWith('/v1/webhook_endpoints/')) {
+        // The update replaces the whole list on Stripe's side, so the stand-in
+        // does the same: what the platform sent is what the endpoint now has.
+        // Stripe takes the list as indexed form fields (`enabled_events[0]`), so
+        // the stand-in reads those as well as the bare `enabled_events[]`.
+        const events = [...new URLSearchParams(body).entries()]
+          .filter(([name]) => /^enabled_events\[\d*\]$/.test(name))
+          .map(([, value]) => value);
+        if (events.length) stripeEndpointEvents = events;
+        return send({
+          id: path.split('/').pop(),
+          object: 'webhook_endpoint',
+          url: stripeEndpointUrl || `${base}/api/public/stripe/webhook`,
+          status: 'enabled',
+          enabled_events: stripeEndpointEvents,
         });
       }
       if (path.startsWith('/v1/checkout/sessions/') && path.endsWith('/expire')) {
@@ -1697,10 +1726,77 @@ check(
   checkOf(connected, 'public-url')
 );
 
+// A timeout is not a refusal, and telling an operator to re-scope their key
+// because the host could not reach Stripe sends them to the wrong screen.
+stripeDropPath = '/v1/checkout/sessions';
+const offlineProbe = await call('POST', '/api/billing/payments/test', {});
+check(
+  'a probe that cannot reach Stripe says so instead of blaming the key',
+  checkOf(offlineProbe, 'checkout')?.state === 'fail' &&
+    /Could not reach/.test(checkOf(offlineProbe, 'checkout')?.detail || '') &&
+    !/restricted key/.test(checkOf(offlineProbe, 'checkout')?.detail || ''),
+  checkOf(offlineProbe, 'checkout')
+);
+check(
+  'the checks that did reach Stripe still report honestly',
+  checkOf(offlineProbe, 'api')?.state === 'pass' && checkOf(offlineProbe, 'webhook-secret')?.state === 'pass',
+  offlineProbe.body.checks?.map((entry) => `${entry.id}:${entry.state}`)
+);
+
+// The endpoint's event list drifts: a feature adds an event, or someone tidies
+// the list in the dashboard. The test sees the gap; repair closes it.
+check(
+  'the test notices events this deployment needs are missing',
+  checkOf(connected, 'webhook-ledger')?.state === 'warn' &&
+    /invoice\.paid/.test(checkOf(connected, 'webhook-ledger')?.detail || ''),
+  checkOf(connected, 'webhook-ledger')
+);
+const repaired = await call('POST', '/api/billing/payments/webhook/repair', {});
+check(
+  'repair adds every missing event and keeps the ones already registered',
+  repaired.status === 200 &&
+    repaired.body.changed === true &&
+    repaired.body.added.includes('invoice.paid') &&
+    repaired.body.added.includes('invoice.payment_failed') &&
+    repaired.body.after.includes('invoice.paid') &&
+    repaired.body.after.includes('checkout.session.completed'),
+  repaired.body
+);
+const repairedAgain = await call('POST', '/api/billing/payments/webhook/repair', {});
+check(
+  'repairing a complete endpoint changes nothing',
+  repairedAgain.status === 200 &&
+    repairedAgain.body.changed === false &&
+    repairedAgain.body.reason === 'nothing_missing',
+  repairedAgain.body
+);
+const healthyAfterRepair = await call('POST', '/api/billing/payments/test', {});
+check(
+  'the ledger and subscription checks pass once the events are repaired',
+  checkOf(healthyAfterRepair, 'webhook-ledger')?.state === 'pass' &&
+    checkOf(healthyAfterRepair, 'webhook-subscriptions')?.state === 'pass',
+  healthyAfterRepair.body.checks?.map((entry) => `${entry.id}:${entry.state}`)
+);
+
+stripeEndpointEvents = ['*'];
+const wildcardRepair = await call('POST', '/api/billing/payments/webhook/repair', {});
+check(
+  'an endpoint subscribed to everything is left alone',
+  wildcardRepair.body.changed === false && wildcardRepair.body.reason === 'all_events',
+  wildcardRepair.body
+);
+stripeEndpointEvents = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+
 // A webhook still pointing at last week's host answers Stripe happily and pays
 // nothing. That is the failure this check exists for.
 stripeEndpointUrl = 'https://old.example/api/public/stripe/webhook';
 const staleWebhook = await call('POST', '/api/billing/payments/test', {});
+const orphanRepair = await call('POST', '/api/billing/payments/webhook/repair', {});
+check(
+  'repair refuses when no endpoint points at this host',
+  orphanRepair.status === 400 && /No endpoint points at/.test(orphanRepair.body.error?.message || ''),
+  orphanRepair.body
+);
 stripeEndpointUrl = '';
 check(
   'an endpoint pointing at another host fails the test',
