@@ -52,6 +52,11 @@ export default function Settings() {
   const [testTo, setTestTo] = useState('');
   const [savingMail, setSavingMail] = useState(false);
   const [testingMail, setTestingMail] = useState(false);
+  const [twilioSid, setTwilioSid] = useState('');
+  const [twilioToken, setTwilioToken] = useState('');
+  const [twilioFrom, setTwilioFrom] = useState('');
+  const [smsTo, setSmsTo] = useState('');
+  const [testingSms, setTestingSms] = useState(false);
   const [backups, setBackups] = useState({ status: null, items: [] });
   const [backupBusy, setBackupBusy] = useState('');
   const [restoring, setRestoring] = useState(null);
@@ -191,6 +196,7 @@ export default function Settings() {
   const chosenProvider = emailStatus.preference || (emailProvider === 'console' ? 'resend' : emailProvider);
 
   const payments = status?.payments || { configured: false, mode: 'none', webhookUrl: '/api/public/stripe/webhook' };
+  const smsStatus = status?.channels?.sms || { provider: 'console', configured: false, missing: [] };
   const secretByName = (name) => vault.items.find((item) => item.name === name);
   const stripeKeyStored = secretByName('STRIPE_SECRET_KEY');
   const stripeSecretStored = secretByName('STRIPE_WEBHOOK_SECRET');
@@ -251,6 +257,9 @@ export default function Settings() {
       else if (name === 'VOIPMS_API_USERNAME') setVoipUser('');
       else if (name === 'VOIPMS_API_PASSWORD') setVoipPass('');
       else if (name === 'VOIPMS_ROUTING') setVoipRoutingField('');
+      else if (name === 'TWILIO_ACCOUNT_SID') setTwilioSid('');
+      else if (name === 'TWILIO_AUTH_TOKEN') setTwilioToken('');
+      else if (name === 'TWILIO_FROM') setTwilioFrom('');
       else if (name === 'LLM_API_KEY') setAiKey('');
       else if (name === 'MAGNATE_WEBHOOK_URL') setMagnateHook('');
       else if (name === 'MAGNATE_API_TOKEN') setMagnateToken('');
@@ -379,6 +388,24 @@ export default function Settings() {
       toast.error('Test failed', err.message);
     } finally {
       setTestingMail(false);
+    }
+  };
+
+  const testSms = async () => {
+    if (!smsTo.trim()) {
+      toast.error('Where should it go?', 'Type the mobile number to text.');
+      return;
+    }
+    setTestingSms(true);
+    try {
+      const result = await api.post('/system/sms/test', { to: smsTo.trim() });
+      if (result.sent) toast.success('Test text sent', `Accepted by ${result.provider} for ${result.to}`);
+      else toast.error('The provider refused it', result.error || 'No detail returned');
+      load();
+    } catch (err) {
+      toast.error('Test failed', err.message);
+    } finally {
+      setTestingSms(false);
     }
   };
 
@@ -523,9 +550,8 @@ export default function Settings() {
             <dt>Rate limit</dt>
             <dd>5 submissions per hour per IP</dd>
           </dl>
-          <p className="tiny dim" style={{ marginTop: 12 }}>          Email leaves through the provider chosen below — a stored key and the choice take effect on the next message, with no restart. With no key at all, codes and invoices are written to the container log. SMS uses{' '}
-            <span className="mono">TWILIO_ACCOUNT_SID</span> and <span className="mono">TWILIO_AUTH_TOKEN</span>{' '}
-            from the environment.
+          <p className="tiny dim" style={{ marginTop: 12 }}>          Email leaves through the provider chosen below — a stored key and the choice take effect on the next message, with no restart. With no key at all, codes and invoices are written to the container log. Texts leave through Twilio, configured in{' '}
+            Settings → Text messages; until it is, the code is written to the log and handed back in the wizard.
           </p>
         </Card>
       </div>
@@ -731,6 +757,140 @@ export default function Settings() {
                 onClick={testMail}
                 loading={testingMail}
                 disabled={!emailStatus.configured}
+              >
+                Send test
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title="Text messages"
+        subtitle="Verification codes go to a handset through Twilio"
+        actions={
+          <Badge tone={smsStatus.configured ? 'success' : 'neutral'} dot>
+            {smsStatus.configured ? `twilio · ${smsStatus.source}` : 'Not configured'}
+          </Badge>
+        }
+      >
+        <p className="tiny muted" style={{ marginTop: 0 }}>
+          All three values come from the Twilio console: the Account SID and Auth token from the dashboard, and a
+          sender number the account owns. They are stored encrypted here, like the mail keys, and a stored change takes
+          effect on the next code with no redeploy. The environment still works as a fallback for a .env-only install.
+        </p>
+        {smsStatus.configured ? null : (
+          <p className="tiny dim" style={{ marginTop: 0 }}>
+            Still needed: <span className="mono">{(smsStatus.missing || []).join(', ') || 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM'}</span>
+            . Until all three are stored, codes are written to the container log instead of being texted.
+          </p>
+        )}
+        <div className="grid two">
+          <div className="stack">
+            <Input
+              label="Account SID"
+              autoComplete="off"
+              placeholder={secretByName('TWILIO_ACCOUNT_SID') ? `Stored ${secretByName('TWILIO_ACCOUNT_SID').hint}` : 'AC…'}
+              hint={
+                secretByName('TWILIO_ACCOUNT_SID')
+                  ? `Stored ${relativeTime(secretByName('TWILIO_ACCOUNT_SID').updatedAt)}`
+                  : 'twilio.com → Console → Account Info'
+              }
+              value={twilioSid}
+              onChange={(event) => setTwilioSid(event.target.value)}
+            />
+            <Input
+              label="Auth token"
+              type="password"
+              autoComplete="off"
+              placeholder={secretByName('TWILIO_AUTH_TOKEN') ? `Stored ${secretByName('TWILIO_AUTH_TOKEN').hint}` : 'The account auth token'}
+              hint={
+                secretByName('TWILIO_AUTH_TOKEN')
+                  ? `Stored ${relativeTime(secretByName('TWILIO_AUTH_TOKEN').updatedAt)}`
+                  : 'Rotating it in Twilio means replacing it here'
+              }
+              value={twilioToken}
+              onChange={(event) => setTwilioToken(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'TWILIO_ACCOUNT_SID'}
+                onClick={() => storeSecret('TWILIO_ACCOUNT_SID', twilioSid, 'Twilio account SID')}
+              >
+                {secretByName('TWILIO_ACCOUNT_SID') ? 'Replace SID' : 'Store SID'}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'TWILIO_AUTH_TOKEN'}
+                onClick={() => storeSecret('TWILIO_AUTH_TOKEN', twilioToken, 'Twilio auth token')}
+              >
+                {secretByName('TWILIO_AUTH_TOKEN') ? 'Replace token' : 'Store token'}
+              </Button>
+              {secretByName('TWILIO_AUTH_TOKEN') ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearSecret('TWILIO_AUTH_TOKEN', 'Remove the stored Twilio auth token? Codes stop being texted until it is stored again.')}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <div className="stack">
+            <Input
+              label="Send from"
+              placeholder={secretByName('TWILIO_FROM') ? `Stored ${secretByName('TWILIO_FROM').hint}` : '+15551234567'}
+              hint={
+                secretByName('TWILIO_FROM')
+                  ? `Codes are texted from ${smsStatus.from || 'the stored number'}`
+                  : 'A number or messaging service SID the Twilio account owns'
+              }
+              value={twilioFrom}
+              onChange={(event) => setTwilioFrom(event.target.value)}
+            />
+            <div className="row wrap" style={{ gap: 8 }}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={savingSecret === 'TWILIO_FROM'}
+                onClick={() => storeSecret('TWILIO_FROM', twilioFrom, 'Twilio sender number')}
+              >
+                {secretByName('TWILIO_FROM') ? 'Replace sender' : 'Store sender'}
+              </Button>
+              {secretByName('TWILIO_FROM') ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => clearSecret('TWILIO_FROM', 'Remove the stored sender number? Codes stop being texted until it is stored again.')}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <div className="row wrap" style={{ gap: 8, marginTop: 4, alignItems: 'flex-end' }}>
+              <div style={{ flex: '1 1 180px' }}>
+                <Input
+                  label="Text a test message to"
+                  value={smsTo}
+                  onChange={(event) => setSmsTo(event.target.value)}
+                  placeholder="+15551234567"
+                  hint="International form, so the carrier knows the country"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="message"
+                onClick={testSms}
+                loading={testingSms}
+                disabled={!smsStatus.configured}
               >
                 Send test
               </Button>

@@ -5,7 +5,7 @@ import { newApiKey } from '../lib/security.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { recentEvents, logEvent } from '../lib/audit.js';
 import { directoryStats } from '../lib/registry.js';
-import { channelStatus, sendEmail } from '../lib/channels.js';
+import { channelStatus, sendEmail, sendSms, twilioConfigured, twilioCredentials, twilioSource } from '../lib/channels.js';
 import { listSecrets, putSecret, deleteSecret } from '../lib/vault.js';
 import { paymentStatus } from '../lib/payments.js';
 import { aiStatus, testAi } from '../lib/ai.js';
@@ -305,6 +305,38 @@ export default async function systemRoutes(app) {
     logEvent({
       actor: request.account.email,
       action: 'system.email_tested',
+      subject: to,
+      detail: result.delivered ? `sent via ${result.provider}` : `failed: ${result.error}`,
+      ip: request.ip,
+    });
+    return { sent: result.delivered, provider: result.provider, error: result.error || null, to };
+  });
+
+  /**
+   * Proves the stored SMS credentials reach Twilio and that a handset answers.
+   *
+   * Same reasoning as the mail test: a SID and token can be wrong, expired or
+   * belong to a trial account that has not verified this number, and none of
+   * that shows up until somebody is waiting for a code that never arrives.
+   */
+  app.get('/system/sms', { preHandler: app.requireRole('owner', 'operator') }, async () => ({
+    configured: twilioConfigured(),
+    source: twilioSource(),
+    from: twilioCredentials().from,
+    provider: twilioConfigured() ? 'twilio' : 'console',
+  }));
+
+  app.post('/system/sms/test', { preHandler: app.requireRole('owner', 'operator') }, async (request) => {
+    const to = v.str(request.body?.to, { name: 'to', min: 7, max: 24 });
+    const result = await sendSms({
+      to,
+      body:
+        'This is a test from your Telno platform. If it arrived, the Twilio credentials ' +
+        'in Settings → Text messages are working, and verification codes will be texted the same way.',
+    });
+    logEvent({
+      actor: request.account.email,
+      action: 'system.sms_tested',
       subject: to,
       detail: result.delivered ? `sent via ${result.provider}` : `failed: ${result.error}`,
       ip: request.ip,
