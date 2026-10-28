@@ -257,10 +257,10 @@ for a live device — only a real check-in moves them.
 | GET/PUT | `/voicemails/:id/audio` | stream (Range-aware) or upload the recording as a raw body |
 | GET/POST | `/faxes` | inbound and outbound faxes; `body` is a plain-text page; `?direction=` |
 | PATCH | `/faxes/:id` | `queued → sending → sent|failed` (`received` for inbound) |
-| POST | `/faxes/:id/send` | **transmit it**: the switch dials the trunk and runs `SendFax` (res_fax, T.38 with G.711 fallback). No carrier fax API and no per-page fee. A PDF or image is rasterised to TIFF with ghostscript (a typed body is typeset first); a refusal is written to the row's `error` |
+| POST | `/faxes/:id/send` | **transmit it**: the switch dials the trunk and runs `SendFax` (res_fax; T.38 when the carrier negotiates it, G.711 passthrough when it does not). No carrier fax API and no per-page fee. A PDF or image is rasterised to TIFF with ghostscript (a typed body is typeset first); a refusal is written to the row's `error` |
 | GET | `/fax/engine` | what this install can actually do: `modules.resFax`, `modules.spandsp`, `ghostscript`, `transport`, `stationId`, and a sentence saying what is missing |
 | GET/PUT/DELETE | `/faxes/:id/attachment` | download, upload (PDF/PNG/JPEG/TIFF) or clear the document |
-| — | inbound fax | a number set to `faxMode: "fax"` answers as a machine; `"auto"` answers voice and takes the call over when the far end negotiates T.38. `ReceiveFax` writes to the data volume and a sweep turns the receipt into a row, including documents that arrived while the API was down |
+| — | inbound fax | a number set to `faxMode: "fax"` answers as a machine; `"auto"` rings the line first and treats an unanswered call as a fax. `ReceiveFax` writes to the data volume, the switch's fax status event names the file and the page count, and a sweep claims any document an event could not report — including one that arrived while the API was down |
 | GET | `/messages?channel=` | SMS/MMS/web threads — carrier messages, which are metered |
 | GET/POST | `/secure-messages` | **internal** messages between people on this platform: no carrier, no per-message cost, body sealed with AES-256-GCM before it is stored. `GET /secure-messages/recipients` lists who is addressable; `POST /secure-messages/:id/read` marks one read. Each end sees only its own copy |
 | GET | `/presets` | the recipes the console offers: `stepTypes`, `triggers`, `workflows` (complete step lists), `agents` (working personas), `voices`, `languages` |

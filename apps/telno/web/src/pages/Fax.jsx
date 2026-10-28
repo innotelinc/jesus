@@ -165,7 +165,7 @@ export default function Fax() {
                   >
                     <option value="voice">Voice</option>
                     <option value="fax">Fax machine</option>
-                    <option value="auto">Voice + detect fax</option>
+                    <option value="auto">Voice, then fax if unanswered</option>
                   </select>
                 </div>
               ))}
@@ -174,8 +174,9 @@ export default function Fax() {
             <p className="tiny dim">No numbers in the registry yet.</p>
           )}
           <p className="tiny dim" style={{ marginTop: 8 }}>
-            “Fax machine” answers immediately and receives. “Voice + detect fax” answers as a line and hands the call
-            to the receiver the moment the far end negotiates T.38 — that is what a fax terminal does.
+            “Fax machine” answers immediately and receives — that is the reliable choice for a fax number, because a fax
+            terminal negotiates T.38 with the receiver. “Voice, then fax if unanswered” rings the line first and only treats
+            the call as a fax when nobody picked up, which suits a number that is mostly voice.
           </p>
         </Card>
       </div>

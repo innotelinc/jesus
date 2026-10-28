@@ -93,7 +93,14 @@ function onEvent(msg) {
   try {
     // Fax rides the same session: res_fax reports an originate and a result, and
     // the hangup that follows a silent transmission is a failure, not a lost row.
-    if (['OriginateResponse', 'FaxStatus', 'Hangup'].includes(msg.Event)) onFaxEvent(msg);
+    // The switch spells these `FAXStatus`, `SendFAX` and `ReceiveFAX`; a filter
+    // listing `FaxStatus` hears none of them and every send looks hung.
+    if (/^(originate(response)?|faxstatus|sendfax|receivefax|hangup)$/i.test(msg.Event || '')) {
+      // The fax handler needs the call's own state to name an inbound document:
+      // the event says what arrived, the channel says who sent it and to which
+      // number.
+      onFaxEvent(msg, channels.get(msg.Uniqueid) || null);
+    }
     switch (msg.Event) {
       case 'Newchannel': {
         track(msg.Uniqueid, {

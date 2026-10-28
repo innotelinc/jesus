@@ -695,15 +695,32 @@ Still outstanding, in the order it matters:
 ## Fax, desk phones and internal messaging
 
 **Fax is a call, not an API.** `res_fax` (with spandsp) runs on the switch and uses the SIP trunk voice
-already uses. T.38 is preferred and G.711 passthrough is the fallback, so a fax works with a carrier that
-refuses T.38 — and nothing is billed per page, because no carrier fax service is involved.
+already uses. Nothing is billed per page, because no carrier fax service is involved.
+
+The media is negotiated in one of two ways, and which one works is the carrier's decision:
+
+- `FAX_T38=true` offers T.38, which is the cheapest on a clean link. A carrier that answers the mid-call
+  renegotiation with `488 Not Acceptable Here` takes the whole call down with it — the switch does not get
+  to fall back, because there is no call left to fall back on. VoIP.ms behaves exactly this way.
+- `FAX_T38=false` sends the page as G.711 audio passed through spandsp. It uses more bandwidth and is
+  slower, but it works on any trunk that carries voice, which is what a fax needs when a carrier will not
+  negotiate T.38. Set this on a VoIP.ms deployment.
+
+- The trunk is framed for the carrier, not for us: `from_domain` is the carrier's own host and `from_user`
+  is left empty so the call's own number is the From user. A trunk that presents `subaccount@our.domain`
+  is refused with `503` even though authentication succeeded.
 
 - A number's `faxMode` decides how it answers: `voice`, `fax` (straight to the machine) or `auto`
-  (answer as a line and hand the call over the moment the far end negotiates T.38).
-- Inbound documents are written to the data volume by the dialplan and turned into rows by a sweep, so a
-  fax that arrived while the API was restarting is not lost.
+  (ring the line, and treat an unanswered call as the fax it probably was).
+- Inbound documents are written to the data volume by `ReceiveFax`, and the switch's own fax status event
+  names the file and its page count once reception is complete. A sweep claims anything the events could
+  not report, so a fax that arrived while the API was restarting is not lost.
 - Outbound: a PDF, a scan or a typed page is rasterised to TIFF with ghostscript and transmitted with
-  `SendFax`. A refusal is recorded on the row with the switch's own reason.
+  `SendFax`. The switch reports the result with `SendFAX` (one page went out) or a failing `FAXStatus`, and
+  the row follows it; a transmission the switch abandons without any event is settled as failed by the
+  sweep, so a page is never shown as "sending" after the call is gone.
+- The end-to-end check is a page dialled through the carrier to the deployment's own DID and back:
+  ![A page received over the VoIP.ms trunk](docs/proof/fax-received-from-voipms.png)
 
 **Desk phones provision themselves at `telno.tel`.** Point DHCP Option 66 (or the phone's provisioning
 URL) at `https://telno.tel` and a handset fetches `/<vendor>/<mac>.cfg` by MAC — Yealink, Grandstream and

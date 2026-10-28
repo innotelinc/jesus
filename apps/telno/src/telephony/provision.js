@@ -176,18 +176,29 @@ function pjsip(extensions, trunks, tls = tlsPaths()) {
       `[${id}-endpoint]`,
       'type=endpoint',
       `context=${safe(trunk.context, 'from-trunk')}`,
-      `from_domain=${sipDomain()}`,
+      // A carrier judges an outbound call by its From header: the From user has
+      // to be a number the account owns and the From domain has to be the
+      // carrier's own host, not this platform's SIP domain. A trunk that sends
+      // `subaccount@telno.tel` is refused with 503 even though it authenticated
+      // (VoIP.ms does exactly this), so the trunk's host is the From domain.
+      `from_domain=${host}`,
       'disallow=all',
       ...codecs.map((c) => `allow=${c}`),
       `outbound_auth=${id}-auth`,
       `aors=${id}`,
       trunk.from_user ? `from_user=${safe(trunk.from_user)}` : '',
+      // A fax over a carrier trunk is only reliable when the switch can offer
+      // T.38 on the endpoint: res_fax renegotiates the media to it during the
+      // call, and falls back to G.711 passthrough when the far end refuses.
+      // Without these the endpoint can only pass it through as audio.
+      ...(config.fax.enabled && config.fax.t38
+        ? ['t38_udptl=yes', 't38_udptl_ec=redundancy', 't38_udptl_nat=yes']
+        : []),
       'direct_media=no',
       'rtp_symmetric=yes',
       'force_rport=yes',
       'rewrite_contact=yes',
       'timers=no',
-      ...faxDetect(),
       '',
       `[${id}-identify]`,
       'type=identify',
@@ -269,7 +280,6 @@ function pjsip(extensions, trunks, tls = tlsPaths()) {
       `aors=${id}`,
       `callerid=${callerIdString(ext)}`,
       ext.voicemail ? `mailboxes=${num}@default` : '',
-      ...faxDetect(),
       '',
       `[${id}-auth]`,
       'type=auth',
@@ -290,13 +300,6 @@ function pjsip(extensions, trunks, tls = tlsPaths()) {
 
   return out.filter((line) => line !== undefined).join('\n');
 }
-
-/**
- * chan_pjsip will hand a call to the `fax` extension when the far end starts a
- * T.38 session — that is what turns an ordinary voice DID into one that also
- * receives faxes. The dialplan's `fax` extension is the landing point.
- */
-const faxDetect = () => (config.fax.enabled ? ['faxdetect=incoming'] : []);
 
 /** Both endpoints of one extension, for a parallel ring. */
 const ringTargets = (num) => `PJSIP/${safe(num)}&PJSIP/${sectionName('webrtc', num)}`;
@@ -327,23 +330,25 @@ function faxConf() {
  * caller ID is attacker-controlled input reaching a shell.
  */
 function faxContexts() {
-  const dir = faxDir();
-  const status = `${dir}/status`;
-  const inbox = `${dir}/in`;
+  const inbox = `${faxDir()}/in`;
   return [
-    ';[fax] received documents land on the data volume, in the store the console reads',
+    ';[fax] received documents land on the data volume; the platform reads the',
+    ';      switch\'s fax events rather than a receipt the dialplan has to write',
     '[telno-fax-in]',
     'exten => s,1,NoOp(Inbound fax from ${CALLERID(num)} to ${TELNO_DID})',
     ' same => n,Answer()',
     ' same => n,Wait(1)',
-    ' same => n,Set(FAXOPT(ecm)=yes)',
+    // ECM off on receive: a T.30 carrier that a lossy trunk drops is the single
+    // most common way a fax fails end to end, and ECM retries make it worse on a
+    // narrowband path. The document is no worse for it.
+    ' same => n,Set(FAXOPT(ecm)=no)',
     ` same => n,Set(FAXOPT(maxrate)=${config.fax.maxRate})`,
     ` same => n,Set(FAXOPT(minrate)=${config.fax.minRate})`,
-    ` same => n,Set(FAXOPT(stationid)=${safe(config.fax.stationId, 'Telno')})`,
-    ` same => n,ReceiveFax(${inbox}/\${UNIQUEID}.tif)`,
-    ' same => n,Set(FAX_RESULT=${FAXOPT(status)})',
-    ' same => n,Set(FAX_PAGES=${FAXOPT(pages)})',
-    ` same => n,System(printf '%s|%s|%s|%s|%s\\n' "\${UNIQUEID}" "\${FAX_RESULT}" "\${FAX_PAGES}" "\${CALLERID(num)}" "\${TELNO_DID}" > ${status}/\${UNIQUEID}.done)`,
+    // The DID is written into the file name. It comes from our own database, so
+    // it cannot smuggle a path separator in — unlike a caller ID, which is why
+    // the number is not part of this name. A document that arrives while the API
+    // is down is still attributable when the sweep picks it up.
+    ` same => n,ReceiveFax(${inbox}/\${UNIQUEID}__\${TELNO_DID}.tif)`,
     ' same => n,Hangup()',
     '',
   ];
@@ -496,6 +501,13 @@ function dialplan(extensions, trunks, flows, dids, agentPolicy = new Map(), park
   if (dids.length) {
     for (const did of dids) {
       const digits = String(did.e164).replace(/\D/g, '');
+      // Carriers differ on what they put in the request URI for a North
+      // American number: some send all eleven digits, some only ten. The
+      // registry is keyed on the full national number, so the short form is
+      // aliased to it rather than falling through to `s` and a busy tone.
+      if (digits.length === 11 && digits.startsWith('1')) {
+        out.push(`exten => ${digits.slice(1)},1,Goto(${digits},1)`);
+      }
       const agent = agentPolicy.get(did.number_id);
       const policy = policyFor(agent);
       // A SCIF line is never recorded, whatever the agent's policy says. The
@@ -510,15 +522,32 @@ function dialplan(extensions, trunks, flows, dids, agentPolicy = new Map(), park
             ` same => n,${record(`inbound-${safe(agent.name, 'agent')}`)}`,
           ]
         : [];
-      const target = did.fax_mode === 'fax' && config.fax.enabled
-        ? 'telno-fax-in'
-        : `internal,${safe(did.extension)}`;
+      const isFax = did.fax_mode === 'fax' && config.fax.enabled;
+      const isAuto = did.fax_mode === 'auto' && config.fax.enabled && did.extension;
+      const target = isFax ? 'telno-fax-in' : `internal,${safe(did.extension)}`;
+      const goto = `Goto(${target.includes(',') ? target : `${target},s`},1)`;
+      if (isAuto) {
+        // Ring the line first, and only if nobody answers treat the call as the
+        // fax it probably was. A fax terminal is patient; a person who wanted a
+        // person has already given up by then.
+        out.push(
+          `exten => ${digits},1,NoOp(${plain(did.display_name)} <- ${plain(did.e164)})`,
+          ` same => n,Set(__TELNO_DID=${plain(did.e164)})`,
+          ...recordLines,
+          ` same => n,Dial(${ringTargets(safe(did.extension))},20,tT)`,
+          ' same => n,GotoIf($["${DIALSTATUS}"="ANSWER"]?answered)',
+          ' same => n,Goto(telno-fax-in,s,1)',
+          ' same => n(answered),Hangup()',
+          `exten => _+${digits},1,Goto(${digits},1)`
+        );
+        continue;
+      }
       out.push(
         `exten => ${digits},1,NoOp(${plain(did.display_name)} <- ${plain(did.e164)})`,
         ` same => n,Set(__TELNO_DID=${plain(did.e164)})`,
-        ...(did.fax_mode === 'fax' && config.fax.enabled ? [] : recordLines),
-        ` same => n,Goto(${target.includes(',') ? target : `${target},s`},1)`,
-        `exten => _+${digits},1,Goto(${target.includes(',') ? target : `${target},s`},1)`
+        ...(isFax ? [] : recordLines),
+        ` same => n,${goto}`,
+        `exten => _+${digits},1,Goto(${digits},1)`
       );
     }
     if (agentPolicy.size) {
