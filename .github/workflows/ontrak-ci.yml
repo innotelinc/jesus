@@ -1,0 +1,1034 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATED FILE — edit the source, not this copy.
+#
+#   source:      apps/ontrak/.github/workflows/ci.yml
+#   regenerate:  perl tools/port-workflows.pl
+#
+# The copy exists because GitHub only reads workflows from the repository root.
+# This one runs only when apps/ontrak/** changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ci.yml — the checks that must be green on main.
+#
+# Thirteen concerns, in the order they fail cheapest:
+#   structure    — the conformant file set, the compose files and every landing page
+#   secrets      — the scanner passes its own self-test, then the tracked tree
+#   lab          — OnTrak Lab's Python suites: the portal's own, and the installer
+#                  and publishing scripts'
+#   training     — the IT support training app: typecheck, unit tests, build
+#   tix          — OnTrak Tix: typecheck, unit tests, build
+#   sentinel     — OnTrak Sentinel: migrations applied, then typecheck and unit tests
+#   roundtrip    — the Sentinel image boots and signs somebody in over the wire
+#   sync         — OnTrak Sync: the API's unittest suite, then the dashboard typecheck
+#   sync-browser — the Sync rollouts console in Chromium, over a faked Network, and the
+#                  dev server's hot-reload socket
+#   genie        — the agent console: typecheck, build, unit and HTTP tests
+#   portal       — the family's front door: typecheck, copy check, unit tests, build
+#   family       — the whole family stack boots together and the wiring between the
+#                  products holds
+#   images       — every container image actually builds, one matrix entry per product
+#
+# Both apps talk to PostgreSQL (through Prisma) and are exercised against a
+# real database here, because a suite that only passes against fakes proves
+# nothing about the SQL it actually issues. The training app ships migrations
+# and applies them; Tix is schema-first (no migrations directory) and pushes.
+# Attribution is enforced separately, in attribution-guard.yml.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: "ontrak: CI"
+
+# `family` is where the family is assembled, so a push there runs CI too: the branch
+# that reaches a deploy is the branch whose images have to be proven to build.
+on:
+  push:
+    paths:
+      - "apps/ontrak/**"
+      - ".github/workflows/ontrak-ci.yml"
+    branches: [main, master, family]
+  pull_request:
+    paths:
+      - "apps/ontrak/**"
+      - ".github/workflows/ontrak-ci.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: apps/ontrak
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ontrak-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  structure:
+    name: Repository structure
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Conformant structure
+        run: |
+          set -euo pipefail
+          for f in README.md LICENSE .env.example .gitignore web/landing/index.html docs/stack.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::missing required file: $f"
+              exit 1
+            fi
+          done
+          echo "structure: ok"
+
+      - name: .gitignore covers .env
+        run: |
+          set -euo pipefail
+          grep -q '^\.env' .gitignore || { echo "::error::.gitignore does not list .env"; exit 1; }
+          echo "gitignore: ok"
+
+      # Four compose files and three `.env.example`s, checked as a set: a family
+      # stack that no longer parses is a broken "one command" that only a person
+      # trying it would find.
+      - name: Every compose file parses
+        run: |
+          set -euo pipefail
+          cp -n .env.example .env
+          cp -n ontrak-tix/.env.example ontrak-tix/.env
+          docker compose config --quiet && echo "compose: training ok"
+          ( cd ontrak-tix && docker compose config --quiet ) && echo "compose: tix ok"
+          ( cd ontrak-sentinel && docker compose config --quiet ) && echo "compose: sentinel ok"
+          docker compose -f docker-compose.all.yml config --quiet && echo "compose: family ok"
+
+      # Every landing in the tree, not only the front door. `pages.yml` publishes
+      # each product's landing at its own path under the family site, so a product
+      # landing that lost its favicon or picked up attribution text ships broken
+      # exactly as visibly as the root one would.
+      - name: Landing page sanity
+        run: |
+          set -euo pipefail
+          for f in web/landing/index.html */web/landing/index.html; do
+            [ -f "$f" ] || continue
+            grep -qi '<title>' "$f" || { echo "::error::$f has no <title>"; exit 1; }
+            grep -qi 'og:title' "$f" || { echo "::error::$f has no og:title"; exit 1; }
+            grep -qi 'data:image/svg+xml' "$f" || { echo "::error::$f favicon is not a self-contained SVG"; exit 1; }
+            grep -Eiq 'generated with|generated by|co-authored-by' "$f" && { echo "::error::$f carries attribution text"; exit 1; }
+            echo "landing: $f ok"
+          done
+
+      # Every product vendors the shared theme byte-for-byte, so the first sign the
+      # family is drifting apart is somebody fixing one copy. A diff is the check that
+      # cannot be argued with; `--update` is how a real theme change is rolled out.
+      - name: Unity theme copies are byte-identical
+        run: python3 theme/tests/test_theme_copies.py
+
+      # The lab's reporting client is the family's half of the completion contract, so
+      # its suite runs where the contract lives rather than waiting for a lab host to
+      # report a payload the server refuses. Offline by design: no network, no database,
+      # and the same command its README gives an operator.
+      - name: Lab client unit tests
+        run: |
+          set -euo pipefail
+          cd integrations/lab-completion-client
+          python3 -m unittest discover -s tests
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # First, because this is the step that catches the failure nobody sees: a
+      # scanner whose patterns have stopped matching reports a clean tree.
+      - name: The scanner must still fire
+        run: python3 scripts/secret-scan.py --selftest
+
+      - name: Scan the tracked tree
+        run: python3 scripts/secret-scan.py
+
+  # OnTrak Lab's own Python suites, which arrived with its tree when the two
+  # repositories became one. Nothing ran them here: the move brought
+  # `ontrak-lab/tests` (the portal, the session manager, the catalog, the scheduler,
+  # the guest drivers — against a fake hypervisor and an in-memory store) and
+  # `ontrak-lab/scripts/tests` (the installer, the image publishing, the secret scan)
+  # into this repository, and a directory of Python tests no job runs is exactly what
+  # `tests/ci-coverage.test.ts` refuses — it named both of these, which is why the job
+  # exists rather than being a nice idea.
+  #
+  # Offline by design, like the boundary tests in the `training` job: no machine, no
+  # network and no host tooling, because these suites assert what the lab *decides*
+  # rather than what a range runs — the script tests put it in their own module
+  # headers ("can be tested without a hypervisor").
+  lab:
+    name: OnTrak Lab
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/ontrak/ontrak-lab
+    steps:
+      - uses: actions/checkout@v7
+
+      # 3.12 because that is what the lab runs on: its portal image is Ubuntu 24.04,
+      # whose python3 this is, and its own development venv is 3.12 as well. The
+      # project's floor is 3.10, and a suite green only on the floor would be a suite
+      # that never ran where it ships.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the lab's dependencies
+        run: pip install -r requirements.txt
+
+      # The lab's `make test`, run the way CI runs every suite: the same command an
+      # operator runs by hand, so a failure here is a failure somebody can reproduce.
+      - name: The lab's own suite
+        run: python3 -m pytest -q tests
+
+      # Its own directory because the project's `testpaths` is `tests` alone, which is
+      # how these seventeen files came to be run by nobody at all.
+      - name: The installer and publishing scripts
+        run: python3 -m pytest -q scripts/tests
+
+  training:
+    name: Training app
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ontrak
+          POSTGRES_PASSWORD: ontrak
+          POSTGRES_DB: ontrak
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ontrak"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/ontrak?schema=public
+      AUTH_SECRET: ci-only-not-a-production-secret-value
+      # The shipped placeholder, so the seeded demo accounts the a11y-free
+      # suites sign in as exist without CI holding a real credential.
+      SEED_PASSWORD: change-me-ontrak
+      STORAGE_DIR: ./storage/packages
+      NEXT_PUBLIC_APP_NAME: OnTrak IT Support Training
+    defaults:
+      run:
+        working-directory: apps/ontrak/.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate the Prisma client and apply migrations
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      # Applied migrations are compared against the models, so a hand-edited SQL
+      # file cannot quietly describe a different schema than the one Prisma thinks
+      # it is talking to — the failure mode that only shows up in production.
+      - name: No drift between the migrations and the models
+        run: |
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Each test is bounded (`--test-timeout=60000`), so a hang fails by name instead
+      # of holding this job to its ceiling — see the Sentinel job's note for the stall
+      # that taught us.
+      - name: Unit tests
+        run: npm test
+
+      # `npm test` skips this (it boots a server), and this is the one place it is
+      # actually run: the lab-completion boundary driven through the app's own route
+      # against the migrations applied above, so the route's database path, its
+      # idempotency and the results feed's mode filter are covered on every change
+      # — with no hypervisor and no lab. The boundary is what CI can test, and does;
+      # where the lab is hosted is an operator's deployment (docs/consolidation-audit.md
+      # §9/Q8), and the clauses that keep that true are held by tests/ci-coverage.test.ts.
+      - name: Lab-completion live test
+        run: ONTRAK_LAB_LIVE=1 npx tsx --tsconfig tests/tsconfig.json --test --test-timeout=60000 tests/lab-live.test.ts
+
+      # The step above drives the route with a body this repository wrote, and the
+      # client's unit tests stub the transport out. This is the only check that runs
+      # the client's *real* request against the route, which is the pair a lab host
+      # depends on. `python3` is already used by the structure job.
+      - name: Lab-client live test
+        run: ONTRAK_LAB_CLIENT_LIVE=1 npx tsx --tsconfig tests/tsconfig.json --test --test-timeout=60000 tests/lab-client-live.test.ts
+
+      - name: Build
+        run: npm run build
+
+  tix:
+    name: OnTrak Tix
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ontrak
+          POSTGRES_PASSWORD: ontrak
+          POSTGRES_DB: ontrak_tix
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ontrak"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/ontrak_tix
+      TIX_AUTH_SECRET: ci-only-not-a-production-secret-value
+      ONTRAK_TIX_WEBHOOK_SECRET: ci-only-not-a-production-secret-value
+      ONTRAK_TIX_RMM_SECRET: ci-only-not-a-production-secret-value
+      ONTRAK_TIX_CRON_SECRET: ci-only-not-a-production-secret-value
+      ONTRAK_TIX_ASSURANCE_SECRET: ci-only-not-a-production-secret-value
+      ONTRAK_TIX_BLOB_DIR: .ontrak-tix-blobs
+      ONTRAK_TIX_EVIDENCE_DIR: .ontrak-tix-evidence
+    defaults:
+      run:
+        working-directory: apps/ontrak/ontrak-tix
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-tix/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate the Prisma client and sync the schema
+        run: |
+          npx prisma generate
+          npx prisma db push
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Each test is bounded (`--test-timeout=60000`); see the Sentinel job's note.
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # OnTrak Sentinel, whose S0 exit criterion is that tenant isolation is covered
+  # by CI tests. Every migration is applied here, because a migration that does
+  # not apply is not a migration: the OIDC tables arrive in the second, SAML
+  # service providers and token revocation in the third, TOTP enrollment state in
+  # the fourth, WebAuthn credentials and challenges in the fifth, provisioning
+  # (SCIM tokens, groups and `Identity.externalId`) in the sixth, and the live
+  # Postgres test runs against the result. The migrations are also diffed against
+  # the models, so a hand-edited SQL file cannot quietly drift from the schema it
+  # is supposed to create.
+  sentinel:
+    name: OnTrak Sentinel
+    runs-on: ubuntu-latest
+    # A test that leaks a handle does not fail, it hangs, and a hung job holds the
+    # runner until GitHub's six-hour ceiling. The suite itself closes its sockets now;
+    # this is the guard that turns a future regression into a fifteen-minute failure.
+    #
+    # `timeout-minutes` bounds the *job*, which is why the run that stalled here on
+    # 2026-10-13 was cancelled with nothing to go on. Reading that log against a green
+    # one says what happened, and it is not a slow test. The stalled run reported the
+    # same 558 results in the same order as the green run and then stopped at exactly
+    # one place: just after the last test of the sign-in file. The *next* file,
+    # `sentinel-webauthn.test.ts`, emitted nothing at all for the fourteen minutes that
+    # remained. That is a file whose process never exits — this runner takes files one at
+    # a time, so a handle one file leaves open starves every file after it, and the suite
+    # goes quiet instead of failing. (A two-file probe reproduces it: a leaked
+    # `setInterval` in the first file keeps the second from ever running.)
+    #
+    # So the suite bounds each *test* (`--test-timeout` in package.json), which on
+    # Node 20 — what this job runs — bounds the file as well: a file whose process will
+    # not exit is reported as `test timed out after 60000ms`, by name, and the rest of
+    # the suite still runs. A stall names itself instead of being cancelled. That
+    # coverage is version-specific: on Node 26 the same lingering file is *not* bounded
+    # this way, so if this job's Node is ever raised, re-check it before trusting it.
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ontrak
+          POSTGRES_PASSWORD: ontrak
+          POSTGRES_DB: sentinel
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ontrak"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/sentinel?schema=public
+    defaults:
+      run:
+        working-directory: apps/ontrak/ontrak-sentinel
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-sentinel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate the Prisma client and apply every migration
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+
+      - name: No drift between the migrations and the models
+        run: |
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$DATABASE_URL" \
+            --exit-code
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+  # The unit suite tests the rules and the live store test tests the SQL, and
+  # neither of them answers the question a deployment actually has: does the thing
+  # in the image sign somebody in, over the wire, with the key it is holding right
+  # now? So this boots the stack a deployment would use — the compose file itself,
+  # which is the artefact under test — and drives a full authorization-code flow
+  # through it, verifying the ID token against the JWKS the container serves.
+  #
+  # It is deliberately here rather than folded into the `sentinel` job: that one
+  # runs the source against a Postgres service, this one runs the image. A broken
+  # Dockerfile, a missing `openssl`, a volume that never gets created — all three
+  # pass the first and fail this one.
+  sentinel-roundtrip:
+    name: Sentinel round trip
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-sentinel/package-lock.json
+
+      - name: Install
+        working-directory: apps/ontrak/ontrak-sentinel
+        run: npm ci
+
+      # The issuer is set here rather than in a `.env`, which is gitignored: this
+      # is the address the provider will advertise, so it has to be one the smoke
+      # check can also reach.
+      - name: Boot the stack
+        working-directory: apps/ontrak/ontrak-sentinel
+        env:
+          SENTINEL_ISSUER: http://127.0.0.1:8787
+        run: |
+          set -euo pipefail
+          docker compose up -d --build
+          # Polled rather than `--wait`: the stack has two one-shot services by
+          # design (`migrate` and `signing-key`), and waiting on them to be
+          # "running" would be waiting for something that is supposed to finish.
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration >/dev/null 2>&1; then
+              echo "provider is up"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration >/dev/null || {
+            echo "::error::the provider never answered discovery"
+            exit 1
+          }
+          docker compose logs app > /tmp/sentinel.log
+          cat /tmp/sentinel.log
+
+      - name: Full authorization-code round trip
+        working-directory: apps/ontrak/ontrak-sentinel
+        run: |
+          set -euo pipefail
+          session=$(grep -o 'demo session: [0-9a-f-]*' /tmp/sentinel.log | head -1 | cut -d' ' -f3)
+          client=$(grep -o 'demo client: [0-9a-f-]*' /tmp/sentinel.log | head -1 | cut -d' ' -f3)
+          test -n "$session" || { echo "::error::no bootstrap session in the boot log"; exit 1; }
+          test -n "$client" || { echo "::error::no demo client in the boot log"; exit 1; }
+          SENTINEL_SMOKE_BASE=http://127.0.0.1:8787 \
+          SENTINEL_SMOKE_CLIENT="$client" \
+          SENTINEL_SMOKE_SESSION="$session" \
+            npx tsx scripts/smoke.ts
+
+      # The image warns on an ephemeral key rather than failing, because that is
+      # right for a scratch run. In a stack it means the key volume did not work,
+      # and the provider would silently stop verifying its own tokens on the next
+      # restart — so here it is a failure.
+      - name: The signing key came from the volume, not from a generator
+        run: |
+          set -euo pipefail
+          if grep -q 'ephemeral key' /tmp/sentinel.log; then
+            echo "::error::the provider generated an ephemeral key: the signing-key service did not do its job"
+            exit 1
+          fi
+          echo "signing key: supplied"
+
+      - name: The stack's logs
+        if: failure()
+        working-directory: apps/ontrak/ontrak-sentinel
+        run: docker compose logs --no-color
+
+      - name: Tear down
+        if: always()
+        working-directory: apps/ontrak/ontrak-sentinel
+        run: docker compose down -v
+
+  # OnTrak Sync is the one product whose service is not a Node app, so its suite is
+  # not run by any of the jobs above: it is `unittest`, run with the interpreter, and
+  # the image build only proves it compiles. Without this job the parsers that decide
+  # what an operator is told to install on every host in the Network would be the only
+  # ones in the family with nothing checking them on a push.
+  sync:
+    name: OnTrak Sync
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # 3.12 because that is what the API's image is built on. The suite itself is the
+      # standard library plus one library (`cryptography`, for verifying an SSO ID
+      # token), so there is nothing else to install and no test tooling at all.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the API's dependencies
+        run: pip install -r ontrak-sync/backend/requirements.txt
+
+      # `run-all.py` discovers `test_*.py`, so a new module is covered by being
+      # written. It runs in the same shape the deployed image runs it in.
+      - name: API tests
+        run: python3 ontrak-sync/backend/tests/run-all.py
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-sync/web/package-lock.json
+
+      # 22 because that is what the dashboard's image is built on; a typecheck on a
+      # different major would pass here and fail in the image.
+      - name: Install the dashboard's dependencies
+        run: npm ci
+        working-directory: apps/ontrak/ontrak-sync/web
+
+      - name: Dashboard typecheck
+        run: npm run typecheck
+        working-directory: apps/ontrak/ontrak-sync/web
+
+  # The Sync dashboard's own half, and the reason it is a job of its own: the `sync`
+  # job above runs the API's unittest suite and the dashboard's typecheck, and neither
+  # of them renders a page. This boots the **real** application — FastAPI routes, Pydantic
+  # bodies, session cookies, capabilities, the remit store, the rails, the roll and the
+  # undo — over a Network that is faked (`ontrak-sync/backend/tests/serve_fake.py`,
+  # which reuses the fake the roll's own unit tests are held to), starts the dashboard
+  # against it with the same-origin `/api/*` proxy the family stack ships, and drives the
+  # rollouts console in Chromium: the empty remit, the images the scans found, the claim,
+  # the pass, the roll's `old → new`, the undo that holds the container, the clear and
+  # the release.
+  #
+  # The harness runs the posture this repository deploys (`ONTRAK_ROLLOUT_ADOPT=unattended`),
+  # so the half of that feature which is easiest to get wrong is covered too: a released
+  # container has to stay out *across a pass* — otherwise the release is a control that
+  # undoes itself — and a claim has to be the way back in. `ONTRAK_SYNC_ADOPT=off` runs the
+  # same file against the shipped claim-by-hand posture.
+  #
+  # The dev server is a dev server on purpose. Next refuses HMR handshakes whose `Origin`
+  # is not in `allowedDevOrigins`, and a WebSocket handshake always carries one — so the
+  # socket the dashboard needs to develop against is also the one thing here that no
+  # typecheck, no unit test and no production build can notice. The suite asserts it
+  # connects, and it fails when the list is missing.
+  sync-browser:
+    name: OnTrak Sync dashboard (browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # The harness starts the real application, so it needs what the application needs.
+      - name: Install the API's dependencies
+        run: pip install -r ontrak-sync/backend/requirements.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          # Two lockfiles: the Playwright suite and its config live at the root, and the
+          # dashboard it drives is its own package with its own dependency tree.
+          cache-dependency-path: |
+            apps/ontrak/package-lock.json
+            apps/ontrak/ontrak-sync/web/package-lock.json
+
+      - name: Install the suite and the dashboard
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ci --prefix ontrak-sync/web
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # One command, because the config boots both halves — the faked API and the
+      # dashboard — and waits for each to answer before the first test runs.
+      - name: Drive the rollouts console
+        run: npm run test:e2e:sync
+
+      - name: The dashboard's dev log
+        if: failure()
+        run: |
+          for f in test-results/*/error-context.md; do
+            [ -f "$f" ] || continue
+            echo "::group::$f"
+            cat "$f"
+            echo "::endgroup::"
+          done
+
+  # OnTrak Genie is where the family's toolchain work is watched, and its suite is
+  # the only thing standing between a turn and a real workspace: the jail that
+  # refuses an escape, the folder picker's fence, the approval gate and the OIDC
+  # verifier are all covered there. It builds before it tests, because `npm test`
+  # runs the compiled suite (`node --test dist/test/*.test.js`) — the same files
+  # the image executes, so a green run here is a green run against the shipped
+  # shape rather than against the source.
+  #
+  # The browser checks (`npm run ui:smoke` and `npm run layout:check`, both part of
+  # `npm run check`) *are* run here, and they used to be skipped without saying so:
+  # they need a Chrome, and every runner this repository has installs none — so the
+  # checks that can only fail in a browser failed on nobody's machine but the one
+  # that happened to have Playwright. `scripts/smoke-run.sh` is what makes them
+  # runnable at all: it starts a stand-in gateway and a console of its own on
+  # scratch directories, seeds one change through the console's own chat route, and
+  # runs the checks against them. The checks that need a *model* still skip there —
+  # a runner has none — and they say so rather than passing quietly.
+  genie:
+    name: OnTrak Genie
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. Five minutes of tests plus a
+    # Chromium download, a browser sweep at four viewports and two console startups
+    # is what is inside this; twenty-five minutes is several times that.
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/ontrak/ontrak-genie
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # 22 because that is what Genie's image is built on; a suite green on a
+          # different major would still be one that never ran in the container.
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-genie/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      # Each test is bounded (`--test-timeout=60000`); see the Sentinel job's note.
+      - name: Unit and HTTP tests
+        run: npm test
+
+      # `scripts/verify-sso.py` is Genie's sign-in posture check, and its suite is
+      # offline by design: it tests what the check *decides* — config precedence, the
+      # redirect URI that has to be this name's callback, a redirect handed back rather
+      # than followed, an unset admin token as SKIP (exit 2) rather than failure — which
+      # is where a green run would otherwise mean nothing. Nothing ran it: `npm test` is
+      # the TypeScript suite (`node --test dist/test/*.test.js`), so these 12 tests only
+      # ever ran on the machine of whoever wrote them. The same failure the portal's own
+      # job was added for, one artifact class over (tests/ci-coverage.test.ts).
+      - name: Sign-in check script tests
+        run: |
+          set -euo pipefail
+          cd scripts
+          python3 -m unittest discover -s tests -q
+
+      # The same browser the Sync job drives its dashboard with, pinned to the same
+      # major, and cached between runs the way that job's is.
+      - name: Install Chromium
+        run: npx --yes playwright@1.63.0 install --with-deps chromium
+
+      # A console of the runner's own, a gateway that answers, one seeded change, and
+      # the two browser suites against them. `dist/` is already built above, which is
+      # what this needs (and what the image runs).
+      - name: Browser checks (the console a real Chrome drives)
+        run: bash scripts/smoke-run.sh
+
+      - name: The console's own log
+        if: failure()
+        run: |
+          for f in /tmp/genie-smoke-run-*/console.log /tmp/genie-smoke-run-*/gateway.log; do
+            [ -f "$f" ] || continue
+            echo "::group::$f"
+            tail -60 "$f"
+            echo "::endgroup::"
+          done
+
+  # The family's front door, run like the products behind it. It had no job: its
+  # typecheck, its unit tests and its copy check only ever ran on the machine of
+  # whoever was editing it, and its TypeScript was compiled only as a side effect of
+  # the image build — which builds the *serving* stage, and cannot say whether the
+  # rules hold. The copy check is the one that catches what nothing else can: the
+  # sign-in gate and the chrome may not carry the family's taglines, and no build
+  # fails and no type breaks when they do, so it is prose that stays wrong on the one
+  # screen every user sees first.
+  portal:
+    name: OnTrak Portal
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/ontrak/ontrak-portal
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # 22 because that is what the portal's image is built on; a suite green on
+          # a different major would still be one that never ran in the container.
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/ontrak/ontrak-portal/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: The gate and the chrome carry no family copy
+        run: npm run copy:check
+
+      # Each test is bounded (`--test-timeout=60000`); see the Sentinel job's note.
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # The family stack — every product in one project — is the artefact behind
+  # `make all-up`, so it is the thing to boot. The unit suites prove each product's
+  # rules; this proves the *wiring between them*: a database per product on its own
+  # port, one network, each app told its own public address, and a provider that
+  # registers a client for each of the others because their callbacks were set.
+  family:
+    name: Family stack
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Boot every product together
+        run: |
+          set -euo pipefail
+          cp -n .env.example .env
+          cp -n ontrak-tix/.env.example ontrak-tix/.env
+          # Placeholders: this job checks wiring, not secrets. The prod overlays are
+          # the ones that refuse to start without real values, and they are not used
+          # here.
+          #
+          # `ONTRAK_API_TOKEN` is one of these placeholders because it is the value
+          # Sync's API refuses to start without — "this service can install packages
+          # across the Network, so it will not start without one" — and until this
+          # job waited for the whole stack, that refusal was a crash loop nothing
+          # looked at: the API restarted every few seconds behind a dashboard that
+          # answered, and the job stayed green.
+          #
+          # The two oauth2-proxy front doors default to the deployment's LAN
+          # address (`192.168.1.21`) on purpose: publishing their port on every
+          # interface would let anyone claim to be anybody by setting a header.
+          # A runner has no such address, and docker refuses to publish a port it
+          # cannot bind, so the job pins them to loopback instead of weakening
+          # the default.
+          AUTH_SECRET=ci-only-not-a-production-secret-value \
+          TIX_AUTH_SECRET=ci-only-not-a-production-secret-value \
+          ONTRAK_API_TOKEN=ci-only-not-a-production-secret-value \
+          G0DM0D3_SSO_BIND=127.0.0.1 \
+          ENGINEER_PORTAL_SSO_BIND=127.0.0.1 \
+            docker compose -f docker-compose.all.yml up -d --build
+
+          # Every service the family stack serves, at the address this job reaches it
+          # and the path it answers without a credential. Six products, seven
+          # services — Sync's dashboard and its API are separate processes and both
+          # have to be up — and all seven are waited for. The loop used to ask three
+          # of them, and the steps below only ever asked the same three, so a product
+          # that never came up left this job green.
+          #
+          # The eighth is not a product: the lab's console gateway is what renders a
+          # training machine in a student's browser, and a stack whose machines can be
+          # graded but never watched is exactly the outage this list exists to catch.
+          # Guacamole answers its own deployed path (`/guacamole/`) rather than
+          # `/health`.
+          #
+          # Each product answers `/health` with its own name. Sync's API is the one
+          # exception and keeps its liveness on `/api/health`, because everything it
+          # serves is under `/api`: `/health` there is a 404, which is exactly what a
+          # status light reports as an outage.
+          probes="training http://127.0.0.1:3000/health
+          tix http://127.0.0.1:3001/health
+          sentinel http://127.0.0.1:8787/health
+          portal http://127.0.0.1:3300/health
+          genie http://127.0.0.1:3400/health
+          sync-api http://127.0.0.1:8420/api/health
+          sync-web http://127.0.0.1:8421/health
+          guacamole http://127.0.0.1:8080/guacamole/"
+
+          missing=""
+          for _ in $(seq 1 120); do
+            missing=""
+            while read -r name url; do
+              [ -n "$name" ] || continue
+              curl -fsS "$url" >/dev/null 2>&1 || missing="$missing $name"
+            done <<< "$probes"
+            if [ -z "$missing" ]; then break; fi
+            sleep 4
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::still not answering after eight minutes:$missing"
+            docker compose -f docker-compose.all.yml ps -a
+            # A product that never answered has usually already said why: a crash
+            # loop prints its own traceback, and the loop above can only report its
+            # absence. `$missing` holds compose service names, so this asks for
+            # exactly the containers under suspicion.
+            for service in $missing; do
+              echo "::group::logs: $service"
+              docker compose -f docker-compose.all.yml logs --no-color --tail 40 "$service" || true
+              echo "::endgroup::"
+            done
+            exit 1
+          fi
+          echo "every product is up"
+
+      - name: The training app answers
+        run: curl -fsS -o /dev/null http://127.0.0.1:3000/login
+
+      # The lab's console gateway, at the path this deployment serves the console on
+      # (`ONTRAK_GUAC__BASE_URL` keeps its trailing `/guacamole/`). No key is needed to
+      # fetch the webapp: the signed payload arrives per student, so the page answering
+      # is the part a stack can get wrong by not starting it at all.
+      - name: The console gateway answers
+        run: curl -fsS -o /dev/null http://127.0.0.1:8080/guacamole/
+
+      - name: The desk answers
+        run: curl -fsS -o /dev/null http://127.0.0.1:3001/sign-in
+
+      - name: The portal answers
+        run: curl -fsS http://127.0.0.1:3300/health | grep -q '"service":"ontrak-portal"'
+
+      - name: The code console answers
+        run: curl -fsS http://127.0.0.1:3400/health | grep -q '"service":"ontrak-genie"'
+
+      - name: The provider answers discovery
+        run: curl -fsS http://127.0.0.1:8787/.well-known/openid-configuration | grep -q authorization_endpoint
+
+      - name: The sync dashboard answers
+        run: curl -fsS http://127.0.0.1:8421/health | grep -q '"service":"ontrak-sync"'
+
+      - name: The sync API answers, without a credential
+        run: curl -fsS http://127.0.0.1:8420/api/health | grep -q '"status":"ok"'
+
+      # The dashboard draws a light per product by asking
+      # `<ONTRAK_<KEY>_INTERNAL_URL><health>` from *inside* the portal container, and
+      # this asks the same question the same way, with the same rule for what counts
+      # as an answer — 2xx, 3xx, 401 and 403 all mean "it is there". A product that
+      # answers this job but not the portal is a red light beside a healthy service,
+      # and a light nobody believes is worse than no light at all.
+      #
+      # Sync is why this is worth doing: the family stack pointed its probe at the API
+      # (`sync-api:8420`, whose liveness is `/api/health`) while the portal asked for
+      # `/health`, so the one product the stack runs as two services was reported as
+      # down on the page whose whole job is to say which products are up.
+      - name: The portal can reach every product it draws a light for
+        run: |
+          set -euo pipefail
+          # `</dev/null` on both exec calls is load-bearing: `docker exec -T` reads
+          # standard input, so without it the first product eats the rest of the
+          # list and the loop ends after one light — a check that reports "Training
+          # answers" and nothing else, which is the shape of check this whole step
+          # exists to replace.
+          while read -r name key path; do
+            [ -n "$name" ] || continue
+            base=$(docker compose -f docker-compose.all.yml exec -T portal-app \
+              printenv "ONTRAK_${key}_INTERNAL_URL" </dev/null)
+            if [ -z "$base" ]; then
+              echo "::error::the portal has no ONTRAK_${key}_INTERNAL_URL, so its ${name} light can never read up"
+              exit 1
+            fi
+            if docker compose -f docker-compose.all.yml exec -T portal-app \
+              node -e 'fetch(process.argv[1], { redirect: "manual" }).then(r => process.exit(r.ok || r.status === 401 || r.status === 403 || (r.status >= 300 && r.status < 400) ? 0 : 1)).catch(() => process.exit(1))' \
+              "${base}${path}" </dev/null; then
+              echo "${name}: ${base}${path} answers"
+            else
+              echo "::error::the portal cannot reach ${name} at ${base}${path}"
+              exit 1
+            fi
+          done <<'PROBES'
+          Training ITS /health
+          Tix TIX /health
+          Sentinel SENTINEL /health
+          Sync SYNC /health
+          Genie GENIE /health
+          Engineer ENGINEER /health
+          Godmode GODMODE /health
+          PROBES
+
+      # A registered client is the half of single sign-on that can silently not
+      # happen: the callbacks are only registered when the family stack supplies
+      # them, and without the client id the products cannot sign anybody in.
+      - name: The provider registered a client for each product
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.all.yml logs sentinel-app > /tmp/family.log
+          grep -q 'OnTrak Tix client:' /tmp/family.log || { echo "::error::no Tix client was registered"; exit 1; }
+          grep -q 'training client:' /tmp/family.log || { echo "::error::no training client was registered"; exit 1; }
+          echo "clients: registered"
+
+      # The desk's outbound provisioning must name the provider over the *network*:
+      # inside its container, `localhost` is the desk itself, so a value copied from
+      # a host-oriented `.env` would be the one wire that silently points nowhere.
+      - name: The desk is pointed at the provider over the network
+        run: |
+          set -euo pipefail
+          wired=$(docker compose -f docker-compose.all.yml exec -T tix-app printenv ONTRAK_TIX_SCIM_BASE_URL)
+          test "$wired" = "http://sentinel-app:8787" || { echo "::error::the desk is pointed at $wired"; exit 1; }
+          echo "scim target: $wired"
+
+      - name: The family stack's logs
+        if: failure()
+        run: docker compose -f docker-compose.all.yml logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.all.yml down -v
+
+  # The container image is what a deployment actually runs, so it is built on
+  # every push rather than discovered broken at release time. This builds the
+  # serving stage of each product and pushes nothing: publishing an image is a
+  # deployment's decision, not CI's.
+  #
+  # Every product the family stack runs has an entry, and that is the point: a
+  # build error in any one of them — an import path that resolves in the repo but
+  # not inside the image's build context, say — is caught here, per product, with
+  # the failing name on the check rather than surfacing as a deploy that half
+  # worked.
+  images:
+    name: Image (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    # Bounded: without a ceiling a hang holds this runner for GitHub's six-hour
+    # default — minutes of real work, hours of waiting. The whole workflow's
+    # slowest job measures about three minutes; this is five times that.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # `target` is per-entry because the products do not agree on the name of
+          # their serving stage: the three Next apps end at `runner`, Portal, Sync and
+          # Genie at `runtime`. Naming it is what makes this a build of the stage that
+          # ships rather than of whichever stage happens to be last in the file.
+          - app: training
+            context: apps/ontrak/.
+            target: runner
+          - app: tix
+            context: apps/ontrak/ontrak-tix
+            target: runner
+          - app: sentinel
+            context: apps/ontrak/ontrak-sentinel
+            target: runner
+          - app: portal
+            context: apps/ontrak/ontrak-portal
+            target: runtime
+          - app: sync
+            context: apps/ontrak/ontrak-sync/web
+            target: runtime
+          - app: genie
+            context: apps/ontrak/ontrak-genie
+            target: runtime
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cached, because an uncached build reinstalls every dependency and re-runs
+      # `next build` for both apps on every push. `mode=max` keeps the builder
+      # stage's layers as well, and those are where the time actually goes.
+      - name: Build the ${{ matrix.app }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: false
+          load: true
+          tags: ontrak-${{ matrix.app }}:ci
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
