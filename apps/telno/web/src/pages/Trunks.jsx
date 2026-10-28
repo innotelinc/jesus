@@ -10,9 +10,34 @@ import {
   Loading,
   Modal,
   PageHeader,
+  Select,
   Switch,
   useToast,
 } from '../ui.jsx';
+
+/**
+ * Where a carrier wants to be dialled, without making an operator look it up.
+ *
+ * The POP is not cosmetic: it is the nearest of the carrier's media servers, and
+ * picking the far one adds a coast of latency to every call. The list is the
+ * carrier's own, short enough to choose from rather than type.
+ */
+const VOIPMS_POPS = [
+  ['atlanta', 'Atlanta'],
+  ['chicago', 'Chicago'],
+  ['dallas', 'Dallas'],
+  ['denver', 'Denver'],
+  ['houston', 'Houston'],
+  ['losangeles', 'Los Angeles'],
+  ['miami', 'Miami'],
+  ['newyork', 'New York'],
+  ['seattle', 'Seattle'],
+  ['tampa', 'Tampa'],
+  ['washington', 'Washington'],
+  ['montreal', 'Montreal'],
+  ['toronto', 'Toronto'],
+  ['vancouver', 'Vancouver'],
+];
 
 export default function Trunks() {
   const toast = useToast();
@@ -117,10 +142,12 @@ export default function Trunks() {
 
 function CreateTrunk({ onClose, onSaved }) {
   const toast = useToast();
+  const [kind, setKind] = useState('voipms');
+  const [pop, setPop] = useState('atlanta');
   const [form, setForm] = useState({
-    name: '',
-    provider: 'generic',
-    host: '',
+    name: 'voip.ms',
+    provider: 'voipms',
+    host: 'atlanta.voip.ms',
     username: '',
     secret: '',
     fromUser: '',
@@ -129,11 +156,36 @@ function CreateTrunk({ onClose, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  /** The preset fills what the carrier documents; the operator fills what only
+   *  they know. Switching back to generic leaves their typing alone. */
+  const chooseKind = (value) => {
+    setKind(value);
+    if (value === 'voipms') {
+      setForm((current) => ({
+        ...current,
+        name: current.name || 'voip.ms',
+        provider: 'voipms',
+        host: `${pop}.voip.ms`,
+        codecs: 'ulaw,alaw',
+      }));
+    } else {
+      setForm((current) => ({ ...current, provider: 'generic' }));
+    }
+  };
+
+  const choosePop = (value) => {
+    setPop(value);
+    setForm((current) => ({ ...current, host: `${value}.voip.ms` }));
+  };
+
   const submit = async () => {
     setBusy(true);
     setError('');
     try {
-      const result = await api.post('/trunks', form);
+      // VoIP.ms authenticates the outbound call as the account or sub-account,
+      // so the From user is the username unless an operator says otherwise.
+      const payload = { ...form, fromUser: form.fromUser || (kind === 'voipms' ? form.username : '') };
+      const result = await api.post('/trunks', payload);
       toast.success(
         'Trunk added',
         result.applied?.error
@@ -162,6 +214,10 @@ function CreateTrunk({ onClose, onSaved }) {
       }
     >
       <div className="grid two" style={{ gap: 12 }}>
+        <Select label="Carrier" value={kind} onChange={(event) => chooseKind(event.target.value)}>
+          <option value="voipms">VoIP.ms — fill the rest in</option>
+          <option value="generic">Another carrier — I know the details</option>
+        </Select>
         <Input
           label="Name"
           value={form.name}
@@ -170,25 +226,39 @@ function CreateTrunk({ onClose, onSaved }) {
           hint="Letters, digits, dot, dash"
           autoFocus
         />
-        <Input
-          label="Provider"
-          value={form.provider}
-          onChange={(event) => setForm({ ...form, provider: event.target.value })}
-          placeholder="generic"
-        />
+        {kind === 'voipms' ? (
+          <Select label="Media server (POP)" value={pop} onChange={(event) => choosePop(event.target.value)}>
+            {VOIPMS_POPS.map(([value, label]) => (
+              <option key={value} value={value}>{label} — {value}.voip.ms</option>
+            ))}
+          </Select>
+        ) : (
+          <Input
+            label="Provider"
+            value={form.provider}
+            onChange={(event) => setForm({ ...form, provider: event.target.value })}
+            placeholder="generic"
+          />
+        )}
         <Input
           label="Host"
           value={form.host}
           onChange={(event) => setForm({ ...form, host: event.target.value })}
           placeholder="sip.carrier.com"
           className="mono"
+          hint={kind === 'voipms' ? 'Set by the POP above; edit it if the carrier moved you' : undefined}
         />
         <Input
           label="Username"
           value={form.username}
           onChange={(event) => setForm({ ...form, username: event.target.value })}
-          placeholder="trunk-user"
+          placeholder={kind === 'voipms' ? '100001' : 'trunk-user'}
           className="mono"
+          hint={
+            kind === 'voipms'
+              ? 'The main account (6 digits) or a sub-account such as 100001_telno'
+              : undefined
+          }
         />
         <Input
           label="Secret"
@@ -197,6 +267,11 @@ function CreateTrunk({ onClose, onSaved }) {
           onChange={(event) => setForm({ ...form, secret: event.target.value })}
           placeholder="••••••••"
           autoComplete="new-password"
+          hint={
+            kind === 'voipms'
+              ? 'The SIP password for that account — Main Menu → Sub Accounts, not the portal password'
+              : undefined
+          }
         />
         <Input
           label="From user"
