@@ -867,3 +867,81 @@ CREATE TABLE IF NOT EXISTS push_devices (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_push_devices_line ON push_devices (account_id, extension);
+
+-- ------------------------------------------------------------------- CRM --
+-- A ticket is one conversation with a customer about one thing: a complaint, a
+-- service request, a change they asked for. The state is what the queue sorts
+-- on; the notes are the history, and every state change writes one, so a
+-- ticket's story is in order rather than inferred from two columns.
+CREATE TABLE IF NOT EXISTS tickets (
+  id                TEXT PRIMARY KEY,
+  -- Nullable on purpose: the snapshot below is what the queue reads, so a
+  -- deleted account cannot take the history of what was asked with it.
+  account_id        TEXT REFERENCES accounts (id) ON DELETE SET NULL,
+  email             TEXT NOT NULL DEFAULT '',
+  name              TEXT NOT NULL DEFAULT '',
+  subject           TEXT NOT NULL,
+  category          TEXT NOT NULL DEFAULT 'support'
+                    CHECK (category IN ('support', 'billing', 'complaint', 'service_change', 'porting', 'outage')),
+  priority          TEXT NOT NULL DEFAULT 'normal'
+                    CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  state             TEXT NOT NULL DEFAULT 'open'
+                    CHECK (state IN ('open', 'pending', 'resolved', 'closed')),
+  assignee          TEXT NOT NULL DEFAULT '',
+  -- The line the ticket is about, when it is about one.
+  number_id         TEXT,
+  due_at            TEXT,
+  -- What the service promise is measured on: the first reply, and when it was
+  -- actually settled. Both are facts, not recomputations.
+  first_response_at TEXT,
+  resolved_at       TEXT,
+  created_by        TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_queue ON tickets (state, priority, created_at);
+CREATE INDEX IF NOT EXISTS idx_tickets_account ON tickets (account_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS ticket_notes (
+  id         TEXT PRIMARY KEY,
+  ticket_id  TEXT NOT NULL REFERENCES tickets (id) ON DELETE CASCADE,
+  actor      TEXT NOT NULL DEFAULT '',
+  -- 'internal' is a note the customer never sees; 'system' is a state change
+  -- written by the platform so the timeline explains itself.
+  kind       TEXT NOT NULL DEFAULT 'note' CHECK (kind IN ('note', 'internal', 'system')),
+  body       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_ticket_notes_ticket ON ticket_notes (ticket_id, created_at);
+
+-- What an operator wants to remember about a customer that is not a job:
+-- who they spoke to, what was promised, why an exception was made.
+CREATE TABLE IF NOT EXISTS customer_notes (
+  id         TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  actor      TEXT NOT NULL DEFAULT '',
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_customer_notes_account ON customer_notes (account_id, created_at DESC);
+
+-- Money that actually moved. An invoice says what is owed; this says what was
+-- collected, how, and when — the question a customer asks ("what did I pay
+-- you, and for what") and the row a refund or a manual payment has to point at.
+CREATE TABLE IF NOT EXISTS payments (
+  id           TEXT PRIMARY KEY,
+  account_id   TEXT,
+  invoice_id   TEXT,
+  -- Negative for a refund, so a ledger sums to what was net collected.
+  amount_cents INTEGER NOT NULL,
+  currency     TEXT NOT NULL DEFAULT 'USD',
+  method       TEXT NOT NULL DEFAULT 'stripe'
+               CHECK (method IN ('stripe', 'manual', 'credit', 'refund')),
+  reference    TEXT NOT NULL DEFAULT '',
+  note         TEXT NOT NULL DEFAULT '',
+  received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  created_by   TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_payments_account ON payments (account_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments (invoice_id);

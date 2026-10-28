@@ -29,6 +29,7 @@ import Subscribe from './pages/Subscribe.jsx';
 import Site from './pages/Site.jsx';
 import PublicDirectory from './pages/PublicDirectory.jsx';
 import Customer from './pages/Customer.jsx';
+import Customers from './pages/Customers.jsx';
 import Setup, { useSetupStatus } from './pages/Setup.jsx';
 import Onboarding from './pages/Onboarding.jsx';
 
@@ -48,6 +49,7 @@ const PAGES = [
   { path: '/workflows', title: 'Workflows', subtitle: 'Triggered automation with recorded runs', Component: Workflows },
   { path: '/numbers', title: 'Number registry', subtitle: 'One canonical row per E.164 number', Component: Numbers },
   { path: '/directory', title: 'Moderation', subtitle: 'Submitted listings awaiting review', Component: Moderation },
+  { path: '/customers', title: 'Customers', subtitle: 'One record per customer: plan, lines, bills, calls and what is waiting on us', Component: Customers },
   { path: '/billing', title: 'Billing', subtitle: 'Invoices grouped by currency', Component: Billing },
   { path: '/plans', title: 'Plans and subscriptions', subtitle: 'What the subscribe page sells and who is paying', Component: Plans },
   { path: '/estate', title: 'Estate', subtitle: 'Sites and the equipment installed at them', Component: Estate },
