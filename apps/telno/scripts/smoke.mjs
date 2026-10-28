@@ -55,6 +55,13 @@ let stripeEndpointUrl = '';
 // What the registered endpoint is subscribed to. A stand-in that can never
 // change would pass a repair test without proving the repair did anything.
 let stripeEndpointEvents = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
+// The endpoint's own state in the dashboard. A paused endpoint receives
+// nothing, which the screen has to tell apart from a healthy one.
+let stripeEndpointStatus = 'enabled';
+// A key that may read the balance but not the endpoint list. The read fails
+// with a permission error, which is a different problem from the network being
+// down and must not be reported as one.
+let stripeListRefusal = false;
 // A path to drop instead of answering, for the network-failure checks. Stripe
 // timing out and Stripe refusing a key are different failures with different
 // fixes, and only a dropped connection exercises the first one.
@@ -98,6 +105,12 @@ if (!base) {
         return send({ object: 'balance', livemode: false, available: [{ amount: 2500, currency: 'usd' }] });
       }
       if (path === '/v1/webhook_endpoints') {
+        if (stripeListRefusal) {
+          return send(
+            { error: { message: 'The provided key does not have the required permissions for this endpoint.' } },
+            403
+          );
+        }
         return send({
           object: 'list',
           data: [
@@ -105,7 +118,7 @@ if (!base) {
               id: 'we_test_live',
               object: 'webhook_endpoint',
               url: stripeEndpointUrl || `${base}/api/public/stripe/webhook`,
-              status: 'enabled',
+              status: stripeEndpointStatus,
               enabled_events: stripeEndpointEvents,
             },
           ],
@@ -124,7 +137,7 @@ if (!base) {
           id: path.split('/').pop(),
           object: 'webhook_endpoint',
           url: stripeEndpointUrl || `${base}/api/public/stripe/webhook`,
-          status: 'enabled',
+          status: stripeEndpointStatus,
           enabled_events: stripeEndpointEvents,
         });
       }
@@ -1751,6 +1764,29 @@ check(
     /invoice\.paid/.test(checkOf(connected, 'webhook-ledger')?.detail || ''),
   checkOf(connected, 'webhook-ledger')
 );
+// The screen reads the event list itself, so the gap is visible on the page
+// instead of only behind a button. That read has to be cheap: the full test
+// creates a Checkout session and expires it, which a page load must not do.
+const probesBefore = stripeCalls.filter(
+  (entry) => entry.method === 'POST' && entry.path === '/v1/checkout/sessions'
+).length;
+const gapHook = await call('GET', '/api/billing/payments/webhook');
+const probesAfter = stripeCalls.filter(
+  (entry) => entry.method === 'POST' && entry.path === '/v1/checkout/sessions'
+).length;
+check(
+  'the webhook status is one read, with no payment page created',
+  gapHook.status === 200 && probesAfter === probesBefore,
+  stripeCalls.slice(-3).map((entry) => `${entry.method} ${entry.path}`)
+);
+check(
+  'the screen sees which events are missing and that repair can close them',
+  gapHook.body.webhook?.state === 'missing' &&
+    gapHook.body.webhook.missing.includes('invoice.paid') &&
+    gapHook.body.webhook.missingLedger.length === 1 &&
+    gapHook.body.webhook.repairable === true,
+  gapHook.body.webhook
+);
 const repaired = await call('POST', '/api/billing/payments/webhook/repair', {});
 check(
   'repair adds every missing event and keeps the ones already registered',
@@ -1778,6 +1814,50 @@ check(
   healthyAfterRepair.body.checks?.map((entry) => `${entry.id}:${entry.state}`)
 );
 
+const hookAfterRepair = await call('GET', '/api/billing/payments/webhook');
+check(
+  'the screen goes quiet once every event is registered',
+  hookAfterRepair.body.webhook?.state === 'ok' &&
+    hookAfterRepair.body.webhook.missing.length === 0 &&
+    hookAfterRepair.body.webhook.repairable === false,
+  hookAfterRepair.body.webhook
+);
+
+// A paused endpoint delivers nothing. It is not "fine" and repair is not the
+// fix, so the screen has to say what the actual next step is.
+stripeEndpointStatus = 'disabled';
+const disabledHook = await call('GET', '/api/billing/payments/webhook');
+stripeEndpointStatus = 'enabled';
+check(
+  'a switched-off endpoint is named as switched off, with no repair offered',
+  disabledHook.body.webhook?.state === 'disabled' &&
+    disabledHook.body.webhook.repairable === false &&
+    /disabled/.test(disabledHook.body.webhook.detail || ''),
+  disabledHook.body.webhook
+);
+
+// The read can fail two ways. A timeout is the network; a 403 is the key. The
+// screen says which, because the fixes are in completely different places.
+stripeDropPath = '/v1/webhook_endpoints';
+const offlineHook = await call('GET', '/api/billing/payments/webhook');
+check(
+  'a timeout reading the endpoint list says the network, not the key',
+  offlineHook.body.webhook?.state === 'unreachable' &&
+    /Could not reach/.test(offlineHook.body.webhook.detail || '') &&
+    !/read access/.test(offlineHook.body.webhook.detail || ''),
+  offlineHook.body.webhook
+);
+stripeListRefusal = true;
+const refusedHook = await call('GET', '/api/billing/payments/webhook');
+stripeListRefusal = false;
+check(
+  'a key without webhook read access is reported as a permission problem',
+  refusedHook.body.webhook?.state === 'unreadable' &&
+    /read access/.test(refusedHook.body.webhook.detail || '') &&
+    refusedHook.body.webhook.repairable === false,
+  refusedHook.body.webhook
+);
+
 stripeEndpointEvents = ['*'];
 const wildcardRepair = await call('POST', '/api/billing/payments/webhook/repair', {});
 check(
@@ -1796,6 +1876,14 @@ check(
   'repair refuses when no endpoint points at this host',
   orphanRepair.status === 400 && /No endpoint points at/.test(orphanRepair.body.error?.message || ''),
   orphanRepair.body
+);
+const staleHook = await call('GET', '/api/billing/payments/webhook');
+check(
+  'an endpoint on another host is reported on the page, with no repair offered',
+  staleHook.body.webhook?.state === 'not_registered' &&
+    staleHook.body.webhook.repairable === false &&
+    /No endpoint points at/.test(staleHook.body.webhook.detail || ''),
+  staleHook.body.webhook
 );
 stripeEndpointUrl = '';
 check(

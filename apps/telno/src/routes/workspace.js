@@ -21,6 +21,7 @@ import {
   paymentStatus,
   repairWebhookEndpoint,
   testConnection,
+  webhookEventStatus,
   webhookUrl,
 } from '../lib/payments.js';
 import { ladder, reminderHistory, runReminderSweep, sendReminderNow } from '../lib/reminders.js';
@@ -1179,6 +1180,12 @@ export default async function workspaceRoutes(app) {
     });
     return result;
   });
+
+  // The endpoint's event list without the price of the full test. The Billing
+  // screen reads this on load so a missing event is visible on the page, not
+  // only behind a button that also probes Checkout. One Stripe read, no
+  // session created, nothing charged.
+  app.get('/billing/payments/webhook', async () => ({ webhook: await webhookEventStatus() }));
 
   // The gap the test reports, closed: an endpoint in Stripe that is missing an
   // event this platform needs gets it, and keeps every event it had. Safe to

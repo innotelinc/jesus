@@ -532,6 +532,15 @@ list instead of adding to it is how an endpoint silently loses an event, so it n
 idempotent: pressing it on a complete endpoint reports that nothing was missing, and an endpoint
 subscribed to `*` is left alone.
 
+The gap is also on the page, not only behind that button. Loading Billing reads the endpoint's event
+list once — no Checkout session, nothing charged — and puts a strip above the totals when Stripe is
+not sending everything this install relies on. It names what the gap costs (an invoice paid through
+Stripe never being marked paid, a plan payment never reaching the customer's history, the portal not
+learning about a lapsed subscription) and carries **Add missing events** right there, so the fix is
+one press and not a hunt through a dialog. A paused endpoint, a webhook still on an old host, a key
+without webhook read access and a host that cannot reach Stripe each say so in their own words, since
+their fixes are in different places. A healthy endpoint draws nothing at all.
+
 ### Devices check themselves in
 
 Every handset, gateway, ATA or door phone gets a `dv_…` token when it is added on the Estate screen

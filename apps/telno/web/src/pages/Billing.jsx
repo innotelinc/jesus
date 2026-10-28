@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Empty,
+  Icon,
   Input,
   Loading,
   Modal,
@@ -76,6 +77,8 @@ export default function Billing() {
   const [stripeTest, setStripeTest] = useState(null);
   const [testing, setTesting] = useState(false);
   const [repairing, setRepairing] = useState(false);
+  // The webhook's event list, read on load so a gap is on the page itself.
+  const [webhook, setWebhook] = useState(null);
   // The month's rent, and the lines of whichever invoice is open in the dialog.
   const [rent, setRent] = useState(null);
   const [invoiceItems, setInvoiceItems] = useState([]);
@@ -83,16 +86,20 @@ export default function Billing() {
 
   const load = async () => {
     try {
-      const [data, dunning, rentData] = await Promise.all([
+      const [data, dunning, rentData, hookData] = await Promise.all([
         api.get(`/billing/invoices${tab ? `?status=${tab}` : ''}`),
         api.get('/billing/accounts'),
         api.get('/billing/rent'),
+        // A convenience, not a dependency: if Stripe is unreachable the
+        // invoices still have to load.
+        api.get('/billing/payments/webhook').catch(() => null),
       ]);
       setItems(data.items);
       setSummary(data.summary);
       setAccounts(dunning.items || []);
       setAccountSummary(dunning.summary || null);
       setRent(rentData);
+      setWebhook(hookData?.webhook || null);
     } catch (err) {
       toast.error('Could not load billing', err.message);
     } finally {
@@ -322,6 +329,18 @@ export default function Billing() {
     }
   };
 
+  /** Re-read the webhook's event list. Cheap: one Stripe read, no probe. */
+  const refreshWebhook = async () => {
+    try {
+      const data = await api.get('/billing/payments/webhook');
+      setWebhook(data.webhook);
+    } catch {
+      // The strip is a convenience. A read that fails because Stripe is down is
+      // already described by the strip's own text, so it must not raise a toast
+      // over the work the operator came here to do.
+    }
+  };
+
   /**
    * Close the gap the test just reported.
    *
@@ -341,10 +360,14 @@ export default function Billing() {
             ? 'This endpoint is subscribed to every event.'
             : 'The endpoint already carries every event the platform needs.'
       );
-      // Re-read the checks so the dialog shows the endpoint as it is now.
-      setStripeTest(await api.post('/billing/payments/test', {}));
+      // One read refreshes the strip. The full test creates and expires a
+      // Checkout session, so it is only re-run for the dialog that asked for it
+      // — pressing repair on the page must not open one nobody wanted.
+      await refreshWebhook();
+      if (stripeTest) setStripeTest(await api.post('/billing/payments/test', {}));
     } catch (err) {
       toast.error('Could not update the endpoint', err.message);
+      await refreshWebhook();
     } finally {
       setRepairing(false);
     }
@@ -452,6 +475,34 @@ export default function Billing() {
         ['webhook-endpoint', 'webhook-ledger', 'webhook-subscriptions'].includes(entry.id) && entry.state !== 'pass'
     );
 
+  // What the strip says before anyone presses a button. Healthy and
+  // unconfigured both stay quiet — a platform with no Stripe key does not have a
+  // webhook problem, and a working endpoint is not news.
+  const hookAttention = !!webhook && webhook.state !== 'ok' && webhook.state !== 'all_events' && webhook.state !== 'unconfigured';
+  const hookTone =
+    webhook?.state === 'missing' || webhook?.state === 'not_registered' || webhook?.state === 'disabled' || webhook?.state === 'unreadable'
+      ? 'bad'
+      : 'warn';
+  const hookTitle = {
+    missing: 'Stripe is not sending every event this platform needs',
+    not_registered: 'No Stripe webhook points at this install',
+    disabled: 'The Stripe webhook is switched off',
+    unreadable: 'Stripe would not list webhook endpoints',
+    unreachable: 'Could not reach Stripe to read the webhook',
+  }[webhook?.state] || 'Stripe webhook';
+  // What the missing events actually cost, named on the screen. "invoice.paid is
+  // missing" means nothing to an operator; "a plan payment will not reach the
+  // customer's history" means they can decide whether to fix it now.
+  const hookImpact = !!webhook
+    ? [
+        webhook.missingPayments?.length ? 'an invoice paid through Stripe will never be marked paid' : '',
+        webhook.missingLedger?.length ? 'card payments for a plan will not be recorded against the customer' : '',
+        webhook.missingSubscriptions?.length ? 'the customer portal will not learn about lapsed subscriptions' : '',
+      ]
+        .filter(Boolean)
+        .join('; ')
+    : '';
+
   const fields = (
     <div className="stack">
       <div className="grid two">
@@ -514,6 +565,28 @@ export default function Billing() {
           </div>
         }
       />
+
+      {hookAttention ? (
+        <div className={`inline-notice ${hookTone}`}>
+          <Icon name="alert" size={18} />
+          <div className="notice-text">
+            <strong>{hookTitle}</strong>
+            <span>{
+              webhook.state === 'missing' && hookImpact
+                ? `${webhook.detail} Until it is fixed, ${hookImpact}.`
+                : webhook.detail
+            }</span>
+          </div>
+          {webhook.repairable ? (
+            <Button variant="primary" size="sm" loading={repairing} onClick={repairStripe}>
+              Add missing events
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="sm" loading={testing} onClick={testStripe}>
+            Test connection
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid stats">
         <Stat label="Open" value={summary?.openCount ?? '—'} foot="Issued, unpaid" />

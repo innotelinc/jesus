@@ -407,6 +407,31 @@ button, input, select, textarea {
   padding: 18px;
 }
 
+/*
+ * A strip that carries one problem and its fix, in the page rather than in a
+ * dialog. Reading it costs nothing, which is the point: a warning that is only
+ * visible behind a button is a warning most people never see.
+ */
+.inline-notice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  background: var(--warning-soft);
+  color: var(--text);
+}
+.inline-notice.good { border-color: rgba(52, 211, 153, 0.3); background: var(--success-soft); }
+.inline-notice.bad { border-color: rgba(251, 113, 133, 0.32); background: var(--danger-soft); }
+.inline-notice > svg { flex: none; color: var(--warning); }
+.inline-notice.bad > svg { color: var(--danger); }
+.inline-notice .notice-text { min-width: 0; flex: 1 1 320px; }
+.inline-notice .notice-text strong { display: block; font-size: 0.8125rem; font-weight: 600; }
+.inline-notice .notice-text span { font-size: 0.75rem; color: var(--text-2); line-height: 1.5; }
+.inline-notice .btn { flex: none; }
+
 .grid {
   display: grid;
   gap: 14px;
