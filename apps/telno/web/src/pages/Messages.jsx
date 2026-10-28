@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, relativeTime } from '../api.js';
 import {
   Badge,
@@ -11,22 +11,59 @@ import {
   PageHeader,
   Select,
   Stat,
+  Tabs,
   Textarea,
   Input,
   useToast,
 } from '../ui.jsx';
 
-const STATUS_TONE = { delivered: 'success', sent: 'info', received: 'info', queued: 'warning', failed: 'danger' };
+const STATUS_TONE = { delivered: 'success', sent: 'info', received: 'info', queued: 'warning', failed: 'danger', read: 'success' };
+const BLANK = { channel: 'sms', to: '', body: '' };
+const BLANK_SECURE = { to: '', body: '' };
 
+/**
+ * Two kinds of message, and they are not the same thing.
+ *
+ * Carrier texts leave the platform and cost money per message; internal secure
+ * messages never leave it, cost nothing and are sealed at rest. Presenting them
+ * as one list would hide the difference that matters — whether a third party
+ * carries the message — so they are separate tabs.
+ */
 export default function Messages() {
   const toast = useToast();
+  const [mode, setMode] = useState('sms');
+
+  return (
+    <>
+      <PageHeader
+        title="Messages"
+        subtitle="Texts on your numbers, and secure messages that never leave this platform"
+        actions={
+          <Tabs
+            value={mode}
+            onChange={setMode}
+            tabs={[
+              { value: 'sms', label: 'Texts' },
+              { value: 'secure', label: 'Secure' },
+            ]}
+          />
+        }
+      />
+      {mode === 'sms' ? <CarrierMessages toast={toast} /> : <SecureMessages toast={toast} />}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ texts -- */
+
+function CarrierMessages({ toast }) {
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState('');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState('');
-  const [form, setForm] = useState({ channel: 'sms', to: '', body: '' });
+  const [form, setForm] = useState(BLANK);
 
   const load = async () => {
     try {
@@ -52,7 +89,7 @@ export default function Messages() {
       setItems((list) => [data.message, ...list]);
       load();
       setOpen(false);
-      setForm({ channel: 'sms', to: '', body: '' });
+      setForm(BLANK);
       toast.success(
         'Message queued',
         data.provider === 'console' ? 'No SMS provider configured — it stays queued.' : `Handed to ${data.provider}.`
@@ -80,12 +117,6 @@ export default function Messages() {
 
   return (
     <>
-      <PageHeader
-        title="Messages"
-        subtitle="SMS, MMS and WhatsApp on the same numbers as voice — delivery is never assumed"
-        actions={<Button variant="primary" icon="message" onClick={() => setOpen(true)}>Compose</Button>}
-      />
-
       <div className="grid stats">
         <Stat label="Outbound" value={summary?.sent ?? '—'} foot="Queued and sent" />
         <Stat label="Inbound" value={summary?.received ?? '—'} foot="Replies received" />
@@ -97,13 +128,15 @@ export default function Messages() {
         title="Threads"
         bodyClass="tight"
         actions={
-          <select className="select" style={{ width: 150 }} value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filter by channel">
-            <option value="">All channels</option>
-            <option value="sms">SMS</option>
-            <option value="mms">MMS</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="web">Web</option>
-          </select>
+          <>
+            <select className="select" style={{ width: 140 }} value={channel} onChange={(e) => setChannel(e.target.value)} aria-label="Filter by channel">
+              <option value="">All channels</option>
+              <option value="sms">SMS</option>
+              <option value="mms">MMS</option>
+              <option value="web">Web</option>
+            </select>
+            <Button size="sm" variant="primary" icon="message" onClick={() => setOpen(true)}>Compose</Button>
+          </>
         }
       >
         {loading ? (
@@ -125,9 +158,7 @@ export default function Messages() {
               <tbody>
                 {items.map((message) => (
                   <tr key={message.id}>
-                    <td>
-                      <Icon name={message.direction === 'inbound' ? 'arrowDown' : 'arrowUp'} size={13} />
-                    </td>
+                    <td><Icon name={message.direction === 'inbound' ? 'arrowDown' : 'arrowUp'} size={13} /></td>
                     <td><span className="tiny mono">{message.channel}</span></td>
                     <td className="tiny num nowrap">{message.direction === 'inbound' ? message.from : message.to}</td>
                     <td className="tiny" style={{ maxWidth: 420 }}>{message.body}</td>
@@ -149,14 +180,14 @@ export default function Messages() {
           </div>
         ) : (
           <Empty icon="message" title="No messages" action={<Button variant="primary" onClick={() => setOpen(true)}>Compose one</Button>}>
-            Outbound messages are queued and only marked delivered when a provider confirms it.
+            Outbound texts are queued and only marked delivered when a provider confirms it.
           </Empty>
         )}
       </Card>
 
       {open ? (
         <Modal
-          title="Compose message"
+          title="Compose text"
           subtitle="Numbers resolve to the registry; unknown numbers create a row"
           onClose={() => setOpen(false)}
           footer={
@@ -172,7 +203,6 @@ export default function Messages() {
             <Select label="Channel" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>
               <option value="sms">SMS</option>
               <option value="mms">MMS</option>
-              <option value="whatsapp">WhatsApp</option>
               <option value="web">Web</option>
             </Select>
             <Input label="To" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} placeholder="+1 415 555 0111" />
@@ -183,6 +213,176 @@ export default function Messages() {
               value={form.body}
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               hint={`${form.body.length}/1600 characters`}
+            />
+          </div>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+/* ----------------------------------------------------------------- secure -- */
+
+function SecureMessages({ toast }) {
+  const [data, setData] = useState({ items: [], threads: [], summary: null });
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState('');
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [recipients, setRecipients] = useState([]);
+  const [form, setForm] = useState(BLANK_SECURE);
+
+  const load = async () => {
+    try {
+      const result = await api.get('/secure-messages');
+      setData({ items: result.items, threads: result.threads, summary: result.summary });
+    } catch (err) {
+      toast.error('Could not load secure messages', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadRecipients = async () => {
+    try {
+      const result = await api.get('/secure-messages/recipients');
+      setRecipients(result.items);
+    } catch (err) {
+      toast.error('Could not load recipients', err.message);
+    }
+  };
+
+  const conversation = useMemo(
+    () => (active ? [...data.items].filter((item) => item.threadId === active).reverse() : []),
+    [active, data.items]
+  );
+
+  const send = async () => {
+    setBusy('new');
+    try {
+      const result = await api.post('/secure-messages', form);
+      setOpen(false);
+      setForm(BLANK_SECURE);
+      setActive(result.threadId);
+      load();
+      toast.success('Delivered', 'Internal message — sealed at rest, no carrier involved.');
+    } catch (err) {
+      toast.error('Could not send', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const openCompose = () => {
+    loadRecipients();
+    setOpen(true);
+  };
+
+  const summary = data.summary;
+
+  return (
+    <>
+      <div className="grid stats">
+        <Stat label="Threads" value={summary?.threads ?? '—'} foot="Conversations you are in" />
+        <Stat label="Messages" value={summary?.total ?? '—'} foot="Sealed in the database" />
+        <Stat label="Unread" value={summary?.unread ?? '—'} foot="Delivered, not opened" />
+        <Stat label="Cost" value="$0.00" foot="No carrier, no per-message fee" />
+      </div>
+
+      <Card
+        title={active ? `Conversation with ${active.split('|').filter((part) => part).join(' ⇄ ')}` : 'Internal threads'}
+        bodyClass="tight"
+        actions={
+          <>
+            {active ? <Button size="sm" variant="ghost" icon="arrowLeft" onClick={() => setActive('')}>All threads</Button> : null}
+            <Button size="sm" variant="primary" icon="message" onClick={openCompose}>New secure message</Button>
+          </>
+        }
+      >
+        {loading ? (
+          <div style={{ padding: 16 }}><Loading rows={4} /></div>
+        ) : active ? (
+          <div className="stack" style={{ padding: 14, maxHeight: 420, overflowY: 'auto' }}>
+            {conversation.map((item) => (
+              <div
+                key={item.id}
+                className="card"
+                style={{
+                  padding: '8px 12px',
+                  alignSelf: item.direction === 'outbound' ? 'flex-end' : 'flex-start',
+                  maxWidth: '78%',
+                  background: item.direction === 'outbound' ? 'var(--accent-soft, rgba(90,120,255,0.12))' : undefined,
+                }}
+              >
+                <div className="tiny dim">{item.direction === 'outbound' ? 'You' : item.from} · {relativeTime(item.createdAt)}</div>
+                <div style={{ fontSize: '0.8125rem', whiteSpace: 'pre-wrap' }}>{item.body}</div>
+              </div>
+            ))}
+            {!conversation.length ? <p className="tiny dim">No messages in this thread yet.</p> : null}
+          </div>
+        ) : data.threads.length ? (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>With</th>
+                  <th>Last message</th>
+                  <th>When</th>
+                  <th className="align-right">Unread</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.threads.map((thread) => (
+                  <tr key={thread.threadId} style={{ cursor: 'pointer' }} onClick={() => setActive(thread.threadId)}>
+                    <td className="tiny num nowrap">{thread.counterpart}</td>
+                    <td className="tiny" style={{ maxWidth: 460 }}>{thread.last}</td>
+                    <td className="tiny dim nowrap">{relativeTime(thread.lastAt)}</td>
+                    <td className="align-right">{thread.unread ? <Badge tone="warning">{thread.unread}</Badge> : <span className="tiny dim">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <Empty icon="shield" title="No secure messages" action={<Button variant="primary" onClick={openCompose}>Start a conversation</Button>}>
+            Messages between people on this platform stay here: no carrier, no per-message fee, sealed at rest.
+          </Empty>
+        )}
+      </Card>
+
+      {open ? (
+        <Modal
+          title="New secure message"
+          subtitle="Delivered in the app — nothing leaves this deployment"
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="primary" loading={busy === 'new'} disabled={!form.to || !form.body.trim()} onClick={send}>
+                Send securely
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            <Select label="To" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })}>
+              <option value="">Choose a person or line</option>
+              {recipients.map((entry) => (
+                <option key={entry.value} value={entry.value}>{entry.label}</option>
+              ))}
+            </Select>
+            <Textarea
+              label="Message"
+              rows={6}
+              maxLength={4000}
+              value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              hint={`${form.body.length}/4000 characters · encrypted with AES-256-GCM before it is stored`}
             />
           </div>
         </Modal>

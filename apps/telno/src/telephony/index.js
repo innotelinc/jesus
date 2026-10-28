@@ -3,6 +3,7 @@ import { writeConfigs, generateConfigs } from './provision.js';
 import { db_, newId, now } from '../db/index.js';
 import { config } from '../config.js';
 import { logEvent } from '../lib/audit.js';
+import { onFaxEvent } from '../lib/fax.js';
 
 const channels = new Map();
 // MixMonitor reports its file when recording starts and stops; the call row is
@@ -90,6 +91,9 @@ function directionFor(context) {
 
 function onEvent(msg) {
   try {
+    // Fax rides the same session: res_fax reports an originate and a result, and
+    // the hangup that follows a silent transmission is a failure, not a lost row.
+    if (['OriginateResponse', 'FaxStatus', 'Hangup'].includes(msg.Event)) onFaxEvent(msg);
     switch (msg.Event) {
       case 'Newchannel': {
         track(msg.Uniqueid, {

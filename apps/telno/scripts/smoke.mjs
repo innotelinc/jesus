@@ -4035,6 +4035,115 @@ check(
   brandRestored.body.brand?.name
 );
 
+/* ---------------------------------------------------------------------------
+ * Fax on the switch, desk-phone provisioning, recipes, connected systems and
+ * the internal secure channel. These are the surfaces that were rebuilt: a fax
+ * that used to be a table, a handset that used to get a config for a port that
+ * was closed, a workflow editor that used to demand its own syntax.
+ * ------------------------------------------------------------------------- */
+
+console.log('\nFax on the switch');
+const faxEngine = await call('GET', '/api/fax/engine');
+check('the fax engine reports what it can do', faxEngine.status === 200 && !!faxEngine.body.engine?.transport, faxEngine.body);
+check(
+  'and says plainly whether the switch has the fax modules',
+  typeof faxEngine.body.engine?.modules?.resFax === 'boolean' && typeof faxEngine.body.engine?.ready === 'boolean',
+  faxEngine.body.engine
+);
+
+const faxQueued = await call('POST', '/api/faxes', { to: '+442079460123', subject: 'Smoke fax', body: 'smoke page' });
+check('an outbound fax can be queued', faxQueued.status === 201 && faxQueued.body.fax.status === 'queued', faxQueued.body);
+const faxAttempt = await call('POST', `/api/faxes/${faxQueued.body.fax?.id}/send`, {});
+// Without a live switch or a rasteriser this must refuse with a reason, not
+// pretend the page was sent.
+check(
+  'sending without a switch or encoder fails with a reason, not a fake success',
+  [422, 503].includes(faxAttempt.status) && /switch|ghostscript|trunk|fax/i.test(faxAttempt.body.error?.message || ''),
+  faxAttempt.body
+);
+const faxAfterAttempt = await call('GET', '/api/faxes?direction=outbound');
+const attempted = (faxAfterAttempt.body.items || []).find((item) => item.id === faxQueued.body.fax?.id);
+check('and the attempt is recorded rather than lost', !!attempted && !!attempted.error, attempted);
+
+const faxNumber = await call('POST', '/api/numbers', { number: '+14155550777', faxMode: 'fax' });
+const faxModeSet = await call('PATCH', `/api/numbers/${faxNumber.body.number?.id}`, { faxMode: 'fax' });
+check(
+  'a number can answer as a fax machine',
+  faxModeSet.status === 200 && faxModeSet.body.number.faxMode === 'fax',
+  faxModeSet.body
+);
+const faxModeBack = await call('PATCH', `/api/numbers/${faxNumber.body.number?.id}`, { faxMode: 'voice' });
+check('and go back to voice', faxModeBack.body.number?.faxMode === 'voice', faxModeBack.body);
+
+console.log('\nDesk-phone provisioning at telno.tel');
+const provisionIndex = await call('GET', '/provision', undefined, { noCookie: true, bearer: '' });
+check(
+  'the provisioning index is public and names the server',
+  provisionIndex.status === 200 && String(provisionIndex.body.raw || '').includes('telno.tel'),
+  provisionIndex.body
+);
+const sparePhone = await call('POST', '/api/estate/devices', { name: 'Smoke desk phone', kind: 'handset', mac: 'AABBCCDDEE11' });
+check('a handset is in the inventory', sparePhone.status === 201, sparePhone.body);
+// A handset with no line is a doorstop: give it the first extension on the
+// switch so the config it fetches actually carries a SIP account.
+const handsetLine = (await call('GET', '/api/extensions')).body.items?.[0]?.extension;
+if (handsetLine) {
+  await call('PATCH', `/api/estate/devices/${sparePhone.body.device?.id}`, { extension: String(handsetLine) });
+}
+const cfgResponse = await fetch(`${base}/provision/yealink/aabbccddee11.cfg`);
+const cfgText = await cfgResponse.text();
+check(
+  'a handset fetches its own config by MAC, with no session',
+  cfgResponse.status === 200 && cfgText.includes('Telno provisioning') && cfgText.includes('device.checkin.token'),
+  { status: cfgResponse.status, head: cfgText.slice(0, 120) }
+);
+if (handsetLine) {
+  check(
+    'and it registers as sip:<extension>@telno.tel on the port the switch listens on',
+    cfgText.includes('account.1.user_name') &&
+      cfgText.includes('telno.tel') &&
+      cfgText.includes('sip_server.1.port = 5060'),
+    cfgText.slice(0, 400)
+  );
+}
+const unknownMac = await fetch(`${base}/provision/yealink/001122334455.cfg`);
+check('a MAC that is not in the inventory gets 404, so extensions cannot be enumerated', unknownMac.status === 404, {
+  status: unknownMac.status,
+});
+
+console.log('\nRecipes instead of syntax');
+const catalog = await call('GET', '/api/presets');
+check('the console can offer recipes', catalog.status === 200 && catalog.body.workflows?.length > 0, catalog.body.workflows?.length);
+check('every recipe is a complete, runnable flow', (catalog.body.workflows || []).every((recipe) => recipe.steps.length > 0 && recipe.trigger), catalog.body.workflows);
+check('each step type has a human label', (catalog.body.stepTypes || []).every((entry) => entry.label && entry.type));
+check('voice agents have presets too', (catalog.body.agents || []).every((preset) => preset.greeting && preset.prompt));
+const recipe = catalog.body.workflows[0];
+const fromRecipe = await call('POST', '/api/workflows', { name: `Smoke ${Date.now()}`, trigger: recipe.trigger, steps: recipe.steps });
+check('a recipe creates a real workflow', fromRecipe.status === 201 && fromRecipe.body.workflow.steps.length === recipe.steps.length, fromRecipe.body);
+
+console.log('\nConnected systems');
+const systemList = await call('GET', '/api/systems?probe=0');
+const interview = (systemList.body.items || []).find((item) => /interview/i.test(item.name));
+check('the interview dashboard is linked', !!interview && /interviews/i.test(interview.path), interview);
+check('and every linked system is enabled by default', (systemList.body.items || []).every((item) => item.enabled), systemList.body.items?.map((i) => [i.name, i.enabled]));
+
+console.log('\nInternal secure messaging');
+const secureRecipients = await call('GET', '/api/secure-messages/recipients');
+check('there is somebody to message', secureRecipients.status === 200 && Array.isArray(secureRecipients.body.items), secureRecipients.body);
+const secureTo = secureRecipients.body.items?.[0]?.value;
+const secureSent = await call('POST', '/api/secure-messages', { to: secureTo, body: 'sealed smoke message' });
+check('a secure message is delivered in-app', secureSent.status === 201 && secureSent.body.delivered === true, secureSent.body);
+const secureList = await call('GET', '/api/secure-messages');
+const sealed = (secureList.body.items || []).filter((item) => item.body === 'sealed smoke message');
+// The sender sees their own copy; the recipient's copy is a second row scoped
+// to them, so it must not appear in the sender's list.
+check('the sent copy is in the sender\'s thread', sealed.length === 1, sealed.length);
+check('and reads back through the seal', sealed[0]?.body === 'sealed smoke message' && !!sealed[0]?.threadId, sealed[0]);
+check('the channel costs nothing per message', /\$0\.00/.test(secureList.body.summary?.cost || ''), secureList.body.summary);
+
+const faxSecret = await call('GET', '/api/faxes');
+check('the fax list is still readable after all of it', faxSecret.status === 200, faxSecret.status);
+
 globalThis.__smokeStopServer?.();
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

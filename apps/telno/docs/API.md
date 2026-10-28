@@ -257,8 +257,13 @@ for a live device — only a real check-in moves them.
 | GET/PUT | `/voicemails/:id/audio` | stream (Range-aware) or upload the recording as a raw body |
 | GET/POST | `/faxes` | inbound and outbound faxes; `body` is a plain-text page; `?direction=` |
 | PATCH | `/faxes/:id` | `queued → sending → sent|failed` (`received` for inbound) |
+| POST | `/faxes/:id/send` | **transmit it**: the switch dials the trunk and runs `SendFax` (res_fax, T.38 with G.711 fallback). No carrier fax API and no per-page fee. A PDF or image is rasterised to TIFF with ghostscript (a typed body is typeset first); a refusal is written to the row's `error` |
+| GET | `/fax/engine` | what this install can actually do: `modules.resFax`, `modules.spandsp`, `ghostscript`, `transport`, `stationId`, and a sentence saying what is missing |
 | GET/PUT/DELETE | `/faxes/:id/attachment` | download, upload (PDF/PNG/JPEG/TIFF) or clear the document |
-| GET | `/messages?channel=` | SMS/MMS/WhatsApp/web threads |
+| — | inbound fax | a number set to `faxMode: "fax"` answers as a machine; `"auto"` answers voice and takes the call over when the far end negotiates T.38. `ReceiveFax` writes to the data volume and a sweep turns the receipt into a row, including documents that arrived while the API was down |
+| GET | `/messages?channel=` | SMS/MMS/web threads — carrier messages, which are metered |
+| GET/POST | `/secure-messages` | **internal** messages between people on this platform: no carrier, no per-message cost, body sealed with AES-256-GCM before it is stored. `GET /secure-messages/recipients` lists who is addressable; `POST /secure-messages/:id/read` marks one read. Each end sees only its own copy |
+| GET | `/presets` | the recipes the console offers: `stepTypes`, `triggers`, `workflows` (complete step lists), `agents` (working personas), `voices`, `languages` |
 | POST/PATCH | `/messages[/:id]` | queue outbound (stays `queued` without a provider); requeue a failure |
 | GET/POST/PATCH | `/billing/invoices[/:id]` | amounts in integer minor units; totals per currency, never summed across; an invoice carries `payUrl` while it is open and Stripe is configured, plus `lastProvider` and `lastSendError` for its last email attempt |
 | GET | `/billing/invoices/:id` | one invoice with its `items` — the lines its amount is the sum of — plus `coveredCents`, the part a card subscription already collected. A line's `settledBy` is `invoice` (payable here) or `subscription` (shown, not charged) |
@@ -288,7 +293,9 @@ for a live device — only a real check-in moves them.
 | GET/POST | `/estate/devices` | real inventory rows: handset, gateway, ata, conference, door; `?site=&kind=&status=` |
 | PATCH/DELETE | `/estate/devices/:id` | re-site, re-extension, change status or firmware, remove; MACs are unique |
 | POST | `/estate/devices/:id/token` | issue a new check-in token; the previous one stops working |
-| GET | `/estate/devices/:id/provisioning` | `?format=yealink|grandstream`: config with SIP account, encryption and a fresh token |
+| GET | `/estate/devices/:id/provisioning` | `?format=yealink|grandstream|polycom`: config with the SIP account, the check-in token and the switch's real transport |
+| GET | `/provision` | **public**, at the root: how to point Option 66 at this platform |
+| GET | `/provision/:vendor/:file` | **public**, by MAC: `yealink/<mac>.cfg`, `grandstream/<mac>.xml`, `polycom/<mac>.cfg`. Registers as `sip:<extension>@telno.tel` on UDP 5060. A MAC that is not in the inventory is 404, so this cannot enumerate extensions |
 | GET/PUT | `/calls/:id/audio` | stream or attach the recording for a call leg |
 | POST | `/devices/heartbeat` | **device token only** (`x-device-token`): stamp `last_seen_at`, report status, ip, firmware |
 | DELETE | `/devices/heartbeat` | the device retires its own token and goes offline |

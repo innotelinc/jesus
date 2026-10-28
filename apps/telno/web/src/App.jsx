@@ -42,7 +42,7 @@ const PAGES = [
   { path: '/ivr', title: 'Call routing', subtitle: 'Menus, inbound DIDs and destinations', Component: Ivr },
   { path: '/voicemail', title: 'Voicemail', subtitle: 'Recorded messages and transcripts', Component: Voicemail },
   { path: '/fax', title: 'Fax', subtitle: 'Inbound documents and outbound sends', Component: Fax },
-  { path: '/messages', title: 'Messages', subtitle: 'SMS, MMS and WhatsApp on your numbers', Component: Messages },
+  { path: '/messages', title: 'Messages', subtitle: 'Texts on your numbers, and secure messages between people on this platform', Component: Messages },
   { path: '/voice', title: 'Voice agents', subtitle: 'Personas that answer and place calls', Component: Voice },
   { path: '/marketing', title: 'Marketing', subtitle: 'Outbound campaigns with graded reports', Component: Marketing },
   { path: '/workflows', title: 'Workflows', subtitle: 'Triggered automation with recorded runs', Component: Workflows },

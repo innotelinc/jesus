@@ -47,6 +47,10 @@ RUN apt-get update \
       build-essential autoconf automake libtool pkg-config \
       libssl-dev libedit-dev libxml2-dev libsqlite3-dev libjansson-dev \
       libsrtp2-dev libcap-dev uuid-dev \
+      # spandsp is what makes fax possible at all: res_fax on its own has no
+      # technology provider, so without res_fax_spandsp a fax call has nothing to
+      # receive or transmit it — T.38 included.
+      libspandsp-dev \
       curl ca-certificates xz-utils bzip2 python3 patch \
  && rm -rf /var/lib/apt/lists/*
 
@@ -80,6 +84,9 @@ RUN apt-get update \
       supervisor curl openssl ca-certificates tzdata \
       libssl3 libedit2 libxml2 libsqlite3-0 libjansson4 libsrtp2-1 \
       libcap2 libuuid1 zlib1g \
+      # res_fax_spandsp's runtime library, and ghostscript, which turns a PDF,
+      # a scan or a typed page into the TIFF the fax engine transmits.
+      libspandsp2 ghostscript \
  && rm -rf /var/lib/apt/lists/* \
  # One unprivileged account owns the database, the switch configuration and the
  # spool. Nothing in this image needs root: every port it listens on is above

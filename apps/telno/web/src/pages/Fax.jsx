@@ -23,6 +23,8 @@ export default function Fax() {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [engine, setEngine] = useState(null);
+  const [numbers, setNumbers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('');
   const [open, setOpen] = useState(false);
@@ -41,6 +43,13 @@ export default function Fax() {
     } finally {
       setLoading(false);
     }
+    // The engine and the routing are what make this screen honest: without a
+    // loaded res_fax, a queued fax would just sit there with no explanation.
+    api.get('/fax/engine').then((data) => setEngine(data.engine)).catch(() => {});
+    api
+      .get('/numbers?limit=100')
+      .then((data) => setNumbers(data.items || []))
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -73,16 +82,30 @@ export default function Fax() {
     }
   };
 
-  const setStatus = async (fax, status) => {
+  /** Hand the document to the switch. No carrier API is involved. */
+  const sendNow = async (fax) => {
     setBusy(fax.id);
     try {
-      const data = await api.patch(`/faxes/${fax.id}`, { status });
+      const data = await api.post(`/faxes/${fax.id}/send`, {});
       setItems((list) => list.map((item) => (item.id === fax.id ? data.fax : item)));
       load();
+      toast.success('Fax handed to the switch', 'res_fax dials the trunk and transmits the document.');
     } catch (err) {
-      toast.error('Could not update the fax', err.message);
+      toast.error('The fax did not send', err.message);
+      load();
     } finally {
       setBusy('');
+    }
+  };
+
+  /** Which numbers answer as a fax machine. */
+  const setFaxMode = async (number, faxMode) => {
+    try {
+      const data = await api.patch(`/numbers/${number.id}`, { faxMode });
+      setNumbers((list) => list.map((item) => (item.id === number.id ? data.number : item)));
+      toast.success(`Fax routing: ${faxMode}`, 'The dialplan was regenerated for this number.');
+    } catch (err) {
+      toast.error('Could not change fax routing', err.message);
     }
   };
 
@@ -99,6 +122,62 @@ export default function Fax() {
         <Stat label="Outbound" value={summary?.outbound ?? '—'} foot="Queued and sent" />
         <Stat label="In flight" value={summary?.queued ?? '—'} foot="Queued or sending" />
         <Stat label="Failed" value={summary?.failed ?? '—'} foot="Carrier rejected" tone={summary?.failed ? 'var(--danger)' : undefined} />
+      </div>
+
+      <div className="grid two">
+        <Card
+          title="Fax engine"
+          subtitle="The switch is the fax machine — no carrier fax API and no per-page fee"
+          actions={<Badge tone={engine?.ready ? 'success' : 'warning'}>{engine?.ready ? 'Ready' : 'Needs attention'}</Badge>}
+        >
+          <dl className="kv">
+            <dt>Transport</dt>
+            <dd className="tiny">{engine?.transport || '…'}</dd>
+            <dt>res_fax</dt>
+            <dd className="tiny mono">{engine?.modules?.resFax ? 'loaded' : 'not loaded'}</dd>
+            <dt>spandsp</dt>
+            <dd className="tiny mono">{engine?.modules?.spandsp ? 'loaded — G.711 fallback works' : 'absent — T.38 only'}</dd>
+            <dt>Ghostscript</dt>
+            <dd className="tiny mono">{engine?.ghostscript || 'not installed'}</dd>
+            <dt>Station ID</dt>
+            <dd className="tiny mono">{engine?.stationId || '—'}</dd>
+          </dl>
+          <p className="tiny dim">{engine?.note || 'Checking the switch…'}</p>
+        </Card>
+
+        <Card
+          title="Which numbers answer as a fax"
+          subtitle="Set a line to fax, or leave it on voice and detect a terminal"
+        >
+          {numbers.length ? (
+            <div className="stack" style={{ gap: 8 }}>
+              {numbers.slice(0, 8).map((number) => (
+                <div key={number.id} className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                    <span className="tiny num">{number.display || number.e164}</span>
+                  </div>
+                  <select
+                    className="select"
+                    style={{ width: 150 }}
+                    value={number.faxMode || 'voice'}
+                    aria-label={`Fax routing for ${number.e164}`}
+                    onChange={(event) => setFaxMode(number, event.target.value)}
+                  >
+                    <option value="voice">Voice</option>
+                    <option value="fax">Fax machine</option>
+                    <option value="auto">Voice + detect fax</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="tiny dim">No numbers in the registry yet.</p>
+          )}
+          <p className="tiny dim" style={{ marginTop: 8 }}>
+            “Fax machine” answers immediately and receives. “Voice + detect fax” answers as a line and hands the call
+            to the receiver the moment the far end negotiates T.38 — that is what a fax terminal does.
+          </p>
+        </Card>
       </div>
 
       <Card
@@ -159,14 +238,14 @@ export default function Fax() {
                     <td className="tiny dim nowrap">{relativeTime(fax.at)}</td>
                     <td><Badge tone={TONE[fax.status] || 'neutral'}>{fax.status}</Badge></td>
                     <td className="align-right">
-                      {fax.status === 'queued' ? (
-                        <Button size="sm" variant="ghost" loading={busy === fax.id} onClick={() => setStatus(fax, 'sending')}>
-                          Start
+                      {fax.direction === 'outbound' && ['queued', 'failed'].includes(fax.status) ? (
+                        <Button size="sm" variant="ghost" icon="printer" loading={busy === fax.id} onClick={() => sendNow(fax)}>
+                          Send now
                         </Button>
-                      ) : fax.status === 'sending' ? (
-                        <Button size="sm" variant="ghost" loading={busy === fax.id} onClick={() => setStatus(fax, 'sent')}>
-                          Mark sent
-                        </Button>
+                      ) : fax.error ? (
+                        <span className="tiny" style={{ color: 'var(--danger)' }} title={fax.error}>
+                          {fax.error.slice(0, 40)}…
+                        </span>
                       ) : (
                         <span className="tiny dim">—</span>
                       )}

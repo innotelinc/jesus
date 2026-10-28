@@ -20,6 +20,8 @@ import { payUrlForInvoice, paymentStatus, testConnection } from '../lib/payments
 import { ladder, reminderHistory, runReminderSweep, sendReminderNow } from '../lib/reminders.js';
 import { monthPeriod } from '../lib/rentals.js';
 import { maskPhone, maskText, maskedExtensions, maskedNumberIds } from '../lib/scif.js';
+import { faxStatus, sendFax } from '../lib/fax.js';
+import { presets } from '../lib/presets.js';
 import {
   addItem,
   billPlanOnto,
@@ -163,8 +165,10 @@ const faxView = (row) => ({
   subject: row.subject,
   document: row.document,
   body: row.body,
-  attachmentName: row.attachment_name,
-  attachmentUrl: row.attachment ? `/api/faxes/${row.id}/attachment` : '',
+  attachmentName: row.attachment_name,    attachmentUrl: row.attachment ? `/api/faxes/${row.id}/attachment` : '',
+    // Why a transmission failed, in the switch's own words.
+    error: row.error || '',
+    stationId: row.station_id || '',
   at: row.at,
 });
 
@@ -428,6 +432,9 @@ export default async function workspaceRoutes(app) {
   });
 
   /* ----------------------------------------------------------- workflows -- */
+  /** The recipes both the workflow and voice screens offer instead of a blank form. */
+  app.get('/presets', async () => presets());
+
   app.get('/workflows', async () => {
     const items = db_.all('SELECT * FROM workflows ORDER BY name').map(workflowView);
     return {
@@ -651,6 +658,23 @@ export default async function workspaceRoutes(app) {
     return { fax: faxView(fresh) };
   });
 
+  /**
+   * Transmit a queued fax. The switch is the fax machine: this hands the
+   * document to res_fax over the SIP trunk, so there is no carrier fax API and
+   * no per-page charge. A failure comes back with the reason attached.
+   */
+  app.post('/faxes/:id/send', { preHandler: requireWrite }, async (request, reply) => {
+    const result = await sendFax(request.params.id, request.account.email);
+    if (!result.ok) {
+      reply.status(result.statusCode || 400);
+      return { error: { code: 'fax_not_sent', message: result.error } };
+    }
+    return { fax: faxView(result.fax) };
+  });
+
+  /** What the fax engine can actually do on this install. */
+  app.get('/fax/engine', async () => ({ engine: await faxStatus() }));
+
   /* ------------------------------------------------------------- messages -- */
   app.get('/messages', async (request) => {
     const where = [];
@@ -658,7 +682,7 @@ export default async function workspaceRoutes(app) {
     const channel = v.str(request.query?.channel, { name: 'channel', max: 10, required: false });
     if (channel) {
       where.push('channel = ?');
-      params.push(v.oneOf(channel, ['sms', 'mms', 'whatsapp', 'web'], 'channel'));
+      params.push(v.oneOf(channel, ['sms', 'mms', 'web'], 'channel'));
     }
     // Messages on a SCIF line: the addresses and any numbers or emails in the
     // body are redacted for as long as the line asks for masking.
@@ -692,7 +716,7 @@ export default async function workspaceRoutes(app) {
 
   app.post('/messages', { preHandler: requireWrite }, async (request, reply) => {
     const body = request.body || {};
-    const channel = v.oneOf(body.channel || 'sms', ['sms', 'mms', 'whatsapp', 'web'], 'channel');
+    const channel = v.oneOf(body.channel || 'sms', ['sms', 'mms', 'web'], 'channel');
     const to = resolveNumber(v.str(body.to, { name: 'to', max: 40 }), { source: 'platform' });
     // Text messages are an SMS-shaped channel, so they report the SMS provider;
     // the mail provider is not what would carry them.
