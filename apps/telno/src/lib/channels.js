@@ -15,44 +15,105 @@ import { getSecret } from './vault.js';
 
 const consoleChannel = {
   name: 'console',
-  async send({ channel, to, code, submission }) {
+  async send({ channel, to, code, submission, body }) {
     // Deliberately explicit: this is the local/dev path, never a silent failure.
     console.log(
-      `[verify] ${channel} -> ${to || '(no address)'} code=${code} submission=${submission?.id} name=${submission?.name}`
+      `[verify] ${channel} -> ${to || '(no address)'} ${body ? `body=${body}` : `code=${code}`} submission=${submission?.id} name=${submission?.name}`
     );
     return { delivered: true, provider: 'console', simulated: true };
   },
 };
 
+/* -------------------------------------------------------------------- sms -- */
+
+/**
+ * SMS has one provider, Twilio, and the same rule as email: the vault holds the
+ * credentials, the environment is the fallback.
+ *
+ *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM
+ *
+ * Three values, not two: a SID and token can send nothing without a sender, and
+ * a half-filled form should read as unconfigured rather than fail at the first
+ * verification code somebody is waiting for.
+ */
+
+const TWILIO_SID = 'TWILIO_ACCOUNT_SID';
+const TWILIO_TOKEN = 'TWILIO_AUTH_TOKEN';
+const TWILIO_FROM = 'TWILIO_FROM';
+
+/** Vault first, environment second. Never logged, never returned by an API. */
+export function twilioCredentials() {
+  return {
+    sid: getSecret(TWILIO_SID) || config.notify.twilioSid || '',
+    token: getSecret(TWILIO_TOKEN) || config.notify.twilioToken || '',
+    from: getSecret(TWILIO_FROM) || config.notify.twilioFrom || '',
+  };
+}
+
+export const twilioConfigured = () => {
+  const { sid, token, from } = twilioCredentials();
+  return !!(sid && token && from);
+};
+
+export const twilioSource = () => sourceOf(TWILIO_SID, config.notify.twilioSid);
+
 const twilioChannel = {
   name: 'twilio',
-  async send({ channel, to }) {
-    const { twilioSid, twilioToken, twilioFrom } = config.notify;
-    if (!twilioSid || !twilioToken || !twilioFrom) {
+  async send({ channel, to, code, body }) {
+    const { sid, token, from } = twilioCredentials();
+    if (!sid || !token || !from) {
       return { delivered: false, provider: 'twilio', error: 'twilio_not_configured' };
     }
     if (channel !== 'sms') return { delivered: false, provider: 'twilio', error: 'sms_only' };
-    const body = new URLSearchParams({
+    const form = new URLSearchParams({
       To: to,
-      From: twilioFrom,
-      Body: `Your ${config.directory.canonical} verification code is ${code}. It expires in ${Math.round(
-        config.directory.otpTtlSeconds / 60
-      )} minutes.`,
+      From: from,
+      Body:
+        body ||
+        `Your ${config.directory.canonical} verification code is ${code}. It expires in ${Math.round(
+          config.directory.otpTtlSeconds / 60
+        )} minutes.`,
     });
-    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64'),
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body,
-    });
-    if (!res.ok) {
-      return { delivered: false, provider: 'twilio', error: `http_${res.status}` };
+    let res;
+    try {
+      res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: form,
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch (err) {
+      // A blocked egress or a wrong host is a delivery failure to report, not a
+      // crash in the middle of somebody's verification step.
+      return { delivered: false, provider: 'twilio', error: `network: ${err.message}` };
     }
-    return { delivered: true, provider: 'twilio' };
+    if (!res.ok) {
+      // Twilio explains itself in the body (an unverified sender, a bad token);
+      // passing that on is what turns a 400 into something an operator can fix.
+      const problem = await res.json().catch(() => ({}));
+      return { delivered: false, provider: 'twilio', error: problem?.message || `http_${res.status}` };
+    }
+    const sent = await res.json().catch(() => ({}));
+    return { delivered: true, provider: 'twilio', id: sent?.sid || null };
   },
 };
+
+/**
+ * One text, for a test send or a notice. Goes through whichever provider the
+ * SMS channel resolves to, so a test proves the same path a code would take.
+ */
+export async function sendSms({ to, body }) {
+  const provider = providerFor('sms');
+  try {
+    const result = await provider.send({ channel: 'sms', to, body });
+    return { ...result, provider: provider.name };
+  } catch (err) {
+    return { delivered: false, provider: provider.name, error: err.message };
+  }
+}
 
 /* ------------------------------------------------------------------ email -- */
 
@@ -269,9 +330,9 @@ export function providerFor(channel) {
     if (name === 'mailjet') return mailjetChannel;
     return consoleChannel;
   }
-  if (config.notify.channel === 'twilio' || (config.notify.twilioSid && config.notify.twilioToken)) {
-    return twilioChannel;
-  }
+  // Stored credentials are enough on their own: a key pasted into Settings must
+  // not need a redeploy before a code can reach a handset.
+  if (twilioConfigured() || config.notify.channel === 'twilio') return twilioChannel;
   return consoleChannel;
 }
 
@@ -304,15 +365,15 @@ export async function deliverNotice({ to, subject, text, html, attachments }) {
       return { ...result, channel };
     }
     if (config.notify.channel === 'twilio') {
-      const { twilioSid, twilioToken, twilioFrom } = config.notify;
-      if (!twilioSid || !twilioToken || !twilioFrom) return { delivered: false, channel, error: 'twilio_not_configured' };
-      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+      const { sid, token, from } = twilioCredentials();
+      if (!sid || !token || !from) return { delivered: false, channel, error: 'twilio_not_configured' };
+      const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: 'POST',
         headers: {
-          Authorization: 'Basic ' + Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64'),
+          Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
           'content-type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({ To: to, From: twilioFrom, Body: `${subject}. ${text}`.slice(0, 300) }),
+        body: new URLSearchParams({ To: to, From: from, Body: `${subject}. ${text}`.slice(0, 300) }),
       });
       return res.ok
         ? { delivered: true, channel }
@@ -355,7 +416,17 @@ export const channelStatus = () => {
     },
     sms: {
       provider: providerFor('sms').name,
-      configured: !!(config.notify.twilioSid && config.notify.twilioToken),
+      configured: twilioConfigured(),
+      source: twilioSource(),
+      // The number codes would come from, so an operator can see which one the
+      // carrier is actually texting as. Never the credentials themselves.
+      from: twilioCredentials().from,
+      // A SID and token without a sender cannot send, and the screen should say
+      // which of the three is missing rather than one flat "not configured".
+      missing: (() => {
+        const { sid, token, from } = twilioCredentials();
+        return [!sid && 'TWILIO_ACCOUNT_SID', !token && 'TWILIO_AUTH_TOKEN', !from && 'TWILIO_FROM'].filter(Boolean);
+      })(),
     },
   };
 };
