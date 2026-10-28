@@ -69,6 +69,15 @@ Concretely, that means:
   the tree, and the tree has moved one directory down. The standalone repos are still there and
   still authoritative for their own history.
 - Tags were not imported, so one project's `v1.0` cannot collide with another's.
+- **Six paths were renamed, all in `freebuff`.** Its history names session directories like
+  `.agents/sessions/03-03-09:09-add-console-log/`, and NTFS cannot hold a `:`. Those characters
+  were mapped to `-` on import so the tree checks out on Windows. Every other path is untouched.
+
+### Integrity
+
+Each directory was compared against its source repository's HEAD after import: same file list,
+same blob hashes, for all 29,828 files (the six renamed `freebuff` paths aside). Commit counts
+match the sources exactly, project by project. Nothing was dropped, filtered or squashed.
 
 ## Working in the tree
 
@@ -91,17 +100,22 @@ remain the places where those pipelines run.
 
 ## Updating a project from its standalone repository
 
-The standalone repositories are still the upstreams; nothing was archived or deleted. To bring a
-fix in, import the new commits on top of the current directory rather than merging the whole repo
-again:
+The standalone repositories are still the upstreams; nothing was archived or deleted. Develop in
+the product's own repository — this tree is an index of the estate, not a replacement for each
+product's home — and re-import when you want the snapshot refreshed:
 
 ```sh
-# fetch the project, rewrite its paths the same way, and merge the new tip
-git -C ../cantus fast-export <old-tip>..main | perl tools/prefix.pl apps/cantus | git fast-import
+git clone https://github.com/innotelinc/cantus.git /tmp/cantus
+git -C /tmp/cantus fast-export --all \
+  | perl tools/prefix.pl apps/cantus cantus \
+  | git fast-import --quiet --force
+git merge --allow-unrelated-histories import/cantus -m "Re-import cantus"
 ```
 
-For day-to-day work, though, develop in the project's own repository and let this tree follow:
-the monorepo is an index of the estate, not a replacement for each product's home.
+The rewrite is deterministic, so a project that has not moved re-imports to an identical tree and
+the merge is trivial. A project that *has* moved brings genuinely new commits, and those merge as
+new work: rewritten hashes mean there is no fast-forward path by construction, which is the price
+of real per-project history inside one repository rather than one squashed commit per project.
 
 ## Licenses
 
