@@ -27,8 +27,6 @@ const WEBHOOK_NAME = 'STRIPE_WEBHOOK_SECRET';
 const WEBHOOK_PATH = '/api/public/stripe/webhook';
 // The two events that mean money moved. An endpoint without them reports 200
 // to Stripe and pays nothing, which is the worst possible failure: silent.
-// The two events that mean money moved. An endpoint without them reports 200
-// to Stripe and pays nothing, which is the worst possible failure: silent.
 const PAYMENT_EVENTS = ['checkout.session.completed', 'checkout.session.async_payment_succeeded'];
 // A subscription is a standing instruction, so its own events matter to the
 // portal gate. They are recommended rather than required: a deployment that
@@ -950,6 +948,111 @@ export async function repairWebhookEndpoint({ actor = 'system' } = {}) {
     detail: `added ${missing.join(', ')}`,
   });
   return { ...settled, changed: true, after, added: missing };
+}
+
+/**
+ * The endpoint's event list on its own, so the gap can be shown before anyone
+ * presses a button.
+ *
+ * testConnection() proves a lot of things and pays for them: it creates a live
+ * Checkout session and expires it. That is the right price for a deliberate
+ * test and the wrong one for a screen that draws every time someone opens
+ * Billing. This does one read — GET /v1/webhook_endpoints — and answers the
+ * single question the screen needs: is Stripe subscribed to everything the
+ * platform relies on, and if not, what is missing?
+ *
+ * Every outcome is named, because they have different fixes: no key, a host
+ * that cannot reach Stripe, a key that cannot read endpoints, no endpoint at
+ * all, or a specific set of missing events.
+ */
+export async function webhookEventStatus() {
+  const url = webhookUrl();
+  const empty = { url, endpointId: null, endpointUrl: null, events: 0, total: REQUIRED_WEBHOOK_EVENTS.length };
+
+  if (!stripeConfigured()) {
+    return {
+      ...empty,
+      state: 'unconfigured',
+      missing: [],
+      missingPayments: [],
+      missingSubscriptions: [],
+      missingLedger: [],
+      repairable: false,
+      detail: 'No Stripe secret key, so there is nothing to check yet.',
+    };
+  }
+
+  const list = await stripeRequest('GET', '/v1/webhook_endpoints', { limit: 100 });
+  if (!list.ok) {
+    const offline = String(list.error).startsWith('network:');
+    return {
+      ...empty,
+      state: offline ? 'unreachable' : 'unreadable',
+      missing: [],
+      missingPayments: [],
+      missingSubscriptions: [],
+      missingLedger: [],
+      repairable: false,
+      detail: offline
+        ? `Could not reach ${config.payments.apiUrl} — ${String(list.error).replace('network: ', '')}. This will clear when the network does.`
+        : `Stripe would not list webhook endpoints (${list.error}). A restricted key needs webhook endpoints read access.`,
+    };
+  }
+
+  const endpoints = list.data?.data || [];
+  const match = endpoints.find((entry) => String(entry.url || '').replace(/\/+$/, '') === url);
+  if (!match) {
+    return {
+      ...empty,
+      state: 'not_registered',
+      missing: [...REQUIRED_WEBHOOK_EVENTS],
+      missingPayments: [...PAYMENT_EVENTS],
+      missingSubscriptions: [...SUBSCRIPTION_EVENTS],
+      missingLedger: [...LEDGER_EVENTS],
+      repairable: false,
+      registered: endpoints.map((entry) => entry.url),
+      detail: endpoints.length
+        ? `No endpoint points at ${url}. Registered instead: ${endpoints.map((entry) => entry.url).join(', ')}.`
+        : `No webhook endpoint is registered at all. Add ${url} in Stripe → Developers → Webhooks.`,
+    };
+  }
+
+  const events = match.enabled_events || [];
+  const wildcard = events.includes('*');
+  const lacking = (wanted) => (wildcard ? [] : wanted.filter((event) => !events.includes(event)));
+  const missingPayments = lacking(PAYMENT_EVENTS);
+  const missingSubscriptions = lacking(SUBSCRIPTION_EVENTS);
+  const missingLedger = lacking(LEDGER_EVENTS);
+  const missing = [...new Set([...missingPayments, ...missingSubscriptions, ...missingLedger])];
+  // A disabled endpoint accepts nothing, which is the same outage as a missing
+  // event and takes a different fix — say so instead of reporting it as fine.
+  const disabled = !!match.status && match.status !== 'enabled';
+
+  const detail = disabled
+    ? `${match.url} is ${match.status} in Stripe, so it receives nothing. Re-enable it in the dashboard.`
+    : wildcard
+      ? `${match.url} is subscribed to every event (${events.length} entries including *).`
+      : missing.length
+        ? `${match.url} is not subscribed to ${missing.join(', ')}.`
+        : `${match.url} carries every event this platform needs (${events.length} in total).`;
+
+  return {
+    url,
+    endpointId: match.id || null,
+    endpointUrl: match.url || null,
+    events: events.length,
+    total: REQUIRED_WEBHOOK_EVENTS.length,
+    state: disabled ? 'disabled' : wildcard ? 'all_events' : missing.length ? 'missing' : 'ok',
+    missing,
+    missingPayments,
+    missingSubscriptions,
+    missingLedger,
+    // Repair only touches the event list, so a disabled endpoint is a dashboard
+    // job: offering a button that cannot help would be a dead end.
+    repairable: !disabled && missing.length > 0,
+    checkedAt: now(),
+    detail,
+  };
 }
 
 /* ------------------------------------------------------------------ pages -- */
