@@ -144,6 +144,12 @@ perl tools/port-workflows.pl --check  # exit 1 if they are stale
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
 
+Two composite actions needed a hand change, because an action's own steps always run at the
+workspace root: `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` now resolve their
+project root from `${{ github.action_path }}`. That works at either depth, so it is correct in the
+standalone repositories too — but it lives in the app's file, so a re-import of either project
+drops it. `tools/port-workflows.pl` looks for the marker comment and warns if the patch is gone.
+
 **Release, publish, deploy, and Pages workflows are deliberately not ported.** In a monorepo a push
 to `main` would publish thirteen artefacts, thirteen images and thirteen Pages sites instead of one,
 and several of them target per-repository state that does not exist here. They remain in
