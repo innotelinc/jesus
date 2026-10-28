@@ -1,0 +1,735 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireSession } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { validateDefinition } from "@/lib/validate";
+import { joinCode } from "@/lib/cohort-rules";
+import { parseAssignmentForm } from "@/lib/assignment-rules";
+import { canDeleteScenario, parseScenarioMeta, slugify } from "@/lib/scenario-rules";
+import { MAX_BUNDLE_BYTES, parseScenarioBundle } from "@/lib/scenario-bundle";
+import {
+  applyScenarioPublish,
+  applyScenarioReviewDecision,
+  applyScenarioRollback,
+  applyScenarioSave,
+  applyScenarioSubmit,
+  type ScenarioWorkflowDb,
+} from "@/lib/scenario-workflow";
+import type { Difficulty } from "@prisma/client";
+import { gradeAttempt } from "@/lib/sim/grade";
+import { ATTEMPT_STATUS_LABELS, coerceSubmittedState, toDefinition } from "@/lib/scenarios";
+import { attemptScopeFor } from "@/lib/attempt-scope";
+import { canRegrade, regradedStatus } from "@/lib/grading-rules";
+import { certificateAction, readStoredCertificate } from "@/lib/certificate-rules";
+import { attemptPassed, certificatePatchFor } from "@/lib/certificates";
+import { certificateSkillsFor } from "@/lib/rubric-rules";
+import { announceGraded, checksFor, storedCertificateOf } from "@/lib/graded-events";
+import { gradingModeForTags } from "@/lib/grading-mode";
+import type { ScenarioDefinition } from "@/lib/sim/types";
+
+async function requireStaff() {
+  const user = await requireSession();
+  if (user.role !== "ADMIN" && user.role !== "INSTRUCTOR") {
+    redirect("/?error=" + encodeURIComponent("Instructor access is required for that."));
+  }
+  return user;
+}
+
+function backTo(path: string, message: string, ok = true): never {
+  redirect(`${path}?${ok ? "flash" : "error"}=${encodeURIComponent(message)}`);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Scenarios                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Create or update a scenario.
+ *
+ * The JSON definition is the single source of truth for platform, engine,
+ * briefing and checks — the form fields only carry the catalog metadata.
+ * That means an author cannot accidentally leave the two disagreeing.
+ *
+ * Scenarios are a shared staff catalog, so any instructor may edit any of them;
+ * only deletion carries an extra guard (`canDeleteScenario`).
+ */
+export async function saveScenario(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "").trim() || null;
+  const raw = String(formData.get("definition") ?? "").trim();
+
+  if (!raw) backTo("/instructor/scenarios", "Paste a scenario definition first.", false);
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch (error) {
+    backTo(`/instructor/scenarios/${id ?? "new"}`, `That JSON is not valid: ${(error as Error).message}`, false);
+  }
+
+  const result = validateDefinition(parsedJson);
+  if (!result.ok || !result.definition) {
+    const first = result.issues.find((issue) => issue.level === "error");
+    backTo(
+      `/instructor/scenarios/${id ?? "new"}`,
+      first ? `${first.field ? `${first.field}: ` : ""}${first.message}` : "The definition is not valid.",
+      false,
+    );
+  }
+
+  // Validated here as well as in the workflow, because the catalog form's copy
+  // falls back to the definition's objective and brief.
+  const meta = parseScenarioMeta(formData, result.definition);
+
+  const outcome = await applyScenarioSave(
+    prisma as unknown as ScenarioWorkflowDb,
+    recordAudit,
+    { id: author.id, email: author.email },
+    { id, definition: parsedJson, meta },
+  );
+  if (!outcome.ok) backTo(`/instructor/scenarios/${id}`, outcome.error, false);
+
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo(`/instructor/scenarios/${outcome.scenarioId}`, outcome.message);
+}
+
+export async function setScenarioPublished(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const published = formData.get("published") === "true";
+
+  const outcome = await applyScenarioPublish(
+    prisma as unknown as ScenarioWorkflowDb,
+    recordAudit,
+    { id: author.id, email: author.email },
+    { id, published },
+  );
+  if (!outcome.ok) {
+    backTo(outcome.missing ? "/instructor/scenarios" : `/instructor/scenarios/${id}`, outcome.error, false);
+  }
+
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo(`/instructor/scenarios/${id}`, outcome.message);
+}
+
+export async function submitScenarioForReview(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+
+  const outcome = await applyScenarioSubmit(
+    prisma as unknown as ScenarioWorkflowDb,
+    recordAudit,
+    { id: author.id, email: author.email },
+    id,
+  );
+  if (!outcome.ok) {
+    backTo(outcome.missing ? "/instructor/scenarios" : `/instructor/scenarios/${id}`, outcome.error, false);
+  }
+
+  revalidatePath(`/instructor/scenarios/${id}`);
+  revalidatePath("/instructor/scenarios");
+  backTo(`/instructor/scenarios/${id}`, outcome.message);
+}
+
+export async function decideScenarioReview(formData: FormData): Promise<void> {
+  const reviewer = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  const note = String(formData.get("note") ?? "");
+
+  const outcome = await applyScenarioReviewDecision(
+    prisma as unknown as ScenarioWorkflowDb,
+    recordAudit,
+    { id: reviewer.id, email: reviewer.email },
+    { id, decision, note },
+  );
+  if (!outcome.ok) {
+    backTo(outcome.missing ? "/instructor/scenarios" : `/instructor/scenarios/${id}`, outcome.error, false);
+  }
+
+  revalidatePath(`/instructor/scenarios/${id}`);
+  revalidatePath("/instructor/scenarios");
+  backTo(`/instructor/scenarios/${id}`, outcome.message);
+}
+
+export async function addScenarioComment(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const body = String(formData.get("body") ?? "").trim().slice(0, 2000);
+  if (!body) backTo(`/instructor/scenarios/${id}`, "Write a comment first.", false);
+
+  const scenario = await prisma.scenario.findUnique({ where: { id }, select: { title: true } });
+  if (!scenario) backTo("/instructor/scenarios", "That scenario no longer exists.", false);
+
+  await prisma.scenarioComment.create({
+    data: { scenarioId: id, authorId: author.id, authorEmail: author.email, body },
+  });
+
+  revalidatePath(`/instructor/scenarios/${id}`);
+  backTo(`/instructor/scenarios/${id}`, "Comment added.");
+}
+
+export async function resolveScenarioComment(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const commentId = String(formData.get("commentId") ?? "");
+  const comment = await prisma.scenarioComment.findFirst({ where: { id: commentId, scenarioId: id } });
+  if (!comment) backTo(`/instructor/scenarios/${id}`, "That comment no longer exists.", false);
+  if (comment.resolvedAt) backTo(`/instructor/scenarios/${id}`, "That comment is already resolved.", false);
+
+  await prisma.scenarioComment.update({
+    where: { id: commentId },
+    data: { resolvedAt: new Date(), resolvedById: author.id },
+  });
+
+  revalidatePath(`/instructor/scenarios/${id}`);
+  backTo(`/instructor/scenarios/${id}`, "Comment resolved.");
+}
+
+export async function duplicateScenario(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const original = await prisma.scenario.findUnique({ where: { id }, include: { software: true } });
+  if (!original) backTo("/instructor/scenarios", "That scenario no longer exists.", false);
+
+  const copy = await prisma.scenario.create({
+    data: {
+      title: `${original.title} (copy)`,
+      slug: `${original.slug}-${Math.random().toString(36).slice(2, 6)}`,
+      summary: original.summary,
+      description: original.description,
+      platform: original.platform,
+      engine: original.engine,
+      difficulty: original.difficulty,
+      timeLimitSec: original.timeLimitSec,
+      passScore: original.passScore,
+      published: false,
+      tags: original.tags,
+      definition: original.definition as object,
+      authorId: author.id,
+      software: {
+        create: original.software.map((link) => ({ softwarePackageId: link.softwarePackageId, required: link.required })),
+      },
+    },
+  });
+
+  await recordAudit({
+    actorId: author.id,
+    action: "scenario.duplicate",
+    targetType: "scenario",
+    targetId: copy.id,
+    detail: { from: original.id },
+  });
+
+  revalidatePath("/instructor/scenarios");
+  backTo(`/instructor/scenarios/${copy.id}`, "Copied. The duplicate starts as a draft.");
+}
+
+export async function importScenarioBundle(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const upload = formData.get("bundle");
+  if (!upload || typeof upload === "string") {
+    backTo("/instructor/scenarios", "Choose a .json scenario bundle to import.", false);
+  }
+  if (upload.size > MAX_BUNDLE_BYTES) {
+    backTo("/instructor/scenarios", `That bundle is larger than ${MAX_BUNDLE_BYTES} bytes.`, false);
+  }
+
+  let text: string;
+  try {
+    text = await upload.text();
+  } catch {
+    backTo("/instructor/scenarios", "That file could not be read.", false);
+  }
+
+  const parsed = parseScenarioBundle(text);
+  if (!parsed.ok) backTo("/instructor/scenarios", `That bundle was refused: ${parsed.error}`, false);
+
+  // The bundle module checks the envelope; the validator is the same dry run an
+  // authored scenario gets, so a pasted file cannot skip the "passes before work"
+  // warnings or an unknown check kind.
+  const result = validateDefinition(parsed.bundle.scenario.definition);
+  if (!result.ok || !result.definition) {
+    const first = result.issues.find((issue) => issue.level === "error");
+    backTo(
+      "/instructor/scenarios",
+      first ? `The bundle's definition is invalid — ${first.message}` : "The bundle's definition is invalid.",
+      false,
+    );
+  }
+
+  const meta = parsed.bundle.scenario;
+  const definition: ScenarioDefinition = result.definition;
+  let slug = slugify(meta.title) || "scenario";
+  const clash = await prisma.scenario.findUnique({ where: { slug } });
+  if (clash) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+  const created = await prisma.scenario.create({
+    data: {
+      title: meta.title,
+      slug,
+      summary: meta.summary,
+      description: meta.description,
+      platform: definition.platform,
+      engine: definition.engine,
+      difficulty: meta.difficulty as Difficulty,
+      timeLimitSec: meta.timeLimitSec,
+      passScore: meta.passScore,
+      // An imported scenario is somebody else's work. It starts as a draft so a
+      // person publishes it after reading the checks, not because a file said so.
+      published: false,
+      tags: meta.tags,
+      definition: definition as unknown as object,
+      authorId: author.id,
+    },
+  });
+
+  // Graded checks, not rubric bands: a band is part of its parent rather than a
+  // question of its own, the same count the save path reports (2.2).
+  const gradedChecks = definition.checks.filter((check) => check.halfOf === undefined).length;
+
+  await recordAudit({
+    actorId: author.id,
+    action: "scenario.import",
+    targetType: "scenario",
+    targetId: created.id,
+    detail: { title: meta.title, platform: definition.platform, checks: gradedChecks, bundle: parsed.bundle.version },
+  });
+
+  revalidatePath("/instructor/scenarios");
+  backTo(
+    `/instructor/scenarios/${created.id}`,
+    `Imported "${meta.title}" — ${gradedChecks} checks. It starts as a draft.`,
+  );
+}
+
+export async function deleteScenario(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const scenario = await prisma.scenario.findUnique({ where: { id }, include: { _count: { select: { attempts: true } } } });
+  if (!scenario) backTo("/instructor/scenarios", "That scenario no longer exists.", false);
+
+  if (!canDeleteScenario(author.role, scenario._count.attempts)) {
+    backTo(
+      "/instructor/scenarios",
+      `"${scenario.title}" has ${scenario._count.attempts} recorded attempt(s). Ask an administrator to archive it instead.`,
+      false,
+    );
+  }
+
+  await prisma.scenario.delete({ where: { id } });
+  await recordAudit({
+    actorId: author.id,
+    action: "scenario.delete",
+    targetType: "scenario",
+    targetId: id,
+    detail: { title: scenario.title },
+  });
+
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo("/instructor/scenarios", `"${scenario.title}" was deleted.`);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Classes                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export async function createCohort(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  if (!name) backTo("/instructor/cohorts", "Give the class a name.", false);
+
+  const cohort = await prisma.cohort.create({
+    data: { name, description, joinCode: joinCode(), instructorId: instructor.id },
+  });
+
+  await recordAudit({
+    actorId: instructor.id,
+    action: "cohort.create",
+    targetType: "cohort",
+    targetId: cohort.id,
+    detail: { name },
+  });
+
+  revalidatePath("/instructor/cohorts");
+  backTo("/instructor/cohorts", `"${name}" created. Share the join code ${cohort.joinCode} with your students.`);
+}
+
+export async function updateCohort(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const cohort = await prisma.cohort.findUnique({ where: { id } });
+  if (!cohort) backTo("/instructor/cohorts", "That class no longer exists.", false);
+  if (cohort.instructorId !== instructor.id && instructor.role !== "ADMIN") {
+    backTo("/instructor/cohorts", "That class belongs to another instructor.", false);
+  }
+
+  await prisma.cohort.update({
+    where: { id },
+    data: {
+      name: String(formData.get("name") ?? "").trim() || cohort.name,
+      description: String(formData.get("description") ?? "").trim() || null,
+    },
+  });
+
+  revalidatePath("/instructor/cohorts");
+  backTo("/instructor/cohorts", "Class updated.");
+}
+
+export async function deleteCohort(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+  const cohort = await prisma.cohort.findUnique({ where: { id } });
+  if (!cohort) backTo("/instructor/cohorts", "That class no longer exists.", false);
+  if (cohort.instructorId !== instructor.id && instructor.role !== "ADMIN") {
+    backTo("/instructor/cohorts", "That class belongs to another instructor.", false);
+  }
+
+  await prisma.cohort.delete({ where: { id } });
+  await recordAudit({
+    actorId: instructor.id,
+    action: "cohort.delete",
+    targetType: "cohort",
+    targetId: id,
+    detail: { name: cohort.name },
+  });
+
+  revalidatePath("/instructor/cohorts");
+  backTo("/instructor/cohorts", `"${cohort.name}" was deleted.`);
+}
+
+export async function addCohortMember(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const cohortId = String(formData.get("cohortId") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const isMentor = formData.get("isMentor") === "on";
+
+  const cohort = await prisma.cohort.findUnique({ where: { id: cohortId } });
+  if (!cohort) backTo("/instructor/cohorts", "That class no longer exists.", false);
+  if (cohort.instructorId !== instructor.id && instructor.role !== "ADMIN") {
+    backTo("/instructor/cohorts", "That class belongs to another instructor.", false);
+  }
+
+  const student = await prisma.user.findUnique({ where: { email } });
+  if (!student) {
+    backTo(
+      "/instructor/cohorts",
+      `No account uses ${email}. Ask an administrator to create it, or share the join code ${cohort.joinCode}.`,
+      false,
+    );
+  }
+
+  await prisma.cohortMember
+    .upsert({
+      where: { cohortId_userId: { cohortId, userId: student.id } },
+      create: { cohortId, userId: student.id, isMentor },
+      update: { isMentor },
+    })
+    .catch(() => undefined);
+
+  revalidatePath("/instructor/cohorts");
+  backTo("/instructor/cohorts", `${student.name} was added to ${cohort.name}.`);
+}
+
+export async function removeCohortMember(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const cohortId = String(formData.get("cohortId") ?? "");
+  const userId = String(formData.get("userId") ?? "");
+
+  const cohort = await prisma.cohort.findUnique({ where: { id: cohortId } });
+  if (!cohort) backTo("/instructor/cohorts", "That class no longer exists.", false);
+  if (cohort.instructorId !== instructor.id && instructor.role !== "ADMIN") {
+    backTo("/instructor/cohorts", "That class belongs to another instructor.", false);
+  }
+
+  // `deleteMany` reports how many rows went, so a stale member id is a message
+  // rather than the P2025 a `delete` would throw.
+  const removed = await prisma.cohortMember.deleteMany({ where: { cohortId, userId } });
+  revalidatePath("/instructor/cohorts");
+  backTo(
+    "/instructor/cohorts",
+    removed.count > 0 ? "Student removed from the class." : "That student is not a member of this class.",
+    removed.count > 0,
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Assignments                                                               */
+/* -------------------------------------------------------------------------- */
+
+export async function createAssignment(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+
+  // Field parsing (units, required fields, the deadline) lives in a pure module
+  // so it can be unit tested without a database.
+  const parsed = parseAssignmentForm(formData);
+  if (!parsed.ok) backTo("/instructor/scenarios", parsed.reason, false);
+  const { scenarioId, cohortId, studentId, dueAt, timeLimitSec, maxAttempts, instructions } = parsed.draft;
+
+  const scenario = await prisma.scenario.findUnique({ where: { id: scenarioId }, select: { id: true } });
+  if (!scenario) backTo("/instructor/scenarios", "That scenario no longer exists.", false);
+
+  // A stale class or student id would otherwise fail as a foreign-key error;
+  // checking first turns it into an ordinary flash message. A class may only
+  // be assigned to by its own instructor (or an administrator).
+  if (cohortId) {
+    const cohort = await prisma.cohort.findUnique({ where: { id: cohortId }, select: { id: true, instructorId: true } });
+    if (!cohort) backTo("/instructor/scenarios", "That class no longer exists.", false);
+    if (cohort.instructorId !== instructor.id && instructor.role !== "ADMIN") {
+      backTo("/instructor/scenarios", "That class belongs to another instructor.", false);
+    }
+  }
+  if (studentId) {
+    const student = await prisma.user.findUnique({ where: { id: studentId }, select: { id: true } });
+    if (!student) backTo("/instructor/scenarios", "That student no longer exists.", false);
+  }
+
+  const assignment = await prisma.assignment.create({
+    data: {
+      scenarioId,
+      cohortId,
+      studentId,
+      dueAt,
+      timeLimitSec,
+      maxAttempts,
+      instructions,
+      createdById: instructor.id,
+    },
+  });
+
+  await recordAudit({
+    actorId: instructor.id,
+    action: "assignment.create",
+    targetType: "assignment",
+    targetId: assignment.id,
+    detail: { scenarioId, cohortId, studentId, dueAt: dueAt ? dueAt.toISOString() : null },
+  });
+
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo("/instructor/scenarios", "Assignment created.");
+}
+
+export async function deleteAssignment(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const id = String(formData.get("id") ?? "");
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id },
+    select: { createdById: true, cohort: { select: { instructorId: true } } },
+  });
+  if (!assignment) backTo("/instructor/scenarios", "That assignment no longer exists.", false);
+
+  const owns = assignment.createdById === instructor.id || assignment.cohort?.instructorId === instructor.id;
+  if (instructor.role !== "ADMIN" && !owns) {
+    backTo("/instructor/scenarios", "That assignment belongs to another instructor.", false);
+  }
+
+  await prisma.assignment.delete({ where: { id } }).catch(() => undefined);
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo("/instructor/scenarios", "Assignment removed.");
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Grading                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Re-grade a submission against the scenario's current checks.
+ *
+ * Useful after fixing a typo in a check: every stored attempt keeps its final
+ * state, so the score can be recalculated without asking students to redo work.
+ */
+export async function regradeAttempt(formData: FormData): Promise<void> {
+  const instructor = await requireStaff();
+  const attemptId = String(formData.get("attemptId") ?? "");
+
+  // Scoped, so an instructor cannot re-grade another instructor's cohort: the
+  // page hides those attempts, and this closes the same hole server-side.
+  const scope = await attemptScopeFor(instructor);
+  const attempt = await prisma.attempt.findFirst({
+    where: { id: attemptId, ...scope },
+    include: {
+      scenario: true,
+      user: { select: { id: true, email: true, name: true } },
+      assignment: { select: { cohort: { select: { id: true, name: true } } } },
+    },
+  });
+  if (!attempt) backTo("/instructor/attempts", "That attempt no longer exists.", false);
+
+  // Only a finished attempt has a final state to score. Re-grading an
+  // in-progress or abandoned attempt would flip it to GRADED and lock the
+  // student out of work they never handed in.
+  if (!canRegrade(attempt.status)) {
+    backTo(
+      `/instructor/attempts/${attemptId}`,
+      `A ${ATTEMPT_STATUS_LABELS[attempt.status]} attempt cannot be re-graded — only submitted, graded or expired work can.`,
+      false,
+    );
+  }
+
+  const definition = toDefinition(attempt.scenario);
+  const state = coerceSubmittedState(attempt.snapshot, definition);
+  const report = gradeAttempt(definition, state, attempt.scenario.passScore);
+  // A re-grade is the same task graded again, so it keeps the task's mode and
+  // re-publishes it: the re-graded evidence must state its grader just as the
+  // original did (docs/consolidation-audit.md §7 Step 6).
+  const mode = gradingModeForTags(attempt.scenario.tags);
+
+  // A re-grade moves the score, but it must not rewrite a certificate the
+  // learner already holds: an existing record is kept as issued, and one is
+  // issued only if this is now a pass that never had one. The single thing a
+  // re-grade can take away is a certificate whose pass no longer stands.
+  const stored = readStoredCertificate(attempt);
+  const gradedAt = new Date();
+  const certificateFacts = {
+    learnerId: attempt.userId,
+    learnerName: attempt.user.name,
+    scenarioId: attempt.scenarioId,
+    scenarioTitle: attempt.scenario.title,
+    platform: attempt.scenario.platform,
+    score: report.score,
+    maxScore: report.maxScore,
+    passScore: attempt.scenario.passScore,
+    completedAt: gradedAt,
+    // The same 2.2 rule as the first grading: competencies are the checks that
+    // earned them, with the scenario's tags only when no check names one.
+    skills: certificateSkillsFor(report.results, attempt.scenario.tags),
+    // So a re-grade that issues a fresh record still says which grader produced it.
+    mode,
+  };
+  const action = certificateAction(attemptPassed(certificateFacts), stored);
+  const certificate = certificatePatchFor(certificateFacts, stored, gradedAt);
+
+  await prisma.$transaction([
+    prisma.checkResult.deleteMany({ where: { attemptId } }),
+    prisma.checkResult.createMany({
+      data: report.results.map((result) => ({
+        attemptId,
+        checkId: result.checkId,
+        label: result.label,
+        passed: result.passed,
+        points: result.points,
+        maxPoints: result.maxPoints,
+        detail: result.detail,
+      })),
+    }),
+    prisma.attempt.update({
+      where: { id: attemptId },
+      data: {
+        score: report.score,
+        maxScore: report.maxScore,
+        gradedAt,
+        status: regradedStatus(attempt.status),
+        gradingMode: mode,
+        ...certificate,
+      },
+    }),
+  ]);
+
+  await recordAudit({
+    actorId: instructor.id,
+    action: "attempt.regrade",
+    targetType: "attempt",
+    targetId: attemptId,
+    detail: { score: report.score, maxScore: report.maxScore, certificate: action, mode },
+  });
+
+  // A re-grade is its own grading fact: it is a second event, not a correction of
+  // the first, so a consumer that stored the original score learns the new one
+  // without having to poll the API for the change.
+  await announceGraded({
+    attempt: {
+      id: attemptId,
+      status: regradedStatus(attempt.status),
+      mode,
+      score: report.score,
+      maxScore: report.maxScore,
+      startedAt: attempt.startedAt,
+      submittedAt: attempt.submittedAt,
+      gradedAt,
+      timeSpentSec: attempt.timeSpentSec,
+    },
+    learner: attempt.user,
+    scenario: {
+      id: attempt.scenarioId,
+      title: attempt.scenario.title,
+      platform: attempt.scenario.platform,
+      passScore: attempt.scenario.passScore,
+    },
+    cohort: attempt.assignment?.cohort ?? null,
+    checks: checksFor(report.results),
+    // Read back after the transaction: a re-grade that *keeps* an issued record
+    // still has to publish the code the learner already holds.
+    certificate: await storedCertificateOf(attemptId),
+  });
+
+  revalidatePath(`/instructor/attempts/${attemptId}`);
+  revalidatePath("/student/results");
+  const certificateNote =
+    action === "revoke"
+      ? " The certificate issued for this attempt has been revoked."
+      : action === "issue"
+        ? " This attempt now passes, so a certificate has been issued."
+        : "";
+  backTo(
+    `/instructor/attempts/${attemptId}`,
+    `Re-graded: ${report.score}/${report.maxScore}.${certificateNote}`,
+  );
+}
+
+/**
+ * Restore a scenario to a shape it used to have.
+ *
+ * Not an undo of the history: rolling back is a *new* save carrying the old shape,
+ * so the revision that was rolled back from stays in the list and the rollback
+ * itself is the newest revision. The slug is kept — it is the catalog's unique
+ * address, and an old one may have been taken since — and the scenario's software
+ * dependencies are left alone for the same reason: they are a catalog fact, not a
+ * scoring one.
+ */
+export async function restoreScenarioRevision(formData: FormData): Promise<void> {
+  const author = await requireStaff();
+  const scenarioId = String(formData.get("scenarioId") ?? "");
+  const revisionId = String(formData.get("revisionId") ?? "");
+
+  const outcome = await applyScenarioRollback(
+    prisma as unknown as ScenarioWorkflowDb,
+    recordAudit,
+    { id: author.id, email: author.email },
+    { scenarioId, revisionId },
+  );
+  if (!outcome.ok) {
+    backTo(
+      outcome.missing ? "/instructor/scenarios" : `/instructor/scenarios/${scenarioId}`,
+      outcome.error,
+      false,
+    );
+  }
+
+  revalidatePath(`/instructor/scenarios/${scenarioId}`);
+  revalidatePath("/instructor/scenarios");
+  revalidatePath("/student");
+  backTo(`/instructor/scenarios/${scenarioId}`, outcome.message);
+}
+
+/** Detach a software dependency from a scenario. */
+export async function detachSoftware(formData: FormData): Promise<void> {
+  await requireStaff();
+  const scenarioId = String(formData.get("scenarioId") ?? "");
+  const softwarePackageId = String(formData.get("softwarePackageId") ?? "");
+  await prisma.scenarioSoftware
+    .delete({ where: { scenarioId_softwarePackageId: { scenarioId, softwarePackageId } } })
+    .catch(() => undefined);
+  revalidatePath(`/instructor/scenarios/${scenarioId}`);
+  revalidatePath("/student");
+  backTo(`/instructor/scenarios/${scenarioId}`, "Software requirement removed.");
+}

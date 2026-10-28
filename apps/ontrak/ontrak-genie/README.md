@@ -1,0 +1,176 @@
+<div align="center">
+
+# OnTrak Genie
+
+**AI coding agent with approval gates and workspace isolation.**
+
+[![CI](https://github.com/innotelinc/OnTrak/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/OnTrak/actions/workflows/ci.yml)
+[![Conformity](https://github.com/innotelinc/OnTrak/actions/workflows/conform.yml/badge.svg)](https://github.com/innotelinc/OnTrak/actions/workflows/conform.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
+[![Theme: Unity](https://img.shields.io/badge/theme-Unity-6366f1)](https://github.com/innotelinc/innotel-platform-stack/blob/main/standards/unity/README.md)
+
+</div>
+
+> **Part of the [OnTrak platform](../README.md) — TrainingOps for the Innotel Labs ecosystem**
+
+**🌐 [OnTrak Landing Page](https://innotelinc.github.io/OnTrak/)** • **[Landing Page](https://innotelinc.github.io/OnTrak/ontrak-genie/)** • **[Documentation](./docs/)**
+
+---
+
+> **OnTrak Genie** is the **CodeOps** product of the [Innotel Labs](../INNOTEL-LABS.md)
+> family and a member of the [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack):
+> the console for a coding agent — **a browser UI and a terminal CLI** — over
+> one server. You state a task; the agent reads, edits and runs code inside a
+> workspace it cannot leave; and every call it makes is on screen as it happens
+> — including the file it is writing, rendered and diffed against what is on
+> disk *before* the write lands. It consumes the platform services rather than
+> re-implementing them, and it is deliberately the only surface in the family
+> that shows an agent's work rather than its output.
+> **Landing page:** [https://innotelinc.github.io/OnTrak/ontrak-genie/](https://innotelinc.github.io/OnTrak/ontrak-genie/)
+
+---
+
+## Why Genie
+
+| Problem | Genie answer |
+| --- | --- |
+| An agent that edits your files is only trustworthy if you can watch it work — but the usual interface shows a spinner, then a finished diff you have to audit afterwards. | Tool calls stream into the transcript as they are decided, and the file being written renders live, character by character, beside a live diff of what is changing. You see the edit before the edit exists. |
+| "Is this write safe?" is not a judgement to leave to the model, and not one a prompt can enforce. | An approval gate: `run_command` and any write over a line threshold stop and wait for a click. Deny ends the turn cleanly; the gate is the only thing between a plan and a changed machine. |
+| A model that cannot call a tool fails the whole turn — usually after a long wait, and usually without saying why. | A chain-health probe reports `models n/m ready` in the sidebar before you type, a fallback chain absorbs a throttled provider mid-task, and a dead chain is visible rather than discovered. |
+| Which model ids actually work is not something a catalog tells you, and a large advertised list is not a usable one. | Sweep the catalog from the browser: probe the ids that claim tool support and keep the ones that answer. |
+| A session that cannot be resumed is a session you repeat, and a pane that forgets is a pane you reopen. | Chats, transcripts and per-file snapshots persist across restarts, and the preview pane restores what it was showing across a browser reload. |
+
+## What it is
+
+- **The agent loop** — request → tool call → result, streamed over Server-Sent Events, with the partial tool call rendered as it is still arriving — in the browser and in the terminal alike.
+- **A terminal client** — `genie`: the same turns, tool cards, diffs and approval gate, plus slash commands, Tab completion, skills, saved projects, session management and follow-ups. A client of the server, never a second agent ([docs/cli.md](docs/cli.md)).
+- **A chat surface built for reading** — the conversation is the page: your turn is a bubble, the agent's is a document, tool calls are cards you can open, and diffs land before the write does. `/` opens a command palette over the console's own actions and the model catalog, and each turn ends with up to three next steps offered as chips that fill the composer rather than firing on click.
+- **A workspace jail you can aim** — the agent works in a directory you choose from the workspace panel (and can create folders from there). The choice is always inside the sandbox: absolute paths and `../` escapes are refused, so pointing the agent at a project never points it at the host. `.git`, `node_modules` and build output are skipped.
+- **Remote workspaces** — a folder on a server, mounted over SSH and made the working directory, so every tool, the diff and the preview reach it through the *same* jail; a GitHub repository cloned with *your* token and edited in place, so the app can be previewed as it changes; and **Atlas**, the ecosystem's Gitea forge, as an add-on — connect, clone, create a project and run it, push and open a pull request. Credentials are the caller's, held for the session and never written into the workspace (`src/remote.ts`, `src/atlas.ts`).
+- **Skills, installed from git** — a skill is a markdown playbook (`SKILL.md`, optional front matter, plus whatever reference files it needs): how *we* do X here, written down once. `genie skills add <owner/repo>` fetches one from GitHub — the repository's own layout is worked out, a repository that publishes the same skill for a dozen providers installs once, and a repository holding several is refused until `--path` says which. The CLI composes one into a message (`/skill`, `--skill`); the **console** gets the same ones, per account, listed in the prompt and loaded with `use_skill` when the model needs it, and its own panel installs one into the signed-in account's lane so a shared console never changes what everybody is offered (`src/skills.ts`, `src/skill-install.ts`, `src/skill-roots.ts`).
+- **A project that remembers** — `MEMORY.md` in the workspace, injected into every turn and written with the `remember` tool. Memory is a file: visible in the tree, reviewable in a diff, correctable by hand, and committed with the code it describes.
+- **The tool set** — `read`, `edit`, `write`, `list`, `search`, `run`, each confined to that workspace.
+- **Projects you can keep, and carry** — a named workspace directory you come back to, and a portable form of it: a project leaves as one JSON bundle holding its files and its note, and loads back as a new project — in the console, or as `genie projects export -o - | genie projects import -` between two deployments.
+- **Bring your own project** — `upload .zip` takes whatever a person has (an export from a forge, a compressed folder), strips the wrapping folder, unpacks it into a new project and **installs its dependencies before it answers**, step by step, because a project that arrives without a `node_modules` or a virtualenv is a project nobody can run yet. The archive is read by `src/zip.ts` with no dependency and no trust: ZIP64, CRC and length checks, encrypted entries and unknown methods refused by name, the uncompressed size bounded before a byte is inflated, and every path through the same fence a project bundle's goes through. Installs run in the sandbox and write *inside the project* (`.venv`, `.gopath`, `.cargo`, `node_modules`), because a container's home directory does not survive the command that made it. When a project is ready, **publish** creates a GitHub or Atlas repository, commits it, pushes it once with the credential inline, and leaves `origin` pointing at it — so the work carries on in the same directory, and a repository that already exists simply receives the next push.
+- **The approval gate** — a browser decision for commands and large writes, with a deny path that ends the turn instead of stalling it.
+- **Live visibility** — the file being written, syntax-highlighted, with a live diff against the on-disk baseline; a changed-marker file tree; a diff view for any file with history.
+- **The app, running** — `preview` opens on the project itself rather than on the code that builds it: it works out this project's own start command (its `dev` script, `manage.py`, a directory with an `index.html`), runs it, reloads it as files change, and serves it same-origin through the console so the app's own cookies and relative URLs behave as they will in production. `show code` is one click away.
+- **A workspace that can actually build** — the image carries bash, git, ripgrep, curl, wget, jq, make, gcc/g++, python3 + pip and unzip, and the agent is told to install what else it needs (`apk add`, `pip install`, `npm install`) rather than work around a missing tool.
+- **Model resilience** — a fallback chain, a chain-health badge, a catalog sweep, and an optional second gateway (a local model, no key) tried only after the chain is exhausted.
+- **Sign-in (optional)** — Authentik OIDC: authorization code with PKCE, RS256 `id_token` verification against the provider's JWKS, and a signed session cookie. The console names the session it is holding and offers **sign out** beside it, which clears the cookie and any `?token=` credential the tab is carrying, then returns to the gate. The shared bearer is kept for API clients that drive the endpoint directly.
+- **Tenancy (optional)** — Distro's control plane: a turn is resolved to an account, gated on that account's quota, spent on that account's own gateway key, and recorded afterwards. The key stays server-side, and a refusal is a `401` or a `429` rather than a quiet charge to the operator. The account keys the disk too: its own workspace, chats and file history, so two people on one deployment cannot read each other's files.
+- **Persistence** — sessions, transcripts and file snapshots under one data directory.
+
+## Quick start
+
+From source:
+
+```bash
+cp .env.example .env          # then set OMNIROUTE_URL to a reachable gateway
+npm install
+npm run build && npm start    # http://127.0.0.1:3400
+```
+
+The terminal client is the same server, one command:
+
+```bash
+genie login                   # browser-assisted sign-in, credential stored locally
+genie                         # chat: streamed tool calls, live diffs, and the gate
+genie ask "run the typecheck" # one turn; --yes approves gated commands
+```
+
+It has no runtime dependencies and no second agent — see
+[docs/cli.md](docs/cli.md).
+
+In Docker:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+# http://127.0.0.1:3410/?token=<WEB_TOKEN>
+#   :3410 rather than :3400, because this is the product-only stack and the
+#   family stack owns :3400 (see docs/family-operations.md). Set
+#   `ONTRAK_GENIE_PORT` to move either stack.
+```
+
+As part of the family, from the repository root:
+
+```bash
+make all-up                   # the whole family, Genie included on :3400
+make genie-up                 # just Genie, as its own stack, on :3410
+```
+
+`make genie-up` refuses while `make all-up` is already serving Genie on :3400,
+and says so — both stacks reaching for one port is a container that crash-loops on
+`EADDRINUSE` with nothing explaining why. Stop the family stack first with
+`make all-down`, or use the console it is already serving.
+
+A gateway is required and is not shipped here: Genie speaks the OpenAI-compatible
+API, so it points at the stack's shared OmniRoute. Its address comes from the
+deployment's environment — no internal address is committed, and `.env` is
+gitignored.
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [docs/cli.md](docs/cli.md) | The terminal client: sign-in, the REPL and its commands, projects, skills, follow-ups, scripting and the flags. |
+| [docs/operations.md](docs/operations.md) | The full developer reference: HTTP API, SSE events, every environment variable, the check commands, the Docker and sandbox setup. |
+| [docs/stack.md](docs/stack.md) | Genie's role in the Innotel Platform Stack — what it owns, provides and consumes, and the service map. |
+| [docs/roadmap.md](docs/roadmap.md) | What is shipped, what is open, and what comes next — the milestones from the console to stack citizenship. |
+| [docs/threat-model.md](docs/threat-model.md) | What Genie is defending: the four trust boundaries, the adversaries, and the residual risk behind each control. |
+| [docs/runbook.md](docs/runbook.md) | The operator's runbook: deploy, sign-in, telling the refusals and alerts apart, off-boarding, and the incident order. |
+
+## Repository layout
+
+```
+ontrak-genie/
+├── src/            # agent loop, tools, workspace jail, HTTP server, diff, snapshots
+│   ├── cli/        # the `genie` terminal client: client, renderer, REPL, skills
+│   └── test/       # unit + HTTP tests (node --test)
+├── public/         # the browser UI: app.js, highlight.js, style.css, index.html
+├── scripts/        # check commands: ui-smoke, draft-check, offline-check, model-health
+├── sandbox/        # the image run_command executes in
+├── web/landing/    # this product's landing page, published under the family site
+└── docs/           # operations reference, stack role, convergence
+```
+
+## Status
+
+Version 0.2.0. The console is complete, the checks pass, and it is now a
+first-class member of the stack rather than a console that happens to live in the
+repo:
+
+- **Auth** is either a static `WEB_TOKEN` (the API path, and what a laptop with no
+  provider uses) or sign-in through Cerulean's Authentik, which is **on** at both
+  of the family's names — set the issuer, the client id and the session secret to
+  require it anywhere else. Turning it on also closes the loopback trust the
+  console otherwise starts with, so an empty `WEB_TOKEN` stops meaning "no gate".
+- **Tenancy** is Distro's control plane, and it is **on** on the family
+  deployment: `CONTROL_PLANE_INTERNAL_URL` points at the plane and
+  `CONTROL_INTERNAL_TOKEN` arrives as a Cerulean Vault reference, so a turn spends
+  the signed-in account's own gateway key and is refused when that account may not
+  spend. That means it needs sign-in as well, because the plane keys accounts on
+  the OIDC subject. The key posture is deliberate: no account, no turn; a quota
+  read that fails does not stop the work; the ledger write never fails an answer.
+  The disk is per-account too — each account's workspace, chats and file history
+  live under `accounts/<account>/`, and a request with no account gets a `401`
+  rather than the shared workspace. See [docs/operations.md](docs/operations.md).
+- **Secrets** are Cerulean Vault `vault://` references the image resolves before
+  the server starts, so `.env` is a reference file rather than the store.
+- **Delivery** is a pull: the image publishes to
+  `ghcr.io/innotelinc/ontrak-genie`, and `docker-compose.prod.yml` beside the
+  product compose names a release instead of building one
+  (`make genie-prod-up`, `ONTRAK_IMAGE_TAG`).
+
+## License
+
+MIT — see [../LICENSE](../LICENSE). Genie's model access is through an
+OpenAI-compatible gateway; no provider SDK is vendored, and no upstream license
+is redistributed here.
+
+---
+
+© 2026 OnTrak Genie — the family's browser agent console. An Innotel Labs product.
+[github.com/innotelinc/OnTrak](https://github.com/innotelinc/OnTrak) ·
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)

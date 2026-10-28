@@ -1,0 +1,34 @@
+{
+  "name": "ontrak-sentinel",
+  "version": "2.0.0",
+  "private": true,
+  "description": "OnTrak Sentinel \u2014 identity provider and intrusion detection/prevention for the Innotel Labs family. An Innotel Labs product, built after OnTrak Tix.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "copy:check": "node scripts/copy-check.mjs",
+    "serve": "tsx scripts/serve.ts",
+    "test": "tsx --tsconfig tests/tsconfig.json --test --test-timeout=60000 tests/*.test.ts",
+    "check": "npm run typecheck && npm run copy:check && npm test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "setup": "prisma generate && prisma migrate deploy"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

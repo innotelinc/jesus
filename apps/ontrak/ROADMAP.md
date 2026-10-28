@@ -1,0 +1,727 @@
+# OnTrak — TrainingOps Roadmap
+
+> The **TrainingOps** platform of the
+> [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)
+> — an [Innotel Labs](INNOTEL-LABS.md) product.
+>
+> Status legend: `[x]` shipped · `[~]` in progress · `[ ]` planned · `[-]` out of scope
+>
+> This is the single source of truth for **what** the training platform does and
+> **what comes next**. 2.0 is the shipped product; this roadmap now versions the
+> next work as 2.1, 2.2, 2.3, 3.0 and 4.0.
+>
+> **Re-baselined at 2.0 (2026-10-24).** The family now shares one version line:
+> everything shipped here is **2.0.0**, the next minor milestones are **2.1**,
+> **2.2**, **2.3**, and the next major directions are **3.0** and **4.0**. The
+> portfolio TODO across all nine products is
+> [docs/portfolio-roadmap-v2.md](docs/portfolio-roadmap-v2.md).
+>
+> Where the shipped sections below still say `v1.0`–`v1.6` or "v2.0", that is
+> history: the mapping is in the version ladder immediately below.
+
+---
+
+## 0. Version ladder (2.0 re-baseline)
+
+| Old milestone | New version | State |
+| --- | --- | --- |
+| v1.0 — Complete | 2.0.0 | `[x]` shipped |
+| v1.1 — Content, insight & polish | 2.0.0 | `[x]` shipped |
+| v1.2 — Real drivers | 2.0.0 | `[x]` shipped |
+| v1.3 — Identity & integrations | 2.0.0 | `[x]` shipped |
+| v1.6 — The learning loop | 2.0.0 | `[x]` shipped |
+| v1.4 — Authoring at scale | **2.1** | `[x]` shipped |
+| v1.5 — Assessment, credentials & evidence | **2.2** | `[x]` certificates/packet, rubric bands, competencies and the opt-in timing record shipped |
+| (content/localization remainder) | **2.3** | `[ ]` open |
+| v2.0 — Enterprise training platform | **3.0** | `[ ]` planned |
+| (new) | **4.0** | `[ ]` planned |
+
+**2.0.0 is the shipped product.** Its exit is the one in §2: a class signs in,
+ runs graded scenarios on three simulated platforms and real bash, the lab's real
+guests grade on a host, instructors author/assign/re-grade, results flow to an
+LMS and a webhook consumer, and a learner holds a verifiable certificate.
+
+### 2.1 — Authoring at scale `[x]`
+**Goal:** a catalog a team can maintain.
+
+- `[x]` Scenario versioning: draft → publish, with one-click rollback and a
+  readable change history per scenario (`ScenarioRevision`, `versions-rules.ts`,
+  the history on `/instructor/scenarios/[id]`).
+- `[x]` Import/export bundles so a scenario set moves between deployments:
+  `src/lib/scenario-bundle.ts` (pure), `GET /api/v1/scenarios/<id>/export`, and the
+  import form on `/instructor/scenarios`. A bundle carries the grading contract and
+  no local row state (no slug, author or publish flag), is refused when it cannot
+  grade anybody, and always imports as a draft. Covered by
+  `tests/scenario-bundle.test.ts`.
+- `[x]` Collaborative authoring: threaded comments with resolve, submit → approve
+  or request-changes, and a publish gate (`ONTRAK_SCENARIO_REVIEW_REQUIRED`). The
+  author cannot approve their own scenario, and a grading-shape edit drops an
+  approval back to draft. The decisions are in `review-rules.ts`; the writes moved
+  out of the server actions into `scenario-workflow.ts`, which the actions wrap and
+  which takes the database as a structural seam — so the workflow runs without a
+  request. Covered by `tests/scenario-review.test.ts` and, end to end over an
+  in-memory store, by `tests/scenario-workflow.test.ts` (save, submit, a
+  self-review refused, approve, the publish gate, an edit that spends the
+  approval, and a rollback), including two saves racing for the same revision
+  number.
+- **Exit:** `[x]` two authors co-edit a scenario through review to publish, with
+  full history and one-click rollback, proven by a test. The same five functions
+  are driven against a real PostgreSQL database by
+  `scripts/verify-scenario-review.ts`: two temporary instructors, revisions 1–3,
+  a rollback that keeps the replaced shape, the audit trail naming every move,
+  and a `finally` that deletes the scenario, its revisions, their audit rows and
+  the two accounts.
+
+### 2.2 — Assessment depth `[x]`
+**Goal:** more than pass/fail. Certificates, the skills matrix and the cohort
+packet ship in 2.0; the rubric, per-check competencies and the opt-in timing
+record ship here.
+
+- `[x]` Partial credit per check and rubric bands (0 / half / full) computed by
+  the server-side grader and explained on the report. A band is authored as an
+  ordinary check carrying `halfOf: <parent id>` — the weaker condition, in the
+  vocabulary the author already uses — and the grader awards
+  `Math.floor(parent points / 2)` when the parent misses and the band passes. A
+  band is never a line of its own, is not a pass (`missedChecks` still names it),
+  and the report says "half credit" beside the points with the band's own
+  evidence in the detail. The validator refuses the shapes that would award
+  nothing (an unknown parent, fewer than 2 points, odd points, a band on a band,
+  two bands for one parent) and warns on a band that already passes on a fresh
+  machine. See `sim/grade.ts`, `rubric-rules.ts` and `tests/rubric.test.ts`.
+- `[x]` Competency tagging per check, feeding the existing skills matrix. A check
+  may carry `competency`; the certificate's skills are then the ones its
+  **full-credit** checks earned, and the scenario's `tags` remain the fallback for
+  a catalog written before a check could name one. A half band demonstrates work
+  in progress, not a competence, so it does not earn the skill — which is also
+  why a scenario whose only tagged check lands in the half band issues no skill
+  rather than falling back to its tags.
+- `[x]` Optional timing-integrity controls (focus loss recorded, not punished by
+  default). A scenario opts in with `integrity: { recordFocusLoss: true }` — a
+  strict block, so a misspelled key is a validator error rather than a control
+  that silently records nothing. The attempt runner reports `visibilitychange`
+  intervals; `timing-integrity-rules.ts` clamps each to the attempt's own window,
+  drops claims it cannot read (ends before it starts, under a second, longer than
+  four hours), merges overlapping and touching periods so five switches are one
+  absence, and caps the total at six hours while flagging the cap. The record is
+  stored on `Attempt.integrity` (`source: "browser-reported"`, the merged spans
+  and their totals) and merged on retry, so a replayed batch cannot double the
+  time. Both the learner's report and the instructor's review show the same
+  sentence — "43 s away in 2 intervals; recorded, not scored" — with the source
+  and the statement that a re-grade does not change it. The grader never reads the
+  column, so a lost tab cannot move a score.
+- **Exit:** met. A scenario grades partial credit identically on re-grade
+  (`tests/rubric.test.ts` grades the same snapshot twice and compares the whole
+  report), every certificate competency traces to the checks that earned it, and
+  the timing record's honesty is pinned by `tests/timing-integrity.test.ts`: window
+  clamping, overlap merging, nonsense dropped, the cap and its flag, idempotent
+  retries, the read-back that refuses to trust a hand-edited total, and the
+  validator's opt-in decision.
+
+### 2.3 — Content & locale completeness `[ ]`
+**Goal:** the localization mechanism gets content.
+
+- `[ ]` Spanish overlays for the ten bundled scenarios.
+- `[ ]` Per-locale catalog `title`/`summary` columns.
+- **Exit:** a cohort runs a bundled scenario end to end in Spanish.
+
+### 4.0 — The open credential network `[ ]`
+**Goal:** evidence that travels.
+
+- `[ ]` A scenario marketplace with signed, versioned packs.
+- `[ ]` Portable credentials verifiable outside this deployment.
+- `[ ]` Cross-organisation competency mapping.
+
+---
+
+## 1. Vision
+
+Teach hands-on IT support the way it is actually done — in a realistic, timed,
+automatically graded environment that runs in a browser, with no virtual machines
+to provision. Then make the resulting **training evidence** usable: who was
+trained, on what, when, and how well.
+
+```mermaid
+flowchart LR
+  A[Scenario] --> B[Timed attempt]
+  B --> C[Server re-grades snapshot]
+  C --> D[Result + evidence]
+```
+
+## 2. 2.0 status (shipped)
+
+| Capability | Status |
+| --- | --- |
+| Linux (bash), Windows (PowerShell), Office (sheet/doc/mail) simulators | `[x]` |
+| Clickable Windows 11 desktop surface driving the same machine state | `[x]` |
+| Deterministic server-side grading, re-grade, hint penalties | `[x]` |
+| Derived availability + licence gate (OPEN / EVALUATION / LICENSED) | `[x]` |
+| RBAC (admin / instructor / student) on middleware **and** every action | `[x]` |
+| Scenario authoring + validator ("passes before work" warnings) + templates | `[x]` |
+| Cohorts, join codes, assignments, due dates, attempt caps, time limits | `[x]` |
+| Admin control room: platform toggles, software inventory, keys, users, audit, integration status | `[x]` |
+| Student experience: timed attempts, autosave, results, personal bests | `[x]` |
+| PWA / mobile quick-keys / offline shell | `[x]` |
+| Test suite (373) + typecheck + production build green | `[x]` |
+| Pure, unit-tested form/rule modules; ownership-guarded actions | `[x]` |
+| Versioned migrations (`prisma/migrations`) applied identically by every environment | `[x]` |
+
+**v1 is complete as a training product.** The remaining work is depth, reach, and
+enterprise readiness.
+
+## 3. Architecture recap
+
+- **Pure simulator** (`src/lib/sim/`) — no framework imports; runs in the
+  browser, on the server, and in tests.
+- **Driver seam** — every console implements `ShellDriver`; today the drivers are
+  in-browser simulations, and a container-backed driver can slot in behind the
+  same interface without touching the UI, scenario format or grader.
+- **Server-side grading** — `coerceSubmittedState` → `gradeAttempt`; client
+  scores are never trusted.
+- **Stack** — Next.js + React + TypeScript + Prisma + PostgreSQL; pure
+  `*-rules.ts` modules for all form/unit/date logic.
+- **One family identity, six roles.** This app's three roles are a slice of one
+  vocabulary shared with OnTrak Tix, OnTrak Sentinel, OnTrak Sync and
+  [OnTrak Portal](ontrak-portal/README.md): `ADMIN`, `SYSADMIN`, `ANALYST`,
+  `TECHNICIAN`, `INSTRUCTOR`, `STUDENT`. The deployed Network uses Cerulean
+  (Authentik) as the directory, and OnTrak Sync owns the family's local account
+  table — which is what the portal's password sign-in delegates to rather than
+  inventing a second login. See
+  [docs/family-operations.md](docs/family-operations.md).
+- **One family theme, [Unity](theme/README.md).** Every surface in the family —
+  this app, Portal, Tix, Sentinel and Sync — loads the same token set rather than
+  a private palette, with `desk` (violet) and `operations` (graphite) schemes and
+  a light/dark switch on top of each. Unity is also the standard for the rest of
+  the Innotel platforms, so a change to it is a change everywhere.
+- **A platform in the Innotel stack.** OnTrak is the **TrainingOps** platform of
+  the [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)
+  (registered there as the `ontrak` component), beside AthenIQ (LearningOps) and
+  Signara (DocumentOps), and it consumes the same shared layers they do:
+  Authentik, Cerulean Vault, Cerulean, ONYX and NPM Edge.
+
+## 4. Milestones
+
+### 2.0 — Complete (shipped) `[x]`
+The feature set in §2. Exit already met: a class can sign in, run graded
+scenarios on three platforms, and instructors can author, assign and re-grade.
+
+### 2.0 — Content, insight & polish (shipped) `[x]`
+**Goal:** more practice, better feedback, a smoother surface.
+
+- `[x]` An analytics dashboard for instructors: per-check pass rates,
+  time-on-task, trends and per-scenario rollups (`/instructor/analytics`).
+- `[x]` More bundled scenarios and a richer template gallery: Linux
+  networking, Linux accounts lifecycle, Windows endpoint/accounts and a
+  service-desk mailbox triage starter, each validated and added to the demo
+  seed. The `file_not_contains` check kind makes "the stale entry is gone"
+  gradeable.
+- `[x]` Accessibility pass (keyboard-first console, screen-reader labels). The
+  workspace tab strip is a real `tablist` with roving arrow/Home/End keys and
+  `aria-selected`; the file editor is a focus-trapped `role="dialog"` that
+  closes on Escape and restores focus; the countdown is a `role="timer"` that
+  announces in its final minute; the console region, progress bars and window
+  controls carry accessible names; decorative icons are `aria-hidden`; the
+  active nav item is marked `aria-current="page"`. An automated axe-core WCAG
+  A/AA audit now runs in `npm test` (`tests/a11y.test.ts`) against the
+  server-rendered desktop and Office surfaces in both locales, plus explicit
+  keyboard checks (every control named, no positive `tabindex`), with a
+  planted-violation guard so the audit cannot silently become a no-op. The
+  paint-dependent rules that need layout and paint (`color-contrast` above all)
+  are now covered by a browser sweep — `tests/browser/a11y.spec.ts`, run with
+  `npm run test:a11y` — which drives real Chromium and audits the public pages
+  plus the signed-in student dashboard and attempt workspace, and it is strict:
+  every WCAG A/AA violation fails, `color-contrast` included. It caught a
+  scrollable region without keyboard access on the landing page, and drove the
+  accent palette to be darkened to clear the 4.5:1 floor.
+- `[x]` A visible case-notes pad in the attempt workspace. Notes are a graded
+  artefact (`note_matches` reads `machine.notes`), but on a Linux scenario the
+  only way to write one was the `note` command — easy to miss. The workspace now
+  has a **Notes** tab with a labelled input, an add button and a removable list,
+  rendered alongside the other panels on wide screens and writable on mobile. It
+  writes to the same `machine.notes` the command and the grader use, so grading
+  and autosave are unchanged.
+- `[x]` Localization groundwork: translator + `en`/`es` dictionaries, a locale
+  cookie and a shell language switch are in place. The staff and admin surfaces
+  are now fully translated through a shared `getTranslator()` server helper
+  (with a client `LocaleProvider`/`useTranslator()` for the scenario editor):
+  the shell, sign-in and registration, the attempt console, the instructor
+  overview, analytics, scenarios (list/new/detail and the editor), attempts
+  (list/review), classes, the admin control room, audit log, software inventory
+  and people, plus the student queue, results index and attempt report and the
+  attempt console shell (header, checklist, machine, help, hints, editor). The
+  deep simulator surfaces are now translated too: the Terminal chrome and
+  quick-keys, the Office panels (spreadsheets, documents and the mailbox) and
+  the Windows desktop (window chrome, all eight apps, taskbar and start menu).
+  The **scenario-authored text** — the one thing that could not live in a
+  dictionary, because it is data rather than copy — now has an overlay of its
+  own (v1.1's last item). A definition may carry `i18n: { <locale>: { objective,
+  tasks, checks, hints } }`, and `src/lib/scenario-i18n.ts` is the single place
+  that applies it. Four decisions carry it, and all four exist so a translation
+  can change what a reader *sees* and nothing else. **An overlay replaces text,
+  never structure**: it cannot add or remove a task, a check or a hint, so a
+  translation cannot make a scenario easier, harder or differently gradeable,
+  and the grader goes on reading the authored `checks`, `tasks` and `hints`
+  exactly as before. **Fallback is per string, not per locale** — a missing
+  translation keeps the authored line, so a half-finished locale reads as a
+  mixture rather than as blank rows a student cannot interpret. **An over-long
+  task list is clamped and reported, not obeyed**, because a seventh task in a
+  six-task scenario would invent a line the grader has no check for. And
+  **checks and hints are keyed by `id`, not by position**, which is what lets a
+  stored evaluation — whose label is the record of what the check was called
+  when it ran — be read back in the reader's language
+  (`localizeCheckLabel`) without the row ever being rewritten. The overlay is
+  applied on the two student-facing surfaces (the attempt console and the
+  attempt report) and nowhere else, deliberately: a staff member looking at a
+  scenario is looking at the thing they author and edit, so they get the
+  authored text. `validateDefinition` keeps the block rather than stripping it
+  (a key the envelope does not name is silently dropped) and reports a stale
+  overlay — an unknown locale, a translated check or hint id the scenario does
+  not have, an over-long task list — as a **warning, never an error**, because a
+  wrong translation misleads a reader but cannot change what is graded; the
+  editor prints the coverage it actually read out of the JSON. Covered by
+  `tests/scenario-i18n.test.ts`, which pairs every "the student reads Spanish"
+  case with the structure it must not have moved, and asserts the authored
+  definition is never mutated.
+  **What is deliberately not here is content.** The ten bundled scenarios still
+  ship English-authored text and an empty overlay: writing Spanish for them is
+  translation work rather than code, and the catalog's own `title`, `summary`
+  and `description` are staff metadata (like a product name) rather than
+  definition text, so a fully translated catalog would need those columns keyed
+  per locale — a later step. What this item owed was the *mechanism*, and a
+  scenario can now be read in a second language without a line of code
+  changing.
+- `[x]` Hardening pass on staff-owned data: attempt viewing, the instructor
+  analytics dashboard and re-grading are scoped to the instructor's own
+  students, authored scenarios and assignments (administrators still see
+  everything); the validator rejects a `file_owner` check that compares nothing
+  and a blank label; the admin actions verify a chosen class actually exists and
+  refuse to delete an author whose scenarios — and every attempt against them —
+  would cascade away; and re-grading refuses `IN_PROGRESS`/`ABANDONED` work
+  instead of quietly marking it `GRADED`. Covered by new tests for the attempt
+  scope, the admin guards and the validator's edge cases.
+- `[x]` Verifiable completion records reach the product surface: clearing the
+  pass mark issues a **certificate** — a tamper-evident completion record — shown
+  on the attempt report with its code and competency tags, listed on the results
+  index, printable as its own sheet, and checkable by anyone at the public
+  `/verify` page (record or assurance packet). The record is now **stored on the
+  attempt** when it is issued, so the code a learner holds keeps verifying after a
+  re-grade instead of being silently re-pointed at a different record; a re-grade
+  that drops the attempt below the pass mark revokes it, visibly. A class's
+  certificates export together as a signed packet (v1.5).
+- `[x]` Versioned migrations: `prisma/migrations` is the schema history, applied
+  by `prisma migrate deploy` in every environment (see CONTRIBUTING.md), so a
+  deploy no longer depends on a `db push` having been run by hand at some point.
+- **Exit:** a cohort dashboard renders trends (`[x]`); strings are externalised
+  — including the scenario-authored text, which now travels as per-locale
+  overlays in the definition rather than being baked into the single authored
+  string — and a non-English locale ships (`[x]`); the a11y implementation, the
+  automated axe/keyboard audit (`npm test`) and the browser paint-rule sweep
+  (`npm run test:a11y`) have all landed and pass (`[x]`).
+  The one bullet above that was left open is the certificate *cohort packet*,
+  which its own text deferred to v1.5 — and it has since shipped there
+  (`/instructor/cohorts/<id>/packet`, `[x]` under v1.5): everything v1.1 asked of
+  verifiable completion records has shipped, so v1.1 is closed.
+
+### 2.0 — Real drivers (shipped) `[x]`
+**Goal:** higher-fidelity practice behind the existing seam.
+
+- `[x]` **A sandbox-backed `ShellDriver` for genuine bash.** `src/lib/sim/drivers/container.ts`
+  runs each command line in a disposable container (`docker create` with no network, no
+  capabilities, `no-new-privileges`, and memory/CPU/PID ceilings — see `dockerCreateArgs`)
+  and, after every command, **harvests the sandbox filesystem back into `EngineState.vfs`**:
+  type, permissions, owner, group, mtime, size and content for every entry, NUL-delimited so
+  a filename with a space, a quote or a newline survives. Because grading reads only
+  `EngineState`, `file_exists`, `file_contains`, `file_mode`, `dir_exists` and `file_absent`
+  grade a real filesystem, and command history is recorded in the same shape, so
+  `command_matched` and `command_sequence` are unchanged. `cd`, `pwd`, `cd ~` and `cd -` are
+  the driver's own (every command is a fresh process), a failed `cd` changes nothing, and a
+  harvest that fails leaves the previous tree in place rather than grading a half-read one.
+  The same port also has a **process** backend (real bash in a scratch directory) which is
+  what makes the automated test exercise genuine bash with no Docker daemon; it is refused
+  unless both `ONTRAK_SANDBOX_BACKEND=process` and `ONTRAK_SANDBOX_ALLOW_PROCESS=1` are set,
+  because it runs commands on the app server with no isolation.
+- `[x]` **Graceful fallback, so the product never becomes unavailable.** Fidelity is resolved
+  on the server when the attempt page renders (`resolveFidelity`), and a scenario that asks
+  for a sandbox on a deployment without one runs in the simulated engine with the reason shown
+  on screen. If the sandbox stops answering *mid-attempt*, the browser-side proxy
+  (`src/lib/sim/drivers/proxy.ts`) falls back once, tells the student, and the rest of the
+  attempt is simulated — every check still grades.
+- `[x]` **Scenario metadata: `simulated | container`.** Declared in the definition
+  (`fidelity`), validated (container fidelity is an error for PowerShell and Office, since a
+  `pwsh` process on Linux under a scenario that promises Windows would be fidelity theatre),
+  surfaced as a badge on the attempt console and as a warning in the editor, and honoured by
+  the availability rule: a sandbox-only scenario is not offered where there is no sandbox
+  (`kind: "sandbox"` blocker). Attempts in a sandbox go through a server action per command
+  (`sandboxCommand`) against one sandbox per attempt, disposed of on submit, abandon and
+  restart, and reaped after 30 minutes idle.
+- `[x]` **The lab's real guests, ported in.** The sandbox above runs real bash; a real
+  *machine* — a Windows or Linux guest that boots, is fault-injected and is graded — is the
+  other half, and it was OnTrak Lab's (`incus`). That control plane now lives here
+  (`src/lib/lab/`): the scenario catalogue and lesson library, the session manager and its
+  availability rule, the hypervisor seam and the host driver, the ticket rubric, the
+  in-memory store for demo mode and the Prisma store for a host, and the student (`/lab`,
+  the session page, the console route and the pollable status), instructor (fleet, both
+  CSVs), admin (`/lab/admin` — overview, accounts, platforms, tickets and one write-up,
+  schedule and audit) and lessons (`/lab/lessons`, `/lab/lessons/[id]`) surfaces — with
+  `npm run lab` for an operator and `ONTRAK_LAB_IN_APP=1` for a deployment that serves the
+  lab itself rather than linking a peer's. The port is complete and on `main`, its last
+  surface (the admin panel and the lesson library) merged in PR #37. The seven conflicts a
+  port of this size creates are resolved, with their costs, in `docs/lab-port.md`: WinRM →
+  `incus-exec` (no Node WinRM client), the lab's own sign-in superseded by this app's,
+  SQLite → the family's Postgres, blocking subprocesses made async, one pass rule for both
+  graders, the lab's YAML data converted to JSON, and the portal's HTTP surface as app
+  routes. Demo mode runs a whole class with no hypervisor and is
+  what the suite exercises, and a real guest has now been run on a lab host: a Linux container
+  cloned in 4.4s, faulted, graded **0%**, repaired, graded **80% resolved**, written up and
+  handed in at **87%**, with the attempt in the ledger and the machine destroyed
+  (`docs/lab-port.md` §5). The Windows half took two things: the image, which clears
+  `requirements.cdrom_agent` and so attaches no `agent:config` disk — the agent comes up in
+  ~90s once one is attached, which is proven — and a real port defect the run exposed: the
+  manager built the Windows `incus-exec` driver with no Incus client, so no Windows guest
+  could ever be graded. That is fixed and pinned by a test that fails on the old
+  construction. A graded Windows session is still owed a host run, on a machine with the
+  disk for it. The console's websocket tunnel was verified without a browser — a link the
+  app mints is accepted by a live Guacamole gateway and the tunnel relays guacd's own
+  frames, with a tampered link refused (`tests/lab-guac-tunnel-live.test.ts`). The browser
+  sweep covers the lab's pages and was run here: `tests/browser/a11y.spec.ts` came back **29
+  passed / 0 failed / 0 skipped, exit 0** over the published, signed-in and lab pages —
+  `/lab`, `/instructor/lab`, the admin panel's six pages and the lesson library — in both the
+  in-app and the peer-lab renderings. Running the whole directory is what found the **two**
+  stale sign-in targets in this app's own specs (the a11y sweep's, and then the re-grade
+  spec's), each signing in
+  at a page that draws the single-sign-on hand-off rather than an email form; both use
+  `/login/break-glass` now, and the re-grade spec passes. And
+  the graded Windows session has been run: with the agent up, `session check` graded
+  `net-dns-failure` **inside the guest** over the agent — 0% unresolved, with the guest's own
+  DNS evidence — which found a second port defect, the upload using the roomy chunk width on
+  a Windows command line. Fixed and pinned. What is still not shown is the *repair* half on
+  Windows (a fixed guest graded back to `resolved`), which needs the lab's own intranet DNS.
+- **Exit:** `[x]` a scenario authored for real bash runs in a sandbox and grades identically
+  to the simulated driver on the bundled checks — `tests/sim-container.test.ts` grades the same
+  five-check scenario twice, once simulated and once under real bash in a process sandbox, and
+  asserts the two reports agree check for check at 100% (26 checks in the suite, including the
+  harvest round trip, the container flags and argv, the fallback paths and the session registry).
+  The container backend itself was verified against a real Docker daemon: create → start →
+  seed → `chmod` → harvest → grade, with the mode change read back and no container left
+  behind.
+
+### 2.0 — Identity & integrations (shipped) `[x]`
+**Goal:** fit into an organisation.
+
+- SSO via the **OnTrak Sentinel** IdP (OIDC/SAML), with SCIM roster sync; keep a
+  local JWT fallback for standalone deployments.
+  - `[x]` **The training app signs in through a provider.** It is a relying party:
+    the pure rules (`src/lib/oidc-rules.ts`), the client that does discovery and
+    the code exchange with `jose` verifying the ID token against the JWKS
+    (`src/lib/oidc-client.ts`), the signed authorization-state cookie, and
+    `/api/sso/start` + `/api/sso/callback`. Claim mapping decides the local role
+    (`ONTRAK_OIDC_ROLE_MAPPINGS`), a first sign-in provisions an account with **no
+    local password**, and `User.externalId` holds the provider's subject so a
+    rename at the directory is a *move* rather than a second account. There is no
+    tenant slug — one deployment, one provider — and nothing changes for a
+    deployment that names none: the sign-in page only offers the button when a
+    handshake can actually complete — and a half-wired `ONTRAK_OIDC_*` block, which
+    degrades to exactly that quiet state, is named once at boot by
+    `src/instrumentation.ts` so an operator who configured a provider cannot be left
+    believing it is in use. Covered by `tests/oidc.test.ts` (34 checks),
+    including a full handshake against a real OpenID provider on a loopback port
+    and the forgeries it must refuse — and by the opt-in `tests/sso-live.test.ts`,
+    which starts the app itself and walks `/api/sso/start` → the provider →
+    `/api/sso/callback` with a cookie jar, then fetches a protected page with the
+    session it issued, so the claim being proved is about the routes and not only
+    about the rules.
+  - `[x]` **A directory pushes people in.** SCIM 2.0 provisioning at the provider is
+    shipped (Sentinel's S2): Users and Groups, a connector token minted in the
+    console, and deprovisioning that ends sessions and revokes their tokens. The
+    training app is now a SCIM 2.0 **service provider** in its own right, so an
+    org's directory can point its Entra or Okta connector straight at
+    `/api/scim/v2` rather than only going through Sentinel: a single bearer token
+    (`ONTRAK_SCIM_TOKEN`), `ServiceProviderConfig`, `Users` (list, create, get,
+    replace, patch, delete) and `Groups` (list, get, patch). It deliberately will
+    not invent or destroy local structure — a class is owned by an instructor, so
+    `Groups` creation, rename and delete are refused `mutability` — and deleting a
+    user **deactivates** them rather than erasing their attempts. A provisioned
+    account has **no local password**, exactly like one an SSO sign-in or a roster
+    import creates. Covered by `tests/scim.test.ts` (20 checks: the filter subset
+    and its refusals, Entra's URN-form paths, both PATCH shapes, PUT replacement
+    semantics, the `uniqueness` 409, the deprovision audit, and membership
+    replacement that keeps `joinedAt` and `isMentor`). The operator's side —
+    pointing Entra or Okta at the base URL, the attribute mapping, and where the
+    token lives and how to rotate it — is in [`docs/integrations.md`](docs/integrations.md)
+    and [`docs/family-operations.md`](docs/family-operations.md). The connector
+    paths themselves Entra and Okta drive — Entra's schema-URN filter and Okta's
+    object-form PATCH — are walked through the *running* routes by the opt-in
+    `tests/scim-live.test.ts`.
+  - MFA is enforced at the provider, so an organization that requires a second
+    factor gets it here without the training app implementing one; a session is
+    refused until a confirmed factor has been verified.
+  - `[x]` **The family has a front door, and this app is not it.**
+    [OnTrak Portal](ontrak-portal/README.md) is a relying party to the same
+    provider and the same group claims, so the role deciding which tiles it draws
+    is the role this app already checks. It authorises nothing — this app keeps
+    re-checking the caller itself — and it holds no accounts: its password form
+    delegates to [OnTrak Sync](ontrak-sync/README.md), which owns the family's
+    local account table. Deployed on Cerulean's Authentik, with the five
+    hostnames, the role groups and the redirect URIs written down in
+    [docs/family-operations.md](docs/family-operations.md).
+- `[x]` **LTI 1.3, so a scenario is launched from an LMS and the grade goes back to it.**
+  - `[x]` **The launch.** `src/lib/lti-rules.ts` is pure and holds every decision:
+    the registration read from the environment (unset means off, half-set is an
+    issue said out loud — and `src/instrumentation.ts` prints it once at boot, so
+    a mis-wired `ONTRAK_LTI_*` block is a line in the app log rather than a
+    learner discovering a 503), the third-party-initiated login, the authorization
+    request (`response_mode=form_post` with `prompt=none`, because it is a launch
+    and not a second sign-in), and the assertion's claims. Every claim that could
+    make a launch somebody else's is checked and each refusal is its own sentence
+    — another platform, another client, an `azp` that is not us, the wrong nonce,
+    a deployment that is not registered, a version that is not 1.3, deep linking,
+    a message type this product does not offer, nobody named, no email, no
+    resource link. `ltiRoleOf` maps the LIS role to this product's, and the more
+    capable role wins a tie, because a learner who is also the instructor is the
+    instructor. `/api/lti/login` starts the round trip with a `state` and a
+    `nonce` in a signed `SameSite=none` cookie — a launch begins in somebody
+    else's frame — and `/api/lti/launch` verifies the assertion against the
+    platform's JWKS with `jose` before anything here trusts it. The account half
+    is `oidc-service.ts`, borrowed whole, with the platform subject namespaced as
+    `lti:<issuer>#<sub>` so two platforms' subject `1` are two people.
+  - `[x]` **The grade.** The launch's Assignment & Grade Services context — which
+    platform, which subject, the line item, the course — travels in a second
+    short-lived signed cookie and is copied onto the **attempt** when the learner
+    starts one, because grading happens later and an instructor re-grading is not
+    the learner who launched it. `announceGraded` then writes the score to the line
+    item, minting its own access token from a `client_credentials` assertion signed
+    with the deployment's key (RS256), as `application/vnd.ims.lis.v1.score+json`
+    with both `*Progress` fields set — without them a platform holds the score as
+    provisional and it never reaches a gradebook. A passback that cannot happen
+    says which of the three reasons it is: no line item, no score scope on the
+    launch, or no credentials here. It never fails a grading.
+  - `[x]` **The key is published, not copied.** `GET /api/lti/jwks.json` serves the
+    public half of `ONTRAK_LTI_PRIVATE_KEY` under `ONTRAK_LTI_KEY_ID`, derived with
+    Node's crypto so it is byte-identical to what `make lti-key ARGS=--from-env`
+    prints. A platform that offers a **Keyset URL** points at it, which means the two
+    sides cannot drift: the deployment always publishes the key it actually signs
+    with, and a rotation under the same key id needs no change on the platform at
+    all. It refuses the same way every `/api/lti/*` route does — a `503` naming the
+    first thing that is wrong — and a key set is public by construction, so there is
+    nothing to authorise and the response is cacheable for an hour.
+  - `[x]` **The control room says what is wired.** The integrations panel on
+    `/admin` reads all three registrations (`src/lib/integration-status.ts`, pure)
+    and shows each as off, configured, or **misconfigured with the reason** — the
+    last being the case where the routes refuse the configuration, which is what
+    makes a broken registration visible before a learner clicks a link. Shared
+    secrets are reported as the *name* of the variable that holds them, never as a
+    value.
+  - Covered by `tests/lti.test.ts` (26 checks: configuration and the boot warning,
+    the published key set and its path,
+    the login refusals, the handshake URL, thirteen assertion refusals, role
+    mapping, the AGS score body, the token assertion, the three passback sentences,
+    the launch context's age, and the client seam), and — for the half that
+    actually leaves the building — by `tests/lti-passback.test.ts`, which drives a
+    real AGS token endpoint that verifies the RS256 client assertion against the
+    tool's registered key, so the signature, its audience and its `kid` are proved
+    rather than assumed. Mint the pair with `make lti-key`, which prints the `.env`
+    lines plus the public key as both a JWKS and a PEM (Moodle's "RSA key" field
+    takes the PEM) to register with the platform; the end-to-end Moodle walkthrough
+    is [docs/moodle-lti.md](docs/moodle-lti.md).
+- `[x]` **Public API + webhooks for attempt/grading events, and bulk CSV
+  import/export of rosters and results.**
+  - `[x]` **A grading is announced, not only stored.** `src/lib/webhook-rules.ts`
+    is pure and holds the whole contract: the event's `id` is derived from
+    `(event, attemptId, gradedAt)` so a retry is the same fact and a consumer can
+    dedupe on it, the body is canonical so the bytes signed are the bytes sent,
+    and the signature is `t=<unix>,sha256=<hmac of "t.body">` with a stated
+    tolerance — a valid signature is not valid forever. `webhook-client.ts` is
+    the transport (one POST, five seconds, and it answers with an outcome instead
+    of throwing, so a consumer that is down can never fail a grading), and
+    `webhook-delivery.ts` writes a row **before** the request so a delivery that
+    was interrupted or refused is a row an operator can see and resend rather
+    than a log line nobody read. `attempts` counts tries, not successes. Nothing
+    is retried on a timer: a person triggers the retry, so a person can stop it.
+    A re-grade publishes a *second* event and not a correction, and the
+    certificate published is read back off the attempt, so a re-grade that keeps
+    an issued record still carries the code the learner was handed.
+  - `[x]` **The read API mirrors it.** `GET /api/v1/results` (keyset-paged, not
+    offset — an offset over a table that is still being written skips records
+    silently) and `GET /api/v1/results/export` (the same page as CSV, header row
+    per page, `x-ontrak-next-cursor`) answer the same question with the same
+    object shape the webhook posts. `GET|POST /api/v1/roster` plus its CSV export
+    are the directory path: columns are read by name, unusable rows are refused
+    **line by line** while the rest import, a cohort name the file does not
+    recognise is reported rather than invented, `?dryRun=1` reports the same
+    counts and writes nothing, and a user created this way has **no local
+    password** — a roster says who exists, not what their secret is.
+    `GET|POST /api/v1/webhook-deliveries` lists outstanding deliveries and
+    resends them.
+    One shared `ONTRAK_API_TOKEN`, compared length-independently; unconfigured is
+    a 503 with a reason rather than a 401.
+  - Covered by `tests/webhook.test.ts` (12 checks: id stability, canonical bytes,
+    the refusals a signature check must make, the replay window, the pass rule,
+    the check-list cap, env configuration and a stubbed-fetch transport) and
+    `tests/csv-rules.test.ts` (10 checks: RFC 4180 writing and parsing, the
+    truncation refusal, roster defaults, duplicate and malformed rows named by
+    line, and a round trip through export and import).
+- **Exit:** an org signs in through its IdP, rosters sync over SCIM, and results
+  flow to an LMS and a webhook consumer.
+  - Signing in through an IdP is done, a scenario now launches from an LMS and its
+    grade goes back to that LMS, results flow to a webhook consumer (or an API
+    reader, or a spreadsheet), and a directory can push people in over SCIM 2.0
+    from Entra, Okta or Sentinel. Scheduled sync stays the directory's job, not
+    this app's: this surface accepts a push, it does not poll.
+
+### 2.1 — Authoring at scale `[ ]`
+**Goal:** a catalog a team can maintain.
+
+- Scenario versioning with draft/preview/rollback and change history.
+- Collaborative authoring (comments, review/approval before publish).
+- Import/export bundles and an optional shared scenario marketplace.
+- **Exit:** two authors co-edit a scenario through review to publish, with full
+  history and one-click rollback.
+
+### 2.2 — Assessment, credentials & training evidence `[~]`
+**Goal:** turn results into credible, portable proof of competence.
+
+- `[x]` Rubrics beyond pass/fail; partial-credit and competency tagging per check.
+  A check's rubric band is another ordinary check attached with `halfOf`, so the
+  authoring language did not grow a second shape: the parent earns 0, half or full,
+  the band is evaluated only when the parent misses, and `Math.floor(points / 2)`
+  keeps the arithmetic whole (`sim/grade.ts`, `rubric-rules.ts`). The validator is
+  where a band that could award nothing is refused, and the dry run warns when a
+  band already passes on a fresh machine — the same bug as a check that passes by
+  itself, which is easy to miss because a band is not a line in the report. A
+  check may also name the one `competency` it demonstrates, and the certificate's
+  skills are then read from the full-credit checks that earned them, with the
+  scenario's `tags` as the fallback for a catalog authored before this existed.
+  Covered by `tests/rubric.test.ts`.
+- `[x]` Certificates and a skills matrix (who is competent in what), with
+  verifiable completion records. A pass issues a certificate and the record is
+  **stored immutably** on the attempt (`certificate`/`certificateIssuedAt`/
+  `certificateRevokedAt`), presented on the report with its code and
+  competencies, printable as its own sheet (`/certificate/<attempt>`), and
+  verifiable without an account (see v1.1). The matrix is `/instructor/skills`
+  over `src/lib/skills-rules.ts`: a column per competency the issued records
+  demonstrate, a row per person certified, scoped by the same `attemptScopeFor`
+  the attempts list and the analytics dashboard use. It reads the certificate's
+  own rules rather than defining competence again — a revoked certificate takes
+  its competency away with it while the person keeps their row, so a withdrawal
+  shows as a withdrawal instead of as an absence; two spellings of one competency
+  are one column; a record with no competencies contributes nothing; and the same
+  competency earned twice is one, dated from the first pass. Covered by
+  `tests/skills-matrix.test.ts`.
+- `[x]` **Auditable training evidence**: immutable completion records and an
+  exportable proof-of-training packet per class — every live certificate its
+  members hold, bundled into one signed document at
+  `/instructor/cohorts/<id>/packet`, scoped to the instructor who runs the class
+  and recorded in the audit log. The training-side counterpart to OnTrak Tix's
+  assurance packets, for compliance and insurance.
+- Optional proctoring/timing integrity controls for higher-stakes assessment.
+- **Exit:** a learner earns a verifiable certificate; an auditor can pull a
+  signed proof-of-training packet for a cohort.
+
+### 2.0 — The learning loop (shipped) `[x]`
+**Goal:** make practice flow in both directions, so the desk and the classroom
+feed each other instead of being two products that happen to share a login.
+
+An incident, a ticket, or a manual entry is the material; a resolution is the
+lesson. Nothing in the loop is a separate thing a person has to go and create.
+
+The loop is built and running; what remains below is stated as shipped with
+where it lives, so the next person reads the code rather than rebuilding it.
+
+```mermaid
+flowchart LR
+  A[Incident or ticket] --> B[Sentinel detects · Tix queues]
+  B --> C[A technician works it]
+  C --> D{Resolved?}
+  D -->|yes| E[Article drafted into the knowledgebase]
+  D -->|yes| F[Training scenario drafted in ITS]
+  E --> G[Review, then publish]
+  F --> G
+```
+
+- `[x]` Provenance on both artefacts. The article carries a `from-ticket-<ref>`
+  tag, and the service adds it rather than trusting the author — which is also the
+  idempotency guard: the sweep checks that tag first, so running it every night, or
+  twice by accident, never writes a second article.
+- **Exit:** met. A resolved ticket produces a reviewable article and a draft
+  scenario with nobody opening an authoring tool, and both name the ticket that
+  caused them.
+
+- `[x]` One front door and one identity for the whole family — Portal is the way
+  in, and every product accepts the same session. Sign-in is Cerulean SSO with
+  **zero password fields** on any product's primary screen; the local account is a
+  break-glass route at an unlinked path (`/sign-in/break-glass`, `/login/break-glass`)
+  because using it is a decision rather than a convenience.
+- `[x]` Resolution → knowledgebase article. `POST /api/outcomes/sweep` in Tix walks
+  the tickets that were resolved and have not been written down, authors the draft
+  from the ticket's own trail, and stores it. `?dry=1` authors and reports without
+  writing, which is how somebody decides whether the prose is good enough.
+- `[x]` Resolution → training scenario **draft**. The same trail leaves as a draft
+  posted to ITS at `/api/v1/scenario-drafts` — deliberately a draft and not a
+  scenario, because a resolved ticket is evidence that a fix worked, which is not
+  the same thing as a graded definition, and auto-publishing machine work would put
+  unverified exercises in front of learners and call it a grade.
+- `[x]` Every source, one pipeline: Tix's `intake`, `incidents`, `rmm` and
+  `security` routes (`/api/security/ingest`, `/api/security/poll`) all enter the
+  same way as a hand-written ticket, so there is one place to look when a draft
+  does not appear.
+
+### 3.0 — Enterprise training platform `[ ]`
+**Goal:** multi-organisation, evidence-grade, assistive.
+
+- Multi-tenant organisations with isolated catalogs, branding and reporting.
+- BI/warehouse export and scheduled reporting.
+- Opt-in AI tutor: hints, misconception detection, and scenario suggestions —
+  always assistive, never auto-grading.
+- Hardening: deeper audit trail, retention controls, SSO/SCIM at org scale.
+- **Exit:** two organisations run isolated catalogs and reports under one
+  deployment with audited, retained training records.
+
+## 5. Cross-cutting requirements
+
+- **Accessibility** — WCAG AA target; keyboard-only console fully usable.
+- **Performance** — attempt page interactive < 1.5 s p95; grading < 200 ms.
+- **Security** — never trust the client; re-grade server-side; audit every
+  privileged action (already the standard).
+- **Testing** — every bug fix ships a regression test; pure logic stays in
+  `*-rules.ts` and `src/lib/sim/`.
+
+## 6. Success metrics
+
+| Metric | Why |
+| --- | --- |
+| Scenarios completed per learner | Engagement |
+| Pass rate & median score by scenario | Difficulty calibration |
+| Time-to-first-scenario for a new cohort | Onboarding friction |
+| Instructor authoring time per scenario | Content velocity |
+| % learners with a verifiable certificate | Outcome |
+| Proof-of-training packets exported | Compliance/insurance value |
+| Container-driver parity on shared checks | Fidelity trust |
+
+## 7. Risks & open questions
+
+- **Container drivers** cost and complexity — sandboxing, cost caps and fallback
+  behaviour need explicit limits.
+- ~~**LMS/LTI scope** — decide how much to build versus integrate.~~ **Decided** in
+  v1.3: this product is the *tool*, the LMS is the platform. It implements LTI 1.3
+  launch and Assignment & Grade Services score passback itself (no LTI library, no
+  vendor), and it does not try to be a gradebook, a course shell or a deep-linking
+  server — deep linking is refused by name rather than half-supported.
+- **AI tutor** — keep it assistive and opt-in; never let it auto-grade.
+- **Localization** — sequencing (v1.1 groundwork vs later full locales).
+- **Evidence vs privacy** — training records are personal data; retention and
+  consent must be designed, not bolted on.
+
+## 8. Immediate next steps
+
+1. **2.1 — authoring at scale.** Scenario versioning (draft → preview → publish,
+   rollback, change history) is the first open item; it is the one that limits a
+   team's catalog throughput.
+2. **2.2 is closed** (`sim/grade.ts`, `rubric-rules.ts`, `timing-integrity-rules.ts`).
+   The next open ITS items are 2.3's content/localisation work and the 3.0 line.
+3. **2.3 — content.** Spanish overlays for the bundled scenarios and per-locale
+   catalog columns.
+4. **3.0 — enterprise line.** Multi-tenant organisations, warehouse export and
+   the opt-in assistive tutor after the 2.x line is closed.
+
+Items previously listed here are shipped and now part of 2.0: the container
+backend (v1.2), the proof-of-training packet (v1.5), the scenario-authored
+localization overlay (v1.1), and the LMS/LTI scope decision (v1.3).

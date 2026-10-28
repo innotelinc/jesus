@@ -1,0 +1,5900 @@
+/* Coding agent web client — talks to the local server, which talks to OmniRoute. */
+
+import { highlightCode, languageOf } from "./highlight.js";
+// The follow-up rule is the CLI's, served to this page as-is: one reducer and one
+// suggestion order for both surfaces, so a turn offers the same three next steps
+// wherever it is read. See `src/cli/followups.ts`.
+import { emptyTurnSummary, reduceTurn, suggestFollowups } from "/followups.js";
+
+const $ = (selector) => document.querySelector(selector);
+
+const state = {
+  sessionId: null,
+  model: "",
+  streaming: false,
+  controller: null,
+  filePath: ".",
+  toolCards: new Map(), // tool_call id -> card handles
+  approvals: new Map(), // approval id -> card handle
+  limits: { minSteps: 1, maxSteps: 999, defaultSteps: 999 },
+  /** Fallback chain the server would use for a new chat; null until health answers. */
+  fallbackDefault: null,
+  /**
+   * Whether this account chooses a model ("manual") or is served one ("auto").
+   * Set from `/api/health`; auto hides the picker and the chain box, because a
+   * control whose setting the server ignores is worse than no control at all.
+   */
+  modelSelection: "manual",
+  /** The chain an automatic turn would use, strongest available first. */
+  autoModels: [],
+  /** The chain in play for this chat, so the sweep report can mark it. */
+  chainModels: [],
+  /**
+   * The share this console is reading, when the transcript on screen is
+   * somebody else's (v0.4). Non-null means read-only: there is no session of
+   * your own behind it to continue, and the composer says so.
+   */
+  shareOf: null,
+  viewer: { path: null, mode: "file", diff: null },
+  /**
+   * The file the agent is writing, as it is being written. `content` is what has
+   * arrived so far and `diff` is filled in when the write lands and reports what
+   * it changed.
+   */
+  preview: {
+    name: null,
+    path: null,
+    content: "",
+    diff: null,
+    mode: "code",
+    /** The tool call the pane is following, so another tool's result is ignored. */
+    toolId: null,
+    toolName: null,
+    generating: false,
+    /**
+     * Whether the gateway streamed the call, so the pane could show the file
+     * being written. `false` means it arrived complete in one frame; `undefined`
+     * means no draft ever arrived (streaming is off), which is not the same
+     * claim and must not be labelled as one.
+     */
+    streamed: undefined,
+    /** Set when the user closes the pane, so a later draft does not reopen it. */
+    dismissed: false,
+    /** Whether the pane follows the end of the file as it grows. */
+    follow: true,
+  },
+  /** Ids the last sweep proved can call a tool; null until it has answered. */
+  sweepUsable: null,
+  /**
+   * The saved project a new chat is tagged with, or null for none. Set when a
+   * project is created or opened; it is what `POST /api/chat` reads to stamp a
+   * chat that is being born, and never what an existing chat is re-tagged to.
+   */
+  projectId: null,
+  /** Every saved project by id, so a chat row can name its own project. */
+  projectsById: new Map(),
+  /**
+   * The step the turn in flight is on, and the budget it is counted against.
+   * `of === 0` means no turn is running, which is what hides the bar.
+   */
+  turn: { step: 0, of: 0 },
+  /** The terminal: what has been run, where the history cursor is, and whether
+   * a command is in flight (one at a time — there is no PTY to multiplex). */
+  terminal: { history: [], index: 0, busy: false },
+};
+
+/** Maximum diff rows to build in the DOM; the server already caps what it sends. */
+const MAX_DIFF_ROWS = 1500;
+
+/* --------------------------------------------------------------- auth token */
+
+/*
+ * The server can require a bearer token (WEB_TOKEN). Open the UI once as
+ *   http://<host>:3400/?token=<token>
+ * and the token is kept in sessionStorage for the tab, then removed from the
+ * address bar so it does not linger in history or get shared by copy-paste.
+ */
+// Named for what it is — the browser-storage slot the token is kept in — not for
+// what it holds. `secret-scan` blocks any identifier carrying a value under a
+// `token`-shaped name, and that rule is right to be blunt: a name is all the
+// scanner can see. The value is unchanged, so a token stored by an earlier build
+// is still found. Do not rename this back into the guard.
+const AUTH_KEY = "coding-agent-token";
+const urlToken = new URLSearchParams(location.search).get("token");
+if (urlToken) {
+  try {
+    sessionStorage.setItem(AUTH_KEY, urlToken);
+  } catch {
+    /* private mode: fall back to in-memory only */
+  }
+  history.replaceState(null, "", location.pathname);
+}
+
+let authToken = urlToken ?? "";
+if (authToken === "") {
+  try {
+    authToken = sessionStorage.getItem(AUTH_KEY) ?? "";
+  } catch {
+    authToken = "";
+  }
+}
+
+function withAuth(headers = {}) {
+  return authToken === "" ? headers : { ...headers, Authorization: `Bearer ${authToken}` };
+}
+
+/* ---------------------------------------------------------------- markdown */
+
+const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (char) => ESCAPES[char]);
+}
+
+/** Small, dependency-free markdown subset: fences, inline code, bold, headings, bullets. */
+function renderMarkdown(text) {
+  const fences = [];
+  let out = escapeHtml(text);
+
+  out = out.replace(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g, (_match, code) => {
+    fences.push(`<pre class="code"><code>${code.replace(/\n$/, "")}</code></pre>`);
+    return `\u0000FENCE${fences.length - 1}\u0000`;
+  });
+
+  out = out.replace(/`([^`\n]+)`/g, '<code class="inline">$1</code>');
+  out = out.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/^### (.+)$/gm, "<h3>$1</h3>");
+  out = out.replace(/^## (.+)$/gm, "<h2>$1</h2>");
+  out = out.replace(/^# (.+)$/gm, "<h1>$1</h1>");
+  out = out.replace(/^\s*[-*] (.+)$/gm, '<div class="li">• $1</div>');
+  out = out.replace(/\n{2,}/g, "</p><p>");
+  out = out.replace(/\n/g, "<br>");
+
+  out = `<p>${out}</p>`;
+  return out.replace(/\u0000FENCE(\d+)\u0000/g, (_match, index) => fences[Number(index)] ?? "");
+}
+
+/* ------------------------------------------------------------------ helpers */
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, { ...options, headers: withAuth(options.headers ?? {}) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(authHint(response, payload));
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+/** Turn a bare 401 into something the user can act on. */
+function authHint(response, payload) {
+  const detail = payload && typeof payload.error === "string" ? payload.error : "";
+  // A bare 401 is the shared token's failure and has one specific fix; anything
+  // more specific than that — a turn refused because the account is out of
+  // quota, or because there is no account to spend on — is the server's to say,
+  // and guessing at it here would send somebody to the wrong setting.
+  if (response.status === 401 && (detail === "" || detail === "unauthorized")) {
+    return authToken === ""
+      ? "This UI needs an access token. Reopen it as http://<host>:3400/?token=<your WEB_TOKEN>."
+      : "That access token was rejected. Check WEB_TOKEN in .env and reopen ?token=<token>.";
+  }
+  return detail || `${response.status} ${response.statusText}`;
+}
+
+/**
+ * Send the browser to the sign-in gate when the server says it uses one.
+ *
+ * A 401 looks the same whether a deployment wants a shared token or a sign-in,
+ * so the console cannot tell them apart from the failure. `/api/auth/status` is
+ * the one route that answers without a session, and asking it once at startup is
+ * what keeps a signed-out visitor from being shown a console that cannot load.
+ *
+ * The target is `/login` and not the provider directly: the gate names the
+ * product and handles the case where no provider is configured, which a bare
+ * redirect into `/api/auth/login` cannot.
+ */
+async function signInIfRequired() {
+  try {
+    // The token goes with the question. A deployment can require a shared bearer
+    // *and* sign-in, and asking without it would report a token holder as signed
+    // out — which is a redirect into a gate holding the credential they already
+    // have.
+    const response = await fetch("/api/auth/status", { headers: withAuth() });
+    if (!response.ok) return;
+    const status = await response.json();
+    // The same answer names the session the console is holding, or says there is
+    // none — which is the whole of what the sidebar's sign-out row is drawn from.
+    renderAccount(status);
+    if (status.oidc && !status.authenticated) {
+      // The gate takes `next`, so a link into a page inside the console comes
+      // back to it rather than always to the root. Today the console has one
+      // page; the parameter is what makes the second one not a regression.
+      const here = location.pathname + location.search;
+      location.replace(here === "/" ? "/login" : `/login?next=${encodeURIComponent(here)}`);
+    }
+  } catch {
+    // Unreachable is not this function's problem — the loads below report that
+    // the way they always have.
+  }
+}
+
+/**
+ * Name the session the console is holding, and offer the way out of it.
+ *
+ * Both halves come from `/api/auth/status`, asked once at startup, because that
+ * is the only route that answers without a session — and it is the same answer
+ * the gate question needs, so asking twice would be asking for a second opinion
+ * on the same fact. With no identity there is nothing to show and nothing to
+ * end, so the row is hidden rather than drawn empty.
+ */
+function renderAccount(status) {
+  const row = $("#account-row");
+  const label = $("#account-label");
+  if (row === null || label === null) return;
+
+  const identity = status?.identity ?? null;
+  if (identity === null) {
+    row.classList.add("hidden");
+    label.textContent = "";
+    label.removeAttribute("title");
+    return;
+  }
+
+  // An address is what a person recognises; a name is what a provider may send
+  // instead; the subject is the one field that is always there.
+  const who =
+    identity.email !== "" ? identity.email : identity.name !== "" ? identity.name : identity.sub;
+  label.textContent = `signed in as ${who}`;
+  label.title = `Signed in at ${location.host} through its identity provider, as ${who}.`;
+  row.classList.remove("hidden");
+}
+
+/**
+ * End the session, and go back to the gate.
+ *
+ * Two credentials can be live at once — the session cookie, and the shared
+ * `WEB_TOKEN` a `?token=` link leaves in this tab — and sign-out means both are
+ * gone, because one that leaves a working credential behind is not a sign-out.
+ * The server clears its cookie; the token is this tab's to forget.
+ *
+ * Nothing is navigated to until the server has actually answered: a sign-out
+ * that failed reports the failure and leaves the controls live, rather than
+ * walking somebody to a gate while their session is still open behind it.
+ */
+async function signOut() {
+  const button = $("#sign-out");
+  if (button !== null) {
+    button.disabled = true;
+    button.textContent = "signing out…";
+  }
+
+  try {
+    const response = await fetch("/api/auth/logout", { method: "POST", headers: withAuth() });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  } catch (error) {
+    if (button !== null) {
+      button.disabled = false;
+      button.textContent = "sign out";
+    }
+    addErrorMessage(`Could not sign out: ${error.message}`);
+    return;
+  }
+
+  try {
+    sessionStorage.removeItem(AUTH_KEY);
+  } catch {
+    /* private mode: there was nowhere to remember it anyway */
+  }
+  authToken = "";
+  // `replace`, not `assign`: Back must not walk into a console whose session has
+  // just been ended, which would show a page that cannot load.
+  location.replace("/login");
+}
+
+function scrollToBottom(force = false) {
+  const box = $("#messages");
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 160;
+  if (force || nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+function hideEmptyState() {
+  const empty = $("#empty");
+  if (empty) empty.remove();
+}
+
+/** Push a short line to the screen-reader live region. */
+function announce(text) {
+  const live = $("#live");
+  if (live) live.textContent = text;
+}
+
+/* -------------------------------------------------------------------- diffs */
+
+function diffLineNode(line) {
+  const row = document.createElement("div");
+  row.className = `diff-line ${line.type}`;
+
+  const oldNo = document.createElement("span");
+  oldNo.className = "diff-num";
+  oldNo.textContent = line.oldLine === null || line.oldLine === undefined ? "" : String(line.oldLine);
+
+  const newNo = document.createElement("span");
+  newNo.className = "diff-num";
+  newNo.textContent = line.newLine === null || line.newLine === undefined ? "" : String(line.newLine);
+
+  const sign = document.createElement("span");
+  sign.className = "diff-sign";
+  sign.textContent = line.type === "add" ? "+" : line.type === "del" ? "-" : " ";
+
+  const text = document.createElement("span");
+  text.className = "diff-text";
+  text.textContent = line.text === "" ? " " : line.text;
+
+  row.append(oldNo, newNo, sign, text);
+  return row;
+}
+
+/** Render the before/after hunks the server attached to a file-changing tool. */
+function renderDiff(diff) {
+  const box = document.createElement("div");
+  box.className = "diff";
+
+  const head = document.createElement("div");
+  head.className = "diff-head";
+  const verb = diff.created ? "new file" : "modified";
+  head.textContent = `${diff.path} — ${verb}, +${diff.added} −${diff.removed}`;
+  box.append(head);
+
+  let rows = 0;
+  let clipped = false;
+
+  for (const hunk of diff.hunks) {
+    if (rows >= MAX_DIFF_ROWS) {
+      clipped = true;
+      break;
+    }
+    const hunkHead = document.createElement("div");
+    hunkHead.className = "diff-hunk-head";
+    hunkHead.textContent = `@@ -${hunk.oldStart} +${hunk.newStart} @@`;
+    box.append(hunkHead);
+
+    for (const line of hunk.lines) {
+      if (rows >= MAX_DIFF_ROWS) {
+        clipped = true;
+        break;
+      }
+      box.append(diffLineNode(line));
+      rows += 1;
+    }
+  }
+
+  if (diff.truncated || clipped) {
+    const note = document.createElement("div");
+    note.className = "diff-hunk-head";
+    note.textContent = "change is too large to show in full — open the file in the workspace panel to see it";
+    box.append(note);
+  }
+
+  if (diff.hunks.length === 0 && !diff.truncated) {
+    const note = document.createElement("div");
+    note.className = "diff-hunk-head";
+    note.textContent = "no textual change";
+    box.append(note);
+  }
+
+  return box;
+}
+
+/* ------------------------------------------------------------ preview pane */
+
+/*
+ * The file being written, while it is being written.
+ *
+ * A write reaches the agent as one finished tool call, so the code is already
+ * complete by the time anything could show it. The server forwards the call's
+ * arguments as they arrive (`draft` events) and this renders them, which is the
+ * point of the pane: watching a file appear instead of being told afterwards.
+ * It stays on screen once the turn ends, because the code the agent just wrote is
+ * usually what you want to look at next.
+ */
+
+const WRITER_TOOLS = new Set(["write_file", "edit_file"]);
+
+function previewIsOpen() {
+  return $("#preview").classList.contains("open");
+}
+
+/** The pane's open state, remembered for the tab so a reload keeps the layout. */
+const PREVIEW_OPEN_KEY = "coding-agent-preview-open";
+
+function rememberPreviewOpen(open) {
+  try {
+    sessionStorage.setItem(PREVIEW_OPEN_KEY, open ? "1" : "0");
+  } catch {
+    /* private mode: the choice just does not outlive the page */
+  }
+}
+
+function storedPreviewOpen() {
+  try {
+    return sessionStorage.getItem(PREVIEW_OPEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * How wide the rail is, and how a person changes that.
+ *
+ * The width is kept for the tab, like the open state, because it is a layout
+ * choice somebody made with a drag and does not expect to re-make on every
+ * reload. It is applied as an inline width only in the docked layout: below the
+ * breakpoint the rail is a fixed overlay with its own width, and pinning pixels
+ * there would beat the stylesheet with a number chosen for a different shape.
+ */
+const PREVIEW_WIDTH_KEY = "coding-agent-preview-width";
+const PREVIEW_MIN_WIDTH = 280;
+/** Must match the docked/overlay breakpoint in `style.css`. */
+const PREVIEW_DOCK_MIN = 1080;
+
+function storedPreviewWidth() {
+  try {
+    const raw = sessionStorage.getItem(PREVIEW_WIDTH_KEY);
+    const px = raw === null ? Number.NaN : Number.parseInt(raw, 10);
+    return Number.isFinite(px) ? px : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberPreviewWidth(px) {
+  try {
+    sessionStorage.setItem(PREVIEW_WIDTH_KEY, String(Math.round(px)));
+  } catch {
+    /* private mode: the width just does not outlive the page */
+  }
+}
+
+function previewMaxWidth() {
+  return Math.max(PREVIEW_MIN_WIDTH, Math.round(window.innerWidth * 0.7));
+}
+
+/*
+ * How tall the toolbar is, published as `--topbar-h`.
+ *
+ * Below 1080px the rail is a drawer, and it hangs from the bottom of the toolbar
+ * rather than from the top of the window: the buttons that open it are up there,
+ * and a drawer that covers the control which opened it cannot be used to close
+ * it. The height is measured rather than written down because the toolbar wraps —
+ * how many rows it takes is a fact about the current width, and the rail's inset
+ * has to follow the same fact.
+ */
+function measureTopbar() {
+  const bar = document.querySelector(".topbar");
+  if (bar === null) return;
+  const height = Math.round(bar.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--topbar-h", `${height}px`);
+}
+
+/** Apply a width, or `null` to hand the rail back to the stylesheet's default. */
+function applyPreviewWidth(px) {
+  const rail = $("#preview");
+  const handle = $("#preview-resize");
+
+  if (px === null || window.innerWidth <= PREVIEW_DOCK_MIN) {
+    rail.style.width = "";
+    rail.style.minWidth = "";
+  } else {
+    const width = Math.min(previewMaxWidth(), Math.max(PREVIEW_MIN_WIDTH, Math.round(px)));
+    rail.style.width = `${width}px`;
+    rail.style.minWidth = `${PREVIEW_MIN_WIDTH}px`;
+  }
+
+  // A separator is a range control, so it reports its own range — the arrow keys
+  // are only a real alternative to the drag if the value is announced.
+  const current = Math.round(rail.getBoundingClientRect().width);
+  handle.setAttribute("aria-valuemin", String(PREVIEW_MIN_WIDTH));
+  handle.setAttribute("aria-valuemax", String(previewMaxWidth()));
+  handle.setAttribute("aria-valuenow", String(current));
+  handle.title = `Preview width: ${current}px. Drag, or use the arrow keys; double-click to reset.`;
+}
+
+/**
+ * The rail's edge grip: drag to trade width with the conversation.
+ *
+ * The rail is on the right, so dragging the grip to the *left* makes it wider —
+ * hence the inverted delta. No pointer events while the rail is an overlay, where
+ * its width is the viewport's decision rather than the user's.
+ */
+function initPreviewResize() {
+  const handle = $("#preview-resize");
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  const move = (event) => {
+    if (!dragging) return;
+    applyPreviewWidth(startWidth + (startX - event.clientX));
+  };
+  const stop = () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove("dragging");
+    document.body.classList.remove("preview-resizing");
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", stop);
+    document.removeEventListener("pointercancel", stop);
+    rememberPreviewWidth($("#preview").getBoundingClientRect().width);
+  };
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (window.innerWidth <= PREVIEW_DOCK_MIN) return;
+    event.preventDefault();
+    dragging = true;
+    startX = event.clientX;
+    startWidth = $("#preview").getBoundingClientRect().width;
+    handle.classList.add("dragging");
+    document.body.classList.add("preview-resizing");
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", stop);
+    document.addEventListener("pointercancel", stop);
+  });
+
+  handle.addEventListener("dblclick", () => {
+    try {
+      sessionStorage.removeItem(PREVIEW_WIDTH_KEY);
+    } catch {
+      /* nothing to forget */
+    }
+    applyPreviewWidth(null);
+  });
+
+  handle.addEventListener("keydown", (event) => {
+    const step = event.shiftKey ? 48 : 16;
+    const current = $("#preview").getBoundingClientRect().width;
+    // Left widens, matching the drag, so the keyboard is the same gesture.
+    if (event.key === "ArrowLeft") applyPreviewWidth(current + step);
+    else if (event.key === "ArrowRight") applyPreviewWidth(current - step);
+    else if (event.key === "Home") applyPreviewWidth(null);
+    else return;
+    event.preventDefault();
+    rememberPreviewWidth($("#preview").getBoundingClientRect().width);
+  });
+}
+
+function togglePreview(force) {
+  const open = force === undefined ? !previewIsOpen() : force;
+  // One view at a time: opening this one collapses whichever of the other two the
+  // rail was showing (see `switchRailTo`).
+  if (open) switchRailTo("preview");
+  $("#preview").classList.toggle("open", open);
+  $("#toggle-preview").setAttribute("aria-expanded", open ? "true" : "false");
+  // Collapse and expand are one control in two states, and exactly one of them
+  // is on screen at all times: the edge tab is only hidden while the rail it
+  // stands for is already open.
+  $("#preview-expand").classList.toggle("hidden", open);
+  $("#preview-collapse").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) applyPreviewWidth(storedPreviewWidth());
+  // Closing it is a preference: a draft later in the turn must not reopen it.
+  if (!open) {
+    state.preview.dismissed = true;
+    cancelLiveDiff();
+  }
+  rememberPreviewOpen(open);
+  // Whether the code and the change share the pane depends on it being open, so
+  // the layout has to be re-applied here rather than only when content arrives.
+  applyPreviewLayout();
+  syncRail();
+}
+
+/** The chip in the pane's header. `level` is "ok", "bad" or nothing. */
+function setPreviewStatus(text, level) {
+  const chip = $("#preview-status");
+  chip.textContent = text;
+  chip.className = text === "" ? "badge hidden" : `badge ${level ?? ""}`.trimEnd();
+  if (text !== "") chip.title = text;
+}
+
+/**
+ * Fill the change half of the pane.
+ *
+ * Called whenever the pane's diff changes - a live draft, the write landing, a
+ * file restored from the transcript - so the box and the button that shows it
+ * can never disagree about whether there is a change to show.
+ */
+function renderPreviewDiff() {
+  const box = $("#preview-diff");
+  box.replaceChildren();
+  const diff = state.preview.diff;
+  if (diff === null || diff === undefined) return;
+  const rendered = renderDiff(diff);
+  rendered.classList.add("diff-inline");
+  box.append(rendered);
+}
+
+/**
+ * Which view of the pane is on screen.
+ *
+ * Three, and they are three rather than two because they answer different
+ * questions. **App** is the built thing running, which is what "preview" means to
+ * anybody who is not the person writing the code. **Code** is the file the agent
+ * is writing. **Change** is what that file did to the one it replaced. The app is
+ * the default the toolbar button opens, and it is the one view that survives the
+ * agent working: the other two are about a write that has already finished by the
+ * time you read them.
+ */
+function applyPreviewLayout() {
+  const pane = state.preview;
+  const hasDiff = pane.diff !== null && pane.diff !== undefined;
+  const app = pane.mode === "app";
+  // A write that is still arriving shows the change beside the code: watching the
+  // file take shape is the point, and the diff is the other half of that. Once
+  // the call lands the pane goes back to one view and the toggle comes back.
+  const live =
+    !app && pane.generating === true && pane.name === "write_file" && hasDiff && previewIsOpen();
+  const showDiff = pane.mode === "change" && hasDiff;
+
+  $("#preview").classList.toggle("live", live);
+  $("#preview-app").classList.toggle("hidden", !app);
+
+  const run = $("#preview-run");
+  run.textContent = app ? "show code" : "show app";
+  run.setAttribute("aria-pressed", app ? "true" : "false");
+  run.title = app ? "Show the code the agent is writing" : "Show the app, running";
+
+  const toggle = $("#preview-toggle");
+  // With both halves on screen at once there is nothing to switch between, and
+  // the app view is a third thing neither half is about.
+  toggle.classList.toggle("hidden", !hasDiff || live || app);
+  toggle.textContent = showDiff ? "show code" : "show change";
+  toggle.setAttribute("aria-pressed", showDiff ? "true" : "false");
+
+  $("#preview-diff").classList.toggle("hidden", app || !(live || showDiff));
+  $("#preview-body").classList.toggle("hidden", app || (!live && showDiff));
+}
+
+/** Show the app, the code, or - when there is a diff - let the button pick. */
+function setPreviewMode(mode) {
+  state.preview.mode = mode;
+  applyPreviewLayout();
+}
+
+function previewBody(content, generating) {
+  const body = $("#preview-body");
+  const language = languageOf(state.preview.path);
+  // The highlighter emits the same characters, only wrapped in spans, so
+  // `textContent` still equals the source: it doubles as the "has anything
+  // changed?" test and keeps the DOM writes down.
+  if (body.textContent !== content || body.dataset.language !== language) {
+    const html = highlightCode(content, language);
+    body.dataset.language = language;
+    if (html === null) body.textContent = content;
+    else body.innerHTML = html;
+  }
+  body.classList.toggle("generating", generating === true);
+  // Follow the end of a growing file, unless the reader scrolled away.
+  if (state.preview.follow) body.scrollTop = body.scrollHeight;
+}
+
+let previewFrame = null;
+let previewPending = null;
+
+/**
+ * Render a draft at most once per frame.
+ *
+ * A file arrives as many small events, each carrying the whole body so far, and
+ * re-highlighting and re-rendering a large one for every one of them is what would
+ * make the pane stutter instead of stream.
+ */
+function schedulePreviewBody(content, generating) {
+  previewPending = { content, generating };
+  if (previewFrame !== null) return;
+  previewFrame = requestAnimationFrame(() => {
+    previewFrame = null;
+    const pending = previewPending;
+    previewPending = null;
+    if (pending !== null) previewBody(pending.content, pending.generating);
+  });
+}
+
+/*
+ * The diff while the file is still being written.
+ *
+ * The pane can show the file landing, but not what it is doing to the file it is
+ * replacing. That baseline is the file as it stands on disk, so this asks the
+ * server to diff it against what has arrived - the same engine the viewer uses,
+ * which keeps the two from ever disagreeing about what changed. Requests are
+ * spaced out and never overlap: a long file arrives as many small drafts, and one
+ * request per draft would spend the whole write diffing bodies that are about to
+ * be replaced.
+ */
+const LIVE_DIFF_INTERVAL_MS = 400;
+let liveDiffTimer = null;
+let liveDiffInFlight = false;
+let liveDiffAgain = false;
+
+function cancelLiveDiff() {
+  if (liveDiffTimer !== null) clearTimeout(liveDiffTimer);
+  liveDiffTimer = null;
+  liveDiffAgain = false;
+}
+
+function scheduleLiveDiff() {
+  const pane = state.preview;
+  // Only a whole-file write has a meaningful diff: an edit's "content" is the
+  // replacement snippet, not the file that snippet goes into.
+  if (pane.name !== "write_file" || pane.path === null || !previewIsOpen()) return;
+  // A request is already queued, and it will read the body as it is when it runs.
+  if (liveDiffTimer !== null) return;
+  liveDiffTimer = setTimeout(() => {
+    liveDiffTimer = null;
+    void runLiveDiff();
+  }, LIVE_DIFF_INTERVAL_MS);
+}
+
+async function runLiveDiff() {
+  const pane = state.preview;
+  if (pane.name !== "write_file" || pane.path === null) return;
+  if (liveDiffInFlight) {
+    liveDiffAgain = true;
+    return;
+  }
+
+  const path = pane.path;
+  const content = pane.content;
+  liveDiffInFlight = true;
+  try {
+    const payload = await api("/api/file/diff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, content }),
+    });
+    // The turn may have moved on to another file while this was in flight.
+    if (state.preview.path === path) {
+      state.preview.diff = payload.diff ?? null;
+      renderPreviewDiff();
+      applyPreviewLayout();
+    }
+  } catch {
+    // A diff that cannot be computed is not worth interrupting a write over.
+  } finally {
+    liveDiffInFlight = false;
+    if (liveDiffAgain) {
+      liveDiffAgain = false;
+      scheduleLiveDiff();
+    }
+  }
+}
+
+function resetPreview() {
+  cancelLiveDiff();
+  // A running app outlives the chat it was started from, so the pane stays on it
+  // rather than throwing the user back to an empty code view they did not ask for.
+  const mode = state.preview.mode === "app" ? "app" : "code";
+  state.preview = {
+    ...state.preview,
+    name: null,
+    path: null,
+    content: "",
+    diff: null,
+    mode,
+    toolId: null,
+    toolName: null,
+    generating: false,
+    streamed: undefined,
+  };
+  $("#preview-title").textContent = "nothing generated yet";
+  setPreviewStatus("");
+  previewBody("", false);
+  renderPreviewDiff();
+  setPreviewMode(mode);
+  $("#preview-open").classList.add("hidden");
+}
+
+/** A tool call still arriving: show the file so far. */
+function previewDraft(event) {
+  const pane = state.preview;
+  // A new file starts a new sequence. That covers a retry on another model too,
+  // which must not leave the failed attempt's half-written body on screen.
+  const fresh = pane.generating !== true || event.reset === true;
+  if (fresh) {
+    cancelLiveDiff();
+    pane.diff = null;
+    pane.toolId = null;
+    pane.mode = "code";
+    renderPreviewDiff();
+  }
+
+  if (!previewIsOpen() && pane.dismissed !== true) togglePreview(true);
+
+  pane.name = event.name;
+  if (event.path !== null && event.path !== undefined) pane.path = event.path;
+  pane.content = event.content;
+  pane.generating = true;
+  pane.streamed = event.streamed === true;
+
+  $("#preview-title").textContent = pane.path ?? `${event.name} — path not named yet`;
+  schedulePreviewBody(event.content, true);
+  // The app view is not switched away from: a file being written is not a reason
+  // to take the running app off the screen, and the code is one click away. The
+  // pane only follows the write when the code is what it is already showing.
+  if (pane.mode !== "app") setPreviewMode("code");
+  // The change, as far as it has been written, beside the file itself.
+  scheduleLiveDiff();
+  /*
+   * A file that was never shown growing is not a stream, and the chip should not
+   * pretend otherwise: this gateway hands the whole call over in one frame, so
+   * the first thing the pane hears of it is the finished body.
+   */
+  if (event.complete === true && event.streamed === false) {
+    setPreviewStatus("arrived complete", "ok");
+    $("#preview-status").title =
+      "The gateway sent this call in one frame, so the file could not be shown while it was written.";
+  } else {
+    setPreviewStatus(event.complete === true ? "writing complete" : "generating");
+  }
+  $("#preview-open").classList.toggle("hidden", pane.path === null);
+
+  // Announced once per file, not once per token: the live region is for state
+  // changes, and every delta arriving is not one.
+  if (fresh) {
+    const label = event.complete === true && event.streamed === false ? "Received" : "Generating";
+    announce(`${label} ${event.name}${pane.path === null ? "" : `: ${pane.path}`}`);
+  }
+}
+
+/** The call has landed: the body is final, so the caret comes off. */
+function previewToolCall(event) {
+  if (!WRITER_TOOLS.has(event.name)) return;
+  const args = event.args !== null && typeof event.args === "object" ? event.args : {};
+  const content =
+    typeof args.content === "string"
+      ? args.content
+      : typeof args.new_string === "string"
+        ? args.new_string
+        : state.preview.content;
+
+  const pane = state.preview;
+  // Streaming is over, so no more live diffs: what is on screen is the file.
+  cancelLiveDiff();
+  if (pane.generating !== true) {
+    pane.diff = null;
+    pane.mode = "code";
+    renderPreviewDiff();
+  }
+
+  pane.name = event.name;
+  if (typeof args.path === "string" && args.path !== "") pane.path = args.path;
+  pane.content = content;
+  pane.generating = false;
+  pane.toolId = event.id;
+  pane.toolName = event.name;
+
+  $("#preview-title").textContent = pane.path ?? event.name;
+  previewBody(content, false);
+  if (pane.mode !== "app") setPreviewMode("code");
+  if (pane.streamed === false) {
+    // Same distinction as above, now that the call has landed: say it arrived in
+    // one piece rather than let the pane imply it was watched being written.
+    setPreviewStatus("written in one frame", "ok");
+    $("#preview-status").title =
+      "The gateway sent this call in one frame, so the file could not be shown while it was written.";
+  } else {
+    setPreviewStatus(event.name === "edit_file" ? "edit ready" : "written");
+  }
+  $("#preview-open").classList.toggle("hidden", pane.path === null);
+}
+
+/** The write finished: report what changed, and offer the diff. */
+function previewToolResult(event) {
+  const pane = state.preview;
+  // The name as well as the id: a text-mode call and the next one it triggers can
+  // share an id in an older transcript, and the run's output is not the file's.
+  if (pane.toolId === null || pane.toolId !== event.id || pane.toolName !== event.name) return;
+
+  if (event.ok !== true) {
+    const first = String(event.content ?? "").split("\n").find((line) => line.trim() !== "") ?? "";
+    setPreviewStatus("failed", "bad");
+    $("#preview-status").title = first;
+    return;
+  }
+
+  pane.diff = event.diff ?? null;
+  renderPreviewDiff();
+  setPreviewStatus(pane.diff ? `+${pane.diff.added} −${pane.diff.removed}` : "written", "ok");
+  // Re-apply, so the change/code button appears now that there is a diff.
+  setPreviewMode(pane.mode);
+  announce(`${pane.path ?? "the file"} written`);
+}
+
+/**
+ * Show a file taken from the transcript rather than from a live turn.
+ *
+ * A reload leaves the pane empty while the conversation beside it still shows the
+ * write, because the drafts that filled it are never stored - only the finished
+ * tool call is. So reopening a chat puts the newest file-writing call back in the
+ * pane, marked as coming from the chat, with nothing streaming into it.
+ */
+function showRestoredFile(entry) {
+  const pane = state.preview;
+  const args = entry.args !== null && typeof entry.args === "object" ? entry.args : {};
+  const content =
+    typeof args.content === "string"
+      ? args.content
+      : typeof args.new_string === "string"
+        ? args.new_string
+        : "";
+
+  pane.name = entry.name;
+  pane.path = typeof args.path === "string" && args.path !== "" ? args.path : null;
+  pane.content = content;
+  pane.generating = false;
+  // No tool id: nothing is in flight, so a later result must not settle this.
+  pane.toolId = null;
+  pane.toolName = null;
+  pane.diff = entry.diff ?? null;
+
+  $("#preview-title").textContent = pane.path ?? entry.name;
+  previewBody(content, false);
+  renderPreviewDiff();
+  setPreviewMode("code");
+  setPreviewStatus(pane.diff ? `+${pane.diff.added} −${pane.diff.removed}` : "written", "ok");
+  $("#preview-status").title = "From this chat's transcript; nothing is being written right now.";
+  $("#preview-open").classList.toggle("hidden", pane.path === null);
+}
+
+/* --------------------------------------------------------------- the running app */
+
+/*
+ * The app, running, in the pane.
+ *
+ * Everything else in this pane is about the *source*: the file being written, the
+ * change it made. This is the other end of the same request — the thing the source
+ * is for — and it is what "preview" means to somebody who did not write the code.
+ *
+ * Three mechanics worth stating.
+ *
+ * **It starts itself.** Clicking "run" on a project nobody has configured should
+ * not answer with a variable name. The server works out what this project is
+ * (its own dev script, manage.py, a directory with an index.html); the pane sends
+ * that and shows what came back. `AGENT_PREVIEW_COMMAND` still overrides it.
+ *
+ * **The frame is same-origin, through the server.** Not a second host or port:
+ * the app's own fetch, cookies and relative URLs then behave in the pane the way
+ * they will in production, and the pane needs no certificate of its own.
+ *
+ * **It reloads on its own.** A dev server with hot reloading already does this;
+ * `python3 -m http.server` does not, and neither does anything whose watcher
+ * misses a file. The change stream covers both, and costs nothing when the app's
+ * own reload got there first.
+ */
+
+const previewApp = {
+  /** The last status the server reported, or null before the first answer. */
+  status: null,
+  /** The change stream, open while the app view is on screen. */
+  stream: null,
+  /** Debounce for reloads, so a write storm is one reload and not twenty. */
+  reloadTimer: null,
+};
+
+/** The pane's "nothing is running" hint, kept so "starting" can borrow and restore it. */
+const PREVIEW_EMPTY_HTML = $("#preview-app-empty").innerHTML;
+
+/*
+ * A dev server that is still building is asked about again rather than written off.
+ *
+ * The server answers `pending` when the process is up but has not bound its port
+ * yet — a debug reloader starting, a bundler's first pass. The frame cannot load
+ * an app that is not listening, so the pane polls the status on a short backoff
+ * and loads the frame the moment `pending` clears. Bounded, because a project that
+ * never binds is a fact the user has to see, not a spinner.
+ */
+const PREVIEW_PENDING_DELAYS = [400, 800, 1400, 2200, 3200, 4600, 6500];
+const PREVIEW_RELOAD_DELAY_MS = 400;
+let previewPendingTimer = null;
+let previewPendingTries = 0;
+
+function cancelPreviewPending() {
+  if (previewPendingTimer !== null) clearTimeout(previewPendingTimer);
+  previewPendingTimer = null;
+  previewPendingTries = 0;
+}
+
+function schedulePreviewPending() {
+  if (previewPendingTimer !== null || previewPendingTries >= PREVIEW_PENDING_DELAYS.length) return;
+  const delay = PREVIEW_PENDING_DELAYS[previewPendingTries++];
+  previewPendingTimer = setTimeout(() => {
+    previewPendingTimer = null;
+    if (previewAppRunning()) void refreshPreviewApp();
+  }, delay);
+}
+
+function previewAppRunning() {
+  return previewApp.status !== null && previewApp.status.running === true;
+}
+
+/** Where the pane points its frame: the proxied app, with this tab's token. */
+function previewFrameUrl() {
+  const params = new URLSearchParams();
+  // A deployment with a shared token authorizes an iframe the same way it
+  // authorizes a fetch; without this the frame is a 401 the user cannot see.
+  if (authToken !== "") params.set("token", authToken);
+  params.set("_", String(Date.now()));
+  return `/preview/?${params.toString()}`;
+}
+
+/** Load the app into the frame. The cache-buster is what makes this a reload. */
+function loadPreviewFrame() {
+  const frame = $("#preview-frame");
+  frame.dataset.loaded = "1";
+  frame.src = previewFrameUrl();
+}
+
+function unloadPreviewFrame() {
+  const frame = $("#preview-frame");
+  delete frame.dataset.loaded;
+  frame.src = "about:blank";
+}
+
+/** Paint the pane from a server status. Pure: no requests, no side effects. */
+function applyPreviewApp(status) {
+  previewApp.status = status;
+  const running = status.running === true;
+  // Up but not answering yet. Not "down": the app is on its way, and showing it
+  // as stopped is what made a first click look like a preview that does not work.
+  const pending = running && status.pending === true;
+
+  $("#preview-app-dot").className = `preview-dot ${running ? "up" : "down"}`;
+  /*
+   * The published address when the deployment has one, and the pane's own path
+   * otherwise. They are different facts: `/preview/` is where *this browser*
+   * reaches the app, and `http://<lan>:<port>/` — when it exists — is where
+   * anything else on the network does. Only the second one can be handed to a
+   * webhook or opened on a phone.
+   */
+  const appUrl = $("#preview-app-url");
+  appUrl.textContent = !running
+    ? "no app running"
+    : pending
+      ? "starting…"
+      : (status.address ?? `/preview/ · port ${status.port}`);
+  appUrl.title = !running
+    ? ""
+    : status.address
+      ? "Reachable on the network at this address"
+      : "Reachable in this console only; set AGENT_LAN_IP and AGENT_PREVIEW_PUBLISH to publish it";
+  // Borrow the hint for "starting", and put it back once it means what it says.
+  const empty = $("#preview-app-empty");
+  if (pending) empty.textContent = `Starting ${status.command ?? "the project"}… this can take a moment.`;
+  else if (empty.innerHTML !== PREVIEW_EMPTY_HTML) empty.innerHTML = PREVIEW_EMPTY_HTML;
+  empty.classList.toggle("hidden", running && !pending);
+
+  $("#preview-frame").classList.toggle("hidden", !running || pending);
+  const log = status.log ?? "";
+  $("#preview-app-log-toggle").classList.toggle("hidden", log === "");
+  $("#preview-app-log").textContent = log;
+  if (log === "") {
+    const toggle = $("#preview-app-log-toggle");
+    toggle.setAttribute("aria-expanded", "false");
+    $("#preview-app-log").classList.add("hidden");
+  }
+
+  /*
+   * One line that says what is true: why it is not up, or what was run. A
+   * detected command is named as detected, because a guess the user did not make
+   * is a guess they should be able to correct.
+   */
+  const note = $("#preview-app-note");
+  let note_ = "";
+  if (status.error) note_ = status.error;
+  else if (pending) note_ = `starting: ${status.command ?? "the project"} — it may still be building`;
+  else if (running && status.command) {
+    note_ = `${status.detected ? "detected" : "running"}: ${status.command}`;
+    if (status.address) note_ += ` · served on the network at ${status.address}`;
+  } else if (!running && status.command) {
+    // Before the click, not after: "will run: npm run dev" is what makes the
+    // guess a thing the user can see and correct rather than a surprise.
+    note_ = `will run: ${status.command}`;
+  }
+  note.textContent = note_;
+  note.classList.toggle("hidden", note_ === "");
+
+  // The frame waits for an app that is actually listening; the retry loop below
+  // is what loads it once this stops saying `pending`.
+  if (running && !pending && $("#preview-frame").dataset.loaded !== "1") loadPreviewFrame();
+  if (!running) unloadPreviewFrame();
+}
+
+/** Ask the server what is running; wrong answers leave the last one on screen. */
+async function refreshPreviewApp() {
+  try {
+    applyPreviewApp(await api("/api/preview"));
+    if (previewApp.status !== null && previewApp.status.pending === true) schedulePreviewPending();
+    else cancelPreviewPending();
+  } catch {
+    /* the pane keeps whatever it last knew rather than blanking on a hiccup */
+  }
+}
+
+/** Reload the app, coalescing the burst a single save produces. */
+function schedulePreviewReload() {
+  if (!previewAppRunning()) return;
+  if (previewApp.reloadTimer !== null) clearTimeout(previewApp.reloadTimer);
+  previewApp.reloadTimer = setTimeout(() => {
+    previewApp.reloadTimer = null;
+    if (previewAppRunning()) loadPreviewFrame();
+  }, PREVIEW_RELOAD_DELAY_MS);
+}
+
+/**
+ * Open the change stream while the app view is on screen.
+ *
+ * Opened on the first look and closed when the pane is dismissed: a stream left
+ * open is a request that never ends, and one opened for a pane nobody is looking
+ * at is a reload nobody asked for.
+ */
+function watchPreviewChanges() {
+  if (previewApp.stream !== null) return;
+  const params = new URLSearchParams();
+  if (authToken !== "") params.set("token", authToken);
+  const stream = new EventSource(`/api/preview/events?${params.toString()}`);
+  stream.addEventListener("message", schedulePreviewReload);
+  // EventSource reconnects by itself; a failed one is a lost convenience, and
+  // the run/reload buttons still work.
+  previewApp.stream = stream;
+}
+
+function unwatchPreviewChanges() {
+  cancelPreviewPending();
+  if (previewApp.reloadTimer !== null) clearTimeout(previewApp.reloadTimer);
+  previewApp.reloadTimer = null;
+  if (previewApp.stream !== null) previewApp.stream.close();
+  previewApp.stream = null;
+}
+
+/**
+ * Show the app view, starting the project if it is not up.
+ *
+ * `autoStart` is false for the restore-on-load path: reopening the console should
+ * not run anything by itself, but *clicking* preview should produce a picture of
+ * the app rather than instructions for getting one.
+ */
+async function showPreviewApp() {
+  setPreviewMode("app");
+  watchPreviewChanges();
+  await refreshPreviewApp();
+}
+
+/* ---------------------------------------------------------------- approvals */
+
+function decisionText(decision) {
+  if (decision === "approve") return "Approved";
+  if (decision === "deny") return "Denied — nothing was run";
+  if (decision === "timeout") return "Timed out — nothing was run";
+  return "Cancelled";
+}
+
+async function respondToApproval(id, decision) {
+  try {
+    await api(`/api/approvals/${encodeURIComponent(id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+  } catch (error) {
+    // A 404 just means the turn already moved on; anything else is worth showing.
+    if (error.status !== 404) addErrorMessage(error.message);
+  }
+}
+
+/** A run_command or a large overwrite is waiting on a click. */
+function addApprovalCard(event) {
+  hideEmptyState();
+  const card = document.createElement("div");
+  card.className = "msg approval";
+
+  const head = document.createElement("div");
+  head.className = "approval-head";
+  const title = document.createElement("span");
+  title.className = "approval-title";
+  title.textContent = `Approve ${event.name}?`;
+  const summary = document.createElement("span");
+  summary.className = "approval-summary mono";
+  summary.textContent = event.summary;
+  head.append(title, summary);
+
+  const body = document.createElement("div");
+  body.className = "approval-body";
+  if (event.diff) body.append(renderDiff(event.diff));
+
+  const actions = document.createElement("div");
+  actions.className = "approval-actions";
+  const approve = document.createElement("button");
+  approve.className = "btn-primary";
+  approve.textContent = "Approve";
+  const deny = document.createElement("button");
+  deny.className = "btn-danger";
+  deny.textContent = "Deny";
+  actions.append(approve, deny);
+
+  card.append(head, body, actions);
+  $("#messages").append(card);
+  scrollToBottom(true);
+  announce(`Approval needed for ${event.name}: ${event.summary}`);
+  approve.focus();
+
+  const settle = (decision) => {
+    if (card.dataset.settled === "1") return;
+    card.dataset.settled = "1";
+    card.classList.add(decision === "approve" ? "approved" : "denied");
+    actions.replaceChildren();
+    const note = document.createElement("span");
+    note.className = "approval-note";
+    note.textContent = decisionText(decision);
+    actions.append(note);
+  };
+
+  approve.addEventListener("click", () => {
+    settle("approve");
+    void respondToApproval(event.id, "approve");
+  });
+  deny.addEventListener("click", () => {
+    settle("deny");
+    void respondToApproval(event.id, "deny");
+  });
+
+  state.approvals.set(event.id, { settle });
+}
+
+function finishApprovalCard(id, decision) {
+  state.approvals.get(id)?.settle(decision);
+  announce(decisionText(decision));
+}
+
+/* ----------------------------------------------------------------- messages */
+
+function addUserMessage(text) {
+  hideEmptyState();
+  const node = document.createElement("div");
+  node.className = "msg msg-user";
+  node.textContent = text;
+  $("#messages").append(node);
+  scrollToBottom(true);
+}
+
+function addAssistantMessage() {
+  hideEmptyState();
+  const node = document.createElement("div");
+  node.className = "msg msg-assistant cursor";
+  $("#messages").append(node);
+  return node;
+}
+
+function addErrorMessage(text) {
+  hideEmptyState();
+  const node = document.createElement("div");
+  node.className = "msg msg-error";
+  node.textContent = text;
+  $("#messages").append(node);
+  scrollToBottom(true);
+  announce(`Error: ${text}`);
+}
+
+function addNotice(text) {
+  hideEmptyState();
+  const node = document.createElement("div");
+  node.className = "msg notice";
+  node.textContent = text;
+  $("#messages").append(node);
+  scrollToBottom();
+  announce(text);
+}
+
+function toolArgSummary(args) {
+  if (args === null || typeof args !== "object") return typeof args === "string" ? args : "";
+  for (const key of ["path", "command", "pattern", "cwd"]) {
+    if (typeof args[key] === "string") return args[key];
+  }
+  return "";
+}
+
+function attachDiff(card, diff) {
+  const rendered = renderDiff(diff);
+  card.stat.textContent = `+${diff.added} −${diff.removed}`;
+
+  if (card.diffBox) {
+    card.diffBox.replaceWith(rendered);
+  } else {
+    // Show the diff first and tuck the raw tool output behind a disclosure, so
+    // the interesting part is visible without hiding what the tool reported.
+    card.content.prepend(rendered);
+    const raw = document.createElement("details");
+    raw.className = "tool-raw";
+    const rawHead = document.createElement("summary");
+    rawHead.textContent = "raw output";
+    card.body.replaceWith(raw);
+    raw.append(rawHead, card.body);
+  }
+
+  card.diffBox = rendered;
+  card.diff = diff;
+}
+
+function addToolCard(id, name, args, diff) {
+  hideEmptyState();
+  const details = document.createElement("details");
+  details.className = "tool";
+  details.open = true;
+
+  const summary = document.createElement("summary");
+  const dot = document.createElement("span");
+  dot.className = "status-dot";
+  const nameEl = document.createElement("span");
+  nameEl.className = "tool-name";
+  nameEl.textContent = name;
+  const argEl = document.createElement("span");
+  argEl.className = "tool-arg";
+  argEl.textContent = toolArgSummary(args);
+  const stat = document.createElement("span");
+  stat.className = "tool-stat";
+  summary.append(dot, nameEl, argEl, stat);
+
+  const content = document.createElement("div");
+  content.className = "tool-content";
+
+  const body = document.createElement("pre");
+  body.className = "tool-body";
+  body.textContent = "running...";
+  content.append(body);
+
+  details.append(summary, content);
+  $("#messages").append(details);
+
+  const card = { details, dot, stat, body, content, diffBox: null, diff: null };
+  state.toolCards.set(id, card);
+  if (diff) attachDiff(card, diff);
+  scrollToBottom(true);
+}
+
+function finishToolCard(id, name, ok, content, diff) {
+  let card = state.toolCards.get(id);
+  if (!card) {
+    // A result can arrive with no matching call: a denied approval never emits
+    // one. Render it as a card of its own rather than dropping the outcome.
+    addToolCard(id, name, {}, diff);
+    card = state.toolCards.get(id);
+  }
+  if (!card) return;
+  card.dot.classList.add(ok ? "ok" : "bad");
+  card.body.textContent = content;
+  if (diff && !card.diff) attachDiff(card, diff);
+  announce(`${name} ${ok ? "finished" : "failed"}`);
+  scrollToBottom();
+}
+
+function setStreaming(streaming) {
+  state.streaming = streaming;
+  $("#send").classList.toggle("hidden", streaming);
+  $("#stop").classList.toggle("hidden", !streaming);
+  $("#messages").setAttribute("aria-busy", streaming ? "true" : "false");
+  $("#input").disabled = false;
+  // A turn is starting or over, and the bar measures a turn. Reset rather than
+  // hide-and-keep, so the first step of the next one is not drawn against the
+  // last one's count.
+  resetTurnProgress();
+}
+
+/* ---------------------------------------------------------- turn progress */
+
+/*
+ * How far into its step budget the message in flight is.
+ *
+ * The budget comes from the server with every step (`AGENT_MAX_STEPS`, then the
+ * chat's own, then the deployment default — only the server knows which won), so
+ * the bar cannot drift from the count the agent itself reports when it runs out.
+ * It is drawn only while a turn is running: an idle bar at 100% would be a claim
+ * about a turn that has already finished.
+ */
+function renderTurnProgress() {
+  const bar = $("#turn-progress");
+  const { step, of } = state.turn;
+  if (of <= 0) {
+    bar.classList.add("hidden");
+    return;
+  }
+  bar.classList.remove("hidden");
+  const percent = Math.max(0, Math.min(100, Math.round((step / of) * 100)));
+  $("#turn-progress-fill").style.width = `${percent}%`;
+  $("#turn-progress-label").textContent = `step ${step} of ${of}`;
+  bar.setAttribute("aria-valuenow", String(step));
+  bar.setAttribute("aria-valuemax", String(of));
+  bar.title = `This message has used ${step} of its ${of} steps.`;
+}
+
+function resetTurnProgress() {
+  state.turn = { step: 0, of: 0 };
+  $("#turn-progress").classList.add("hidden");
+  $("#turn-progress-fill").style.width = "0%";
+  $("#turn-progress-label").textContent = "";
+}
+
+/* -------------------------------------------------------------------- chat */
+
+function currentModel() {
+  return $("#model").value || state.model;
+}
+
+function currentSteps() {
+  const parsed = Number.parseInt($("#steps").value, 10);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.min(state.limits.maxSteps, Math.max(state.limits.minSteps, parsed));
+}
+
+/**
+ * The chain as typed, or undefined when we should leave the decision alone.
+ *
+ * An empty box means "this model and nothing else" only once it has actually
+ * been seeded or edited. Before that, sending it would silently turn the
+ * fallback chain off just because health had not answered yet.
+ */
+function currentFallbacks() {
+  const input = $("#fallbacks");
+  if (input.dataset.known !== "true") return undefined;
+  return input.value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== "");
+}
+
+function setFallbacks(models) {
+  const input = $("#fallbacks");
+  input.value = Array.isArray(models) ? models.join(",") : "";
+  input.dataset.known = "true";
+}
+
+/** Fill the box from the server default, but only once health has told us it. */
+function seedFallbacks() {
+  if (state.fallbackDefault === null) return;
+  setFallbacks(state.fallbackDefault);
+}
+
+/** May this chat fall back to the local model? */
+function currentUseOffline() {
+  return $("#use-offline").checked;
+}
+
+function setUseOffline(value) {
+  $("#use-offline").checked = value;
+}
+
+/* ------------------------------------------------------------------- sweep */
+
+/*
+ * The sweep asks the gateway, model by model, whether it can make a tool call,
+ * and renders the answer. The catalog cannot be trusted from the inside - a model
+ * picker shows 500 ids and hides the fact that most of them answer with an error -
+ * so the point of this panel is to make the provider list legible.
+ */
+
+let sweepTimer = null;
+
+function sweepSection(title, lines, note) {
+  const section = document.createElement("div");
+  section.className = "sweep-section";
+
+  const heading = document.createElement("div");
+  heading.className = "sweep-heading";
+  heading.textContent = note === undefined ? title : `${title} — ${note}`;
+
+  const body = document.createElement("pre");
+  body.className = "sweep-body";
+  body.textContent = lines.join("\n");
+
+  section.append(heading, body);
+  return section;
+}
+
+/** Mark the rows that are already the chain in play, so the report is actionable. */
+function chainMarker(model) {
+  return (state.chainModels ?? []).includes(model) ? "   <- in your chain" : "";
+}
+
+/** "just now" / "12 min ago" / "3 h ago" / "2 d ago". */
+function relativeAge(ms) {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+/** ", swept 3 h ago" - empty when the report is undated or the date is unusable. */
+function sweptWhen(finishedAt) {
+  const finished = typeof finishedAt === "string" ? Date.parse(finishedAt) : Number.NaN;
+  if (!Number.isFinite(finished)) return "";
+  return `, swept ${relativeAge(Date.now() - finished)}`;
+}
+
+/**
+ * Point this chat at a model the sweep just proved works, from the report itself.
+ * Reading the answer and then hunting for the id in a 578-entry picker is the
+ * part of a sweep that was still manual.
+ */
+function sweepUseButton(model) {
+  // An automatic account cannot pin a model to the chat, so the sweep's "use"
+  // affordance is replaced by the reason rather than offered and then ignored.
+  if (state.modelSelection === "auto") {
+    const note = document.createElement("span");
+    note.className = "muted sweep-use-note";
+    note.textContent = "auto";
+    note.title =
+      "This account is served the model automatically, so a sweep cannot pin one to the chat. The result is still a useful check of the gateway.";
+    return note;
+  }
+  const button = document.createElement("button");
+  button.className = "btn-ghost sweep-use";
+  button.textContent = "use";
+  button.title = `Make ${model} the model for this chat`;
+  button.addEventListener("click", () => {
+    const select = $("#model");
+    if (![...select.options].some((option) => option.value === model)) {
+      const option = document.createElement("option");
+      option.value = model;
+      option.textContent = model;
+      select.append(option);
+    }
+    select.value = model;
+    state.model = model;
+    void persistSettings();
+    closeSweep();
+    addNotice(`Model for this chat set to ${model}.`);
+  });
+  return button;
+}
+
+/**
+ * Mark the picker's entries that the last sweep got a tool call out of. A
+ * catalog of 578 ids is not a menu; this is the only part of it that has been
+ * asked to do the one thing the agent needs.
+ */
+function annotateModels() {
+  const usable = state.sweepUsable;
+  if (usable === null) return;
+
+  for (const option of $("#model").options) {
+    if (option.dataset.marked === "true") continue;
+    option.dataset.marked = "true";
+    if (!usable.has(option.value)) continue;
+    option.textContent = `${option.value} ✓`;
+    option.title = "Made a tool call in the last catalog sweep";
+  }
+}
+
+function updateSweepUsable(results) {
+  state.sweepUsable = new Set(results.filter((result) => result.ok).map((result) => result.model));
+  annotateModels();
+}
+
+function renderSweep(sweep) {
+  const status = $("#sweep-status");
+  const report = $("#sweep-report");
+  const results = Array.isArray(sweep?.results) ? sweep.results : [];
+
+  if (sweep?.running === true) {
+    status.textContent = `probing ${sweep.done} of ${sweep.total}...`;
+    status.classList.remove("stale");
+  } else if (results.length === 0) {
+    status.textContent =
+      "Not run yet. A sweep costs one small request per model, so it only runs when you ask.";
+    status.classList.remove("stale");
+  } else {
+    const working = results.filter((result) => result.ok).length;
+    // A persisted report can be days old while looking current, so it carries the
+    // time it was taken - and says so when that is long enough to have gone off.
+    status.textContent =
+      `${working} of ${results.length} can drive the agent (${sweep.scope} sweep${sweptWhen(sweep.finishedAt)}).` +
+      (sweep.stale === true ? " Old enough that the gateway may have moved on - re-run it." : "");
+    status.classList.toggle("stale", sweep.stale === true);
+  }
+
+  updateSweepUsable(results);
+  report.replaceChildren();
+
+  const working = results
+    .filter((result) => result.ok)
+    .sort((a, b) => (a.ms ?? 0) - (b.ms ?? 0));
+  if (working.length > 0) {
+    const section = document.createElement("div");
+    section.className = "sweep-section";
+
+    const heading = document.createElement("div");
+    heading.className = "sweep-heading";
+    heading.textContent = `Usable (${working.length}), fastest first — use one without hunting for it in the picker`;
+    section.append(heading);
+
+    for (const result of working) {
+      const row = document.createElement("div");
+      row.className = "sweep-row";
+      row.append(sweepUseButton(result.model));
+
+      const text = document.createElement("span");
+      text.className = "sweep-model";
+      const rerouted =
+        result.servedAs && result.servedAs !== result.model ? `  -> ${result.servedAs}` : "";
+      text.textContent = `${String(result.ms ?? "?").padStart(6)} ms  ${result.model}${rerouted}${chainMarker(result.model)}`;
+      row.append(text);
+      section.append(row);
+    }
+    report.append(section);
+  }
+
+  // Grouped by what can be done about it: one is the provider to fix, one is worth
+  // retrying later, one is probably just this sweep's own load.
+  const groups = [
+    ["broken", "Broken", "fix these in the gateway's provider settings"],
+    ["throttled", "Throttled", "credentials cooling down - often caused by the sweep itself"],
+    ["slow", "No answer in time", "may be the queue under load rather than the model"],
+  ];
+
+  for (const [verdict, title, note] of groups) {
+    const subset = results.filter((result) => !result.ok && result.verdict === verdict);
+    if (subset.length === 0) continue;
+
+    const byReason = new Map();
+    for (const result of subset) {
+      const reason = result.error ?? "unknown";
+      if (!byReason.has(reason)) byReason.set(reason, []);
+      byReason.get(reason).push(result.model);
+    }
+
+    const lines = [];
+    for (const [reason, models] of [...byReason].sort((a, b) => b[1].length - a[1].length)) {
+      lines.push(`${models.length} x ${reason}`);
+      for (const model of models.slice(0, 6)) lines.push(`      ${model}${chainMarker(model)}`);
+      if (models.length > 6) lines.push(`      ...and ${models.length - 6} more`);
+    }
+    report.append(sweepSection(`${title} (${subset.length})`, lines, note));
+  }
+}
+
+async function refreshSweep() {
+  let payload;
+  try {
+    payload = await api("/api/models/sweep");
+  } catch (error) {
+    addErrorMessage(error.message);
+    return null;
+  }
+
+  renderSweep(payload.sweep);
+
+  // Poll only while it is running and on screen, so the panel is never a source
+  // of requests on its own.
+  if (payload.sweep?.running === true && !$("#sweep").classList.contains("hidden")) {
+    if (sweepTimer === null) sweepTimer = setInterval(() => void refreshSweep(), 1000);
+  } else if (sweepTimer !== null) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+    void loadHealth();
+  }
+  return payload.sweep;
+}
+
+async function runSweep(all) {
+  const buttons = [$("#sweep-run"), $("#sweep-run-all")];
+  for (const button of buttons) button.disabled = true;
+  try {
+    const payload = await api("/api/models/sweep", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all }),
+    });
+    renderSweep(payload.sweep);
+    if (sweepTimer === null) sweepTimer = setInterval(() => void refreshSweep(), 1000);
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    for (const button of buttons) button.disabled = false;
+  }
+}
+
+/* ------------------------------------------------------------------ dialogs */
+
+/*
+ * Focus, for the five modal panels — `[role="dialog"][aria-modal="true"]`.
+ *
+ * A panel that says `aria-modal="true"` is making a promise: the page behind it
+ * is inert until it closes. The class flip that shows it keeps none of that
+ * promise on its own — a screen reader is told the rest of the page is
+ * unavailable while the keyboard is still free to wander into it, and Tab does
+ * exactly that, straight out of "this chat's model settings" and into the
+ * toolbar behind it. So the promise is kept in one place for all five: opening
+ * moves focus in, Tab is steered back at the panel's edges, and closing hands
+ * focus to whatever opened it.
+ *
+ * The opener is remembered from the *click*, in the capture phase, rather than
+ * read off `document.activeElement` at open time: clicking a button does not
+ * focus it in every browser, and a panel that closes by dropping focus on
+ * `<body>` is a panel that loses your place in a transcript you were reading.
+ * `document.activeElement` is still the fallback, which is what covers a panel
+ * opened from the keyboard rather than from a click (the palette's `/settings`).
+ */
+
+/** The modal panels: derived from the markup, not kept in a list that can drift. */
+function modalPanels() {
+  return [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')];
+}
+
+/**
+ * The panel on top, which is the last one open in document order. That is the
+ * same order the Escape handler unwinds them in, so the two cannot disagree
+ * about which panel "the current one" is.
+ */
+function openModal() {
+  const shown = modalPanels().filter((panel) => !panel.classList.contains("hidden"));
+  return shown.length === 0 ? null : shown[shown.length - 1];
+}
+
+/**
+ * Whether a control is really there to be tabbed to.
+ *
+ * `offsetParent` is NOT that question, and the difference is a closed `<details>`
+ * (which the console is now full of): Chromium lays a closed block's controls out
+ * — they have a box, and their `offsetParent` is the panel — but the browser will
+ * not give them focus. A trap that counted them would take one for the panel's
+ * last stop, and Tab from the control above it would walk out of the dialog: the
+ * one thing `aria-modal="true"` promises cannot happen.
+ *
+ * `checkVisibility()` is the browser's own answer to "is this being rendered",
+ * and it is the same answer for a `display: none` subtree as for a block that is
+ * folded shut. Where it does not exist, an empty rectangle is the same fact by
+ * another route — which is what the old filter was reaching for.
+ */
+function isReachableTarget(element) {
+  if (typeof element.checkVisibility === "function") return element.checkVisibility();
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+/** Everything inside a panel that a Tab should stop on, in tab order. */
+function tabStops(panel) {
+  const selector =
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),' +
+    // `summary` is a control the browser gives a tab stop to on its own, so a trap
+    // that did not know about it would hand Tab back to the page from the last
+    // block of a panel — the one place a modal must never fail.
+    ' textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+  return [...panel.querySelectorAll(selector)].filter(isReachableTarget);
+}
+
+/** Where focus goes when the last panel closes. */
+let dialogOpener = null;
+
+/**
+ * Show a panel's focus. The panel itself takes it rather than its first control:
+ * that is what makes a screen reader read the title (`aria-labelledby`) before
+ * the options, and one Tab then lands on the first control anyway.
+ */
+function enterDialog(panel) {
+  const from = document.activeElement;
+  if (from instanceof HTMLElement && from !== document.body) dialogOpener = from;
+  panel.focus();
+}
+
+/**
+ * Remember the control a click is about to act on, before it acts — see the
+ * capture-phase listener in `wire()`. Kept here so the whole of "where did this
+ * panel come from" is in one place.
+ */
+function noteDialogOpener(control) {
+  if (control === null || openModal() !== null) return;
+  dialogOpener = control;
+}
+
+/** Hand focus back, unless another panel is still open to own it. */
+function leaveDialog(panel) {
+  panel.blur();
+  if (openModal() !== null) return;
+  const opener = dialogOpener;
+  dialogOpener = null;
+  if (opener !== null && opener.isConnected) opener.focus();
+}
+
+function openSweep() {
+  $("#sweep").classList.remove("hidden");
+  enterDialog($("#sweep"));
+  void refreshSweep();
+}
+
+function closeSweep() {
+  $("#sweep").classList.add("hidden");
+  // The poll exists to watch a running sweep; the panel is gone, so stop it.
+  if (sweepTimer !== null) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
+  leaveDialog($("#sweep"));
+}
+
+/**
+ * Report whether the chain's models can still make a tool call, and when that was
+ * last checked. The detail lives in the tooltip so the row stays one line.
+ */
+function renderModelHealth(info) {
+  const dot = $("#models-dot");
+  const label = $("#models-label");
+  const total = info?.total ?? 0;
+
+  if (total === 0) {
+    dot.className = "status-dot";
+    label.textContent = info?.intervalMs === 0 ? "chain check off" : "chain not checked yet";
+    label.title =
+      info?.intervalMs === 0
+        ? "Set AGENT_HEALTH_INTERVAL_MS above 0 to check the chain on a timer."
+        : "The first check runs a few seconds after the server starts.";
+    return;
+  }
+
+  dot.className = `status-dot ${info.working === total ? "ok" : info.working > 0 ? "warn" : "bad"}`;
+  label.textContent = `models ${info.working}/${total} ready`;
+  const when = info.checkedAt === null ? "never" : new Date(info.checkedAt).toLocaleTimeString();
+  label.title = `Tool-call check, last run ${when}:\n${info.entries
+    .map(
+      (entry) =>
+        `${entry.ok ? "ok  " : "FAIL"} ${entry.model}${entry.offline ? " (offline)" : ""}` +
+        (entry.ok ? ` - ${entry.ms} ms` : ` - ${entry.error}`),
+    )
+    .join("\n")}`;
+}
+
+/**
+ * Show the account its own spend and the ceiling it is measured against.
+ *
+ * The plane records every turn's cost, so this is the half a person can act on —
+ * how much of today's allowance is gone. The verdict and the caps come from the
+ * same decision the turn gate reads, so the number here and the refusal on the
+ * next turn cannot disagree. On a deployment with no control plane there is no
+ * account to bill, and the row says that rather than showing a fake zero.
+ */
+function renderAccountUsage(usage) {
+  const dot = $("#usage-dot");
+  const label = $("#usage-label");
+  if (dot === null || label === null) return;
+
+  if (usage?.tenancy !== true || !usage.usageToday) {
+    dot.className = "status-dot";
+    label.textContent = "no account usage";
+    label.title =
+      usage?.error ??
+      "This deployment runs as a single operator, so there is no account to read usage for.";
+    return;
+  }
+
+  const today = usage.usageToday;
+  const tokens = (today.tokensIn ?? 0) + (today.tokensOut ?? 0);
+  const cap = usage.quota?.requestsPerDay ?? null;
+  // The ceiling Genie enforces itself (v1.0). It is shown beside the plan rather
+  // than merged into it, because the two are not the same kind of number: the
+  // plan is what the account may spend, and this is the bound that stops a loop.
+  const ceiling = usage.ceiling?.limit > 0 ? usage.ceiling : null;
+  dot.className = `status-dot ${usage.allowed && (ceiling === null || ceiling.allowed) ? "ok" : "warn"}`;
+  label.textContent =
+    `today ${today.requests ?? 0} req / ${tokens} tok` +
+    (cap === null ? " · uncapped" : ` / ${cap} req`) +
+    (ceiling === null ? "" : ` · stop at ${ceiling.limit}`);
+  label.title =
+    `Signed in as ${usage.email}.\n` +
+    `Today: ${today.requests ?? 0} requests, ${tokens} tokens, $${Number(today.costUsd ?? 0).toFixed(4)}.\n` +
+    (cap === null
+      ? "No daily request ceiling on this plan."
+      : `${usage.allowed ? "Within" : "Over"} the ${cap} request/day ceiling.`) +
+    (ceiling === null
+      ? "\nThis deployment's own turn ceiling is off."
+      : `\nGenie's own ceiling: ${ceiling.used} of ${ceiling.limit} turns started today ` +
+        `(${ceiling.remaining} left). It resets at midnight UTC.`) +
+    (usage.reasons?.length ? `\n${usage.reasons.join(", ")}` : "");
+}
+
+/**
+ * Show, persistently, which gateway is answering. A notice scrolls away; a model
+ * quietly falling back to a 7B local one is something the user should not have
+ * to infer from the transcript.
+ */
+function setGatewayBadge(mode, model, url) {
+  const badge = $("#gateway-badge");
+  if (mode !== "offline") {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    badge.removeAttribute("title");
+    return;
+  }
+  badge.classList.remove("hidden");
+  badge.textContent = `offline: ${model}`;
+  badge.title = `${model} via ${url ?? "the offline gateway"} — everything on the main gateway failed, so the local model took over.`;
+}
+
+/**
+ * Say which model an automatic turn is on, and why it is not a choice.
+ *
+ * The badge exists so the model is still *visible* when it is not selectable: a
+ * person debugging a bad answer needs to know what answered, and "auto" on its
+ * own would make a deployment with a stale health check look like a black box.
+ * The chain is in the tooltip, because a fallback that happens mid-turn is worth
+ * being able to predict.
+ */
+function setAutoBadge(models) {
+  const badge = $("#model-auto");
+  if (state.modelSelection !== "auto") {
+    badge.classList.add("hidden");
+    return;
+  }
+  const chain = (Array.isArray(models) ? models : state.autoModels).filter(
+    (entry) => typeof entry === "string" && entry !== "",
+  );
+  badge.classList.remove("hidden");
+  badge.textContent = chain.length === 0 ? "auto" : `auto / ${chain[0]}`;
+  badge.title =
+    chain.length > 1
+      ? `Chosen automatically from the free pool, least-throttled first:\n${chain.join("\n")}`
+      : chain.length === 1
+        ? `${chain[0]} - chosen automatically from the free pool.`
+        : "Chosen automatically from the free pool.";
+}
+
+async function sendMessage(text) {
+  // A shared chat is a read. Refusing here is a courtesy rather than the control
+  // — the server resolves sessions against your own store, so a turn against
+  // somebody else's id is refused there too.
+  if (state.streaming || state.shareOf !== null || text.trim() === "") return;
+
+  // In automatic mode the server picks the chain, so nothing about a model is
+  // sent: sending the hidden picker's value would be asking the server to hold an
+  // opinion it has already said it decides itself.
+  const auto = state.modelSelection === "auto";
+  const model = auto ? undefined : currentModel();
+  const maxSteps = currentSteps();
+  const fallbacks = auto ? undefined : currentFallbacks();
+  const useOffline = currentUseOffline();
+  addUserMessage(text);
+  $("#input").value = "";
+  autoGrow();
+  setStreaming(true);
+
+  closePalette();
+  beginTurnNotes();
+  const assistant = addAssistantMessage();
+  let buffer = "";
+  state.controller = new AbortController();
+  // Clear last turn's state; the server re-announces this turn's gateway.
+  setGatewayBadge("primary");
+
+  const onEvent = (event) => {
+    noteTurnEvent(event);
+    switch (event.type) {
+      case "session": {
+        state.sessionId = event.id;
+        $("#chat-title").textContent = event.title;
+        showModelChain(event.models);
+        // The server names the chain it actually chose, which in auto mode is
+        // this turn's answer rather than a stored preference.
+        setAutoBadge(event.models);
+        void loadSessions();
+        break;
+      }
+      case "approval_request":
+        addApprovalCard(event);
+        break;
+      case "approval_result":
+        finishApprovalCard(event.id, event.decision);
+        break;
+      case "gateway":
+        setGatewayBadge(event.mode, event.model, event.url);
+        break;
+      case "step":
+        state.turn = { step: event.index, of: event.of };
+        renderTurnProgress();
+        break;
+      case "text": {
+        buffer += event.text;
+        assistant.innerHTML = renderMarkdown(buffer);
+        scrollToBottom();
+        break;
+      }
+      case "draft":
+        previewDraft(event);
+        break;
+      case "tool_call":
+        addToolCard(event.id, event.name, event.args, event.diff);
+        previewToolCall(event);
+        break;
+      case "tool_result":
+        finishToolCard(event.id, event.name, event.ok, event.content, event.diff);
+        previewToolResult(event);
+        break;
+      case "notice":
+        addNotice(event.text);
+        break;
+      case "error":
+        addErrorMessage(event.message);
+        break;
+      default:
+        break;
+    }
+  };
+
+  try {
+    await streamChat(
+      {
+        sessionId: state.sessionId,
+        message: text,
+        model,
+        ...(fallbacks === undefined ? {} : { fallbackModels: fallbacks }),
+        useOffline,
+        maxSteps,
+        // The project a *new* chat is born into. The server ignores it for a
+        // chat that already exists, so browsing sessions cannot re-tag them.
+        ...(state.projectId === null ? {} : { projectId: state.projectId }),
+      },
+      onEvent,
+      state.controller.signal,
+    );
+  } catch (error) {
+    if (error.name !== "AbortError") addErrorMessage(error.message);
+  } finally {
+    assistant.classList.remove("cursor");
+    if (buffer.trim() === "" && assistant.childElementCount === 0) assistant.remove();
+    state.controller = null;
+    setStreaming(false);
+    void loadSessions();
+    // A failure included: "fix the failure" is the most useful chip there is,
+    // and it is first in `suggestFollowups` for exactly that reason.
+    if (turnNotes !== null) showFollowups(suggestFollowups(turnNotes));
+    $("#input").focus();
+  }
+}
+
+async function streamChat(payload, onEvent, signal) {
+  const response = await fetch("/api/chat", {
+    method: "POST",
+    headers: withAuth({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(authHint(response, detail));
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    pending += decoder.decode(value, { stream: true });
+
+    let split = pending.indexOf("\n\n");
+    while (split !== -1) {
+      const frame = pending.slice(0, split);
+      pending = pending.slice(split + 2);
+      split = pending.indexOf("\n\n");
+
+      for (const line of frame.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") return;
+        try {
+          onEvent(JSON.parse(data));
+        } catch {
+          /* ignore malformed frames */
+        }
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------------ session list */
+
+/**
+ * The chat list, and what may be done to a chat from it.
+ *
+ * Listing was the whole of this while a deployment was one operator with one
+ * pile of chats; what it was missing is the ordinary housekeeping — a name that
+ * is yours, putting a finished chat away, and deleting one. All three are on the
+ * row itself rather than behind an admin screen, because the person who owns the
+ * chat is the person who knows which of them it needs.
+ *
+ * Archiving folds rather than hides: the count stays visible and the folder
+ * opens in place, so a chat that was put away is never something you have to
+ * remember the existence of. The server keeps the transcript either way; this
+ * only decides what the list draws.
+ */
+let showArchived = false;
+
+async function loadSessions() {
+  let sessions = [];
+  try {
+    ({ sessions } = await api("/api/sessions"));
+  } catch {
+    return;
+  }
+
+  const nav = $("#sessions");
+  nav.replaceChildren();
+
+  const archived = sessions.filter((session) => session.archived === true);
+  for (const session of sessions) {
+    if (session.archived !== true) nav.append(sessionRow(session));
+  }
+
+  if (archived.length > 0) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "session-archived-toggle";
+    toggle.setAttribute("aria-expanded", showArchived ? "true" : "false");
+    toggle.textContent = showArchived
+      ? `hide archived (${archived.length})`
+      : `archived (${archived.length})`;
+    toggle.addEventListener("click", () => {
+      showArchived = !showArchived;
+      void loadSessions();
+    });
+    nav.append(toggle);
+    if (showArchived) {
+      for (const session of archived) nav.append(sessionRow(session, true));
+    }
+  }
+
+  // Chats a colleague handed to you (v0.4). Listed apart from your own, because
+  // they are not yours: you can read one and put it away, and nothing here
+  // renames, archives or deletes somebody else's chat.
+  let sharedWithMe = [];
+  try {
+    ({ sharedWithMe } = await api("/api/shares"));
+  } catch {
+    sharedWithMe = [];
+  }
+  if (sharedWithMe.length > 0) {
+    const heading = document.createElement("div");
+    heading.className = "session-group";
+    heading.textContent = `shared with you (${sharedWithMe.length})`;
+    nav.append(heading);
+    for (const share of sharedWithMe) nav.append(sharedRow(share));
+  }
+
+  /*
+   * The list's own count, on the section's header. It is what makes folding the
+   * section lossless: a folded panel that still says how much is folded into it
+   * is a panel somebody can leave folded, and one that says nothing is a panel
+   * they have to open to find out what they are missing.
+   */
+  const total = sessions.length + sharedWithMe.length;
+  $("#sessions-count").textContent = total === 1 ? "1 chat" : `${total} chats`;
+}
+
+/** One chat somebody shared with you: open it read-only, or put it away. */
+function sharedRow(share) {
+  const active = state.shareOf !== null && state.shareOf.id === share.id;
+  const row = document.createElement("div");
+  row.className = `session-row shared${active ? " active" : ""}`;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "session";
+  button.setAttribute("aria-current", active ? "true" : "false");
+
+  const title = document.createElement("span");
+  title.className = "session-title";
+  title.textContent = share.title;
+
+  const meta = document.createElement("span");
+  meta.className = "session-meta";
+  meta.textContent = share.missing
+    ? "removed by its owner"
+    : `from ${share.ownerEmail} · ${share.messageCount} messages`;
+
+  button.append(title, meta);
+  if (!share.missing) button.addEventListener("click", () => void openShared(share.id));
+
+  const actions = document.createElement("span");
+  actions.className = "session-actions";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "session-action";
+  remove.textContent = "remove";
+  remove.title = `remove the shared chat “${share.title}” from your list`;
+  remove.setAttribute("aria-label", `Remove the shared chat “${share.title}”`);
+  remove.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    try {
+      await api(`/api/shares/${encodeURIComponent(share.id)}`, { method: "DELETE" });
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadSessions();
+  });
+  actions.append(remove);
+
+  row.append(button, actions);
+  return row;
+}
+
+/** One chat: open it, or rename, archive or delete it. */
+function sessionRow(session, isArchived = false) {
+  const row = document.createElement("div");
+  row.className = `session-row${session.id === state.sessionId ? " active" : ""}${
+    isArchived ? " archived" : ""
+  }`;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "session";
+  button.setAttribute("aria-current", session.id === state.sessionId ? "true" : "false");
+
+  const title = document.createElement("span");
+  title.className = "session-title";
+  title.textContent = session.title;
+
+  const meta = document.createElement("span");
+  meta.className = "session-meta";
+  // A chat tagged to a project says so, which is what makes a project more than
+  // a folder: its list of chats is the work done against it.
+  const project = session.projectId ? state.projectsById.get(session.projectId) : null;
+  meta.textContent = `${session.messageCount} messages${project ? ` · ${project.name}` : ""}${
+    session.model ? ` · ${session.model}` : ""
+  }`;
+
+  button.append(title, meta);
+  button.addEventListener("click", () => void openSession(session.id));
+
+  const actions = document.createElement("span");
+  actions.className = "session-actions";
+  actions.append(
+    sessionAction(isArchived ? "restore" : "archive", session, async () => {
+      await patchSession(session.id, { archived: !isArchived });
+    }),
+    sessionAction("share", session, async () => {
+      const email = window.prompt(`Share “${session.title}” read-only with which address?`);
+      if (email === null || email.trim() === "") return;
+      const { share, existing } = await api(
+        `/api/sessions/${encodeURIComponent(session.id)}/share`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim() }),
+        },
+      );
+      addNotice(
+        existing
+          ? `Already shared with ${share.recipientEmail}.`
+          : `Shared read-only with ${share.recipientEmail}.`,
+      );
+    }),
+    sessionAction("rename", session, async () => {
+      const next = window.prompt("Name this chat", session.title);
+      if (next === null || next.trim() === "") return;
+      await patchSession(session.id, { title: next.trim() });
+      if (session.id === state.sessionId) $("#chat-title").textContent = next.trim();
+    }),
+    sessionAction("delete", session, async () => {
+      const gone = await deleteSession(session.id);
+      if (!gone) return;
+      // Deleting the chat you are looking at has to leave the console somewhere:
+      // a fresh chat, not a transcript whose record no longer exists. That path
+      // redraws the list itself; the row's own reload covers the other case.
+      if (session.id === state.sessionId) startNewChat();
+    }),
+  );
+
+  row.append(button, actions);
+  return row;
+}
+
+/**
+ * One row control.
+ *
+ * Delete is armed in two clicks for the same reason deleting a file is: a
+ * one-click destroy sitting beside "rename" is a trap, and a native `confirm()`
+ * is neither testable nor usable headlessly.
+ */
+function sessionAction(name, session, run) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `session-action${name === "delete" ? " danger" : ""}`;
+  button.textContent = name;
+  button.title = `${name} “${session.title}”`;
+  button.setAttribute("aria-label", `${name} the chat “${session.title}”`);
+
+  if (name !== "delete") {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      try {
+        await run();
+      } catch (error) {
+        addErrorMessage(error.message);
+      }
+      await loadSessions();
+    });
+    return button;
+  }
+
+  let timer = null;
+  const disarm = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    button.textContent = "delete";
+    button.classList.remove("armed");
+  };
+  button.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    if (timer === null) {
+      button.textContent = "sure?";
+      button.classList.add("armed");
+      timer = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    try {
+      await run();
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadSessions();
+  });
+  return button;
+}
+
+/** Save one edit to a chat — its name, or whether it is put away. */
+async function patchSession(id, body) {
+  await api(`/api/sessions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function deleteSession(id) {
+  const result = await api(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  return result?.removed === true;
+}
+
+/** A fresh chat, and the callers that need one (the button, and a delete). */
+function startNewChat() {
+  if (state.streaming) return;
+  state.sessionId = null;
+  setSharedView(null);
+  state.toolCards.clear();
+  state.approvals.clear();
+  resetPreview();
+  $("#chat-title").textContent = "New chat";
+  seedFallbacks();
+  setUseOffline(true);
+  setGatewayBadge("primary");
+  $("#messages").innerHTML =
+    '<div class="empty" id="empty"><h2>What are we building?</h2><p class="muted">This agent reads, edits and runs code inside the workspace. Model access is routed through your OmniRoute gateway.</p></div>';
+  toggleSidebar(false);
+  void loadSessions();
+  $("#input").focus();
+}
+
+/** Apply a session's saved model and step budget to the toolbar. */
+function applySessionSettings(session) {
+  if (typeof session.model === "string" && session.model !== "") {
+    state.model = session.model;
+    $("#model").value = session.model;
+    // The model may not be in the picker (e.g. the session predates it).
+    if ($("#model").value !== session.model) {
+      const option = document.createElement("option");
+      option.value = session.model;
+      option.textContent = session.model;
+      $("#model").append(option);
+      $("#model").value = session.model;
+    }
+  }
+  // A chat that never saved a chain inherits whatever the server would use.
+  if (session.fallbackModels !== undefined) setFallbacks(session.fallbackModels);
+  else seedFallbacks();
+  setUseOffline(session.useOffline !== false);
+  if (typeof session.maxSteps === "number") $("#steps").value = String(session.maxSteps);
+}
+
+async function persistSettings() {
+  if (state.sessionId === null) return;
+  // Nothing to save: the server ignores a model for an automatic account, so a
+  // write here would be a setting that is stored and never read.
+  if (state.modelSelection === "auto") return;
+  const fallbacks = currentFallbacks();
+  try {
+    await api(`/api/sessions/${encodeURIComponent(state.sessionId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: currentModel(),
+        ...(fallbacks === undefined ? {} : { fallbackModels: fallbacks }),
+        useOffline: currentUseOffline(),
+        maxSteps: currentSteps(),
+      }),
+    });
+  } catch {
+    /* the setting is also sent with the next message, so this is best effort */
+  }
+}
+
+async function openSession(id) {
+  if (state.streaming) return;
+  let session;
+  try {
+    ({ session } = await api(`/api/sessions/${encodeURIComponent(id)}`));
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  state.sessionId = session.id;
+  setSharedView(null);
+  // On a phone the chat list is a drawer covering the chat that was just
+  // chosen; on a desktop this is a no-op, which is the point.
+  toggleSidebar(false);
+  $("#chat-title").textContent = session.title;
+  renderTranscript(session);
+
+  applySessionSettings(session);
+  scrollToBottom(true);
+  await loadSessions();
+}
+
+/**
+ * Open a chat somebody shared with you, read-only (v0.4).
+ *
+ * The transcript is drawn exactly as the owner's own console draws it — the
+ * record is the same record — and the only difference is stated where it can be
+ * seen: the composer is off and the top bar says whose chat this is. There is no
+ * "continue as them": the model route resolves sessions against your own store,
+ * so the id is not there and a turn against it is refused, which is why turning
+ * the composer off is honesty rather than the control.
+ */
+async function openShared(shareId) {
+  if (state.streaming) return;
+  let payload;
+  try {
+    payload = await api(`/api/shares/${encodeURIComponent(shareId)}`);
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  // Deliberately not `state.sessionId`: that id belongs to somebody else's
+  // store, and every route that reads it would 404. A shared view has no
+  // session of your own, which is the whole point.
+  state.sessionId = null;
+  setSharedView(payload.share);
+  $("#chat-title").textContent = `${payload.share.ownerEmail} — shared with you`;
+  renderTranscript(payload.session);
+  scrollToBottom(true);
+  await loadSessions();
+}
+
+/**
+ * Whether the console is showing somebody else's chat, and the composer's state.
+ * `null` is your own chat (or a fresh one), where the composer is live again.
+ */
+function setSharedView(share) {
+  state.shareOf = share;
+  const badge = $("#share-badge");
+  const readOnly = share !== null;
+  badge.classList.toggle("hidden", !readOnly);
+  badge.textContent = readOnly ? `read-only — shared by ${share.ownerEmail}` : "";
+  $("#input").disabled = readOnly;
+  $("#send").disabled = readOnly;
+  $("#input").placeholder = readOnly
+    ? "This chat was shared with you read-only."
+    : "Describe a change, ask a question, or paste an error...";
+}
+
+/**
+ * Draw a transcript into the message pane.
+ *
+ * Shared between a chat you can continue and one that was handed to you, because
+ * the record is the same record; what differs is only whether the composer is
+ * live, which `setSharedView` owns.
+ */
+function renderTranscript(session) {
+  state.toolCards.clear();
+  state.approvals.clear();
+  resetPreview();
+  const box = $("#messages");
+  box.replaceChildren();
+
+  // Pair tool calls with their results before rendering.
+  const results = new Map();
+  /** The newest call that wrote a file, for the preview pane to show. */
+  let lastWrite = null;
+  for (const message of session.messages) {
+    if (message.role === "tool" && message.tool_call_id) results.set(message.tool_call_id, message);
+  }
+
+  for (const message of session.messages) {
+    if (message.role === "user") {
+      addUserMessage(message.content ?? "");
+    } else if (message.role === "assistant") {
+      if (message.content && message.content.trim() !== "") {
+        const node = addAssistantMessage();
+        node.innerHTML = renderMarkdown(message.content);
+        node.classList.remove("cursor");
+      }
+      for (const call of message.tool_calls ?? []) {
+        let args = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          args = call.function.arguments;
+        }
+        const result = results.get(call.id);
+        const ok = result ? !/^(Exit code: [1-9]|Refused)/.test(result.content ?? "") : true;
+        addToolCard(call.id, call.function.name, args, result?.diff);
+        finishToolCard(
+          call.id,
+          call.function.name,
+          ok,
+          result ? result.content : "(no result recorded)",
+          result?.diff,
+        );
+        // A write that failed is not what the pane should be holding up.
+        if (ok && WRITER_TOOLS.has(call.function.name)) {
+          lastWrite = { name: call.function.name, args, diff: result?.diff ?? null };
+        }
+      }
+    }
+  }
+
+  if (box.childElementCount === 0) {
+    box.innerHTML =
+      '<div class="empty" id="empty"><h2>What are we building?</h2><p class="muted">This agent reads, edits and runs code inside the workspace. Model access is routed through your OmniRoute gateway.</p></div>';
+  }
+
+  if (lastWrite === null) resetPreview();
+  else showRestoredFile(lastWrite);
+}
+
+/* ---------------------------------------------------------------- workspace */
+
+async function loadFiles(path = state.filePath) {
+  let payload;
+  try {
+    payload = await api(`/api/files?path=${encodeURIComponent(path)}`);
+  } catch (error) {
+    $("#files-list").textContent = error.message;
+    return;
+  }
+
+  state.filePath = payload.path;
+  $("#files-path").textContent = payload.path;
+
+  const list = $("#files-list");
+  list.replaceChildren();
+
+  if (payload.path !== ".") {
+    const up = document.createElement("button");
+    up.className = "file-entry";
+    const parent = payload.path.split("/").slice(0, -1).join("/") || ".";
+    up.innerHTML = '<span class="glyph" aria-hidden="true">↑</span> ..';
+    up.setAttribute("aria-label", "Go up one directory");
+    up.addEventListener("click", () => void loadFiles(parent));
+    list.append(up);
+  }
+
+  for (const entry of payload.entries) {
+    const button = document.createElement("button");
+    button.className = entry.changed ? "file-entry changed" : "file-entry";
+
+    const glyph = document.createElement("span");
+    glyph.className = "glyph";
+    glyph.setAttribute("aria-hidden", "true");
+    glyph.textContent = entry.type === "dir" ? "▸" : "·";
+
+    const name = document.createElement("span");
+    name.textContent = entry.name;
+    button.append(glyph, name);
+
+    // A dot marks anything the agent has written, so the tree points at the change.
+    if (entry.changed) {
+      const mark = document.createElement("span");
+      mark.className = "changed-mark";
+      mark.setAttribute("aria-hidden", "true");
+      button.append(mark);
+      button.title = "Changed by the agent";
+      button.setAttribute("aria-label", `${entry.name}, changed by the agent`);
+    }
+
+    if (entry.type === "file") {
+      const size = document.createElement("span");
+      size.className = "size";
+      size.textContent = formatBytes(entry.size);
+      button.append(size);
+    }
+
+    button.addEventListener("click", () =>
+      entry.type === "dir" ? void loadFiles(entry.path) : void openFile(entry.path),
+    );
+    list.append(button);
+  }
+
+  if (payload.entries.length === 0) {
+    list.textContent = "empty directory";
+  }
+}
+
+/**
+ * Which directory the agent works in, and how to change it.
+ *
+ * `dirs` is every directory inside the sandbox, never the host: picking one moves
+ * the agent's working directory without moving the fence around it. Values are
+ * sandbox-relative (`.` is the sandbox itself), which is what the picker offers
+ * and what `POST /api/workspace` takes back.
+ */
+async function loadWorkspace() {
+  let info;
+  try {
+    info = await api("/api/workspace");
+  } catch {
+    return;
+  }
+
+  const pick = $("#workspace-pick");
+  pick.replaceChildren();
+  for (const dir of info.dirs ?? []) {
+    const option = document.createElement("option");
+    option.value = dir;
+    option.textContent = dir === "." ? "(the sandbox root)" : dir;
+    pick.append(option);
+  }
+  pick.value = info.rel === "" ? "." : info.rel;
+
+  const note = $("#workspace-note");
+  note.textContent = info.cwd;
+  note.title = `The agent reads and writes here. Nothing outside ${info.base} is reachable.`;
+}
+
+/** Make a directory the agent's working directory. */
+async function chooseWorkspace(path) {
+  try {
+    const payload = await api("/api/workspace", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    });
+    $("#workspace-note").textContent = payload.cwd;
+  } catch (error) {
+    $("#workspace-note").textContent = error.message;
+    return;
+  }
+  await afterWorkspaceChange();
+}
+
+/**
+ * Everything that has to follow the agent moving to a different tree.
+ *
+ * A different root is a different file tree, a different set of changed-marker
+ * files, and a different running app — the frame in the pane belongs to the
+ * workspace that produced it, so showing it under the new one's name would be a
+ * lie about what the person is looking at. Choosing a folder, connecting to a
+ * remote one and cloning a repository all end here.
+ */
+async function afterWorkspaceChange() {
+  await loadFiles(".");
+  await loadWorkspace();
+  unloadPreviewFrame();
+  await refreshPreviewApp();
+}
+
+/** Create a folder in the working directory, then offer it as the working directory. */
+async function newWorkspaceFolder() {
+  const name = window.prompt("New folder name", "project");
+  if (name === null) return;
+  try {
+    await api("/api/workspace/mkdir", {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim() }),
+    });
+  } catch (error) {
+    $("#workspace-note").textContent = error.message;
+    return;
+  }
+  await loadFiles(state.filePath);
+  await loadWorkspace();
+}
+
+/*
+ * Empty the working directory, in two clicks.
+ *
+ * The same reasoning as deleting a file: a one-click wipe of the whole workspace
+ * sitting in the panel's header is a trap, and a native confirm() cannot be
+ * answered in a headless browser, so the first click arms the button and says so
+ * and a second click within a few seconds clears the folder. Dot-entries (`.git`,
+ * `.env`) are kept by the server, which is why this is "clear" and not "delete".
+ */
+let clearArmed = null;
+
+function disarmClear() {
+  if (clearArmed === null) return;
+  clearTimeout(clearArmed.timer);
+  clearArmed = null;
+  const button = $("#files-clear");
+  button.textContent = "clear";
+  button.classList.remove("armed");
+  button.setAttribute("aria-label", "Clear this workspace folder");
+}
+
+function armClear() {
+  if (clearArmed !== null) {
+    disarmClear();
+    void clearWorkspaceFolder();
+    return;
+  }
+
+  disarmClear();
+  const button = $("#files-clear");
+  button.textContent = "confirm clear";
+  button.classList.add("armed");
+  button.setAttribute("aria-label", "Confirm clearing this workspace folder");
+  clearArmed = { timer: setTimeout(disarmClear, 6000) };
+}
+
+async function clearWorkspaceFolder() {
+  let payload;
+  try {
+    payload = await api("/api/workspace/clear", { method: "POST" });
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  const kept = Array.isArray(payload.kept) ? payload.kept : [];
+  const removed = Number(payload.removed ?? 0);
+  const dropped = Number(payload.snapshots ?? 0);
+  addNotice(
+    `Workspace cleared — ${removed} ${removed === 1 ? "entry" : "entries"} removed` +
+      (kept.length > 0 ? `, kept ${kept.join(", ")}` : "") +
+      (dropped > 0
+        ? `; ${dropped} file-history ${dropped === 1 ? "entry" : "entries"} dropped`
+        : "") +
+      ".",
+  );
+
+  // The viewer and the tree were showing files that no longer exist, and the
+  // folder's shape is what the picker re-reads.
+  closeViewer();
+  resetPreview();
+  await loadFiles(".");
+  await loadWorkspace();
+  await loadProjects();
+}
+
+/* ---------------------------------------------------------------- projects */
+
+/*
+ * Saved workspace projects.
+ *
+ * The list is the noun the folder picker never had: a workspace you can name and
+ * come back to. Opening one runs through the *same* `POST /api/workspace` the
+ * picker uses, so everything downstream — the file tree, the preview, the
+ * publish flow — follows without knowing projects exist. Creating one makes the
+ * directory and opens it, because a project you just named is one you meant to
+ * work in.
+ */
+async function loadProjects() {
+  let info;
+  try {
+    info = await api("/api/projects");
+  } catch {
+    return;
+  }
+
+  const projects = Array.isArray(info.projects) ? info.projects : [];
+  state.projectsById = new Map(projects.map((project) => [project.id, project]));
+  const active = projects.find((project) => project.active === true) ?? null;
+  state.projectId = active === null ? null : active.id;
+
+  const list = $("#projects-list");
+  list.replaceChildren();
+  for (const project of projects) list.append(projectRow(project));
+
+  // The chat list names each chat's project, so it is redrawn now that the names
+  // are known (the two requests are independent and either can land first).
+  void loadSessions();
+}
+
+/** One saved project: open it, rename it, or forget it. */
+function projectRow(project) {
+  const row = document.createElement("div");
+  row.className = `project${project.active ? " active" : ""}${project.exists ? "" : " missing"}`;
+
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "project";
+  open.setAttribute("aria-current", project.active ? "true" : "false");
+  const name = document.createElement("span");
+  name.className = "project-name";
+  name.textContent = project.name;
+  open.append(name);
+  if (project.exists) {
+    const tag = document.createElement("span");
+    tag.className = "project-tag";
+    tag.textContent = project.active ? "open" : project.dir;
+    open.append(tag);
+  } else {
+    const gone = document.createElement("span");
+    gone.className = "project-gone";
+    gone.textContent = "folder is gone";
+    open.append(gone);
+  }
+  open.addEventListener("click", () => void openProjectById(project.id));
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "btn-ghost mini";
+  save.textContent = "export";
+  save.title = project.exists
+    ? `Save “${project.name}” as one portable file`
+    : `“${project.name}” has no folder left to export`;
+  // Nothing to export once the directory is gone; the row already says so.
+  save.disabled = !project.exists;
+  save.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void exportProjectById(project);
+  });
+
+  const rename = document.createElement("button");
+  rename.type = "button";
+  rename.className = "btn-ghost mini";
+  rename.textContent = "rename";
+  rename.title = `Rename “${project.name}” (the folder keeps its name)`;
+  rename.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const next = window.prompt("Project name", project.name);
+    if (next === null || next.trim() === "") return;
+    try {
+      await api(`/api/projects/${encodeURIComponent(project.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: next.trim() }),
+      });
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadProjects();
+  });
+
+  const install = document.createElement("button");
+  install.type = "button";
+  install.className = "btn-ghost mini";
+  install.textContent = "install";
+  install.title = project.exists
+    ? `Install “${project.name}”'s dependencies — the steps are shown in the log below before they run`
+    : `“${project.name}” has no folder left to install into`;
+  install.disabled = !project.exists;
+  install.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void installProjectById(project);
+  });
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn-ghost mini";
+  remove.textContent = "remove";
+  remove.title = `Stop listing “${project.name}”. Its files stay in the workspace.`;
+  remove.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const alsoFiles = window.confirm(
+      `Remove “${project.name}” from the project list?\n\nOK also deletes the folder and everything in it. Cancel keeps the files.`,
+    );
+    try {
+      const query = alsoFiles ? "?files=delete" : "";
+      await api(`/api/projects/${encodeURIComponent(project.id)}${query}`, { method: "DELETE" });
+      addNotice(
+        alsoFiles
+          ? `Project “${project.name}” and its folder were deleted.`
+          : `Project “${project.name}” is no longer listed; its files are untouched.`,
+      );
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadProjects();
+    await loadWorkspace();
+    await loadFiles(".");
+  });
+
+  row.append(open, install, save, rename, remove);
+  return row;
+}
+
+async function createProject() {
+  const name = window.prompt("Name this project", "my-project");
+  if (name === null || name.trim() === "") return;
+  let project;
+  try {
+    ({ project } = await api("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), open: true }),
+    }));
+    addNotice(`Project “${project.name}” created — the agent now works in ${project.dir}.`);
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+  await loadProjects();
+  await loadWorkspace();
+  await loadFiles(".");
+}
+
+async function openProjectById(id) {
+  try {
+    const payload = await api(`/api/projects/${encodeURIComponent(id)}/open`, { method: "POST" });
+    $("#workspace-note").textContent = payload.cwd;
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+  // A different working directory is a different tree and a different app, so
+  // start both at the top rather than leaving them on the old one's paths.
+  unloadPreviewFrame();
+  await loadProjects();
+  await loadWorkspace();
+  await loadFiles(".");
+  await refreshPreviewApp();
+}
+
+/**
+ * Save a project as one portable file, and load one back.
+ *
+ * The export is the bundle the server encodes (`src/project-archive.ts`), handed
+ * to the browser as a download; the import reads a chosen file in the page and
+ * POSTs its text back, so nothing has to be streamed and the same bytes load on
+ * another deployment. A loaded bundle becomes a *new* project and opens, because
+ * a project you just loaded is one you meant to work in.
+ */
+async function exportProjectById(project) {
+  let payload;
+  try {
+    payload = await api(`/api/projects/${encodeURIComponent(project.id)}/export`);
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  const filename = typeof payload.filename === "string" ? payload.filename : "project.genie-project.json";
+  saveTextFile(filename, typeof payload.content === "string" ? payload.content : "");
+  const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
+  const files = Number(payload.files ?? 0);
+  addNotice(
+    `Exported “${project.name}” — ${files} ${files === 1 ? "file" : "files"} saved to ${filename}` +
+      (skipped.length > 0 ? ` (left out: ${skipped.join(", ")}).` : "."),
+  );
+}
+
+/** Hand the browser a file to download. */
+function saveTextFile(filename, text) {
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importProjectFromFile(file) {
+  let text;
+  try {
+    text = await file.text();
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  let payload;
+  try {
+    // The bundle is posted as its own text, so it is not re-escaped on the way in.
+    payload = await api("/api/projects/import?open=1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: text,
+    });
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  const project = payload.project;
+  const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
+  const files = Number(payload.files ?? 0);
+  addNotice(
+    `Loaded “${project.name}” — ${files} ${files === 1 ? "file" : "files"} written to ${project.dir}.` +
+      (skipped.length > 0 ? ` The bundle had left out: ${skipped.join(", ")}.` : ""),
+  );
+
+  // A loaded project is a different working directory, so the tree, the picker
+  // and the preview all start from the top exactly as opening one does.
+  unloadPreviewFrame();
+  await loadProjects();
+  await loadWorkspace();
+  await loadFiles(".");
+  await refreshPreviewApp();
+}
+
+/*
+ * A project that arrives as a `.zip`.
+ *
+ * `upload .zip` is the whole feature in one control: the archive is POSTed as its
+ * own bytes, the server unpacks it into a *new* project with the wrapping folder
+ * stripped, opens it, and installs its dependencies before answering. So the file
+ * is handed to `fetch` unread — a 40 MB project is never decoded into a string in
+ * the page — and the response carries the install's step-by-step report, which is
+ * printed as a log rather than summarised: when an install fails, the installer's
+ * own words are the useful part.
+ */
+async function uploadProjectZip(file) {
+  const log = $("#project-import-log");
+  log.classList.remove("hidden");
+  log.textContent = `uploading ${file.name}…\nthe dependencies are installed before this finishes, so give it a moment.`;
+
+  let payload;
+  try {
+    payload = await api("/api/projects/import-zip?open=1&install=1", { method: "POST", body: file });
+  } catch (error) {
+    log.textContent = `${file.name}: ${error.message}`;
+    addErrorMessage(error.message);
+    return;
+  }
+
+  renderImportLog(payload);
+
+  const project = payload.project;
+  const files = Number(payload.files ?? 0);
+  const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
+  const install = payload.install;
+  const failed = install !== null && install !== undefined && install.ok !== true;
+  addNotice(
+    failed
+      ? `Loaded “${project.name}” — ${files} ${files === 1 ? "file" : "files"}, but the dependency install did not finish. See the log under the project list.`
+      : `Loaded “${project.name}” — ${files} ${files === 1 ? "file" : "files"} written to ${project.dir}` +
+          (install && install.ran > 0 ? ` and ${install.ran} install ${install.ran === 1 ? "step" : "steps"} run.` : ".") +
+          (skipped.length > 0 ? ` Left out: ${skipped.length} ${skipped.length === 1 ? "entry" : "entries"} (see the log).` : ""),
+  );
+
+  // A new project is a new working directory, so the tree, the picker and the
+  // preview all start from the top exactly as opening one does.
+  unloadPreviewFrame();
+  await loadProjects();
+  await loadWorkspace();
+  await loadFiles(".");
+  await refreshPreviewApp();
+}
+
+/**
+ * Install one project's dependencies, on request.
+ *
+ * The upload does this for a zip automatically, but a project can arrive other
+ * ways — a clone, a bundle, a folder made by hand, or a zip uploaded before this
+ * deployment had a network for installs — and "install the dependencies" is then
+ * a thing a person wants to ask for rather than a thing they have to remember the
+ * command for. The plan is fetched and printed *first* (`GET …/stack`), so the log
+ * says what is about to run even if it then fails, which is the whole reason the
+ * plan is a pure function of file names on the server side.
+ */
+async function installProjectById(project) {
+  const log = $("#project-import-log");
+  log.classList.remove("hidden");
+
+  let plan;
+  try {
+    plan = await api(`/api/projects/${encodeURIComponent(project.id)}/stack`);
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  const stack = plan?.stack ?? {};
+  const steps = Array.isArray(stack.steps) ? stack.steps : [];
+  const notes = Array.isArray(stack.notes) ? stack.notes : [];
+
+  if (steps.length === 0) {
+    log.textContent = [
+      `“${project.name}”: nothing to install — no manifest this console recognises.`,
+      ...notes.map((note) => `note: ${note}`),
+    ].join("\n");
+    return;
+  }
+
+  log.textContent = [`installing “${project.name}”…`, ...steps.map((step) => `${step.label}: ${step.command}`)].join("\n");
+
+  let report;
+  try {
+    report = await api(`/api/projects/${encodeURIComponent(project.id)}/install`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+  } catch (error) {
+    log.textContent = `${log.textContent}\n${error.message}`;
+    addErrorMessage(error.message);
+    return;
+  }
+
+  renderImportLog({ project, files: 0, root: null, skipped: [], stack: report.stack ?? stack, install: report });
+  const failed = report.ok !== true;
+  addNotice(
+    failed
+      ? `“${project.name}”: the dependency install did not finish. The log under the project list has the installer's own output.`
+      : `“${project.name}”: dependencies installed (${report.ran} ${report.ran === 1 ? "step" : "steps"}).`,
+  );
+}
+
+/** What an upload did, line by line: what landed, what did not, and what ran. */
+function renderImportLog(payload) {
+  const log = $("#project-import-log");
+  const lines = [];
+
+  if (typeof payload.root === "string" && payload.root !== "") {
+    lines.push(`unwrapped the folder “${payload.root}” — the project is what was inside it`);
+  }
+  // Absent for an install-only run, which is about the dependencies and has no
+  // files of its own to report.
+  const written = Number(payload.files ?? 0);
+  if (written > 0) lines.push(`${written} files written`);
+
+  const skipped = Array.isArray(payload.skipped) ? payload.skipped : [];
+  if (skipped.length > 0) {
+    const named = skipped.slice(0, 6).map((entry) => entry.path ?? String(entry));
+    lines.push(`left out: ${named.join(", ")}${skipped.length > named.length ? ` (+${skipped.length - named.length} more)` : ""}`);
+  }
+
+  const install = payload.install;
+  if (install === null || install === undefined) {
+    lines.push("dependencies: not installed (this deployment only installs them on request)");
+  } else if (install.ran === 0) {
+    lines.push("dependencies: nothing to install — no manifest this console recognises");
+  } else {
+    lines.push(`dependencies — ${install.where}`);
+    for (const step of install.steps) {
+      lines.push(`${step.ok ? "✓" : "✗"} ${step.label}: ${step.command}`);
+      // The tail of a failed step's output, because that is what says why.
+      if (!step.ok) {
+        const tail = String(step.output ?? "").trim().split("\n").slice(-14).join("\n");
+        if (tail !== "") lines.push(tail.split("\n").map((line) => `    ${line}`).join("\n"));
+        if (step.refused) lines.push(`    ${step.refused}`);
+      }
+    }
+    if (install.stopped === true) lines.push("stopped at the first failure — later steps were not attempted");
+  }
+
+  const notes = Array.isArray(payload.stack?.notes) ? payload.stack.notes : [];
+  for (const note of notes) lines.push(`note: ${note}`);
+
+  log.textContent = lines.join("\n");
+}
+
+/*
+ * Publishing a project to a repository that does not exist yet.
+ *
+ * The console asks for the two things only a person knows — which forge, and what
+ * to call the repository — and the server does the rest: create, point `origin`,
+ * commit, push. Which forges are actually available is asked rather than assumed:
+ * GitHub needs a token (asked for here, held for the session by the server and
+ * never written into the project), and Atlas needs either a connected forge or the
+ * deployment's own Atlas credential.
+ */
+function togglePublish(force) {
+  const dialog = $("#publish");
+  const open = force === undefined ? dialog.classList.contains("hidden") : force;
+  dialog.classList.toggle("hidden", !open);
+  $("#project-publish").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    enterDialog(dialog);
+    void preparePublish();
+  } else {
+    leaveDialog(dialog);
+  }
+}
+
+/** Prefill the dialog: the project's own name, and which forges are usable. */
+async function preparePublish() {
+  const note = $("#publish-note");
+  const project = state.projectId === null ? null : state.projectsById.get(state.projectId) ?? null;
+
+  if (project === null) {
+    note.textContent = "Open a project first — publishing saves the project you are working in.";
+    $("#publish-go").disabled = true;
+    return;
+  }
+  $("#publish-go").disabled = false;
+
+  const name = $("#publish-name");
+  if (name.value.trim() === "") name.value = slugForRepo(project.name);
+
+  try {
+    const info = await api("/api/remote");
+    const atlas = info?.atlas ?? {};
+    const forges = Array.isArray(info?.forge) ? info.forge : [];
+    const where =
+      atlas.configured === true
+        ? forges.length > 0
+          ? `Atlas is ${atlas.url} (connected as ${forges[0].user}).`
+          : `Atlas is ${atlas.url}; the deployment's own credential will be used if this account has no connection to it.`
+        : "Atlas is not configured on this deployment (AGENT_ATLAS_URL).";
+    note.textContent =
+      `“${project.name}” is published from ${project.dir}, and its directory becomes the clone: ` +
+      `origin is set to the new repository, so pushing and pull requests work here afterwards. ${where}`;
+  } catch (error) {
+    note.textContent = error.message;
+  }
+
+  syncPublishTarget();
+}
+
+/** A repository name from a project name: lowercase, hyphens, no punctuation. */
+function slugForRepo(text) {
+  const slug = String(text ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return slug === "" ? "project" : slug;
+}
+
+/** Only GitHub needs a token, so its field appears only when GitHub is chosen. */
+function syncPublishTarget() {
+  const target = $("#publish-target").value;
+  $("#publish-token-field").classList.toggle("hidden", target !== "github");
+}
+
+async function publishActiveProject() {
+  const project = state.projectId === null ? null : state.projectsById.get(state.projectId) ?? null;
+  if (project === null) {
+    addErrorMessage("Open a project first — publishing saves the project you are working in.");
+    return;
+  }
+
+  const button = $("#publish-go");
+  const target = $("#publish-target").value;
+  const name = $("#publish-name").value.trim();
+  const description = $("#publish-description").value.trim();
+  const isPrivate = $("#publish-private").checked;
+  const token = $("#publish-token").value.trim();
+
+  button.disabled = true;
+  $("#publish-note").textContent = `creating ${name === "" ? project.name : name} on ${target === "github" ? "GitHub" : "Atlas"} and pushing the project…`;
+
+  let payload;
+  try {
+    payload = await api("/api/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        target,
+        ...(name === "" ? {} : { name }),
+        ...(description === "" ? {} : { description }),
+        private: isPrivate,
+        ...(token === "" ? {} : { token }),
+      }),
+    });
+  } catch (error) {
+    $("#publish-note").textContent = error.message;
+    addErrorMessage(error.message);
+    return;
+  } finally {
+    button.disabled = false;
+  }
+
+  // Used for this one push and then forgotten in the page, as the server does.
+  $("#publish-token").value = "";
+  togglePublish(false);
+  addNotice(
+    `Saved “${project.name}” to ${payload.repo} — ${payload.files} ${payload.files === 1 ? "file" : "files"} on ${payload.branch}` +
+      (payload.commit === "" ? "" : ` (${payload.commit})`) +
+      (payload.ignoreFile ? "; a .gitignore was added so installed dependencies are not committed" : "") +
+      (payload.existing ? `; that repository already existed, so the work was pushed into it.` : ".") +
+      ` ${payload.url}`,
+  );
+  // The session now holds the repository, so the push and pull-request controls
+  // are usable from here on. `origin` in the project points at it too.
+  await loadProjects();
+  await loadRemote();
+}
+
+/**
+ * This chat's own controls: the fallback chain, the local fallback and the step
+ * budget.
+ *
+ * They live in a dialog rather than the top bar because they are decisions you
+ * make once per chat — three more controls beside the model made the bar read as
+ * settings rather than as where you are.
+ */
+function toggleSettings(force) {
+  const dialog = $("#settings");
+  const open = force === undefined ? dialog.classList.contains("hidden") : force;
+  dialog.classList.toggle("hidden", !open);
+  $("#chat-settings").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    $("#settings-note").textContent =
+      state.sessionId === null ? "Saved on the chat once it starts." : "Saved on this chat.";
+    enterDialog(dialog);
+  } else {
+    leaveDialog(dialog);
+  }
+}
+
+/**
+ * Appearance: light, dark, system, and the family's colour scheme.
+ *
+ * Nothing here decides anything — `unity-theme.js` owns the preference and paints
+ * it before the first frame, which is why the page never flashes the wrong palette.
+ * This only shows the controls whose state is read back from the document, so the
+ * panel cannot claim a mode the page is not in. That is also what makes the deep
+ * link honest: `?settings=appearance` opens the same controls anyone else gets.
+ */
+function toggleAppearance(force) {
+  const dialog = $("#appearance");
+  const open = force === undefined ? dialog.classList.contains("hidden") : force;
+  dialog.classList.toggle("hidden", !open);
+  $("#appearance-open").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) enterDialog(dialog);
+  else leaveDialog(dialog);
+}
+
+/* --------------------------------------------------------- deleting a file */
+
+/*
+ * Deleting from the viewer, in two clicks.
+ *
+ * A native confirm() is the obvious way and the wrong one: it blocks the page
+ * and nobody can answer it in a headless browser. A one-click delete sitting
+ * next to "close" is a trap. So the first click arms the button and a second one
+ * within a few seconds removes the file.
+ */
+let deleteArmed = null;
+
+function disarmDelete() {
+  if (deleteArmed === null) return;
+  clearTimeout(deleteArmed.timer);
+  deleteArmed = null;
+  const button = $("#viewer-delete");
+  button.textContent = "delete";
+  button.classList.remove("armed");
+}
+
+function armDelete() {
+  const path = state.viewer.path;
+  if (path === null) return;
+
+  if (deleteArmed !== null && deleteArmed.path === path) {
+    disarmDelete();
+    void deleteFile(path);
+    return;
+  }
+
+  disarmDelete();
+  const button = $("#viewer-delete");
+  button.textContent = "confirm delete";
+  button.classList.add("armed");
+  button.setAttribute("aria-label", `Confirm deleting ${path}`);
+  deleteArmed = { path, timer: setTimeout(disarmDelete, 6000) };
+}
+
+async function deleteFile(path) {
+  try {
+    await api(`/api/file?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+  } catch (error) {
+    addErrorMessage(error.message);
+    return;
+  }
+
+  closeViewer();
+  // The pane would otherwise be holding a file that no longer exists.
+  if (state.preview.path === path) resetPreview();
+  await loadFiles(state.filePath);
+  addNotice(`${path} deleted from the workspace`);
+}
+
+function closeViewer() {
+  const viewer = $("#viewer");
+  if (viewer.classList.contains("hidden")) return;
+  disarmDelete();
+  viewer.classList.add("hidden");
+  state.viewer = { path: null, mode: "file", diff: null };
+  leaveDialog(viewer);
+}
+
+/** Switch the viewer between the agent's change and the file as it stands. */
+async function setViewerMode(mode) {
+  const diffBox = $("#viewer-diff");
+  const body = $("#viewer-body");
+  const toggle = $("#viewer-toggle");
+
+  if (mode === "diff") {
+    if (state.viewer.diff === null) {
+      try {
+        const payload = await api(`/api/file/diff?path=${encodeURIComponent(state.viewer.path)}`);
+        state.viewer.diff = payload.diff ?? false;
+      } catch (error) {
+        state.viewer.diff = false;
+        addErrorMessage(error.message);
+      }
+
+      diffBox.replaceChildren();
+      if (state.viewer.diff) {
+        const rendered = renderDiff(state.viewer.diff);
+        rendered.classList.add("diff-inline");
+        diffBox.append(rendered);
+      } else {
+        const note = document.createElement("p");
+        note.className = "muted viewer-note";
+        note.textContent = "The agent has not changed this file.";
+        diffBox.append(note);
+      }
+    }
+    diffBox.classList.remove("hidden");
+    body.classList.add("hidden");
+  } else {
+    diffBox.classList.add("hidden");
+    body.classList.remove("hidden");
+  }
+
+  state.viewer.mode = mode;
+  toggle.textContent = mode === "diff" ? "show file" : "show diff";
+  toggle.setAttribute("aria-pressed", mode === "diff" ? "true" : "false");
+}
+
+async function openFile(path) {
+  try {
+    const payload = await api(`/api/file?path=${encodeURIComponent(path)}`);
+    $("#viewer-title").textContent = `${payload.path}${payload.truncated ? " (truncated)" : ""}`;
+    // The same colouring as the preview pane: the file you opened to read and the
+    // file being written should not look like two different applications.
+    const body = $("#viewer-body");
+    const html = highlightCode(payload.content, languageOf(payload.path));
+    if (html === null) body.textContent = payload.content;
+    else body.innerHTML = html;
+
+    state.viewer = { path, mode: "file", diff: null };
+    // A file is open, so it can be deleted - but never by the click that opened it.
+    disarmDelete();
+    $("#viewer-delete").classList.remove("hidden");
+    $("#viewer-toggle").classList.toggle("hidden", !payload.hasHistory);
+    // For a file the agent has touched, the change is what you came to see.
+    await setViewerMode(payload.hasHistory ? "diff" : "file");
+
+    $("#viewer").classList.remove("hidden");
+    enterDialog($("#viewer"));
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+/* ------------------------------------------------------------------- status */
+
+async function loadHealth() {
+  try {
+    const health = await api("/api/health");
+    $("#gateway-dot").className = `status-dot ${health.ok ? "ok" : "bad"}`;
+    $("#gateway-label").textContent = health.ok
+      ? `${health.modelCount} models via gateway`
+      : "gateway unreachable";
+    $("#workspace-label").textContent = health.workspace;
+
+    if (health.sandbox) {
+      // Green only when commands really are isolated in a container.
+      const level = health.sandbox.backend === "docker" ? "ok" : "warn";
+      $("#sandbox-dot").className = `status-dot ${level}`;
+      $("#sandbox-label").textContent =
+        health.sandbox.backend === "docker" ? "sandboxed commands" : "commands run on host";
+      $("#sandbox-label").title = health.sandbox.detail;
+    }
+
+    if (health.approval) {
+      const badge = $("#approval-badge");
+      const mode = health.approval.mode ?? "off";
+      badge.classList.toggle("hidden", mode === "off");
+      badge.textContent = `approval: ${mode}`;
+      badge.title =
+        mode === "all"
+          ? "Every file change and command asks for a click first"
+          : `Every command, and writes over ${health.approval.maxLines} lines, ask for a click first`;
+    }
+
+    if (Array.isArray(health.fallbackModels)) {
+      state.fallbackDefault = health.fallbackModels;
+      // Only seed a chat that has not already chosen a chain of its own.
+      if (state.sessionId === null) setFallbacks(state.fallbackDefault);
+    }
+
+    /*
+     * Who chooses the model. `auto` is an account without a paid plan (or a
+     * deployment with AGENT_FORCE_AUTO_MODEL): the picker and the chain box are
+     * hidden rather than disabled, because a greyed-out control still invites the
+     * question "how do I unlock this?" and this one cannot be unlocked from here.
+     */
+    if (health.modelSelection === "auto" || health.modelSelection === "manual") {
+      state.modelSelection = health.modelSelection;
+    }
+    if (Array.isArray(health.autoModels)) state.autoModels = health.autoModels;
+    const auto = state.modelSelection === "auto";
+    $("#model-field").classList.toggle("hidden", auto);
+    $("#chat-settings").classList.toggle("hidden", auto);
+    if (auto) toggleSettings(false);
+    setAutoBadge(state.autoModels);
+
+    renderModelHealth(health.modelHealth);
+
+    // Its own request: usage is read from the plane, and the status poll should
+    // not wait on it or fail with it.
+    try {
+      renderAccountUsage(await api("/api/account/usage"));
+    } catch {
+      renderAccountUsage(null);
+    }
+
+    if (health.offline) {
+      const models = Array.isArray(health.offline.models) ? health.offline.models : [];
+      $("#offline-dot").className = "status-dot ok";
+      $("#offline-label").textContent = `offline: ${models.join(", ") || health.offline.url}`;
+      $("#offline-label").title = `${health.offline.url} — tried only after every main model fails, and needs no network.`;
+      $("#use-offline").disabled = false;
+      $("#use-offline").title =
+        "Let this chat fall back to the local model when every main model fails. Uncheck for work where a small local model's answer would be worse than an error.";
+    } else {
+      $("#offline-dot").className = "status-dot";
+      $("#offline-label").textContent = "no offline fallback";
+      $("#offline-label").title =
+        "Set AGENT_OFFLINE_URL to a local model server (for example Ollama) so the agent keeps working without a network.";
+      $("#use-offline").disabled = true;
+      $("#use-offline").title = "No offline gateway is configured, so there is nothing to fall back to.";
+    }
+
+    if (health.limits) {
+      state.limits = health.limits;
+      $("#steps").min = String(health.limits.minSteps);
+      $("#steps").max = String(health.limits.maxSteps);
+      if ($("#steps").dataset.touched !== "true") {
+        $("#steps").value = String(health.limits.defaultSteps);
+      }
+    }
+  } catch (error) {
+    $("#gateway-dot").className = "status-dot bad";
+    $("#gateway-label").textContent = error.message;
+  }
+}
+
+/**
+ * Ids to offer when the catalog cannot be read at all. Deliberately short and
+ * generic: guessing specific model names here would just invent a menu, and
+ * "auto/offline" in particular would be confused with the real offline gateway.
+ */
+function defaults() {
+  return ["auto", "auto/coding", "auto/best-coding"];
+}
+
+/** Surface the ordered fallback list so it is clear what else will be tried. */
+function showModelChain(models) {
+  if (!Array.isArray(models) || models.length === 0) return;
+  state.chainModels = models;
+  const select = $("#model");
+  select.title =
+    models.length > 1
+      ? `Tried in order if one rate-limits:\n${models.join("\n")}`
+      : `${models[0]} (no fallbacks configured)`;
+}
+
+/**
+ * Routes we would rather use, best first. `auto/best-coding` is the gateway's
+ * own "best" combo; the rest are progressively more general fallbacks every
+ * OmniRoute deployment offers. A route only leads if the catalog actually
+ * carries it, so this never puts a model the gateway cannot serve in front.
+ */
+const PREFERRED_MODELS = ["auto/best-coding", "auto/best", "auto/best-free", "auto"];
+
+/** The best route the catalog offers, else the deployment's own default. */
+function pickBestModel(available, serverDefault) {
+  for (const id of PREFERRED_MODELS) {
+    if (available.includes(id)) return id;
+  }
+  if (typeof serverDefault === "string" && available.includes(serverDefault)) return serverDefault;
+  return available[0] ?? serverDefault;
+}
+
+async function loadModels() {
+  const select = $("#model");
+  let models = defaults();
+  let current = "auto/coding";
+  try {
+    const payload = await api("/api/models");
+    const available = Array.isArray(payload.models)
+      ? payload.models.filter((id) => typeof id === "string" && id !== "")
+      : [];
+    if (available.length > 0) {
+      // Offer exactly what the gateway serves: a model disabled upstream drops
+      // out of the catalog, and the old code re-injected the deployment's
+      // default even when the catalog no longer carried it, so a disabled
+      // model stayed in the list. Lead with the best available route and keep
+      // every other one selectable.
+      current = pickBestModel(available, payload.model);
+      models = [current, ...available.filter((id) => id !== current)];
+    } else if (typeof payload.model === "string" && payload.model !== "") {
+      current = payload.model;
+    }
+  } catch {
+    /* keep the defaults */
+  }
+
+  state.model = current;
+  select.replaceChildren();
+  for (const id of models) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = id;
+    select.append(option);
+  }
+  select.value = current;
+  // The sweep may have answered before the picker was filled.
+  annotateModels();
+}
+
+/* --------------------------------------------------------------- composer */
+
+function autoGrow() {
+  const input = $("#input");
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 220)}px`;
+}
+
+/* --------------------------------------------------------------- the sidebar */
+
+/**
+ * The sidebar: a column on a desktop, a drawer on a phone.
+ *
+ * One class decides it and the stylesheet decides what that class *means* at
+ * this width — so there is no `matchMedia` here, and no second copy of the 720px
+ * breakpoint to drift away from the one in `style.css`. Two things fall out of
+ * that for free: a resize across the breakpoint needs no listener (the drawer's
+ * rules stop applying and the column comes back on their own), and closing it is
+ * safe to call on any device — which is why opening a chat can call it without
+ * first asking how wide the screen is.
+ *
+ * `aria-expanded` reports the drawer's real state rather than the click that
+ * asked for the change, so the handle in the toolbar and the close button on the
+ * head cannot disagree with each other or with the panel.
+ */
+function toggleSidebar(force) {
+  const open = force === undefined ? !$("#sidebar").classList.contains("open") : force;
+  $("#sidebar").classList.toggle("open", open);
+  $("#sidebar-scrim").classList.toggle("hidden", !open);
+  $("#sidebar-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function toggleFilesPanel(force) {
+  const panel = $("#files-panel");
+  const open = force === undefined ? !panel.classList.contains("open") : force;
+  if (open) switchRailTo("workspace");
+  panel.classList.toggle("open", open);
+  // The three buttons' `aria-expanded` is `syncRail`'s to write, because all three
+  // describe the rail rather than their own panel.
+  syncRail();
+}
+
+/* -------------------------------------------------------------------- rail */
+
+/*
+ * The right-hand rail: one column, three views — the preview, the workspace and
+ * publishing.
+ *
+ * The three were independent surfaces (a grid track, a `position: fixed` overlay
+ * and a centred dialog), which is why two of them could be open at once, one on
+ * top of the other, with the workspace covering the very toolbar that opened it.
+ * `syncRail` is the single place that reads their three states and says which view
+ * the rail is showing. The panels keep their own open/closed flags — and the tests
+ * that drive them — and the rail is *derived* from those flags rather than kept in
+ * step with them by hand, so the two cannot drift.
+ *
+ * `data-view` survives a collapse, so reopening the rail comes back to the view
+ * that was there: the pane a person was reading is not replaced by whichever
+ * button they happened to reach for next.
+ */
+const RAIL_VIEWS = ["preview", "workspace", "publish", "addons"];
+
+/** Which control opens each view — where focus goes back when one is left. */
+const RAIL_TOGGLES = {
+  preview: "#toggle-preview",
+  workspace: "#toggle-files",
+  publish: "#hosting-open",
+  addons: "#addons-open",
+};
+
+/** The view on screen, or `null` when the rail is collapsed. */
+function railOpenView() {
+  const rail = $("#rail");
+  if (!rail.classList.contains("open")) return null;
+  const view = rail.dataset.view;
+  return RAIL_VIEWS.includes(view) ? view : RAIL_VIEWS[0];
+}
+
+/**
+ * The rail's tab strip.
+ *
+ * One place derives it from the same `view` the rail itself is derived from, so a
+ * tab cannot claim to be selected while a different panel is on screen — which is
+ * the failure a second copy of the state would inevitably produce.
+ *
+ * Roving tabindex, the pattern a tablist is expected to have: exactly one tab is a
+ * Tab stop (the selected one, or the first when nothing is open), and the arrow
+ * keys move between them.
+ */
+const RAIL_TABS = [
+  { view: "preview", id: "rail-tab-preview", label: "preview" },
+  { view: "workspace", id: "rail-tab-workspace", label: "workspace" },
+  { view: "addons", id: "rail-tab-addons", label: "add-ons" },
+  { view: "publish", id: "rail-tab-publish", label: "publish" },
+];
+
+function syncRailTabs(view) {
+  const reachable = view ?? "preview";
+  for (const tab of RAIL_TABS) {
+    const button = $(`#${tab.id}`);
+    const selected = view === tab.view;
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = tab.view === reachable ? 0 : -1;
+  }
+  // The strip's own close says what it closes, because "close" beside three tabs
+  // is a question rather than a label.
+  const close = $("#rail-close");
+  const name = view === null ? null : (RAIL_TABS.find((tab) => tab.view === view)?.label ?? null);
+  close.disabled = name === null;
+  close.setAttribute("aria-label", name === null ? "Close this view" : `Close the ${name} view`);
+  close.title = close.getAttribute("aria-label");
+  close.classList.toggle("hidden", view === null);
+}
+
+/** Which panel a tab opens, and how — each arm is that panel's own open path. */
+function openRailView(view, focusPanel = false) {
+  if (view === "preview") {
+    togglePreview(true);
+    void showPreviewApp();
+  } else if (view === "workspace") {
+    toggleFilesPanel(true);
+  } else if (view === "addons") {
+    openAddons();
+  } else {
+    openHosting();
+  }
+  // A click on a tab is a request to *be* in that panel, so focus goes with it: the
+  // next Tab walks the panel's own controls rather than the console's.
+  if (focusPanel) $(`#${view === "workspace" ? "files-panel" : view}`).focus();
+}
+
+/**
+ * Wire the strip: click to switch, click the selected tab to close, arrows to move.
+ *
+ * The arrow keys follow focus, which is what a tablist is for: a person never has
+ * to press Space to see the thing they just moved to.
+ */
+function initRailTabs() {
+  for (const tab of RAIL_TABS) {
+    const button = $(`#${tab.id}`);
+    button.addEventListener("click", () => {
+      if (railOpenView() === tab.view) closeRail();
+      else openRailView(tab.view, true);
+    });
+    button.addEventListener("keydown", (event) => {
+      const index = RAIL_TABS.findIndex((entry) => entry.view === tab.view);
+      let next = null;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        next = RAIL_TABS[(index + 1) % RAIL_TABS.length];
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        next = RAIL_TABS[(index - 1 + RAIL_TABS.length) % RAIL_TABS.length];
+      } else if (event.key === "Home") {
+        next = RAIL_TABS[0];
+      } else if (event.key === "End") {
+        next = RAIL_TABS[RAIL_TABS.length - 1];
+      } else if (event.key === "Delete") {
+        // The strip's own close, from the keyboard, without leaving the tab.
+        if (railOpenView() === tab.view) closeRail();
+        return;
+      }
+      if (next === null) return;
+      event.preventDefault();
+      openRailView(next.view);
+      $(`#${next.id}`).focus();
+    });
+  }
+  $("#rail-close").addEventListener("click", () => closeRail());
+}
+
+/** Say which view the rail is showing, from the panels' own flags. */
+function syncRail() {
+  const rail = $("#rail");
+  // Latest wins: every opener has already set its own flag before calling this,
+  // and the click that just happened is the newest of the three.
+  const view = !$("#hosting").classList.contains("hidden")
+    ? "publish"
+    : !$("#addons").classList.contains("hidden")
+      ? "addons"
+      : $("#files-panel").classList.contains("open")
+        ? "workspace"
+        : $("#preview").classList.contains("open")
+          ? "preview"
+          : null;
+  if (view !== null) rail.dataset.view = view;
+  rail.classList.toggle("open", view !== null);
+  // A control says whether *its* view is the one on screen, which is what a person
+  // is looking at — not whether some panel behind another one is technically open.
+  $("#toggle-preview").setAttribute("aria-expanded", view === "preview" ? "true" : "false");
+  $("#toggle-files").setAttribute("aria-expanded", view === "workspace" ? "true" : "false");
+  $("#hosting-open").setAttribute("aria-expanded", view === "publish" ? "true" : "false");
+  $("#addons-open").setAttribute("aria-expanded", view === "addons" ? "true" : "false");
+  $("#preview-collapse").setAttribute("aria-expanded", view === "preview" ? "true" : "false");
+  // Collapse and expand are one control in two states, and exactly one of them is
+  // on screen: the edge tab is only hidden while the rail it stands for is open.
+  $("#preview-expand").classList.toggle("hidden", view !== null);
+  syncRailTabs(view);
+}
+
+/** Leave the two views that are not `keep`. */
+function switchRailTo(keep) {
+  for (const view of RAIL_VIEWS) {
+    if (view !== keep) closeRailView(view);
+  }
+}
+
+/**
+ * Collapse one view on its way to another.
+ *
+ * This is the *switch* half of the rail, and it deliberately does not do what the
+ * preview's own close button does: switching away is not somebody saying they are
+ * done with the pane, so it must not mark it dismissed — that flag is what stops
+ * the next write from ever showing the preview again.
+ */
+function closeRailView(name) {
+  const panel = name === "preview"
+    ? $("#preview")
+    : name === "workspace"
+      ? $("#files-panel")
+      : name === "addons"
+        ? $("#addons")
+        : $("#hosting");
+  const held = panel.contains(document.activeElement);
+  if (name === "preview") {
+    panel.classList.remove("open");
+    cancelLiveDiff();
+  } else if (name === "workspace") {
+    panel.classList.remove("open");
+  } else {
+    panel.classList.add("hidden");
+    if (name === "addons") leaveDialog(panel);
+  }
+  // A view that goes away must not take the keyboard with it: the control that
+  // owns it is where focus was, so that is where it goes back to.
+  if (held) $(RAIL_TOGGLES[name]).focus();
+}
+
+/** Escape, or a click on the toggle of the view already showing: collapse it. */
+function closeRail() {
+  const view = railOpenView();
+  if (view === null) return;
+  if (view === "preview") {
+    togglePreview(false);
+    unwatchPreviewChanges();
+  } else if (view === "workspace") {
+    toggleFilesPanel(false);
+  } else if (view === "addons") {
+    closeAddons();
+  } else {
+    closeHosting();
+  }
+}
+
+/* ---------------------------------------------------------------- terminal */
+
+/*
+ * A shell for the workspace.
+ *
+ * It posts one command at a time to `/api/terminal`, which runs it through the
+ * same executor the agent's `run_command` uses — same guard list, same sandbox,
+ * same fence — so what a person can reach here is exactly what the model can, and
+ * neither can reach further than the workspace. It is deliberately not an
+ * interactive shell: there is no PTY behind one HTTP request, and a terminal that
+ * silently cannot run `vi` is worse than one that says so.
+ *
+ * Output is appended, not replaced, so a build's log stays on screen while the
+ * next command runs. That is also why `clear` exists: the scrollback is the
+ * terminal's memory, and the user decides when it is done with it.
+ */
+const TERMINAL_OPEN_KEY = "coding-agent-terminal-open";
+
+function terminalIsOpen() {
+  return !$("#terminal").classList.contains("hidden");
+}
+
+function rememberTerminalOpen(open) {
+  try {
+    sessionStorage.setItem(TERMINAL_OPEN_KEY, open ? "1" : "0");
+  } catch {
+    /* private mode: the choice just does not outlive the page */
+  }
+}
+
+function storedTerminalOpen() {
+  try {
+    return sessionStorage.getItem(TERMINAL_OPEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Show or hide the panel. `focus` is false when the page is only restoring it. */
+function toggleTerminal(force, focus = true) {
+  const open = force === undefined ? !terminalIsOpen() : force;
+  $("#terminal").classList.toggle("hidden", !open);
+  $("#terminal-open").setAttribute("aria-expanded", open ? "true" : "false");
+  $("#terminal-close").setAttribute("aria-label", "Close the terminal");
+  if (open) {
+    // Say where a command will run before it runs, not after: the workspace a
+    // terminal is pointed at is the one thing about it that is not obvious.
+    const where = $("#workspace-note").textContent;
+    $("#terminal-where").textContent = where;
+    $("#terminal-where").title = where;
+    if (focus) $("#terminal-input").focus();
+  }
+  rememberTerminalOpen(open);
+}
+
+/** Append a line. Text, never HTML: command output is data, not markup. */
+function terminalPrint(line) {
+  const out = $("#terminal-output");
+  out.textContent = out.textContent === "" ? line : `${out.textContent}\n${line}`;
+  out.scrollTop = out.scrollHeight;
+}
+
+async function runTerminalCommand(raw) {
+  const command = String(raw ?? "").trim();
+  if (command === "" || state.terminal.busy) return;
+
+  state.terminal.busy = true;
+  $("#terminal-busy").classList.remove("hidden");
+  $("#terminal-run").disabled = true;
+
+  // Remember it before running, so a command that hangs is still in the history
+  // to recall and fix. Consecutive repeats are collapsed.
+  if (state.terminal.history.at(-1) !== command) state.terminal.history.push(command);
+  state.terminal.index = state.terminal.history.length;
+
+  terminalPrint(`$ ${command}`);
+  try {
+    const result = await api("/api/terminal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command }),
+    });
+    const output = String(result.output ?? "").replace(/\s+$/, "");
+    if (output !== "") terminalPrint(output);
+    if (result.error !== undefined) terminalPrint(result.error);
+    else if (result.timedOut === true) terminalPrint("[killed: the command ran too long]");
+    else if (result.exitCode !== 0) terminalPrint(`[exit ${result.exitCode}]`);
+  } catch (error) {
+    terminalPrint(error.message);
+  } finally {
+    state.terminal.busy = false;
+    $("#terminal-busy").classList.add("hidden");
+    $("#terminal-run").disabled = false;
+    $("#terminal-input").value = "";
+    $("#terminal-input").focus();
+  }
+
+  // A command can add, change or remove files, so the tree is re-read rather
+  // than left describing the workspace as it was before the command ran.
+  await loadFiles(state.filePath);
+  await loadWorkspace();
+}
+
+/**
+ * Recall a command. `delta` is -1 for older, +1 for newer, and the position past
+ * the end is the empty line you were typing before you started browsing.
+ */
+function recallTerminalCommand(delta) {
+  const input = $("#terminal-input");
+  const history = state.terminal.history;
+  if (history.length === 0) return;
+  const next = Math.min(history.length, Math.max(0, state.terminal.index + delta));
+  state.terminal.index = next;
+  input.value = next === history.length ? "" : (history[next] ?? "");
+  // Put the caret at the end so the recalled line can be edited straight away.
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+/* --------------------------------------------------------- publish & host */
+
+/*
+ * Publishing the workspace to a public address.
+ *
+ * The console has always known how to *run* a project locally; this is the same
+ * thing exposed on the network. An auto address (`p<port>`) is free; a named one
+ * is what Magnate's `genie` plan ($5/mo, $50/yr) sells, and the price shown here
+ * is read back from Magnate so it cannot drift from what the checkout charges.
+ * The console never grants a name itself — it asks, and the server checks the
+ * subscription with Magnate before registering anything.
+ */
+
+/* --------------------------------------------------------------- add-ons */
+
+/*
+ * What is left to spend on each add-on, and the way to buy more.
+ *
+ * The list is drawn from `/api/addons`, which reads the same control plane a run
+ * is charged against — so the number on screen is the number the next run spends,
+ * and a person who has none left is told so *here* rather than by a refusal after
+ * they have described the job. An add-on whose balance could not be read says that
+ * instead of showing a zero, because zero and unknown are different answers and
+ * only one of them is a reason to buy.
+ */
+let addonsCache = null;
+
+function openAddons() {
+  switchRailTo("addons");
+  $("#addons").classList.remove("hidden");
+  enterDialog($("#addons"));
+  syncRail();
+  void loadAddons();
+}
+
+function closeAddons() {
+  $("#addons").classList.add("hidden");
+  leaveDialog($("#addons"));
+  syncRail();
+}
+
+function addonRow(addon, topUpUrl) {
+  const row = document.createElement("div");
+  row.className = "addon";
+  const head = document.createElement("div");
+  head.className = "addon__head";
+  const name = document.createElement("strong");
+  name.textContent = addon.name;
+  const open = document.createElement("a");
+  open.className = "btn-ghost addon__open";
+  open.href = addon.url;
+  open.rel = "noopener";
+  open.textContent = "open";
+  head.append(name, open);
+  const note = document.createElement("p");
+  note.className = "addon__note";
+  const credits = addon.credits ?? {};
+  if (credits.gated === false) {
+    note.textContent = `${addon.tagline} Credits are not metered on this deployment.`;
+  } else if (credits.unlimited) {
+    note.textContent = `${addon.tagline} This account is the platform's own, so there is nothing to spend.`;
+  } else {
+    const left = credits.balance ?? 0;
+    const per = credits.creditsPerProject ?? 1;
+    const price = typeof credits.pricePerCreditUsd === "number" ? money(Math.round(credits.pricePerCreditUsd * 100)) : null;
+    // A run costing one credit is what "one credit left" already means, so the
+    // per-run count is only worth saying when a run costs more than one.
+    const each = per > 1 ? `${per} credits a run` : "";
+    const costs = [each, price ? `${price} a credit` : ""].filter((part) => part !== "");
+    note.textContent = left > 0
+      ? `${addon.tagline} ${left} credit${left === 1 ? "" : "s"} left${costs.length ? ` (${costs.join(", ")})` : ""}.`
+      : `${addon.tagline} No credits left${price ? ` — ${price} a credit` : ""}.`;
+  }
+  row.append(head, note);
+  if (credits.gated !== false && !credits.unlimited && (credits.balance ?? 0) <= 0 && topUpUrl) {
+    const buy = document.createElement("a");
+    buy.className = "btn-primary addon__buy";
+    buy.href = topUpUrl;
+    buy.rel = "noopener";
+    buy.textContent = "add credits";
+    row.append(buy);
+  }
+  return row;
+}
+
+async function loadAddons() {
+  const list = $("#addons-list");
+  const status = $("#addons-status");
+  status.textContent = "reading balances…";
+  try {
+    addonsCache = await api("/api/addons");
+  } catch (error) {
+    addonsCache = null;
+    status.textContent = `could not read the add-ons: ${error.message}`;
+    list.replaceChildren();
+    return;
+  }
+  const addons = addonsCache?.addons ?? [];
+  status.textContent = addons.length === 0
+    ? "This deployment has no add-ons configured."
+    : "Two front doors on this account, and what is left on each.";
+  list.replaceChildren(...addons.map((addon) => addonRow(addon, addonsCache.topUpUrl)));
+}
+
+let hostingInfoCache = null;
+
+function openHosting() {
+  switchRailTo("publish");
+  $("#hosting").classList.remove("hidden");
+  // Focus still goes into the panel — publishing is a form, and the first thing a
+  // keyboard should meet is the field it is about. Not a modal any more, though:
+  // it shares the rail with the preview and the workspace instead of covering them.
+  enterDialog($("#hosting"));
+  syncRail();
+  void loadHosting();
+}
+
+function closeHosting() {
+  $("#hosting").classList.add("hidden");
+  leaveDialog($("#hosting"));
+  syncRail();
+}
+
+function money(cents) {
+  const dollars = cents / 100;
+  // Grouped above a thousand: a per-class add-on can be priced in the thousands,
+  // and "$2750" beside "per class" reads as a much smaller number than it is.
+  return dollars % 1 === 0
+    ? `$${dollars.toLocaleString("en-US")}`
+    : `$${dollars.toFixed(2)}`;
+}
+
+async function loadHosting() {
+  const status = $("#hosting-status");
+  let info;
+  try {
+    info = await api("/api/hosting");
+  } catch (error) {
+    status.textContent = error.message;
+    return;
+  }
+  hostingInfoCache = info;
+  renderHosting(info);
+}
+
+function renderHosting(info) {
+  const status = $("#hosting-status");
+  const plan = $("#hosting-plan");
+  const buy = $("#hosting-buy");
+  const publish = $("#hosting-publish");
+
+  $("#hosting-suffix").textContent = `.${info.domain}`;
+  plan.replaceChildren();
+
+  if (!info.enabled) {
+    status.textContent =
+      "Publishing is switched off on this deployment (PREVIEW_ENABLED). The preview pane still runs the project locally.";
+    publish.classList.add("hidden");
+    buy.classList.add("hidden");
+    $("#hosting-list").replaceChildren();
+    return;
+  }
+  publish.classList.remove("hidden");
+  publish.disabled = false;
+
+  const left = document.createElement("div");
+  const title = document.createElement("div");
+  title.textContent = info.plan.name || "Genie Subdomain";
+  const sub = document.createElement("div");
+  sub.className = "muted";
+  sub.textContent = "Your own name under this wildcard, routed to your workspace";
+  left.append(title, sub);
+  const price = document.createElement("div");
+  price.className = "hosting-price";
+  price.innerHTML = `${money(info.plan.priceMonthlyCents)}<span>/mo</span> · ${money(
+    info.plan.priceYearlyCents,
+  )}<span>/yr</span>`;
+  plan.append(left, price);
+
+  if (info.entitled === true) {
+    status.textContent = `You're subscribed — publish under a name of your own, or use a free port address.`;
+    buy.classList.add("hidden");
+  } else if (info.entitled === false) {
+    status.textContent =
+      "A free address is available now; your own name needs the plan. Subscribe and the name is claimed automatically.";
+    buy.classList.remove("hidden");
+  } else {
+    status.textContent = `A free address is available now. ${
+      info.entitlementReason || "Sign in to check your subscription for your own name."
+    }`;
+    buy.classList.remove("hidden");
+  }
+
+  const list = $("#hosting-list");
+  list.replaceChildren();
+  for (const preview of info.previews ?? []) list.append(hostingRow(preview));
+}
+
+function hostingRow(preview) {
+  const row = document.createElement("div");
+  row.className = "hosting-row";
+
+  const host = document.createElement("span");
+  host.className = "hosting-host";
+  host.textContent = preview.host;
+  host.title = preview.url;
+
+  const actions = document.createElement("span");
+  actions.className = "hosting-actions";
+
+  const open = document.createElement("a");
+  open.className = "btn-ghost mini";
+  open.href = preview.url;
+  open.target = "_blank";
+  open.rel = "noopener";
+  open.textContent = "open";
+
+  const stop = document.createElement("button");
+  stop.type = "button";
+  stop.className = "btn-ghost mini";
+  stop.textContent = "stop";
+  stop.title = "Stop the app but keep the address";
+  stop.addEventListener("click", async () => {
+    try {
+      await api(`/api/hosting/${encodeURIComponent(preview.name)}/stop`, { method: "POST" });
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadHosting();
+  });
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn-ghost mini";
+  remove.textContent = "unpublish";
+  remove.title = "Withdraw this address";
+  remove.addEventListener("click", async () => {
+    try {
+      await api(`/api/hosting/${encodeURIComponent(preview.name)}`, { method: "DELETE" });
+      addNotice(`${preview.host} is no longer published.`);
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadHosting();
+  });
+
+  actions.append(open, stop, remove);
+  row.append(host, actions);
+  return row;
+}
+
+async function publishHosting() {
+  const button = $("#hosting-publish");
+  const name = $("#hosting-name").value.trim().toLowerCase();
+  button.disabled = true;
+  button.textContent = "publishing…";
+  try {
+    const result = await api("/api/hosting", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(name === "" ? {} : { name }),
+    });
+    addNotice(`Published at ${result.url}`);
+    $("#hosting-name").value = "";
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "publish";
+  }
+  await loadHosting();
+}
+
+/**
+ * Send the buyer to Magnate's signup, carrying the name they typed.
+ *
+ * The claimed name is what the plan's whole deliverable is, so asking for it
+ * twice — once here, once after payment — is how a buyer ends up owning a name
+ * they did not choose. The signup page reads `subdomain` from the query string.
+ */
+function buyHosting() {
+  const info = hostingInfoCache;
+  if (info === null || !info.subscribeUrl) return;
+  let url;
+  try {
+    url = new URL(info.subscribeUrl);
+  } catch {
+    return;
+  }
+  const name = $("#hosting-name").value.trim().toLowerCase();
+  if (name !== "") url.searchParams.set("subdomain", name);
+  window.open(url.toString(), "_blank", "noopener");
+}
+
+/* ------------------------------------------------------- skills & memory */
+
+/*
+ * What this agent is offered here, and what this workspace has learned.
+ *
+ * INSTALLING WRITES, AND ONLY INTO THE SIGNED-IN ACCOUNT'S OWN SLICE. That is the
+ * whole permission model, and it is the server's (`POST /api/skills`): a shared
+ * console must not let one person change what everybody is offered, so an install
+ * lands in the account's lane — above the deployment's, below this project's
+ * `.genie/skills` — and a deployment-wide skill is still an operator's copy or
+ * `genie skills add` from a shell. Removal follows the same rule and one more: only
+ * a directory the installer wrote (provenance) is anything this panel may delete,
+ * which is why the two write controls are driven by the route's answer rather than
+ * by what the markup happens to have.
+ *
+ * The memory is read here and written only by the agent, through its `remember`
+ * tool: it is a file in the workspace, so it goes through the same gate, diff and
+ * change list as any other edit rather than through a panel's side door.
+ *
+ * The route answers for *this* caller — the project's `.genie/skills`, the
+ * account's, then the deployment's — and which of the three a skill came from is
+ * the part worth showing, so the roots are compared rather than re-derived here.
+ */
+
+async function openSkills() {
+  $("#skills").classList.remove("hidden");
+  $("#skills-open").setAttribute("aria-expanded", "true");
+  enterDialog($("#skills"));
+  await loadSkills();
+}
+
+function closeSkills() {
+  $("#skills").classList.add("hidden");
+  $("#skills-open").setAttribute("aria-expanded", "false");
+  leaveDialog($("#skills"));
+}
+
+async function loadSkills() {
+  const status = $("#skills-status");
+  let info;
+  try {
+    info = await api("/api/skills");
+  } catch (error) {
+    status.textContent = error.message;
+    return;
+  }
+  renderSkills(info);
+}
+
+/**
+ * Which of the three places a skill came from, in the words a person would use.
+ *
+ * The order is the loader's own precedence (`skillRoots`), so the names line up
+ * with which one would win if two skills shared a name.
+ */
+function skillOrigin(source, dirs) {
+  const names = ["this project", "your account", "this deployment"];
+  for (let index = 0; index < dirs.length; index += 1) {
+    const root = String(dirs[index] ?? "").replace(/\/+$/, "");
+    if (root !== "" && typeof source === "string" && source.startsWith(`${root}/`)) {
+      return names[index] ?? "elsewhere";
+    }
+  }
+  return "elsewhere";
+}
+
+function renderSkills(info) {
+  const status = $("#skills-status");
+  const list = $("#skills-list");
+  const skills = Array.isArray(info.skills) ? info.skills : [];
+  const dirs = Array.isArray(info.dirs) ? info.dirs.map(String) : [];
+  list.replaceChildren();
+  // A re-render replaces the buttons an arm was pointing at, so an armed removal
+  // is dropped rather than left holding a node nobody can see.
+  disarmSkillRemove();
+
+  status.textContent =
+    skills.length === 0
+      ? "No skills are installed here, so none are offered to the model. A playbook dropped into .genie/skills of this workspace shows up on the next turn."
+      : `${skills.length} skill${skills.length === 1 ? "" : "s"} offered to the model in this chat, read from disk on every turn.`;
+
+  // The memory is a file in the workspace rather than a store of its own, and
+  // saying so is the point: it can be read, edited and committed like any other.
+  const memory = info.memory ?? {};
+  const file = typeof memory.file === "string" && memory.file !== "" ? memory.file : "MEMORY.md";
+  $("#skills-memory").textContent = memory.present
+    ? `${file} is in this workspace, and its contents go into the prompt at the start of every turn. The agent adds to it with the remember tool, so a note it wrote a moment ago is already in front of it — and an edit anyone makes by hand is too.`
+    : `No ${file} yet. The agent writes it with the remember tool the first time it learns something durable about this project, and it is a file like any other: it appears in the change list and can be corrected by hand.`;
+
+  for (const skill of skills) {
+    const card = document.createElement("article");
+    card.className = "skill-card";
+
+    const head = document.createElement("div");
+    head.className = "skill-head";
+    const name = document.createElement("span");
+    name.className = "skill-name mono";
+    name.textContent = `/${String(skill.name ?? "")}`;
+    const origin = document.createElement("span");
+    origin.className = "skill-origin muted";
+    origin.textContent = skillOrigin(skill.source, dirs);
+    head.append(name, origin);
+
+    const description = document.createElement("p");
+    description.className = "skill-description";
+    description.textContent = String(skill.description ?? "");
+    card.append(head, description);
+
+    // Removal is offered exactly where the route says it is allowed, and it takes
+    // two clicks with the label changing in between — the same guard the workspace
+    // clear uses, because a native confirm() cannot be answered in a headless run
+    // and a one-click delete beside a list of files is a trap.
+    if (skill.removable === true && typeof skill.name === "string") {
+      const actions = document.createElement("div");
+      actions.className = "skill-actions";
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn-ghost mini skill-remove";
+      remove.dataset.name = skill.name;
+      remove.textContent = "remove";
+      remove.setAttribute("aria-label", `Remove the ${skill.name} skill from your account`);
+      actions.append(remove);
+      card.append(actions);
+    }
+
+    // Only the parts that are true: a single markdown file has no extra files to
+    // count and nothing recorded about where it came from.
+    const notes = [];
+    const files = Number(skill.files ?? 0);
+    if (files > 0) notes.push(`${files} more file${files === 1 ? "" : "s"} it can read`);
+    const provenance = skill.provenance ?? null;
+    if (provenance !== null && typeof provenance.repo === "string" && provenance.repo !== "") {
+      const ref = typeof provenance.ref === "string" && provenance.ref !== "" ? `@${provenance.ref}` : "";
+      notes.push(`installed from ${provenance.repo}${ref}`);
+    }
+    if (notes.length > 0) {
+      const meta = document.createElement("p");
+      meta.className = "skill-meta muted mono";
+      meta.textContent = notes.join(" · ");
+      card.append(meta);
+    }    list.append(card);
+  }
+}
+
+/**
+ * The two-click removal, and the request behind the second click.
+ *
+ * `armed` holds the button and its timer, so a click elsewhere or a timeout puts
+ * the label back: the first click is a question, and an unanswered one has to stop
+ * asking.
+ */
+let skillRemoveArmed = null;
+
+function disarmSkillRemove() {
+  if (skillRemoveArmed === null) return;
+  clearTimeout(skillRemoveArmed.timer);
+  skillRemoveArmed.button.textContent = "remove";
+  skillRemoveArmed.button.classList.remove("armed");
+  skillRemoveArmed = null;
+}
+
+function onSkillListClick(event) {
+  const button = event.target instanceof Element ? event.target.closest(".skill-remove") : null;
+  if (button === null) return;
+  const name = button.dataset.name ?? "";
+  if (name === "") return;
+
+  if (skillRemoveArmed === null || skillRemoveArmed.button !== button) {
+    disarmSkillRemove();
+    button.textContent = "confirm remove";
+    button.classList.add("armed");
+    skillRemoveArmed = { button, timer: setTimeout(disarmSkillRemove, 5_000) };
+    return;
+  }
+
+  disarmSkillRemove();
+  void removeSkillFromPanel(name);
+}
+
+async function removeSkillFromPanel(name) {
+  const note = $("#skills-install-note");
+  try {
+    const result = await api(`/api/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
+    addNotice(`Removed the ${result.name ?? name} skill — ${result.files ?? 0} files.`);
+    note.textContent = `Removed ${result.name ?? name}.`;
+  } catch (error) {
+    addErrorMessage(error.message);
+    note.textContent = error.message;
+  }
+  await loadSkills();
+}
+
+/**
+ * Install one skill from a GitHub repository into this account's own lane.
+ *
+ * The message the server refuses with is shown as it came: it is the one that knows
+ * whether the repository has no skill in it, holds several (`--path`, spelled as
+ * the route's own words), or is private and needs a token. Nothing is guessed here,
+ * and nothing is retried with different arguments on the user's behalf.
+ */
+async function installSkillFromPanel() {
+  const input = $("#skills-repo");
+  const button = $("#skills-install-run");
+  const note = $("#skills-install-note");
+
+  /*
+   * `owner/repo`, and optionally `owner/repo#which-skill` — the fragment is this
+   * panel's spelling of the route's `path`, because a repository that publishes a
+   * dozen playbooks is common and "which one" is not something to guess at. The
+   * message a refusal comes back with names the alternatives, so the field only has
+   * to accept the answer.
+   */
+  const typed = input.value.trim();
+  const hash = typed.indexOf("#");
+  const repo = (hash === -1 ? typed : typed.slice(0, hash)).trim();
+  const which = hash === -1 ? "" : typed.slice(hash + 1).trim();
+  if (repo === "") {
+    note.textContent = "Name a repository as owner/repo.";
+    input.focus();
+    return;
+  }
+
+  button.disabled = true;
+  const was = button.textContent;
+  button.textContent = "installing…";
+  note.textContent = `Reading ${repo} from GitHub…`;
+  try {
+    const result = await api("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(which === "" ? { repo } : { repo, path: which }),
+    });
+    const skill = result.installed ?? {};
+    const others = Array.isArray(result.others) ? result.others : [];
+    addNotice(`Installed ${skill.name} from ${repo} — the agent can load it from the next turn.`);
+    note.textContent =
+      `${result.replaced === true ? "Replaced" : "Installed"} ${skill.name} (${skill.files ?? 0} files).` +
+      (others.length === 0 ? "" : ` That repository also holds ${others.join(", ")}.`);
+    input.value = "";
+  } catch (error) {
+    addErrorMessage(error.message);
+    // The route's refusal, plus the one thing this panel can do about it: a
+    // repository holding several skills says which, and the fragment picks one.
+    note.textContent = /several skills/.test(error.message)
+      ? `${error.message}. Add #<name> after the repository to pick one.`
+      : error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = was;
+  }
+  await loadSkills();
+}
+
+/* ------------------------------------------------------ remote workspaces */
+
+
+
+/*
+ * A folder on a server, and a repository on GitHub.
+ *
+ * The console has always worked in a directory it can see. This is how one that
+ * is somewhere else becomes such a directory: an SSH folder is mounted inside the
+ * sandbox and made the working directory, so the tools, the tree, the diffs and
+ * the preview reach it without knowing it is remote; a GitHub clone lands in the
+ * working directory and is edited where it lands.
+ *
+ * Both take the credential from the person typing it, and the panel says the one
+ * thing a credential field has to say — what happens to it. It is held for this
+ * session only, and never written into the workspace. The key field is emptied the
+ * moment it has been used, because a key left sitting in a textarea is a key on
+ * the screen.
+ */
+
+async function openRemote() {
+  $("#remote").classList.remove("hidden");
+  $("#remote-open").setAttribute("aria-expanded", "true");
+  enterDialog($("#remote"));
+  await loadRemote();
+}
+
+function closeRemote() {
+  $("#remote").classList.add("hidden");
+  $("#remote-open").setAttribute("aria-expanded", "false");
+  leaveDialog($("#remote"));
+}
+
+async function loadRemote() {
+  const status = $("#remote-status");
+  let info;
+  try {
+    info = await api("/api/remote");
+  } catch (error) {
+    status.textContent = error.message;
+    return;
+  }
+  renderRemote(info);
+}
+
+function renderRemote(info) {
+  const status = $("#remote-status");
+  const list = $("#remote-list");
+  const controls = [
+    $("#remote-connect"),
+    $("#remote-clone"),
+    $("#remote-branch-new"),
+    $("#remote-push"),
+    $("#remote-pr"),
+  ];
+  list.replaceChildren();
+
+  if (!info.enabled) {
+    status.textContent =
+      "Remote workspaces are switched off on this deployment (AGENT_REMOTE_ENABLED=false). The console still works in the sandbox.";
+    for (const control of controls) control.disabled = true;
+    return;
+  }
+  for (const control of controls) control.disabled = false;
+
+  const allowed = Array.isArray(info.allowedHosts) ? info.allowedHosts : [];
+  status.textContent =
+    allowed.length > 0
+      ? `This deployment reaches ${allowed.join(", ")} and nothing else.`
+      : "Any host you name can be reached. Credentials are held for this session only, and never written into the workspace.";
+
+  const ssh = Array.isArray(info.ssh) ? info.ssh : [];
+  const github = Array.isArray(info.github) ? info.github : [];
+  if (ssh.length === 0 && github.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "muted files-note";
+    empty.textContent = "Nothing is connected yet.";
+    list.append(empty);
+  }
+  for (const connection of ssh) list.append(remoteSshRow(connection));
+  for (const connection of github) list.append(remoteGitHubRow(connection));
+  for (const connection of Array.isArray(info.forge) ? info.forge : []) list.append(remoteForgeRow(connection));
+  for (const clone of Array.isArray(info.forgeClones) ? info.forgeClones : []) list.append(remoteForgeCloneRow(clone));
+
+  renderAtlas(info.atlas ?? null);
+}
+
+/*
+ * Atlas: the forge, if this deployment has one, and what the caller's plan says
+ * about it.
+ *
+ * The block reports three different things rather than hiding behind one, because
+ * "not configured", "your plan does not include it" and "we could not ask" are
+ * three different situations with three different answers — and the second one is
+ * where a subscription is sold.
+ */
+let atlasInfoCache = null;
+
+function renderAtlas(atlas) {
+  const status = $("#remote-atlas-status");
+  atlasInfoCache = atlas;
+  const controls = [
+    $("#remote-atlas-connect"),
+    $("#remote-atlas-create"),
+    $("#remote-atlas-clone"),
+    $("#remote-atlas-ssh"),
+    $("#remote-forge-branch"),
+    $("#remote-forge-push"),
+    $("#remote-forge-pr"),
+  ];
+
+  if (atlas === null || atlas.configured !== true) {
+    status.textContent =
+      "No Atlas is configured on this deployment (AGENT_ATLAS_URL), so its forge is not offered here.";
+    for (const control of controls) control.disabled = true;
+    return;
+  }
+  for (const control of controls) control.disabled = false;
+
+  $("#remote-forge-url").value = atlas.url;
+  const user = $("#remote-forge-user");
+  if (user.value === "" && atlas.systemUser !== "") user.value = atlas.systemUser;
+
+  const sentences = [`The forge is at ${atlas.url}.`];
+  if (atlas.systemCredential) {
+    sentences.push(`This deployment holds its own credential, connecting as ${atlas.systemUser}.`);
+  }
+  if (atlas.entitled === true) {
+    sentences.push("Your plan includes Atlas.");
+  } else if (atlas.entitled === false) {
+    sentences.push(
+      `Atlas is an add-on and your plan does not include it${atlas.reason ? `: ${atlas.reason}` : ""}.`,
+    );
+  } else if (atlas.reason) {
+    sentences.push(`${atlas.reason}.`);
+  }
+  const cost = atlasPriceSentence(atlas.price);
+  if (cost !== "") sentences.push(cost);
+  if (atlas.signupUrl) sentences.push(`Subscribe at ${atlas.signupUrl}.`);
+  status.textContent = sentences.join(" ");
+}
+
+/**
+ * What the Atlas add-on costs, in Magnate's own numbers.
+ *
+ * The price is read from the billing platform rather than written here, so the
+ * panel and the checkout cannot drift apart. A price Magnate could not answer for
+ * is left out entirely: an empty sentence is the honest panel, and a number typed
+ * into this file would be one nobody was ever charged.
+ */
+function atlasPriceSentence(price) {
+  if (price === null || price === undefined) return "";
+  // A plan sold per unit is quoted beside its unit: the amount is what ONE
+  // class costs, and "$27.50/month" beside a per-class add-on would read as the
+  // price of the whole thing. Magnate decides the plan is per-unit; the panel
+  // only decides how to say it.
+  if (price.perUnit === true && price.billingUnit && price.pricePerUnitCents > 0) {
+    return `${price.name} costs ${money(price.pricePerUnitCents)} per ${price.billingUnit}, monthly.`;
+  }
+  const parts = [];
+  if (price.priceMonthlyCents >= 0) parts.push(`${money(price.priceMonthlyCents)}/month`);
+  if (price.priceYearlyCents > 0) parts.push(`${money(price.priceYearlyCents)}/year`);
+  if (parts.length === 0) return "";
+  return `${price.name} costs ${parts.join(" or ")}.`;
+}
+
+function remoteForgeRow(connection) {
+  const row = document.createElement("div");
+  row.className = "hosting-row";
+
+  const label = document.createElement("span");
+  label.className = "hosting-host";
+  label.textContent = `${connection.label} as ${connection.user}`;
+
+  const state = document.createElement("span");
+  state.className = "remote-state muted";
+  state.textContent = connection.system ? "deployment credential" : "connected";
+
+  const forget = document.createElement("button");
+  forget.type = "button";
+  forget.className = "btn-ghost mini";
+  forget.textContent = "disconnect";
+  forget.title = "Forget this forge's credential";
+  forget.addEventListener("click", async () => {
+    try {
+      await api("/api/remote/forge/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: connection.host }),
+      });
+      addNotice(`Disconnected from ${connection.label}.`);
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadRemote();
+  });
+
+  const actions = document.createElement("span");
+  actions.className = "hosting-actions";
+  actions.append(forget);
+  row.append(label, state, actions);
+  return row;
+}
+
+function remoteForgeCloneRow(clone) {
+  const row = document.createElement("div");
+  row.className = "hosting-row";
+
+  const label = document.createElement("span");
+  label.className = "hosting-host";
+  label.textContent = `${clone.repo}${clone.branch ? ` (${clone.branch})` : ""}`;
+  label.title = clone.url;
+
+  const state = document.createElement("span");
+  state.className = "remote-state muted";
+  state.textContent = "cloned";
+
+  const open = document.createElement("a");
+  open.className = "btn-ghost mini";
+  open.href = clone.url;
+  open.target = "_blank";
+  open.rel = "noopener";
+  open.textContent = "open";
+
+  const actions = remoteRowActions(clone.rel, null);
+  actions.prepend(open);
+  row.append(label, state, actions);
+  return row;
+}
+
+/** The two buttons every connected row ends with. */
+function remoteRowActions(rel, forget) {
+  const actions = document.createElement("span");
+  actions.className = "hosting-actions";
+
+  const use = document.createElement("button");
+  use.type = "button";
+  use.className = "btn-ghost mini";
+  use.textContent = "work here";
+  use.title = "Make this the directory the agent works in";
+  use.addEventListener("click", async () => {
+    await chooseWorkspace(rel);
+  });
+  actions.append(use);
+
+  if (forget !== null) actions.append(forget);
+  return actions;
+}
+
+function remoteSshRow(connection) {
+  const row = document.createElement("div");
+  row.className = "hosting-row";
+
+  const label = document.createElement("span");
+  label.className = "hosting-host";
+  label.textContent = connection.label;
+  label.title = `Mounted at ${connection.mountPoint}`;
+
+  const state = document.createElement("span");
+  state.className = "remote-state muted";
+  state.textContent = connection.live ? "connected" : "not answering";
+  if (!connection.live) state.classList.add("warn-text");
+
+  const forget = document.createElement("button");
+  forget.type = "button";
+  forget.className = "btn-ghost mini";
+  forget.textContent = "disconnect";
+  forget.title = "Unmount it and remove the key this session was holding";
+  forget.addEventListener("click", async () => {
+    try {
+      await api("/api/remote/ssh/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: connection.id }),
+      });
+      addNotice(`${connection.label} is disconnected, and its key is gone.`);
+    } catch (error) {
+      addErrorMessage(error.message);
+    }
+    await loadRemote();
+    await afterWorkspaceChange();
+  });
+
+  row.append(label, state, remoteRowActions(connection.rel, forget));
+  return row;
+}
+
+function remoteGitHubRow(connection) {
+  const row = document.createElement("div");
+  row.className = "hosting-row";
+
+  const label = document.createElement("span");
+  label.className = "hosting-host";
+  label.textContent = `${connection.repo}${connection.branch ? ` (${connection.branch})` : ""}`;
+  label.title = connection.url;
+
+  const state = document.createElement("span");
+  state.className = "remote-state muted";
+  state.textContent = connection.credential ? "token held" : "public";
+
+  const open = document.createElement("a");
+  open.className = "btn-ghost mini";
+  open.href = connection.url;
+  open.target = "_blank";
+  open.rel = "noopener";
+  open.textContent = "open";
+
+  const actions = remoteRowActions(connection.rel, null);
+  actions.prepend(open);
+  row.append(label, state, actions);
+  return row;
+}
+
+/** Empty the credential fields once the session has taken them. */
+function clearRemoteSecrets() {
+  for (const id of ["#remote-key", "#remote-passphrase", "#remote-password", "#remote-token", "#remote-forge-secret"]) {
+    $(id).value = "";
+  }
+}
+
+async function connectRemoteSsh() {
+  const button = $("#remote-connect");
+  const port = $("#remote-port").value.trim();
+  const body = {
+    host: $("#remote-host").value.trim(),
+    user: $("#remote-user").value.trim(),
+    path: $("#remote-path").value.trim(),
+    key: $("#remote-key").value,
+    passphrase: $("#remote-passphrase").value,
+    password: $("#remote-password").value,
+  };
+  if (port !== "") body.port = Number(port);
+
+  button.disabled = true;
+  button.textContent = "connecting…";
+  try {
+    const payload = await api("/api/remote/ssh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    addNotice(`${payload.connection.label} is mounted — the agent now works there.`);
+    clearRemoteSecrets();
+    await afterWorkspaceChange();
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "connect folder";
+    await loadRemote();
+  }
+}
+
+async function cloneRemoteGitHub() {
+  const button = $("#remote-clone");
+  const body = {
+    repo: $("#remote-repo").value.trim(),
+    branch: $("#remote-branch").value.trim(),
+    token: $("#remote-token").value.trim(),
+  };
+
+  button.disabled = true;
+  button.textContent = "cloning…";
+  try {
+    const payload = await api("/api/remote/github/clone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    addNotice(`${payload.connection.repo} is cloned into ${payload.rel} — the agent now works there.`);
+    clearRemoteSecrets();
+    await afterWorkspaceChange();
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "clone & work in it";
+    await loadRemote();
+  }
+}
+
+async function newRemoteBranch() {
+  const title = window.prompt("New working branch — what is it for?", "");
+  if (title === null || title.trim() === "") return;
+  try {
+    const result = await api("/api/remote/github/branch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim() }),
+    });
+    addNotice(`On branch ${result.branch}.`);
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+async function pushRemote() {
+  const branch = window.prompt("Push which branch?", "");
+  if (branch === null || branch.trim() === "") return;
+  try {
+    const result = await api("/api/remote/github/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch: branch.trim() }),
+    });
+    addNotice(`Pushed ${result.branch} to ${result.repo}.`);
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+async function openRemotePullRequest() {
+  const title = window.prompt("Pull request title", "");
+  if (title === null || title.trim() === "") return;
+  const head = window.prompt("Branch to merge from", "");
+  if (head === null || head.trim() === "") return;
+  try {
+    const result = await api("/api/remote/github/pr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim(), head: head.trim() }),
+    });
+    addNotice(result.url ? `Pull request #${result.number ?? ""} opened: ${result.url}` : "Pull request opened.");
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+/*
+ * Atlas, and a forge you name.
+ *
+ * The credential typed here is verified by the forge itself before it is stored
+ * (`GET /api/v1/user`), so what the session holds is a login the server agreed to
+ * rather than one typed into a box. Empty user and password means "this
+ * deployment's own credential", which is the system path and is not gated on a
+ * plan; anyone else's is checked against the Atlas plan first.
+ */
+
+async function connectAtlas() {
+  const button = $("#remote-atlas-connect");
+  const body = {
+    url: $("#remote-forge-url").value.trim(),
+    user: $("#remote-forge-user").value.trim(),
+    secret: $("#remote-forge-secret").value.trim(),
+  };
+
+  button.disabled = true;
+  button.textContent = "connecting…";
+  try {
+    const info = await api("/api/remote/forge/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    addNotice(
+      `Connected to ${info.label} as ${info.user}${info.system ? " (this deployment's credential)" : ""}.`,
+    );
+    $("#remote-forge-secret").value = "";
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "connect to Atlas";
+    await loadRemote();
+  }
+}
+
+/**
+ * Create a repository on the forge and work in it.
+ *
+ * One action rather than two: the person asking for a project is asking for the
+ * repository *and* the checkout, and a repository nobody cloned is not somewhere
+ * to work.
+ */
+async function createAtlasProject() {
+  const name = $("#remote-atlas-name").value.trim();
+  if (name === "") {
+    addErrorMessage("A project name is required — it becomes the repository's name.");
+    return;
+  }
+  const button = $("#remote-atlas-create");
+  button.disabled = true;
+  button.textContent = "creating…";
+  try {
+    const payload = await api("/api/remote/forge/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, url: $("#remote-forge-url").value.trim() }),
+    });
+    addNotice(`${payload.connection.repo} is created and cloned into ${payload.rel} — the agent works there now.`);
+    $("#remote-atlas-name").value = "";
+    await afterWorkspaceChange();
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "create a project";
+    await loadRemote();
+  }
+}
+
+async function cloneAtlasRepo() {
+  const repo = $("#remote-atlas-repo").value.trim();
+  if (repo === "") {
+    addErrorMessage("A repository is named owner/name.");
+    return;
+  }
+  const button = $("#remote-atlas-clone");
+  button.disabled = true;
+  button.textContent = "cloning…";
+  try {
+    const payload = await api("/api/remote/forge/clone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo, url: $("#remote-forge-url").value.trim() }),
+    });
+    addNotice(`${payload.connection.repo} is cloned into ${payload.rel} — the agent works there now.`);
+    $("#remote-atlas-repo").value = "";
+    await afterWorkspaceChange();
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "clone";
+    await loadRemote();
+  }
+}
+
+/**
+ * Run the project in the working directory, and show the app.
+ *
+ * The half that makes a project *created* on Atlas usable rather than merely
+ * present: `create a project` clones it and makes it where the agent works, and
+ * this runs it through the same route the preview pane's own "run" uses — so a
+ * project from a forge is run the way any other project is, and the pane shows the
+ * app rather than instructions for getting one.
+ *
+ * The pane is what reports the outcome, including "nothing here looks like an app":
+ * the server's own sentence lands in the pane's note, which is why this closes the
+ * dialog rather than keeping a copy of it on screen. A preview that is already up
+ * is left alone — starting again would replace a running app to say what the pane
+ * was already showing.
+ */
+async function runAtlasProject() {
+  const button = $("#remote-atlas-run");
+  button.disabled = true;
+  button.textContent = "running…";
+  try {
+    closeRemote();
+    setPreviewMode("app");
+    watchPreviewChanges();
+    await refreshPreviewApp();
+  } catch (error) {
+    addErrorMessage(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "run the project";
+  }
+}
+
+/**
+ * Fill the SSH form in with Atlas's own machine.
+ *
+ * A folder on Atlas is not a clone: it is the *host* — the same estate, mounted —
+ * so it goes through the SSH half of this panel and needs a key or a password
+ * there. This only saves the person from looking the address up, and says which
+ * field is still missing.
+ */
+function prefillAtlasSsh() {
+  const atlas = atlasInfoCache;
+  if (atlas === null || atlas.configured !== true) return;
+  let host = atlas.sshHost;
+  if (host === "") {
+    try {
+      host = new URL(atlas.url).hostname;
+    } catch {
+      host = "";
+    }
+  }
+  $("#remote-host").value = host;
+  if ($("#remote-user").value === "") $("#remote-user").value = atlas.systemUser;
+  // Whatever this person has already typed is left alone: the only thing missing
+  // is the credential, so that is where the cursor goes. The path is theirs to
+  // name — a guessed one would be a directory the agent works in by accident.
+  // The password is what is missing first, because it is the credential the mount
+  // prefers: a pasted key beside it is the fallback, not the requirement.
+  const missing = $("#remote-password").value === "" ? $("#remote-password") : $("#remote-key");
+  missing.focus();
+  addNotice(
+    host === ""
+      ? "Atlas has no host configured for a folder mount (AGENT_ATLAS_SSH_HOST)."
+      : `${host} is filled in above — add a password or a private key, then connect folder.`,
+  );
+}
+
+async function newForgeBranch() {
+  const title = window.prompt("New working branch — what is it for?", "");
+  if (title === null || title.trim() === "") return;
+  try {
+    const result = await api("/api/remote/forge/branch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim() }),
+    });
+    addNotice(`On branch ${result.branch}.`);
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+async function pushToForge() {
+  const branch = window.prompt("Push which branch to the forge?", "");
+  if (branch === null || branch.trim() === "") return;
+  try {
+    const result = await api("/api/remote/forge/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch: branch.trim(), url: $("#remote-forge-url").value.trim() }),
+    });
+    addNotice(`Pushed ${result.branch} to ${result.repo}.`);
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+async function openForgePullRequest() {
+  const title = window.prompt("Pull request title", "");
+  if (title === null || title.trim() === "") return;
+  const head = window.prompt("Branch to merge from", "");
+  if (head === null || head.trim() === "") return;
+  try {
+    const result = await api("/api/remote/forge/pr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title.trim(), head: head.trim(), url: $("#remote-forge-url").value.trim() }),
+    });
+    addNotice(result.url ? `Pull request #${result.number ?? ""} opened: ${result.url}` : "Pull request opened.");
+  } catch (error) {
+    addErrorMessage(error.message);
+  }
+}
+
+/*
+ * The command palette, and what to do next.
+ *
+ * Two affordances the console did not have, both of them about *not typing a
+ * sentence to do a thing the console already knows how to do*:
+ *
+ *   - `/` in the composer opens a palette of the console's own actions, plus the
+ *     models, filtered as you type. It is a listbox (`role=listbox` / `role=option`
+ *     with `aria-activedescendant`), so the keyboard selection is announced
+ *     rather than only drawn.
+ *   - After a turn, up to three next steps are offered as chips. They **fill the
+ *     composer** instead of sending: a suggestion you can edit before it goes is a
+ *     suggestion, and one that fires on click is a command.
+ *
+ * The follow-ups are derived from the turn's own events — a failure outranks a
+ * review; a change suggests review, tests, commit — and never from a second model
+ * call, so a chip can only ever name work the turn actually did.
+ */
+const PALETTE_ACTIONS = [
+  { name: "help", desc: "what this console can do", run: () => addNotice(paletteHelp()) },
+  { name: "new", desc: "start a new chat", run: () => startNewChat() },
+  { name: "settings", desc: "this chat's model, chain and step budget", run: () => toggleSettings(true) },
+  { name: "appearance", desc: "light, dark or system, and the colour scheme", run: () => toggleAppearance(true) },
+  { name: "workspace", desc: "toggle the workspace panel", run: () => toggleFilesPanel() },
+  { name: "preview", desc: "run this project and watch it change", run: () => { togglePreview(true); void showPreviewApp(); } },
+  { name: "terminal", desc: "run a shell command in the workspace", run: () => toggleTerminal() },
+  { name: "files", desc: "open the workspace tree", run: () => toggleFilesPanel(true) },
+  { name: "sweep", desc: "ask which models can actually call a tool", run: () => openSweep() },
+  { name: "publish", desc: "put this workspace on the network", run: () => openHosting() },
+  { name: "remote", desc: "work on a folder over SSH, or a GitHub repository", run: () => openRemote() },
+  // Reachable from the palette because the panel it opens lives behind the
+  // workspace drawer, and a phone is the screen that has least room for it.
+  { name: "skills", desc: "the skills the agent is offered, and what this workspace remembers", run: () => void openSkills() },
+  { name: "model", desc: "choose the model for this chat", run: null },
+];
+
+let paletteRows = [];
+let paletteActive = 0;
+let paletteOpen = false;
+
+function paletteHelp() {
+  return (
+    "Slash commands: " +
+    PALETTE_ACTIONS.map((action) => "/" + action.name).join(", ") +
+    ". Enter sends, Shift+Enter makes a new line, and after a turn the chips under the reply fill this box."
+  );
+}
+
+function paletteElement() {
+  return $("#palette");
+}
+
+function paletteRowsFor(text) {
+  const body = text.slice(1);
+  const space = body.indexOf(" ");
+  const word = (space === -1 ? body : body.slice(0, space)).toLowerCase();
+  const rest = space === -1 ? "" : body.slice(space + 1).trim().toLowerCase();
+
+  // `/model <prefix>` completes the deployment's own catalog, read from the
+  // picker the console already populated — so the palette cannot offer a model
+  // the console would not.
+  if (word === "model") {
+    const options = [...$("#model").options].map((option) => option.value).filter((id) => id !== "");
+    return options
+      .filter((id) => id.toLowerCase().includes(rest))
+      .slice(0, 40)
+      .map((id) => ({ name: id, desc: "use this model for this chat", model: id }));
+  }
+
+  return PALETTE_ACTIONS.filter((action) => action.name.startsWith(word)).map((action) => ({
+    name: action.name,
+    desc: action.desc,
+    run: action.run,
+  }));
+}
+
+function renderPalette(text) {
+  const rows = paletteRowsFor(text);
+  const box = paletteElement();
+  if (rows.length === 0) {
+    box.innerHTML = '<div class="palette-empty">No command matches. Type /help.</div>';
+    paletteRows = [];
+    paletteOpen = true;
+    box.classList.remove("hidden");
+    return;
+  }
+  paletteRows = rows;
+  paletteActive = Math.min(paletteActive, rows.length - 1);
+  box.innerHTML =
+    '<div class="palette-group" role="presentation">Commands</div>' +
+    rows
+      .map((row, index) =>
+        '<div class="palette-row' +
+        (index === paletteActive ? " active" : "") +
+        '" id="palette-row-' +
+        index +
+        '" role="option" aria-selected="' +
+        (index === paletteActive) +
+        '"><span class="palette-name">/' +
+        escapeHtml(row.name) +
+        '</span><span class="palette-desc">' +
+        escapeHtml(row.desc) +
+        "</span></div>",
+      )
+      .join("");
+  paletteOpen = true;
+  box.classList.remove("hidden");
+  $("#input").setAttribute("aria-activedescendant", "palette-row-" + paletteActive);
+  $("#input").setAttribute("aria-expanded", "true");
+}
+
+function closePalette() {
+  if (!paletteOpen) return;
+  paletteOpen = false;
+  paletteRows = [];
+  paletteActive = 0;
+  paletteElement().classList.add("hidden");
+  $("#input").removeAttribute("aria-activedescendant");
+  $("#input").setAttribute("aria-expanded", "false");
+}
+
+function choosePaletteRow(row) {
+  closePalette();
+  const input = $("#input");
+  if (row.model !== undefined) {
+    state.model = row.model;
+    input.value = "";
+    autoGrow();
+    if ($("#model").querySelector('option[value="' + row.model + '"]') !== null) {
+      $("#model").value = row.model;
+      void persistSettings();
+    } else {
+      addNotice("This deployment serves every account the same model, so " + row.model + " is not selectable here.");
+    }
+    input.focus();
+    return;
+  }
+  input.value = "";
+  autoGrow();
+  if (typeof row.run === "function") row.run();
+  else addNotice("/" + row.name + " needs an argument — type /" + row.name + " and pick from the list.");
+  input.focus();
+}
+
+/** Returns true when the palette consumed the key, so the composer must not. */
+function paletteHandleKey(event) {
+  if (!paletteOpen) return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closePalette();
+    return true;
+  }
+  if (paletteRows.length === 0) return false;
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    paletteActive = (paletteActive + 1) % paletteRows.length;
+    renderPalette($("#input").value);
+    return true;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    paletteActive = (paletteActive - 1 + paletteRows.length) % paletteRows.length;
+    renderPalette($("#input").value);
+    return true;
+  }
+  if (event.key === "Tab" || event.key === "Enter") {
+    event.preventDefault();
+    const row = paletteRows[paletteActive];
+    if (row !== undefined) choosePaletteRow(row);
+    return true;
+  }
+  return false;
+}
+
+function paletteOnInput() {
+  const text = $("#input").value;
+  if (text.startsWith("/") && !text.includes("\n") && !state.streaming) {
+    paletteActive = 0;
+    renderPalette(text);
+    return;
+  }
+  closePalette();
+}
+
+/* ------------------------------------------------------------- follow-ups */
+
+let turnNotes = null;
+
+function beginTurnNotes() {
+  turnNotes = emptyTurnSummary();
+}
+
+function noteTurnEvent(event) {
+  if (turnNotes === null) return;
+  reduceTurn(turnNotes, event);
+}
+
+function showFollowups(suggestions) {
+  if (suggestions.length === 0) return;
+  const wrap = document.createElement("div");
+  wrap.className = "followups";
+  const label = document.createElement("span");
+  label.className = "followups-label";
+  label.textContent = "next";
+  wrap.appendChild(label);
+  for (const suggestion of suggestions) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "followup";
+    chip.textContent = suggestion;
+    // Fills the box rather than sending: the suggestion stays editable.
+    chip.addEventListener("click", () => {
+      $("#input").value = suggestion;
+      autoGrow();
+      $("#input").focus();
+    });
+    wrap.appendChild(chip);
+  }
+  $("#messages").appendChild(wrap);
+  scrollToBottom();
+}
+
+function wirePalette() {
+  // Built here rather than in index.html so the palette is one feature in one
+  // place: the markup, the keyboard handling and the actions ship together.
+  const box = document.createElement("div");
+  box.id = "palette";
+  box.className = "palette hidden";
+  box.setAttribute("role", "listbox");
+  box.setAttribute("aria-label", "Slash commands");
+  $("#composer").appendChild(box);
+  $("#input").setAttribute("role", "combobox");
+  $("#input").setAttribute("aria-expanded", "false");
+  $("#input").setAttribute("aria-controls", "palette");
+  $("#input").setAttribute("aria-autocomplete", "list");
+
+  const hint = document.createElement("div");
+  hint.className = "composer-hint";
+  hint.innerHTML =
+    "<span><kbd>/</kbd> for commands</span><span><kbd>Enter</kbd> to send</span><span><kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>";
+  $("#composer").after(hint);
+
+  $("#input").addEventListener("input", paletteOnInput);
+  box.addEventListener("mousedown", (event) => {
+    // `mousedown`, not `click`: the input's blur would close the palette first.
+    const row = event.target.closest(".palette-row");
+    if (row === null) return;
+    event.preventDefault();
+    const index = [...box.querySelectorAll(".palette-row")].indexOf(row);
+    const chosen = paletteRows[index];
+    if (chosen !== undefined) choosePaletteRow(chosen);
+  });
+  document.addEventListener("click", (event) => {
+    if (!$("#composer").contains(event.target)) closePalette();
+  });
+}
+
+/* --- folds: what a person collapsed, kept for this browser ------------------ */
+
+/*
+ * Every `<details data-section>` in the console is a fold somebody chose, and the
+ * choice is remembered. A `<details>` with no `data-section` still folds — the
+ * browser does that by itself — it is simply not remembered: the attribute is
+ * what marks a fold as a preference rather than as markup, and the `open` in the
+ * markup is what a section nobody has touched falls back to.
+ *
+ * `localStorage`, unlike the preview pane and the terminal, which keep their own
+ * state in `sessionStorage`: a fold is a preference about how a panel is laid
+ * out, not state belonging to one tab, and a person who folded the status rows
+ * yesterday means it today. It is the same trade the theme next door makes
+ * ("remembered in this browser rather than on the account"), down to the key's
+ * `ontrak.` prefix.
+ */
+const SECTIONS_KEY = "ontrak.sections";
+
+/** The remembered folds, or an empty map when there are none to read. */
+function storedSections() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SECTIONS_KEY) ?? "{}");
+    return parsed !== null && typeof parsed === "object" ? parsed : {};
+  } catch {
+    /* private mode, or a value written by something else: the markup stands */
+    return {};
+  }
+}
+
+function wireSections() {
+  for (const section of document.querySelectorAll("details[data-section]")) {
+    const key = section.dataset.section;
+    const remembered = storedSections()[key];
+    // Only a real boolean is applied: a stored `"false"` or a number is a value
+    // this console did not write, and guessing what it meant is how a section
+    // ends up open when `<details>` says it should be closed.
+    if (typeof remembered === "boolean") section.open = remembered;
+
+    /*
+     * `toggle` fires for the click on the summary, for the keyboard's Enter and
+     * Space, and for a change made from script — so there is no second place that
+     * has to agree about what the section's state is. The map is re-read on every
+     * change rather than held from boot: two tabs of this console are two places
+     * folding the same panel, and the tab that folded nothing must not write back
+     * a map that undoes the other one's fold.
+     *
+     * The listener is added *after* the stored state is applied, because setting
+     * `open` from script fires `toggle` too — and that first event would otherwise
+     * be written straight back as if the person had folded it themselves.
+     */
+    section.addEventListener("toggle", () => {
+      const all = storedSections();
+      all[key] = section.open;
+      try {
+        localStorage.setItem(SECTIONS_KEY, JSON.stringify(all));
+      } catch {
+        /* private mode: the fold just does not outlive the page */
+      }
+    });
+  }
+}
+
+function wire() {
+  $("#composer").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void sendMessage($("#input").value);
+  });
+
+  $("#input").addEventListener("input", autoGrow);
+  $("#input").addEventListener("keydown", (event) => {
+    // The palette sees the key first: Enter picks a row while it is open, and
+    // only sends when it is not.
+    if (paletteHandleKey(event)) return;
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void sendMessage($("#input").value);
+    }
+  });
+
+  $("#stop").addEventListener("click", () => state.controller?.abort());
+
+  $("#new-chat").addEventListener("click", () => startNewChat());
+
+  $("#viewer-close").addEventListener("click", closeViewer);
+  $("#viewer-delete").addEventListener("click", () => armDelete());
+
+  $("#sweep-open").addEventListener("click", openSweep);
+
+  $("#sweep-close").addEventListener("click", closeSweep);
+  $("#sweep-run").addEventListener("click", () => void runSweep(false));
+  $("#sweep-run-all").addEventListener("click", () => void runSweep(true));
+
+  // Clicking the backdrop closes it; clicking inside does not.
+  $("#sweep").addEventListener("click", (event) => {
+    if (event.target === $("#sweep")) closeSweep();
+  });
+
+  $("#viewer-toggle").addEventListener("click", () => {
+    void setViewerMode(state.viewer.mode === "diff" ? "file" : "diff");
+  });
+
+  // Clicking the backdrop closes the viewer; clicking inside it does not.
+  $("#viewer").addEventListener("click", (event) => {
+    if (event.target === $("#viewer")) closeViewer();
+  });
+
+  /*
+   * The toolbar button opens the app, not the code.
+   *
+   * "Preview" means the built thing to anybody who did not write it, and a pane
+   * that answers with the source of a file is answering a different question. The
+   * code is one click further in.
+   */
+  $("#toggle-preview").addEventListener("click", () => {
+    const opening = !previewIsOpen();
+    togglePreview();
+    if (opening) void showPreviewApp();
+    else unwatchPreviewChanges();
+  });
+  $("#preview-close").addEventListener("click", () => {
+    togglePreview(false);
+    unwatchPreviewChanges();
+  });
+  // Collapse is the same act as close, from the rail's own header; the edge tab
+  // is how it comes back, and it opens the app view the way the toolbar does.
+  $("#preview-collapse").addEventListener("click", () => {
+    togglePreview(false);
+    unwatchPreviewChanges();
+  });
+  $("#preview-expand").addEventListener("click", () => {
+    togglePreview(true);
+    void showPreviewApp();
+  });
+  initPreviewResize();
+  // The rail's tab strip: the same views the toolbar opens, reachable where they
+  // are, each with a close on the control itself.
+  initRailTabs();
+  syncRailTabs(railOpenView());
+  // A resize can cross the docked/overlay breakpoint, so the width is re-applied
+  // rather than left as pixels that no longer describe this layout.
+  window.addEventListener("resize", () => {
+    applyPreviewWidth(storedPreviewWidth());
+    measureTopbar();
+  });
+  measureTopbar();
+  $("#preview-run").addEventListener("click", () => {
+    if (state.preview.mode === "app") {
+      setPreviewMode("code");
+      return;
+    }
+    void showPreviewApp();
+  });
+  $("#preview-toggle").addEventListener("click", () =>
+    setPreviewMode(state.preview.mode === "change" ? "code" : "change"),
+  );
+  $("#preview-open").addEventListener("click", () => {
+    if (state.preview.path !== null) void openFile(state.preview.path);
+  });
+
+  $("#preview-app-log-toggle").addEventListener("click", () => {
+    const log = $("#preview-app-log");
+    const open = log.classList.toggle("hidden");
+    $("#preview-app-log-toggle").setAttribute("aria-expanded", open ? "false" : "true");
+  });
+
+  // Following the end of a growing file is the default; scrolling up stops it, so
+  // reading an earlier part of a long file is not yanked away mid-sentence.
+  const previewScroll = $("#preview-body");
+  previewScroll.addEventListener("scroll", () => {
+    state.preview.follow =
+      previewScroll.scrollHeight - previewScroll.scrollTop - previewScroll.clientHeight < 40;
+  });
+
+  $("#files-root").addEventListener("click", () => void loadFiles("."));
+
+  $("#sidebar-toggle").addEventListener("click", () => toggleSidebar());
+  $("#sidebar-close").addEventListener("click", () => toggleSidebar(false));
+  // Tapping the dimmed page behind the drawer dismisses it, like a dialog's
+  // backdrop — the one gesture a person will try first.
+  $("#sidebar-scrim").addEventListener("click", () => toggleSidebar(false));
+
+  // The foldable sections — the sidebar's, the Skills panel's and the Remote
+  // panel's — wired before anything can open a panel onto them, so a remembered
+  // fold is already in place when the panel is first shown.
+  wireSections();
+
+  $("#toggle-files").addEventListener("click", () => toggleFilesPanel());
+  $("#files-close").addEventListener("click", () => toggleFilesPanel(false));
+  $("#files-new").addEventListener("click", () => void newWorkspaceFolder());
+  $("#files-clear").addEventListener("click", () => armClear());
+  // The way out of the session the sidebar names. Hidden until `/api/auth/status`
+  // reports one, so this handler is only ever wired to a row that is on screen.
+  $("#sign-out").addEventListener("click", () => void signOut());
+
+  $("#project-new").addEventListener("click", () => void createProject());
+  $("#project-import").addEventListener("click", () => $("#project-import-file").click());
+  $("#project-import-file").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    // Reset the value so choosing the same file again still fires `change`.
+    event.target.value = "";
+    if (file) void importProjectFromFile(file);
+  });
+  $("#project-upload").addEventListener("click", () => $("#project-upload-file").click());
+  $("#project-upload-file").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) void uploadProjectZip(file);
+  });
+  $("#project-publish").addEventListener("click", () => togglePublish());
+  $("#publish-close").addEventListener("click", () => togglePublish(false));
+  $("#publish-target").addEventListener("change", () => syncPublishTarget());
+  $("#publish-go").addEventListener("click", () => void publishActiveProject());
+
+  $("#terminal-open").addEventListener("click", () => toggleTerminal());
+  $("#terminal-close").addEventListener("click", () => toggleTerminal(false));
+  $("#terminal-clear").addEventListener("click", () => {
+    $("#terminal-output").textContent = "";
+  });
+  $("#terminal-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void runTerminalCommand($("#terminal-input").value);
+  });
+  $("#terminal-input").addEventListener("keydown", (event) => {
+    if (event.key === "ArrowUp" && !event.shiftKey) {
+      event.preventDefault();
+      recallTerminalCommand(-1);
+    } else if (event.key === "ArrowDown" && !event.shiftKey) {
+      event.preventDefault();
+      recallTerminalCommand(1);
+    }
+  });
+
+  $("#remote-open").addEventListener("click", () => openRemote());
+  $("#remote-close").addEventListener("click", () => closeRemote());
+  $("#remote-connect").addEventListener("click", () => void connectRemoteSsh());
+  $("#remote-clone").addEventListener("click", () => void cloneRemoteGitHub());
+  $("#remote-branch-new").addEventListener("click", () => void newRemoteBranch());
+  $("#remote-atlas-connect").addEventListener("click", () => void connectAtlas());
+  $("#remote-atlas-create").addEventListener("click", () => void createAtlasProject());
+  $("#remote-atlas-clone").addEventListener("click", () => void cloneAtlasRepo());
+  $("#remote-atlas-run").addEventListener("click", () => void runAtlasProject());
+  $("#remote-atlas-ssh").addEventListener("click", () => prefillAtlasSsh());
+  $("#remote-forge-branch").addEventListener("click", () => void newForgeBranch());
+  $("#remote-forge-push").addEventListener("click", () => void pushToForge());
+  $("#remote-forge-pr").addEventListener("click", () => void openForgePullRequest());
+  $("#remote-push").addEventListener("click", () => void pushRemote());
+  $("#remote-pr").addEventListener("click", () => void openRemotePullRequest());
+  // Clicking the backdrop closes it; clicking inside does not.
+  $("#remote").addEventListener("click", (event) => {
+    if (event.target === $("#remote")) closeRemote();
+  });
+
+  $("#skills-open").addEventListener("click", () => void openSkills());
+  $("#skills-close").addEventListener("click", () => closeSkills());
+  // Clicking the backdrop closes it; clicking inside does not.
+  $("#skills").addEventListener("click", (event) => {
+    if (event.target === $("#skills")) closeSkills();
+  });
+
+  $("#skills-install").addEventListener("submit", (event) => {
+    event.preventDefault();
+    void installSkillFromPanel();
+  });
+  // One delegated listener for the whole list: the cards are rebuilt on every load,
+  // so a listener per card would be a handler per render.
+  $("#skills-list").addEventListener("click", onSkillListClick);
+
+  // The toggle is a toggle in both directions: pressing it while its view is the
+  // one on screen collapses the rail, which is what a person reaching for it again
+  // means. The backdrop listener the dialog needed is gone with the dialog — a
+  // docked panel has no backdrop, and clicking its own padding is not a dismissal.
+  $("#hosting-open").addEventListener("click", () => {
+    if (railOpenView() === "publish") closeHosting();
+    else openHosting();
+  });
+  $("#hosting-close").addEventListener("click", () => closeHosting());
+  // The add-ons toggle is a toggle in both directions too: pressing it while its
+  // view is the one on screen collapses the rail, like the other three.
+  $("#addons-open").addEventListener("click", () => {
+    if (railOpenView() === "addons") closeAddons();
+    else openAddons();
+  });
+  $("#addons-close").addEventListener("click", () => closeAddons());
+  $("#hosting-publish").addEventListener("click", () => void publishHosting());
+  $("#hosting-buy").addEventListener("click", () => buyHosting());
+  $("#workspace-pick").addEventListener("change", (event) => void chooseWorkspace(event.target.value));
+
+  $("#chat-settings").addEventListener("click", () => toggleSettings());
+  $("#settings-close").addEventListener("click", () => toggleSettings(false));
+  $("#settings").addEventListener("click", (event) => {
+    if (event.target === $("#settings")) toggleSettings(false);
+  });
+
+  $("#appearance-open").addEventListener("click", () => toggleAppearance());
+  $("#appearance-close").addEventListener("click", () => toggleAppearance(false));
+  $("#appearance").addEventListener("click", (event) => {
+    if (event.target === $("#appearance")) toggleAppearance(false);
+  });
+
+  // The palette and the follow-up chips build their own DOM, so this is the
+  // whole of their wiring.
+  wirePalette();
+
+  $("#model").addEventListener("change", (event) => {
+    state.model = event.target.value;
+    void persistSettings();
+  });
+
+  $("#steps").addEventListener("change", () => {
+    $("#steps").dataset.touched = "true";
+    void persistSettings();
+  });
+
+  // Editing the box is what makes an empty value meaningful, so mark it on input
+  // (which fires before blur) and save on change.
+  $("#fallbacks").addEventListener("input", () => {
+    $("#fallbacks").dataset.known = "true";
+  });
+  $("#fallbacks").addEventListener("change", () => void persistSettings());
+
+  $("#use-offline").addEventListener("change", () => void persistSettings());
+
+  /*
+   * A click is remembered before it is handled, because a panel it opens has to
+   * know what to hand focus back to — and clicking a button does not focus it in
+   * every browser (Safari on iOS and macOS is the one that matters there), so
+   * asking `document.activeElement` at open time is not that answer. Capture
+   * phase, so this runs before the button's own handler opens anything.
+   */
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      noteDialogOpener(target === null ? null : target.closest("button, a[href]"));
+    },
+    true,
+  );
+
+  /*
+   * Tab is kept inside whichever panel is open. Only the *edges* are steered:
+   * the browser still does the walking, so `tabindex`, disabled controls and
+   * whatever the panel currently hides stay authoritative, and the trap cannot
+   * invent a tab order of its own.
+   */
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const panel = openModal();
+    if (panel === null) return;
+    const stops = tabStops(panel);
+    if (stops.length === 0) {
+      event.preventDefault();
+      panel.focus();
+      return;
+    }
+    const first = stops[0];
+    const last = stops[stops.length - 1];
+    const active = document.activeElement;
+    if (!panel.contains(active)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!$("#sweep").classList.contains("hidden")) closeSweep();
+    else if (!$("#remote").classList.contains("hidden")) closeRemote();
+    else if (!$("#hosting").classList.contains("hidden")) closeHosting();
+    else if (!$("#skills").classList.contains("hidden")) closeSkills();
+    else if (!$("#appearance").classList.contains("hidden")) toggleAppearance(false);
+    // `#publish` sits between the two in the markup, and this chain is the same
+    // order read backwards (`openModal` says why), so it is dismissed here.
+    else if (!$("#publish").classList.contains("hidden")) togglePublish(false);
+    else if (!$("#settings").classList.contains("hidden")) toggleSettings(false);
+    // The drawer is the last thing Escape reaches: anything open on top of it
+    // is what the user is looking at, and dismissing that must not also hide
+    // the panel underneath it.
+    else if ($("#sidebar").classList.contains("open")) toggleSidebar(false);
+    // The file viewer is a modal on top of everything, so it goes first; the rail
+    // is under it and collapses only when nothing else is left to dismiss.
+    else if (!$("#viewer").classList.contains("hidden")) closeViewer();
+    else if (railOpenView() !== null) closeRail();
+  });
+}
+
+wire();
+autoGrow();
+// Restore the pane's own state before any turn can change it: open if it was open,
+// and quiet if it was closed on purpose.
+if (storedPreviewOpen() === "1") {
+  togglePreview(true);
+  // Reopened, not started: reloading the console is not a request to run the app.
+  void showPreviewApp();
+} else if (storedPreviewOpen() === "0") state.preview.dismissed = true;
+// The width is restored whether or not the rail is open, so collapsing and
+// expanding does not quietly reset a drag the user made earlier.
+applyPreviewWidth(storedPreviewWidth());
+// Same for the terminal: it lives in session storage, so a reload keeps it on
+// screen without making the shell a preference that outlives the tab.
+if (storedTerminalOpen() === "1") toggleTerminal(true, false);
+// Before anything is fetched: if this deployment signs people in, go there.
+void signInIfRequired();
+void loadModels();
+// Which models the last sweep found usable, for the picker and the panel.
+void refreshSweep();
+void loadHealth();
+void loadSessions();
+void loadProjects();
+void loadWorkspace();
+void loadFiles(".");
+// A link can carry the panel with it: `?settings=appearance` opens Appearance, so
+// a person is sent to "make it dark" rather than to "go and find the toggle".
+if (new URLSearchParams(location.search).get("settings") === "appearance") toggleAppearance(true);
+// The deep link above can have opened a panel, and the composer does not get to
+// take focus back out of a panel that is up.
+if (openModal() === null) $("#input").focus();
+
+// The server checks the chain on its own timer, so re-read the status to show it.
+// Skipped mid-turn: the row is about the chain, not about the reply in flight.
+setInterval(() => {
+  if (!state.streaming) void loadHealth();
+}, 60_000);

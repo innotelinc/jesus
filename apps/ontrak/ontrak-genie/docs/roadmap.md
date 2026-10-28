@@ -1,0 +1,738 @@
+# OnTrak Genie roadmap
+
+**Classification: CodeOps** — the browser console for a coding agent: an agent's
+work made visible and gated, in one workspace, on the operator's own machine.
+See [stack.md](stack.md) for the role and [operations.md](operations.md) for the
+full developer reference.
+
+> Status legend: `[x]` shipped · `[~]` in progress · `[ ]` planned · `[-]` out of
+> scope for v1
+>
+> This is the single source of truth for **what** Genie does and **what comes
+> next**. It is written so the next person reads the code rather than rebuilding
+> it: every shipped line points at the file that carries it, and every open line
+> states what is missing rather than implying it is done.
+
+> **Status.** **0.1 shipped** — the console is complete: the agent loop streamed
+> over SSE, the workspace jail, the tool set, the approval gate, live draft and
+> live diff, per-file snapshots, the model-resilience chain, and a browser UI
+> with no build step. **0.2 shipped** — stack citizenship: sign-in is **on** at
+> both edge names, secrets are read from **Cerulean Vault** through path-scoped
+> `vault://` references, tenancy is **on** through Distro's control plane, and the
+> image is published with a pull-only overlay beside the product compose. **0.3
+> is complete** — resilience and reach: the console is honest about what the
+> gateway actually streams, the approval gate has a channel besides the browser,
+> the workspace has a real toolchain, the app itself is shown rather than only the
+> code that builds it, and a chat can now be named, put away and deleted beside a
+> workspace chosen per account. **1.0 shipped (2026-10-01)** — the CodeOps
+> surface: isolated workspaces per account with a ceiling Genie enforces itself, an
+> audit trail an operator can read, a deployment posture that is written down
+> rather than assumed ([threat-model.md](threat-model.md), [runbook.md](runbook.md)),
+> and — the last of the exit — two accounts proven isolated on a running console by
+> a check rather than by a description (`scripts/verify-tenancy.mjs`). What is
+> **v0.4 has landed** — the shared half of more than one operator: **shared
+> sessions** (hand one chat's transcript to a colleague, read-only, still gated per
+> turn), **propose-then-commit** (a change set a reviewer applies in one call), and
+> **repository-aware workspaces** (take a repository, branch it, open a PR, all
+> through the same jail and gate). **0.5 shipped** — the **terminal client**:
+> `genie` drives the same server over the same API, with sign-in handed back to a
+> loopback, skills, follow-ups and the gate, and no runtime dependency
+> ([cli.md](cli.md)). **0.6 shipped** — **remote workspaces**: a folder on a
+> server mounted over SSH and worked in as if it were local, a GitHub repository
+> cloned with the caller's own token and edited in place, and **Atlas** (the
+> ecosystem's Gitea) as an add-on behind a Magnate plan — all with credentials
+> held in memory for the session rather than written beside the workspace. **0.7
+> shipped** — **bring your own project**: an uploaded `.zip` becomes a project that
+> installs its own dependencies, and it or any other project can be saved to a new
+> GitHub or Atlas repository and carried on from there.
+
+> **Re-baselined at 2.0 (2026-10-24).** Everything above — v0.1 through v1.0 — is
+> the shipped **2.0.0**. 2.1 (CLI parity) and 2.2 (per-account change sets) have
+> since shipped; 2.3 (fleet operations) is the next minor milestone. The next
+> majors are 3.0 (team-scale CodeOps) and 4.0 (continuous code operations). The portfolio TODO is
+> [../../docs/portfolio-roadmap-v2.md](../../docs/portfolio-roadmap-v2.md). The
+> `v0.x` headings below are history, not open versions.
+
+## 0. Version ladder (2.0 re-baseline)
+
+| Old milestone | New version | State |
+| --- | --- | --- |
+| v0.1 — The console | 2.0.0 | `[x]` shipped |
+| v0.2 — Stack citizenship | 2.0.0 | `[x]` shipped |
+| v0.3 — Resilience and reach | 2.0.0 | `[x]` shipped |
+| v0.4 — Beyond a single operator | 2.0.0 | `[x]` shipped |
+| v0.5 — The terminal client | 2.0.0 | `[x]` shipped (three open ends → 2.1) |
+| v0.6 — Remote workspaces | 2.0.0 | `[x]` shipped |
+| v0.7 — Bring your own project | 2.0.0 | `[x]` shipped |
+| Skills and memory | 2.0.0 | `[x]` shipped |
+| v1.0 — The CodeOps surface | 2.0.0 | `[x]` shipped |
+
+**2.0.0 is the shipped CodeOps console:** the agent loop, the workspace jail,
+approvals, snapshots, propose-then-commit, repository-aware workspaces, the
+terminal client, remote workspaces, BYO projects, sharing, tenancy and the
+account ceiling.
+
+### 2.1 — CLI parity `[x]`
+**Goal:** the terminal is not second-class.
+
+- `[x]` Propose-then-commit from the CLI: `genie changes` reads the pending set,
+  `genie apply` commits it, `genie discard` drops it without writing a byte.
+- `[x]` Commands over the sharing API: `genie shares`, `genie share <chat>
+  <email>` (a row number from `genie sessions` works) and `genie unshare <id>`.
+- `[x]` Web research as an agent tool (`web_search`/`web_fetch`), behind the same
+  gate. Fetch is SSRF-aware (every resolved address is checked, redirects are
+  checked per hop, the body is capped) and search speaks Exa when `EXA_API_KEY`
+  is set. Both always ask in `risky` and `all`, because egress is the argument a
+  hostile page can steer. The terminal drives them through the same approval
+  queue it already uses for commands (`genie pending`, `approve`, `deny`).
+
+### 2.2 — Per-account change sets `[x]`
+
+- `[x]` One pending change set per account instead of one per process. The state in
+  `src/proposals.ts` is a map keyed by the account, using the same key `scope.ts`
+  gives the workspace (`currentScope().userId`, or the literal `local` for an
+  un-tenanted deployment), so a set can only be read and applied against the disk
+  it was proposed for. The tools and the three `/api/changes*` routes pass no key
+  and take the request's own, the ledger row now carries the account beside the
+  actor, and one account's apply or discard leaves every other account's set
+  untouched. Covered by `src/test/change-set.test.ts` — two accounts stage, review
+  and commit concurrently, in one process.
+
+### 2.3 — Fleet operations `[ ]`
+- `[ ]` Many workspaces from one console without the operator becoming the
+  bottleneck.
+
+### 3.0 — Team-scale CodeOps `[ ]`
+- `[ ]` Shared review queue, per-team policy, and the L2 rung (a signed policy
+  naming what may run unattended inside the sandbox).
+
+### 4.0 — Continuous code operations `[ ]`
+- `[ ]` Scheduled/event-driven runs under a signed policy; L3 stays refused for
+  host changes outside the sandbox.
+
+## 1. Vision
+
+Your wish is my command. The usual coding-agent interface shows a spinner, then
+a finished diff you have to audit afterwards; Genie shows the tool calls as they
+are decided, the file being written while it is still being written, and a diff
+against disk *before* the write lands — with a human gate between a plan and a
+changed machine.
+
+```mermaid
+flowchart LR
+  A[Task in the browser] --> B[Agent loop]
+  B --> C[Tool call — streamed as it is decided]
+  C --> D{Touches machine?}
+  D -->|yes| E[Approval gate — Approve or Deny]
+  D -->|no| F[Workspace jail]
+  E --> G[Workspace jail]
+  F --> H[Live draft + live diff in the preview pane]
+  G --> H
+```
+
+## 2. v0.1 status (shipped)
+
+| Capability | Status |
+| --- | --- |
+| Agent loop — request → tool call → result, streamed over SSE | `[x]` |
+| Workspace jail — escapes and absolute paths refused, trees skipped | `[x]` |
+| Tool set — `read`, `edit`, `write`, `list`, `search`, `run` | `[x]` |
+| Approval gate — `off` / `risky` / `all`, deny ends the turn, times out closed | `[x]` |
+| Live draft — the write rendered character by character while it arrives | `[x]` |
+| Live diff — the change against the on-disk baseline, before the write lands | `[x]` |
+| Per-file snapshots — a viewer diff against what replaced the file | `[x]` |
+| Model resilience — fallback chain, retry re-walk, chain-health timer | `[x]` |
+| Free-plan model service — a plan with no subscription is served the healthiest free model, and offered no picker | `[x]` |
+| Catalog sweep — probe which advertised ids can actually call a tool, from the UI | `[x]` |
+| Offline gateway — a second, independent gateway tried only after the chain | `[x]` |
+| Text-mode tool calls — salvage a weak model's JSON-prose call | `[x]` |
+| Command sandbox — `docker run --network none --read-only`, workspace only | `[x]` |
+| Persistence — sessions, transcripts, snapshots, `sweep.json`, `workspace.json` | `[x]` |
+| Sign-in — Authentik OIDC, code + PKCE, RS256 id_token vs JWKS, signed cookie | `[x]` (on at both names) |
+| Tenancy — Distro control plane: identity, quota, usage, audit | `[x]` (wired, off) |
+| Per-account disk scope — `accounts/<account>/` for workspace, chats, history | `[x]` |
+| UI — transcript, tool cards, preview pane, diff view, sweep panel, a11y | `[x]` |
+| Unity theme + landing page published under the family site | `[x]` |
+| Checks — `node --test`, `ui-smoke`, `draft-check`, `offline-check`, `model-health` | `[x]` |
+| No runtime dependencies in `public/` — the console is served, not built | `[x]` |
+
+**v0.1 is complete as an agent console.** What is outstanding is not the console
+— it is that the console does not yet stand in the stack the way its siblings do.
+
+## 3. Architecture recap
+
+- **One HTTP server** (`src/server.ts`) — UI + JSON API + SSE, no framework and
+  no bundler; `public/` is served as written.
+- **The turn loop** (`src/agent.ts`) — chain selection, retry re-walk, tool
+  dispatch and event emission; the approval gate (`src/approval.ts`) parks the
+  stream on a second connection rather than blocking it.
+- **The jail** (`src/workspace.ts`) and the account scope (`src/scope.ts`) are
+  the two answers to "where may this touch": the former bounds the sandbox, the
+  latter keys it to an account. Every store, the path jail, the ripgrep root and
+  the `run_command` mount resolve through them.
+- **The model layer** never holds a provider credential — Genie speaks only the
+  OpenAI-compatible wire format, and the gateway's address arrives from the
+  environment.
+- **Stack placement.** Genie is the **CodeOps** member of the OnTrak family and a
+  component of the Innotel Platform Stack. It consumes OmniRoute, Distro's control
+  plane, Authentik, Cerulean Vault or Cerulean DNS/TLS and NPM Edge. It owns none
+  of them.
+
+## 4. Milestones
+
+### v0.1 — The console `[x]`
+
+The feature set in §2. Exit met: a task can be stated, watched while it is worked,
+approved or denied at the gate, and the session resumed after a restart.
+
+### v0.2 — Stack citizenship `[x]`
+
+**Goal:** make Genie a first-class member of the stack rather than a console that
+happens to be in the repo.
+
+- `[x]` **Sign-in on by default at the edge.** Authentik OIDC is configured on
+  the family deployment (`ONTRAK_OIDC_ISSUER` =
+  `https://auth.cerulean.innotel.us/application/o/ontrak`, the `ontrak` client id,
+  the client secret and a generated `ONTRAK_OIDC_SESSION_SECRET`), the `OnTrak`
+  provider carries a redirect URI per deployment name, and reaching the console
+  requires a sign-in. **Both names sign in on their own URI**: the redirect
+  resolution reads the browser's `Host` and picks the matching entry, so
+  `genie.ontrak.innotel.us` and `genie.innotel.us` each complete a code flow
+  rather than one name bouncing its session onto the other.
+- `[x]` **Tenancy through Distro's control plane.** `src/controlplane.ts` and
+  `src/tenancy.ts` speak the same `/api/internal/identity`, `/quota-check`,
+  `/usage-report` and `/audit` contract Studio uses, with the deliberate key
+  posture (strict identity, fail-open quota, best-effort ledger). On the family
+  deployment `CONTROL_PLANE_INTERNAL_URL` points at Distro's plane and the service
+  token arrives as the `vault://cerulean/ontrak#CONTROL_INTERNAL_TOKEN` reference,
+  so a turn resolves to the signed-in subject's own account and spends that
+  account's gateway key instead of the shared one — which is what makes
+  per-account quota and usage real. Sign-in is what gives the subject to key on.
+- `[x]` **Secrets from Cerulean Vault.** `.env` now holds `vault://` references
+  rather than values, resolved at container startup by `scripts/vault-env.mjs`
+  (run from `docker-entrypoint.sh`) under the path-scoped KV v2 `ontrak` token the
+  rest of the estate uses — covering only `cerulean/data/ontrak`. The resolver is
+  fail-fast: a reference that cannot be resolved, a missing key or an unreachable
+  store stops the container instead of booting with a literal `vault://` string,
+  which is what makes a partially-migrated deployment impossible rather than
+  merely unlikely (§8). Cerulean mints the token (it is in `VAULT_PRODUCT_TOKENS`)
+  and the family stack mounts it read-only; moving the first values in is one
+  `scripts/vault-migrate.py` run.
+- `[x]` **The operator surface at the edge.** Cerulean owns DNS/TLS and NPM Edge
+  owns the public route; Genie registers the names through Cerulean rather than
+  writing DNS or the NPM API itself (the platform rule the standard states).
+  **Both names are live and gated** — `genie.ontrak.innotel.us` (family) and
+  `genie.innotel.us` (platform) are registered in the `innotel.us` zone and on
+  the edge, each forwarding to the Genie app on `192.168.1.21:3400` under the
+  estate's wildcard certificate (NPM hosts 195 and 197, certificates
+  `*.ontrak.innotel.us` and `*.innotel.us`), and both sit behind the same
+  Authentik sign-in as the rest of the estate.
+- `[x]` **A published image and a stack entry.** Genie publishes to
+  `ghcr.io/innotelinc/ontrak-genie` as its `runtime` stage — one image and no
+  `-migrate` twin, because it has no database — from the same `publish.yml` /
+  `scripts/publish-images.sh` list the other products use. Beside the product
+  compose sits `docker-compose.prod.yml`, the pull-only overlay
+  (`make genie-prod-up`, `ONTRAK_IMAGE_TAG`), and the family stack's
+  `genie-app` entry names the same version, so a deploy is a pull rather than a
+  build.
+- `[x]` **Model-chain health on the deployment.** The chain is pinned in the
+  deployment's environment rather than left on `auto/*`, every entry an explicit
+  id checked for a real tool call, and the chain-health row plus `model-health`
+  are the guards. The pin moved when the pool did (v1.0): the deployment now
+  leads with the explicit Gemini id that answered (`AGENT_MODEL=gemini/gemini-3.1-flash-lite`,
+  `AGENT_FALLBACK_MODELS=gemini/gemini-3-flash-preview,gemini/gemini-2.5-flash`)
+  and a free account is served the automatic pool in health order rather than
+  choosing (`AGENT_FREE_MODELS`, `src/modelSelect.ts`) — the free-tier daily
+  quota is why the pool spans providers rather than resting on one. What v0.2
+  established is what still holds: an explicit, measured chain, never a combo
+  whose real target depends on the gateway's mood.
+
+**Exit:** reaching `genie.innotel.us` requires an Authentik sign-in, a signed-in
+turn spends that account's own gateway key and is refused when it may not spend,
+secrets are read from Vault, and the name is a Cerulean-registered route — not a
+hand-written DNS record and an NPM host someone clicked.
+
+### v0.3 — Resilience and reach `[x]`
+
+**Goal:** the console stays useful when the gateway, the plane or the model does
+not.
+
+- `[x]` **Streaming fidelity where the gateway supports it.** The stream already
+  sees how a call arrives, so a `draft` event now carries `streamed`: false when
+  the pane was only ever shown the finished body — what the LAN gateway's Gemini
+  path produces by handing the whole call over in one frame. The pane says
+  *written in one frame* rather than implying a stream that never happened, and
+  `draft:check` reports the same field (its `--require-fragmented` failure now
+  comes from the server's own answer, not a frame count). Both shapes are pinned
+  by `src/test/draft-streaming.test.ts`, and the pure rule by
+  `draftStreamed` in `src/test/draft.test.ts`.
+- `[x]` **A second approval channel.** `GET /api/approvals` lists what the cards
+  would show and `POST /api/approvals/:id` still answers, so the gate is reachable
+  without watching a tab; `npm run approvals` (`scripts/approvals.mjs`) is the
+  headless driver a CI job uses. Every decision — from either channel, including a
+  timeout or a cancelled stream — is appended to `<AGENT_DATA_DIR>/approvals.jsonl`
+  with the actor, so unattended running still leaves a record of who let what run.
+- `[x]` **Session and workspace management.** Listing was the whole of this while
+  a deployment was one operator with one pile of chats; the missing half was the
+  ordinary housekeeping, and all of it is on the row itself rather than behind an
+  admin screen, because the person who owns a chat is the person who knows which
+  of them it needs. **Naming** flattens and bounds the title (`normalizeTitle`),
+  because it is drawn into a one-line list; **archiving** is a flag on the chat
+  and nothing else — the transcript, its file history and its directory are
+  untouched, which is what makes it reversible by the owner rather than by an
+  administrator, and the list folds archived chats behind a count rather than
+  hiding that they exist; **deleting** is armed in two clicks for the same reason
+  deleting a file is, and deleting the chat you are looking at leaves you in a
+  fresh one instead of in a transcript whose record is gone. The **workspace
+  choice is per account**, keyed exactly as the scope is — it was deployment-wide
+  on the reasoning that the window picking it *was* the operator's, which tenancy
+  turns into a bug: one person choosing `project-a` would have moved everybody's
+  tools, including an account that had chosen `project-b`. The **sweep report**
+  followed for the same reason: the catalog is shared but the report is what
+  *this* account last measured, so it is written beside the account
+  (`accounts/<account>/sweep.json`) and loaded lazily per key. An install that
+  never signs in reads the one choice it wrote, in the one slot it wrote it to.
+  Pinned by `src/test/session-management.test.ts` and the per-account cases in
+  `src/test/scope.test.ts`.
+- `[x]` **Per-account usage visible in the console.** The ledger is written and
+  the account can now read it back: `GET /api/account/usage` resolves the caller
+  exactly as a turn does and returns the plane's own answer — today's requests,
+  tokens and cost, the caps it is judged by, and its allow/deny verdict — and the
+  sidebar renders it (`usage: today n req / t tok / cap`). Because the number
+  shown and the number that refuses the next turn come from the *same* decision,
+  they cannot disagree; a deployment with no control plane has no account to read
+  and says so rather than showing a fake zero. Pinned by
+  `src/test/account-usage.test.ts`.
+- `[x]` **A toolchain in the workspace, and the network to use it.** The runtime
+  image carries bash, git, ripgrep, curl, wget, jq, make, gcc/g++, python3 + pip
+  and unzip, and the system prompt tells the agent to install what else it needs
+  (`apk add`, `pip install`, `npm install`) rather than work around it — "curl not
+  found" is not an answer this agent gives. `AGENT_SANDBOX_NETWORK` (default
+  `none`) is the deliberate opt-in for the sandboxed case, and the compose
+  deployment runs on the host path where the container is already the boundary.
+- `[x]` **The app, running.** `preview` used to open on the code the agent was
+  writing; it now opens on the project *running*, and reloads it as files change.
+  `src/preview.ts` owns one dev server per workspace, the port it ended up on, and
+  the change feed; the app is proxied same-origin and gated like any other read,
+  both under `/preview/` (with root-relative URLs rewritten, so a page asking for
+  `/assets/app.js` keeps its links inside the pane) and at the console's own root,
+  because a bundler's URLs — `/@vite/client`, `/_next/webpack-hmr`, a dynamic
+  import — are strings no rewrite can reach. Websocket upgrades are forwarded too,
+  which is what a development server's hot reload actually is. Which command to
+  run is detected from the project rather than configured, and named  as detected
+  in the pane; `show code` still shows the file being written.
+- `[x]` **An address the rest of the network can use.** The pane's `/preview/` is
+  a path on the console: right for the person looking at it, useless to a webhook,
+  a phone, or a gateway calling back into the app. `AGENT_LAN_IP`,
+  `AGENT_PREVIEW_HOST` and `AGENT_PREVIEW_PUBLISH` publish the app at the
+  deployment's LAN address and report it as `address`, so "where does the app
+  live" has one answer that is never `172.17.0.1` — the platform's own rule for
+  an upstream, applied to a preview. `AGENT_SANDBOX_NETWORK=host` is the same
+  answer for a sandboxed command that starts the app itself.
+
+### v0.4 — Beyond a single operator `[x]`
+
+**Goal:** more than one person, more than one workspace, without the operator
+becoming the bottleneck.
+
+- `[x]` **Shared sessions.** Hand a transcript to a colleague with the same
+  visibility, still gated per turn. A share names **one chat and one address**
+  (`src/sharing.ts`, `shares.json` beside the sessions), it is **read from the
+  owner's own slice** through the same `accountScope` every other path uses, and
+  it is **read-only by construction**: the model route resolves sessions against
+  the recipient's own store, so a shared id is simply absent there and a turn
+  against it is refused by the same code that refuses an unknown chat — no
+  special case in the chat route, and no way to run a turn as somebody else. The
+  owner can withdraw a share and the recipient can put one away (`DELETE
+  /api/shares/:id`; either side may, because a share is not a grant that only one
+  person can end), and a chat whose owner deletes it is reported as **removed by
+  its owner** rather than silently dropped from the list. A share is addressed to
+  an address rather than an account id, because the console knows the signed-in
+  person's address and does not ask the control plane to resolve anybody else's;
+  the honest limit is that an address that changes stops matching, which is a
+  permission that lapses rather than one that follows the wrong person. Single-
+  operator mode (no accounts to share with) returns empty lists instead of a
+  second, weaker permission. Covered by the four sharing cases in
+  `src/test/tenancy-http.test.ts`.
+- `[x]` **Repository-aware workspaces.** Gitea/Atlas as the source of a workspace
+  — clone, branch and open a PR from the console — with the same jail and gate.
+  The console provides the three moves a person makes before the agent has anything
+  to do, and the agent then edits, commits and reviews through the ordinary tools:
+  a clone lands through `resolveInWorkspace`, so a repository name can never become a
+  path out of the account's own slice, and every git command runs through
+  `runShellCommand`, so it meets the *same* guard, sandbox and timeout a tool call
+  does. A repository is named `owner/name` and a pasted URL is reduced to that form —
+  its host discarded, never dialled — so a caller cannot point the console at a host
+  of their choosing; the credential is supplied **per command and never stored** (the
+  clone rewrites `origin` back to the plain URL, so `.git/config` holds no live
+  token), and any token a git error echoes is redacted before it is returned. The
+  rules are pure (`src/repo-rules.ts`), the operations are `src/repo.ts`, and the
+  routes are `GET /api/repo` and `POST /api/repo/{clone,branch,push,pr}`. Covered by
+  `src/test/repo.test.ts`.- `[x]` **Diff review before write, not only during.** `AGENT_WRITE_MODE=propose`
+  holds the agent's file writes in a **change set** instead of writing them, and one
+  `POST /api/changes/apply` commits the whole set (a `discard` drops it without a
+  byte written). The rules are pure (`src/change-set.ts` — an entry, the totals, and
+  the apply order), the state is one pending set (`src/proposals.ts`) filed to
+  `changes.jsonl` whether it lands or is dropped, and the file tools stage at the
+  exact seam that already computed the diff (`src/tools.ts`), so what a reviewer
+  approves is computed the same way the approval prompt already was. A path
+  proposed twice is one entry — the later one wins, because an agent correcting
+  itself should not ask a reviewer to approve both — and the model is told plainly
+  that nothing landed, because one that believed otherwise would read a stale file
+  next. Covered by `src/test/change-set.test.ts`. One pending set **per account** is
+  deliberate: a change set is a document a person reads, so there is one at a time
+  for the person reading it — but which one is theirs, not the process's. That
+  key (`2.2`) is what lets two operators sign in to one deployment and review their
+  own proposals instead of sharing a slot neither of them chose.
+- `[-]` **ONYX** is explicitly *not* this: Genie owns no storage; a shared artifact
+  that outlives a workspace is ONYX's to hold, which is why this is out of scope
+  rather than an open bullet.
+
+### v0.5 — The terminal client `[x]`
+
+**Goal:** the console's promise without the console — the same server, driven
+from a terminal, so the people who work in one are not second-class.
+
+- `[x]` **`genie`, a client of the server.** `src/cli/` is a terminal client over
+the same HTTP API the browser uses: `POST /api/chat` streamed as SSE, the same
+`AgentEvent` union, the same `POST /api/approvals/:id` gate. It owns no agent
+loop and no provider credential, so the jail, the gate and the audit trail are
+unchanged by its existence — and it adds **no runtime dependency**, matching the
+console's own rule (the SSE parser, the argument parser and the renderer are all
+here). See [cli.md](cli.md).
+- `[x]` **Sign-in from a terminal.** A CLI cannot read the session cookie the
+deployment sets, so a sign-in started at `GET /api/auth/cli?port=` finishes by
+redirecting to that loopback port with the session in the URL **fragment** — never
+sent to a server, so it cannot land in an access log or a `Referer`. The port is
+bounded to loopback so the handoff can never be pointed at another host, and the
+CLI verifies the credential against `/api/auth/status` before storing it. Pinned
+by `src/test/cli-handoff.test.ts`.
+- `[x]` **The REPL.** Streamed prose, tool cards, live diffs and the gate; a
+slash-command palette with Tab completion drawn from the same table `/help` uses;
+session list/resume/rename/archive/delete; model, step budget and offline
+per-chat settings; and a non-interactive `ask` whose exit code is the answer.
+- `[x]` **Projects, from the terminal.** `genie projects` saves, lists, opens,
+renames and forgets workspace projects, and moves one as a single portable file:
+`export` writes the bundle (or streams it with `-o -`, so two deployments can be
+piped together), `import` loads it back as a new project. The same routes the
+console's panel calls, and no project logic of its own.
+- `[x]` **Skills.** Markdown playbooks loaded from a personal directory, the
+environment or `./.genie/skills/`, composed into the message with the task last —
+no hidden system prompt, and `/last` shows what was sent.
+- `[x]` **Follow-ups.** Up to three next steps derived from the turn's own events
+(a failure outranks a review; a clean change suggests review, tests, commit).
+Deliberately not a second model call: a suggestion can never invent work the turn
+did not do.
+- `[x]` **Propose-then-commit.** The live diff exists and the review-after-the-fact
+is not it; a queued change set a reviewer approves before it lands is what v0.4
+shipped (`AGENT_WRITE_MODE=propose`, `POST /api/changes/apply`), and the terminal
+drives the same set with `genie changes`, `genie apply` and `genie discard` (2.1).
+It is per account now (2.2), so two operators review their own proposals.
+- `[x]` **Web research tools.** `web_fetch` reads a public page as text behind
+an address policy and a 2 MB cap; `web_search` returns titles, URLs and snippets
+from Exa. Both are approval-gated, and both are available to the terminal because
+they are server-side tools — no second implementation.
+
+**Open, plainly:** the CLI covers the console's core and the housekeeping around
+it, including the web tool set now. Per-account change sets (2.2) have since landed,
+so what remains in this milestone's neighbourhood is 2.3's fleet operations, not
+another surface: `web_search` still needs a provider key, and a deployment without
+one gets `web_fetch` only.
+
+### v0.6 — Remote workspaces `[x]`
+
+**Goal:** the workspace stops having to be *this* machine — a folder on a
+server, a repository on GitHub, and the ecosystem's own forge — without growing a
+second jail, a second editor or a second credential store.
+
+- `[x]` **A folder on a server, mounted rather than reimplemented.** `sshfs` puts
+the remote tree at `<sandbox>/.remotes/<id>` and the console makes it the working
+directory, so every tool, the diff, the snapshots and the preview reach it through
+the jail that already exists — the whole of "remote support" is that the same
+code runs over a FUSE mount. Mounts are **verified** before they are trusted
+(`sshfs` reports success for a connection that has already died, so
+`/proc/self/mounts` is the authority), they live in this process's memory so a
+saved working directory under `.remotes` is cleared at boot rather than resolving
+into an empty directory, and they are unmounted and their key files removed at
+shutdown. Pure rules in `src/remote-rules.ts`; the process, the credential store
+and the routes in `src/remote.ts` and `server.ts`.
+- `[x]` **A repository on GitHub, with the caller's token.** `owner/name` — or a
+pasted URL, **of that host** — is cloned into the working directory and edited in
+place, so the preview runs the project as it changes; branch, push and pull request
+follow through `api.github.com`. The Gitea rules *discard* a URL's host because
+one base is the operator's; here the host is checked, so `gitlab.com/acme/x` is
+refused rather than quietly cloned from GitHub. The token is supplied per command,
+`origin` is rewritten to the plain URL, and every error path is redacted.
+- `[x]` **Atlas, as an add-on.** Atlas runs the ecosystem's Gitea, so the forge
+path is Gitea's own API: connect (verified by `GET /api/v1/user`, remembering the
+login the forge agreed to), clone, **create a repository and work in it in one
+step**, push, and open a pull request. Two ways in, and the difference is stated
+rather than assumed: this deployment's **own** credential is the system path and is
+not gated on a plan, while anyone else's is checked against `MAGNATE_ATLAS_PLAN`
+*first* so a refusal reads as an add-on with a signup link rather than as a wrong
+password — and a Magnate that cannot be reached is not a refusal
+(`src/atlas.ts`, `src/entitlements.ts`, `src/test/remote-forge.test.ts`).
+- `[x]` **Credentials that are the caller's, and stay theirs.** Held in this
+process's memory, keyed by account exactly as the workspace scope is, and gone when
+it stops; nothing is written into the workspace, a config file or a transcript. Two
+stated exceptions: a private key has to be a file for `sshfs` to read it (`0600`
+under `<AGENT_DATA_DIR>/remote/<account>/<id>/`, removed on disconnect and at
+shutdown), and a password or passphrase reaches `sshpass` through `SSHPASS` rather
+than a command line, so it is never in `ps`. Host keys pin on first use into the
+data directory, never into the operator's `~/.ssh`, and
+`AGENT_REMOTE_ALLOWED_HOSTS` bounds where the console may dial at all.
+- `[x]` **The same three from the terminal.** `genie remote` lists, mounts,
+disconnects, connects to Atlas, creates a project, clones, runs, pushes and opens a
+pull request — over the same routes, with a secret that is never a positional
+argument (`--key-file`, `--password-stdin`, `--token-stdin`), and with
+`genie remote atlas` needing no secret at all because the deployment already holds
+one.
+- `[x]` **Create it, then run it.** A repository created or cloned from a forge
+becomes the working directory, so the project it produced is run the way any other
+project is: the console's **run the project** in the Atlas block, or
+`genie remote run`, both over `POST /api/preview/start`. Nothing new runs the app —
+the preview already knew how — which is why the whole of it is a button and a
+subcommand rather than a second runner (`src/cli/remote.ts`, `public/app.js`).
+
+### v0.7 — Bring your own project `[x]`
+
+**Goal:** the work does not have to start here. A project arrives as an archive,
+and leaves as a repository — with the two things that make it usable done for the
+person rather than explained to them: its dependencies installed, and somewhere
+for it to live that is not one deployment's disk.
+
+- `[x]` **An uploaded `.zip` is a project.** `src/zip.ts` reads the format without
+  a dependency (the central directory plus `zlib.inflateRawSync`, ZIP64 included,
+  every entry's CRC and claimed length verified, encrypted entries and methods it
+  cannot unpack refused *by name*), and it is bounded three ways before anything is
+  written — the upload, the entry count, and the *uncompressed* size, with each
+  entry inflated under `maxOutputLength`, so a small archive cannot expand into the
+  memory it lied about. Every path goes through the same fence a project bundle's
+  does, which is why `../../etc/passwd` inside an archive is refused rather than
+  written. `src/project-zip.ts` decides what the archive *means*: the wrapping
+  folder is stripped when every file shares it (`repo-main/` is what an export
+  from a forge looks like), the directories the console ignores are left out and
+  reported, the operating system's litter is dropped without being reported, and
+  the result is a new project made the same way every other one is.
+- `[x]` **It installs its own dependencies, inside the project.**
+  `src/project-install.ts` reads the stack off the *names* of the files at the
+  project root and nothing else, so the plan is knowable before it runs (the
+  console shows the steps, `GET /api/projects/:id/stack`), and it runs them through
+  the same sandboxed executor the agent's `run_command` does. The decision that
+  shapes every step: a sandboxed command runs in a throwaway container whose root
+  filesystem is read-only, so anything installed *outside* the project is gone the
+  moment the step ends — which is why Python gets a `.venv` in the project rather
+  than a `pip install` into the interpreter, and why Go's and Rust's caches are
+  pointed at `.gopath`/`.cargo` inside it. A step that fails stops the rest, and
+  the installer's own output is returned whole, because that is what says why.
+  `POST /api/projects/:id/install` runs it, `POST /api/projects/import-zip` with
+  `?install=1` does the whole arrival in one call.
+- `[x]` **And it can be saved to a repository that does not exist yet.**
+  `POST /api/publish` takes a target of `github` or `atlas` and does the four
+  things in the order that works: create the repository (GitHub through
+  `api.github.com` with the caller's own token, Atlas through Gitea's API with the
+  connected credential or the deployment's own), commit what is here with an
+  identity supplied per command, point `origin` at the **plain** URL, and push once
+  with the credential inline — so `.git/config` holds no secret and the directory
+  *is* the clone afterwards, which is what makes the push and pull-request paths
+  above work from there on. A repository that already exists is pushed into rather
+  than refused, and a `.gitignore` is written — and *reported* — when the installer
+  left dependencies in the project, because committing `node_modules` is not what
+  "save my project" means (`src/remote-rules.ts` for the payloads, `src/remote.ts`
+  for the process, `src/test/remote-publish.test.ts` for the sequence).
+
+### Skills and memory `[x]`
+
+**Goal:** a session that starts where the last one finished, and a team's way of
+working that can be handed to the agent instead of retyped.
+
+- `[x]` **A skill is a playbook, and one can be installed.** `SKILL.md` with
+optional front matter, or a *directory* of one playbook plus its references; read
+from the project (`.genie/skills`), the account, and the deployment, in that order
+of precedence. `genie skills add <owner/repo>` fetches one from GitHub — working
+out the repository's own layout, installing a skill published for a dozen providers
+**once** from its canonical copy, refusing a repository that holds several until
+`--path` says which, and reading `GITHUB_TOKEN` because a private repository needs
+one and the anonymous rate limit is low (`src/skill-install.ts`, `src/skills.ts`).
+- `[x]` **The same skills in the console, per account.** The prompt carries a
+*menu* and the playbook arrives with `use_skill` when it is wanted, which is the
+difference between offering thirty skills and shipping thirty playbooks every turn
+(`src/skill-roots.ts`, `GET /api/skills`).
+- `[x]` **Installing from the console, with a scope that can be explained.** A
+panel lists what this caller is offered, installs one from GitHub into the
+signed-in account's own lane, and offers removal only where the route says the
+caller owns it — provenance and lane, both decided server-side so the panel cannot
+disagree with the route that enforces them (`POST /api/skills`,
+`DELETE /api/skills/<name>`, `src/test/skills-route.test.ts`).
+- `[x]` **The browser checks run in CI.** They needed a Chrome and a console to
+drive, and had neither on a runner — so `scripts/smoke-run.sh` starts a stand-in
+gateway and a console of its own, seeds one change through the real chat route, and
+runs `ui:smoke` and `layout:check` against them; the checks that need a model still
+skip there, and say so (`scripts/fake-gateway.mjs`, `.github/workflows/ci.yml`).
+- `[x]` **A project that remembers.** `MEMORY.md` in the workspace, injected into
+every turn, written with the `remember` tool — a file, so it is visible, diffable,
+revertable and committed with the code (`src/memory.ts`).
+- `[x]` **A pre-existing bug this work found:** the CLI's argv parser refused the
+subcommands' own flags, so `--key-file`, `--port` and `--dir` worked only inside
+the REPL and a shell answered "unknown option" for the syntax the help documented.
+
+### 2.0 — The CodeOps surface `[x]` (was v1.0)
+
+**Goal:** the counterpart, in a browser, of a terminal agent session — with the
+gate the terminal does not have.
+
+- `[x]` **Multi-tenant by account, with isolated workspaces and an audit trail.**
+  The tenancy half was already there — an account's disk, chats and file history
+  are its own, and Distro bills each turn to that account's own gateway key. What
+  1.0 added is the record an operator can read afterwards, and where to read it:
+  `approvals.jsonl` (every decision, including a timeout, with its actor), the
+  account's transcripts and file snapshots, and Distro's ledger by account — the
+  three are listed as one backup set and one incident order in
+  [runbook.md](runbook.md) §9–§10, because an audit trail nobody can find is not
+  one.
+- `[x]` **A ceiling per account, not a price list.** The family runs on unlimited
+  usage, so a quota here is not a bill: it is attribution plus a bound on a
+  runaway loop, and the plan cannot supply the second because it never refuses
+  anyone. `AGENT_ACCOUNT_CEILING_REQUESTS` is the number **Genie** enforces, and
+  three decisions make it a stop rather than a licence: it is counted in
+  `beginTurn` — the gate that spends, after the plane has allowed the turn — so
+  nothing reaches the model around it; the day is UTC and the reset is a
+  comparison rather than a timer; and the count is held **in the process** on
+  purpose, so a restart forgives it, because a durable counter is a billing
+  mechanism wearing a safety belt. `0` disables it. The account reads the number,
+  the turns used against it and its `allowed` verdict at `GET /api/account/usage`
+  (`docs/roadmap.md` → `src/ceiling.ts`, `src/test/ceiling.test.ts`).
+- `[x]` Deployment posture: retained audit, an operator runbook, and a
+  documented threat model for exposing a shell-capable agent at a name. The
+  posture is now two documents rather than a paragraph:
+  [threat-model.md](threat-model.md) names the four trust boundaries, the five
+  adversaries and — the part that matters — the **residual** exposure behind each
+  control, with the largest one stated plainly (the code the agent reads is sent
+  to whichever provider answers, which is a property of using a hosted model at
+  all, and the reason the offline gateway exists);
+  [runbook.md](runbook.md) is what an operator does with it — deploy (and read
+  the fail-fast Vault resolver as a feature), add a name (which needs an Authentik
+  redirect URI, not only DNS), tell four refusals apart, read the two
+  outage alerts as opposite things, act on a runaway loop, off-board an account
+  without destroying its work, and the incident order to follow when an agent at a
+  public name runs unattended. Retention is stated where it is practised:
+  `approvals.jsonl` is append-only and pruned on a defended schedule, transcripts
+  and snapshots are the backup set.
+- **Exit — met (2026-10-01):** two accounts run isolated workspaces under one
+  deployment with a gate on every destructive call and an auditable record of what
+  each account did — with usage explained rather than charged. The last thing owed
+  was a *deployment* fact rather than a code fact, so it is checked against the
+  console people use rather than asserted: `npm run tenancy:check`
+  (`scripts/verify-tenancy.mjs`) signs in as two of the control plane's accounts
+  and requires two workspaces, two chat lists and two records, and against the
+  family plane `dhunter@innotel.us` and `admin@cerulean.innotel.us` each got their
+  own — with one real turn by the second moving **its** `usage_cache` row from 0 to
+  1 request while the first's 64 were untouched. What is left open below is the
+  *shared* half of running more than one operator (`v0.4`), not the isolation.
+
+## 5. Safety and autonomy ladder
+
+Genie's approval gate *is* its autonomy control: autonomy is earned per
+deployment, not configured by a prompt, and the gate is the only thing between a
+plan and a changed machine.
+
+| Rung | Name | What it means | State |
+| --- | --- | --- | --- |
+| **L0** | Manual | `AGENT_APPROVAL=risky` (or `all`): every command and large write waits for a click | current |
+| **L1** | Watched auto | A recorded run of a known task shape from which the operator raises the threshold — never by disabling the gate | later |
+| **L2** | Policy-bounded | The gate stays, but a signed policy names what may run unattended inside the sandbox | later |
+| **L3** | Unattended | `[-]` **Out of scope.** A coding agent that changes a host without a human decision is not a configuration this product ships | out |
+
+The sandbox and the gate are independent on purpose: sandboxing stops a command
+from reaching the host, approval stops it from running at all. Raising a rung
+loosens the second, never the first.
+
+## 6. Cross-cutting requirements
+
+- **Safety first** — no privilege escalation, no `--network none` removal by
+  default, no unreviewed write over the threshold; the refusal comes back to the
+  model, never a crash.
+- **No runtime dependencies** in `public/` — the console is served, not built, and
+  the vendored highlighter keeps an invalid file watchable.
+- **Testing** — every fix ships a regression test; `npm run check` runs the
+  typecheck, the build, the unit suite and the browser smoke test in one command.
+- **A11y** — landmarks, labelled controls, focus handling and a polite live
+  region that announces tool results without narrating every streamed token.
+- **Unity** — the family token set, not a private palette.
+- **Attribution and license** — MIT, one author, no vendored provider SDK.
+
+## 7. Success metrics
+
+| Metric | Why |
+| --- | --- |
+| Turns that reach a tool call vs. turns that die on a model | Chain health actually matters |
+| Approval decisions per turn, and deny rate | Whether the gate is used or clicked through |
+| Time-to-first-tool-call after a task is stated | Responsiveness of the console |
+| Sweep: usable ids ÷ ids claiming tool calling | The catalog is not a capability — 25 of 582 advertised ids answered on 2026-10-01 (see `docs/operations.md`) |
+| Sessions resumed after a restart | Whether persistence is real |
+| Accounts whose turns spend their own key | Whether tenancy is actually on |
+
+## 8. Risks and open questions
+
+- **Exposing a shell-capable agent at a public name** is the central risk. The
+  posture is one gate (Authentik) plus the sandbox; the threat model in v1.0 is a
+  deliverable, not a paragraph.
+- **Provider capacity** — free tiers throttle, and a model that cannot call a tool
+  fails the turn however strong it is; the chain mitigates, it does not remove it.
+- **Local model quality** — a 7B model drives tools but rewrites more than asked;
+  the offline gateway is a floor, not a peer.
+- **Distro contract drift** — Genie and Studio share one control-plane contract;
+  a change must land in both, and neither should grow a private variant.
+- **Vault migration** — moving `.env` values to `vault://` needs the path-scoped
+  token and a deploy-time resolver; a half-migrated deployment is worse than an
+  un-migrated one. **Mitigated:** the resolver is fail-fast, so a reference whose
+  secret, key or store is missing stops the container at startup rather than
+  booting with a placeholder — a partial migration fails loudly, not silently.
+  What remains is keeping the two halves in step: a value moved to Vault must
+  arrive as a reference *in the same change*, or the plaintext stays authoritative.
+
+## 9. Not in this roadmap
+
+- **Identity (Authentik), secrets (Cerulean Vault), trust/DNS/TLS (Cerulean),
+  storage (ONYX), revenue (Magnate) and model routing policy** — Genie integrates
+  with these instead of re-implementing them; it chooses which model id to ask for
+  and reports what came back, and the gateway decides which provider answers.
+- **Auto-merge and unattended host changes** — see the ladder's L3.
+- **A second builder/execution plane.** Atlas keeps the ecosystem's code and CI;
+  Genie is a console over a workspace, not a factory.
+
+## 10. Immediate next steps
+
+1. ~~Register `genie.ontrak.innotel.us` and `genie.innotel.us` through Cerulean
+   (DNS + NPM Edge) against a decided deployment target.~~ **Done** — both A
+   records and both proxy hosts are live against the Genie app on
+   `192.168.1.21:3400`. The same change still owes the Authentik application and
+   its redirect URI, so the name is gated rather than merely routed (v0.2).
+2. ~~Turn tenancy on~~ **Done** — `CONTROL_PLANE_INTERNAL_URL` points at
+   Distro's plane on `192.168.1.61:20140` and `CONTROL_INTERNAL_TOKEN` arrives as
+   a `vault://cerulean/ontrak#CONTROL_INTERNAL_TOKEN` reference, so a turn
+   resolves to the signed-in subject's account and spends its own gateway key.
+   The token moved to Vault in the same change, as item 3 requires. `WEB_TOKEN`
+   stays as the API-client bearer until it does not.
+3. ~~Move the deployment's secrets to Cerulean Vault `vault://` references with
+   the path-scoped token (v0.2).~~ **Done** — `OMNIROUTE_API_KEY`,
+   `ONTRAK_OIDC_CLIENT_SECRET` and `ONTRAK_OIDC_SESSION_SECRET` live at
+   `cerulean/ontrak` and `.env` points at them; the image resolves them at boot
+   under the `ontrak` policy. `WEB_TOKEN` and `CONTROL_INTERNAL_TOKEN` are unset
+   on the deployment today and move the same way when they are set.
+4. ~~Publish a versioned release image and add Genie's entry to the platform's
+   group compose so a deploy is a pull (v0.2).~~ **Done** — Genie publishes as
+   `ghcr.io/innotelinc/ontrak-genie:0.2.0` (the `runtime` stage, and no migration
+   image because there is no database), the family stack's `genie-app` entry names
+   that version, and `ontrak-genie/docker-compose.prod.yml` with
+   `make genie-prod-up` is the pull-only deploy path the other products already
+   had.
+5. ~~Write the threat model and the operator runbook (v1.0).~~ **Done** —
+   [threat-model.md](threat-model.md) (boundaries, adversaries, and the residual
+   behind each control) and [runbook.md](runbook.md) (deploy, sign-in, the four
+   refusals, the two outage alerts, a runaway loop, off-boarding, the incident
+   order). The *deployment* half of 1.0's exit is now met too: two accounts are
+   isolated on a running console, each with its own key, workspace and record,
+   proven by `npm run tenancy:check` against the live control plane rather than
+   described (see the exit above). `docs/operations.md` § *Two accounts, two
+   workspaces* carries the check and the measurement.

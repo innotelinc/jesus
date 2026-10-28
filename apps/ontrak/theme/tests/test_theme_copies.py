@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Every product ships the same theme, and this is what proves it.
+
+The family's rule is one palette: `theme/unity-theme.{css,js}` is the canonical
+copy and each app carries a byte-identical one, because every app is built from its
+own directory and cannot import a file outside its build context.
+
+A rule like that rots quietly — somebody adds `--brand-alt` to one app's copy, it
+looks right in that app, and six weeks later two products disagree about what
+"attention" looks like. So the rule is a test rather than a sentence in a README.
+
+Run:  python3 theme/tests/test_theme_copies.py
+"""
+
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+CANONICAL = ROOT / "theme"
+NAMES = ("unity-theme.css", "unity-theme.js")
+
+# The switch itself is shared the same way, but lands under the component name each
+# app imports. One control, five identical copies, so the family cannot grow five
+# different-looking theme switches.
+# (the CSS copy that marks an app as converted, the app's theme-switch component)
+# Gating on the marker means the switch is required exactly once the app has adopted
+# the theme — an app that has not been converted yet is skipped, and one that has
+# cannot ship a switch that does not match.
+TOGGLE_CANONICAL = "unity-theme.tsx"
+TOGGLES = (
+    ("ontrak-portal/src/theme/unity-theme.css", "ontrak-portal/src/components/ThemeToggle.tsx"),
+    ("ontrak-tix/src/theme/unity-theme.css", "ontrak-tix/src/components/ThemeToggle.tsx"),
+    ("ontrak-sentinel/src/theme/unity-theme.css", "ontrak-sentinel/src/components/ThemeToggle.tsx"),
+    ("ontrak-sync/web/app/theme/unity-theme.css", "ontrak-sync/web/components/ThemeToggle.tsx"),
+    ("src/theme/unity-theme.css", "src/components/ThemeToggle.tsx"),   # the training range
+)
+
+# Where a product keeps its copy, relative to the repository root. An app that has
+# not been converted yet is simply absent from this list, which is why the test
+# passes on a partially-rolled-out family and fails the moment a converted app's
+# copy drifts.
+# The rule is one file per app per artifact: the CSS is imported by the app's
+# stylesheet (bundled at build time), and the JS is a `public/` asset loaded by a
+# blocking <script src> so it runs before the first paint. The standalone runtime
+# image contains no `src/`, so a copy there would be read in development and missing
+# in the container — which is the mistake this list is written to make impossible.
+APPS = (
+    ("ontrak-portal/public", ("unity-theme.js",)),
+    ("ontrak-portal/src/theme", ("unity-theme.css",)),
+    ("ontrak-tix/public", ("unity-theme.js",)),
+    ("ontrak-tix/src/theme", ("unity-theme.css",)),
+    ("ontrak-sentinel/public", ("unity-theme.js",)),
+    ("ontrak-sentinel/src/theme", ("unity-theme.css",)),
+    ("ontrak-sync/web/public", ("unity-theme.js",)),
+    ("ontrak-sync/web/app/theme", ("unity-theme.css",)),
+    # Genie has no bundler: both files are served as static assets out of `public/`
+    # (see STATIC_FILES in ontrak-genie/src/server.ts), so both live there.
+    ("ontrak-genie/public", ("unity-theme.css", "unity-theme.js")),
+    # The lab's portal is the one copy with no build step at all: it is a Jinja
+    # template serving the two files out of its own static directory, so both are
+    # copied by hand. That is precisely why it belongs in this list — the lab lived
+    # in another repository when this list was written, and a hand-copied pair in a
+    # tree no check reads is how a sixth product ends up off-palette.
+    ("ontrak-lab/ontrak/portal/static", ("unity-theme.css", "unity-theme.js")),
+    ("public", ("unity-theme.js",)),          # the training range at the root
+    ("src/theme", ("unity-theme.css",)),
+    # The landing pages of three products, which each grew their own copy of the
+    # theme before this list existed and were left out of it — so they were the one
+    # place a palette change did not reach, and nobody would have noticed until a
+    # marketing page and the app it describes disagreed about what "brand" is.
+    ("web/landing", ("unity-theme.css", "unity-theme.js")),
+    ("ontrak-sync/web/landing", ("unity-theme.css", "unity-theme.js")),
+    ("ontrak-genie/web/landing", ("unity-theme.css", "unity-theme.js")),
+    # G0DM0D3 reads its pages into memory and serves them itself, so it carries
+    # both files in `public/` and answers `/unity-theme.*` from the same door
+    # (see the route in src/app.js). Its studio and engineer pages are exempt on
+    # purpose: the studio is a vendored upstream single-file app with its own art
+    # direction, and the engineer page is a terminal with a glass palette of its
+    # own; neither is a page this repository designs.
+    ("g0dm0d3/public", ("unity-theme.css", "unity-theme.js")),
+)
+
+
+def digest(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+def main() -> int:
+    failures: list[str] = []
+    canonical = {}
+    for name in NAMES:
+        source = CANONICAL / name
+        if not source.is_file():
+            failures.append(f"the canonical copy is missing: theme/{name}")
+            continue
+        canonical[name] = digest(source)
+
+    checked = 0
+    for app, names in APPS:
+        folder = ROOT / app
+        if not folder.is_dir():
+            continue
+        # An app that has not been converted yet is skipped, not failed: a half
+        # rolled-out family is the normal state of a rollout. The moment one file of
+        # a pair is there, the other is required — a CSS copy with no script (or the
+        # reverse) is a product whose theme silently does nothing.
+        if not any((folder / name).is_file() for name in names):
+            continue
+        for name in names:
+            copy = folder / name
+            if not copy.is_file():
+                failures.append(f"{app}/{name} is missing (the app has a theme folder)")
+                continue
+            checked += 1
+            if digest(copy) != canonical[name]:
+                failures.append(
+                    f"{app}/{name} has drifted from theme/{name} "
+                    f"({digest(copy)} != {canonical[name]}) — copy the canonical file over it"
+                )
+
+    # ── the switch ────────────────────────────────────────────────────────────
+    toggle_source = CANONICAL / TOGGLE_CANONICAL
+    if not toggle_source.is_file():
+        failures.append(f"the canonical copy is missing: theme/{TOGGLE_CANONICAL}")
+    else:
+        want = digest(toggle_source)
+        for marker, app in TOGGLES:
+            copy = ROOT / app
+            # Skipped, not failed, while a product has not been converted yet — the
+            # app's theme CSS is the marker that it has been.
+            if not (ROOT / marker).is_file() or not copy.is_file():
+                continue
+            checked += 1
+            if digest(copy) != want:
+                failures.append(
+                    f"{app} has drifted from theme/{TOGGLE_CANONICAL} "
+                    f"({digest(copy)} != {want}) — copy the canonical file over it"
+                )
+
+    if failures:
+        print("theme copies are not identical:")
+        for line in failures:
+            print(f"  ✗ {line}")
+        print("\nfix: cp theme/unity-theme.css theme/unity-theme.js <app>/<folder>/ (and theme/unity-theme.tsx over the app's ThemeToggle.tsx)")
+        return 1
+
+    print(f"theme: {checked} file(s) verified identical to the canonical copy")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

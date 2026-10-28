@@ -1,0 +1,261 @@
+/*
+ * OnTrak Unity — styles.
+ *
+ * Everything visual comes from the shared theme (`src/theme/unity-theme.css`,
+ * which is a checked copy of `theme/unity-theme.css`). This file adds layout and
+ * nothing else: no raw colours, no second palette, no "just this one accent" —
+ * because a page that picks its own colour is a page that will look wrong the
+ * first time somebody switches to light mode.
+ *
+ * The old class names are kept (`tile`, `panel`, `status`, `gate`) so the markup
+ * did not have to be rewritten to gain dark mode; they are defined in terms of the
+ * tokens now.
+ */
+
+@import "../theme/unity-theme.css";
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 14px/1.55 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+
+/* ── the page and its masthead ──────────────────────────────────────────────
+   `.page`, `.page__main`, the masthead, the footer, the gate and the SSO button
+   all come from the shared theme: they are the family's front door, not this
+   product's page, and every OnTrak sign-in is the same shape because of it. What
+   is defined here is the part only the portal has — who it thinks you are. */
+
+/* Who the portal thinks you are, and the one action that can change the answer
+   without a sign-out. Deliberately quiet: it is a diagnostic, not a hero. */
+.masthead__account { display: inline-flex; align-items: center; gap: 6px; }
+.masthead__who { color: var(--ink-faint); font-size: 12.5px; }
+.masthead__link { color: var(--ink-soft); font-size: 12.5px; text-decoration: none; }
+.masthead__link:hover { color: var(--brand); text-decoration: underline; }
+@media (max-width: 720px) {
+  /* The address is the first thing to go when the bar is tight; the role pill is the
+     part that answers the question somebody came here with. */
+  .masthead__who { display: none; }
+}
+
+/* The theme switch is `.ot-theme`, and it lives in the shared theme file above so
+   that all five products render the identical control. */
+
+/* ── headings ────────────────────────────────────────────────────────────── */
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.head h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+.head p { margin: 5px 0 0; color: var(--ink-soft); max-width: 74ch; }
+
+/* ── the person ──────────────────────────────────────────────────────────── */
+.who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  padding: 3px 11px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.chip strong { color: var(--ink); font-weight: 600; }
+.chip--role { border-color: var(--brand-ring); color: var(--brand); background: var(--brand-soft); }
+
+/* ── tiles ───────────────────────────────────────────────────────────────── */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: 14px;
+  margin-bottom: var(--space-5);
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 17px 15px;
+  color: var(--ink);
+  min-height: 168px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+.tile:hover {
+  text-decoration: none;
+  border-color: var(--brand-ring);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-pop);
+}
+/* The product's colour is a left rule, not a filled header: it survives being
+   printed, screenshotted, and read by somebody who cannot tell it apart. */
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--line-strong);
+}
+.tile--training::before { background: var(--tone-its); }
+.tile--desk::before { background: var(--tone-tix); }
+.tile--security::before { background: var(--tone-sentinel); }
+.tile--operations::before { background: var(--tone-sync); }
+.tile--agent::before { background: var(--tone-genie); }
+.tile--engineer::before { background: var(--tone-engineer); }
+.tile--godmode::before { background: var(--tone-godmode); }
+.tile--lab::before { background: var(--tone-lab); }
+
+.tile__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+/* The mark and the name read as one heading, so they sit on one line and the
+   badge on the right stays clear of both. */
+.tile__head { display: flex; align-items: flex-start; gap: 10px; }
+.tile__mark { width: 26px; height: 26px; flex: none; }
+.tile h2 { margin: 0; font-size: 15.5px; font-weight: 650; }
+.tile p { margin: 5px 0 0; color: var(--ink-soft); font-size: 13px; }
+.tile__foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tile__url { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+.tile__open { font-size: 12.5px; font-weight: 600; color: var(--brand); }
+
+.badge {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-ring);
+  color: var(--brand);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* ── status lights ───────────────────────────────────────────────────────── */
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; white-space: nowrap; }
+.status__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unknown); flex: none; }
+.status--up .status__dot { background: var(--ok); }
+.status--down .status__dot { background: var(--bad); }
+.status--unknown .status__dot { background: var(--unknown); }
+.status--up { color: var(--ok); }
+.status--down { color: var(--bad); }
+.status--unknown { color: var(--unknown); }
+
+/* ── panels and tables ───────────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.panel > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+  flex-wrap: wrap;
+}
+.panel > header h2 {
+  margin: 0;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-soft);
+}
+.panel .body { padding: 14px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  font-weight: 600;
+  background: var(--surface-muted);
+}
+tbody tr:last-child td { border-bottom: none; }
+
+.note {
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-muted);
+  padding: 9px 12px;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  border-radius: 0 6px 6px 0;
+  margin: 10px 0;
+}
+.note--warn { border-left-color: var(--attention); background: var(--attention-soft); color: var(--ink); }
+.note--bad { border-left-color: var(--bad); background: var(--bad-soft); color: var(--ink); }
+.note--ok { border-left-color: var(--ok); background: var(--ok-soft); color: var(--ink); }
+
+.dim { color: var(--ink-soft); }
+.faint { color: var(--ink-faint); }
+.empty { padding: 30px 16px; text-align: center; color: var(--ink-faint); }
+
+/* The sign-in gate (`.gate`, `.gate__mark-wrap`, `.gate__mark`) is the shared
+   theme's, so this product's front door and the other five cannot drift. */
+
+label.field { display: block; margin-bottom: 13px; text-align: left; }
+label.field > span { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }
+
+input[type="text"], input[type="password"], select {
+  width: 100%;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  padding: 8px 10px;
+  font: inherit;
+}
+input:focus, select:focus { outline: 2px solid var(--brand-ring); outline-offset: 1px; border-color: var(--brand); }
+
+button {
+  background: var(--surface-muted);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 13px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--brand-ring); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); font-weight: 600; }
+button.ghost { background: transparent; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.actions--end { justify-content: flex-end; }
+
+/* ── the people page ─────────────────────────────────────────────────────── */
+.people td.role select { width: auto; min-width: 148px; padding: 5px 8px; font-size: 12.5px; }
+.people .who-cell { display: flex; flex-direction: column; gap: 1px; }
+.people .who-cell strong { font-weight: 600; }
+.people .who-cell span { font-size: 12px; color: var(--ink-faint); }
+.people form { display: inline; }
+.people .row-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.people .toast { margin: 0 0 14px; }

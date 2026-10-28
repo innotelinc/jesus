@@ -1,0 +1,280 @@
+@import "tailwindcss";
+@import "../theme/unity-theme.css";
+
+/* --------------------------------------------------------------------------
+   The training range in the family's clothes.
+
+   Every colour comes from the shared theme imported above (a checked
+   byte-identical copy of `theme/unity-theme.css`). The range sits in the **desk**
+   scheme — the violet family that it, Tix and the service desk have always shared —
+   and now gets light *and* dark from the same tokens as the rest of the Network.
+
+   What is left in this file is the range's own personality: a warm second canvas,
+   cards that float, the animated accents. All of it is expressed in theme tokens, so
+   none of it can disagree with the theme when somebody switches modes.
+   -------------------------------------------------------------------------- */
+
+:root {
+  /*
+   * The extras the range needs that the family theme does not carry, plus the old
+   * accent names kept as aliases of the semantic tokens they always meant. Read the
+   * right-hand side; the left is history, and it is what several hundred existing
+   * utility classes already say.
+   */
+  --pink: var(--bad);
+  --amber: var(--attention);
+  --teal: var(--ok);
+  --sky: var(--info);
+  --lime: var(--tone-its);
+
+  /* The warm second canvas: the near side of a surface, never a second palette. */
+  --canvas-2: var(--surface-muted);
+  /* A lifted card. */
+  --shadow-lift: var(--shadow-pop);
+
+  /*
+   * The range's own typefaces, loaded by `next/font` in the root layout. A theme is
+   * one palette and one component language, not one typeface: keeping Outfit and
+   * Plus Jakarta here is what stops the training product from looking like the
+   * operations console. The shared stack remains the fallback if the webfonts fail
+   * to load.
+   */
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --mono: var(--font-mono-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@theme inline {
+  --font-display: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-code), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  /* Text that sits *on* a solid brand fill — never `text-white`, because in dark
+     mode the brand is a light violet and white on it is unreadable. */
+  --color-brand-ink: var(--brand-ink);
+  --color-pink: var(--pink);
+  --color-amber: var(--amber);
+  --color-teal: var(--teal);
+  --color-sky: var(--sky);
+  --color-lime: var(--lime);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-lift: var(--shadow-lift);
+
+  --radius-xl2: 1.25rem;
+  --radius-xl3: 1.75rem;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-rise: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  --animate-pulse-ring: pulse-ring 1.8s ease-out infinite;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(2deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 28%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--brand) 70%, transparent);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--ink-faint) 40%, transparent) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--ink-faint) 35%, transparent);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Utilities
+   -------------------------------------------------------------------------- */
+@utility gradient-brand {
+  background-image: linear-gradient(120deg, var(--brand) 0%, var(--pink) 50%, var(--amber) 100%);
+}
+
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--brand), var(--pink) 55%, var(--amber));
+  background-clip: text;
+  color: transparent;
+}
+
+@utility mesh-bg {
+  background-image:
+    radial-gradient(at 8% 6%, color-mix(in oklab, var(--brand) 22%, transparent) 0px, transparent 55%),
+    radial-gradient(at 92% 4%, color-mix(in oklab, var(--pink) 20%, transparent) 0px, transparent 50%),
+    radial-gradient(at 84% 92%, color-mix(in oklab, var(--teal) 18%, transparent) 0px, transparent 52%),
+    radial-gradient(at 12% 96%, color-mix(in oklab, var(--amber) 20%, transparent) 0px, transparent 50%);
+}
+
+@utility grid-lines {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--line) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--line) 70%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--surface) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+@utility card-surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+/* --------------------------------------------------------------------------
+   The sign-in gate and its chrome — `.page`, `.masthead`, `.gate`, `.gate__mark`,
+   `.footer`, `.sso-button` — all come from the shared theme, so this product's
+   front door and the other five are the same door. Only what is particular to
+   this page is left here.
+   -------------------------------------------------------------------------- */
+.gate__title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   The certificate sheet.
+
+   A certificate is meant to be printed, and a printed page does not follow the
+   screen's colour scheme: in dark mode this would put light ink on white paper.
+   Pinning the light palette to the sheet keeps it readable on screen and on
+   paper, whatever theme the viewer happens to be using.
+   -------------------------------------------------------------------------- */
+.certificate-sheet {
+  --canvas: #f7f5ff;
+  --surface: #ffffff;
+  --surface-muted: #f3f1fb;
+  --line: #e6e2f5;
+  --ink: #1c1633;
+  --ink-soft: #4a4266;
+  --ink-faint: #6a6386;
+  color-scheme: light;
+}
+
+@media print {
+  /* On paper only the sheet matters: a white page and honest margins. */
+  body {
+    background: #ffffff;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
+
+/* The xterm canvas needs a transparent background so the panel shows through. */
+.xterm .xterm-viewport {
+  background-color: transparent !important;
+}
+
+.xterm-screen {
+  padding: 2px 0;
+}

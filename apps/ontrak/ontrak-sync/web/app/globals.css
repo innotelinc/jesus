@@ -1,0 +1,396 @@
+@import "./theme/unity-theme.css";
+
+/*
+ * Ontrak Sync — dashboard styles.
+ *
+ * The colours all come from the shared theme imported above (a checked
+ * byte-identical copy of `theme/unity-theme.css`). Sync sits in the
+ * **operations** scheme — the graphite-and-blue family it and the Unity portal
+ * already used — and gains light mode, which it never had, from the same tokens
+ * every other product uses.
+ *
+ * What is left here is layout: the palette is doing semantic work and the class
+ * names still say which fact they represent (`pill--unknown`, `row--security`), so
+ * a page cannot invent a new colour to mean "attention" and drift from what the
+ * rest of the operations console looks like.
+ *
+ * The one deliberate rule the theme enforces for us: `--unknown` is a distinct
+ * colour from `--ok`. A host that could not be inspected must not read as a host
+ * with nothing to do.
+ */
+
+:root {
+  /*
+   * The old names are kept as aliases of the semantic tokens they always meant, so
+   * several hundred declarations below did not have to be rewritten to gain light
+   * mode. Read the right-hand side; the left is history.
+   *
+   * Names the theme already defines with the same meaning — `--line`,
+   * `--line-strong`, `--ok`, `--info`, `--attention`, `--unknown`, `--mono` — are
+   * deliberately *not* re-aliased. A custom property that references itself is
+   * invalid at computed-value time, and aliasing `--ok: var(--ok)` would take the
+   * colour down with it.
+   */
+  --bg: var(--canvas);
+  --bg-raised: var(--surface);
+  --bg-input: var(--surface-sunken);
+  --text: var(--ink);
+  --text-dim: var(--ink-soft);
+  --text-faint: var(--ink-faint);
+  --security: var(--bad);
+  --accent: var(--brand);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+a { color: var(--info); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+
+/* ── shell ───────────────────────────────────────────────────────────────
+   The console is the family's masthead over a rail and the work, which is the same
+   shape the portal draws: the header belongs to the product, not to one page of it.
+   The mark, the name and the address come from the shared theme, so this is one
+   header everywhere rather than a bespoke bar per product. */
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+.shell__body { display: flex; flex: 1; min-width: 0; }
+
+/* `.page` supplies the horizontal padding around the theme's masthead on a sign-in
+   page; the console has no `.page`, so the bar is padded to line up with the rail's
+   links on the left and the main column on the right. */
+.masthead { padding-left: 16px; padding-right: 24px; }
+
+/* Who the console thinks you are — the same quiet line the portal's masthead
+   carries. It is a diagnostic, not a hero, and it is the first thing to go when the
+   bar is tight: the role pill is what answers the question somebody came with. */
+.masthead__who { color: var(--ink-faint); font-size: 12.5px; }
+@media (max-width: 720px) {
+  .masthead__who { display: none; }
+}
+
+/* The sidebar is a column of the page, not a pane of its own. Sizing it with
+   `max-content` lets the labels and the family notes set the width instead of a
+   fixed 208px clipping them; dropping the fixed `100vh` height and its own
+   `overflow-y` is what stops it reading as a separate window with a scrollbar of
+   its own — the page scrolls as one and the sidebar scrolls with it. */
+.nav {
+  width: max-content;
+  min-width: 208px;
+  max-width: 320px;
+  flex: 0 0 auto;
+  border-right: 1px solid var(--line);
+  background: var(--bg-raised);
+  padding: 14px 0;
+}
+
+.nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  color: var(--text-dim);
+  border-left: 2px solid transparent;
+}
+.nav a:hover { background: var(--surface-muted); color: var(--text); text-decoration: none; }
+.nav a.active { color: var(--text); border-left-color: var(--accent); background: var(--surface-muted); }
+.nav a .count {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--surface-sunken);
+  color: var(--text-dim);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+.nav a .count.alert { background: var(--bad-soft); color: var(--bad); }
+
+.main { flex: 1; min-width: 0; padding: 20px 24px 60px; }
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.page-head h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.page-head p { margin: 4px 0 0; color: var(--text-dim); max-width: 70ch; }
+
+/* ── cards, tables ─────────────────────────────────────────────────────── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+}
+.card .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+}
+.card .value { font-size: 25px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.card .hint { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+.card--security .value { color: var(--security); }
+.card--unknown .value { color: var(--unknown); }
+.card--ok .value { color: var(--ok); }
+.card--attention .value { color: var(--attention); }
+
+.panel {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.panel > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.panel > header h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+.panel .body { padding: 13px; }
+.panel .body--flush { padding: 0; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  font-weight: 600;
+  background: var(--surface-muted);
+  position: sticky;
+  top: 0;
+}
+tbody tr:hover { background: var(--surface-muted); }
+tbody tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+td.tight { white-space: nowrap; }
+.scroll { max-height: 62vh; overflow: auto; }
+
+.dim { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.nowrap { white-space: nowrap; }
+
+/* ── pills ─────────────────────────────────────────────────────────────── */
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pill--pending { background: var(--attention-soft); color: var(--attention); border-color: var(--attention); }
+.pill--approved { background: var(--info-soft); color: var(--info); border-color: var(--info); }
+.pill--applied { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.pill--failed { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.pill--skipped { background: var(--surface-sunken); color: var(--text-faint); border-color: var(--line-strong); }
+.pill--security { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.pill--unknown { background: var(--unknown-soft); color: var(--unknown); border-color: var(--unknown); }
+.pill--ok { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.pill--bad { background: var(--bad-soft); color: var(--bad); border-color: var(--bad); }
+.pill--partial { background: var(--attention-soft); color: var(--attention); border-color: var(--attention); }
+.pill--absent { background: var(--surface-sunken); color: var(--text-faint); border-color: var(--line-strong); }
+
+/*
+ * The registry-refusal history: the pill is the newest scan, the bars are the window
+ * behind it. Kept as one inline row so a host header does not reflow when it appears.
+ */
+.registry-refusals { display: inline-flex; align-items: center; gap: 6px; }
+.spark { display: block; overflow: visible; }
+
+tr.row--security td:first-child { box-shadow: inset 3px 0 0 var(--security); }
+
+/* ── forms, buttons ────────────────────────────────────────────────────── */
+label.field { display: block; margin-bottom: 12px; }
+label.field > span { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+label.field > small { display: block; color: var(--text-faint); margin-top: 4px; font-size: 11.5px; }
+
+input[type="text"], input[type="number"], input[type="password"], select, textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 7px 9px;
+  font: inherit;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+input[type="checkbox"] { width: auto; margin-right: 6px; }
+.row-inline { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.checkline { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12.5px; }
+
+button {
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--surface-sunken); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--brand); filter: brightness(1.06); }
+button.danger { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+button.ghost { background: transparent; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+.note {
+  border-left: 3px solid var(--line-strong);
+  background: var(--surface-muted);
+  padding: 8px 11px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  border-radius: 0 6px 6px 0;
+  margin: 10px 0;
+}
+.note--warn { border-left-color: var(--attention); color: var(--attention); }
+.note--bad { border-left-color: var(--security); color: var(--bad); }
+.note--ok { border-left-color: var(--ok); color: var(--ok); }
+
+pre.out {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  overflow: auto;
+  max-height: 320px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 8px 0 0;
+}
+.empty { padding: 26px 14px; text-align: center; color: var(--text-faint); }
+.spinner { color: var(--text-dim); font-size: 12.5px; }
+
+/* ── the sign-in gate ────────────────────────────────────────────────────
+   `.page`, `.masthead`, `.gate`, `.gate__mark` and `.sso-button` come from the
+   shared theme, so this console's front door and the other products' are the same
+   door and cannot drift apart. What is left here is what only Sync has on the gate:
+   the break-glass form's own spacing, and the divider that separates it from the
+   provider's button. */
+.gate p { color: var(--text-dim); margin-top: 0; }
+
+.sched-list { list-style: none; margin: 8px 0 0; padding: 0; font-family: var(--mono); font-size: 12px; }
+.sched-list li { padding: 3px 0; color: var(--text-dim); }
+.sched-list li strong { color: var(--text); font-weight: 600; }
+
+/* ── the family, in the sidebar ────────────────────────────────────────────
+   The sibling products are external links, so they are separated from the
+   in-app navigation and labelled as leaving. A product link that looks like a
+   page in this app is how somebody reports "the training range is broken" when
+   they were on the wrong address.
+   ──────────────────────────────────────────────────────────────────────── */
+.nav-group { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.nav-group__label {
+  display: block;
+  padding: 0 16px 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+.nav-note { font-size: 10.5px; color: var(--text-faint); }
+
+.nav-user { padding: 10px 16px; margin-top: 10px; border-top: 1px solid var(--line); }
+
+/* ── roles ──────────────────────────────────────────────────────────────── */
+.pill--role { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-ring); }
+.pill--sso { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-ring); }
+.pill--local { background: var(--surface-sunken); color: var(--text-dim); border-color: var(--line-strong); }
+
+/* ── single sign-on ─────────────────────────────────────────────────────── */
+/* The control itself is the shared theme's `.sso-button`. The three rules that used
+   to live here — `.gate__sso`, `.gate__divider` and a second copy of the button —
+   were leftovers from before the gate moved into the theme, and the copy was the
+   one place a change to the family's button did not reach. */
+
+/* A table of accounts can be wide; let it scroll rather than squeeze. */
+.panel table select { min-width: 130px; }
+
+/* ── progress ─────────────────────────────────────────────────────────────
+   The apply answers in one response, so the bar moves by *phase*, not by package:
+   it fills to where the current step sits in the flow and animates while the work
+   is live. The sheen is what says "still going" when the width alone would look
+   frozen on a slow apt run. It is decoration and is dropped for anyone who has
+   asked for reduced motion. */
+.progress {
+  height: 6px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.progress__fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+  transition: width 240ms ease;
+  overflow: hidden;
+}
+.progress__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-ink) 35%, transparent), transparent);
+  animation: progress-sheen 1.2s linear infinite;
+}
+@keyframes progress-sheen {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress__fill { transition: none; }
+  .progress__fill::after { animation: none; }
+}
+
+/* ── failed updates, grouped by target ────────────────────────────────────
+   A failure is a worklist, not a footnote: each target's failures are one card
+   with the reasons in full and one Retry all over the set. */
+.panel--failed > header h2 { color: var(--bad); }
+.failed-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.failed-group:last-child { margin-bottom: 0; }
+.failed-group__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-muted);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
