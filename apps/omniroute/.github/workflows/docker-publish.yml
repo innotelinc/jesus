@@ -1,0 +1,590 @@
+name: Publish to Docker Hub
+
+# Fork retarget (2026-10-24): upstream publishes to diegosouzapw/* on Docker Hub
+# and GHCR, and neither namespace accepts this fork's credentials — so every name
+# below points at the namespaces this repository can actually write to. Only the
+# names changed; the build, scan and manifest logic is untouched. The Docker Hub
+# pair it logs in with is DOCKERHUB_USERNAME / DOCKERHUB_TOKEN, the same one that
+# publishes innotel/orion.
+#
+# Login runs before Set up Docker Buildx on purpose: the docker-container driver
+# copies the client's docker config into the builder when it creates it, so a
+# builder created first resolves base images anonymously and Docker Hub answers
+# "429 Too Many Requests" from the shared runner IP — while the login step that
+# runs a second later still reports success.
+
+on:
+  push:
+    branches:
+      - main
+      - "release/v*"
+    tags:
+      - "v*"
+    paths-ignore:
+      - ".github/workflows/**"
+  # Use 'released' instead of 'published' so editing/re-publishing old releases
+  # does NOT re-trigger this workflow. 'released' fires only on the initial
+  # release publication (and pre-release → release transition).
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to build (e.g. 3.8.4)"
+        required: true
+        type: string
+      promote_latest:
+        description: "Also tag :latest (only if this is the highest semver)"
+        required: false
+        type: boolean
+        default: false
+
+# Least-privilege default: read-only at the top level; the build and merge jobs that
+# push to GHCR grant packages: write themselves (Scorecard TokenPermissions).
+permissions:
+  contents: read
+
+# One publish at a time per ref. Two overlapping runs split the same 200 pulls/hour
+# of Docker Hub quota and both fail with 429, so a queued run is the better outcome.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Resolve Docker release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      promote_latest: ${{ steps.version.outputs.promote_latest }}
+      skip: ${{ steps.version.outputs.skip }}
+    env:
+      IMAGE_NAME: innotel/omniroute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
+          # Need full tag history for semver comparison when deciding :latest.
+          fetch-depth: 0
+
+      - name: Resolve version, latest-promotion, and skip flag
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          INPUT_VERSION: ${{ inputs.version }}
+          PROMOTE_INPUT: ${{ inputs.promote_latest }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # 1) Resolve version/channel from the trigger. Only the current default
+          # release branch publishes the mutable `next` channel; main keeps `main`.
+          VERSION=$(bash scripts/ci/resolve-docker-publish-version.sh \
+            "$EVENT_NAME" "$REF_TYPE" "$REF_NAME" "$INPUT_VERSION" "$DEFAULT_BRANCH")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # 2) Decide whether to promote :latest. Floating channels are never
+          # eligible, and the helper independently fails closed for non-semver.
+          PROMOTE="false"
+          if [ "$VERSION" = "main" ] || [ "$VERSION" = "next" ]; then
+            PROMOTE="false"
+          elif printf '%s' "$VERSION" | grep -qE -- '-(rc|alpha|beta|pre|next)'; then
+            echo "Pre-release identifier detected — skipping :latest."
+            PROMOTE="false"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PROMOTE="${PROMOTE_INPUT:-false}"
+          else
+            git fetch --tags --quiet || true
+            # Decide via the extracted helper, which folds VERSION into the
+            # candidate set so the result is independent of git-tag sync timing
+            # on `release` events (#5301). Without that, the freshly-created tag
+            # is often not yet visible here and :latest stays a release behind.
+            PROMOTE=$(git tag -l 'v[0-9]*' | bash scripts/ci/should-promote-latest.sh "$VERSION")
+            if [ "$PROMOTE" != "true" ]; then
+              echo "Version $VERSION is not the highest stable semver. Not promoting :latest."
+            fi
+          fi
+          echo "promote_latest=$PROMOTE" >> "$GITHUB_OUTPUT"
+
+          # 3) Skip immutable version tags that already exist. Floating `main`
+          # and `next` channels are intentionally rebuilt on every matching push.
+          SKIP="false"
+          if [ "$VERSION" != "main" ] && [ "$VERSION" != "next" ]; then
+            if docker manifest inspect "$IMAGE_NAME:${VERSION}" >/dev/null 2>&1; then
+              echo "Image $IMAGE_NAME:${VERSION} already exists on Docker Hub — skipping rebuild."
+              SKIP="true"
+            fi
+          fi
+          echo "skip=$SKIP" >> "$GITHUB_OUTPUT"
+
+          echo "Publishing $IMAGE_NAME:$VERSION (promote_latest=$PROMOTE, skip=$SKIP)"
+
+  build:
+    name: Build Docker (${{ matrix.platform }})
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            arch: arm64
+    env:
+      IMAGE_NAME: innotel/omniroute
+      GHCR_IMAGE_NAME: ghcr.io/innotelinc/omniroute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
+          fetch-depth: 0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub allows 200 authenticated pulls per rolling hour, counted across
+      # every repository that shares the account. A cold build needs a slice of it,
+      # and an exhausted budget answers the very first metadata HEAD with 429 —
+      # which buildx reports as a base-image resolution failure. Wait for the
+      # window to roll over instead of dying on it; the probe itself costs one pull.
+      - name: Wait for Docker Hub pull quota
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          # Probe sparingly: each probe is itself a pull, and two jobs polling every
+          # minute would spend 120 of the 200 hourly pulls just waiting.
+          for delay in 60 120 180 300 300 300; do
+            TOKEN=$(curl -fsS -u "$DOCKERHUB_USERNAME:$DOCKERHUB_TOKEN" \
+              "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/node:pull" \
+              | jq -r '.token // empty')
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -I \
+              -H "Authorization: Bearer $TOKEN" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json' \
+              "https://registry-1.docker.io/v2/library/node/manifests/26-trixie-slim")
+            if [ "$CODE" != "429" ]; then
+              echo "Docker Hub pulls available (HTTP $CODE)."
+              exit 0
+            fi
+            echo "::warning::Docker Hub pull quota exhausted (200/hour); waiting ${delay}s"
+            sleep "$delay"
+          done
+          echo "::error::Docker Hub still answering 429 after 20 minutes. The account's hourly pull budget is spent by other publishes; re-run later or split the build."
+          exit 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push platform image by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runner-base
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE_NAME }}
+          cache-from: type=gha,scope=docker-${{ matrix.arch }}
+          cache-to: type=gha,scope=docker-${{ matrix.arch }},mode=max
+          no-cache: false
+        env:
+          DOCKER_BUILDKIT_INLINE_CACHE: 1
+
+      - name: Build and push WEB platform image by digest
+        id: build-web
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runner-web
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE_NAME }}
+          cache-from: type=gha,scope=docker-web-${{ matrix.arch }}
+          cache-to: type=gha,scope=docker-web-${{ matrix.arch }},mode=max
+          no-cache: false
+        env:
+          DOCKER_BUILDKIT_INLINE_CACHE: 1
+
+      - name: Build and push BUN base platform image by digest
+        id: build-bun-base
+        # Bun is a best-effort compatibility target, not a supported runtime
+        # (AGENTS.md -> Environment). Its `bun run build` has been OOM-killing on
+        # both arches; letting that sink the whole publish means the SUPPORTED
+        # runner-base / runner-web images never reach the registry either. The
+        # image is still built and pushed whenever it succeeds — only its power to
+        # block the release is removed.
+        continue-on-error: true
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: Dockerfile.bun
+          target: runner-base
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE_NAME }}
+          cache-from: type=gha,scope=docker-bun-base-${{ matrix.arch }}
+          cache-to: type=gha,scope=docker-bun-base-${{ matrix.arch }},mode=max
+          no-cache: false
+        env:
+          DOCKER_BUILDKIT_INLINE_CACHE: 1
+
+      - name: Build and push BUN web platform image by digest
+        id: build-bun-web
+        # Bun is a best-effort compatibility target, not a supported runtime
+        # (AGENTS.md -> Environment). Its `bun run build` has been OOM-killing on
+        # both arches; letting that sink the whole publish means the SUPPORTED
+        # runner-base / runner-web images never reach the registry either. The
+        # image is still built and pushed whenever it succeeds — only its power to
+        # block the release is removed.
+        continue-on-error: true
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: Dockerfile.bun
+          target: runner-web
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          tags: |
+            ${{ env.IMAGE_NAME }}
+            ${{ env.GHCR_IMAGE_NAME }}
+          cache-from: type=gha,scope=docker-bun-web-${{ matrix.arch }}
+          cache-to: type=gha,scope=docker-bun-web-${{ matrix.arch }},mode=max
+          no-cache: false
+        env:
+          DOCKER_BUILDKIT_INLINE_CACHE: 1
+
+      - name: Export digests
+        env:
+          DIGEST_BASE: ${{ steps.build.outputs.digest }}
+          DIGEST_WEB: ${{ steps.build-web.outputs.digest }}
+          DIGEST_BUN_BASE: ${{ steps.build-bun-base.outputs.digest }}
+          DIGEST_BUN_WEB: ${{ steps.build-bun-web.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digests/base /tmp/digests/web /tmp/digests/bun-base /tmp/digests/bun-web
+          touch "/tmp/digests/base/${DIGEST_BASE#sha256:}"
+          touch "/tmp/digests/web/${DIGEST_WEB#sha256:}"
+          # Empty when the (non-blocking) bun build produced no image. `if` blocks,
+          # not `[ -n ] && touch`: under `set -e` a failing AND-list aborts the step,
+          # which is precisely the case being handled here.
+          if [ -n "$DIGEST_BUN_BASE" ]; then
+            touch "/tmp/digests/bun-base/${DIGEST_BUN_BASE#sha256:}"
+          fi
+          if [ -n "$DIGEST_BUN_WEB" ]; then
+            touch "/tmp/digests/bun-web/${DIGEST_BUN_WEB#sha256:}"
+          fi
+
+      - name: Upload base digests
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-base-${{ matrix.arch }}
+          path: /tmp/digests/base/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload web digests
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-web-${{ matrix.arch }}
+          path: /tmp/digests/web/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload bun-base digests
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: digests-bun-base-${{ matrix.arch }}
+          path: /tmp/digests/bun-base/*
+          # `ignore`, not `error`: the bun build is non-blocking, so an absent
+          # digest is the expected outcome of a failed/skipped bun image — the
+          # manifest step already treats these tags as optional. Leaving `error`
+          # here just relocates the blocker from the manifest to the upload.
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Upload bun-web digests
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: digests-bun-web-${{ matrix.arch }}
+          path: /tmp/digests/bun-web/*
+          # `ignore`, not `error`: the bun build is non-blocking, so an absent
+          # digest is the expected outcome of a failed/skipped bun image — the
+          # manifest step already treats these tags as optional. Leaving `error`
+          # here just relocates the blocker from the manifest to the upload.
+          if-no-files-found: ignore
+          retention-days: 1
+
+  merge:
+    name: Publish multi-arch manifests
+    needs:
+      - prepare
+      - build
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    env:
+      IMAGE_NAME: innotel/omniroute
+      GHCR_IMAGE_NAME: ghcr.io/innotelinc/omniroute
+      VERSION: ${{ needs.prepare.outputs.version }}
+      PROMOTE_LATEST: ${{ needs.prepare.outputs.promote_latest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', inputs.version) || '' }}
+          fetch-depth: 0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Download base digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digests-base-*
+          path: /tmp/digests/base
+          merge-multiple: true
+
+      - name: Download web digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digests-web-*
+          path: /tmp/digests/web
+          merge-multiple: true
+
+      - name: Download bun-base digests
+        # Non-blocking: the bun image is best-effort, so its artifact may not
+        # exist at all. The manifest step treats these tags as optional.
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: digests-bun-base-*
+          path: /tmp/digests/bun-base
+          merge-multiple: true
+
+      - name: Download bun-web digests
+        # Non-blocking: the bun image is best-effort, so its artifact may not
+        # exist at all. The manifest step treats these tags as optional.
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: digests-bun-web-*
+          path: /tmp/digests/bun-web
+          merge-multiple: true
+
+      - name: Create Docker Hub manifest
+        run: |
+          set -euo pipefail
+
+          # Docker Hub answers a burst of manifest HEADs with 429 Too Many Requests
+          # (seen on the first full run, 2026-10-24) and buildx surfaces that as a hard
+          # error. Throttling is transient, so back off and try again instead of failing
+          # a build whose images are already pushed.
+          retry() {
+            local attempt=1 max=4 delay=20
+            until "$@"; do
+              if [ "$attempt" -ge "$max" ]; then return 1; fi
+              echo "::warning::manifest write failed (attempt ${attempt}/${max}) — retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          create_manifest() {
+            local image="$1" suffix="$2" dir="$3" optional="${4:-}"
+            local tags=(-t "${image}:${VERSION}${suffix}")
+            if [ "$PROMOTE_LATEST" = "true" ]; then
+              tags+=(-t "${image}:latest${suffix}")
+            fi
+            local refs=()
+            while IFS= read -r digest_file; do
+              refs+=("${image}@sha256:$(basename "$digest_file")")
+            done < <(find "$dir" -type f | sort)
+            if [ "${#refs[@]}" -eq 0 ]; then
+              if [ -n "$optional" ]; then
+                echo "::warning::No image digests in $dir — skipping optional tag ${image}:${VERSION}${suffix}" >&2
+                return 0
+              fi
+              echo "No image digests in $dir" >&2
+              exit 1
+            fi
+            retry docker buildx imagetools create "${tags[@]}" "${refs[@]}"
+          }
+
+          create_manifest "${IMAGE_NAME}" "" /tmp/digests/base
+          create_manifest "${IMAGE_NAME}" "-web" /tmp/digests/web
+          create_manifest "${IMAGE_NAME}" "-bun" /tmp/digests/bun-base optional
+          create_manifest "${IMAGE_NAME}" "-web-bun" /tmp/digests/bun-web optional
+
+      - name: Create GHCR manifest
+        run: |
+          set -euo pipefail
+
+          # Docker Hub answers a burst of manifest HEADs with 429 Too Many Requests
+          # (seen on the first full run, 2026-10-24) and buildx surfaces that as a hard
+          # error. Throttling is transient, so back off and try again instead of failing
+          # a build whose images are already pushed.
+          retry() {
+            local attempt=1 max=4 delay=20
+            until "$@"; do
+              if [ "$attempt" -ge "$max" ]; then return 1; fi
+              echo "::warning::manifest write failed (attempt ${attempt}/${max}) — retrying in ${delay}s"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          create_manifest() {
+            local image="$1" suffix="$2" dir="$3" optional="${4:-}"
+            local tags=(-t "${image}:${VERSION}${suffix}")
+            if [ "$PROMOTE_LATEST" = "true" ]; then
+              tags+=(-t "${image}:latest${suffix}")
+            fi
+            local refs=()
+            while IFS= read -r digest_file; do
+              refs+=("${image}@sha256:$(basename "$digest_file")")
+            done < <(find "$dir" -type f | sort)
+            if [ "${#refs[@]}" -eq 0 ]; then
+              if [ -n "$optional" ]; then
+                echo "::warning::No image digests in $dir — skipping optional tag ${image}:${VERSION}${suffix}" >&2
+                return 0
+              fi
+              echo "No image digests in $dir" >&2
+              exit 1
+            fi
+            retry docker buildx imagetools create "${tags[@]}" "${refs[@]}"
+          }
+
+          create_manifest "${GHCR_IMAGE_NAME}" "" /tmp/digests/base
+          create_manifest "${GHCR_IMAGE_NAME}" "-web" /tmp/digests/web
+          create_manifest "${GHCR_IMAGE_NAME}" "-bun" /tmp/digests/bun-base optional
+          create_manifest "${GHCR_IMAGE_NAME}" "-web-bun" /tmp/digests/bun-web optional
+
+      - name: Inspect image
+        if: needs.prepare.outputs.version != 'main'
+        run: |
+          docker buildx imagetools inspect "${IMAGE_NAME}:${VERSION}"
+
+      - name: Generate CycloneDX SBOM (image, advisory)
+        if: needs.prepare.outputs.version != 'main'
+        continue-on-error: true
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.GHCR_IMAGE_NAME }}:${{ env.VERSION }}
+          format: cyclonedx-json
+          output-file: sbom-image.cdx.json
+          artifact-name: sbom-image.cdx.json
+
+      # Visibility scan: reports HIGH + CRITICAL into the SARIF (Security tab) but
+      # never blocks (exit-code 0). The blocking gate below narrows to CRITICAL.
+      #
+      # ignore-unfixed mirrors the blocking gate: the Security tab must surface only
+      # ACTIONABLE vulnerabilities — ones with a published fix we can pull by rebuilding
+      # on a patched base or bumping the dep. Without it the advisory upload floods the
+      # tab with unfixable base-image OS CVEs (Debian trixie packages with no upstream
+      # patch yet, overwhelmingly local-only and not reachable from the proxy request
+      # surface), which is noise an operator cannot act on. trivyignores points at the
+      # repo-root .trivyignore so accepted-risk fixable CVEs have one auditable home.
+      # See docs/security/SUPPLY_CHAIN.md.
+      - name: Trivy image scan (SARIF, advisory)
+        if: needs.prepare.outputs.version != 'main'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.GHCR_IMAGE_NAME }}:${{ env.VERSION }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          exit-code: "0"
+
+      # BLOCKING gate (v3.8.27 cycle-end): fail the release on a CRITICAL CVE in the
+      # published image. Narrowed to severity CRITICAL (HIGH stays visible in the
+      # SARIF step above, not blocking). ignore-unfixed:true so an unfixable base-image
+      # CVE with no upstream patch does not red the release (reduces false-blocks);
+      # a fixable CRITICAL still blocks. Per docs/security/SUPPLY_CHAIN.md. NB: Trivy
+      # scans against a CVE DB that grows continuously — a newly-disclosed CRITICAL on
+      # an unchanged base image can red this gate; the fix is to rebuild on a patched
+      # base, bump the dep, or add a justified .trivyignore entry (see the CVE-variance
+      # note in docs/security/SUPPLY_CHAIN.md).
+      - name: Trivy CRITICAL gate (blocking)
+        if: needs.prepare.outputs.version != 'main'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.GHCR_IMAGE_NAME }}:${{ env.VERSION }}
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          # Explicit: the advisory scan above already points at it, and the blocking
+          # gate must honour the same accepted-risk list (#12084).
+          trivyignores: .trivyignore
+
+      - name: Upload Trivy SARIF to Security tab
+        if: needs.prepare.outputs.version != 'main'
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4.37.7
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      - name: Update Docker Hub description
+        # Only refresh README/description when we actually promote :latest
+        # (avoids overwriting from main, next, or back-fill builds).
+        if: needs.prepare.outputs.promote_latest == 'true'
+        uses: peter-evans/dockerhub-description@v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: innotel/omniroute
+          short-description: "OmniRoute — Unified AI proxy. Route any LLM through one endpoint."
+          readme-filepath: ./README.md
