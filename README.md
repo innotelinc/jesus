@@ -87,8 +87,26 @@ dependency manifest** — the stacks are Perl, Node, Python, Android/Kivy and Do
 single command that pretended to build all of them would only mislead. Build instructions are in
 the README of the project you are touching.
 
-The root owns one thing: the ignore file, because scratch directories and OS noise should not be
-committed from any project.
+The root owns the ignore file and the submodule list, because scratch directories, OS noise and
+submodules are properties of the whole tree rather than of any one project.
+
+### Submodules
+
+Three projects track git submodules — `dograh` (pipecat), `rea` (its `third_party` tools) and
+`freebuff` (OmniRoute) — seven gitlinks in total. Git only reads `.gitmodules` from the repository
+root, so those entries were mirrored there as well; the projects keep their own `.gitmodules`
+files untouched. Fetch them with:
+
+```sh
+git submodule update --init --recursive
+```
+
+### Size
+
+The packed history is about **2.8 GB**. That is not the code: `claude-mem` alone carries 714 MB of
+session PDFs, `omniroute` is a 499 MB mirror and `freebuff` is 142 MB. If you only want the code
+as it stands, clone shallow (`--depth 1`); if you want a project's past, clone fully and be
+patient once.
 
 ## CI
 
