@@ -3,13 +3,14 @@
 Run REA, connect your selected agents, and check the tools needed for your task.
 Setup previews configuration changes and asks for approval before applying them.
 
-| Task                              | Section                                                                                             |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Connect an agent                  | [Start setup](#start-setup), then [review changes](#review-setup-changes)                           |
-| Diagnose one task                 | [Scoped readiness checks](#check-readiness-for-your-task)                                           |
-| Configure an analysis engine      | [Hopper](#hopper), [Ghidra](#ghidra), the [IDA guide](ida-provider.md), or [Kuna](kuna-provider.md) |
-| Update or remove REA              | [Maintenance](#diagnose-update-and-remove)                                                          |
-| Resolve a client-specific problem | [Client configuration](client-configuration.md)                                                     |
+| Task                               | Section                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Connect an agent                   | [Start setup](#start-setup), then [review changes](#review-setup-changes)                           |
+| Install a Claude Code/Codex plugin | [Agent plugins and marketplaces](#agent-plugins-and-marketplaces)                                   |
+| Diagnose one task                  | [Scoped readiness checks](#check-readiness-for-your-task)                                           |
+| Configure an analysis engine       | [Hopper](#hopper), [Ghidra](#ghidra), the [IDA guide](ida-provider.md), or [Kuna](kuna-provider.md) |
+| Update or remove REA               | [Maintenance](#diagnose-update-and-remove)                                                          |
+| Resolve a client-specific problem  | [Client configuration](client-configuration.md)                                                     |
 
 ## Start setup
 
@@ -84,9 +85,16 @@ For an existing configuration, setup and uninstall recovery refuse a detected
 replacement or edit and name the recovery backup. Quit clients before editing their configuration;
 these checks do not lock out another writer modifying the same file in place,
 or exclude pathname changes between the final check and publication.
+Setup refreshes an existing `rea` registration only when its launcher proves REA
+ownership. Foreign or unresolved launcher identity blocks setup before any
+backup or write, including an OpenCode legacy entry that migration would remove.
+Review the existing launcher and manually rename or remove that registration to
+approve replacing it. A different existing installation path is foreign to the
+current entrypoint; a path that cannot be resolved remains unknown. Cordis uses
+its stable REA entry ID instead of launcher identity.
 Setup also retains valid environment overrides in REA's existing server entry,
 such as `REA_MCP_INPUT_SCHEMA_PROFILE`, `REA_MCP_OUTPUT_SCHEMA_PROFILE`, and
-`REA_MCP_MAX_RESPONSE_BYTES`.
+`REA_MCP_MAX_RESPONSE_BYTES`, and `REA_MCP_TOOL_FAMILIES`.
 Detected provider settings replace only matching environment keys.
 Setup manages REA's launcher, selected provider settings, and recommended timeout
 defaults. Codex approval policies, tool selections, and other caller-owned server
@@ -204,7 +212,8 @@ identity remains available at `identity.catalog`.
 
 Setup pins package-runner MCP registrations to the exact installed REA version,
 installs the matching skill and on-demand references in the same plan, and adds
-`startup_timeout_sec = 30` for Codex and Grok Build. Codex also receives a
+`startup_timeout_sec = 30` for Codex and Grok Build when no positive timeout
+is already configured. Codex also receives a
 `tool_timeout_sec` derived from known provider startup plus operation headroom.
 
 ## Limit REA to one project or agent profile
@@ -319,14 +328,14 @@ Register with the variable unset:
 <!-- x-release-please-start-version -->
 
 ```bash
-claude mcp add --scope local rea -- npx -y rea-agents@6.7.0 mcp
+claude mcp add --scope local rea -- npx -y rea-agents@6.8.0 mcp
 ```
 
 On native Windows, use the same project directory and wrap the package-runner
 shim so the stdio client can launch it:
 
 ```powershell
-claude mcp add --scope local rea -- cmd.exe /d /c npx -y rea-agents@6.7.0 mcp
+claude mcp add --scope local rea -- cmd.exe /d /c npx -y rea-agents@6.8.0 mcp
 ```
 
 <!-- x-release-please-end -->
@@ -341,7 +350,7 @@ remove it with `claude mcp remove --scope local rea` from the same directory.
 To move it to a newer release, first back up the project entry in
 `~/.claude.json` and record its environment and other metadata. In particular,
 preserve caller-selected overrides such as `REA_MCP_INPUT_SCHEMA_PROFILE` and
-`REA_MCP_MAX_RESPONSE_BYTES`. Run `claude mcp remove --scope local rea` from the
+`REA_MCP_MAX_RESPONSE_BYTES`, and `REA_MCP_TOOL_FAMILIES`. Run `claude mcp remove --scope local rea` from the
 same directory, then recreate it with the platform-appropriate command above
 and the new version. Reapply every recorded environment value with Claude
 Code's `mcp add --env NAME=value` options and restore any other retained entry
@@ -412,6 +421,13 @@ The public error code varies by caller: `capability_unavailable`,
 only a generic startup error. Check this prerequisite before following
 provider-specific recovery advice.
 
+`binary_session` still returns status on such a host. Providers whose
+readiness check reaches the owned-child launch, such as Ghidra's Java probe,
+JADX and Apktool, report themselves unavailable with a reason naming the
+missing `ps`. A provider that fails an earlier configuration check, such as
+JADX without `REA_JADX_MCP_JAR`, keeps that reason. The other providers keep
+their own status. `open_binary` keeps the refusal described above.
+
 ## Diagnose, update, and remove
 
 `rea doctor --json` is strictly read-only. `rea update` updates only the npm or Bun global installation that owns the running CLI. Source checkouts and package-runner copies must be updated through the mechanism that owns them; a fresh package-runner invocation can use `npx rea-agents@latest` or `bunx rea-agents@latest`. `rea uninstall` removes only REA-owned agent registrations and skill files; `--purge-data` additionally removes REA cache and state paths.
@@ -429,11 +445,19 @@ and other MCP servers. Purging removes REA's legacy cache and state under
 archives under `${XDG_CACHE_HOME:-~/.cache}/rea/hopper-releases`. Other cache
 namespaces remain intact. A caller-selected `REA_KUNA_CACHE_DIR` is retained
 and reported because REA cannot establish ownership of its entire contents.
+Lexically equivalent spellings of that default directory, including a trailing
+separator, a `.` segment, or a repeated separator, share its purge result.
+The comparison preserves POSIX `..` traversal and literal backslashes.
 A client configuration that is malformed, unreadable, or at an unsafe
-path stops the operation before anything is removed, and a client that fails
-while being updated stops the remaining removals. Uninstall reports each
-candidate `configuration_path` with its outcome. A client with multiple files
-keeps their individual `actions` alongside its aggregate status and detail,
+path stops the operation before anything is removed when that client's
+product applicability is established or unresolved. Shared registration
+storage such as `~/.agents/mcp.json` whose product cannot be established
+(for example when FreeBuff and ZCode discovery directories are absent) is
+retained unchanged and does not block other REA removals, including cache
+and state deletion with `--purge-data`. A client that fails while being
+updated stops the remaining removals. Uninstall reports each candidate
+`configuration_path` with its outcome. A client with multiple files keeps
+their individual `actions` alongside its aggregate status and detail,
 including earlier removals when a later file fails. The paths name
 the discovered configuration candidates, not resolved physical file identities.
 For JSON clients, uninstall removes every repeated `rea` member in the effective
@@ -494,6 +518,10 @@ on Windows, security software's protection history before attributing the cause.
 Do not rename `index.cjs` to `index.mjs` or disable protection to make startup pass.
 
 ### Update the owning installation
+
+Read-only metadata and version checks time out after 10 seconds. This does not
+interrupt a package installation already in progress. If a probe cannot be
+stopped, the updater reports a cleanup failure.
 
 `rea update` installs the exact resolved
 release into the npm prefix or Bun global directory that owns the running
@@ -616,9 +644,12 @@ hosted connector; see [its configuration](client-configuration.md#other-client-s
 | WorkBuddy          | `workbuddy`      |
 | ZCode              | `zcode`          |
 | DeepSeek Harness   | `dsh`            |
+| FreeBuff           | `freebuff`       |
 
 `droid`, `dsh`, `kimi`, `qoder`, `trae`, `workbuddy`, and `zcode` require
 `rea-agents@6.5.0` or later. The 6.4.0 registry check above does not cover them.
+`freebuff` requires `rea-agents@6.8.0` or later. Older releases reject
+`rea setup --client freebuff` as an unsupported client.
 
 See [client configuration and troubleshooting](client-configuration.md) for
 configuration paths, profiles, trust policies, and schema-limit workarounds.
@@ -645,6 +676,10 @@ Linux distribution with a recognized apt, dnf, or pacman package family, where
 an existing Hopper launcher is selected through `HOPPER_LAUNCHER_PATH`. Ghidra
 and IDA have their own provider-specific host requirements; Windows Ghidra uses
 the [experimental P0 boundary](windows-ghidra-p0.md).
+
+If the Linux package download receives an HTTP failure, setup includes the
+observed HTTP status in its `download_failed` diagnostic. The status does not
+establish the underlying cause or guarantee that retrying will succeed.
 
 Hopper metadata and package downloads require HTTPS throughout the redirect
 chain; a redirect to HTTP is refused before that destination is requested.
@@ -809,7 +844,10 @@ Hopper startup allows 120,000 ms for launch, initial analysis, and authenticated
 bridge readiness. For large targets, set `REA_HOPPER_STARTUP_TIMEOUT_MS` to a
 decimal integer from 1 to 2,147,483,647 milliseconds in the environment that
 starts REA. CLI and MCP use the same setting; invalid values fail configuration
-validation. An MCP client's own request timeout must also allow enough time.
+validation. In MCP, `update_analysis_settings` can set
+`hopper.startup_timeout_ms` for the next startup attempt without restarting REA;
+accepted work keeps its budget and retained cleanup must still complete. An
+MCP client's own request timeout must also allow enough time.
 `open_binary` validates and selects a target without waiting for native provider
 readiness. During Hopper startup, `binary_session.provider_operation_health`
 reports `busy` at stage `launch`; `analysis_activity` describes bridge requests
@@ -960,7 +998,7 @@ copying license secrets into logs, or killing unrelated Hopper processes.
 
 REA connects to an existing Ghidra installation on Linux x64/arm64, macOS x64/arm64,
 or experimental Windows x64 P0.
-It accepts Ghidra 12.1.x and the 64-bit full JDK declared by that installation's
+It accepts Ghidra 12.x (>=12.1) and the 64-bit full JDK declared by that installation's
 `application.java.min` and `application.java.max`. The JDK's reported platform must also
 map to the same native decompiler directory as the host: a JDK running under
 emulation (for example x86_64 under Rosetta on Apple silicon) or reporting a
@@ -968,7 +1006,8 @@ non-host `os.name` fails the doctor
 even when it is an otherwise accepted 64-bit full JDK. Select a matching JDK
 through `JAVA_HOME`; adding another decompiler in the JVM-selected directory
 does not satisfy this host-validated admission rule. Current 12.1 releases require
-JDK 21 or newer and set no maximum. The bridge is verified with Ghidra 12.1.4
+JDK 21 or newer; Ghidra 12.2 declares JDK 25 or newer. Neither sets a maximum.
+The bridge is verified with Ghidra 12.1.4
 and JDK 21. Each installation must include the native decompiler for the host
 architecture in `Ghidra/Features/Decompiler/os/<platform>/` or the corresponding
 `build/os/<platform>/` directory. Linux ARM64 uses `linux_arm_64`; official
@@ -1083,7 +1122,7 @@ the application metadata and headless launcher. An explicitly supplied
 REA reports that error instead of silently selecting another installation.
 This discovery is read-only and does not execute the Ghidra launcher.
 
-Doctor validates the platform, architecture, Ghidra 12.1.x application version,
+Doctor validates the platform, architecture, Ghidra 12.x (>=12.1) application version,
 `support/analyzeHeadless` or `support/analyzeHeadless.bat`, the installation's
 Java major range, 64-bit JDK bitness, and the presence of `javac`/`javac.exe`.
 It also checks that the reported JVM `os.arch` and `os.name` map to the same native decompiler
@@ -1139,9 +1178,10 @@ This coordinate selects only REA's session-private configuration directory, not
 the installation or an existing user configuration directory.
 
 Each verified session uses an ephemeral temporary project and isolated
-home/cache/config/temp paths. REA passes `-readOnly`, `-deleteProject`, uses
-Ghidra's default analysis settings, and loads its packaged Java
-bridge via `-scriptPath`; it never opens an existing user project. Linux and
+home/cache/config/temp paths. By default REA passes `-readOnly`, `-deleteProject`,
+uses Ghidra's default analysis settings, and loads its packaged Java
+bridge via `-scriptPath` into a new ephemeral project; opt-in
+[existing-project reuse](#reuse-an-existing-ghidra-project) opens only an owned copy. Linux and
 macOS use a current-user-only local bridge socket and descriptor. The
 project remains under the selected temporary directory. If its Unix socket
 pathname would exceed the host's byte limit, REA allocates a separate owner-only
@@ -1160,7 +1200,7 @@ original process owner for a later cleanup retry.
 The experimental Windows transport uses authenticated IPv4 loopback with a
 private native-owned bearer descriptor and Job Object process ownership.
 
-Operations begin only after default auto-analysis completes. `open_binary`
+In the default fresh-import mode, operations begin only after default auto-analysis completes. `open_binary`
 selects and validates the target/provider binding; it does not wait for Ghidra
 import and auto-analysis. The first Ghidra-backed query starts that work lazily.
 The provider startup deadline is 330,000 ms by default for import, analysis,
@@ -1179,19 +1219,25 @@ can time out earlier even when Ghidra would complete within its startup deadline
 See [Ghidra first-query deadlines and recovery](mcp-contracts.md#ghidra-first-query-deadlines-and-recovery)
 for client options and the close/reopen recovery flow.
 
-The 330-second default is configurable. Configuration is read when REA starts:
-changing an environment variable in another shell, or closing and reopening a
-binary in the same MCP server, does not change that server's startup allowance.
+The 330-second default can be changed on a running MCP server by setting
+`ghidra.startup_timeout_ms` through `update_analysis_settings`. The next accepted
+operation that starts a provider uses that value; an accepted startup keeps its
+original budget. Changing an environment variable in another shell, or closing
+and reopening a binary, does not change the launch configuration already read
+by that server.
 For a CLI retry with an example 30-minute allowance:
 
 ```sh
 REA_GHIDRA_STARTUP_TIMEOUT_MS=1800000 rea analyze /absolute/path/to/app.exe --provider ghidra --json
 ```
 
-For MCP, export useful Evidence before restarting, close the binary and resolve
-any cleanup failure, update the environment in the client's REA server launch
-configuration, then restart REA and reconnect before reopening the target. Allow
-startup plus the query in the client's own tool-call deadline. Every retry uses
+For MCP, update the runtime setting and resolve any retained cleanup before the
+next startup attempt. Follow the error's close/reopen guidance where needed;
+the settings update does not clear cleanup blockers. To change the launch
+environment instead, export useful Evidence, close the binary and resolve any
+cleanup failure, update the client's REA server launch configuration, then
+restart REA and reconnect. Allow startup plus the query in the client's own
+tool-call deadline; runtime updates do not change that deadline. Each new startup attempt uses
 a fresh ephemeral import; smaller result requests do not reduce the prerequisite
 auto-analysis. A larger time allowance does not raise the JVM heap limit or
 guarantee completion. Keep [heap and host CPU controls](#ghidra-heap-and-cpu-controls)
@@ -1218,9 +1264,14 @@ fails with `provider_timeout` and that message; other Ghidra tools stay
 available. If the caller also cancels while the timeout settles, the session
 still closes and the message says so. Session reuse concerns an active MCP or
 library session; a standalone CLI command still closes its own session when it
-finishes. The limit is read when a Ghidra session
-starts, and Codex/Kimi registrations derived by `rea setup` add it to the tool
-deadline as a single-decompile estimate. A bulk call can need that limit for
+finishes. In MCP, `ghidra.decompile_timeout_seconds` can override the launch
+value for newly accepted operations on the existing Program; explicit `null`
+removes the deadline. A transient timeout remains uncached so the same function
+can be retried after an update. See the
+[settings design](design/limits-and-recovery.md#runtime-settings-through-mcp).
+Codex/Kimi registrations derived by `rea setup` add the selected launch value
+to the tool deadline as a single-decompile estimate; a runtime update does not
+change that registration. A bulk call can need that limit for
 every attempted function plus listing and file work; select the client deadline
 for the workload, split batches, use `decompile_all` limit/resume, or reduce
 `trace_native_values` `max_functions` to select fewer serial decompiles. Ghidra's own interactive default is 30 seconds. Unresolved computed calls
@@ -1280,6 +1331,63 @@ not needed for the make step, only for the Ghidra provider. If your toolchain
 rejects the inherited `-mmacosx-version-min=10.6` flag, retry the make with
 `ADDITIONAL_FLAGS="-w"`.
 
+### Reuse an existing Ghidra project
+
+For repeated investigations, select an expanded local project marker with
+`REA_GHIDRA_PROJECT_PATH=/absolute/projects/app-analysis.gpr`. Both CLI and MCP
+use this shared selection. `REA_GHIDRA_PROGRAM_NAME` selects one exact program
+in the project root; when omitted it defaults to the selected target's filename.
+Paths, globs and command flags are not program names. The matching `.rep`
+directory must be present; restore `.grez` archives with Ghidra first.
+
+```bash
+export REA_ANALYSIS_PROVIDER=ghidra
+export REA_GHIDRA_PROJECT_PATH=/absolute/projects/app-analysis.gpr
+export REA_GHIDRA_PROGRAM_NAME=app
+rea decompile /absolute/target/app --procedure entry --provider ghidra --json
+```
+
+Set the same variables in the MCP server environment and restart/reconnect;
+`open_binary` still selects the original target file. `rea setup` retains these
+explicit settings in a saved registration. Fresh import remains the default
+when the project setting is absent. This route supports native ELF, PE and
+Mach-O programs on POSIX without provider-pinned import preparation; Windows,
+raw/DOS/DOL and special pinned-language import profiles require fresh import.
+
+REA fingerprints only the selected `.gpr`/`.rep` pair, copies it into its owned
+runtime, verifies the copied content against the committed analysis profile,
+and runs `-process <program> -noanalysis -readOnly`. Ghidra never opens or saves
+the original database; REA reads selected files only for fingerprinting and copying.
+This mode does not copy unrelated sibling projects, rerun repair scripts, or
+admit bridge database edits. Cleanup removes the owned copy.
+The bridge checks the program's recorded import SHA-256 against the admitted
+target digest; mismatches and project changes fail explicitly. Reopen the target
+to resolve a new profile after intentionally changing the source project.
+
+The profile records the caller path, resolved project/name, program and content
+fingerprint. Original analysis settings and completeness remain **unknown**;
+prior annotations or edits are caller-project state, not fresh REA discoveries.
+A matching recorded import digest does not claim that the database is unedited.
+Saved REA seed/analyzer reports remain historical facts in retained source Evidence;
+they are not interpreted as overrides applied by this session.
+Project content participates in snapshot identity, so different project states
+cannot reuse the same profile's cached observations.
+
+To prepare a new project explicitly, use your existing Ghidra installation in a
+new directory you own (this writes that project; REA does not save it for you):
+
+```bash
+mkdir /absolute/new-projects
+GHIDRA_HEADLESS_MAXMEM=1536M JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 \
+  "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" /absolute/new-projects app-analysis \
+  -import /absolute/target/app -analysisTimeoutPerFile 600 -max-cpu 2
+```
+
+Check that preparation completed successfully before selecting the project.
+Preparation time, disk copy/fingerprinting, engine startup and client deadlines
+are separate costs; reusing a project avoids import/analysis, not all startup.
+Use the [heap/CPU controls](#ghidra-heap-and-cpu-controls) appropriate to the target.
+
 ### Ghidra import language and analysis seeds
 
 Ghidra detects the language from the executable header. To set it (for example, Borland C++ PE images):
@@ -1333,6 +1441,21 @@ environment requires restarting the server; reopening a target alone keeps the
 current setting. For Windows PE resource analysis, the exact name is
 `WindowsResourceReference`. Disabling an analyzer skips the facts it would have
 produced.
+
+Ghidra's Objective-C Message Analyzer can log
+`Required Objective-C data type not found in data type manager` /
+`Try adding libobjc.dylib` when a Mach-O links Objective-C runtime symbols but
+defines no class metadata (thin Cocoa glue in a C++ binary is a common case).
+That text is non-fatal Ghidra analyzer output: auto-analysis continues, and the
+analyzer simply skips `objc_msgSend` call-target recovery. REA's headless import
+does not accept a "add this library" option, and on modern macOS
+`/usr/lib/libobjc.A.dylib` exists only in the dyld shared cache, so there is no
+on-disk library to add. Treat the line as a coverage limitation, not an REA
+failure; check the session's `failure_kind` (and related provider errors) for
+any real abort. To silence that analyzer, set
+`REA_GHIDRA_DISABLED_ANALYZERS="Objective-C Message Analyzer"`. For large
+executables that miss the startup deadline instead, raise
+`REA_GHIDRA_STARTUP_TIMEOUT_MS` and the [Ghidra heap](#ghidra-heap-and-cpu-controls).
 
 ### Ghidra heap and CPU controls
 
@@ -1435,6 +1558,87 @@ read-only operations, digest identity, and runtime cleanup. The separate
 ordinary user. It requires the built Windows native bundle and an existing
 Ghidra/JDK installation; neither is inferred from startup alone.
 
+## Agent plugins and marketplaces
+
+REA's npm package is the shared Claude Code and Codex plugin artifact. It
+contains `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, and the
+canonical generated `skills/` tree. Both manifests select `./skills` and run a plain Node bootstrap pinned to
+that exact package version. The client must have a supported standalone `node`
+on its PATH. Claude expands its documented `CLAUDE_PLUGIN_ROOT` in the script
+argument; Codex resolves `cwd: "."` from the installed plugin root before
+launching the relative script. The bootstrap verifies the package version and runs its bundled runtime in
+the same process, preserving stdio and REA's provider/worker cleanup. It does
+not start another package runner or download a different runtime. The existing release skill
+generator also pins CLI recovery commands to the same version.
+
+The repository's single-plugin marketplaces are declared in
+`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`.
+Both select an exact `rea-agents` npm version instead of mutable source-checkout
+contents. Release Please updates their selectors alongside the plugin manifests.
+No plugin-only publication or generated skill files committed to Git are needed.
+The qualified release archive contains a runtime-only manifest and
+`npm-shrinkwrap.json` plus bundled runtime dependencies, including PTY packages
+for each supported OS and CPU; development dependencies and development-only overrides
+stay in the source manifest and lockfile. Both clients receive this same archive.
+
+This distribution becomes installable after the first qualified npm release
+containing these plugin manifests. Earlier published packages are not changed
+by this source proposal. For local source development, run `npm ci && npm run build:cached` to generate
+the runtime and packaged skill before loading the repository as a plugin.
+A source plugin uses the locally built runtime and generated skill; rebuild after
+source changes. Missing builds and mismatched version pins fail with an actionable
+error. The authored `.agents/skills/` tree is not the plugin's shipped skill layout.
+Windows source workflows that need native controls still require the
+[Windows source-checkout build](https://github.com/morluto/rea/blob/main/native/windows/README.md#build).
+
+In Claude Code:
+
+```text
+/plugin marketplace add morluto/rea
+/plugin install rea@rea
+```
+
+In Codex CLI, add the marketplace and install REA:
+
+```bash
+codex plugin marketplace add morluto/rea
+codex plugin add rea@rea
+```
+
+Each release updates both manifest versions and their pinned server version
+together, which is when installed copies refresh the bundled skill and move to
+the new server. A plugin does not run `rea setup`, so provider
+configuration still follows the sections above. Use the plugin or a
+`rea setup` registration for a client, not both, to avoid two `rea` servers.
+
+`rea doctor` does not see plugin-owned state. Its client and skill checks read
+only the registrations and skill locations that `rea setup` manages, so for a
+plugin-only install `rea doctor --client <id>` and `rea doctor --skill` report
+`missing` and recommend `rea setup`. Do not follow that remediation. Check the
+plugin with the client instead (`claude plugin list` and `/mcp` in Claude
+Code, `codex plugin list` in Codex).
+
+For analysis engines, ask the connected server: have the agent call
+`binary_session` and read `result.tool_availability`, which reports what the
+server the plugin started can use, with reasons and remediation. See
+[MCP contracts](mcp-contracts.md).
+
+A plugin does not put `rea` on your `PATH`. To check an engine from a
+terminal, use the package runner at the version the plugin pins:
+
+<!-- x-release-please-start-version -->
+
+```bash
+npx -y rea-agents@6.8.0 doctor --provider ghidra --json
+```
+
+<!-- x-release-please-end -->
+
+If your installed plugin is older, use the version in its manifest instead.
+That report describes the terminal's environment, not the plugin server's.
+The server inherits the client's environment, so a setting such as
+`GHIDRA_INSTALL_DIR` that exists only in your terminal does not reach it.
+
 ## MCP Registry
 
 REA is published in the official MCP Registry as `io.github.morluto/rea`. Registry
@@ -1454,7 +1658,7 @@ For a client that requires manual configuration, use:
   "mcpServers": {
     "rea": {
       "command": "npx",
-      "args": ["-y", "rea-agents@6.7.0", "mcp"]
+      "args": ["-y", "rea-agents@6.8.0", "mcp"]
     }
   }
 }

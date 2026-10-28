@@ -1,4 +1,6 @@
+import { bindArtifactFileCleanup } from "../artifacts/ArtifactFileOperation.js";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
+import { absoluteCallerPath } from "../filesystem/callerPath.js";
 import { fileURLToPath } from "node:url";
 import { accessSync, constants, statSync } from "node:fs";
 
@@ -13,6 +15,7 @@ import type {
   ProviderAvailability,
   ProviderIdentity,
   ProviderTargetSupport,
+  RetainedResourceScope,
 } from "../application/AnalysisProvider.js";
 import type { AnalysisProfileCommitment } from "../domain/analysisProfile.js";
 import type { AppConfig } from "../config/types.js";
@@ -23,14 +26,9 @@ import { analysisErrorWithCleanupFailure } from "../domain/analysisErrorCleanup.
 import type { AnalysisError } from "../domain/analysisErrorBase.js";
 import { AnalysisCapabilityUnavailableError } from "../domain/analysisErrorCore.js";
 import { err, ok } from "../domain/result.js";
-import type { RetainedResourceScope } from "../application/AnalysisProvider.js";
 import { AnalysisCleanupLease } from "../artifacts/AnalysisCleanupLease.js";
-import { AnalysisCleanupLeaseGroup } from "../artifacts/AnalysisCleanupLease.js";
 import { ArtifactReaderFailure } from "../artifacts/ArtifactReader.js";
-import {
-  ArtifactResourceRetryFailure,
-  ArtifactResourceScope,
-} from "../artifacts/ArtifactResourceScope.js";
+import { ArtifactResourceScope } from "../artifacts/ArtifactResourceScope.js";
 import type { OwnedFileHandle } from "../filesystem/OwnedFileHandle.js";
 import { RegularFileCleanupFailure } from "../filesystem/OwnedRegularFile.js";
 import { ProviderCleanupError } from "../domain/providerCleanupError.js";
@@ -55,7 +53,7 @@ import {
 /** Concrete analysis provider backed by REA's private Hopper bridge. */
 export class HopperProvider implements AnalysisProviderCandidate {
   private readonly environment: Readonly<NodeJS.ProcessEnv>;
-  readonly #capabilities: readonly CapabilityDescriptor[];
+  readonly #launcherPath: string;
   readonly #ownedResources = new ArtifactResourceScope();
   readonly #inspectionOwner: RetainedResourceScope = {
     retain: (owner, resource) =>
@@ -80,10 +78,8 @@ export class HopperProvider implements AnalysisProviderCandidate {
     private readonly platform: NodeJS.Platform = process.platform,
   ) {
     this.environment = snapshotEnvironment(environment, platform);
-    this.#capabilities = hopperCapabilities(
-      config.regexMatchingDeadline,
-      config.regexWorkerHeapRequest,
-    );
+    // Bind lookup once; retain config's selected spelling for diagnostics.
+    this.#launcherPath = absoluteCallerPath(config.hopperLauncherPath);
   }
 
   identity(): ProviderIdentity {
@@ -91,7 +87,10 @@ export class HopperProvider implements AnalysisProviderCandidate {
   }
 
   capabilities(): readonly CapabilityDescriptor[] {
-    return this.#capabilities;
+    return hopperCapabilities(
+      this.config.regexMatchingDeadline,
+      this.config.regexWorkerHeapRequest,
+    );
   }
 
   inspectAvailability(): ProviderAvailability {
@@ -107,9 +106,9 @@ export class HopperProvider implements AnalysisProviderCandidate {
         diagnostics,
       };
     try {
-      accessSync(this.config.hopperLauncherPath, constants.X_OK);
+      accessSync(this.#launcherPath, constants.X_OK);
       // A searchable directory, such as an .app bundle, also passes X_OK.
-      if (!statSync(this.config.hopperLauncherPath).isFile())
+      if (!statSync(this.#launcherPath).isFile())
         throw new TypeError("Hopper launcher is not a regular file");
       return {
         status: "available",
@@ -202,7 +201,7 @@ export class HopperProvider implements AnalysisProviderCandidate {
   ) {
     const resourceScope = options?.resourceScope ?? this.#inspectionOwner;
     return resolveHopperAnalysisProfile(target, {
-      launcherPath: this.config.hopperLauncherPath,
+      launcherPath: this.#launcherPath,
       loaderArgsOverride: this.config.hopperLoaderArgs,
       provider: HOPPER_PROVIDER_IDENTITY,
       resourceScope,
@@ -225,8 +224,7 @@ export class HopperProvider implements AnalysisProviderCandidate {
         { reason: cause instanceof Error ? cause.message : String(cause) },
         { cause, operation: "close_owned_resources" },
       );
-      if (cause instanceof ArtifactResourceRetryFailure)
-        new AnalysisCleanupLeaseGroup(failure, cause.cleanupLeases);
+      bindArtifactFileCleanup(cause, failure);
       return err(failure);
     }
   }
@@ -289,7 +287,7 @@ export class HopperProvider implements AnalysisProviderCandidate {
     const client = new HopperClient({
       launcher: new HopperApplicationLauncher({
         environment: this.environment,
-        launcherPath: this.config.hopperLauncherPath,
+        launcherPath: this.#launcherPath,
         targetPath: target.path,
         targetKind: target.kind,
         ...(target.kind === "executable"
@@ -322,6 +320,7 @@ export class HopperProvider implements AnalysisProviderCandidate {
       }),
       ...(context === undefined ? {} : { runId: context.runId }),
       startupTimeoutMs: this.config.hopperStartupTimeoutMs,
+      readStartupTimeoutMs: () => this.config.hopperStartupTimeoutMs,
       bridgeMaxRequestBytes: this.config.bridgeMaxRequestBytes,
       logger: this.logger.child({ layer: "bridge" }),
       onDiagnostic: (diagnostic) =>
@@ -377,7 +376,7 @@ export class HopperProvider implements AnalysisProviderCandidate {
                   ? "REA loaded a digest-verified private executable copy. Evidence identifies the selected original source; Hopper document names describe the private image. The owned image and its Hopper document close together."
                   : "REA loaded a verified thin Mach-O image prepared from the original source. Identity and file offsets refer to the original file. The owned temporary image and its Hopper document close together, including on MCP shutdown.",
               ]),
-          ...(this.#capabilities.find(
+          ...(this.capabilities().find(
             (descriptor) => descriptor.operation === operation,
           )?.limitations ?? []),
           ...(operation === "read_bytes"
@@ -503,13 +502,7 @@ const hopperSourceCleanupError = (
   cause: ArtifactReaderFailure,
   operation: string,
 ): AnalysisError => {
-  const leases = [
-    ...new Set(
-      cause instanceof ArtifactResourceRetryFailure
-        ? cause.cleanupLeases
-        : (cause.cleanupLeases ?? []),
-    ),
-  ];
+  const leases = cause.cleanupLeases ?? [];
   const failure = new ProviderCleanupError(
     HOPPER_PROVIDER_IDENTITY.id,
     cause.cleanup?.resources ?? [
@@ -518,6 +511,6 @@ const hopperSourceCleanupError = (
     { reason: cause.cleanup?.reason ?? cause.message },
     { operation, cause },
   );
-  if (leases.length > 0) new AnalysisCleanupLeaseGroup(failure, leases);
+  bindArtifactFileCleanup(cause, failure);
   return failure;
 };

@@ -4,14 +4,17 @@ import {
 } from "../../domain/analysisView/environmentStateWriteAddress.js";
 import {
   bodyProblem,
+  laterItemFields,
+  optionalFields,
   updatedEntity,
   updatedFields,
   writtenBulkResponse,
 } from "../../domain/analysisView/environmentStateWriteApply.js";
 import type { FieldRule } from "../../domain/analysisView/environmentStateWriteRules.js";
-import type {
-  JsonObject,
-  StateEntity,
+import {
+  ownMember,
+  type JsonObject,
+  type StateEntity,
 } from "../../domain/analysisView/environmentStateRules.js";
 import type { AnalysisError } from "../../domain/analysisErrorBase.js";
 import type { JsonValue } from "../../domain/jsonValue.js";
@@ -20,6 +23,8 @@ import { callSegments } from "./environmentStateCallLines.js";
 import {
   namedEntity,
   refused,
+  deleteAnswerFields,
+  softDeleteFlag,
   type StateAnswer,
   type StateServing,
 } from "./environmentStateAnswer.js";
@@ -31,6 +36,7 @@ import {
   generator,
   observedEntity,
   pathValues,
+  sortedOrder,
   unloadable,
   heldEntity,
   updateTarget,
@@ -57,7 +63,8 @@ const namedTargets = (
   const { address } = plan;
   const type = plan.target ?? "";
   const name = environmentToolArguments(tool, true).body;
-  const body = name === undefined ? undefined : (args[name] as JsonValue);
+  const body =
+    name === undefined ? undefined : (ownMember(args, name) as JsonValue);
   if (body !== undefined && !isLoadableValue(body))
     return err(unloadable(tool, "The body"));
   const named =
@@ -169,7 +176,29 @@ export const answerBulk = (
   const answer = writeAnswer(
     serving,
     request,
-    (recorded) => writtenBulkResponse(plan.response!, recorded, written.value),
+    (recorded) =>
+      writtenBulkResponse(
+        plan.response!,
+        recorded,
+        written.value.map((entity, index) => ({
+          ...entity,
+          fields: update
+            ? entity.fields
+            : deleteAnswerFields(
+                serving,
+                entity.type,
+                entity.fields,
+                Array.isArray(recorded) ? recorded[0] : undefined,
+              ),
+          sent: Object.keys(targets.value[index]!.body ?? {}),
+        })),
+        optionalFields(plan),
+        laterItemFields(
+          serving.store.state.views.values(),
+          serving.store.state.entities,
+          plan.target,
+        ),
+      ),
     {
       source: "state",
       view: update ? "update" : "delete",
@@ -181,9 +210,23 @@ export const answerBulk = (
   );
   if (!answer.ok) return answer;
   if (update) {
-    const updated = serving.store.updateAll(written.value);
+    const updated = serving.store.updateAll(
+      written.value,
+      sortedOrder(
+        serving,
+        plan,
+        written.value.map((after, index) => ({
+          before: targets.value[index]!.entity,
+          after,
+        })),
+      ),
+    );
     if (!updated.ok) return updated;
-  } else serving.store.removeAll(written.value);
+  } else
+    serving.store.removeAll(
+      written.value,
+      softDeleteFlag(serving, first!.entity.type) !== undefined,
+    );
   serving.store.commitWrite(values.taken);
   return answer;
 };

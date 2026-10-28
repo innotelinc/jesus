@@ -7,7 +7,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parse as parseToml } from "smol-toml";
 
@@ -25,6 +25,7 @@ import { supportedClients } from "../../../src/application/SupportedClients.js";
 import { readClientRegistrationStatuses } from "../../../src/application/ClientRegistrationStatus.js";
 import { failedConfigurationMessage } from "../../../src/application/SetupClients.js";
 import { PRODUCT_IDENTITY } from "../../../src/identity.js";
+import { CURRENT_ENTRYPOINT_PATH } from "../../../src/process/CurrentEntrypointPath.js";
 
 const pinnedPackage = PRODUCT_IDENTITY.registrationPackageSpecifier;
 
@@ -34,9 +35,9 @@ it.skipIf(process.platform === "win32")(
     const home = await createTestTempDirectory(
       "rea-config-equivalent-launcher-",
     );
-    const real = join(home, "rea-current");
+    const real = CURRENT_ENTRYPOINT_PATH;
+    if (real === undefined) throw new Error("missing current entrypoint");
     const alias = join(home, "rea-alias");
-    await writeFile(real, "current launcher\n");
     await symlink(real, alias);
     await mkdir(join(home, ".cursor"));
     const configPath = join(home, ".cursor", "mcp.json");
@@ -76,9 +77,9 @@ it.skipIf(process.platform === "win32")(
     const home = await createTestTempDirectory(
       "rea-config-timeout-launcher-alias-",
     );
-    const real = join(home, "rea-current");
+    const real = CURRENT_ENTRYPOINT_PATH;
+    if (real === undefined) throw new Error("missing current entrypoint");
     const alias = join(home, "rea-alias");
-    await writeFile(real, "current launcher\n");
     await symlink(real, alias);
     await mkdir(join(home, ".codex"));
     const configPath = join(home, ".codex", "config.toml");
@@ -118,6 +119,73 @@ it.skipIf(process.platform === "win32")(
     ).toEqual({ status: "unchanged" });
     expect(await readFile(configPath, "utf8")).toBe(configured);
     expect(await readFile(`${configPath}.rea.backup`, "utf8")).toBe(original);
+  },
+);
+
+it.skipIf(process.platform === "win32").each([false, true])(
+  "preserves filesystem parent traversal when the configuration exists=%s",
+  async (exists) => {
+    const root = await createTestTempDirectory("rea-config-parent-traversal-");
+    const selectedDirectory = join(root, "selected");
+    await mkdir(join(selectedDirectory, "child"), { recursive: true });
+    await symlink(join(selectedDirectory, "child"), join(root, "link"), "dir");
+    const selected = join(selectedDirectory, "config.json");
+    const unrelated = join(root, "config.json");
+    const original = '{"theme":"keep"}\n';
+    await writeFile(unrelated, original);
+    if (exists) await writeFile(selected, original);
+    const requested = `${root}/link/../config.json`;
+    expect(await resolveClientConfigTransactionPath(requested)).toBe(selected);
+    expect(
+      await configureClientConfiguration({
+        name: "cursor",
+        format: "json",
+        configPath: requested,
+      }),
+    ).toMatchObject({ status: "configured" });
+    expect(JSON.parse(await readFile(selected, "utf8"))).toMatchObject({
+      mcpServers: { rea: { command: "npx" } },
+    });
+    expect(await readFile(unrelated, "utf8")).toBe(original);
+    await expect(lstat(`${unrelated}.rea.backup`)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    if (exists)
+      expect(await readFile(`${selected}.rea.backup`, "utf8")).toBe(original);
+    expect(
+      await resolveClientConfigTransactionPath(`${root}/absent/../config.json`),
+    ).toBeUndefined();
+  },
+);
+
+it
+  .skipIf(process.platform === "win32")
+  .each(
+    ["/", "/."].flatMap((suffix) =>
+      [false, true].map((relativePath) => ({ suffix, relativePath })),
+    ),
+  )(
+  "rejects a missing configuration with directory suffix $suffix and relative=$relativePath",
+  async ({ suffix, relativePath }) => {
+    const root = await createTestTempDirectory("rea-config-directory-suffix-");
+    const path = join(root, "config.json");
+    const requested = `${relativePath ? relative(process.cwd(), path) : path}${suffix}`;
+    expect(await resolveClientConfigTransactionPath(requested)).toBe(
+      `${path}/`,
+    );
+    expect(
+      await configureClientConfiguration({
+        name: "cursor",
+        format: "json",
+        configPath: requested,
+      }),
+    ).toMatchObject({ status: "failed" });
+    const selected = await lstat(path).catch((cause: unknown) => {
+      if (cause instanceof Error && "code" in cause && cause.code === "ENOENT")
+        return undefined;
+      throw cause;
+    });
+    expect(selected?.isFile() ?? false).toBe(false);
   },
 );
 

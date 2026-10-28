@@ -1,6 +1,7 @@
 import {
   createdFields,
   documentBodyProblem,
+  laterItemFields,
   optionalFields,
   renewUuids,
   updatedEntity,
@@ -12,14 +13,19 @@ import {
 } from "../../domain/analysisView/environmentStateWriteApply.js";
 import {
   insertIndex,
+  resortedMembers,
   nextInteger,
 } from "../../domain/analysisView/environmentStateWriteExplain.js";
 import { callRenewal } from "../../domain/analysisView/environmentStateWriteGenerated.js";
 import {
+  heldObjects,
+  madeObjectValue,
   nestedClockValue,
+  nextMadeCount,
   unenveloped,
 } from "../../domain/analysisView/environmentStateWriteStamps.js";
 import {
+  anyLinkedSource,
   linkedCollection,
   sameLinkedSource,
 } from "../../domain/analysisView/environmentStateWriteLinks.js";
@@ -29,17 +35,22 @@ import {
   type StateWritePlan,
   type WriteCall,
 } from "../../domain/analysisView/environmentStateWriteRules.js";
+import { withRead } from "../../domain/analysisView/environmentStateWriteObserve.js";
 import {
   formatClock,
   generatedIntegerDigits,
   seededInteger,
   seededLike,
   spelledLike,
+  startedSequence,
 } from "../../domain/analysisView/environmentStateWriteValues.js";
 import {
+  at,
+  ownMember,
   collectionMatch,
   decodedSegment,
   isObject,
+  pointerTokens,
   scalarText,
   type JsonObject,
   type StateEntity,
@@ -61,6 +72,8 @@ import {
   namedEntity,
   recordedJson,
   refused,
+  deleteAnswerFields,
+  softDeleteFlag,
   stateAnswer,
   type StateAnswer,
   type StateProvenance,
@@ -96,7 +109,7 @@ export const pathValues = (
     .split("/");
   const values = new Map<string, string>();
   for (const param of tool.params) {
-    const value = args[names.get(param.name) ?? param.name];
+    const value = ownMember(args, names.get(param.name) ?? param.name);
     const segment = template[param.index] ?? "";
     if (typeof value === "string") values.set(segment.slice(1, -1), value);
   }
@@ -120,7 +133,7 @@ const callBody = ({
   plan,
 }: WriteRequest): Result<JsonObject | undefined, AnalysisError> => {
   const name = environmentToolArguments(tool).body;
-  const sent = name === undefined ? undefined : args[name];
+  const sent = name === undefined ? undefined : ownMember(args, name);
   if (sent === undefined) return ok(undefined);
   const envelope = plan.body?.envelope ?? "";
   const value = unenveloped(sent as JsonValue, plan.body?.envelope);
@@ -139,17 +152,30 @@ const callBody = ({
     : err(unloadable(tool, `Member ${member}`));
 };
 
-/** The entity a recorded observation shows: the values a create keeps and an update's constants. */
+/** The object a recorded response shows at a pointer. */
+const recordedObject = (
+  serving: StateServing,
+  at: { readonly ordinal: number; readonly pointer: string },
+): JsonObject | undefined => {
+  const exchange = serving.source.exchanges.get(at.ordinal);
+  const body = exchange === undefined ? undefined : recordedJson(exchange);
+  const object = body === undefined ? undefined : valueAt(body, at.pointer);
+  return isObject(object) ? object : undefined;
+};
+
+/** The entity a recorded observation shows, with a create's read-back over it: the values a create keeps and an update's constants. */
 export const observedEntity = (
   serving: StateServing,
   plan: StateWritePlan,
 ): JsonObject | undefined => {
   if (plan.observation === null) return undefined;
-  const exchange = serving.source.exchanges.get(plan.observation.ordinal);
-  const body = exchange === undefined ? undefined : recordedJson(exchange);
-  const object =
-    body === undefined ? undefined : valueAt(body, plan.observation.pointer);
-  return isObject(object) ? object : undefined;
+  const object = recordedObject(serving, plan.observation);
+  if (object === undefined || plan.observation.read === undefined)
+    return object;
+  const read = recordedObject(serving, plan.observation.read);
+  return read === undefined
+    ? undefined
+    : withRead(object, read, plan.observation.read.shape);
 };
 
 /** One past the largest integer these entities hold in the field, read as the exemplar spells it, or undefined when none holds one. */
@@ -226,7 +252,7 @@ export const generator = (
     make: (attempt: number) => JsonValue,
   ): Result<JsonValue, string> => {
     const held = new Set(
-      ofType.map((entity) => scalarText(entity.fields[field])),
+      ofType.map((entity) => scalarText(ownMember(entity.fields, field))),
     );
     for (let attempt = 0; attempt < GENERATION_ATTEMPTS; attempt += 1) {
       const value = make(attempt);
@@ -240,7 +266,7 @@ export const generator = (
     target: GeneratedTarget,
     rule: GeneratedRule,
   ): Result<JsonValue, string> => {
-    const exemplar = target.observed[rule.field] ?? "";
+    const exemplar = ownMember(target.observed, rule.field) ?? "";
     const seed = (attempt: number) =>
       `${store.state.evidenceId}:${request.tool.name}:${rule.field}:${String(write.count)}:${String(attempt)}`;
     switch (rule.rule) {
@@ -254,7 +280,7 @@ export const generator = (
           );
         return rule.rule === "nested-clock"
           ? nestedClockValue(
-              (target.current ?? target.observed)[rule.field],
+              ownMember(target.current ?? target.observed, rule.field),
               rule,
               value,
             )
@@ -266,16 +292,41 @@ export const generator = (
             exemplar,
             sequence(
               `${request.tool.name} ${rule.field} ${rule.scope === "collection" ? target.name : ""}`,
-              nextHeld(
-                rule.scope === "collection"
-                  ? [...target.collection, ...startedIn(target.name)]
-                  : [...ofType, ...started],
-                rule.field,
-                exemplar,
+              startedSequence(
+                nextHeld(
+                  rule.scope === "collection"
+                    ? [...target.collection, ...startedIn(target.name)]
+                    : [...ofType, ...started],
+                  rule.field,
+                  exemplar,
+                ),
+                rule.start,
               ),
             ),
           ),
         );
+      case "made-object": {
+        const clock = formatClock(write.clockMs, rule.format);
+        if (clock === undefined)
+          return err(
+            `The generated clock for ${rule.field} is outside its recorded four-digit year format.`,
+          );
+        const base = ownMember(target.observed, rule.field);
+        const held = heldObjects(
+          [...ofType, ...started].map((entity) => entity.fields),
+          rule.field,
+        );
+        return madeObjectValue(base, rule, clock, (count) =>
+          sequence(
+            `${request.tool.name} ${rule.field}/${count.member}`,
+            nextMadeCount(
+              held,
+              count,
+              isObject(base) ? ownMember(base, count.member) : undefined,
+            ),
+          ),
+        );
+      }
       case "unique":
         return unused(rule.field, (attempt) =>
           generatedIntegerDigits(exemplar) === undefined
@@ -285,7 +336,7 @@ export const generator = (
       case "renewed":
         return ok(
           renewUuids(
-            target.current?.[rule.field] ?? null,
+            ownMember(target.current, rule.field) ?? null,
             rule.pointers,
             renewed,
           ),
@@ -318,7 +369,11 @@ export const writeAnswer = (
   serving: StateServing,
   request: WriteRequest,
   rendered:
-    | { readonly fields: JsonObject | undefined; readonly id: string }
+    | {
+        readonly fields: JsonObject | undefined;
+        readonly id: string;
+        readonly sent?: readonly string[];
+      }
     | ((
         recorded: JsonValue | undefined,
       ) => Result<JsonValue | undefined, string>),
@@ -347,8 +402,33 @@ export const writeAnswer = (
       : writtenResponse(
           plan.response,
           recorded,
-          rendered,
+          {
+            ...rendered,
+            clocks:
+              plan.observation?.read?.shape === "item"
+                ? plan.rules.flatMap((rule) =>
+                    rule.rule === "clock" ? [rule.field] : [],
+                  )
+                : [],
+            // A member the call sent and the plan stores as sent is answered as sent; any other keeps the recorded answer.
+            unloaded: (plan.observation?.read?.unloaded ?? []).filter(
+              (path) => {
+                const [field] = pointerTokens(path);
+                return !(
+                  rendered.sent?.includes(field!) === true &&
+                  plan.rules.some(
+                    (rule) => rule.field === field && rule.rule === "echo",
+                  )
+                );
+              },
+            ),
+          },
           optionalFields(plan),
+          laterItemFields(
+            serving.store.state.views.values(),
+            serving.store.state.entities,
+            plan.target,
+          ),
         );
   if (!body.ok) return err(refused(tool, body.error));
   return stateAnswer(serving, { exchange, exact }, body.value ?? null, state);
@@ -362,7 +442,7 @@ const pathArguments = (
   const names = environmentToolArguments(tool).path;
   return new Map(
     tool.params.flatMap((param) => {
-      const value = args[names.get(param.name) ?? param.name];
+      const value = ownMember(args, names.get(param.name) ?? param.name);
       return typeof value === "string" ? [[param.index, value] as const] : [];
     }),
   );
@@ -388,12 +468,13 @@ const writtenCollection = (
     return ok(
       createdCollection(serving, tool, request.args, plan.target ?? ""),
     );
-  // No read showed where other path arguments create.
-  return sameLinkedSource(
-    tool.path_template,
-    exemplarPath(serving, plan),
-    pathArguments(tool, request.args),
-  )
+  // No read showed where other path arguments create, unless they cannot change it.
+  return anyLinkedSource(plan, tool.path_template) ||
+    sameLinkedSource(
+      tool.path_template,
+      exemplarPath(serving, plan),
+      pathArguments(tool, request.args),
+    )
     ? ok(linked)
     : err(
         refused(
@@ -405,7 +486,7 @@ const writtenCollection = (
 
 /**
  * The path values a create's path fields take, decoded once as the gate learned them: a linked
- * create accepts its exemplar's source only, so it takes that; another the collection this call
+ * create that accepts its exemplar's source only takes that; another the collection this call
  * selects, else its own arguments.
  */
 const createdPathValues = (
@@ -416,7 +497,8 @@ const createdPathValues = (
 ): ReadonlyMap<string, string> => {
   const { tool, plan } = request;
   const exemplar =
-    linkedCollection(plan, tool.path_template) === undefined
+    linkedCollection(plan, tool.path_template) === undefined ||
+    anyLinkedSource(plan, tool.path_template)
       ? undefined
       : exemplarPath(serving, plan);
   return (
@@ -471,11 +553,12 @@ const answerCreate = (
     created,
     values.forTarget({ name: collection, collection: members, observed }),
     heldEntity(serving),
+    idField,
   );
   if (!fields.ok) return err(refused(tool, fields.error));
   const field = unloadableMember(fields.value);
   if (field !== undefined) return err(unloadable(tool, `Field ${field}`));
-  const id = scalarText(fields.value[idField]);
+  const id = scalarText(ownMember(fields.value, idField));
   if (
     id === undefined ||
     serving.store.entity(type, collection, id) !== undefined
@@ -496,7 +579,7 @@ const answerCreate = (
   const answer = writeAnswer(
     serving,
     request,
-    { fields: fields.value, id },
+    { fields: fields.value, id, sent: Object.keys(call.body ?? {}) },
     state,
   );
   if (!answer.ok) return answer;
@@ -568,7 +651,11 @@ const answerUpdate = (
   const answer = writeAnswer(
     serving,
     request,
-    { fields: written.value, id: entity.id },
+    {
+      fields: written.value,
+      id: entity.id,
+      sent: Object.keys(call.body ?? {}),
+    },
     {
       source: "state",
       view: "update",
@@ -578,10 +665,32 @@ const answerUpdate = (
     },
   );
   if (!answer.ok) return answer;
-  const updated = serving.store.update(updatedEntity(entity, written.value));
+  const after = updatedEntity(entity, written.value);
+  const updated = serving.store.updateAll(
+    [after],
+    sortedOrder(serving, plan, [{ before: entity, after }]),
+  );
   if (!updated.ok) return updated;
   serving.store.commitWrite(values.taken);
   return answer;
+};
+
+/** The collection's members in the order a sorted collection holds them after these writes; empty when the plan keeps them in place. */
+export const sortedOrder = (
+  serving: StateServing,
+  plan: StateWritePlan,
+  writes: readonly {
+    readonly before: StateEntity;
+    readonly after: StateEntity;
+  }[],
+): StateEntity[] => {
+  const [first] = writes;
+  if (plan.insert?.rule !== "sorted" || first === undefined) return [];
+  return resortedMembers(
+    plan.insert,
+    serving.store.inCollection(first.before.type, first.before.collection),
+    writes,
+  );
 };
 
 const answerDelete = (
@@ -591,10 +700,27 @@ const answerDelete = (
   const target = targetEntity(serving, request);
   if (!target.ok) return target.error;
   const entity = target.value;
+  const { response } = request.plan;
+  const exchange =
+    response === null
+      ? undefined
+      : serving.source.exchanges.get(response.ordinal);
+  const recorded = exchange === undefined ? undefined : recordedJson(exchange);
+  // A soft-deleting application answers with the entity's deleted flag as its recorded answer showed it.
   const answer = writeAnswer(
     serving,
     request,
-    { fields: entity.fields, id: entity.id },
+    {
+      fields: deleteAnswerFields(
+        serving,
+        entity.type,
+        entity.fields,
+        recorded === undefined
+          ? undefined
+          : at(recorded, response!.pointer ?? ""),
+      ),
+      id: entity.id,
+    },
     {
       source: "state",
       view: "delete",
@@ -604,7 +730,11 @@ const answerDelete = (
     },
   );
   if (answer.ok) {
-    serving.store.remove(entity);
+    // An application that soft-deletes still answers the entity by id, so its last fields are kept for that read.
+    serving.store.remove(
+      entity,
+      softDeleteFlag(serving, entity.type) !== undefined,
+    );
     serving.store.commitWrite(new Map());
   }
   return answer;

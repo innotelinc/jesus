@@ -3,6 +3,7 @@ import { readGoBinaryImage } from "../../go/GoBinaryImage.js";
 import { readPeImage } from "./PeImage.js";
 import { pe } from "../../domain/binaryTarget.fixture.js";
 import { BinaryFormatFailure } from "./BinaryContainer.js";
+import { readBinaryContainer } from "./readBinaryContainer.js";
 import {
   createGoBinaryFixture,
   setGoPeVirtualSize,
@@ -32,6 +33,20 @@ it("reports complete DOS MZ images as outside the PE reader", () => {
     "DOS MZ images are outside the supported ELF, PE and thin Mach-O formats",
   );
 });
+
+it.each(["NE", "LE", "LX"])(
+  "recognizes %s without requiring a PE COFF header",
+  (signature) => {
+    const bytes = pe(0x014c).subarray(0, 66);
+    bytes.write(signature, 64, "ascii");
+    expect(() => readBinaryContainer(bytes)).toThrow(
+      expect.objectContaining({
+        kind: "unsupported",
+        message: `${signature} images are outside the supported ELF, PE and thin Mach-O formats`,
+      }),
+    );
+  },
+);
 
 it.each([32, 64] as const)(
   "uses raw-size fallback for PE%d Go build-info and keeps RVA mappings intact",
@@ -65,6 +80,27 @@ it.each([32, 64] as const)(
       expect(container.executable_mappings).toEqual([]);
       expect(readGoBinaryImage(fixture.bytes).build_info).toEqual(expected);
     }
+  },
+);
+
+it.each([32, 64] as const)(
+  "retains PE%d declared image base and alignments in native image facts",
+  (bits) => {
+    const { bytes } = createGoBinaryFixture({ format: "pe", bits });
+    const optional = bytes.readUInt32LE(0x3c) + 24;
+    const imageBase = bits === 64 ? 0xfedcba9876540000n : 0x87650000n;
+    if (bits === 64) bytes.writeBigUInt64LE(imageBase, optional + 24);
+    else bytes.writeUInt32LE(Number(imageBase), optional + 28);
+    // These remain declarations; alignment policy belongs to image consumers.
+    bytes.writeUInt32LE(0, optional + 32);
+    bytes.writeUInt32LE(0xffffffff, optional + 36);
+    const container = readPeImage(bytes);
+    expect(container.image_base).toBe(imageBase);
+    expect(container.pe_header_mapping.address).toBe(imageBase);
+    expect(container.mappings[0]?.address).toBe(imageBase + 0x400n);
+    expect(container.pe_section_alignment).toBe(0);
+    expect(container.pe_file_alignment).toBe(0xffffffff);
+    expect(container.sections[0]?.file_alignment).toBe(0xffffffff);
   },
 );
 

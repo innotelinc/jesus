@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { createCli } from "../../../src/cli.js";
 import { createCliInventory } from "../../../scripts/lib/catalog-cli.mjs";
+import { adbInputSchemas } from "../../../src/domain/adb/adbDeviceAnalysis.js";
 import {
   apktoolInputSchemas,
   MAX_SELECTED_LOCALES,
@@ -315,6 +316,49 @@ describe("web module CLI advertised input schema", () => {
   });
 });
 
+describe("ADB activity extra input schema", () => {
+  it("matches the owning workflow's extra count through advertisement and CLI parsing", async () => {
+    const cli = createCli({});
+    const advertised = await advertisedSchema(cli, "start-adb-activity");
+    const parser = parserSchema(cli, "start-adb-activity", "options");
+    if (parser === undefined)
+      throw new Error("ADB activity options parser was not registered");
+    const validate = new Ajv2020({ strict: false }).compile(
+      advertised.options ?? {},
+    );
+    expect(advertised.options?.properties.extra).toMatchObject({
+      type: "array",
+      maxItems: 16,
+      default: [],
+    });
+    const request = {
+      serial: "emulator-5554",
+      action: "android.intent.action.VIEW",
+    };
+    expect(validate({})).toBe(true);
+    const omitted = adbInputSchemas.start_adb_activity.parse(request);
+    expect(omitted.extras).toEqual([]);
+    expect(parser.parse({}).extra).toEqual(omitted.extras);
+    for (const count of [0, 16, 17]) {
+      const extras = Array.from({ length: count }, (_, index) => ({
+        type: "string",
+        key: `key${index}`,
+        value: `value${index}`,
+      }));
+      const input = {
+        extra: extras.map(({ type, key, value }) => `${type}:${key}:${value}`),
+      };
+      const expected = adbInputSchemas.start_adb_activity.safeParse({
+        ...request,
+        extras,
+      }).success;
+      expect(expected).toBe(count <= 16);
+      expect(parser.safeParse(input).success).toBe(expected);
+      expect(validate(input)).toBe(expected);
+    }
+  });
+});
+
 describe("Apktool locale selection input schema", () => {
   it("preserves the owner's array bounds through CLI advertisement and parsing", async () => {
     const cli = createCli({});
@@ -350,25 +394,44 @@ describe("Apktool locale selection input schema", () => {
 });
 
 describe("reference-source outline-depth input schema", () => {
-  it("aligns advertised bounds with the parser's accepted values", async () => {
+  it("parses decimal CLI tokens into the advertised safe integer schema", async () => {
     const cli = createCli({});
     const advertised = await advertisedSchema(cli, "import-reference-source");
     const outlineDepth = advertised.options?.properties?.outlineDepth;
     expect(outlineDepth).toMatchObject({ type: "integer", minimum: 0 });
 
     const parser = parserSchema(cli, "import-reference-source", "options");
-    expect(parser?.safeParse({ outlineDepth: -1 }).success).toBe(false);
-    expect(parser?.safeParse({ outlineDepth: 0 }).success).toBe(true);
-    expect(parser?.safeParse({ outlineDepth: 2 }).success).toBe(true);
+    expect(parser?.safeParse({}).success).toBe(true);
+    const parsedValues = [
+      ["0", 0],
+      ["2", 2],
+      ["02", 2],
+      [String(Number.MAX_SAFE_INTEGER), Number.MAX_SAFE_INTEGER],
+    ] as const;
+    for (const [token, expected] of parsedValues) {
+      const parsed = parser?.safeParse({ outlineDepth: token });
+      expect(parsed?.success).toBe(true);
+      if (parsed === undefined || !parsed.success)
+        throw new Error(`Expected outline-depth token ${token} to parse`);
+      expect(parsed.data).toMatchObject({ outlineDepth: expected });
+    }
+    for (const token of ["", "-1", "9007199254740992"]) {
+      expect(parser?.safeParse({ outlineDepth: token }).success).toBe(false);
+    }
 
     const ajv = new Ajv2020({ strict: false });
     const validate = ajv.compile({
       ...advertised.options,
       $schema: "https://json-schema.org/draft/2020-12/schema",
     });
+    for (const [token] of parsedValues) {
+      const parsed = parser?.safeParse({ outlineDepth: token });
+      if (parsed === undefined || !parsed.success)
+        throw new Error(`Expected outline-depth token ${token} to parse`);
+      expect(validate(parsed.data)).toBe(true);
+    }
     expect(validate({ outlineDepth: -1 })).toBe(false);
-    expect(validate({ outlineDepth: 0 })).toBe(true);
-    expect(validate({ outlineDepth: 2 })).toBe(true);
+    expect(validate({ outlineDepth: 9007199254740992 })).toBe(false);
   });
 });
 

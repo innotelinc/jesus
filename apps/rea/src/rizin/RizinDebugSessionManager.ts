@@ -32,6 +32,7 @@ import {
   type OwnedDebuggerDetachResult,
 } from "../process/ownedDebuggerSession.js";
 import { absoluteCallerPath } from "../filesystem/callerPath.js";
+import { ABORTED, waitForAbortable } from "../process/AbortablePromise.js";
 
 const MAX_SESSIONS = 8;
 const MAX_PENDING_COMMANDS = 16;
@@ -1185,6 +1186,10 @@ export class RizinDebugSessionManager {
           platform: this.#platform,
         }),
       )
+      .catch((cause: unknown) => ({
+        status: "incomplete" as const,
+        reason: `Owned Rizin debugger shutdown failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+      }))
       .then((stopped) => {
         if (stopped.status !== "incomplete") {
           for (const failure of session.cleanupFailures)
@@ -1839,19 +1844,11 @@ const waitForTurn = (
   signal?: AbortSignal,
 ): Promise<void> => {
   if (signal === undefined) return previous;
-  if (signal.aborted)
-    return Promise.reject(rizinCancellation("rizin_debug_command", signal));
-  return new Promise<void>((resolve, reject) => {
-    const onAbort = (): void =>
-      reject(rizinCancellation("rizin_debug_command", signal));
-    signal.addEventListener("abort", onAbort, { once: true });
-    previous.then(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    });
+  return waitForAbortable(previous, signal).then((outcome) => {
+    if (outcome === ABORTED)
+      throw rizinCancellation("rizin_debug_command", signal);
   });
 };
-
 /** Translate only this transport's typed cancellation, preserving opaque/null caller reasons. */
 const rizinCancellation = (
   operation: string,

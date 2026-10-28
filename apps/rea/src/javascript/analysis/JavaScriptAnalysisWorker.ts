@@ -1,5 +1,11 @@
+import { analysisErrorWithCancellation } from "../../domain/analysisErrorCancellation.js";
+import { safeParseUtf8Json } from "../../domain/safeJson.js";
+import { analysisSettingLimit } from "../../domain/analysisSettingDefinitions.js";
 import { WorkerFrameSignal } from "../../process/WorkerFrameSignal.js";
-import type { JavaScriptSemanticProjectionCapacity } from "../../domain/javascript/javascriptSemanticFileProjection.js";
+import type {
+  JavaScriptSemanticProjectionCapacity,
+  JavaScriptSemanticFileProjection,
+} from "../../domain/javascript/javascriptSemanticFileProjection.js";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -11,7 +17,6 @@ import type { JavaScriptArtifactFile } from "../../domain/javascript/javascriptA
 import type { JavaScriptStaticAnalysis } from "../../domain/javascript/javascriptStaticAnalysisTypes.js";
 import { estimateJavaScriptStaticApplicationProjection } from "../../domain/javascript/javascriptApplicationProjectionResources.js";
 import type { JavaScriptModuleSemanticIr } from "../../domain/javascript/javascriptModuleSemanticIr.js";
-import type { JavaScriptSemanticFileProjection } from "../../domain/javascript/javascriptSemanticFileProjection.js";
 import type {
   JavaScriptAnalyzedSource,
   JavaScriptSourceAnalysisFailure,
@@ -537,7 +542,17 @@ export class JavaScriptAnalysisWorker {
           await rm(join(rootPath, `${id}.${suffix}`), { force: true });
       } catch (cause: unknown) {
         this.#runtime.retainForCleanup();
-        const error = this.#cleanupError(message(cause));
+        const previous = result.ok ? undefined : result.error.error;
+        const primary = signal?.aborted
+          ? analysisErrorWithCancellation(
+              previous,
+              new AnalysisCancelledError(OPERATION, {
+                cause: signal.reason,
+                capturedOutput: this.#captured(),
+              }),
+            )
+          : previous;
+        const error = this.#cleanupError(message(cause), primary);
         this.#runtime.bindCleanupFailure(error);
         result = err({
           javascript,
@@ -546,6 +561,17 @@ export class JavaScriptAnalysisWorker {
           error,
         });
       }
+    }
+    if (signal?.aborted === true) {
+      const error = analysisErrorWithCancellation(
+        result.ok ? undefined : result.error.error,
+        new AnalysisCancelledError(OPERATION, {
+          cause: signal.reason,
+          capturedOutput: this.#captured(),
+        }),
+      );
+      if (result.ok) this.#lastFailure = error;
+      result = err({ error, javascript, module, projection });
     }
     if (this.#applicationProjectionFailure !== undefined)
       return result.ok
@@ -708,17 +734,18 @@ export class JavaScriptAnalysisWorker {
           remediationAction: JAVASCRIPT_PARENT_CHECKPOINT_HEAP_REMEDIATION,
         },
       );
-    const text = await readFile(path, "utf8");
+    const checkpoint = await readFile(path);
     if (
       expected !== undefined &&
-      createHash("sha256").update(text).digest("hex") !== expected.sha256
+      createHash("sha256").update(checkpoint).digest("hex") !== expected.sha256
     )
       throw new AnalysisOutputError(
         OPERATION,
         "JavaScript static checkpoint digest does not match",
       );
-    const value: unknown = JSON.parse(text);
-    const facts = javaScriptWorkerStaticAnalysisSchema.parse(value);
+    const decoded = safeParseUtf8Json(checkpoint);
+    if (!decoded.ok) throw decoded.cause;
+    const facts = javaScriptWorkerStaticAnalysisSchema.parse(decoded.value);
     const remaining = this.#remainingTotalResultBudget();
     const retainedBytes = bytes * STATIC_CHECKPOINT_RETENTION_EXPANSION;
     this.#parentCapacityExhausted = retainedBytes > remaining;
@@ -778,6 +805,11 @@ export class JavaScriptAnalysisWorker {
       this.#limits(),
       {
         capturedOutput: this.#captured(),
+        limit: analysisSettingLimit(
+          "javascript.max_heap_mb",
+          this.limits.heapMb,
+          undefined,
+        ),
         remediationAction: javaScriptWorkerHeapRemediation(this.limits.heapMb),
       },
     );
@@ -972,6 +1004,11 @@ export class JavaScriptAnalysisWorker {
       return this.#projectPrimaryFailure(path);
     return deadline.interruption === "timeout"
       ? new AnalysisTimeoutError(OPERATION, this.limits.timeoutMs, {
+          limit: analysisSettingLimit(
+            "javascript.analysis_timeout_ms",
+            this.limits.timeoutMs,
+            undefined,
+          ),
           capturedOutput: this.#captured(),
           userMessage: `JavaScript source analysis reached its ${String(this.limits.timeoutMs)}ms per-source server/provider deadline (analysis_timeout_ms), not the MCP client deadline.`,
           remediationAction:
@@ -1000,6 +1037,15 @@ export class JavaScriptAnalysisWorker {
         this.#limits(),
         {
           capturedOutput: this.#captured(),
+          ...(WORKER_HEAP_FLAGS_ENFORCED
+            ? {
+                limit: analysisSettingLimit(
+                  "javascript.max_heap_mb",
+                  this.limits.heapMb,
+                  undefined,
+                ),
+              }
+            : {}),
           remediationAction: recovery.remediationAction,
         },
       );
