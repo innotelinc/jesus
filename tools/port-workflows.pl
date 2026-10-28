@@ -374,7 +374,11 @@ sub fix_precheckout_steps {
         if ($line =~ /^jobs:\s*$/) { $in_jobs = 1; $seen = 0; push @out, $line; next }
         if ($in_jobs && $line =~ /^  [A-Za-z0-9_-]+:\s*$/) { $seen = 0; push @out, $line; next }
         if ($in_jobs && $line =~ /uses:\s*actions\/checkout/) { $seen = 1; push @out, $line; next }
-        if ($in_jobs && !$seen && $line =~ /^(\s*)run:/) {
+        # A step's `run:` sits at column 8 (or 6 behind a `- `). A job-level
+        # `defaults: { run: ... }` also has a `run:` key, at column 6, and
+        # inserting a sibling there would make `defaults` invalid rather than
+        # working-directory the step.
+        if ($in_jobs && !$seen && $line =~ /^( {8,})run:/) {
             push @out, "$1" . 'working-directory: .';
         }
         push @out, $line;

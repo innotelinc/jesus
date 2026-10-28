@@ -263,7 +263,6 @@ jobs:
     name: Dashboard build
     runs-on: ubuntu-latest
     defaults:
-      working-directory: .
       run:
         working-directory: apps/capstone/dashboard
     steps:
@@ -303,7 +302,6 @@ jobs:
     name: Dashboard browser smoke
     runs-on: ubuntu-latest
     defaults:
-      working-directory: .
       run:
         working-directory: apps/capstone/dashboard
     steps:
