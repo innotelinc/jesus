@@ -75,6 +75,7 @@ export default function Billing() {
   const [accountSummary, setAccountSummary] = useState(null);
   const [stripeTest, setStripeTest] = useState(null);
   const [testing, setTesting] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   // The month's rent, and the lines of whichever invoice is open in the dialog.
   const [rent, setRent] = useState(null);
   const [invoiceItems, setInvoiceItems] = useState([]);
@@ -321,6 +322,34 @@ export default function Billing() {
     }
   };
 
+  /**
+   * Close the gap the test just reported.
+   *
+   * The endpoint's event list lives in Stripe's dashboard, so a missing event
+   * shows up here and is fixed here — the alternative is an operator copying
+   * event names out of a dialog into another tab.
+   */
+  const repairStripe = async () => {
+    setRepairing(true);
+    try {
+      const data = await api.post('/billing/payments/webhook/repair', {});
+      toast.success(
+        data.changed ? `${data.added.length} event${data.added.length === 1 ? '' : 's'} added in Stripe` : 'Nothing was missing',
+        data.changed
+          ? data.added.join(', ')
+          : data.reason === 'all_events'
+            ? 'This endpoint is subscribed to every event.'
+            : 'The endpoint already carries every event the platform needs.'
+      );
+      // Re-read the checks so the dialog shows the endpoint as it is now.
+      setStripeTest(await api.post('/billing/payments/test', {}));
+    } catch (err) {
+      toast.error('Could not update the endpoint', err.message);
+    } finally {
+      setRepairing(false);
+    }
+  };
+
   const reinstate = async (account) => {
     setBusy(account.id);
     try {
@@ -413,6 +442,15 @@ export default function Billing() {
   // Only accounts the dunning system is actually acting on belong in the table:
   // a current account with no warnings is not news.
   const dunning = accounts.filter((account) => account.state !== 'current');
+
+  // A gap the test found that repair can close. It decides whether the dialog's
+  // action looks like the next step or just an option.
+  const stripeGap =
+    !!stripeTest &&
+    stripeTest.checks.some(
+      (entry) =>
+        ['webhook-endpoint', 'webhook-ledger', 'webhook-subscriptions'].includes(entry.id) && entry.state !== 'pass'
+    );
 
   const fields = (
     <div className="stack">
@@ -653,9 +691,18 @@ export default function Billing() {
           }`}
           onClose={() => setStripeTest(null)}
           footer={
-            <Button variant="ghost" onClick={() => setStripeTest(null)}>
-              Close
-            </Button>
+            <>
+              <Button
+                variant={stripeGap ? 'primary' : 'ghost'}
+                loading={repairing}
+                onClick={repairStripe}
+              >
+                Add missing events
+              </Button>
+              <Button variant="ghost" onClick={() => setStripeTest(null)}>
+                Close
+              </Button>
+            </>
           }
         >
           <div className="stack" style={{ gap: 12 }}>
