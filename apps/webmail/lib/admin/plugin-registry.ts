@@ -1,0 +1,488 @@
+import type { CredentialSpec } from '@/lib/plugin-secrets/credentials';
+import { readFile, writeFile, mkdir, rename, unlink } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { logger } from '@/lib/logger';
+import { getConfigDir, assertWritable } from './paths';
+import { forgetVersion, purgeHistory, snapshotPlugin, snapshotTheme } from './extension-history';
+
+function getPluginsDir(): string {
+  return path.join(getConfigDir(), 'plugins');
+}
+
+function getThemesDir(): string {
+  return path.join(getConfigDir(), 'themes');
+}
+
+// ─── Types ───────────────────────────────────────────────────
+
+export interface PluginConfigField {
+  type: 'string' | 'secret' | 'boolean' | 'number' | 'select';
+  label: string;
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+  placeholder?: string;
+  options?: { label: string; value: string }[];
+}
+
+/**
+ * Per-user setting field, mirrors the manifest's `settingsSchema` shape
+ * (see lib/plugin-types.ts SettingFieldSchema). The server passes these
+ * through unchanged so the client can render the per-user settings UI.
+ */
+export interface PluginSettingsField {
+  type: 'boolean' | 'string' | 'number' | 'select';
+  label: string;
+  description?: string;
+  default: unknown;
+  options?: string[];
+  min?: number;
+  max?: number;
+}
+
+/**
+ * Where an installed extension came from. Set on install; entries written
+ * before this existed have none. The marketplace uses it to ask the directory
+ * about updates, yanked versions and advisories for exactly the extensions
+ * that came from it, and the admin UI uses it to link back to the listing.
+ */
+export type ExtensionSource =
+  | { kind: 'marketplace'; slug: string; directoryUrl: string }
+  | { kind: 'upload' };
+
+export interface ServerPlugin {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  type: string;
+  /** Requested execution tier ('untrusted' | 'privileged'). Privileged plugins
+   * run in a same-origin sandbox and require admin approval + consent. */
+  tier?: string;
+  permissions: string[];
+  entrypoint: string;
+  enabled: boolean;
+  forceEnabled?: boolean;
+  configSchema?: Record<string, PluginConfigField>;
+  settingsSchema?: Record<string, PluginSettingsField>;
+  /**
+   * Optional per-locale translation tables (locale -> key -> string) declared
+   * in the plugin manifest. Surfaced to the sandbox so plugin code can call
+   * `api.i18n.t(key)`; without it a plugin's strings stay in its hardcoded
+   * default language.
+   */
+  locales?: Record<string, Record<string, string>>;
+  installedAt: string;
+  updatedAt: string;
+  /**
+   * Full SHA-256 hex of the bundle code (64 chars). Refreshed every save so
+   * the same version re-uploaded with new code still appears as a change to
+   * the client. Also doubles as the HTTP ETag for the bundle endpoint and is
+   * verified by the sandbox loader on every load
+   * (`lib/plugin-sandbox/bundle-integrity.ts`), so it must match the served
+   * bytes exactly.
+   */
+  bundleHash?: string;
+  /**
+   * Validated CSP origins (https-only, single-origin form) the plugin may
+   * embed. Merged into the host frame-src by the proxy.
+   */
+  frameOrigins?: string[];
+  /**
+   * Validated HTTPS origins the plugin may target via `api.http.fetch()`.
+   * Same syntax as `frameOrigins`. Surfaced to clients via /api/plugins.
+   */
+  httpOrigins?: string[];
+  /**
+   * Same-origin `/api/*` path allowlist for `api.http.post()`. See
+   * `InstalledPlugin.apiPostPaths` in `lib/plugin-types.ts`.
+   */
+  apiPostPaths?: string[];
+  /** Credentials the plugin uses through the server proxy (no secrets here). */
+  credentials?: Record<string, CredentialSpec>;
+  source?: ExtensionSource;
+}
+
+export interface ServerTheme {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  variants: string[];
+  enabled: boolean;
+  forceEnabled?: boolean;
+  installedAt: string;
+  updatedAt: string;
+  source?: ExtensionSource;
+  /** True when a Theme API v2 skin.css is stored next to the CSS. */
+  hasSkin?: boolean;
+  /**
+   * SHA-256 of the CSS and skin. Clients use it to notice a re-upload of
+   * the same version and as a cache key on the CSS and skin URLs.
+   */
+  contentHash?: string;
+}
+
+interface PluginRegistry {
+  plugins: ServerPlugin[];
+}
+
+interface ThemeRegistry {
+  themes: ServerTheme[];
+}
+
+// ─── Plugin Registry ─────────────────────────────────────────
+
+async function ensureDir(dir: string): Promise<void> {
+  if (!existsSync(dir)) {
+    await mkdir(dir, { recursive: true });
+  }
+}
+
+async function readJsonFile<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    const raw = await readFile(filePath, 'utf-8');
+    return JSON.parse(raw);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return fallback;
+    logger.warn(`Failed to read ${filePath}`, { error: error instanceof Error ? error.message : 'Unknown error' });
+    return fallback;
+  }
+}
+
+async function writeJsonFile(filePath: string, data: unknown): Promise<void> {
+  const dir = path.dirname(filePath);
+  await ensureDir(dir);
+  // A temp name per write: two writers sharing one ".tmp" overwrote each
+  // other's file and the second rename failed (a 500 on concurrent installs).
+  const tmpPath = `${filePath}.${process.pid}.${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+  await rename(tmpPath, filePath);
+}
+
+// Changes to one registry file run one after another, so two admin actions
+// at once can't read the same old list and drop each other's change.
+const registryQueues = new Map<string, Promise<unknown>>();
+function withRegistryLock<T>(name: 'plugins' | 'themes', task: () => Promise<T>): Promise<T> {
+  const run = (registryQueues.get(name) ?? Promise.resolve()).then(task, task);
+  const tail = run.catch(() => {});
+  registryQueues.set(name, tail);
+  return run;
+}
+
+// ─── Plugin Operations ───────────────────────────────────────
+
+const pluginRegistryPath = () => path.join(getPluginsDir(), 'registry.json');
+
+const FULL_HASH_RE = /^[0-9a-f]{64}$/;
+
+/**
+ * Older builds wrote a 16-char SHA-256 prefix into `bundleHash`. The current
+ * client-side verifyBundle requires equal-length hex (and the full digest for
+ * real integrity), so any registry entry with a truncated or otherwise
+ * malformed hash needs to be re-hashed from the on-disk bundle. If the bundle
+ * file is missing the hash is cleared so verifyBundle skips the check rather
+ * than refusing to load.
+ */
+async function migrateBundleHashes(registry: PluginRegistry): Promise<boolean> {
+  let changed = false;
+  for (const plugin of registry.plugins) {
+    if (!plugin.bundleHash || FULL_HASH_RE.test(plugin.bundleHash)) continue;
+    const bundlePath = path.join(getPluginsDir(), `${plugin.id}.js`);
+    try {
+      const code = await readFile(bundlePath);
+      plugin.bundleHash = createHash('sha256').update(code).digest('hex');
+    } catch {
+      delete plugin.bundleHash;
+    }
+    changed = true;
+  }
+  return changed;
+}
+
+export async function getPluginRegistry(): Promise<PluginRegistry> {
+  const registry = await readJsonFile<PluginRegistry>(pluginRegistryPath(), { plugins: [] });
+  if (await migrateBundleHashes(registry)) {
+    try { await writeJsonFile(pluginRegistryPath(), registry); } catch { /* read-only fs ok */ }
+  }
+  return registry;
+}
+
+export async function getPlugin(id: string): Promise<ServerPlugin | null> {
+  const registry = await getPluginRegistry();
+  return registry.plugins.find(p => p.id === id) || null;
+}
+
+const SAFE_ID_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
+export function savePlugin(plugin: ServerPlugin, code: string): Promise<void> {
+  return withRegistryLock('plugins', () => savePluginNow(plugin, code));
+}
+
+async function savePluginNow(
+  plugin: ServerPlugin,
+  code: string,
+): Promise<void> {
+  assertWritable('install plugin');
+  if (!SAFE_ID_RE.test(plugin.id)) {
+    throw new Error('Invalid plugin id');
+  }
+  const dir = getPluginsDir();
+  await ensureDir(dir);
+
+  const bundleHash = createHash('sha256').update(code).digest('hex');
+  const registry = await getPluginRegistry();
+  const idx = registry.plugins.findIndex(p => p.id === plugin.id);
+
+  // Keep what is about to be replaced, so the update can be undone
+  // (extension-history.ts). The same bytes under the same version are not
+  // a replacement worth keeping.
+  const bundlePath = path.join(dir, `${plugin.id}.js`);
+  if (idx >= 0) {
+    const current = registry.plugins[idx];
+    await forgetVersion('plugin', plugin.id, plugin.version);
+    if (current.version !== plugin.version || current.bundleHash !== bundleHash) {
+      const currentCode = await readFile(bundlePath, 'utf-8').catch(() => null);
+      if (currentCode !== null) await snapshotPlugin(current, currentCode);
+    }
+  }
+
+  // Save code bundle
+  await writeFile(bundlePath, code, 'utf-8');
+  // Sign now and keep the signature with the bundle. Signing at serve time
+  // would sign whatever is on disk, so a bundle file swapped after install
+  // would still verify.
+  await storePluginSignature(plugin.id, code);
+
+  // Stamp content hash + updatedAt so clients can detect re-uploads even
+  // when the manifest version hasn't changed. Preserve the original
+  // installedAt across re-uploads. The full SHA-256 is required because the
+  // client-side verifyBundle compares the entire digest length-checked.
+  const now = new Date().toISOString();
+
+  const next: ServerPlugin = {
+    ...plugin,
+    bundleHash,
+    updatedAt: now,
+    installedAt: idx >= 0 ? registry.plugins[idx].installedAt : plugin.installedAt,
+  };
+  if (idx >= 0) {
+    registry.plugins[idx] = next;
+  } else {
+    registry.plugins.push(next);
+  }
+  await writeJsonFile(pluginRegistryPath(), registry);
+}
+
+export function updatePluginMeta(id: string, updates: Partial<Pick<ServerPlugin, 'enabled' | 'forceEnabled'>>): Promise<ServerPlugin | null> {
+  return withRegistryLock('plugins', () => updatePluginMetaNow(id, updates));
+}
+
+async function updatePluginMetaNow(id: string, updates: Partial<Pick<ServerPlugin, 'enabled' | 'forceEnabled'>>): Promise<ServerPlugin | null> {
+  assertWritable('update plugin metadata');
+  const registry = await getPluginRegistry();
+  const idx = registry.plugins.findIndex(p => p.id === id);
+  if (idx < 0) return null;
+
+  registry.plugins[idx] = { ...registry.plugins[idx], ...updates, updatedAt: new Date().toISOString() };
+  await writeJsonFile(pluginRegistryPath(), registry);
+  return registry.plugins[idx];
+}
+
+export function deletePlugin(id: string): Promise<boolean> {
+  return withRegistryLock('plugins', () => deletePluginNow(id));
+}
+
+async function deletePluginNow(id: string): Promise<boolean> {
+  assertWritable('delete plugin');
+  const registry = await getPluginRegistry();
+  const idx = registry.plugins.findIndex(p => p.id === id);
+  if (idx < 0) return false;
+
+  registry.plugins.splice(idx, 1);
+  await writeJsonFile(pluginRegistryPath(), registry);
+
+  // Remove bundle and signature files
+  for (const file of [`${id}.js`, `${id}.sig`]) {
+    try { await unlink(path.join(getPluginsDir(), file)); } catch { /* ok if missing */ }
+  }
+  await purgeHistory('plugin', id);
+
+  return true;
+}
+
+async function storePluginSignature(id: string, code: string): Promise<string | null> {
+  const sigPath = path.join(getPluginsDir(), `${id}.sig`);
+  try {
+    const { signBytes } = await import('./plugin-signing');
+    const signature = await signBytes(code);
+    await writeFile(sigPath, signature, 'utf-8');
+    return signature;
+  } catch (err) {
+    // Without a key the bundle still installs; it just can't run privileged.
+    try { await unlink(sigPath); } catch { /* none */ }
+    logger.warn('[plugin-registry] could not sign plugin bundle', { id, error: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
+
+/**
+ * The signature made when the bundle was installed. Bundles installed before
+ * signatures were stored get one on first request (trust on first use), so
+ * a later change to the file on disk stops verifying from then on.
+ */
+export async function getPluginSignature(id: string, code: string): Promise<string | null> {
+  if (!SAFE_ID_RE.test(id)) return null;
+  try {
+    return (await readFile(path.join(getPluginsDir(), `${id}.sig`), 'utf-8')).trim() || null;
+  } catch {
+    return storePluginSignature(id, code);
+  }
+}
+
+export async function getPluginBundle(id: string): Promise<string | null> {
+  const bundlePath = path.join(getPluginsDir(), `${id}.js`);
+  try {
+    return await readFile(bundlePath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+// ─── Theme Operations ────────────────────────────────────────
+
+const themeRegistryPath = () => path.join(getThemesDir(), 'registry.json');
+
+export async function getThemeRegistry(): Promise<ThemeRegistry> {
+  return readJsonFile<ThemeRegistry>(themeRegistryPath(), { themes: [] });
+}
+
+export async function getTheme(id: string): Promise<ServerTheme | null> {
+  const registry = await getThemeRegistry();
+  return registry.themes.find(t => t.id === id) || null;
+}
+
+export function saveTheme(theme: ServerTheme, css: string, skin: string | null = null): Promise<void> {
+  return withRegistryLock('themes', () => saveThemeNow(theme, css, skin));
+}
+
+async function saveThemeNow(
+  theme: ServerTheme,
+  css: string,
+  skin: string | null = null,
+): Promise<void> {
+  assertWritable('install theme');
+  if (!SAFE_ID_RE.test(theme.id)) {
+    throw new Error('Invalid theme id');
+  }
+  const dir = getThemesDir();
+  await ensureDir(dir);
+
+  const contentHash = createHash('sha256').update(css).update('\0').update(skin ?? '').digest('hex');
+  const registry = await getThemeRegistry();
+  const idx = registry.themes.findIndex(t => t.id === theme.id);
+  const cssPath = path.join(dir, `${theme.id}.css`);
+  const skinPath = path.join(dir, `${theme.id}.skin.css`);
+
+  // Keep the theme being replaced for a rollback (extension-history.ts).
+  if (idx >= 0) {
+    const current = registry.themes[idx];
+    await forgetVersion('theme', theme.id, theme.version);
+    if (current.version !== theme.version || current.contentHash !== contentHash) {
+      const currentCss = await readFile(cssPath, 'utf-8').catch(() => null);
+      const currentSkin = current.hasSkin ? await readFile(skinPath, 'utf-8').catch(() => null) : null;
+      if (currentCss !== null) await snapshotTheme(current, currentCss, currentSkin);
+    }
+  }
+
+  // Save CSS file
+  await writeFile(cssPath, css, 'utf-8');
+  if (skin) {
+    await writeFile(skinPath, skin, 'utf-8');
+  } else {
+    try { await unlink(skinPath); } catch { /* none stored */ }
+  }
+  theme = { ...theme, hasSkin: !!skin, contentHash };
+
+  // Update registry
+  if (idx >= 0) {
+    registry.themes[idx] = theme;
+  } else {
+    registry.themes.push(theme);
+  }
+  await writeJsonFile(themeRegistryPath(), registry);
+}
+
+export function updateThemeMeta(id: string, updates: Partial<Pick<ServerTheme, 'enabled' | 'forceEnabled'>>): Promise<ServerTheme | null> {
+  return withRegistryLock('themes', () => updateThemeMetaNow(id, updates));
+}
+
+async function updateThemeMetaNow(id: string, updates: Partial<Pick<ServerTheme, 'enabled' | 'forceEnabled'>>): Promise<ServerTheme | null> {
+  assertWritable('update theme metadata');
+  const registry = await getThemeRegistry();
+  const idx = registry.themes.findIndex(t => t.id === id);
+  if (idx < 0) return null;
+
+  registry.themes[idx] = { ...registry.themes[idx], ...updates, updatedAt: new Date().toISOString() };
+  await writeJsonFile(themeRegistryPath(), registry);
+  return registry.themes[idx];
+}
+
+export function deleteTheme(id: string): Promise<boolean> {
+  return withRegistryLock('themes', () => deleteThemeNow(id));
+}
+
+async function deleteThemeNow(id: string): Promise<boolean> {
+  assertWritable('delete theme');
+  const registry = await getThemeRegistry();
+  const idx = registry.themes.findIndex(t => t.id === id);
+  if (idx < 0) return false;
+
+  registry.themes.splice(idx, 1);
+  await writeJsonFile(themeRegistryPath(), registry);
+
+  // Remove CSS and skin files
+  for (const file of [`${id}.css`, `${id}.skin.css`]) {
+    try { await unlink(path.join(getThemesDir(), file)); } catch { /* ok if missing */ }
+  }
+  await purgeHistory('theme', id);
+
+  return true;
+}
+
+export async function getThemeSkin(id: string): Promise<string | null> {
+  if (!SAFE_ID_RE.test(id)) return null;
+  try {
+    return await readFile(path.join(getThemesDir(), `${id}.skin.css`), 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * CSS of every installed theme and every built-in theme, keyed by id, for
+ * resolving a new theme's `extends`.
+ */
+export async function themeCSSResolver(): Promise<(id: string) => string | null> {
+  const { BUILTIN_THEMES } = await import('@/lib/builtin-themes');
+  const map = new Map<string, string>();
+  for (const t of BUILTIN_THEMES) if (t.css) map.set(t.id, t.css);
+  for (const t of (await getThemeRegistry()).themes) {
+    const css = await getThemeCSS(t.id);
+    if (css) map.set(t.id, css);
+  }
+  return (id) => map.get(id) ?? null;
+}
+
+export async function getThemeCSS(id: string): Promise<string | null> {
+  const cssPath = path.join(getThemesDir(), `${id}.css`);
+  try {
+    return await readFile(cssPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}

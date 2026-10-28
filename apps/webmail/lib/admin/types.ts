@@ -1,0 +1,350 @@
+// Admin dashboard types
+
+/**
+ * Operator-authored admin record. Lives in admin.json under the config dir
+ * and can be mounted read-only after setup. Only the password hash itself
+ * is config; mutable timestamps live in AdminStateData.
+ */
+export interface AdminConfigData {
+  passwordHash: string | undefined;
+  passwordHashFile: string | undefined;
+}
+
+/**
+ * Runtime-mutable admin record. Lives in admin-state.json under the state
+ * dir. Updated on every login and password change, so it must stay writable.
+ */
+export interface AdminStateData {
+  createdAt: string;
+  lastLogin: string | null;
+  passwordChangedAt: string;
+}
+
+export interface AdminSessionPayload {
+  role: 'admin';
+  iat: number;
+  exp: number;
+}
+
+export interface SettingRestriction {
+  locked?: boolean;
+  value?: unknown;
+  hidden?: boolean;
+  allowedValues?: unknown[];
+  min?: number;
+  max?: number;
+}
+
+export interface FeatureGates {
+  pluginsEnabled: boolean;
+  pluginsUploadEnabled: boolean;
+  requirePluginApproval: boolean;
+  themesEnabled: boolean;
+  sidebarAppsEnabled: boolean;
+  userThemesEnabled: boolean;
+  settingsExportEnabled: boolean;
+  customKeywordsEnabled: boolean;
+  templatesEnabled: boolean;
+  calendarEnabled: boolean;
+  calendarTasksEnabled: boolean;
+  smimeEnabled: boolean;
+  externalContentEnabled: boolean;
+  debugModeEnabled: boolean;
+  folderIconsEnabled: boolean;
+  hoverActionsConfigEnabled: boolean;
+  tabTitleSubjectEnabled: boolean;
+  filesEnabled: boolean;
+  contactsEnabled: boolean;
+  /** @deprecated Folded into `crossAllViewEnabled`; normalized forward on policy load. */
+  allMailViewEnabled: boolean;
+  crossUnreadViewEnabled: boolean;
+  crossStarredViewEnabled: boolean;
+  crossAllViewEnabled: boolean;
+  unifiedCrossAccountEnabled: boolean;
+  /** Encrypted account list kept on the server, restorable on another device. */
+  accountArchiveEnabled: boolean;
+  /** Lets that list carry mailbox passwords, so a restore signs in by itself. */
+  accountArchivePasswordsEnabled: boolean;
+  /** Composer "Custom" From: free-text sender address instead of an identity. */
+  customFromEnabled: boolean;
+  /** The Archive action on messages (button, menus, hover, swipe, shortcut). */
+  archiveActionEnabled: boolean;
+}
+
+export const DEFAULT_FEATURE_GATES: FeatureGates = {
+  pluginsEnabled: false,
+  pluginsUploadEnabled: true,
+  requirePluginApproval: true,
+  themesEnabled: true,
+  sidebarAppsEnabled: true,
+  userThemesEnabled: true,
+  settingsExportEnabled: true,
+  customKeywordsEnabled: true,
+  templatesEnabled: true,
+  calendarEnabled: true,
+  calendarTasksEnabled: true,
+  smimeEnabled: true,
+  externalContentEnabled: true,
+  debugModeEnabled: true,
+  folderIconsEnabled: true,
+  hoverActionsConfigEnabled: true,
+  tabTitleSubjectEnabled: true,
+  filesEnabled: true,
+  contactsEnabled: true,
+  allMailViewEnabled: false,
+  crossUnreadViewEnabled: false,
+  crossStarredViewEnabled: false,
+  crossAllViewEnabled: false,
+  unifiedCrossAccountEnabled: false,
+  accountArchiveEnabled: false,
+  accountArchivePasswordsEnabled: false,
+  customFromEnabled: true,
+  archiveActionEnabled: true,
+};
+
+export type ColorMode = 'light' | 'dark' | 'system';
+
+export interface ThemePolicy {
+  /** Built-in theme IDs that are disabled (hidden from users) */
+  disabledBuiltinThemes: string[];
+  /** Admin-deployed theme IDs that are disabled (hidden from users) */
+  disabledThemes: string[];
+  /** Default theme ID for new users (null = system default) */
+  defaultThemeId: string | null;
+  /** Color mode for users who have not picked one (null = system) */
+  defaultColorMode: ColorMode | null;
+  /** Every user gets defaultColorMode (system when unset) and cannot switch it */
+  lockColorMode: boolean;
+}
+
+export const DEFAULT_THEME_POLICY: ThemePolicy = {
+  disabledBuiltinThemes: [],
+  disabledThemes: [],
+  defaultThemeId: null,
+  defaultColorMode: null,
+  lockColorMode: false,
+};
+
+/** One entry of the Web Push relay list users can pick from. */
+export interface PushRelayOption {
+  /** Name shown in the relay picker. Empty falls back to the URL host. */
+  label: string;
+  /** Relay base URL, without a trailing slash. */
+  url: string;
+}
+
+/**
+ * A sidebar app the operator ships to every user (#931). Same shape as the
+ * user's own `SidebarApp`, but the id is issued by the admin UI and the entry
+ * is read-only in the client - users see it in the rail without configuring
+ * anything, and cannot edit or delete it.
+ */
+export interface AdminSidebarApp {
+  id: string;
+  name: string;
+  url: string;
+  /** Lucide icon name (e.g. 'Globe'). */
+  icon: string;
+  /** Open in a new browser tab, or embedded in an iframe. */
+  openMode: 'tab' | 'inline';
+  showOnMobile: boolean;
+}
+
+export interface SettingsPolicy {
+  restrictions: Record<string, SettingRestriction>;
+  features: FeatureGates;
+  defaults: Record<string, unknown>;
+  themePolicy: ThemePolicy;
+  /** Plugin IDs that are force-enabled (users cannot disable) */
+  forceEnabledPlugins: string[];
+  /** Plugin IDs that have been approved by admin (users can enable) */
+  /**
+   * @deprecated Never had a writer, and approving an id approved any code
+   * under it. Approvals are per package now (lib/admin/plugin-approvals.ts).
+   */
+  approvedPlugins: string[];
+  /** Theme IDs that are force-enabled (users cannot deactivate) */
+  forceEnabledThemes: string[];
+  /**
+   * Extra Web Push relays offered alongside the built-in default. Users pick
+   * from this list; only admins can introduce a relay URL.
+   */
+  pushRelays?: PushRelayOption[];
+  /** Relay preselected for users. Empty means the built-in default. */
+  pushRelayUrl?: string;
+  /** When true, users are pinned to pushRelayUrl and cannot pick another relay. */
+  pushRelayUrlLocked?: boolean;
+  /**
+   * Sidebar apps shown to every user, ahead of their own. Read-only in the
+   * client; sanitized on policy load and save. Independent of the
+   * `sidebarAppsEnabled` gate, which only governs *user-added* apps - an
+   * operator can ship a fixed set while forbidding custom ones.
+   */
+  defaultSidebarApps?: AdminSidebarApp[];
+}
+
+/** Set to `public` on a policy answered with the pre-login subset. */
+export const POLICY_SCOPE_HEADER = 'X-Bulwark-Policy-Scope';
+
+export const DEFAULT_POLICY: SettingsPolicy = {
+  restrictions: {},
+  features: { ...DEFAULT_FEATURE_GATES },
+  defaults: {},
+  themePolicy: { ...DEFAULT_THEME_POLICY },
+  forceEnabledPlugins: [],
+  approvedPlugins: [],
+  forceEnabledThemes: [],
+  pushRelays: [],
+  pushRelayUrl: '',
+  pushRelayUrlLocked: false,
+  defaultSidebarApps: [],
+};
+
+export interface AuditEntry {
+  ts: string;
+  action: string;
+  detail: Record<string, unknown>;
+  ip: string;
+}
+
+/** Config keys that map to environment variables */
+export const CONFIG_ENV_MAP: Record<string, { envVar: string; fileEnvVar?: string; fileKey?: string; type: 'string' | 'boolean' | 'url' | 'enum' | 'json'; defaultValue: unknown; enumValues?: string[] }> = {
+  appName: { envVar: 'APP_NAME', type: 'string', defaultValue: 'Loomix Mail' },
+  appShortName: { envVar: 'APP_SHORT_NAME', type: 'string', defaultValue: '' },
+  appDescription: { envVar: 'APP_DESCRIPTION', type: 'string', defaultValue: '' },
+  searchEngineIndexing: { envVar: 'SEARCH_ENGINE_INDEXING', type: 'boolean', defaultValue: false },
+  jmapServerUrl: { envVar: 'JMAP_SERVER_URL', type: 'url', defaultValue: '' },
+  stalwartFeaturesEnabled: { envVar: 'STALWART_FEATURES', type: 'boolean', defaultValue: true },
+  // Server-side switch for /api/account/stalwart/jmap. Independent of the UI
+  // flag above so operators can keep the client features but block the
+  // credential-bearing passthrough entirely (#904).
+  stalwartJmapPassthroughEnabled: { envVar: 'STALWART_JMAP_PASSTHROUGH_ENABLED', type: 'boolean', defaultValue: true },
+  demoMode: { envVar: 'DEMO_MODE', type: 'boolean', defaultValue: false },
+  devMode: { envVar: 'DEV_MOCK_JMAP', type: 'boolean', defaultValue: false },
+  faviconUrl: { envVar: 'FAVICON_URL', type: 'url', defaultValue: '/branding/Loomix_Favicon.svg' },
+  pwaIconUrl: { envVar: 'PWA_ICON_URL', type: 'url', defaultValue: '' },
+  pwaScreenshotMobileUrl: { envVar: 'PWA_SCREENSHOT_MOBILE_URL', type: 'url', defaultValue: '' },
+  pwaScreenshotDesktopUrl: { envVar: 'PWA_SCREENSHOT_DESKTOP_URL', type: 'url', defaultValue: '' },
+  pwaThemeColor: { envVar: 'PWA_THEME_COLOR', type: 'string', defaultValue: '#4f46e5' },
+  pwaBackgroundColor: { envVar: 'PWA_BACKGROUND_COLOR', type: 'string', defaultValue: '#ffffff' },
+  appLogoLightUrl: { envVar: 'APP_LOGO_LIGHT_URL', type: 'url', defaultValue: '' },
+  appLogoDarkUrl: { envVar: 'APP_LOGO_DARK_URL', type: 'url', defaultValue: '' },
+  loginLogoLightUrl: { envVar: 'LOGIN_LOGO_LIGHT_URL', type: 'url', defaultValue: '/branding/Loomix_Mark.svg' },
+  loginLogoDarkUrl: { envVar: 'LOGIN_LOGO_DARK_URL', type: 'url', defaultValue: '/branding/Loomix_Mark.svg' },
+  loginCompanyName: { envVar: 'LOGIN_COMPANY_NAME', type: 'string', defaultValue: '' },
+  loginImprintUrl: { envVar: 'LOGIN_IMPRINT_URL', type: 'url', defaultValue: '' },
+  loginPrivacyPolicyUrl: { envVar: 'LOGIN_PRIVACY_POLICY_URL', type: 'url', defaultValue: '' },
+  loginWebsiteUrl: { envVar: 'LOGIN_WEBSITE_URL', type: 'url', defaultValue: '' },
+  // Where users get the source of the build they are running (AGPL-3.0 §13).
+  // Operators of a modified build point it at their fork; the About card then
+  // links there instead of the upstream repository (#1161). Empty = upstream.
+  sourceCodeUrl: { envVar: 'SOURCE_CODE_URL', type: 'url', defaultValue: '' },
+  // Login header customization. The logo box is otherwise a fixed 64×64
+  // (w-16/h-16), which fits a wide wordmark to ~13px tall; set a max height
+  // and/or width (any CSS length, e.g. "230px" or "3rem") to size it. The
+  // heading ({appName}) and subtitle can be hidden when the logo already
+  // reads as the brand (e.g. a wordmark) and they'd be redundant.
+  loginLogoMaxHeight: { envVar: 'LOGIN_LOGO_MAX_HEIGHT', type: 'string', defaultValue: '' },
+  loginLogoMaxWidth: { envVar: 'LOGIN_LOGO_MAX_WIDTH', type: 'string', defaultValue: '' },
+  loginShowHeading: { envVar: 'LOGIN_SHOW_HEADING', type: 'boolean', defaultValue: true },
+  loginShowSubtitle: { envVar: 'LOGIN_SHOW_SUBTITLE', type: 'boolean', defaultValue: true },
+  // Hide the manual "I have a 2FA code" toggle on the login form. Deployments
+  // that delegate auth to an external directory (LDAP/OIDC) where 2FA lives in
+  // the IdP have no server-side TOTP, so the toggle only leads to a failed
+  // login. Server-required TOTP (totp_required) still shows regardless.
+  loginShowTotp: { envVar: 'LOGIN_SHOW_TOTP', type: 'boolean', defaultValue: true },
+  // Offer signing in with an access token (Bearer auth) instead of a
+  // password. For JMAP servers that hand out API tokens, such as Fastmail,
+  // whose API accepts no passwords at all.
+  loginShowTokenLogin: { envVar: 'LOGIN_SHOW_TOKEN_LOGIN', type: 'boolean', defaultValue: false },
+  // Show the "Remember me" box on the login form. Off (the default) remembers
+  // every sign-in, as long as a SESSION_SECRET makes that possible.
+  loginShowRememberMe: { envVar: 'LOGIN_SHOW_REMEMBER_ME', type: 'boolean', defaultValue: false },
+  // Show the build version in the login footer. Off keeps the exact version
+  // from being disclosed to unauthenticated visitors.
+  loginShowVersion: { envVar: 'LOGIN_SHOW_VERSION', type: 'boolean', defaultValue: true },
+  oauthEnabled: { envVar: 'OAUTH_ENABLED', type: 'boolean', defaultValue: false },
+  oauthOnly: { envVar: 'OAUTH_ONLY', type: 'boolean', defaultValue: false },
+  oauthClientId: { envVar: 'OAUTH_CLIENT_ID', type: 'string', defaultValue: '' },
+  oauthClientSecret: { envVar: 'OAUTH_CLIENT_SECRET', fileEnvVar: 'OAUTH_CLIENT_SECRET_FILE', fileKey: "oauthClientSecretFile", type: 'string', defaultValue: '' },
+  oauthIssuerUrl: { envVar: 'OAUTH_ISSUER_URL', type: 'url', defaultValue: '' },
+  // Overrides only the user-facing authorize endpoint. Discovery, token exchange
+  // and refresh continue to use the canonical OAUTH_ISSUER_URL. Lets a per-brand
+  // authorize host front a single canonical issuer. Empty = use the discovered
+  // authorization_endpoint.
+  oauthAuthorizeUrl: { envVar: 'OAUTH_AUTHORIZE_URL', type: 'url', defaultValue: '' },
+  oauthScopes: { envVar: 'OAUTH_SCOPES', type: 'string', defaultValue: '' },
+  oauthExtraScopes: { envVar: 'OAUTH_EXTRA_SCOPES', type: 'string', defaultValue: '' },
+  oauthAllowPrivateEndpoints: { envVar: 'OAUTH_ALLOW_PRIVATE_ENDPOINTS', type: 'boolean', defaultValue: false },
+  // Signing out of an SSO account also ends the identity provider's session
+  // through its end_session_endpoint (#905). Off keeps the provider signed in,
+  // for providers shared with other apps that should stay signed in.
+  oauthEndSession: { envVar: 'OAUTH_END_SESSION', type: 'boolean', defaultValue: true },
+  // The provider's logout URL, for providers whose discovery document has no
+  // end_session_endpoint (#1279). Used instead of the discovered one when set.
+  // Applies to the global provider only; JMAP_SERVERS entries set their own
+  // oauth.endSessionUrl.
+  oauthEndSessionUrl: { envVar: 'OAUTH_END_SESSION_URL', type: 'url', defaultValue: '' },
+  // Where the provider sends the browser after ending its session. Must be
+  // registered with the provider as a post-logout redirect URI. Empty = none
+  // is sent and the provider shows its own signed-out page.
+  oauthPostLogoutRedirectUri: { envVar: 'OAUTH_POST_LOGOUT_REDIRECT_URI', type: 'url', defaultValue: '' },
+  allowCustomJmapEndpoint: { envVar: 'ALLOW_CUSTOM_JMAP_ENDPOINT', type: 'boolean', defaultValue: false },
+  // What being a Stalwart admin grants inside the Loomix admin dashboard (#870).
+  //   auto     - Stalwart admins see the shield and are signed into /admin
+  //              without the Loomix admin password (legacy behaviour).
+  //   password - Stalwart admins see the shield, but must enter the Loomix
+  //              admin password like everyone else.
+  //   off      - Stalwart admin status is ignored; /admin is reachable only
+  //              via /admin/login with the Loomix admin password.
+  // "password" and "off" require an admin password to be configured, or the
+  // dashboard would become unreachable.
+  stalwartAdminAccess: { envVar: 'STALWART_ADMIN_ACCESS', type: 'enum', defaultValue: 'auto', enumValues: ['auto', 'password', 'off'] },
+  jmapServers: { envVar: 'JMAP_SERVERS', type: 'json', defaultValue: [] },
+  jmapServerAutoPickByDomain: { envVar: 'JMAP_SERVER_AUTO_PICK_BY_DOMAIN', type: 'boolean', defaultValue: false },
+  domainBranding: { envVar: 'DOMAIN_BRANDING', type: 'json', defaultValue: [] },
+  autoSsoEnabled: { envVar: 'AUTO_SSO_ENABLED', type: 'boolean', defaultValue: false },
+  cookieSameSite: { envVar: 'COOKIE_SAME_SITE', type: 'enum', defaultValue: 'lax', enumValues: ['lax', 'strict', 'none'] },
+  allowedFrameAncestors: { envVar: 'ALLOWED_FRAME_ANCESTORS', type: 'string', defaultValue: '' },
+  parentOrigin: { envVar: 'NEXT_PUBLIC_PARENT_ORIGIN', type: 'string', defaultValue: '' },
+  settingsSyncEnabled: { envVar: 'SETTINGS_SYNC_ENABLED', type: 'boolean', defaultValue: false },
+  logFormat: { envVar: 'LOG_FORMAT', type: 'enum', defaultValue: 'text', enumValues: ['text', 'json'] },
+  logLevel: { envVar: 'LOG_LEVEL', type: 'enum', defaultValue: 'info', enumValues: ['error', 'warn', 'info', 'debug'] },
+  sessionSecret: { envVar: 'SESSION_SECRET', fileEnvVar: 'SESSION_SECRET_FILE', fileKey: "sessionSecretFile", type: 'string', defaultValue: '' },
+  extensionDirectoryUrl: { envVar: 'EXTENSION_DIRECTORY_URL', type: 'url', defaultValue: 'https://extensions.bulwarkmail.org' },
+  // Root keys (base64 raw Ed25519, comma-separated) a self-hosted extension
+  // directory signs its keyring with. The official directory's are built in
+  // (lib/admin/directory-keys.ts); with none known, marketplace bundles are
+  // installed without a signature check.
+  extensionDirectoryRootKeys: { envVar: 'EXTENSION_DIRECTORY_ROOT_KEYS', type: 'string', defaultValue: '' },
+  // 'beta' also offers pre-release versions from the marketplace.
+  extensionDirectoryChannel: { envVar: 'EXTENSION_DIRECTORY_CHANNEL', type: 'enum', defaultValue: 'stable', enumValues: ['stable', 'beta'] },
+  // Connector links (connector.bulwarkmail.org): docs and the extension
+  // directory link to a destination, and the reader's own browser resolves it
+  // to their instance. `connectorEnabled` covers both halves - the
+  // /api/connector/capabilities endpoint a connector probes, and the "add this
+  // instance" links the app offers - so a deployment that wants no third-party
+  // hostname anywhere can switch the whole thing off. `connectorUrl` points a
+  // white-label or self-hosted deployment at its own connector.
+  connectorEnabled: { envVar: 'CONNECTOR_ENABLED', type: 'boolean', defaultValue: true },
+  connectorUrl: { envVar: 'CONNECTOR_URL', type: 'url', defaultValue: 'https://connector.bulwarkmail.org' },
+  // WOPI document editing (#425). `wopiClientUrl` is the editor's base URL
+  // (Collabora Online / OnlyOffice / EuroOffice, ...); discovery is fetched
+  // from `<url>/hosting/discovery` unless the URL already carries a path.
+  // Empty = feature off.
+  wopiClientUrl: { envVar: 'WOPI_CLIENT_URL', type: 'url', defaultValue: '' },
+  // How the WOPI editor reaches this webmail (WOPISrc base). Empty = the
+  // origin the browser uses; set it when the editor sees a different host
+  // than the browser (docker networks, split DNS). The base path of a
+  // sub-path install is added to a bare origin (#1130).
+  wopiHostUrl: { envVar: 'WOPI_HOST_URL', type: 'url', defaultValue: '' },
+};
+
+/** Keys that should never be exposed to the client config endpoint */
+export const SENSITIVE_CONFIG_KEYS = new Set(['oauthClientSecret', 'sessionSecret']);
+
+/** Admin session cookie name */
+export const ADMIN_SESSION_COOKIE = 'admin_session';
+
+/** Default admin session TTL in seconds */
+export const DEFAULT_ADMIN_SESSION_TTL = 3600;
