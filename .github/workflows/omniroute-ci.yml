@@ -662,6 +662,7 @@ jobs:
       # documents the same failure (exit 143 at ~3.5 min) and fixed it the same
       # way; this job kept the 7 GB default and kept dying.
       - name: Expand virtual memory (10 GB swap)
+        working-directory: .
         run: |
           sudo swapoff -a || true
           sudo rm -f /mnt/swapfile /swapfile
@@ -1213,6 +1214,7 @@ jobs:
         env:
           COVERAGE_RESULT: ${{ needs.test-coverage.result }}
           POLICY_RESULT: ${{ needs.pr-test-policy.result }}
+        working-directory: .
         run: |
           mkdir -p .artifacts
           {
@@ -1503,6 +1505,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           # Workflow-controlled data (job results), not user input — safe to read here.
           NEEDS_JSON: ${{ toJSON(needs) }}
+        working-directory: .
         run: |
           status() {
             case "$1" in

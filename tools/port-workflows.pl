@@ -251,9 +251,11 @@ BANNER
     # Step and job-level directories, plus the path-like action inputs that are
     # resolved against the workspace rather than the step's directory.
     my @l = split /\n/, $text, -1;
+    my $block = block_scalar_lines(\@l);
     my $PATHLIKE = qr/(?:working-directory|path|context|cache-dependency-path|bun-version-file|node-version-file|version-file)/;
     my $ALREADY  = qr{^(?:/|~|apps/|\$\{|!)|github\.workspace};
     for (my $i = 0; $i < @l; $i++) {
+        next if $block->[$i];    # a script body is not YAML, leave it alone
         if ($l[$i] =~ /^(\s+)($PATHLIKE):\s*([|>][-+]?)\s*$/) {
             # Block scalar: every line under it is a path, cache glob, or file.
             my ($ind, $key) = ($1, $2);
@@ -286,6 +288,7 @@ BANNER
         pip  => 'requirements.txt',
     );
     for (my $i = 0; $i < @l; $i++) {
+        next if $block->[$i];
         next unless $l[$i] =~ /^(\s+)cache:\s*(npm|yarn|pnpm|pip)\s*$/;
         my ($ind, $pm) = ($1, $2);
         my ($j, $has) = ($i + 1, 0);
@@ -331,9 +334,52 @@ BANNER
         }
     }
 
+    $text = fix_precheckout_steps($text);
+
     $text =~ s/\n{3,}/\n\n/g;
     $text .= "\n" unless $text =~ /\n\z/;
     return $text;
+}
+
+# Mark every line that is the body of a block scalar (`run: |`, `with: >`,
+# `paths: |` ...). Those lines are data, not YAML: a shell script is allowed to
+# contain `path: something` or a bare `run:`, and rewriting it would corrupt it.
+sub block_scalar_lines {
+    my ($l) = @_;
+    my @in = (0) x @$l;
+    my $ind;
+    for my $i (0 .. $#$l) {
+        if (defined $ind) {
+            if ($l->[$i] =~ /^(\s*)\S/ && length($1) <= $ind) { undef $ind }
+            else { $in[$i] = 1; next }
+        }
+        if ($l->[$i] =~ /^(\s*)[^\s#].*?:\s*[|>][-+]?\s*$/) { $ind = length($1) }
+    }
+    return \@in;
+}
+
+# The runner creates the step's process in `defaults.run.working-directory`
+# *before* the step runs, so a step that runs before actions/checkout dies with
+# "could not start process: no such file or directory" -- the app directory is
+# not on disk yet. Steps that precede the job's checkout get an explicit `.`,
+# which is the directory the original workflow ran them from.
+sub fix_precheckout_steps {
+    my ($text) = @_;
+    my @l = split /\n/, $text, -1;
+    my $block = block_scalar_lines(\@l);
+    my (@out, $in_jobs, $seen);
+    for my $i (0 .. $#l) {
+        my $line = $l[$i];
+        if ($block->[$i]) { push @out, $line; next }
+        if ($line =~ /^jobs:\s*$/) { $in_jobs = 1; $seen = 0; push @out, $line; next }
+        if ($in_jobs && $line =~ /^  [A-Za-z0-9_-]+:\s*$/) { $seen = 0; push @out, $line; next }
+        if ($in_jobs && $line =~ /uses:\s*actions\/checkout/) { $seen = 1; push @out, $line; next }
+        if ($in_jobs && !$seen && $line =~ /^(\s*)run:/) {
+            push @out, "$1" . 'working-directory: .';
+        }
+        push @out, $line;
+    }
+    return join("\n", @out);
 }
 
 # ── Write ──────────────────────────────────────────────────────────────────
@@ -384,6 +430,28 @@ for my $dest (glob("$OUTDIR/*.yml")) {
     unlink $dest or die "unlink $dest: $!\n";
     print "removed $dest\n";
     $changed = 1;
+}
+
+# Two composite actions locate their project from their own path, because a
+# composite action's steps run at the workspace root no matter what the calling
+# workflow's working-directory says. That patch lives in the app's file, so a
+# re-import can drop it and every job that installs through them would fail at
+# the first step. Warn rather than fail: the workflows are still correct, and
+# the fix is three lines in the two files named below.
+my @PATCHED = (
+    'apps/omniroute/.github/actions/npm-ci-retry/action.yml',
+    'apps/rea/.github/actions/portable-build-cache/action.yml',
+);
+for my $p (@PATCHED) {
+    next unless -f $p;
+    open my $fh, '<', $p or next;
+    local $/;
+    my $t = <$fh>;
+    close $fh;
+    next if $t =~ /monorepo-port:/;
+    warn "WARNING: $p lost its monorepo-port patch; jobs that use it will run\n"
+       . "         at the repository root and fail. Re-apply the `cd` (see git log).\n";
+    $changed = 1 if $CHECK;
 }
 
 printf "%d workflow(s) ported\n", scalar @order;

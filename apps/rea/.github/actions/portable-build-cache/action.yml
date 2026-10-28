@@ -15,7 +15,10 @@ runs:
       uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
       with:
         name: ${{ inputs.build_cache_artifact }}
-        path: .turbo/cache/
+        # monorepo-port: resolve from this action's own location, so the cache
+        # directory is rea's whether rea is the repository root or a directory
+        # inside a larger tree.
+        path: ${{ github.action_path }}/../../../.turbo/cache/
     - name: Resolve portable build task hashes
       id: plan
       if: inputs.build_cache_artifact == ''
@@ -23,19 +26,21 @@ runs:
       env:
         BUILD_CACHE_PREFIX: rea-portable-build-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.npmrc', '.nvmrc', 'package-lock.json') }}
       run: |
+        # monorepo-port: package scripts are rea's own, not the root's.
+        cd "$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
         npm run --silent test:prepare -- --dry=json |
           node scripts/ci/portable-build-cache.mjs key >> "$GITHUB_OUTPUT"
     - name: Restore portable build outputs
       if: inputs.build_cache_artifact == '' && inputs.save != 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: .turbo/cache/
+        path: ${{ github.action_path }}/../../../.turbo/cache/
         key: ${{ steps.plan.outputs.key }}
         restore-keys: ${{ steps.plan.outputs.prefix }}
     - name: Restore and save portable build outputs
       if: inputs.build_cache_artifact == '' && inputs.save == 'true'
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
-        path: .turbo/cache/
+        path: ${{ github.action_path }}/../../../.turbo/cache/
         key: ${{ steps.plan.outputs.key }}
         restore-keys: ${{ steps.plan.outputs.prefix }}

@@ -175,6 +175,7 @@ jobs:
     # slowest job measures about three minutes; this is five times that.
     timeout-minutes: 15
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/ontrak-lab
     steps:
@@ -230,6 +231,7 @@ jobs:
       STORAGE_DIR: ./storage/packages
       NEXT_PUBLIC_APP_NAME: OnTrak IT Support Training
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/.
     steps:
@@ -318,6 +320,7 @@ jobs:
       ONTRAK_TIX_BLOB_DIR: .ontrak-tix-blobs
       ONTRAK_TIX_EVIDENCE_DIR: .ontrak-tix-evidence
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/ontrak-tix
     steps:
@@ -397,6 +400,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://ontrak:ontrak@127.0.0.1:5432/sentinel?schema=public
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/ontrak-sentinel
     steps:
@@ -667,6 +671,7 @@ jobs:
     # is what is inside this; twenty-five minutes is several times that.
     timeout-minutes: 25
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/ontrak-genie
     steps:
@@ -744,6 +749,7 @@ jobs:
     # slowest job measures about three minutes; this is five times that.
     timeout-minutes: 15
     defaults:
+      working-directory: .
       run:
         working-directory: apps/ontrak/ontrak-portal
     steps:
