@@ -275,6 +275,41 @@ BANNER
         $l[$i] = "$ind$key: " . "apps/$app/$val";
     }
 
+    # setup-node/setup-python resolve `cache:` against the workspace root and
+    # FAIL (not warn) when the lockfile is not there, so every cache request
+    # has to name the app's lockfile explicitly. This is the one rewrite the
+    # port cannot skip: without it every npm job dies in "Set up Node".
+    my %LOCK = (
+        npm  => 'package-lock.json',
+        yarn => 'yarn.lock',
+        pnpm => 'pnpm-lock.yaml',
+        pip  => 'requirements.txt',
+    );
+    for (my $i = 0; $i < @l; $i++) {
+        next unless $l[$i] =~ /^(\s+)cache:\s*(npm|yarn|pnpm|pip)\s*$/;
+        my ($ind, $pm) = ($1, $2);
+        my ($j, $has) = ($i + 1, 0);
+        while ($j < @l) {
+            # A sibling at the same indent is still part of this `with:` block,
+            # so look for the key before deciding the block has ended.
+            $has = 1 if $l[$j] =~ /^\s+cache-dependency-path:/;
+            if ($l[$j] =~ /^(\s*)\S/ && $l[$j] !~ /^\s*#/) {
+                last if length($1) <= length($ind);
+            }
+            $j++;
+        }
+        next if $has;
+        my $lock = $LOCK{$pm};
+        if (-e "apps/$app/$lock") {
+            splice @l, $i + 1, 0, "${ind}cache-dependency-path: apps/$app/$lock";
+            $i++;
+        } else {
+            # Caching is impossible without a lockfile, and asking for it is a
+            # build failure rather than a slow build, so ask for nothing.
+            $l[$i] = "$ind# cache: $pm dropped by tools/port-workflows.pl — no $lock in apps/$app";
+        }
+    }
+
     # hashFiles() globs from the workspace root, so its relative patterns need
     # the app prefix for the same reason every other path does -- otherwise the
     # cache key hashes an empty set and every build misses.

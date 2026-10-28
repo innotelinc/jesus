@@ -239,6 +239,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: apps/ontrak/package-lock.json
 
       - name: Install
         run: npm ci
