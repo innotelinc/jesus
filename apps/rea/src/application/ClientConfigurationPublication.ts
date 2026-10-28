@@ -4,6 +4,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { AnalysisCleanupLease } from "../artifacts/AnalysisCleanupLease.js";
 import { fileHandleMatchesBytes } from "../filesystem/fileHandleMatchesBytes.js";
+import { absoluteCallerPath } from "../filesystem/callerPath.js";
 import { OwnedFileHandle } from "../filesystem/OwnedFileHandle.js";
 import { OwnedStagedOutput } from "../filesystem/OwnedStagedOutput.js";
 import {
@@ -83,7 +84,10 @@ export class ClientConfigurationPublication {
     selection?: ClientConfigurationSelection,
   ): Promise<ClientConfigurationPublication> {
     const parent = await realpath(dirname(path));
-    const destination = join(parent, basename(path));
+    // Retain the transaction owner's directory requirement through final-file
+    // publication rather than allowing basename/join to select a regular file.
+    const destination =
+      join(parent, basename(path)) + (path.endsWith(sep) ? sep : "");
     const input = await selectedConfiguration(destination, previous);
     if (selection !== undefined) {
       await assertRequestedConfigurationPath(path, selection.requestedPath);
@@ -168,12 +172,12 @@ export class ClientConfigurationPublication {
     return outcome.value;
   }
 
-  async assertCurrent(readback?: string): Promise<void> {
+  async assertCurrent(readback: string): Promise<void> {
     const owned = await this.owner.handle.stat();
     const named = await lstat(this.path);
     if (
       owned.ino === 0 ||
-      (readback !== undefined && readback !== this.contents) ||
+      readback !== this.contents ||
       named.isSymbolicLink() ||
       !sameRegularFileState(owned, named)
     )
@@ -290,10 +294,10 @@ const isParentAliasRetarget = async (
     );
   }
   if (requestedStats.isSymbolicLink()) return false;
-  const requestedParent = dirname(resolve(requestedPath));
+  const requestedParent = dirname(absoluteCallerPath(requestedPath));
   try {
     const canonicalParent = await realpath(requestedParent);
-    return resolve(canonicalParent) !== requestedParent;
+    return canonicalParent !== requestedParent;
   } catch (cause: unknown) {
     void cause;
     return false;

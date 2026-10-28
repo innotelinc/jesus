@@ -1,9 +1,13 @@
 import { jsonTextCodeUnits } from "../jsonSerialization.js";
 import { digestCanonicalValue } from "../canonicalDigest.js";
 import type { JsonValue } from "../jsonValue.js";
-import { same, type JsonObject } from "./environmentStateRules.js";
+import { ownMember, same, type JsonObject } from "./environmentStateRules.js";
 import { storedKinds } from "./environmentStateWriteApply.js";
 import { composedValue } from "./environmentStateWriteComposed.js";
+import {
+  ampersandSpelled,
+  type AmpersandSpelling,
+} from "./environmentStateWriteCreateCalls.js";
 import type { explainUpdate } from "./environmentStateWriteExplain.js";
 import {
   alikeRules,
@@ -48,7 +52,7 @@ export const disagreesWithCall = (
     (rule) =>
       (unsentChange(rule) &&
         Object.hasOwn(call.after, rule.field) &&
-        !same(call.written[rule.field], call.after[rule.field])) ||
+        !same(ownMember(call.written, rule.field), call.after[rule.field])) ||
       (regenerates(rule) && call.kept.includes(rule.field)),
   );
 
@@ -60,8 +64,8 @@ export const steadyFields = (
 ): string[] =>
   rules.flatMap((rule) =>
     rule.rule === "set" &&
-    same(before[rule.field], rule.value) &&
-    same(after[rule.field], rule.value)
+    same(ownMember(before, rule.field), rule.value) &&
+    same(ownMember(after, rule.field), rule.value)
       ? [rule.field]
       : [],
   );
@@ -104,7 +108,50 @@ export interface UpdateCall {
   readonly kept: readonly string[];
 }
 
-/** Whether a rule a later call showed gives an earlier call a value other than the one it showed for a field it did not send. */
+/** How a later update's entity and the plan's calls and held entities showed `&` in the slugs it learns. */
+export interface UpdateSpelling {
+  readonly entity: JsonObject;
+  readonly ampersands: ReadonlyMap<string, AmpersandSpelling>;
+}
+
+/** Ambiguous saves may echo an already-derived slug, hold a clock in its own second, or slug no `&`. Keep the demonstrated derivation; call evidence still has to reproduce it. */
+export const reconciledUpdateRule = (
+  held: FieldRule,
+  later: FieldRule,
+  kept: ReadonlySet<string>,
+  spelling?: UpdateSpelling,
+): FieldRule | undefined => {
+  const alike = alikeRules(held, later, kept);
+  if (alike !== undefined) return alike;
+  if (spelling !== undefined) {
+    const spelled = ampersandSpelled(
+      held,
+      { rule: later, entity: spelling.entity },
+      spelling.ampersands.get(held.field),
+    );
+    if (spelled !== undefined) return spelled;
+  }
+  for (const [derived, ambiguous] of [
+    [held, later],
+    [later, held],
+  ] as const) {
+    if (
+      derived.rule === "slug" &&
+      ambiguous.rule === "echo" &&
+      ambiguous.sorted !== true
+    )
+      return derived;
+    if (
+      derived.rule === "clock" &&
+      ambiguous.rule === "held-clock" &&
+      same(derived.format, ambiguous.format)
+    )
+      return derived;
+  }
+  return undefined;
+};
+
+/** Whether a later rule reproduces earlier calls, including echoes promoted to derivations. */
 export const contradictsEarlierCalls = (
   draft: {
     readonly plan: { readonly rules: readonly FieldRule[] };
@@ -112,11 +159,20 @@ export const contradictsEarlierCalls = (
   },
   rules: readonly FieldRule[],
 ): boolean => {
-  const ruled = new Set(draft.plan.rules.map((rule) => rule.field));
+  const ruled = new Map(draft.plan.rules.map((rule) => [rule.field, rule]));
   return rules.some((rule) => {
+    const held = ruled.get(rule.field);
+    // A slug that echoes, or that spells `&` as the word where the plan's drops it, must reproduce every earlier call; one that slugged no `&` keeps the plan's spelling.
     if (
       !(unsentChange(rule) || regenerates(rule) || rule.rule === "clock") ||
-      ruled.has(rule.field)
+      (held !== undefined &&
+        !(
+          rule.rule === "slug" &&
+          (held.rule === "echo" ||
+            (held.rule === "slug" &&
+              held.ampersand === undefined &&
+              rule.ampersand !== undefined))
+        ))
     )
       return false;
     // Compute a structured rule's digest once, rather than once per earlier call.
@@ -148,9 +204,15 @@ export const contradictsEarlierCalls = (
         );
       }
       const from = rule.rule === "slug" ? sent.get(rule.from) : undefined;
+      // A slug rule runs only when its source is sent; otherwise serving keeps the field.
       return (
-        typeof from === "string" &&
-        !sameObserved(observation, observedValue(slugOf(from)))
+        rule.rule === "slug" &&
+        (typeof from === "string"
+          ? !sameObserved(
+              observation,
+              observedValue(slugOf(from, rule.ampersand)),
+            )
+          : !kept.includes(rule.field))
       );
     });
   });
@@ -188,6 +250,7 @@ export const conflictsWithPlan = (
   plan: Pick<StateWritePlan, "body" | "rules">,
   explained: ReturnType<typeof explainUpdate>,
   kept: ReadonlySet<string>,
+  spelling?: UpdateSpelling,
 ): boolean => {
   const body = plan.body!;
   const fixed = new Map(body.fixed.map((entry) => [entry.member, entry.sent]));
@@ -205,7 +268,10 @@ export const conflictsWithPlan = (
     (identity !== null && fixed.has(identity)) ||
     explained.rules.some((rule) => {
       const held = rules.get(rule.field);
-      return held !== undefined && alikeRules(held, rule, kept) === undefined;
+      return (
+        held !== undefined &&
+        reconciledUpdateRule(held, rule, kept, spelling) === undefined
+      );
     })
   );
 };
@@ -230,7 +296,8 @@ export const appliedUpdate = (
   );
   const derived = Object.keys(written).filter(
     (field) =>
-      !Object.hasOwn(before, field) || !same(written[field], before[field]),
+      !Object.hasOwn(before, field) ||
+      !same(written[field], ownMember(before, field)),
   );
   const changed = {
     fields: [...new Set([...sent, ...derived])],

@@ -1,6 +1,8 @@
 import type { BrowserObservationPort } from "../application/BrowserObservationPort.js";
-import type { ProviderIdentity } from "../application/AnalysisProvider.js";
-import type { ExecutionOptions } from "../application/AnalysisProvider.js";
+import type {
+  ProviderIdentity,
+  ExecutionOptions,
+} from "../application/AnalysisProvider.js";
 import {
   sanitizeBrowserUrl,
   type InspectWebPageInput,
@@ -164,7 +166,7 @@ export class CdpBrowserProvider implements BrowserObservationPort {
                 ]),
             ...(selected.allowed.some((target) => target.attached === null)
               ? [
-                  "CDP discovery omitted attachment state for one or more targets; attached is reported as unknown.",
+                  "CDP discovery could not establish debugger attachment state for one or more targets.",
                 ]
               : []),
           ],

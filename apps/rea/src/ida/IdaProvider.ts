@@ -1,5 +1,10 @@
+import { bindArtifactFileCleanup } from "../artifacts/ArtifactFileOperation.js";
+import { launchRegexMatchingLimitation } from "../process/RegexMatcher.js";
 import { snapshotEnvironment } from "../process/snapshotEnvironment.js";
-import { createAnalysisProfile } from "../domain/analysisProfile.js";
+import {
+  createAnalysisProfile,
+  analysisProfilesEqual,
+} from "../domain/analysisProfile.js";
 import type { AnalysisProfileCommitment } from "../domain/analysisProfile.js";
 import {
   isElfMetadataArchitecture,
@@ -18,15 +23,17 @@ import type {
   AnalysisProviderCandidate,
   ProviderAvailability,
   ProviderTargetSupport,
+  RetainedResourceScope,
 } from "../application/AnalysisProvider.js";
 import type { AppConfig } from "../config/types.js";
 import type { ConfigurationError } from "../domain/configurationErrors.js";
 import { idaRegistrationDigest } from "./IdaRegistrationIdentity.js";
 import { isDeepStrictEqual } from "node:util";
-import { analysisProfilesEqual } from "../domain/analysisProfile.js";
 import type { Result } from "../domain/result.js";
 import {
   readIdaConfiguration,
+  idaCompatibilityProfile,
+  IDA_COMPATIBILITY_PROFILES,
   type IdaConfiguration,
   idaConfigurationError,
 } from "./IdaConfiguration.js";
@@ -42,11 +49,8 @@ import { IdaSessionClient } from "./IdaSessionClient.js";
 import { privateRuntimeRootCapability } from "../process/PrivateRuntimeRoot.js";
 import { ArtifactResourceScope } from "../artifacts/ArtifactResourceScope.js";
 import { AnalysisCleanupLease } from "../artifacts/AnalysisCleanupLease.js";
-import { AnalysisCleanupLeaseGroup } from "../artifacts/AnalysisCleanupLease.js";
-import { ArtifactResourceRetryFailure } from "../artifacts/ArtifactResourceScope.js";
 import { ProviderCleanupError } from "../domain/providerCleanupError.js";
-import type { RetainedResourceScope } from "../application/AnalysisProvider.js";
-import type { ProviderInspectionScope } from "../providers/ProviderInspectionScope.js";
+import type { ProviderInspectionScope } from "../application/ProviderInspectionScope.js";
 
 /** Bring-your-own IDA MCP candidate; discovery performs no provider startup. */
 export class IdaProvider implements AnalysisProviderCandidate {
@@ -81,9 +85,21 @@ export class IdaProvider implements AnalysisProviderCandidate {
   }
   capabilities(): readonly CapabilityDescriptor[] {
     const profiles = [
-      ...idaCapabilities("attached", false, false),
-      ...idaCapabilities("attached", true, true),
-      ...idaCapabilities("headless", true, false),
+      ...idaCapabilities(
+        IDA_COMPATIBILITY_PROFILES.legacy,
+        false,
+        this.#regexLimitation(),
+      ),
+      ...idaCapabilities(
+        IDA_COMPATIBILITY_PROFILES.native,
+        true,
+        this.#regexLimitation(),
+      ),
+      ...idaCapabilities(
+        IDA_COMPATIBILITY_PROFILES.modern,
+        true,
+        this.#regexLimitation(),
+      ),
     ];
     const byOperation = new Map<string, (typeof profiles)[number][]>();
     for (const capability of profiles) {
@@ -150,8 +166,7 @@ export class IdaProvider implements AnalysisProviderCandidate {
         { cause: cause instanceof Error ? cause.message : String(cause) },
         { cause, operation: "close_owned_resources" },
       );
-      if (cause instanceof ArtifactResourceRetryFailure)
-        new AnalysisCleanupLeaseGroup(failure, cause.cleanupLeases);
+      bindArtifactFileCleanup(cause, failure);
       return err(failure);
     }
   }
@@ -166,9 +181,9 @@ export class IdaProvider implements AnalysisProviderCandidate {
     const config = await this.#configuration(options);
     const capabilities = config.ok
       ? idaCapabilities(
-          config.value.mode,
+          idaCompatibilityProfile(config.value),
           "command" in config.value,
-          config.value.protocol === "native",
+          this.#regexLimitation(),
         )
       : this.capabilities();
     const registrationDiagnostics = {
@@ -344,12 +359,7 @@ export class IdaProvider implements AnalysisProviderCandidate {
       engine_version: null,
       upstream_distribution_version: null,
       mode: config.value.mode,
-      compatibility_profile:
-        config.value.protocol === "native"
-          ? "native-ida-mcp"
-          : config.value.mode === "attached"
-            ? "legacy-1.4"
-            : "database-supervisor",
+      compatibility_profile: idaCompatibilityProfile(config.value).identity,
       database_revision: null,
       cache_policy: "live",
       registration_digest: idaRegistrationDigest(config.value),
@@ -398,6 +408,12 @@ export class IdaProvider implements AnalysisProviderCandidate {
     const registration = await pending;
     return registration;
   }
+  #regexLimitation(): string {
+    return launchRegexMatchingLimitation(
+      this.config.regexMatchingDeadline,
+      this.config.regexWorkerHeapRequest,
+    );
+  }
   #createBoundClient(
     config: IdaConfiguration,
     target: BinaryTarget,
@@ -408,6 +424,7 @@ export class IdaProvider implements AnalysisProviderCandidate {
       target,
       this.connectionFactory(config, this.environment),
       profile,
+      this.config,
     );
   }
   #unboundClient(reason: string): AnalysisClient {
