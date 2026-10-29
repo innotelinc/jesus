@@ -29,7 +29,10 @@ if (
 if (outputs.tier === "full" && selectedScopes.length !== CI_FLAGS.length)
   throw new Error("Full qualification requires every canonical CI scope");
 const required = reused ? ["changes"] : ["changes", "static", "test"];
-if (outputs.tier === "full") required.push("static-deep");
+// The deep job runs whenever the code lane does, so the gate requires it for
+// every such run, not only a full qualification. A fast push that skipped it
+// must fail here instead of passing because nothing named it.
+if (outputs.code === "true") required.push("static-deep");
 const lanes = {
   code: [
     "build",

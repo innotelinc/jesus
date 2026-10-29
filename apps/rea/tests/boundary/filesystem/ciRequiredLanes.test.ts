@@ -573,6 +573,9 @@ it.each([
           [scope]: selected,
         },
       };
+      // The code lane makes the deep job required; satisfy it so each case
+      // isolates its own lane.
+      needs["static-deep"] = { result: "success" };
       if (result === "missing") delete needs[lane];
       else needs[lane] = { result };
       const execution = executeWorkflowFixture(
@@ -596,6 +599,64 @@ it.each([
     }
   },
 );
+
+it("requires the deep static job for every code run, whatever the tier", async () => {
+  const { needs: laneNames } = await requiredNeeds();
+  const flags = await scopeFlags();
+  const run = (
+    code: string,
+    tier: string,
+    deep: "success" | "skipped" | "missing",
+  ) => {
+    // Every other lane passes, so only the deep job's fate can decide the gate.
+    const jobs: Record<string, unknown> = Object.fromEntries(
+      laneNames
+        .filter((name) => name !== "static-deep")
+        .map((name) => [name, { result: "success" }]),
+    );
+    jobs.changes = {
+      result: "success",
+      outputs: {
+        // Full qualification selects every scope; the deep job follows code.
+        ...Object.fromEntries(
+          flags.map((flag) => [flag, tier === "full" ? "true" : "false"]),
+        ),
+        tier,
+        code,
+      },
+    };
+    if (deep !== "missing") jobs["static-deep"] = { result: deep };
+    return executeWorkflowFixture(
+      process.execPath,
+      [
+        fileURLToPath(
+          new URL("../../../scripts/ci/required.mjs", import.meta.url),
+        ),
+      ],
+      {
+        env: {
+          ...process.env,
+          CI_JOBS: JSON.stringify(jobs),
+          CI_QUALIFICATION_DIRECTORY: "",
+        },
+      },
+    );
+  };
+  for (const tier of ["fast", "full"] as const) {
+    await expect(run("true", tier, "success")).resolves.toMatchObject({
+      stderr: "",
+    });
+    for (const deep of ["skipped", "missing"] as const)
+      await expect(run("true", tier, deep)).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining("static-deep"),
+      });
+  }
+  // A run without the code lane never selects it, so skipping stays legal.
+  await expect(run("false", "fast", "skipped")).resolves.toMatchObject({
+    stderr: "",
+  });
+});
 
 it("rejects incomplete or malformed classification even when available jobs succeeded", async () => {
   const flags = await scopeFlags();

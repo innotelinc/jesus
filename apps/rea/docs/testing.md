@@ -843,7 +843,8 @@ change selects code checks, on push feedback as well as full qualification, and
 do not gate provider admission. Portable test shards and documentation
 checks remain independent of static results, so they can still provide
 diagnostic feedback. The required gate rejects skipped selected lanes when
-static checks fail; on the full tier it also requires the deep static job.
+static checks fail; it also requires the deep static job whenever the code lane
+is selected, so fast feedback cannot pass with a skipped deep job.
 Passing revisions retain all selected coverage. This ordering reduces peak
 demand on invalid revisions but can add static-check waiting to otherwise
 passing runs; it is not a measured reduction in end-to-end latency.
