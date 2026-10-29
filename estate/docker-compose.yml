@@ -108,12 +108,20 @@ services:
       # `on` offers and answers RTP/SAVP with an SDES key. A sub-account that
       # requires encryption refuses plain RTP with 488, in both directions.
       SIP_SRTP: ${SIP_SRTP:-}
+      # The console's switch beats SIP_SRTP after the first flip, so a restart
+      # does not restore encryption the sub-account has been told to stop using.
+      SRTP_STATE_FILE: /data/srtp.json
       # What goes in Contact and SDP: the address the carrier must send to.
       SIP_ADVERTISE: ${PUBLIC_IP:-}
       SIP_LOCAL_PORT: "5060"
       GATEWAY_RTP_START: ${GATEWAY_RTP_START:-40000}
       GATEWAY_RTP_END: ${GATEWAY_RTP_END:-40063}
       GATEWAY_HTTP_PORT: "7454"
+    volumes:
+      # The operator's encryption choice, on the host: it has to survive a
+      # rebuild of this container, not just a restart, or the carrier and the
+      # gateway drift apart after the next deploy.
+      - ./state/gateway:/data
     ports:
       - "5060:5060/udp"
       - "${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}:${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}/udp"
@@ -176,6 +184,12 @@ services:
       CANTUS_URL: http://switch:8088
       CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
       TELNO_URL: http://telno:8080
+      # The console's encryption switch reads the gateway and writes both it and
+      # the sub-account at the carrier, so it needs the trunk's API side too.
+      GATEWAY_URL: http://gateway:7454
+      VOIPMS_SUB_ACCOUNT: ${VOIPMS_SIP_USERNAME:-}
+      VOIPMS_API_USERNAME: ${VOIPMS_API_USERNAME:-}
+      VOIPMS_API_PASSWORD: ${VOIPMS_API_PASSWORD:-}
       # Point this at a Capstone stack to light up its pill; empty means the
       # console simply reports it as not configured.
       CAPSTONE_URL: ${CAPSTONE_URL:-}

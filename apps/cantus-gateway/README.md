@@ -39,6 +39,7 @@ instead of silence.
 | `SIP_USERNAME` / `SIP_PASSWORD` | — | the sub-account the trunk registers as |
 | `SIP_FROM_USER` | `SIP_USERNAME` | the number outbound calls present as (the trunk's DID) |
 | `SIP_SRTP` | off | `on` offers and answers `RTP/SAVP` with an SDES key (`AES_CM_128_HMAC_SHA1_80`) |
+| `SRTP_STATE_FILE` | — | where a change made over HTTP is remembered; it wins over `SIP_SRTP` on the next boot |
 | `SIP_DOMAIN` | `SIP_HOST` | realm/From domain |
 | `SIP_ADVERTISE` | first public IPv4 | what goes in `Contact` and `c=` SDP |
 | `SIP_LOCAL_PORT` | `0` (ephemeral) | bind 5060 when the container maps it |
@@ -51,6 +52,21 @@ instead of silence.
 
 `GET /healthz` is `200` only when both halves are usable: a bound Cantus socket
 **and** a registered trunk. Anything else is `503` with the reason.
+
+Encryption can be changed while the gateway runs, because the other half of it
+lives at the carrier and the two have to move together:
+
+```bash
+GET  /srtp                       # {"enabled":true,"registered":true}
+POST /srtp  {"enabled":false}    # {"ok":true,"enabled":false,"registered":true}
+```
+
+The change applies to the **next** call in either direction; a call already up
+keeps the keys it negotiated. `SIP_SRTP` is the value a fresh deployment starts
+with, and `SRTP_STATE_FILE` — written on every change — is what a restart boots
+with. Without that file a restart would quietly restore encryption the carrier
+had already been told to stop expecting, and every call would be refused with
+`488` until somebody found out why.
 
 ## Pointing VoIP.ms at it
 

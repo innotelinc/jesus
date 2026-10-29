@@ -296,6 +296,23 @@ export class Gateway {
     };
   }
 
+  /**
+   * Encrypt carrier legs, or stop encrypting them, from now on.
+   *
+   * A call that is already up keeps the keys it negotiated — an SDP offer
+   * cannot be renegotiated halfway through a sentence — so what this changes is
+   * the next INVITE in either direction. The caller (the console) flips the
+   * carrier's sub-account setting too; a gateway that offers SAVP to a carrier
+   * that no longer expects it is refused with 488, and so is the reverse.
+   */
+  setSrtp(enabled) {
+    const next = !!enabled;
+    if (next === this.srtp) return this.srtp;
+    this.srtp = next;
+    this.log({ kind: 'srtp-changed', enabled: next });
+    return this.srtp;
+  }
+
   status() {
     return {
       ok: true,
@@ -309,6 +326,8 @@ export class Gateway {
       },
       sip: {
         server: `${this.trunk.host}:${this.trunk.port}`,
+        // What the next call will offer: RTP/SAVP with an SDES key when true.
+        srtp: this.srtp,
         registered: this.trunk.registered,
         expiresAt: this.trunk.registerExpiresAt || null,
         error: this.trunk.lastRegisterError || '',

@@ -10,6 +10,7 @@
  *
  *   node sip-probe.js --gateway 45.63.1.70:5060 --did 14132642700 --from 14134210134
  *   node sip-probe.js --gateway 127.0.0.1:5060 --did 14132642700 --ring 20 --no-audio
+ *   node sip-probe.js --gateway 45.63.1.70:5060 --did 14132642700 --srtp
  *
  * Exit status is 0 only when the call was answered (200 OK) and the ACK landed,
  * which is the answer to "does the DID actually ring a line?".
@@ -18,6 +19,8 @@
 import dgram from 'node:dgram';
 import { randomUUID } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
+
+import { SrtpContext, cryptoAttribute, newKeyMaterial, parseCryptoAttribute } from '../../apps/cantus-gateway/src/srtp.js';
 
 const CRLF = '\r\n';
 const args = process.argv.slice(2);
@@ -33,9 +36,18 @@ const did = flag('did', '').replace(/\D/g, '');
 const from = flag('from', '1000').replace(/\D/g, '');
 const ringSeconds = Number(flag('ring', '15'));
 const sendAudio = !has('no-audio');
+// A sub-account that only accepts `RTP/SAVP` refuses a plain offer with 488,
+// so the probe has to be able to make the encrypted offer the carrier makes.
+const secure = has('srtp');
+// Where to send audio instead of the address in the answer's `c=`. A probe on
+// the box has to use the gateway's container address: its SDP advertises the
+// public IP, which does not route back in from the Docker network.
+const mediaHost = flag('media-host', '');
 
 if (!did) {
-  console.error('usage: node sip-probe.js --gateway <host:port> --did <number> [--from <number>] [--ring 15] [--no-audio]');
+  console.error(
+    'usage: node sip-probe.js --gateway <host:port> --did <number> [--from <number>] [--ring 15] [--no-audio] [--srtp] [--media-host <addr>]'
+  );
   process.exit(2);
 }
 
@@ -96,7 +108,11 @@ const tone = () => {
   return frames;
 };
 
-const probe = { frame: 0, rtpPort: 0, remoteAudio: null, rtpPackets: 0, answered: false, rtpSocket: undefined };
+const probe = { frame: 0, rtpPort: 0, remoteAudio: null, rtpPackets: 0, authFailures: 0, answered: false, rtpSocket: undefined, out: null, in: null };
+
+// Our key goes in the offer; theirs comes back in the answer. One context per
+// direction, exactly as the gateway keys its own leg.
+const ourKeys = secure ? newKeyMaterial() : null;
 
 function headers() {
   return [
@@ -119,24 +135,32 @@ function sendInvite() {
     's=cantus-probe',
     `c=IN IP4 ${advertised}`,
     't=0 0',
-    `m=audio ${probe.rtpPort} RTP/AVP 0`,
+    `m=audio ${probe.rtpPort} RTP/${secure ? 'SAVP' : 'AVP'} 0`,
     'a=rtpmap:0 PCMU/8000',
     'a=ptime:20',
     'a=sendrecv',
+    ...(secure ? [`a=crypto:${cryptoAttribute(ourKeys)}`] : []),
     '',
   ].join(CRLF);
   const message = [`INVITE sip:${did}@${gatewayHost}:${gatewayPort} SIP/2.0`, ...headers().map(([k, v]) => `${k}: ${v}`)];
   message.push('Content-Type: application/sdp', `Content-Length: ${Buffer.byteLength(sdp)}`);
   const bytes = Buffer.from(message.join(CRLF) + CRLF + CRLF + sdp, 'utf8');
   socket.send(bytes, Number(gatewayPort), gatewayHost);
-  log(`INVITE sip:${did}@${gatewayHost}:${gatewayPort} (audio ${advertised}:${probe.rtpPort})`);
+  log(`INVITE sip:${did}@${gatewayHost}:${gatewayPort} (audio ${advertised}:${probe.rtpPort}${secure ? ', SRTP' : ''})`);
 }
 
 function answerSdp(body) {
-  const media = /m=audio\s+(\d+)\s+RTP\/AVP\s+([\d ]+)/.exec(String(body || ''));
-  const connection = /c=IN\s+IP4\s+([\d.]+)/.exec(String(body || ''));
+  const text = String(body || '');
+  const media = /m=audio\s+(\d+)\s+RTP\/(AVP|SAVP)\s+([\d ]+)/.exec(text);
+  const connection = /c=IN\s+IP4\s+([\d.]+)/.exec(text);
   if (!media) return null;
-  return { port: Number(media[1]), host: connection ? connection[1] : gatewayHost, pcmu: media[2].split(/\s+/).includes('0') };
+  return {
+    port: Number(media[1]),
+    host: mediaHost || (connection ? connection[1] : gatewayHost),
+    pcmu: media[3].split(/\s+/).includes('0'),
+    secure: media[2] === 'SAVP',
+    crypto: /^a=crypto:(.+)$/im.exec(text)?.[1]?.trim() || '',
+  };
 }
 
 function onResponse(message, rinfo) {
@@ -155,6 +179,16 @@ function onResponse(message, rinfo) {
     log('answered without an audio address; signalling only');
   } else {
     log(`answered; sending to ${probe.remoteAudio.host}:${probe.remoteAudio.port}`);
+  }
+  if (secure) {
+    const theirs = parseCryptoAttribute(probe.remoteAudio?.crypto);
+    if (!theirs) {
+      log(`answered without a usable a=crypto line (${probe.remoteAudio?.crypto || 'none'}) — media cannot be encrypted`);
+    } else {
+      probe.out = new SrtpContext(ourKeys);
+      probe.in = new SrtpContext(theirs);
+      log(`SRTP agreed: AES_CM_128_HMAC_SHA1_80, their tag ${theirs.tag}`);
+    }
   }
   sendAck(rinfo);
   startAudio();
@@ -177,8 +211,15 @@ function sendAck(rinfo) {
 function startAudio() {
   if (!sendAudio || !probe.remoteAudio) return;
   probe.rtpSocket = dgram.createSocket('udp4');
-  probe.rtpSocket.on('message', () => {
-    probe.rtpPackets += 1;
+  probe.rtpSocket.on('message', (buf) => {
+    if (!probe.in) {
+      probe.rtpPackets += 1;
+      return;
+    }
+    // An encrypted packet that fails its tag is not audio: counting it would
+    // report a working call when nothing decryptable arrived.
+    if (probe.in.unprotect(buf)) probe.rtpPackets += 1;
+    else probe.authFailures += 1;
   });
   // The port in the SDP is `probe.rtpPort`, so that is the port the gateway
   // sends to. Binding 0 instead gave the probe a socket on some other port and
@@ -195,7 +236,8 @@ function startAudio() {
       packet.writeUInt32BE(0xdeadbeef, 8); // SSRC
       tone().copy(packet, 12);
       seq.value += 1;
-      probe.rtpSocket.send(packet, probe.remoteAudio.port, probe.remoteAudio.host);
+      const outbound = probe.out ? probe.out.protect(packet) : packet;
+      probe.rtpSocket.send(outbound, probe.remoteAudio.port, probe.remoteAudio.host);
     }, 20);
     timer.unref?.();
     probe.audioTimer = timer;
@@ -217,7 +259,10 @@ function hangup() {
   socket.send(Buffer.from(message + CRLF + CRLF, 'utf8'), Number(gatewayPort), gatewayHost);
   log('BYE sent');
   setTimeout(() => {
-    log(`result: ${probe.answered ? 'answered' : 'not answered'}, ${probe.rtpPackets} RTP packets received`);
+    log(
+      `result: ${probe.answered ? 'answered' : 'not answered'}, ${probe.rtpPackets} RTP packets received` +
+        (probe.in ? `, ${probe.authFailures} failed authentication` : '')
+    );
     try {
       probe.rtpSocket?.close();
     } catch {

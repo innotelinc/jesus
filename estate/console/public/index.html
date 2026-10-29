@@ -175,6 +175,19 @@
 
     <div class="grid" style="gap:16px; min-width:0;">
       <section class="card">
+        <h2>Carrier encryption <span class="count" id="enc-count">—</span></h2>
+        <div class="body">
+          <div id="enc"></div>
+          <div class="dialer" style="margin-top:12px;">
+            <button class="primary" id="enc-toggle" disabled>reading…</button>
+          </div>
+          <p class="note">Both halves of the carrier leg, read live: the gateway's own SRTP setting
+          and the sub-account's encryption at VoIP.ms. The switch changes both; a mismatch is refused
+          with <span class="mono">488</span> in both directions.</p>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Lines <span class="count" id="line-count">0</span></h2>
         <div class="body" id="lines"></div>
       </section>
@@ -287,6 +300,67 @@ function render(data) {
   </div>`;
 }
 
+let encryptionState = null;
+
+function encryptionRow(name, encrypted, detail) {
+  const cls = encrypted === true ? 'online' : encrypted === false ? 'ended' : 'offline';
+  const label = encrypted === true ? 'encrypted' : encrypted === false ? 'plain rtp' : 'unknown';
+  return `<div style="display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid rgba(29,34,42,.7)">
+      <span class="mono" style="width:72px;color:var(--muted)">${esc(name)}</span>
+      <span class="state ${cls}">${label}</span>
+      <span class="mono" style="color:var(--dim);font-size:11.5px;margin-left:auto;text-align:right">${esc(detail)}</span>
+    </div>`;
+}
+
+function renderEncryption(data) {
+  encryptionState = data;
+  const g = data.gateway || {};
+  const c = data.carrier || {};
+  const sync = data.inSync;
+  $('enc-count').textContent = sync === null ? 'half seen' : sync ? 'in sync' : 'MISMATCH';
+
+  const checked = c.checkedAt ? new Date(c.checkedAt).toLocaleTimeString() : '';
+  const gatewayDetail = !g.configured
+    ? 'not configured'
+    : !g.reachable
+      ? g.error || 'unreachable'
+      : `${g.registered ? 'registered' : 'not registered'}${g.server ? ' · ' + g.server : ''}`;
+  const carrierDetail = !c.configured
+    ? 'API not configured'
+    : c.encryption === null
+      ? 'unreadable'
+      : `${c.subAccount || ''} · read ${checked}`;
+
+  const notes = [g.reachable === false ? `gateway: ${g.error}` : '', c.error || ''].filter(Boolean);
+
+  $('enc').innerHTML =
+    encryptionRow('gateway', g.srtp, gatewayDetail) +
+    encryptionRow('voip.ms', c.encryption, carrierDetail) +
+    (notes.length ? `<p class="note">${notes.map((n) => esc(n)).join('<br />')}</p>` : '');
+
+  const button = $('enc-toggle');
+  const known = g.srtp === true || g.srtp === false || c.encryption === true || c.encryption === false;
+  button.disabled = !known;
+  if (known) {
+    const target = !(g.srtp ?? c.encryption);
+    button.textContent = `Turn encryption ${target ? 'on' : 'off'}`;
+  } else {
+    button.textContent = 'reading…';
+  }
+}
+
+async function pollEncryption() {
+  try {
+    const response = await fetch('/api/encryption');
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || `console answered ${response.status}`);
+    renderEncryption(body);
+  } catch (error) {
+    $('enc').innerHTML = `<div class="err">${esc(error.message)}</div>`;
+  }
+  setTimeout(pollEncryption, 12000);
+}
+
 async function poll() {
   try {
     const response = await fetch('/api/estate');
@@ -303,7 +377,27 @@ document.addEventListener('click', async (event) => {
   const hangup = event.target.closest('[data-hangup]');
   const dtmf = event.target.closest('[data-dtmf]');
   const dial = event.target.closest('#dial');
+  const toggle = event.target.closest('#enc-toggle');
   try {
+    if (toggle) {
+      const g = encryptionState?.gateway || {};
+      const c = encryptionState?.carrier || {};
+      const enabled = !(g.srtp ?? c.encryption);
+      toggle.disabled = true;
+      const response = await fetch('/api/encryption', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || `console answered ${response.status}`);
+      const failed = [
+        body.carrier?.ok ? '' : `voip.ms: ${body.carrier?.error || 'not changed'}`,
+        body.gateway?.ok ? '' : `gateway: ${body.gateway?.error || 'not changed'}`,
+      ].filter(Boolean);
+      renderEncryption(body.state);
+      if (failed.length) $('error').innerHTML = `<div class="err">${failed.map((f) => esc(f)).join('<br />')}</div>`;
+      return;
+    }
     if (hangup) {
       await fetch(`/api/calls/${hangup.dataset.hangup}`, { method: 'DELETE' });
     } else if (dtmf) {
@@ -331,6 +425,7 @@ document.addEventListener('click', async (event) => {
 });
 
 poll();
+pollEncryption();
 </script>
 </body>
 </html>

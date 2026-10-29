@@ -15,12 +15,15 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+import * as voipms from './voipms.js';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
 const SWITCH_URL = (process.env.CANTUS_URL || 'http://cantus-switch:8088').replace(/\/$/, '');
 const CONTROL_TOKEN = process.env.CANTUS_CONTROL_TOKEN || '';
 const TELNO_URL = (process.env.TELNO_URL || '').replace(/\/$/, '');
 const CAPSTONE_URL = (process.env.CAPSTONE_URL || '').replace(/\/$/, '');
+const GATEWAY_URL = (process.env.GATEWAY_URL || '').replace(/\/$/, '');
 
 /**
  * A call tape: what finished, newest first, bounded.
@@ -93,6 +96,9 @@ async function estate() {
   record(events);
   const products = await Promise.all([
     probe('telno', TELNO_URL, '/healthz'),
+    // `/srtp` rather than `/healthz`: the health answer is 503 while the trunk
+    // is unregistered, and a gateway that is up with no carrier is not down.
+    probe('gateway', GATEWAY_URL, '/srtp'),
     probe('capstone', CAPSTONE_URL, '/api/health'),
   ]);
   return {
@@ -107,8 +113,116 @@ async function estate() {
   };
 }
 
+/**
+ * Encryption, as each side of the carrier leg sees it.
+ *
+ * The gateway's answer is a local HTTP call, so it is read fresh every time. The
+ * carrier's is an API call behind a rate limit and an IP allowlist, so it is
+ * cached for a few seconds: the console polls, and the console must not be the
+ * reason the account starts refusing requests.
+ */
+const CARRIER_TTL = 12_000;
+let carrierCache = { at: 0, value: null };
+
+async function carrierState(force = false) {
+  if (!force && carrierCache.value && Date.now() - carrierCache.at < CARRIER_TTL) return carrierCache.value;
+  const value = await voipms.state();
+  carrierCache = { at: Date.now(), value };
+  return value;
+}
+
+async function gatewayState() {
+  if (!GATEWAY_URL) {
+    return { configured: false, reachable: false, srtp: null, registered: false, server: '', error: 'GATEWAY_URL is empty' };
+  }
+  try {
+    const response = await fetch(`${GATEWAY_URL}/status`, { signal: AbortSignal.timeout(2500) });
+    if (!response.ok) throw new Error(`gateway answered ${response.status}`);
+    const body = await response.json();
+    const sip = body.sip || {};
+    return {
+      configured: true,
+      reachable: true,
+      srtp: sip.srtp === true,
+      registered: !!sip.registered,
+      server: sip.server || '',
+      expiresAt: sip.expiresAt || null,
+      error: sip.error || '',
+    };
+  } catch (error) {
+    return { configured: true, reachable: false, srtp: null, registered: false, server: '', error: error.message };
+  }
+}
+
+async function encryption({ refresh = false } = {}) {
+  const [gateway, carrier] = await Promise.all([gatewayState(), carrierState(refresh)]);
+  return {
+    at: new Date().toISOString(),
+    gateway,
+    carrier,
+    // Both known and disagreeing is the state that gets every call refused with
+    // 488 — one side offering encryption the other will not take. Showing them
+    // side by side is the point.
+    inSync: gateway.srtp === null || carrier.encryption === null ? null : gateway.srtp === carrier.encryption,
+  };
+}
+
+/**
+ * Change both sides. The carrier goes first: it is the half that can refuse our
+ * calls, so a failure there is reported before anything local is claimed to be
+ * in effect. Each half reports its own outcome — a carrier that cannot be
+ * reached must not stop the gateway from being switched for a local test.
+ */
+async function setEncryption(enabled) {
+  let carrier;
+  try {
+    if (!voipms.configured()) throw new Error('voip.ms API credentials are not set, so the sub-account was not touched');
+    await voipms.setEncryption(enabled);
+    carrier = { ok: true };
+  } catch (error) {
+    carrier = { ok: false, error: error.message };
+  }
+
+  // A carrier that is configured and did not take the change is the one case
+  // where our side must not move: if its sub-account still demands encryption
+  // and we stop offering it, every call is refused with 488 until somebody
+  // notices. Unconfigured is different — that is a local test, and the card
+  // says which half is real.
+  if (!carrier.ok && voipms.configured()) {
+    return {
+      requested: enabled,
+      carrier,
+      gateway: { ok: false, skipped: true, error: 'not changed, because the carrier was not changed' },
+      state: await encryption({ refresh: true }),
+    };
+  }
+
+  let gateway;
+  try {
+    if (!GATEWAY_URL) throw new Error('GATEWAY_URL is empty');
+    const response = await fetch(`${GATEWAY_URL}/srtp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+      signal: AbortSignal.timeout(2500),
+    });
+    const body = await response.json().catch(() => ({}));
+    gateway = response.ok ? { ok: body.enabled === enabled, enabled: body.enabled } : { ok: false, error: body.error || `gateway answered ${response.status}` };
+  } catch (error) {
+    gateway = { ok: false, error: error.message };
+  }
+
+  return { requested: enabled, carrier, gateway, state: await encryption({ refresh: true }) };
+}
+
 const routes = [
   ['GET', /^\/api\/estate$/, async () => estate()],
+  ['GET', /^\/api\/encryption$/, async () => encryption()],
+  ['POST', /^\/api\/encryption$/, async (request) => {
+    const body = await json(request);
+    if (typeof body?.enabled !== 'boolean') throw Object.assign(new Error('enabled must be true or false'), { status: 400 });
+    return setEncryption(body.enabled);
+  }],
   ['POST', /^\/api\/calls$/, async (request) => {
     const body = await json(request);
     if (!body?.to) throw Object.assign(new Error('to is required'), { status: 400 });
