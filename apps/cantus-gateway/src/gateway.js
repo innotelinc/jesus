@@ -16,11 +16,76 @@
  * gateway that queues audio is a gateway that adds delay to every call.
  */
 
-import { RtpSession } from './rtp.js';
+import { RtpSession, DTMF } from './rtp.js';
 import { buildSdp } from './sip.js';
 import { SrtpContext, cryptoAttribute, newKeyMaterial, parseCryptoAttribute } from './srtp.js';
 
 const SILENCE = Buffer.alloc(320);
+
+/**
+ * Cantus reason code → the SIP status a carrier understands.
+ *
+ * A refusal is not just a refusal: a carrier routes `486 Busy Here` to
+ * voicemail or call-forward-busy and treats `480 Temporarily Unavailable` as
+ * "try the next branch". Sending 480 for everything threw that information
+ * away at the border, so a switch that knew exactly why it declined a call
+ * told the PSTN nothing.
+ */
+const SIP_BY_REASON = {
+  UNSPECIFIED: [480, 'Temporarily Unavailable'],
+  BUSY: [486, 'Busy Here'],
+  NOT_FOUND: [404, 'Not Found'],
+  REJECTED: [403, 'Forbidden'],
+  UNAVAILABLE: [480, 'Temporarily Unavailable'],
+  TIMEOUT: [408, 'Request Timeout'],
+  NO_CAPABILITY: [488, 'Not Acceptable Here'],
+  NOT_REACHABLE: [503, 'Service Unavailable'],
+  BAD_REQUEST: [400, 'Bad Request'],
+  GLARE: [491, 'Request Pending'],
+  AUTH_FAILED: [403, 'Forbidden'],
+  // Capacity is what a carrier understands as busy; a 503 would take the
+  // trunk out of rotation instead of trying the next number.
+  LIMIT: [486, 'Busy Here'],
+  CANCELLED: [487, 'Request Terminated'],
+  NORMAL: [200, 'OK'],
+  TRANSPORT_ERROR: [503, 'Service Unavailable'],
+  PATH_FAILED: [503, 'Service Unavailable'],
+};
+
+export const sipStatusFor = (reason) => SIP_BY_REASON[String(reason || '').toUpperCase()] || SIP_BY_REASON.UNSPECIFIED;
+
+/** SIP status → the Cantus reason the switch records. */
+const REASON_BY_STATUS = new Map([
+  [400, 'BAD_REQUEST'],
+  [401, 'AUTH_FAILED'],
+  [403, 'REJECTED'],
+  [404, 'NOT_FOUND'],
+  [407, 'AUTH_FAILED'],
+  [408, 'TIMEOUT'],
+  [480, 'UNAVAILABLE'],
+  [486, 'BUSY'],
+  [487, 'CANCELLED'],
+  [488, 'NO_CAPABILITY'],
+  [491, 'GLARE'],
+  [503, 'UNAVAILABLE'],
+  [600, 'BUSY'],
+  [603, 'REJECTED'],
+  [606, 'NO_CAPABILITY'],
+]);
+
+/**
+ * The switch's reason for a call the carrier refused.
+ *
+ * `reason` arrives as `'486 Busy Here'` or `'timeout'`; the status is the only
+ * part that is safe to parse, because the phrase after it is the carrier's own
+ * wording and no two carriers agree on it.
+ */
+export const cantusReasonFor = (failure) => {
+  const text = String(failure ?? '').trim();
+  if (!text || text === 'timeout') return 'TIMEOUT';
+  const status = Number(/^(\d{3})/.exec(text)?.[1]);
+  return REASON_BY_STATUS.get(status) || 'REJECTED';
+};
 
 /** The first component of a Cantus address: `14155550100@trunk@gw`. */
 export const dialledNumber = (address) => {
@@ -111,9 +176,17 @@ export class Gateway {
     if (event.kind === 'rejected') {
       this.counters.failed += 1;
       if (leg.sipCall && !leg.sipCall.answered) {
-        this.trunk.reject(leg.sipCall, 480, 'Temporarily Unavailable');
+        const [status, phrase] = sipStatusFor(event.reason);
+        this.trunk.reject(leg.sipCall, status, phrase);
       }
       this.dropLeg(leg);
+      return;
+    }
+    if (event.kind === 'dtmf') {
+      // A keypress arrived from the switch (a console pressing a digit, or an
+      // IVR on the Cantus side prompting a PSTN caller). The carrier only
+      // understands an RTP event, so the digit is carried across as one.
+      leg.rtp?.sendDtmf(event.digit);
       return;
     }
     if (event.kind === 'ended') {
@@ -194,6 +267,9 @@ export class Gateway {
 
     const rtp = new RtpSession({
       port: this.nextRtpPort(),
+      // The carrier names its own event payload type in the offer. Guessing
+      // 101 is how a keypress ends up decoded as one frame of silence.
+      dtmfType: audio.dtmfType || DTMF,
       onError: (err) => this.log({ kind: 'rtp-error', call: call.callId, error: err.message }),
     });
     await rtp.start();
@@ -210,11 +286,20 @@ export class Gateway {
       return;
     }
 
+    // The carrier's keypresses become Cantus `INFO event=dtmf`, which is what
+    // the switch's IVR routes and DTMF events already listen for.
+    rtp.onDtmf = (digit) => {
+      const session = this.endpoint.sessions.get(sessionId);
+      if (session) this.endpoint.sendDtmf(session, digit);
+      this.log({ kind: 'dtmf-in', call: sessionId, digit });
+    };
+
     const leg = {
       sessionId,
       sipCall: call,
       rtp,
-      offer: buildSdp({ address: this.address, port: rtp.port, crypto }),
+      // Answer only with an event type the carrier actually offered.
+      offer: buildSdp({ address: this.address, port: rtp.port, crypto, dtmf: audio.dtmfType || 0 }),
       direction: 'inbound',
       srtp,
     };
@@ -270,6 +355,8 @@ export class Gateway {
         return;
       }
       rtp.to(audio.host, audio.port);
+      // The answered stream may name a different payload type than we offered.
+      rtp.dtmfType = audio.dtmfType || rtp.dtmfType;
       if (ours) {
         const remote = parseCryptoAttribute(audio.crypto);
         if (remote) {
@@ -291,7 +378,11 @@ export class Gateway {
       // the switch and nothing anywhere says whether it was a wrong number, a
       // caller ID the trunk is not allowed to present, or a blocked account.
       this.log({ kind: 'call-out-failed', call: session.call, number, reason });
-      this.endpoint.reject(session, reason === 'timeout' ? 'TIMEOUT' : 'REJECTED');
+      // `491` means the carrier already has a dialog for this call, `404` that
+      // the number does not exist. Both are causes the switch can act on, and
+      // flattening them into REJECTED is how a wrong number and a glare start
+      // to look like the same outage.
+      this.endpoint.reject(session, cantusReasonFor(reason));
       this.dropLeg(leg);
     };
   }
