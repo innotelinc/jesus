@@ -60,9 +60,24 @@ const full = (reason) => {
 };
 const git = (...args) =>
   execFileSync("git", args, { encoding: "utf8" }).trimEnd();
+// This script runs inside the project directory, which is the repository root
+// upstream and one directory inside a larger tree here. Git answers every path
+// question from the repository root, so ask once where the project starts and
+// translate what comes back: without this, no pattern below matches and a push
+// that only touches the project selects no lanes at all.
+const projectPrefix = execFileSync("git", ["rev-parse", "--show-prefix"], {
+  encoding: "utf8",
+}).trim();
+const projectPath = (file) =>
+  projectPrefix === ""
+    ? file
+    : file.startsWith(projectPrefix)
+      ? file.slice(projectPrefix.length)
+      : null;
+const revisionPath = (revision, file) => `${revision}:${projectPrefix}${file}`;
 function classifyPackage(base, head) {
-  const before = JSON.parse(git("show", `${base}:package.json`));
-  const after = JSON.parse(git("show", `${head}:package.json`));
+  const before = JSON.parse(git("show", revisionPath(base, "package.json")));
+  const after = JSON.parse(git("show", revisionPath(head, "package.json")));
   const { scripts: beforeScripts, ...beforeRest } = before;
   const { scripts: afterScripts, ...afterRest } = after;
   const compilerDependencies = (metadata) => ({
@@ -202,9 +217,17 @@ if (tier === "reused") {
   }
   if (base) {
     // Disable rename detection so both the removed and added paths participate.
-    files = git("diff", "--name-only", "--no-renames", "-z", base, head)
+    const changed = git("diff", "--name-only", "--no-renames", "-z", base, head)
       .split("\0")
       .filter(Boolean);
+    files = changed.map(projectPath).filter((file) => file !== null);
+    // A push can touch the rest of the tree in the same commit. Those paths
+    // say nothing about this project, but say so rather than dropping them
+    // silently when the selection looks unexpectedly empty.
+    if (changed.length !== files.length)
+      reasons.push(
+        `Ignored ${changed.length - files.length} path(s) outside the project directory`,
+      );
     for (const file of files) {
       if (matchesAny(file, SCOPES.reverse_tools)) selected.reverse_tools = true;
       if (

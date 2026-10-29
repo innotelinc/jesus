@@ -222,8 +222,9 @@ jobs:
   static-deep:
     name: Deep static checks
     needs: changes
-    # Full qualification only. Provider lanes wait on fast static, not this job.
-    if: needs.changes.outputs.tier == 'full' && needs.changes.outputs.code == 'true'
+    # Code changes need the deep checks on a push as well; provider lanes wait
+    # on fast static, not on this job.
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
