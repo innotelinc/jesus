@@ -192,6 +192,12 @@ not effective fails exactly like one that was never installed. It refuses to clo
 `core.hooksPath` without `--force`, since that would silently drop someone else's hooks. Under CI
 the generator skips all of this: a CI checkout never commits.
 
+CI checks the guard itself. [githooks.yml](.github/workflows/githooks.yml) fails the build when
+either script loses its committed executable bit or its LF endings, when `.gitattributes` stops
+covering them, or when the installer stops configuring a repository: it unpacks the committed
+guard into a scratch repo, installs, and then tries both the commits that must be blocked and the
+ones that must not.
+
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
 
