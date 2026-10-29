@@ -77,10 +77,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Both modules are pytest-style functions, not unittest TestCase classes,
-      # and a bare runner image has no pytest: under `unittest discover` they
-      # failed on `import pytest` at collection time, and with pytest merely
-      # installed it would collect none of them and report "Ran 0 tests OK".
+      # monorepo-port: the tests need a runner this job never installed. Both
+      # modules are pytest-style functions, not unittest TestCase classes, and a
+      # bare runner image has no pytest: under `unittest discover` they failed
+      # on `import pytest` at collection time, and with pytest merely installed
+      # it would collect none of them and report "Ran 0 tests OK".
+      # A re-import from upstream drops these two steps; tools/port-workflows.pl
+      # checks for this marker and fails when it is gone.
       - name: Install the test runner
         run: python3 -m pip install --quiet pytest
 
