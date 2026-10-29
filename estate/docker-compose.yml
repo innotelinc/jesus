@@ -1,0 +1,189 @@
+# The estate: one switch, the products that live on it, and one console.
+#
+#   switch     Cantus 1.0. Signalling plus media on one UDP port, control API,
+#              ARI-compatible surface and the browser softphone socket on one
+#              HTTP port. No SIP port, no RTP range, no AMI, no MariaDB.
+#   telno      the platform: sign-up, numbers, routing document, recordings.
+#   console    the estate console: what the switch is doing right now, what is
+#              routed where, and the one button that places a call through it.
+#
+# `docker compose up -d` from this directory is the whole demo. Capstone is a
+# separate, much larger stack (dograh + interviews + dashboards); it joins this
+# switch instead of running its own — see README.md → "Adding Capstone".
+#
+# Ports are published on the host, so nothing here depends on a reverse proxy:
+#   http://localhost:8000   console
+#   http://localhost:8188   switch control API + /ari + /ws/line
+#
+# 8088 is the switch's own port inside the network; 8188 is the host mapping so
+# the demo does not fight a telno or capstone checkout already using 8088.
+#   udp  7443 / 7444        Cantus signalling + relay
+
+name: cantus-estate
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  switch:
+    build:
+      context: ../apps/cantus-switch
+    image: cantus-switch:${CANTUS_TAG:-local}
+    container_name: estate-switch
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      CANTUS_ID: ${CANTUS_ID:-switch@estate.local}
+      CANTUS_SECRET: ${CANTUS_SECRET:?set CANTUS_SECRET — every Cantus node shares this signing secret}
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?set CANTUS_CONTROL_TOKEN — the console and telno authenticate with it}
+      # The routing document and the line inventory this demo starts from.
+      # telno replaces both through the control API the first time it provisions.
+      CANTUS_ROUTES_FILE: /etc/cantus/routes.json
+      CANTUS_LINES_FILE: /etc/cantus/lines.json
+      CANTUS_RECORD_DIR: /data/recordings
+      CANTUS_PROMPTS: /data/prompts
+      CANTUS_BIND: 0.0.0.0:7443
+      CANTUS_RELAY_BIND: 0.0.0.0:7444
+      CANTUS_ADVERTISE: ${CANTUS_ADVERTISE:-}
+      CANTUS_RELAY_ADVERTISE: ${CANTUS_RELAY_ADVERTISE:-}
+      CANTUS_HTTP_PORT: "8088"
+      # dograh dials ARI as this user; the same credentials go in its telephony
+      # configuration (or ansible/group_vars/all.yml in the Capstone checkout).
+      CANTUS_ARI_USER: ${CANTUS_ARI_USER:-dograh}
+      CANTUS_ARI_PASSWORD: ${CANTUS_ARI_PASSWORD:-dograh}
+      CANTUS_ARI_APP: ${CANTUS_ARI_APP:-dograh}
+      CANTUS_DEBUG: ${CANTUS_DEBUG:-}
+    volumes:
+      - ./switch:/etc/cantus:ro
+      - switch-data:/data
+    ports:
+      - "${SWITCH_PORT:-8188}:8088"
+      - "${CANTUS_SIGNAL_PORT:-7443}:7443/udp"
+      - "${CANTUS_RELAY_PORT:-7444}:7444/udp"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8088/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # The PSTN boundary. The only process in the estate that speaks SIP, and the
+  # only one with a port range to open: Cantus needs one socket, a carrier needs
+  # 5060 and RTP.
+  #
+  # It runs without credentials too, and says so on /healthz — a gateway that
+  # refuses to boot would take the whole demo down with it, while one that boots
+  # unregistered just has no trunk yet.
+  gateway:
+    build:
+      # Both apps: the gateway imports the switch's Cantus modules rather than
+      # keeping a second implementation of the wire format in the repo.
+      context: ..
+      dockerfile: apps/cantus-gateway/Dockerfile
+    image: cantus-gateway:${CANTUS_TAG:-local}
+    container_name: estate-gateway
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      # Must equal the trunk's endpoint (`name@host`) so the switch can dial it.
+      CANTUS_ID: ${GATEWAY_CANTUS_ID:-voipms@gateway}
+      CANTUS_SECRET: ${CANTUS_SECRET:?set CANTUS_SECRET}
+      CANTUS_RELAY: switch:7444
+      CANTUS_SWITCH: ${CANTUS_ID:-switch@estate.local}
+      CANTUS_BIND: 0.0.0.0:7453
+      # The carrier half. Empty SIP_HOST is a boot the gateway refuses; empty
+      # username is a trunk that never registers, which /healthz reports.
+      SIP_HOST: ${VOIPMS_SIP_HOST:-}
+      SIP_PORT: ${VOIPMS_SIP_PORT:-5060}
+      SIP_USERNAME: ${VOIPMS_SIP_USERNAME:-}
+      SIP_PASSWORD: ${VOIPMS_SIP_PASSWORD:-}
+      # Presented as the caller on outbound calls. The trunk's DID, so the far
+      # end sees a number instead of a sub-account login.
+      SIP_FROM_USER: ${VOIPMS_SIP_FROM_USER:-}
+      SIP_DOMAIN: ${VOIPMS_SIP_DOMAIN:-}
+      # What goes in Contact and SDP: the address the carrier must send to.
+      SIP_ADVERTISE: ${PUBLIC_IP:-}
+      SIP_LOCAL_PORT: "5060"
+      GATEWAY_RTP_START: ${GATEWAY_RTP_START:-40000}
+      GATEWAY_RTP_END: ${GATEWAY_RTP_END:-40063}
+      GATEWAY_HTTP_PORT: "7454"
+    ports:
+      - "5060:5060/udp"
+      - "${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}:${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}/udp"
+      - "7454:7454"
+    depends_on:
+      - switch
+
+  telno:
+    build:
+      context: ../apps/telno
+    image: telno:${CANTUS_TAG:-local}
+    container_name: estate-telno
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8090}
+      DATA_DIR: /data
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      CANTUS_CONFIG_DIR: /data/cantus
+      CANTUS_RECORD_DIR: /data/recordings
+      DEFAULT_COUNTRY: ${DEFAULT_COUNTRY:-US}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@estate.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SOFTPHONE_ENABLED: "true"
+      # Demo default: no SMTP, no Stripe, no voip.ms. The console says which
+      # features are off instead of offering dead buttons.
+      NOTIFY_CHANNEL: console
+      PAYMENTS_ENABLED: "false"
+      BACKUP_ENABLED: "true"
+      ALLOW_INSECURE_PUBLIC_URL: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - telno-data:/data
+    ports:
+      - "${TELNO_PORT:-8090}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  console:
+    build:
+      context: ./console
+    image: cantus-console:${CANTUS_TAG:-local}
+    container_name: estate-console
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      TELNO_URL: http://telno:8080
+      # Point this at a Capstone stack to light up its pill; empty means the
+      # console simply reports it as not configured.
+      CAPSTONE_URL: ${CAPSTONE_URL:-}
+    ports:
+      - "${ESTATE_PORT:-8000}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  switch-data:
+  telno-data:
