@@ -12,11 +12,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 
-import { paramsFor, readEncryption, state } from '../voipms.js';
+import { matches, paramsFor, readEncryption, state } from '../voipms.js';
 
+// The shape the live API answers with: `username` is the bare name, `account`
+// the prefixed one, and `id` is what a write has to carry.
 const subAccount = {
   id: '10236',
-  username: '235662_telno',
+  username: 'telno',
+  account: '235662_telno',
   description: 'Telno demo line',
   auth_type: '1',
   device_type: '1',
@@ -42,6 +45,16 @@ test('the encryption flag is read from the field the API actually uses', () => {
   assert.equal(readEncryption({ sip_traffic: 'maybe' }), null);
 });
 
+test('a sub-account is found by either name the API and the credentials use', () => {
+  // Configured as the SIP credentials spell it, and as the portal spells it.
+  assert.equal(matches(subAccount, '235662_telno'), true);
+  assert.equal(matches(subAccount, 'telno'), true);
+  assert.equal(matches(subAccount, '235662_TELNO'), true);
+  assert.equal(matches(subAccount, '10236'), true, 'the record id identifies it too');
+  assert.equal(matches(subAccount, 'ia x'), false);
+  assert.equal(matches(subAccount, ''), false);
+});
+
 test('a change sends the whole sub-account, with the flag overridden', () => {
   const params = paramsFor(subAccount, true);
   assert.equal(params.sip_traffic, '1');
@@ -50,6 +63,7 @@ test('a change sends the whole sub-account, with the flag overridden', () => {
   assert.equal(params.dtmf_mode, '1');
   assert.equal(params.username, undefined, 'read-only fields are not sent back');
   assert.equal(params.status, undefined);
+  assert.equal(params.account, '235662_telno', 'the prefixed name is not read-only');
 
   assert.equal(paramsFor(subAccount, false).sip_traffic, '0');
 });
@@ -98,14 +112,51 @@ test('a change reads the sub-account, writes one flag, and reads it back', async
   const mod = await import('../voipms.js?roundtrip');
 
   assert.equal((await mod.state()).encryption, false);
-  const after = await mod.setEncryption(true);
+  const { record: after, ms } = await mod.setEncryption(true);
   assert.equal(readEncryption(after), true, 'the answer is the carrier\'s record, not our request');
+  assert.equal(typeof ms, 'number', 'how long the carrier took is reported, not guessed');
 
   const set = seen.find((call) => call.method === 'setSubAccount');
   assert.equal(set.params.sip_traffic, '1');
   assert.equal(set.params.id, '10236');
   assert.equal(set.params.allowed_codecs, 'ulaw');
   assert.equal(set.params.username, undefined);
+});
+
+test('a write gets the write budget, not the read one', async (t) => {
+  // The carrier takes seconds to apply a sub-account change. A read-sized
+  // deadline reports a timeout for a change that actually landed, so the two
+  // halves are left disagreeing and nothing says so.
+  let encryption = '1';
+  const fake = createServer((request, response) => {
+    const url = new URL(request.url, 'http://127.0.0.1');
+    const method = url.searchParams.get('method');
+    const reply = () => {
+      response.setHeader('content-type', 'application/json');
+      if (method === 'getSubAccounts') {
+        response.end(JSON.stringify({ status: 'success', accounts: [{ ...subAccount, sip_traffic: encryption }] }));
+        return;
+      }
+      encryption = url.searchParams.get('sip_traffic');
+      response.end(JSON.stringify({ status: 'success' }));
+    };
+    // Reads answer at once; the write sits there for longer than a read may.
+    if (method === 'setSubAccount') setTimeout(reply, 400);
+    else reply();
+  });
+  await new Promise((resolve) => fake.listen(0, '127.0.0.1', resolve));
+  t.after(() => fake.close());
+
+  process.env.VOIPMS_API_USERNAME = 'demo@example.com';
+  process.env.VOIPMS_API_PASSWORD = 'api-password';
+  process.env.VOIPMS_SUB_ACCOUNT = '235662_telno';
+  process.env.VOIPMS_API_URL = `http://127.0.0.1:${fake.address().port}/rest.php`;
+  process.env.VOIPMS_READ_TIMEOUT_MS = '150';
+  process.env.VOIPMS_WRITE_TIMEOUT_MS = '5000';
+  const mod = await import('../voipms.js?slowwrite');
+
+  const { record: after } = await mod.setEncryption(false);
+  assert.equal(readEncryption(after), false, 'the slow write landed and was read back');
 });
 
 test('state() reports a failure instead of throwing at the console', async () => {

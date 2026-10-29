@@ -204,6 +204,15 @@ curl -s -XPOST http://<ip>:8000/api/encryption \
 The answer says what each half did, separately: a carrier that cannot be reached
 does not stop the gateway from being switched for a local test.
 
+A flip is not instant, and that is the carrier's doing: `setSubAccount` sends the
+whole record back and has taken anywhere from 14 to 39 seconds to answer. So the
+write gets its own deadline (`VOIPMS_WRITE_TIMEOUT_MS`, 90 s) instead of the
+read one (`VOIPMS_READ_TIMEOUT_MS`, 15 s) — a read-sized deadline reports a
+timeout for a change that actually landed, which is worse than waiting — and the
+answer carries `carrier.ms` so the card can say *applied in 32s* rather than
+looking hung. In the browser the button sits at *applying at voip.ms…* for the
+duration instead of inviting a second click.
+
 Prerequisites for the carrier half — the API is not the SIP password:
 
 1. VoIP.ms portal → **Main Menu → SOAP and REST/JSON API**: generate an API
@@ -217,6 +226,11 @@ and the carrier line reads *API not configured*. The sub-account is read with
 `getSubAccounts`, matched by `VOIPMS_SIP_USERNAME`, and written with
 `setSubAccount` — the whole record, with `sip_traffic` overridden, because that
 method is not a patch and rejects a call that leaves required fields out.
+
+Matching takes both names on purpose: the API answers `username: "telno"` with
+`account: "235662_telno"`, while the SIP credentials are spelled with the
+prefix. Comparing only one of them is how the card once reported "not in the
+account" for an account it was looking straight at.
 
 What the gateway remembers lives on the host (`estate/state/gateway/srtp.json`,
 runs as uid 65534), so a rebuild of the container does not silently restore

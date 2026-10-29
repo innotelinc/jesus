@@ -41,7 +41,19 @@ export const configured = () => Boolean(API_USER && API_PASSWORD && SUB_ACCOUNT)
 
 export const subAccount = () => SUB_ACCOUNT;
 
-async function call(method, params = {}) {
+/**
+ * How long to wait for the carrier.
+ *
+ * Reading is quick (about a second, occasionally a few). Writing is not:
+ * `setSubAccount` sends the whole record back and the carrier has taken forty
+ * seconds to answer — long enough that a read-sized deadline reports a timeout
+ * for a change that actually landed, leaving the two halves disagreeing and the
+ * operator told nothing happened.
+ */
+const READ_TIMEOUT_MS = Number(process.env.VOIPMS_READ_TIMEOUT_MS || 15000);
+const WRITE_TIMEOUT_MS = Number(process.env.VOIPMS_WRITE_TIMEOUT_MS || 90000);
+
+async function call(method, params = {}, { timeoutMs = READ_TIMEOUT_MS } = {}) {
   if (!configured()) throw new Error('VOIPMS_API_USERNAME, VOIPMS_API_PASSWORD and VOIPMS_SUB_ACCOUNT are not all set');
   const url = new URL(BASE);
   url.searchParams.set('api_username', API_USER);
@@ -51,7 +63,7 @@ async function call(method, params = {}) {
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
   }
-  const response = await fetch(url, { signal: AbortSignal.timeout(9000) });
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   const text = await response.text();
   let body;
   try {
@@ -72,14 +84,36 @@ async function call(method, params = {}) {
   return body;
 }
 
+/**
+ * Does this record answer to the configured name?
+ *
+ * `getSubAccounts` returns `username` as the bare name (`telno`) and `account`
+ * as the prefixed one (`235662_telno`), while a deployment may be configured
+ * with either — the SIP credentials use the prefixed form. Comparing only one
+ * of them is how the console reported "not in the account" for an account it
+ * was looking straight at.
+ */
+export function matches(entry, wanted) {
+  const target = String(wanted || '').toLowerCase();
+  if (!target) return false;
+  const bare = target.replace(/^\d+_/, '');
+  const names = [entry.username, entry.account, entry.id]
+    .map((value) => String(value ?? '').toLowerCase())
+    .filter(Boolean);
+  return names.includes(target) || names.includes(bare);
+}
+
 /** The sub-account as the carrier currently holds it, or a reason we cannot see it. */
 export async function getSubAccount() {
   const body = await call('getSubAccounts');
   const list = body.sub_accounts || body.subaccounts || body.accounts || [];
   if (!Array.isArray(list) || !list.length) throw new Error('voip.ms returned no sub-accounts');
-  const match = list.find((entry) => String(entry.username || '').toLowerCase() === SUB_ACCOUNT.toLowerCase());
+  const match = list.find((entry) => matches(entry, SUB_ACCOUNT));
   if (!match) {
-    const known = list.map((entry) => entry.username).filter(Boolean).join(', ');
+    const known = list
+      .map((entry) => entry.account || entry.username)
+      .filter(Boolean)
+      .join(', ');
     throw new Error(`sub-account ${SUB_ACCOUNT} is not in the account (it has: ${known || 'none'})`);
   }
   // The API has returned a one-element list in both shapes over time.
@@ -121,8 +155,11 @@ export function paramsFor(record, encryption) {
 /** Set the carrier's side of it and read the record back, so the answer is the carrier's. */
 export async function setEncryption(enabled) {
   const record = await getSubAccount();
-  await call('setSubAccount', paramsFor(record, enabled));
-  return getSubAccount();
+  const startedAt = Date.now();
+  await call('setSubAccount', paramsFor(record, enabled), { timeoutMs: WRITE_TIMEOUT_MS });
+  const applied = await getSubAccount();
+  // How long the carrier took is the one number that explains a slow switch.
+  return { record: applied, ms: Date.now() - startedAt };
 }
 
 /**
@@ -147,7 +184,7 @@ export async function state() {
     const encryption = readEncryption(record);
     return {
       configured: true,
-      subAccount: record.username || SUB_ACCOUNT,
+      subAccount: record.account || record.username || SUB_ACCOUNT,
       encryption,
       checkedAt: new Date().toISOString(),
       error: encryption === null ? 'the sub-account record has no encryption flag this console recognises' : '',

@@ -301,6 +301,12 @@ function render(data) {
 }
 
 let encryptionState = null;
+// The carrier takes tens of seconds to apply a sub-account change, so the switch
+// has to stay visibly busy instead of looking dead and being clicked again.
+let toggling = false;
+// How long the last switch took at the carrier, so a slow one does not read as
+// a hung one.
+let lastAppliedMs = 0;
 
 function encryptionRow(name, encrypted, detail) {
   const cls = encrypted === true ? 'online' : encrypted === false ? 'ended' : 'offline';
@@ -329,7 +335,7 @@ function renderEncryption(data) {
     ? 'API not configured'
     : c.encryption === null
       ? 'unreadable'
-      : `${c.subAccount || ''} · read ${checked}`;
+      : `${c.subAccount || ''} · read ${checked}${lastAppliedMs ? ` · applied in ${Math.round(lastAppliedMs / 1000)}s` : ''}`;
 
   const notes = [g.reachable === false ? `gateway: ${g.error}` : '', c.error || ''].filter(Boolean);
 
@@ -339,6 +345,11 @@ function renderEncryption(data) {
     (notes.length ? `<p class="note">${notes.map((n) => esc(n)).join('<br />')}</p>` : '');
 
   const button = $('enc-toggle');
+  if (toggling) {
+    button.disabled = true;
+    button.textContent = 'applying at voip.ms…';
+    return;
+  }
   const known = g.srtp === true || g.srtp === false || c.encryption === true || c.encryption === false;
   button.disabled = !known;
   if (known) {
@@ -383,17 +394,20 @@ document.addEventListener('click', async (event) => {
       const g = encryptionState?.gateway || {};
       const c = encryptionState?.carrier || {};
       const enabled = !(g.srtp ?? c.encryption);
-      toggle.disabled = true;
+      toggling = true;
+      renderEncryption(encryptionState);
       const response = await fetch('/api/encryption', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ enabled }),
       });
       const body = await response.json();
+      toggling = false;
       if (!response.ok) throw new Error(body.error || `console answered ${response.status}`);
       const failed = [
         body.carrier?.ok ? '' : `voip.ms: ${body.carrier?.error || 'not changed'}`,
         body.gateway?.ok ? '' : `gateway: ${body.gateway?.error || 'not changed'}`,
       ].filter(Boolean);
+      lastAppliedMs = body.carrier?.ok ? body.carrier.ms || 0 : 0;
       renderEncryption(body.state);
       if (failed.length) $('error').innerHTML = `<div class="err">${failed.map((f) => esc(f)).join('<br />')}</div>`;
       return;
