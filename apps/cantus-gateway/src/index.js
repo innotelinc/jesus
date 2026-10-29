@@ -10,6 +10,8 @@
  */
 
 import { createServer } from 'node:http';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { networkInterfaces } from 'node:os';
 
 import { CantusEndpoint } from '../../cantus-switch/src/endpoint.js';
@@ -44,6 +46,37 @@ const log = (entry) => {
 const domain = arg('CANTUS_DOMAIN', 'estate.local');
 const statusPort = num('GATEWAY_HTTP_PORT', 7454);
 const advertise = arg('SIP_ADVERTISE', '') || firstPublicAddress();
+
+/**
+ * Where the operator's choice of encryption is remembered.
+ *
+ * `SIP_SRTP` in the environment is the value a deployment starts with. Once
+ * somebody flips the switch from the console, that choice is written here and
+ * wins on the next boot — otherwise a restart would quietly restore encryption
+ * the carrier has already been told to stop expecting, and every call would be
+ * refused with 488 until somebody noticed why.
+ */
+const srtpStateFile = arg('SRTP_STATE_FILE', '');
+
+function storedSrtp() {
+  if (!srtpStateFile) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(srtpStateFile, 'utf8'));
+    return typeof parsed?.srtp === 'boolean' ? parsed.srtp : null;
+  } catch {
+    return null; // absent or unreadable is "no opinion", not an error
+  }
+}
+
+function rememberSrtp(enabled) {
+  if (!srtpStateFile) return;
+  try {
+    mkdirSync(dirname(srtpStateFile), { recursive: true });
+    writeFileSync(srtpStateFile, `${JSON.stringify({ srtp: enabled, at: new Date().toISOString() })}\n`);
+  } catch (err) {
+    log({ kind: 'srtp-state-unwritable', file: srtpStateFile, detail: err.message });
+  }
+}
 
 const endpoint = new CantusEndpoint({
   id: arg('CANTUS_ID', `voipms@gateway`),
@@ -95,6 +128,22 @@ const trunk = carrierHost
     })
   : TRUNK_STUB;
 
+/** A tiny body reader: the status port takes one small JSON object and nothing else. */
+function readJson(request) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => {
+      try {
+        resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    request.on('error', () => resolve({}));
+  });
+}
+
 let gateway;
 
 async function main() {
@@ -118,8 +167,10 @@ async function main() {
     advertise,
     carrier: !!trunk.host,
     // SIP_SRTP=on offers and answers RTP/SAVP with an SDES key. Off is plain
-    // RTP; a sub-account that requires encryption refuses that with 488.
-    srtp: /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', '')),
+    // RTP; a sub-account that requires encryption refuses that with 488. A
+    // value set from the console wins over the environment, because the
+    // carrier's own setting was changed to match it.
+    srtp: storedSrtp() ?? /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', '')),
     rtpStart: num('GATEWAY_RTP_START', 40000),
     rtpEnd: num('GATEWAY_RTP_END', 40063),
     log: (entry) => log(entry),
@@ -127,12 +178,35 @@ async function main() {
 
   if (trunk.host) await trunk.start();
 
-  const server = createServer((request, response) => {
+  const server = createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     const send = (status, body) => {
       response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       response.end(JSON.stringify(body));
     };
+    if (url.pathname === '/srtp') {
+      // The console's switch. GET is what the console polls for live state;
+      // POST is the change, and it applies to the next call rather than to one
+      // already in flight.
+      if (request.method === 'GET') {
+        send(200, { enabled: gateway.srtp, registered: !!trunk.registered });
+        return;
+      }
+      if (request.method === 'POST') {
+        const body = await readJson(request);
+        const enabled = typeof body?.enabled === 'boolean' ? body.enabled : /^(1|on|true|yes)$/i.test(String(body?.enabled ?? ''));
+        if (body?.enabled === undefined) {
+          send(400, { error: 'enabled is required (true or false)' });
+          return;
+        }
+        const applied = gateway.setSrtp(enabled);
+        rememberSrtp(applied);
+        send(200, { ok: true, enabled: applied, registered: !!trunk.registered });
+        return;
+      }
+      send(405, { error: 'GET or POST' });
+      return;
+    }
     if (url.pathname === '/healthz') {
       // Healthy means both halves are usable, which is the only question an
       // operator has: Cantus reachable and the trunk registered.

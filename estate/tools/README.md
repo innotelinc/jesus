@@ -139,6 +139,9 @@ the same claim as "a call works":
 # inbound: a real INVITE for the DID, real SDP, real PCMU audio
 node estate/tools/sip-probe.js --gateway <ip>:5060 --did 14132642700 --ring 15
 
+# inbound the way an encrypted sub-account does it: RTP/SAVP + a=crypto
+node estate/tools/sip-probe.js --gateway <ip>:5060 --did 14132642700 --srtp
+
 # outbound: a carrier that challenges REGISTER and answers INVITEs
 node estate/tools/sip-fake-carrier.js --port 5070 --username demo --password demo
 ```
@@ -161,6 +164,15 @@ docker run --rm --network cantus-estate_default \
   node:24-alpine node /src/estate/tools/line-client.js \
   --switch switch:8088 --ext 101 --answer --seconds 20
 
+# the same, as a line that stays registered between calls (a demo needs this:
+# without --keep the client exits after the first call and the DID rings a line
+# nobody is registered on)
+docker run -d --name line101 --restart unless-stopped \
+  --network cantus-estate_default \
+  -v /opt/cantus-estate:/src:ro -e CANTUS_CONTROL_TOKEN="$TOKEN" \
+  node:24-alpine node /src/estate/tools/line-client.js \
+  --switch switch:8088 --ext 101 --answer --keep
+
 # the softphone's own dial, the same message the page sends
 ... line-client.js --switch switch:8088 --ext 101 --call 14134210134@estate.local
 ```
@@ -168,6 +180,47 @@ docker run --rm --network cantus-estate_default \
 With those two running together the whole path is verified: `sip-probe` is the
 carrier, `line-client` is the phone, and the gateway and switch are the ones
 being tested.
+
+### Encryption on or off, with the carrier in step
+
+The console at `:8000` has a **Carrier encryption** card, and it is the honest
+way to look at this because encryption is two settings, not one:
+
+| side | where | what it means |
+| --- | --- | --- |
+| gateway | `GET/POST http://<ip>:7454/srtp` | whether our INVITEs offer `RTP/SAVP` with an SDES key |
+| carrier | the sub-account's *Encrypted SIP Traffic* | whether VoIP.ms will accept anything else |
+
+Flipping one without the other refuses every call with `488 Not acceptable
+here`, in both directions — which looks like a broken gateway, not a mismatched
+setting. So the card reads both live and the button changes both:
+
+```sh
+curl -s http://<ip>:8000/api/encryption          # both sides, and whether they agree
+curl -s -XPOST http://<ip>:8000/api/encryption \
+     -H 'content-type: application/json' -d '{"enabled":false}'
+```
+
+The answer says what each half did, separately: a carrier that cannot be reached
+does not stop the gateway from being switched for a local test.
+
+Prerequisites for the carrier half — the API is not the SIP password:
+
+1. VoIP.ms portal → **Main Menu → SOAP and REST/JSON API**: generate an API
+   password and allowlist this box's address (without the allowlist every call
+   answers `invalid_ip`, and `getIP` is the one method exempt from it).
+2. Put `VOIPMS_API_USERNAME` and `VOIPMS_API_PASSWORD` in `estate/.env` and
+   `docker compose up -d console`.
+
+With those absent the card still works, and says so: the gateway line is live
+and the carrier line reads *API not configured*. The sub-account is read with
+`getSubAccounts`, matched by `VOIPMS_SIP_USERNAME`, and written with
+`setSubAccount` — the whole record, with `sip_traffic` overridden, because that
+method is not a patch and rejects a call that leaves required fields out.
+
+What the gateway remembers lives on the host (`estate/state/gateway/srtp.json`,
+runs as uid 65534), so a rebuild of the container does not silently restore
+`SIP_SRTP` and leave the sub-account expecting something else.
 
 ### Encrypted carrier legs
 

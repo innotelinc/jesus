@@ -113,6 +113,17 @@ ensure_key VOIPMS_SIP_PASSWORD "${VOIPMS_SIP_PASSWORD:-}"
 ensure_key VOIPMS_SIP_FROM_USER "${VOIPMS_SIP_FROM_USER:-}"
 ensure_key VOIPMS_SIP_DOMAIN "${VOIPMS_SIP_DOMAIN:-}"
 ensure_key SIP_SRTP "${SIP_SRTP:-}"
+# The API side of the carrier, for the console's encryption switch: it reads and
+# writes the sub-account's own setting. Different credentials from the SIP
+# sub-account, and both are empty until an operator fills them in.
+ensure_key VOIPMS_API_USERNAME "${VOIPMS_API_USERNAME:-}"
+ensure_key VOIPMS_API_PASSWORD "${VOIPMS_API_PASSWORD:-}"
+
+# The gateway runs as 65534 and remembers the encryption switch in /data. A
+# root-owned directory is a state file it cannot write, and a switch that does
+# not survive the next deploy is worse than no switch at all.
+mkdir -p state/gateway
+chown 65534:65534 state/gateway 2>/dev/null || true
 
 case "${1:-up}" in
   up)

@@ -8,6 +8,8 @@ desktop.ini
 
 # Estate demo local state
 estate/.env
+# The gateway remembers the console's encryption choice here.
+estate/state/
 estate/tools/.vultr-demo.json
 estate/tools/.vultr-key
 estate/tools/.vultr-key.pub

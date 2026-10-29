@@ -210,6 +210,24 @@ test('a carrier that never answers times out the Cantus leg', async (t) => {
   assert.deepEqual(endpoint.rejected, { id: 'call-11', reason: 'TIMEOUT' });
 });
 
+test('encryption can be switched between calls, and only the next call changes', async (t) => {
+  const { gateway, trunk } = makeGateway(t);
+  assert.equal(gateway.status().sip.srtp, false, 'plain RTP until somebody asks for encryption');
+
+  assert.equal(gateway.setSrtp(true), true);
+  assert.equal(gateway.status().sip.srtp, true, 'the status surface reports what the next call will offer');
+  await gateway.onCantusCall({ call: 'call-20' }, '14134210134@voipms@gateway');
+  assert.match(trunk.invites.at(-1).sdp, /m=audio \d+ RTP\/SAVP 0/);
+  assert.match(trunk.invites.at(-1).sdp, /a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:/);
+
+  // A call already up keeps the keys it negotiated — an offer cannot change
+  // halfway through — so switching off shows up on the next INVITE.
+  assert.equal(gateway.setSrtp(false), false);
+  await gateway.onCantusCall({ call: 'call-21' }, '14134210134@voipms@gateway');
+  assert.match(trunk.invites.at(-1).sdp, /m=audio \d+ RTP\/AVP 0/);
+  assert.doesNotMatch(trunk.invites.at(-1).sdp, /a=crypto/);
+});
+
 test('addresses are read the way the switch writes them', () => {
   assert.equal(dialledNumber('14134210134@voipms@gateway'), '14134210134');
   assert.equal(dialledNumber('+14134210134@voipms@gateway'), '+14134210134');

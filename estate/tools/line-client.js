@@ -38,11 +38,14 @@ const autoAnswer = has('answer');
 const holdSeconds = Number(flag('seconds', '0'));
 const saveTo = flag('save', '');
 const waitSeconds = Number(flag('wait', callTo ? '45' : '50'));
+const keep = has('keep');
 
 const log = (...parts) => console.log('[line]', ...parts);
 
 if (!token) {
-  console.error('usage: node line-client.js --switch host:8188 --token <control token> --ext 101 [--answer] [--call <address>] [--seconds N] [--save file.wav]');
+  console.error(
+    'usage: node line-client.js --switch host:8188 --token <control token> --ext 101 [--answer] [--call <address>] [--seconds N] [--save file.wav] [--keep]'
+  );
   process.exit(2);
 }
 
@@ -107,6 +110,13 @@ function startMedia() {
 
 function finish(code, reason) {
   if (finished) return;
+  // A demo line has to be a line, not a one-call test: `--keep` stays
+  // registered and waits for the next call instead of exiting after the first
+  // one, which is what left the DID ringing a line that had already gone away.
+  if (keep && code === 0) {
+    resetCall(reason);
+    return;
+  }
   finished = true;
   clearInterval(sendTimer);
   try {
@@ -121,6 +131,25 @@ function finish(code, reason) {
   }
   log(`${reason} · frames out ${counters.sent} / in ${counters.received} (${counters.audio} with audio)`);
   process.exit(code);
+}
+
+/** End this call, keep the registration. */
+function resetCall(reason) {
+  clearInterval(sendTimer);
+  sendTimer = null;
+  if (saveTo && audio.length) {
+    const written = wav(Buffer.concat(audio));
+    writeFileSync(saveTo, written);
+    log(`wrote ${saveTo} (${written.length} bytes)`);
+  }
+  log(`${reason} · frames out ${counters.sent} / in ${counters.received} (${counters.audio} with audio)`);
+  counters.sent = 0;
+  counters.received = 0;
+  counters.audio = 0;
+  answered = false;
+  callId = '';
+  audio.length = 0;
+  log(`still registered as ${ext}; waiting for the next call`);
 }
 
 socket.addEventListener('open', () => log(`socket open for ${ext} on ${host}`));
@@ -171,10 +200,18 @@ socket.addEventListener('message', (event) => {
       startMedia();
       return;
     case 'cancelled':
+      if (keep) {
+        resetCall('caller cancelled before the line answered');
+        return;
+      }
       finish(1, 'caller cancelled before the line answered');
       return;
     case 'ended':
       log(`call ended: ${message.cause || 'normal'}`);
+      if (keep) {
+        resetCall('call ended');
+        return;
+      }
       finish(answered && counters.audio > 0 && counters.sent > 0 ? 0 : 1, 'call ended');
       return;
     case 'error':
@@ -190,4 +227,5 @@ socket.addEventListener('close', (event) => {
   if (!finished) finish(1, `socket closed (${event.code}) ${event.reason || ''}`.trim());
 });
 
-setTimeout(() => finish(1, 'timed out waiting for a call'), waitSeconds * 1000);
+// A kept line waits indefinitely; only a one-shot run has a deadline.
+if (!keep) setTimeout(() => finish(1, 'timed out waiting for a call'), waitSeconds * 1000);
