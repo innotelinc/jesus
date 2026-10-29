@@ -94,18 +94,29 @@ export class SrtpContext {
     return roc * 0x1_0000 + seq;
   }
 
-  counterBlock(index) {
+  /**
+   * The AES-CM counter block for one packet (RFC 3711 §4.1.1):
+   *
+   *     IV = (k_s * 2^16) XOR (SSRC * 2^64) XOR (i * 2^16)
+   *
+   * Which puts the 112-bit session salt in the top 14 bytes, the 32-bit SSRC in
+   * bytes 4..7, and the 48-bit packet index in bytes 8..13. Getting these
+   * offsets wrong does not break authentication — the HMAC covers the
+   * ciphertext — it just decrypts to noise at the far end, which is why this is
+   * written out rather than left to look plausible.
+   */
+  counterBlock(index, ssrc) {
     const iv = Buffer.alloc(16);
     this.salt.copy(iv, 0, 0, MASTER_SALT_BYTES);
-    // XOR the 48-bit index into the low six bytes of the 128-bit block.
+    iv.writeUInt32BE((iv.readUInt32BE(4) ^ (ssrc >>> 0)) >>> 0, 4);
     for (let i = 0; i < 6; i += 1) {
-      iv[10 + i] ^= (index / 2 ** (8 * (5 - i))) & 0xff;
+      iv[8 + i] ^= Math.floor(index / 2 ** (8 * (5 - i))) & 0xff;
     }
     return iv;
   }
 
-  keystream(index, length) {
-    const cipher = createCipheriv('aes-128-ctr', this.encryptionKey, this.counterBlock(index));
+  keystream(index, ssrc, length) {
+    const cipher = createCipheriv('aes-128-ctr', this.encryptionKey, this.counterBlock(index, ssrc));
     return Buffer.concat([cipher.update(Buffer.alloc(length)), cipher.final()]);
   }
 
@@ -119,12 +130,13 @@ export class SrtpContext {
   /** Encrypt one RTP packet as sent, appending the authentication tag. */
   protect(packet) {
     const seq = packet.readUInt16BE(2);
+    const ssrc = packet.readUInt32BE(8);
     if (this.lastSeq >= 0 && seq < this.lastSeq && this.lastSeq - seq > 0x8000) this.roc += 1;
     this.lastSeq = seq;
     const index = this.index(seq, this.roc);
     const header = packet.subarray(0, 12);
     const payload = packet.subarray(12);
-    const mask = this.keystream(index, payload.length);
+    const mask = this.keystream(index, ssrc, payload.length);
     const encrypted = Buffer.alloc(payload.length);
     for (let i = 0; i < payload.length; i += 1) encrypted[i] = payload[i] ^ mask[i];
     const body = Buffer.concat([header, encrypted]);
@@ -137,6 +149,7 @@ export class SrtpContext {
     const body = packet.subarray(0, packet.length - TAG_BYTES);
     const tag = packet.subarray(packet.length - TAG_BYTES);
     const seq = body.readUInt16BE(2);
+    const ssrc = body.readUInt32BE(8);
     if (this.lastSeq >= 0 && seq < this.lastSeq && this.lastSeq - seq > 0x8000) this.roc += 1;
     this.lastSeq = seq;
     const expected = this.authTag(body, this.roc);
@@ -146,7 +159,7 @@ export class SrtpContext {
     const index = this.index(seq, this.roc);
     const header = body.subarray(0, 12);
     const payload = body.subarray(12);
-    const mask = this.keystream(index, payload.length);
+    const mask = this.keystream(index, ssrc, payload.length);
     const plain = Buffer.alloc(payload.length);
     for (let i = 0; i < payload.length; i += 1) plain[i] = payload[i] ^ mask[i];
     return Buffer.concat([header, plain]);

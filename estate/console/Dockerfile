@@ -4,7 +4,7 @@
 FROM node:24-alpine
 
 WORKDIR /app
-COPY package.json server.js voipms.js ./
+COPY package.json server.js voipms.js flip.js ./
 COPY public ./public
 
 ENV NODE_ENV=production

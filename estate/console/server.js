@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import * as voipms from './voipms.js';
+import { flip } from './flip.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
@@ -168,53 +169,45 @@ async function encryption({ refresh = false } = {}) {
 }
 
 /**
- * Change both sides. The carrier goes first: it is the half that can refuse our
- * calls, so a failure there is reported before anything local is claimed to be
- * in effect. Each half reports its own outcome — a carrier that cannot be
- * reached must not stop the gateway from being switched for a local test.
+ * Switch the gateway's own half and wait for it to say so.
+ *
+ * Acknowledged by the value it reports, not by the request being sent: a 200
+ * that leaves the offer unchanged is not a switch. The deadline is generous
+ * because this re-registers the trunk on the way.
+ */
+async function setGatewaySrtp(enabled) {
+  if (!GATEWAY_URL) throw new Error('GATEWAY_URL is empty');
+  const response = await fetch(`${GATEWAY_URL}/srtp`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+    signal: AbortSignal.timeout(8000),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `gateway answered ${response.status}`);
+  if (body.enabled !== enabled) throw new Error(`gateway still reports enabled=${body.enabled}`);
+}
+
+/**
+ * Change both sides, in the order that can be undone.
+ *
+ * The carrier goes first and the gateway second; if the gateway refuses even
+ * after a retry, the carrier is put back, so the estate never stays half on and
+ * half off with every call failing and nothing saying why.
  */
 async function setEncryption(enabled) {
-  let carrier;
-  try {
-    if (!voipms.configured()) throw new Error('voip.ms API credentials are not set, so the sub-account was not touched');
-    const changed = await voipms.setEncryption(enabled);
-    // The carrier is slow enough that a switch needs to say how slow, or an
-    // operator assumes it hung and clicks it again.
-    carrier = { ok: true, ms: changed.ms };
-  } catch (error) {
-    carrier = { ok: false, error: error.message };
-  }
-
-  // A carrier that is configured and did not take the change is the one case
-  // where our side must not move: if its sub-account still demands encryption
-  // and we stop offering it, every call is refused with 488 until somebody
-  // notices. Unconfigured is different — that is a local test, and the card
-  // says which half is real.
-  if (!carrier.ok && voipms.configured()) {
-    return {
-      requested: enabled,
-      carrier,
-      gateway: { ok: false, skipped: true, error: 'not changed, because the carrier was not changed' },
-      state: await encryption({ refresh: true }),
-    };
-  }
-
-  let gateway;
-  try {
-    if (!GATEWAY_URL) throw new Error('GATEWAY_URL is empty');
-    const response = await fetch(`${GATEWAY_URL}/srtp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ enabled }),
-      signal: AbortSignal.timeout(2500),
-    });
-    const body = await response.json().catch(() => ({}));
-    gateway = response.ok ? { ok: body.enabled === enabled, enabled: body.enabled } : { ok: false, error: body.error || `gateway answered ${response.status}` };
-  } catch (error) {
-    gateway = { ok: false, error: error.message };
-  }
-
-  return { requested: enabled, carrier, gateway, state: await encryption({ refresh: true }) };
+  const outcome = await flip({
+    enabled,
+    carrier: {
+      configured: voipms.configured(),
+      set: async (value) => {
+        if (!voipms.configured()) throw new Error('voip.ms API credentials are not set, so the sub-account was not touched');
+        return voipms.setEncryption(value);
+      },
+    },
+    gateway: { set: setGatewaySrtp },
+  });
+  return { requested: enabled, ...outcome, state: await encryption({ refresh: true }) };
 }
 
 const routes = [

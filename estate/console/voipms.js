@@ -155,11 +155,13 @@ export function paramsFor(record, encryption) {
 /** Set the carrier's side of it and read the record back, so the answer is the carrier's. */
 export async function setEncryption(enabled) {
   const record = await getSubAccount();
+  // What it held before, so a switch the gateway refuses can be undone here.
+  const before = readEncryption(record);
   const startedAt = Date.now();
   await call('setSubAccount', paramsFor(record, enabled), { timeoutMs: WRITE_TIMEOUT_MS });
   const applied = await getSubAccount();
   // How long the carrier took is the one number that explains a slow switch.
-  return { record: applied, ms: Date.now() - startedAt };
+  return { record: applied, before, ms: Date.now() - startedAt };
 }
 
 /**
