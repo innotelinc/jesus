@@ -125,6 +125,14 @@ export class Switch extends EventEmitter {
     // When each line socket last proved it was still there: any frame, or the
     // answer to a ping. A registration that stops answering is dropped.
     this.socketSeen = new Map();
+    // Recent line registrations and drops, newest first. A count of zero says a
+    // phone is not there; this says when it left and why, which is what an
+    // operator needs to tell a switched-off handset from a broken switch.
+    this.lineLog = [];
+    this.on('line', (event) => {
+      this.lineLog.unshift({ ...event, at: new Date().toISOString() });
+      if (this.lineLog.length > 50) this.lineLog.length = 50;
+    });
     this.counters = { calls: 0, answered: 0, rejected: 0, failed: 0 };
     this.startedAt = now();
 

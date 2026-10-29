@@ -190,6 +190,9 @@
       <section class="card">
         <h2>Lines <span class="count" id="line-count">0</span></h2>
         <div class="body" id="lines"></div>
+        <p class="note" style="padding:0 16px 14px">Phones is the live registration count. Media is frames per second
+        each way, measured between polls — a browser line is fed at 50. A line at zero shows when and why it
+        was dropped.</p>
       </section>
 
       <section class="card">
@@ -210,6 +213,46 @@ let last = null;
 function pill(state, label) {
   const cls = state === 'up' || state === 'online' ? 'up' : state === 'down' ? 'down' : '';
   return `<span class="pill"><i class="dot ${cls}"></i>${esc(label)}</span>`;
+}
+
+// Counters from the previous poll, so an absolute total becomes a rate the way
+// an operator reads it: frames a second, not frames since boot.
+const mediaPrev = new Map();
+let mediaKeys = new Set();
+
+/** The leg a line is on right now, if any call has one. */
+function legForLine(calls, ext) {
+  // A bridged call has one leg per phone it rang, and the ones nobody picked up
+  // are already `ended` with their counters frozen at zero. Taking the first
+  // match showed a live line as "ended web · 0.0 fps", so a leg that is
+  // actually carrying audio wins.
+  let idle = null;
+  for (const call of calls) {
+    if (call.state === 'ended') continue;
+    for (const leg of call.legs || []) {
+      if (String(leg.ext) !== String(ext)) continue;
+      if (leg.state === 'answered' || leg.state === 'ringing') return { call, leg };
+      idle = idle || { call, leg };
+    }
+  }
+  return idle;
+}
+
+/** Frames a second each way, from the media counters in two consecutive polls. */
+function mediaRate(callId, leg, at) {
+  const key = `${callId}:${leg.id}`;
+  const sent = Number(leg.sent || 0);
+  const received = Number(leg.received || 0);
+  const previous = mediaPrev.get(key);
+  mediaPrev.set(key, { sent, received, at });
+  mediaKeys.add(key);
+  if (!previous) return null;
+  const seconds = (at - previous.at) / 1000;
+  if (!(seconds > 0)) return null;
+  return {
+    out: Math.max(0, (sent - previous.sent) / seconds),
+    in: Math.max(0, (received - previous.received) / seconds),
+  };
 }
 
 function render(data) {
@@ -267,13 +310,42 @@ function render(data) {
     </div>`).join('') || '<div class="empty">no routes loaded</div>';
 
   $('line-count').textContent = lines.length;
+  const at = Date.parse(data.at) || Date.now();
+  mediaKeys = new Set();
   $('lines').innerHTML = lines.length ? `<table>
-    <thead><tr><th>ext</th><th>name</th><th>state</th></tr></thead>
-    <tbody>${lines.map((l) => `<tr>
+    <thead><tr><th>ext</th><th>line</th><th>phones</th><th>call</th><th>media</th></tr></thead>
+    <tbody>${lines.map((l) => {
+      const devices = Number(l.registered ?? (l.online ? 1 : 0));
+      const active = legForLine(calls, l.ext);
+      const rate = active ? mediaRate(active.call.id, active.leg, at) : null;
+      const change = l.lastChange?.at ? new Date(l.lastChange.at).toLocaleTimeString() : '';
+      const why = l.lastChange?.reason ? ` · ${l.lastChange.reason}` : '';
+      // A phone dropping is news even when another one is still registered, so a
+      // recent unregistration is shown for a few minutes at any count.
+      const droppedAt = l.lastChange?.kind === 'unregistered' ? Date.parse(l.lastChange.at) : 0;
+      const recentlyDropped = droppedAt && at - droppedAt < 5 * 60 * 1000;
+      const note = change && (devices === 0 || recentlyDropped)
+        ? `<div class="mono" style="color:${devices === 0 ? 'var(--rose)' : 'var(--dim)'};font-size:11px;margin-top:4px">${esc(l.lastChange.kind)}${esc(why)} ${esc(change)}</div>`
+        : '';
+      const phones = devices > 0
+        ? `<span class="state online">${devices} registered</span>${note}`
+        : `<span class="state ended">0 registered</span>${note}`;
+      const media = !active
+        ? '<span style="color:var(--dim)">idle</span>'
+        : rate
+          ? `<span class="mono" style="font-size:11.5px">out ${rate.out.toFixed(1)} · in ${rate.in.toFixed(1)} <span style="color:var(--dim)">fps</span></span>`
+          : '<span class="mono" style="color:var(--dim);font-size:11.5px">sampling</span>';
+      const numbers = (l.numbers || []).join(', ');
+      return `<tr>
       <td class="mono">${esc(l.ext)}</td>
-      <td>${esc(l.displayName || '—')}</td>
-      <td><span class="state ${l.state === 'online' || l.online ? 'online' : 'offline'}">${l.state === 'online' || l.online ? 'online' : 'idle'}</span></td>
-    </tr>`).join('')}</tbody></table>` : '<div class="empty">no lines in the inventory</div>';
+      <td>${esc(l.displayName || '—')}${numbers ? `<div class="mono" style="color:var(--dim);font-size:11px;margin-top:4px">${esc(numbers)}</div>` : ''}</td>
+      <td>${phones}</td>
+      <td>${active ? `<span class="state ${esc(active.leg.state)}">${esc(active.leg.state)}</span><div class="mono" style="color:var(--dim);font-size:11px;margin-top:4px">${esc(active.leg.role)}</div>` : '<span style="color:var(--dim)">—</span>'}</td>
+      <td>${media}</td>
+    </tr>`;
+    }).join('')}</tbody></table>` : '<div class="empty">no lines in the inventory</div>';
+  // Counters belong to the call they came from; once it is gone, so are they.
+  for (const key of [...mediaPrev.keys()]) if (!mediaKeys.has(key)) mediaPrev.delete(key);
 
   const tape = data.tape || [];
   $('tape-count').textContent = tape.length;

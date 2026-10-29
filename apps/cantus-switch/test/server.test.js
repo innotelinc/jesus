@@ -316,3 +316,63 @@ test('an originated call to a local line runs its route and rings the line', asy
   assert.equal(call.state, 'ended');
   assert.equal(call.cause, 'no-answer');
 });
+
+test('the line list says a phone is there, and why it left', async (t) => {
+  const { switchRef, server } = await bootstrap();
+  t.after(() => {
+    switchRef.stop();
+    return server.close();
+  });
+
+  const handlers = new Map();
+  const socket = {
+    closed: false,
+    send: () => {},
+    sendJson: () => {},
+    ping: () => {},
+    on: (event, handler) => {
+      if (!handlers.has(event)) handlers.set(event, []);
+      handlers.get(event).push(handler);
+    },
+    close: () => {
+      socket.closed = true;
+      for (const handler of handlers.get('close') || []) handler(1000);
+    },
+  };
+
+  switchRef.attachSocket(socket, { ext: '100' });
+  let line = (await (await fetch(`${server.url}/v1/lines`)).json()).find((entry) => entry.ext === '100');
+  assert.equal(line.registered, 1);
+  assert.equal(line.online, true);
+  assert.equal(line.lastChange.kind, 'registered');
+  assert.ok(line.lastChange.at, 'the console needs a time to show');
+
+  // The health check drops a phone that stopped answering; the console has to be
+  // able to tell that apart from one that was never there.
+  switchRef.forgetSocket(socket, switchRef.lines.get('100'), 'silent');
+  line = (await (await fetch(`${server.url}/v1/lines`)).json()).find((entry) => entry.ext === '100');
+  assert.equal(line.registered, 0);
+  assert.equal(line.online, false);
+  assert.equal(line.lastChange.kind, 'unregistered');
+  assert.equal(line.lastChange.reason, 'silent');
+});
+
+test('a call reports the media counters a console needs for a rate', async (t) => {
+  const { switchRef, server } = await bootstrap();
+  t.after(() => {
+    switchRef.stop();
+    return server.close();
+  });
+
+  const browser = { role: 'web', ext: '100', ws: { send: () => {} }, isAnswered: true, isEnded: false, received: 41, sent: 50, rx: null, rxAt: 0 };
+  const carrier = { role: 'inbound', ext: '', ws: null, isAnswered: true, isEnded: false, received: 50, sent: 41, rx: null, rxAt: 0 };
+  const call = { id: 'call-media', direction: 'inbound', from: 'voipms', to: '100@test.local', state: 'answered', route: 'did', events: [], legs: [carrier, browser], startedAt: Date.now(), answeredAt: Date.now() };
+  browser.call = call;
+  carrier.call = call;
+  switchRef.calls.set(call.id, call);
+
+  const body = await (await fetch(`${server.url}/v1/calls`)).json();
+  const leg = body.find((entry) => entry.id === 'call-media').legs.find((entry) => entry.role === 'web');
+  assert.equal(leg.sent, 50, 'frames written to the phone');
+  assert.equal(leg.received, 41, 'frames arriving from it');
+});
