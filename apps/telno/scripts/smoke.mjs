@@ -4058,9 +4058,18 @@ check(
 
 const postScif = documentOf((await call('GET', '/api/system/config-preview?file=routes.json')).body);
 const postScifRoute = routeNamed(postScif, 'did-14155550196');
+// Existence first, on its own line. "The route records nothing" is also true of
+// a route that is not there, so asserting the absence alone would stay green if
+// arming SCIF lost the number entirely.
+check(
+  'the SCIF line keeps the inbound route it had before arming',
+  postScifRoute?.name === 'did-14155550196',
+  { route: postScifRoute ?? null, routes: (postScif.routes || []).map((route) => route.name) }
+);
 check(
   'the switch stops recording a SCIF line, whatever the agent asks for',
-  !recordAction(postScifRoute) &&
+  postScifRoute !== null &&
+    !recordAction(postScifRoute) &&
     (postScif.notes || []).some((note) => /SCIF lines never record: 296/.test(note)),
   { route: postScifRoute, notes: postScif.notes }
 );
