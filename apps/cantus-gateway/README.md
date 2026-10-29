@@ -38,6 +38,7 @@ instead of silence.
 | `SIP_PORT` | `5060` | |
 | `SIP_USERNAME` / `SIP_PASSWORD` | — | the sub-account the trunk registers as |
 | `SIP_FROM_USER` | `SIP_USERNAME` | the number outbound calls present as (the trunk's DID) |
+| `SIP_SRTP` | off | `on` offers and answers `RTP/SAVP` with an SDES key (`AES_CM_128_HMAC_SHA1_80`) |
 | `SIP_DOMAIN` | `SIP_HOST` | realm/From domain |
 | `SIP_ADVERTISE` | first public IPv4 | what goes in `Contact` and `c=` SDP |
 | `SIP_LOCAL_PORT` | `0` (ephemeral) | bind 5060 when the container maps it |
@@ -72,8 +73,12 @@ curl -X POST http://<console>/api/trunks -b cookie -H 'content-type: application
 
 - **PCMU only.** G.729, G.722 and Opus are refused with `488 Not Acceptable
   Here` rather than negotiated into something that would carry silence.
-- **No TLS/SRTP.** The carrier leg is plain SIP/RTP over UDP; the encrypted half
-  of the estate is Cantus. `sips:` is not implemented.
+- **SDES-SRTP only, no TLS.** `SIP_SRTP=on` encrypts the carrier media with
+  `AES_CM_128_HMAC_SHA1_80`, keyed in the SDP the way a carrier expects. The
+  signalling itself stays plain UDP: `sips:` and DTLS-SRTP are not implemented,
+  so a carrier that offers `UDP/TLS/RTP/SAVP` is refused rather than downgraded.
+  Interop is proven against Asterisk + libsrtp2, not only against itself — see
+  [`estate/tools/asterisk-srtp`](../../estate/tools/asterisk-srtp).
 - **No re-INVITE.** An offer inside a confirmed dialog is not handled; the
   gateway answers `491` by omission and keeps the original stream.
 - **One codec, no transcoding per frame.** PCM16↔µ-law is a table lookup, which

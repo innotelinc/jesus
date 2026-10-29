@@ -105,6 +105,9 @@ services:
       # end sees a number instead of a sub-account login.
       SIP_FROM_USER: ${VOIPMS_SIP_FROM_USER:-}
       SIP_DOMAIN: ${VOIPMS_SIP_DOMAIN:-}
+      # `on` offers and answers RTP/SAVP with an SDES key. A sub-account that
+      # requires encryption refuses plain RTP with 488, in both directions.
+      SIP_SRTP: ${SIP_SRTP:-}
       # What goes in Contact and SDP: the address the carrier must send to.
       SIP_ADVERTISE: ${PUBLIC_IP:-}
       SIP_LOCAL_PORT: "5060"
