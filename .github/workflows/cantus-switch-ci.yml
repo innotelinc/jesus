@@ -1,0 +1,62 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATED FILE — edit the source, not this copy.
+#
+#   source:      apps/cantus-switch/.github/workflows/ci.yml
+#   regenerate:  perl tools/port-workflows.pl
+#
+# The copy exists because GitHub only reads workflows from the repository root.
+# This one runs only when apps/cantus-switch/** changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# CI — the switch's suite, on real sockets.
+#
+# `npm test` starts two switches and a relay, places a call and checks the audio
+# that arrived; nothing here is mocked, so a red build means the switch stopped
+# working. The package has no dependencies, so there is no install step to fail
+# and no lockfile to cache.
+
+name: "cantus-switch: CI"
+
+on:
+  push:
+    paths:
+      - "apps/cantus-switch/**"
+      - ".github/workflows/cantus-switch-ci.yml"
+    branches: [main, master]
+  pull_request:
+    paths:
+      - "apps/cantus-switch/**"
+      - ".github/workflows/cantus-switch-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cantus-switch-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/cantus-switch
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: Switch suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Show version
+        run: node --version
+
+      - name: Run the suite
+        run: npm test

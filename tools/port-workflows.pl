@@ -75,6 +75,8 @@ if (!$ENV{CI} && -f '.githooks/install') {
 # pages.yml, deploy-*.yml) is intentionally absent; see the header.
 my %SEED = (
     'cantus'          => [qw(ci.yml)],
+    'cantus-gateway'  => [qw(ci.yml)],
+    'cantus-switch'   => [qw(ci.yml)],
     'capstone'        => [qw(ci.yml)],
     'claude-mem'      => [qw(ci.yml ods-native.yml windows.yml)],
     'dograh'          => [qw(api-tests.yml pre-pr-drift-check.yml)],
