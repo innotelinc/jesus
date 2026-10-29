@@ -265,7 +265,10 @@ function render(data) {
 
   $('clock').textContent = new Date(data.at).toLocaleTimeString();
   $('pills').innerHTML = [
-    pill('up', `switch ${node.id || '?'}`),
+    // The switch names itself `switch@domain` at the top level; `node` is its
+    // transport block and carries no id, which is why this header used to read
+    // "switch ?" on every deployment that worked.
+    pill('up', `switch ${String(sw.id || node.addr || 'unknown').replace(/^switch@/, '')}`),
     ...(data.products || []).map((p) => pill(p.state === 'up' ? 'up' : 'down', `${p.name}: ${p.state}`)),
   ].join('');
 
