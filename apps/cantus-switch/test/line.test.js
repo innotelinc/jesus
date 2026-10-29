@@ -13,8 +13,7 @@ import assert from 'node:assert/strict';
 
 import { Switch } from '../src/switch.js';
 import { CantusEndpoint } from '../src/endpoint.js';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { waitUntil } from './wait.js';
 
 function fakeLineSocket() {
   const sent = [];
@@ -212,15 +211,17 @@ test('a line that dials carries the audio of the call it placed', async (t) => {
   peer.onIncoming = (session) => peer.accept(session);
   await peer.start();
   t.after(() => peer.stop());
-  await sleep(120);
+  await waitUntil(() => peer.handle, { label: 'the gateway to register with the relay' });
 
   const socket = fakeLineSocket();
   const call = sw.originate({ from: '101', to: '14134210134@line.test', ws: socket, ext: '101' });
   assert.equal(call.route, 'national');
 
-  await sleep(250);
   const web = call.legs.find((leg) => leg.ws === socket);
   assert.ok(web, 'the dialling socket is a leg of its own call');
+  await waitUntil(() => web.state === 'answered' && socket.sent.length > 2, {
+    label: 'the carrier to answer and the line to receive audio',
+  });
   assert.equal(web.state, 'answered');
   assert.ok(
     socket.sent.length > 2,
@@ -231,6 +232,6 @@ test('a line that dials carries the audio of the call it placed', async (t) => {
   sw.onSocketMessage(socket, sw.lines.get('101'), { type: 'hangup', callId: call.id }, (id) =>
     call.legs.find((leg) => leg.ws === socket && leg.call.id === id)
   );
-  await sleep(80);
+  await waitUntil(() => call.state === 'ended', { label: 'the hangup to end the call' });
   assert.equal(call.state, 'ended');
 });
