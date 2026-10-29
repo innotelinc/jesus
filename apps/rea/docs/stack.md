@@ -50,5 +50,5 @@ there; this file records only what REA does inside it.
 
 ## See also
 
-- [README](../README.md)
+- [README](https://github.com/innotelinc/rea/blob/main/README.md)
 - [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)

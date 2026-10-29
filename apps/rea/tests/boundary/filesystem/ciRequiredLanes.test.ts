@@ -403,7 +403,11 @@ it("binds provider build reuse to the current run while keeping standalone dispa
   );
   expect(download?.with).toEqual({
     name: "${{ inputs.build_cache_artifact }}",
-    path: ".turbo/cache/",
+    // Steps of a composite action run at the workspace root, so the cache
+    // directory is named from the action's own location rather than assumed
+    // to be the root: rea is the root standalone and a directory inside a
+    // larger tree here.
+    path: "${{ github.action_path }}/../../../.turbo/cache/",
   });
   expect(download?.if).toBe("inputs.build_cache_artifact != ''");
   expect(download?.["continue-on-error"]).not.toBe(true);
