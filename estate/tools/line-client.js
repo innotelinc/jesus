@@ -50,7 +50,10 @@ const url = `ws://${host}/ws/line?ext=${encodeURIComponent(ext)}&token=${encodeU
 const socket = new WebSocket(url);
 socket.binaryType = 'arraybuffer';
 
-const counters = { sent: 0, received: 0 };
+// `audio` is the number that matters: the switch keeps a browser line fed with
+// 20 ms of silence while a call is up, so counting frames proved nothing.
+// A frame with any non-zero sample is a real person or a tone on the far side.
+const counters = { sent: 0, received: 0, audio: 0 };
 const audio = [];
 let callId = '';
 let answered = false;
@@ -97,7 +100,7 @@ function startMedia() {
     counters.sent += 1;
     // Both directions have carried audio: the call is bridged, not just
     // signalled. That is the claim worth exiting 0 for.
-    if (counters.received > 3 && counters.sent > 3) finish(0, 'call bridged in both directions');
+    if (counters.audio > 3 && counters.sent > 3) finish(0, 'call bridged in both directions');
   }, 20);
   if (holdSeconds) setTimeout(() => finish(0, `held ${holdSeconds}s`), holdSeconds * 1000);
 }
@@ -116,7 +119,7 @@ function finish(code, reason) {
     writeFileSync(saveTo, written);
     log(`wrote ${saveTo} (${written.length} bytes)`);
   }
-  log(`${reason} · frames out ${counters.sent} / in ${counters.received}`);
+  log(`${reason} · frames out ${counters.sent} / in ${counters.received} (${counters.audio} with audio)`);
   process.exit(code);
 }
 
@@ -124,9 +127,11 @@ socket.addEventListener('open', () => log(`socket open for ${ext} on ${host}`));
 
 socket.addEventListener('message', (event) => {
   if (typeof event.data !== 'string') {
+    const frameIn = Buffer.from(event.data);
     counters.received += 1;
-    if (saveTo) audio.push(Buffer.from(event.data));
-    if (answered && counters.received > 3 && counters.sent > 3) finish(0, 'call bridged in both directions');
+    if (frameIn.some((byte) => byte !== 0)) counters.audio += 1;
+    if (saveTo) audio.push(frameIn);
+    if (answered && counters.audio > 3 && counters.sent > 3) finish(0, 'call bridged in both directions');
     return;
   }
   let message;
@@ -170,7 +175,7 @@ socket.addEventListener('message', (event) => {
       return;
     case 'ended':
       log(`call ended: ${message.cause || 'normal'}`);
-      finish(answered && counters.received > 0 && counters.sent > 0 ? 0 : 1, 'call ended');
+      finish(answered && counters.audio > 0 && counters.sent > 0 ? 0 : 1, 'call ended');
       return;
     case 'error':
       finish(1, `switch refused: ${message.error}`);

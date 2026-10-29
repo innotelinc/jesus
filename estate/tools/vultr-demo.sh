@@ -286,9 +286,14 @@ upload_and_start() {
   rm -f "$archive"
 
   echo "[vultr] starting the estate on the instance (this builds two images)" >&2
+  # Line endings are normalised on the way in. A Windows checkout can hand the
+  # archive a CRLF `up.sh`, and then the box answers `nohup: failed to run
+  # command './up.sh': No such file or directory` — the shebang is `/bin/sh\r`,
+  # a path that does not exist — while the upload itself looked fine.
   remote "set -eu
     mkdir -p $ESTATE_DIR
     tar -xzf /tmp/cantus-estate.tgz -C $ESTATE_DIR
+    find $ESTATE_DIR -name '*.sh' -exec sed -i 's/\r$//' {} +
     chmod +x $ESTATE_DIR/estate/up.sh
     cd $ESTATE_DIR/estate
     nohup ./up.sh up > /var/log/estate-up.log 2>&1 &
