@@ -56,6 +56,10 @@ export const TIMERS = {
   REFRESH: 20_000,
   MEDIA_TICK: 20,
   FEEDBACK: 200,
+  // A browser line has no registration to expire, so it is kept honest with a
+  // ping: answer within two rounds or the socket is not a phone any more.
+  LINE_PING: 10_000,
+  LINE_DEAD: 30_000,
 };
 
 export const DEFAULT_LIMITS = {
