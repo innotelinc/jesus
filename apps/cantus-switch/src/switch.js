@@ -218,22 +218,33 @@ export class Switch extends EventEmitter {
     return this.routesDoc;
   }
 
+  /**
+   * Create or update a line from the platform's document.
+   *
+   * The platform re-sends this every thirty seconds, so a line that already
+   * exists has to be updated in place. Handing it a fresh entry gave it an
+   * empty socket set, and every browser line silently unregistered twice a
+   * minute: the socket stayed open, the client still showed "Registered", and
+   * the switch could no longer ring the phone. `/v1/status` flapped between 0
+   * and 1 while nobody was touching the console.
+   */
   setLine(line) {
     const { ext } = line;
     if (ext === undefined) throw new Error('a line needs an ext');
-    const entry = {
-      ext: String(ext),
-      displayName: line.displayName || '',
-      numbers: (line.numbers || []).map(String),
-      secret: line.secret || '',
-      voicemail: !!line.voicemail,
-      dnd: !!line.dnd,
-      forwardTo: line.forwardTo || '',
+    const key = String(ext);
+    const entry = this.lines.get(key) || {
+      ext: key,
       sockets: new Set(),
       cantus: new Set(),
       contacts: new Map(),
     };
-    this.lines.set(String(ext), entry);
+    entry.displayName = line.displayName || '';
+    entry.numbers = (line.numbers || []).map(String);
+    entry.secret = line.secret || '';
+    entry.voicemail = !!line.voicemail;
+    entry.dnd = !!line.dnd;
+    entry.forwardTo = line.forwardTo || '';
+    this.lines.set(key, entry);
     if (this.endpoint.relay && this.endpoint.running) this.syncRegistrations();
     return entry;
   }

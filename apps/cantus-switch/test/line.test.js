@@ -90,6 +90,29 @@ function incomingCall(sw, id = 'call-stale') {
   return call;
 }
 
+test('re-sending the line document does not unregister a phone', () => {
+  const sw = lineSwitch();
+  const socket = lineSocket();
+  sw.attachSocket(socket, { ext: '101' });
+  assert.equal(sw.status().lines.find((line) => line.ext === '101').registered, 1);
+
+  // The platform re-sends its document every 30 s; the phone never moves.
+  for (let round = 0; round < 3; round += 1) {
+    sw.setLine({ ext: '101', displayName: 'Demo Owner', numbers: ['+14132642700'] });
+    const line = sw.lines.get('101');
+    assert.equal(line.sockets.has(socket), true, 'the socket survives the refresh');
+  }
+
+  const status = sw.status().lines.find((line) => line.ext === '101');
+  assert.equal(status.registered, 1, 'the line is still registered afterwards');
+  assert.deepEqual(status.numbers, ['+14132642700'], 'and the new numbers were taken');
+
+  const call = incomingCall(sw, 'call-after-sync');
+  sw.ringTargets(call, '101', { timeout: 30 });
+  assert.equal(call.legs.filter((leg) => leg.state === 'ringing').length, 1);
+  sw.endCall(call, 'normal');
+});
+
 test('a line socket that stops answering is dropped, not rung', () => {
   const sw = lineSwitch();
   const dead = lineSocket({ answers: false });
