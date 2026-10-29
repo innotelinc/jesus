@@ -8,6 +8,7 @@ import * as v from '../lib/validate.js';
 import { applyAfterChange, telephonyStatus } from '../telephony/index.js';
 import { voipmsConfigured } from '../lib/carriers/voipms.js';
 import { pushStatus } from '../lib/push.js';
+import { publicSocketUrl } from '../telephony/wssRelay.js';
 import { config } from '../config.js';
 
 /**
@@ -141,7 +142,7 @@ export default async function setupRoutes(app) {
       softphone: {
         enabled: config.softphone.enabled,
         ready: softphoneReady,
-        socketUrl: config.softphone.socketUrl,
+        socketUrl: publicSocketUrl(),
         video: config.softphone.video,
         ticketTtlSec: config.softphone.ticketTtlSec,
       },

@@ -238,7 +238,12 @@ export async function telephonyStatus() {
     enabled: config.telephony.enabled,
     domain: config.telephony.domain,
     routesFile: config.telephony.configDir || null,
-    simulated: false,
+    // The configured mode, not a guess from `connected`. A box that runs with
+    // TELEPHONY_SIMULATE is one whose console and health probes should say
+    // "simulated" rather than report a switch that is down — and, the other way
+    // round, a real switch that is merely unreachable must not be excused as a
+    // simulation. Hardcoding this to false made both cases lie.
+    simulated: !!config.telephony.simulate,
   };
 }
 

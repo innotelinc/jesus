@@ -9,7 +9,7 @@ import { applyAfterChange } from '../telephony/index.js';
 import { badRequest, forbidden, notFound, voiceRequired } from '../lib/errors.js';
 import { logEvent } from '../lib/audit.js';
 import { cantus } from '../telephony/cantus.js';
-import { proxyToSwitch, socketUrlFor } from '../telephony/wssRelay.js';
+import { proxyToSwitch, publicSocketUrl } from '../telephony/wssRelay.js';
 import * as v from '../lib/validate.js';
 
 /**
@@ -62,21 +62,6 @@ function takeTicket(value) {
 /* ------------------------------------------------------------------ host -- */
 
 const hostOf = (value) => String(value || '').split(',')[0].split(':')[0].trim();
-
-/**
- * The same-origin path the browser opens; the console proxies it to the switch.
- *
- * The route is mounted under `/api`, and the browser concatenates this value
- * onto the page's own origin, so the prefix has to be advertised: without it the
- * softphone opened `<origin>/softphone/line`, which nothing upgrades, and every
- * connection failed with "no Cantus line answered at /softphone/line". A
- * configured absolute (`ws://…`) URL is passed through untouched.
- */
-const publicSocketUrl = () => {
-  const url = socketUrlFor();
-  if (!url || url.startsWith('ws') || url.startsWith('/api/')) return url;
-  return `/api${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 /* -------------------------------------------------------------- policy -- */
 

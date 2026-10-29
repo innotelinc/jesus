@@ -214,7 +214,7 @@ if (!base) {
   // failed on precisely the machine that had never run the platform before.
   // A temporary directory also means the suite cannot touch a developer's data.
   dataDir = await mkdtemp(join(tmpdir(), 'telno-smoke-'));
-  configDir = join(dataDir, 'asterisk');
+  configDir = join(dataDir, 'cantus');
 
   // The checks below assert against demo data — voicemail, call history, the
   // connected systems, the demo accounts — so a run that starts its own server
@@ -225,7 +225,7 @@ if (!base) {
     env: {
       ...process.env,
       DATA_DIR: dataDir,
-      ASTERISK_CONFIG_DIR: configDir,
+      CANTUS_CONFIG_DIR: configDir,
       ADMIN_EMAIL: email,
       ADMIN_PASSWORD: password,
     },
@@ -246,7 +246,7 @@ if (!base) {
     // The owner this run will sign in as. Set explicitly so first boot creates
     // the account the suite expects instead of printing a random password.
     DATA_DIR: dataDir,
-    ASTERISK_CONFIG_DIR: configDir,
+    CANTUS_CONFIG_DIR: configDir,
     ADMIN_EMAIL: email,
     ADMIN_PASSWORD: password,
     // The same origin the stub will claim is registered in Stripe, so the
@@ -254,7 +254,10 @@ if (!base) {
     PUBLIC_URL: base,
     SESSION_SECRET: `smoke-${Date.now()}`,
     SUBMISSION_LIMIT_PER_HOUR: '500',
-    TELEPHONY_SIMULATED: 'true',
+    TELEPHONY_SIMULATE: 'true',
+    // Parking is opt-in on a real install. This run exercises the lot and the
+    // status that reports it, so it is switched on here.
+    PARKING_ENABLED: 'true',
     // Escalation is compressed for the test: a final notice at 21 days and no
     // grace period, so one sweep proves the whole path. Production defaults
     // are 30 days and 14 days of grace.
@@ -827,10 +830,21 @@ const newExtension = await call('POST', '/api/extensions', {
 check('extension created with a generated secret', newExtension.status === 201 && !!newExtension.body.secret, newExtension.body);
 // There is no Apply button anywhere in the console: saving the row has to be
 // what writes the file and reloads the switch, or a saved endpoint stays dark.
+// The switch is configured by two documents now, not a tree of `.conf` files:
+// `routes.json` is the dial plan and `lines.json` is the inventory. Every
+// assertion in this section reads what telno actually wrote, so a document that
+// is written but wrong fails here instead of at the first call.
+const documentOf = (body) => JSON.parse(body?.content || '{}');
+const generated = (name) => JSON.parse(readFileSync(join(configDir, name), 'utf8'));
+const routeNamed = (doc, name) => (doc.routes || []).find((route) => route.name === name) || null;
+const lineFor = (doc, ext) => (doc.lines || []).find((line) => line.ext === String(ext)) || null;
+// Only the agent's recording counts here: a DID route also records voicemail
+// after the bridge times out, and that action has nothing to do with policy.
+const recordAction = (route) => (route?.then || []).find((action) => /^inbound-/.test(action.record?.name || '')) || null;
+
 check(
   'saving an extension writes the switch config and reloads it, with no apply step',
-  newExtension.body.applied?.written === true &&
-    readFileSync(join(configDir, 'pjsip.conf'), 'utf8').includes('[299]'),
+  newExtension.body.applied?.written === true && !!lineFor(generated('lines.json'), '299'),
   newExtension.body.applied
 );
 
@@ -850,15 +864,15 @@ check(
 
 const linked = await call('PATCH', `/api/extensions/${newExtension.body.extension.id}`, { number: '+14155550198' });
 check(
-  'a number linked to an extension lands in the generated dialplan',
-  linked.status === 200 && readFileSync(join(configDir, 'extensions.conf'), 'utf8').includes('+14155550198'),
-  linked.body
+  'a number linked to an extension gets its own inbound route',
+  linked.status === 200 && !!routeNamed(generated('routes.json'), 'did-14155550198'),
+  (generated('routes.json').routes || []).map((route) => route.name).slice(-6)
 );
 
 const unlinked = await call('DELETE', `/api/numbers/${switchNumber.body.number.id}`);
 check(
-  'deleting the number takes the DID back out of the dialplan',
-  unlinked.status === 200 && !readFileSync(join(configDir, 'extensions.conf'), 'utf8').includes('+14155550198'),
+  'deleting the number takes the DID back out of the routing document',
+  unlinked.status === 200 && !routeNamed(generated('routes.json'), 'did-14155550198'),
   unlinked.body
 );
 
@@ -867,32 +881,38 @@ check('secret can be rotated', rotate.status === 200 && !!rotate.body.secret, ro
 
 const status = await call('GET', '/api/system/status');
 check('system status', status.status === 200 && !!status.body.telephony, status.body);
-check('telephony reports simulated when no switch', status.body.telephony.simulated === true, status.body.telephony);
-
-const preview = await call('GET', '/api/system/config-preview?file=pjsip.conf');
-// The desk endpoint is named after the extension and the browser endpoint is
-// `webrtc-<ext>`, because chan_pjsip matches a registration against the
-// endpoint of the same name. Assert both halves of that contract.
+// Nothing is listening on the switch's port in this run. The status has to say
+// so: a platform that reported a healthy switch here is the one that would let
+// a console claim calls are being carried when nothing is.
 check(
-  'generated pjsip config contains the new extension',
-  preview.status === 200 &&
-    /\n\[299\]\ntype=endpoint/.test(preview.body.content) &&
-    /\n\[webrtc-299\]\ntype=endpoint/.test(preview.body.content),
-  preview.body.content?.slice(0, 160)
-);
-check(
-  'each endpoint authenticates as its own name',
-  preview.status === 200 &&
-    /\n\[299-auth\]\ntype=auth[\s\S]*?\nusername=299\n/.test(preview.body.content) &&
-    /\n\[webrtc-299-auth\]\ntype=auth[\s\S]*?\nusername=webrtc-299\n/.test(preview.body.content),
-  'endpoint and auth user must match for endpoint identification'
+  'telephony reports the switch as unreachable instead of inventing one',
+  status.body.telephony.connected === false && status.body.telephony.simulated === true,
+  status.body.telephony
 );
 
-const dialplan = await call('GET', '/api/system/config-preview?file=extensions.conf');
+const preview = await call('GET', '/api/system/config-preview?file=lines.json');
+// One line per extension, carried in the inventory by address. The address is
+// what the switch routes and the console prints, so it has to be in the file
+// before a call can be placed to it.
 check(
-  'dialplan has internal and outbound contexts',
-  dialplan.body.content.includes('[internal]') && dialplan.body.content.includes('[outbound]'),
-  dialplan.body.content?.slice(0, 160)
+  'the generated line inventory carries the new extension',
+  preview.status === 200 &&
+    lineFor(documentOf(preview.body), '299')?.displayName === 'Smoke Desk' &&
+    lineFor(documentOf(preview.body), '299')?.numbers?.length === 0,
+  preview.body.content?.slice(0, 200)
+);
+check(
+  'the line inventory carries no credential',
+  preview.status === 200 && !/"(secret|password)"/i.test(preview.body.content || ''),
+  'a Cantus line is authorised by the socket ticket, so the document must not carry a password'
+);
+
+const dialplan = documentOf((await call('GET', '/api/system/config-preview?file=routes.json')).body);
+const dialplanNames = (dialplan.routes || []).map((route) => route.name);
+check(
+  'the routing document has internal and outbound routes, and refuses the rest',
+  dialplanNames.includes('internal-1xx') && dialplanNames.includes('outbound') && !!dialplan.default?.reject,
+  dialplanNames.slice(0, 10)
 );
 
 const calls = await call('GET', '/api/calls/stats');
@@ -2307,17 +2327,18 @@ check('a system can be removed', removedSystem.status === 200, removedSystem.bod
 // --------------------------------------------------------------- softphone --
 const softphoneStatus = await call('GET', '/api/softphone/status');
 check(
-  'the softphone reports its secure signaling endpoint',
+  'the softphone reports a same-origin socket and a proxy to the switch',
   softphoneStatus.status === 200 &&
     softphoneStatus.body.enabled === true &&
-    String(softphoneStatus.body.wssUrl).startsWith('wss://') &&
+    String(softphoneStatus.body.socketUrl).startsWith('/api/softphone') &&
+    softphoneStatus.body.relay === true &&
     softphoneStatus.body.webSocket === true,
   softphoneStatus.body
 );
 check(
-  'TLS material is ready for the WebSocket listener',
-  softphoneStatus.body.tls?.ready === true && /^[0-9a-f]{64}$/.test(softphoneStatus.body.tls?.fingerprint || ''),
-  softphoneStatus.body.tls
+  'the status names the domain its lines are addressed in',
+  softphoneStatus.body.domain === 'telno.local' && softphoneStatus.body.codec === 'pcm-s16/8000/1',
+  { domain: softphoneStatus.body.domain, codec: softphoneStatus.body.codec }
 );
 
 const sipExtension = await call('POST', '/api/extensions', {
@@ -2337,59 +2358,60 @@ const sipAgent = await call('POST', '/api/voice/agents', {
 await call('PATCH', `/api/voice/agents/${sipAgent.body.agent.id}`, { recordInbound: true, recordOutbound: false });
 
 const DID_DIGITS = FIXTURE_E164.replace(/\D/g, '');
-const didBlock = (content) => {
-  const match = new RegExp(`exten => ${DID_DIGITS},1([\\s\\S]*?)(?=\\nexten|\\n\\[)`).exec(content);
-  return match ? match[0] : '';
-};
+// Recording happens in the route, so the switch's behavior is the `record`
+// action on the DID's inbound route — not a dialplan application string.
+const inboundNow = async () =>
+  recordAction(
+    routeNamed(documentOf((await call('GET', '/api/system/config-preview?file=routes.json')).body), `did-${DID_DIGITS}`)
+  );
 
-const recordedConfig = await call('GET', '/api/system/config-preview?file=extensions.conf');
-const recordedBlock = didBlock(recordedConfig.body.content || '');
+const recorded = await inboundNow();
 check(
-  'an agent recording policy reaches the dialplan',
-  /MixMonitor\(/.test(recordedBlock) && /TELNO_AGENT=/.test(recordedBlock),
-  recordedBlock
+  'an agent recording policy reaches the dial plan',
+  /^inbound-/.test(recorded?.record?.name || '') && String(recorded.record.name).endsWith(DID_DIGITS),
+  recorded
 );
 
 await call('PATCH', `/api/voice/agents/${sipAgent.body.agent.id}`, { recordInbound: false });
-const unrecordedConfig = await call('GET', '/api/system/config-preview?file=extensions.conf');
 check(
-  'turning the policy off removes the recording from the dialplan',
-  !/MixMonitor\(/.test(didBlock(unrecordedConfig.body.content || '')),
-  didBlock(unrecordedConfig.body.content || '')
+  'turning the policy off removes the recording from the dial plan',
+  !(await inboundNow()),
+  await inboundNow()
 );
 
-const pjsipConfig = await call('GET', '/api/system/config-preview?file=pjsip.conf');
+// The browser opens a same-origin path and the console proxies it to the
+// switch, so there is no second certificate to trust and no switch port to
+// publish. The advertised path is what proves the browser is not being pointed
+// at the switch itself.
 check(
-  'the softphone endpoint is WebRTC and DTLS-SRTP only',
-  /\[transport-wss\]/.test(pjsipConfig.body.content || '') &&
-    /protocol=wss/.test(pjsipConfig.body.content) &&
-    /webrtc=yes/.test(pjsipConfig.body.content) &&
-    /media_encryption=dtls/.test(pjsipConfig.body.content),
-  (pjsipConfig.body.content || '').split('\n').filter((line) => /wss|webrtc=yes|dtls/.test(line)).slice(0, 6)
+  'the browser is never pointed at the switch itself',
+  !String(softphoneStatus.body.socketUrl).includes('127.0.0.1') &&
+    !String(softphoneStatus.body.socketUrl).includes('8088') &&
+    softphoneStatus.body.relay === true,
+  softphoneStatus.body.socketUrl
 );
 check(
-  'video codecs are offered when video calling is on',
-  /allow=vp8/.test(pjsipConfig.body.content) && /allow=opus/.test(pjsipConfig.body.content),
-  'codecs'
-);
-
-const httpConfig = await call('GET', '/api/system/config-preview?file=http.conf');
-check(
-  'the switch listens for a secure WebSocket',
-  /tlsenable=yes/.test(httpConfig.body.content) && /tlsbindaddr=0\.0\.0\.0:8089/.test(httpConfig.body.content),
-  httpConfig.body.content
+  'the media contract is one PCM socket, not a codec negotiation',
+  softphoneStatus.body.codec === 'pcm-s16/8000/1' && softphoneStatus.body.video === false,
+  { codec: softphoneStatus.body.codec, video: softphoneStatus.body.video }
 );
 
 const softphoneSession = await call('POST', '/api/softphone/session', { extension: '297' });
 check(
-  'a session carries a single-use ticket, SIP credentials and ICE servers',
+  'a session carries a single-use ticket and the address the switch routes to',
   softphoneSession.status === 201 &&
     String(softphoneSession.body.ticket).startsWith('sf_') &&
-    softphoneSession.body.sip.authUser === 'webrtc-297' &&
-    softphoneSession.body.sip.uri === 'sip:webrtc-297@127.0.0.1' &&
-    softphoneSession.body.media.encryption === 'dtls-srtp' &&
-    softphoneSession.body.iceServers.some((server) => String(server.urls).startsWith('stun:')),
+    softphoneSession.body.line?.address === `297@${softphoneSession.body.line?.domain}` &&
+    softphoneSession.body.line?.domain === 'telno.local' &&
+    softphoneSession.body.media?.transport === 'cantus/1' &&
+    softphoneSession.body.media?.sampleRate === 8000 &&
+    softphoneSession.body.media?.frameMs === 20,
   softphoneSession.body
+);
+check(
+  'a session hands out no long-lived line credential',
+  softphoneSession.status === 201 && !('sip' in softphoneSession.body) && !('iceServers' in softphoneSession.body),
+  Object.keys(softphoneSession.body)
 );
 check(
   'the session states the recording policy the switch will apply',
@@ -2881,13 +2903,13 @@ if (startServer) {
       PORT: String(firstRunPort),
       HOST: '127.0.0.1',
       DATA_DIR: firstRunDir,
-      ASTERISK_CONFIG_DIR: join(firstRunDir, 'asterisk'),
+      CANTUS_CONFIG_DIR: join(firstRunDir, 'cantus'),
       ADMIN_EMAIL: firstRunEmail,
       // Empty on purpose: this is the branch that generates a password.
       ADMIN_PASSWORD: '',
       SESSION_SECRET: 'smoke-first-run-secret',
       PUBLIC_URL: firstRunBase,
-      TELEPHONY_SIMULATED: 'true',
+      TELEPHONY_SIMULATE: 'true',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -3687,9 +3709,12 @@ const ownLine = await fetch(`${base}/api/softphone/session`, {
 });
 const ownLineBody = await ownLine.json().catch(() => ({}));
 check(
-  'a customer can open a softphone session on their own line, with encrypted media',
-  ownLine.status === 201 && ownLineBody.media?.encryption === 'dtls-srtp' && !!ownLineBody.ticket,
-  { status: ownLine.status, media: ownLineBody.media }
+  'a customer can open a softphone session on their own line, over the line socket',
+  ownLine.status === 201 &&
+    ownLineBody.media?.transport === 'cantus/1' &&
+    ownLineBody.line?.address === '296@telno.local' &&
+    !!ownLineBody.ticket,
+  { status: ownLine.status, media: ownLineBody.media, line: ownLineBody.line }
 );
 
 const lineId = (customerMeBody.lines || []).find((line) => line.extension === '296')?.id;
@@ -4004,17 +4029,13 @@ const scifAgent = await call('POST', '/api/voice/agents', {
   status: 'active',
   recordInbound: true,
 });
-const blockFor = (content, digits) => {
-  const match = new RegExp(`exten => ${digits},1([\\s\\S]*?)(?=\\nexten|\\n\\[)`).exec(content);
-  return match ? match[0] : '';
-};
-const preScif = await call('GET', '/api/system/config-preview?file=extensions.conf');
+const inboundFor = async (digits) =>
+  routeNamed(documentOf((await call('GET', '/api/system/config-preview?file=routes.json')).body), `did-${digits}`);
+const preScifRoute = await inboundFor('14155550196');
 check(
   'the agent would record this line before SCIF is armed',
-  scifLine.status === 200 &&
-    scifAgent.status === 201 &&
-    /MixMonitor\(/.test(blockFor(preScif.body.content || '', '14155550196')),
-  blockFor(preScif.body.content || '', '14155550196')
+  scifLine.status === 200 && scifAgent.status === 201 && !!recordAction(preScifRoute),
+  preScifRoute
 );
 
 const scifSave = await asCustomer('POST', '/api/softphone/scif', {
@@ -4035,21 +4056,24 @@ check(
   scifSave.body
 );
 
-const postScif = await call('GET', '/api/system/config-preview?file=extensions.conf');
+const postScif = documentOf((await call('GET', '/api/system/config-preview?file=routes.json')).body);
+const postScifRoute = routeNamed(postScif, 'did-14155550196');
 check(
   'the switch stops recording a SCIF line, whatever the agent asks for',
-  !/MixMonitor\(/.test(blockFor(postScif.body.content || '', '14155550196')) &&
-    /SCIF lines never record: 296/.test(postScif.body.content || ''),
-  blockFor(postScif.body.content || '', '14155550196')
+  !recordAction(postScifRoute) &&
+    (postScif.notes || []).some((note) => /SCIF lines never record: 296/.test(note)),
+  { route: postScifRoute, notes: postScif.notes }
 );
-const scifPjsip = await call('GET', '/api/system/config-preview?file=pjsip.conf');
+// Caller ID is a property of the line, so it is asserted in the inventory the
+// switch registers. One anonymous line, and every other line keeps its own.
+const scifLines = documentOf((await call('GET', '/api/system/config-preview?file=lines.json')).body);
+const anonymousLines = (scifLines.lines || []).filter((line) => line.callername === '"Anonymous" <anonymous>');
 check(
-  'the endpoints present an anonymous caller ID',
-  (scifPjsip.body.content || '').split('callerid="Anonymous" <anonymous>').length - 1 >= 2,
-  (scifPjsip.body.content || '')
-    .split('\n')
-    .filter((line) => line.startsWith('callerid='))
-    .slice(0, 4)
+  'the SCIF line presents an anonymous caller ID and the open lines do not',
+  lineFor(scifLines, '296')?.callername === '"Anonymous" <anonymous>' &&
+    anonymousLines.length === 1 &&
+    anonymousLines[0].ext === '296',
+  anonymousLines.map((line) => [line.ext, line.callername])
 );
 
 const badMask = await asCustomer('POST', '/api/softphone/scif', { extension: '296', voiceMask: 'helium' });
@@ -4361,7 +4385,8 @@ check(
 check(
   'and it says whether the softphone can register and whether a carrier exists',
   typeof setupNow.body.softphone?.enabled === 'boolean' &&
-    typeof setupNow.body.softphone?.tls === 'boolean' &&
+    typeof setupNow.body.softphone?.ready === 'boolean' &&
+    String(setupNow.body.softphone?.socketUrl || '').startsWith('/api/softphone') &&
     typeof setupNow.body.carrier?.voipms === 'boolean',
   setupNow.body.softphone
 );
@@ -4478,8 +4503,10 @@ console.log('\nFax on the switch');
 const faxEngine = await call('GET', '/api/fax/engine');
 check('the fax engine reports what it can do', faxEngine.status === 200 && !!faxEngine.body.engine?.transport, faxEngine.body);
 check(
-  'and says plainly whether the switch has the fax modules',
-  typeof faxEngine.body.engine?.modules?.resFax === 'boolean' && typeof faxEngine.body.engine?.ready === 'boolean',
+  'and says plainly what the switch can carry, and what a fax still needs',
+  typeof faxEngine.body.engine?.ready === 'boolean' &&
+    /T\.38|unavailable/.test(String(faxEngine.body.engine?.transport || '')) &&
+    /voice only|T\.38 gateway/.test(String(faxEngine.body.engine?.note || '')),
   faxEngine.body.engine
 );
 
@@ -4490,7 +4517,7 @@ const faxAttempt = await call('POST', `/api/faxes/${faxQueued.body.fax?.id}/send
 // pretend the page was sent.
 check(
   'sending without a switch or encoder fails with a reason, not a fake success',
-  [422, 503].includes(faxAttempt.status) && /switch|ghostscript|trunk|fax/i.test(faxAttempt.body.error?.message || ''),
+  [409, 422, 503].includes(faxAttempt.status) && /switch|ghostscript|trunk|fax|gateway/i.test(faxAttempt.body.error?.message || ''),
   faxAttempt.body
 );
 const faxAfterAttempt = await call('GET', '/api/faxes?direction=outbound');
