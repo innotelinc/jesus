@@ -29,6 +29,69 @@ export function switchLineUrl(ext, ticket) {
 export const socketUrlFor = () => config.softphone.directUrl || config.softphone.socketUrl || '/softphone/line';
 
 /**
+ * How long a browser may go without proving it is still there.
+ *
+ * The switch pings the upstream socket, and `ws` answers those pings on this
+ * side at the protocol layer — the proxy is healthy even when the browser
+ * behind it is a closed laptop lid. So the switch cannot see a dead browser
+ * through this hop: the proxy has to judge the browser itself and take the
+ * upstream down, which is what tells the switch the line is gone.
+ */
+export const BROWSER_PING_MS = 10_000;
+export const BROWSER_DEAD_MS = 30_000;
+
+/**
+ * Watch one browser socket and call `onDead` when it stops answering.
+ *
+ * `check` is exposed so a test can drive the clock instead of sleeping: in
+ * service it runs from the interval, and any frame from the browser counts as
+ * proof of life, not just a pong — a browser sending 20 ms audio has no reason
+ * to be doubted.
+ */
+export function watchBrowser(socket, { pingMs = BROWSER_PING_MS, deadMs = BROWSER_DEAD_MS, now = Date.now, onDead = () => {} } = {}) {
+  let lastSeen = now();
+  let stopped = false;
+
+  const touch = () => {
+    lastSeen = now();
+  };
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(timer);
+    socket.off?.('pong', touch);
+  };
+
+  const check = (at = now()) => {
+    if (stopped) return false;
+    if (at - lastSeen > deadMs) {
+      stop();
+      try {
+        onDead();
+      } catch {
+        /* the caller closes both sockets; a throw here must not kill the tick */
+      }
+      return false;
+    }
+    if (socket.readyState === 1) {
+      try {
+        socket.ping();
+      } catch {
+        /* a socket that cannot be pinged will fail the next deadline */
+      }
+    }
+    return true;
+  };
+
+  socket.on('pong', touch);
+  const timer = setInterval(() => check(), pingMs);
+  timer.unref?.();
+
+  return { stop, touch, check };
+}
+
+/**
  * Pipe one accepted browser socket to the switch.
  *
  * Frames are forwarded as they arrive and not buffered into a playback queue:
@@ -37,6 +100,8 @@ export const socketUrlFor = () => config.softphone.directUrl || config.softphone
  */
 export function proxyToSwitch(socket, { ext, ticket }) {
   const url = switchLineUrl(ext, ticket);
+  // Declared before the sockets so every close path can stop it.
+  let watch;
   let upstream;
   try {
     upstream = new WebSocket(url, { headers: config.telephony.token ? { authorization: `Bearer ${config.telephony.token}` } : {} });
@@ -49,6 +114,7 @@ export function proxyToSwitch(socket, { ext, ticket }) {
   const closeBoth = (code = 1000, reason = '') => {
     if (closed) return;
     closed = true;
+    watch?.stop();
     try {
       upstream.close(code, reason);
     } catch {
@@ -65,6 +131,11 @@ export function proxyToSwitch(socket, { ext, ticket }) {
     if (!config.softphone.proxy) return;
   });
 
+  // A browser that stops answering takes the upstream with it: the switch then
+  // drops the line on its own close handler instead of ringing a phone that is
+  // no longer there, and a held call ends instead of hanging in silence.
+  watch = watchBrowser(socket, { onDead: () => closeBoth(4408, 'browser stopped answering') });
+
   upstream.addEventListener('message', (event) => {
     try {
       if (typeof event.data === 'string') socket.send(event.data);
@@ -75,6 +146,7 @@ export function proxyToSwitch(socket, { ext, ticket }) {
   });
 
   upstream.addEventListener('close', (event) => {
+    watch?.stop();
     if (closed) return;
     closed = true;
     try {
@@ -89,6 +161,7 @@ export function proxyToSwitch(socket, { ext, ticket }) {
   });
 
   socket.on('message', (data, isBinary) => {
+    watch?.touch();
     if (upstream.readyState !== 1) return; // OPEN
     try {
       upstream.send(isBinary ? data : String(data));
@@ -98,6 +171,7 @@ export function proxyToSwitch(socket, { ext, ticket }) {
   });
 
   socket.on('close', () => {
+    watch?.stop();
     if (closed) return;
     closed = true;
     try {

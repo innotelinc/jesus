@@ -16,6 +16,7 @@
     "check:node": "node scripts/check-node.mjs",
     "build": "vite build --config web/vite.config.js",
     "seed": "node src/seed.js",
+    "test": "node --test test/*.test.js",
     "smoke": "node scripts/smoke.mjs",
     "inspect": "node scripts/cdp-inspect.mjs"
   },
