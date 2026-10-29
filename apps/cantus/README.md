@@ -172,6 +172,9 @@ amplitude of the received PCM, `ACTIVE` is read from the state machine, and
 | Doc | What it covers |
 |---|---|
 | [spec/CANTUS-1.0.md](spec/CANTUS-1.0.md) | The normative standard: everything that must be true of an implementation |
+| [spec/CANTUS-SIP-BORDER.md](spec/CANTUS-SIP-BORDER.md) | Where SIP is still used, and the rules that keep it there: codecs, keypresses, refusal mapping, security posture |
+| [docs/interop.md](docs/interop.md) | What compatibility means for zeus, capstone, dograh, telno, warden and this monorepo |
+| [docs/security.md](docs/security.md) | Threat model, the controls that exist, and the gaps that are not fixed yet |
 | [docs/stack.md](docs/stack.md) | Cantus's role in the Innotel Platform Stack (Voice) |
 | [analysis/asterisk-22-findings.md](analysis/asterisk-22-findings.md) | The measured review of Asterisk 22.11.0 that drove the design |
 | [examples/routes.json](examples/routes.json) | A routing document, with the offline evaluator |
@@ -209,6 +212,9 @@ Deliberate, and stated so nobody mistakes a reference stack for a deployment:
   RTT and jitter are still zero, and `desired_kbps` is fixed rather than driven by
   a congestion controller.
 - **No T.38, no in-band DTMF, no dialplan** — by design.
+- **SIP exists only in [`cantus-gateway`](../cantus-gateway)**, the border. The
+  switch, the reference stack and every endpoint speak Cantus and nothing else;
+  [the border profile](spec/CANTUS-SIP-BORDER.md) says exactly what crosses.
 - **Bind default** is `127.0.0.1:0`; pass `bind => '0.0.0.0:7443'` for a real node.
 - **The Asterisk tarball is not committed** (26 MB, reproducibly downloadable);
   its SHA-256 is in the findings doc.

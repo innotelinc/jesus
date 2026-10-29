@@ -5,7 +5,8 @@ the other, PCM16 to PCMU in between.
 
 ```bash
 node src/index.js          # needs SIP_HOST and credentials, see below
-npm test                   # 17 tests, including a real UDP registrar and dialog
+npm test                   # 43 tests, including a real UDP registrar, a dialog,
+                           # and keypad events across the border both ways
 ```
 
 ## Why it exists
@@ -29,6 +30,32 @@ The DID is the *dialled address* on the Cantus side, so the routing document —
 not the gateway — decides which line rings. Outbound, the Cantus leg is accepted
 only when the carrier answers, so a failed call has a cause the switch records
 instead of silence.
+
+## Keypresses
+
+A digit is not audio, and a gateway that treats it as audio silently breaks
+every IVR on the PSTN side. The bridge is exact in both directions:
+
+```
+carrier ──RFC 4733 telephone-event──▶ gateway ──INFO event=dtmf──▶ switch
+switch  ──INFO event=dtmf───────────▶ gateway ──RFC 4733 telephone-event──▶ carrier
+```
+
+The event payload type is read from the carrier's SDP, not assumed: an answer
+must not name a type the offer did not contain. A keypress arrives as a burst of
+packets repeating one event number, and exactly one Cantus `INFO` is emitted per
+burst — forwarding each packet would take an IVR menu once per packet.
+
+A refusal is information too. `486 Busy Here` sends a carrier to call-forward-busy
+and `480` sends it to the next branch, so the switch's reason code is mapped
+rather than replaced with a generic failure: `BUSY`→486, `NOT_FOUND`→404,
+`NO_CAPABILITY`→488, `LIMIT`→486, `CANCELLED`→487, `GLARE`→491, and the rest per
+the table in [`spec/CANTUS-SIP-BORDER.md`](../cantus/spec/CANTUS-SIP-BORDER.md).
+Inbound, only the carrier's status number is parsed; its reason phrase is the
+carrier's own wording and is never matched.
+
+The full border contract — media, encryption, refusal codes, failure semantics and
+conformance — is [`CANTUS-SIP-BORDER.md`](../cantus/spec/CANTUS-SIP-BORDER.md).
 
 ## Configuration
 
@@ -89,6 +116,8 @@ curl -X POST http://<console>/api/trunks -b cookie -H 'content-type: application
 
 - **PCMU only.** G.729, G.722 and Opus are refused with `488 Not Acceptable
   Here` rather than negotiated into something that would carry silence.
+- **No in-band DTMF.** Keys are RFC 4733 events; a carrier that sends tones as
+  audio is not supported, and no tone detector pretends otherwise.
 - **SDES-SRTP only, no TLS.** `SIP_SRTP=on` encrypts the carrier media with
   `AES_CM_128_HMAC_SHA1_80`, keyed in the SDP the way a carrier expects. The
   signalling itself stays plain UDP: `sips:` and DTLS-SRTP are not implemented,
