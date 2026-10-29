@@ -136,19 +136,20 @@ jobs:
       - name: Unit tests for the Zeus portal API client
         run: python3 -m unittest discover -s scripts/tests -v
 
-  # Magnate entitlement gate for the dograh route sync: dry-runs the REAL
-  # sync_dograh_routes.py --check through every gate state (standalone,
-  # disabled, entitled, not-entitled, plan 404, unauthorized abort,
-  # unreachable fail-open) against stubbed dograh/FreePBX/Magnate HTTP
-  # servers and a fake `docker` — no PBX, no Magnate, no network required.
-  dograh-sync-gate:
-    name: Route sync Magnate gate
+  # Magnate entitlement gate for the agent-number sync: runs the REAL
+  # pbx/sync_agent_numbers.py through every gate state (standalone, disabled,
+  # entitled, not-entitled, plan 404, unauthorized abort, unreachable
+  # fail-open) against stubbed dograh/Magnate/switch HTTP servers — no switch,
+  # no Magnate, no network required. The gate outlived the FreePBX sync it was
+  # written for; this job is what noticed it did not survive the move.
+  agent-number-gate:
+    name: Agent-number Magnate gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Dry-run every Magnate gate state
-        run: python3 scripts/test_dograh_routes_gate.py
+      - name: Walk every Magnate gate state
+        run: python3 scripts/test_agent_number_gate.py
 
   # Sign-in is the one path where every failure — a credential that was never
   # resolved, a proxy that follows a redirect server-side, group admission, a
