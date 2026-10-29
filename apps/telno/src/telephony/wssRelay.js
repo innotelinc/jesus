@@ -29,6 +29,24 @@ export function switchLineUrl(ext, ticket) {
 export const socketUrlFor = () => config.softphone.directUrl || config.softphone.socketUrl || '/softphone/line';
 
 /**
+ * The same-origin path the browser opens; the console proxies it to the switch.
+ *
+ * The route is mounted under `/api`, and the browser concatenates this value
+ * onto the page's own origin, so the prefix has to be advertised: without it the
+ * softphone opened `<origin>/softphone/line`, which nothing upgrades, and every
+ * connection failed with "no Cantus line answered at /softphone/line". A
+ * configured absolute (`ws://…`) URL is passed through untouched.
+ *
+ * Every screen that hands a socket URL to a browser uses this, so setup and the
+ * softphone cannot advertise two different paths for the same socket.
+ */
+export function publicSocketUrl() {
+  const url = socketUrlFor();
+  if (!url || url.startsWith('ws') || url.startsWith('/api/')) return url;
+  return `/api${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+/**
  * How long a browser may go without proving it is still there.
  *
  * The switch pings the upstream socket, and `ws` answers those pings on this
