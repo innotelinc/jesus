@@ -169,11 +169,13 @@ perl tools/port-workflows.pl --check  # exit 1 if they are stale; write nothing
 
 Both modes exit 1 when one of the hand patches below is missing, so a re-import cannot pass as
 a clean regeneration. The plain run still regenerates the root copies to keep the tree consistent,
-but it says they are not safe to commit on their own.A pre-commit hook asks the same question before the commit exists. When nothing under
+but it says they are not safe to commit on their own.
+
+A pre-commit hook asks the same question before the commit exists. When nothing under
 `apps/*/.github/` or the generator is staged it exits after two read-only git queries, without
 starting perl — measured at ~0.45 s on Windows, where process creation dominates, and far less
 elsewhere. `git commit --no-verify` skips it for one commit; the drift job still checks the
-committed tree, including a patch reverted across a partial stage.
+committed tree, including a patch reverted across a partial stage.
 
 The hook lives in [.githooks/](.githooks) and is enabled by `core.hooksPath`, which is per-clone
 config inside `.git/` — so `git clone` cannot install it, and a fresh clone starts unguarded.
