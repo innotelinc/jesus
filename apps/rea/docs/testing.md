@@ -1594,7 +1594,11 @@ Shared process/contract/CLI boundaries, dependencies, other packaging inputs,
 unknown paths, and changes to the planner select the fast Linux x64 baseline:
 portable code checks and the installed-package runtime lane, without provider
 lanes or the multi-host package matrix. A shared file with exactly one owner
-still selects that owner. Full qualification still selects every lane.
+still selects that owner. Full qualification still selects every lane. On a
+push, the comparison base is the newest successful run of the workflow doing
+the classification, whatever file name publishes it, so a project nested in a
+larger repository still finds its own history instead of falling back to the
+unfiltered baseline.
 CI timing collection, timing history, and test-report helper edits retain static
 checks and the complete portable suite without selecting unrelated host/provider
 lanes. Classification, qualification, gate, release receipt, and unknown CI

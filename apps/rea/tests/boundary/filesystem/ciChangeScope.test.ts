@@ -492,6 +492,63 @@ it("selects only a trusted successful ancestor from recent CI push runs", async 
   expect(await readFile(output, "utf8")).toBe(`base=${base}\nreason=\n`);
 });
 
+it("reads the baseline of the workflow that is actually running", async ({
+  skip,
+}) => {
+  skip(process.platform === "win32", "the fake gh is a POSIX shell script");
+  const { directory, base } = await fixture();
+  const head = await change(directory, ["src/evm/client.ts"]);
+  const bin = join(directory, "fake-bin");
+  await mkdir(bin);
+  const gh = join(bin, "gh");
+  // The port gives the workflow another name, so a lookup hard-coded to ci.yml
+  // would be refused here exactly as GitHub refuses it in the larger tree.
+  await writeFile(
+    gh,
+    '#!/bin/sh\ncase "$*" in\n  *"/actions/workflows/rea-ci.yml/runs"*) cat "$GH_FIXTURE_RESPONSE" ;;\n  *) echo "unexpected endpoint: $*" >&2; exit 22 ;;\nesac\n',
+  );
+  await chmod(gh, 0o755);
+  const response = join(directory, "runs.json");
+  await writeFile(
+    response,
+    JSON.stringify({
+      workflow_runs: [
+        {
+          event: "push",
+          conclusion: "success",
+          head_branch: "main",
+          head_repository: { full_name: "owner/repo" },
+          head_sha: base,
+        },
+      ],
+    }),
+  );
+  const output = join(directory, "baseline-output");
+  const result = await execFileAsync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL("../../../scripts/ci/baseline.mjs", import.meta.url),
+      ),
+    ],
+    {
+      cwd: directory,
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        GH_FIXTURE_RESPONSE: response,
+        CI_REPOSITORY: "owner/repo",
+        CI_DEFAULT_BRANCH: "main",
+        HEAD_SHA: head,
+        GITHUB_WORKFLOW_REF:
+          "owner/repo/.github/workflows/rea-ci.yml@refs/heads/main",
+        GITHUB_OUTPUT: output,
+      },
+    },
+  );
+  expect(JSON.parse(result.stdout)).toEqual({ base, reason: "" });
+});
+
 it("returns an empty baseline when GitHub lookup fails", async ({ skip }) => {
   skip(process.platform === "win32", "the fake gh is a POSIX shell script");
   const { directory, base } = await fixture();

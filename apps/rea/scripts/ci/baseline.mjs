@@ -5,6 +5,17 @@ const repository = process.env.CI_REPOSITORY;
 const branch = process.env.CI_DEFAULT_BRANCH;
 const head = process.env.HEAD_SHA;
 const shaPattern = /^[0-9a-f]{40}$/i;
+// The workflow that runs this script is ci.yml in the standalone project and a
+// ported name when the project lives inside a larger tree, so read the name
+// from the run that is executing rather than assuming one. GitHub reports it
+// as owner/repository/.github/workflows/<file>@<ref>.
+function workflowFile() {
+  const reference = process.env.GITHUB_WORKFLOW_REF ?? "";
+  const separator = reference.lastIndexOf("@");
+  const path = separator === -1 ? reference : reference.slice(0, separator);
+  const name = path.split("/").pop();
+  return name ? name : "ci.yml";
+}
 
 function ancestor(base) {
   try {
@@ -38,7 +49,7 @@ if (!repository || !branch || !head || !shaPattern.test(head)) {
         "api",
         "--method",
         "GET",
-        `repos/${repository}/actions/workflows/ci.yml/runs`,
+        `repos/${repository}/actions/workflows/${encodeURIComponent(workflowFile())}/runs`,
         "-f",
         `branch=${branch}`,
         "-f",
