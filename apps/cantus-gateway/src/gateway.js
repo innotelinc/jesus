@@ -150,6 +150,17 @@ export class Gateway {
     }
     if (!audio?.pcmu) {
       // Only PCMU was offered, so anything else is a codec we cannot carry.
+      // Logged with what was actually offered: a carrier that wants SRTP or a
+      // codec this gateway does not have is otherwise indistinguishable from a
+      // carrier that never sent an INVITE at all.
+      this.log({
+        kind: 'call-in-refused',
+        number,
+        from: sipUser(call.request?.get('from')),
+        codec: audio ? 'no-pcmu' : 'no-audio',
+        media: audio ? `${audio.host}:${audio.port}` : '',
+        offer: String(call.request?.body || '').split('\r\n').filter((line) => /^(m=|a=crypto|a=rtpmap)/.test(line)).join(' | '),
+      });
       this.trunk.reject(call, 488, 'Not Acceptable Here');
       return;
     }
@@ -233,6 +244,10 @@ export class Gateway {
     sipCall.onFailed = (reason) => {
       if (this.legs.get(session.call) !== leg) return;
       this.counters.failed += 1;
+      // The carrier's own words. Without them a refused call is "rejected" on
+      // the switch and nothing anywhere says whether it was a wrong number, a
+      // caller ID the trunk is not allowed to present, or a blocked account.
+      this.log({ kind: 'call-out-failed', call: session.call, number, reason });
       this.endpoint.reject(session, reason === 'timeout' ? 'TIMEOUT' : 'REJECTED');
       this.dropLeg(leg);
     };
