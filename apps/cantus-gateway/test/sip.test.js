@@ -38,7 +38,8 @@ test('an inbound INVITE is parsed into something routable', () => {
   assert.match(message.get('to'), /\+14132642700/);
 
   const audio = parseSdpAddress(message.body, '198.51.100.7');
-  assert.deepEqual(audio, { host: '198.51.100.7', port: 49170, pcmu: true, secure: false, crypto: '' });
+  // The carrier's offer names no event type, so it cannot send a keypress.
+  assert.deepEqual(audio, { host: '198.51.100.7', port: 49170, pcmu: true, secure: false, crypto: '', dtmfType: null });
 });
 
 test('an SDP without PCMU is recognised as uncarryable', () => {
@@ -67,7 +68,7 @@ test('offered SDP names one codec and the port we bound', () => {
   assert.match(sdp, /c=IN IP4 203\.0\.113\.9/);
   assert.match(sdp, /m=audio 40000 RTP\/AVP 0/);
   assert.match(sdp, /a=rtpmap:0 PCMU\/8000/);
-  assert.deepEqual(parseSdpAddress(sdp, 'ignored'), { host: '203.0.113.9', port: 40000, pcmu: true, secure: false, crypto: '' });
+  assert.deepEqual(parseSdpAddress(sdp, 'ignored'), { host: '203.0.113.9', port: 40000, pcmu: true, secure: false, crypto: '', dtmfType: 101 });
 });
 
 /**

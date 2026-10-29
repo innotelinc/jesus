@@ -200,7 +200,9 @@ test('a carrier that rejects the call rejects the Cantus leg with a reason', asy
   const { gateway, endpoint, trunk } = makeGateway(t);
   await gateway.onCantusCall({ call: 'call-10' }, '14134210134@voipms@gateway');
   trunk.lastCall.onFailed('404 Not Found');
-  assert.deepEqual(endpoint.rejected, { id: 'call-10', reason: 'REJECTED' });
+  // A wrong number is not the same failure as a policy refusal, and the switch
+  // records the difference.
+  assert.deepEqual(endpoint.rejected, { id: 'call-10', reason: 'NOT_FOUND' });
 });
 
 test('a carrier that never answers times out the Cantus leg', async (t) => {

@@ -66,7 +66,9 @@ export function buildResponse({ status, reason, headers, body = '' }) {
   return Buffer.from(lines.join(CRLF) + CRLF + CRLF + body, 'utf8');
 }
 
-/** The one SDP answer/offer this gateway ever sends: PCMU, 20 ms, sendrecv. */
+/** The dynamic payload type this gateway offers for RFC 4733 keypresses. */
+export const DTMF_PT = 101;
+
 /**
  * Our media offer, encrypted when `crypto` is present.
  *
@@ -74,19 +76,27 @@ export function buildResponse({ status, reason, headers, body = '' }) {
  * answered `RTP/AVP` with 488, and an offer of `RTP/AVP` to an encrypted
  * sub-account was refused the same way. The `a=crypto` line carries the master
  * key for the media we send, which is what SDES means by putting a key in SDP.
+ *
+ * `telephone-event` is offered because a keypad digit is the one thing in-band
+ * audio cannot carry: a carrier sends `#` as an RTP event, and a gateway that
+ * did not advertise the event type would drop it and leave every IVR on the
+ * PSTN side unable to take a menu choice.
  */
-export function buildSdp({ address, port, crypto = '' }) {
+export function buildSdp({ address, port, crypto = '', dtmf = DTMF_PT }) {
+  // `dtmf: 0` answers an offer that had no event type: adding one to an answer
+  // would name a payload the far side never offered.
+  const formats = dtmf ? `0 ${dtmf}` : '0';
   const lines = [
     'v=0',
     `o=cantus-gateway ${Date.now()} ${Date.now()} IN IP4 ${address}`,
     's=cantus-gateway',
     `c=IN IP4 ${address}`,
     't=0 0',
-    crypto ? `m=audio ${port} RTP/SAVP 0` : `m=audio ${port} RTP/AVP ${0}`,
+    crypto ? `m=audio ${port} RTP/SAVP ${formats}` : `m=audio ${port} RTP/AVP ${formats}`,
     'a=rtpmap:0 PCMU/8000',
-    'a=ptime:20',
-    'a=sendrecv',
   ];
+  if (dtmf) lines.push(`a=rtpmap:${dtmf} telephone-event/8000`, `a=fmtp:${dtmf} 0-16`);
+  lines.push('a=ptime:20', 'a=sendrecv');
   if (crypto) lines.push(`a=crypto:${crypto}`);
   lines.push('');
   return lines.join(CRLF);
@@ -100,6 +110,10 @@ export function parseSdpAddress(body, fallbackHost) {
   const media = /m=audio\s+(\d+)\s+RTP\/(AVP|SAVP)\s+([\d ]+)/.exec(text);
   const connection = /c=IN\s+IP4\s+([\d.]+)/.exec(text);
   if (!media) return null;
+  // The far side picks its own dynamic payload type for keypresses, and the
+  // number is only meaningful inside this SDP: matching our own constant here
+  // is how an event arrives as audio, or not at all.
+  const dtmf = /a=rtpmap:(\d+)\s+telephone-event\/8000/i.exec(text);
   return {
     port: Number(media[1]),
     host: connection ? connection[1] : fallbackHost,
@@ -108,6 +122,8 @@ export function parseSdpAddress(body, fallbackHost) {
     secure: media[2] === 'SAVP',
     // The key for the media the far side sends, when it sent one.
     crypto: /^a=crypto:(.+)$/im.exec(text)?.[1]?.trim() || '',
+    // `null` means the far side cannot send keypresses as events at all.
+    dtmfType: dtmf ? Number(dtmf[1]) : null,
   };
 }
 

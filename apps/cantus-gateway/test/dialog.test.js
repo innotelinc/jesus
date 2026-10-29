@@ -107,9 +107,9 @@ test('an INVITE is answered with SDP and its audio address is parsed back', asyn
   assert.match(String(inboundCall.request.get('to')), /sip:14134210134@/);
   // What the callee is given is the *caller's* audio address, taken from the
   // offer — that is where its RTP has to go.
-  assert.deepEqual(audio, { host: '203.0.113.9', port: 40000, pcmu: true, secure: false, crypto: '' }, 'the carrier sees PCMU offered');
+  assert.deepEqual(audio, { host: '203.0.113.9', port: 40000, pcmu: true, secure: false, crypto: '', dtmfType: 101 }, 'the carrier sees PCMU offered, with an event type for keypresses');
 
-  assert.deepEqual(answeredAudio, { host: '198.51.100.20', port: 41000, pcmu: true, secure: false, crypto: '' });
+  assert.deepEqual(answeredAudio, { host: '198.51.100.20', port: 41000, pcmu: true, secure: false, crypto: '', dtmfType: 101 });
   assert.equal(call.state, 'confirmed');
 
   gateway.bye(call);
