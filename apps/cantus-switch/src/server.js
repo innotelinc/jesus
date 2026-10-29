@@ -155,7 +155,17 @@ export class CantusServer extends EventEmitter {
             route: call.route || '',
             answeredAt: call.answeredAt ? new Date(call.answeredAt).toISOString() : null,
             seconds: call.durationSec,
-            legs: call.legs.map((leg) => ({ id: leg.id, role: leg.role, ext: leg.ext, state: leg.state })),
+            // Counters travel with the leg so a console can turn two polls into
+            // a frame rate: `sent` is media written to a phone, `received` is
+            // media arriving from it.
+            legs: call.legs.map((leg) => ({
+              id: leg.id,
+              role: leg.role,
+              ext: leg.ext,
+              state: leg.state,
+              sent: leg.sent,
+              received: leg.received,
+            })),
           })),
         };
       }
@@ -233,12 +243,22 @@ export class CantusServer extends EventEmitter {
       if (method === 'GET') {
         return {
           status: 200,
-          body: [...sw.lines.values()].map((line) => ({
-            ext: line.ext,
-            displayName: line.displayName,
-            numbers: line.numbers,
-            registered: line.sockets.size + line.cantus.size,
-          })),
+          body: [...sw.lines.values()].map((line) => {
+            const registered = line.sockets.size + line.cantus.size;
+            const last = (sw.lineLog || []).find((event) => String(event.ext) === String(line.ext));
+            return {
+              ext: line.ext,
+              displayName: line.displayName,
+              numbers: line.numbers,
+              registered,
+              online: registered > 0,
+              // Why the count is what it is: a phone that stopped answering is
+              // dropped by the health check, and that reason belongs on screen.
+              lastChange: last
+                ? { kind: last.kind, at: last.at, reason: last.reason || '', transport: last.transport || '' }
+                : null,
+            };
+          }),
         };
       }
       if (method === 'POST') {
