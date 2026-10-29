@@ -177,8 +177,10 @@ async function setEncryption(enabled) {
   let carrier;
   try {
     if (!voipms.configured()) throw new Error('voip.ms API credentials are not set, so the sub-account was not touched');
-    await voipms.setEncryption(enabled);
-    carrier = { ok: true };
+    const changed = await voipms.setEncryption(enabled);
+    // The carrier is slow enough that a switch needs to say how slow, or an
+    // operator assumes it hung and clicks it again.
+    carrier = { ok: true, ms: changed.ms };
   } catch (error) {
     carrier = { ok: false, error: error.message };
   }
