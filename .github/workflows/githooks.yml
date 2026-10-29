@@ -1,0 +1,295 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# githooks.yml — the local guard is committed code, so CI proves it still runs.
+#
+# .githooks/install points a clone's core.hooksPath at .githooks, and
+# .githooks/pre-commit refuses a commit that carries a reverted monorepo patch.
+# Both can break without any test noticing, because nothing else in CI runs
+# them:
+#
+#   lost bit   git skips a hook that is not executable ("cannot run
+#              .githooks/pre-commit: Permission denied" — or, worse on some
+#              checkouts, nothing at all), so the guard is silently gone in
+#              every clone and the drift job only sees the pushed tree.
+#   CRLF       a hook checked out CRLF dies at "bad interpreter" before its
+#              first line; only .gitattributes stops a Windows clone doing it,
+#              and on Linux nothing would ever look.
+#   quiet bug  an installer that writes no config, reads nothing back, or
+#              exits 0 without enabling anything leaves every clone unguarded
+#              while printing exactly the message it prints when it works.
+#
+# So there are two jobs. The static one reads the index and the committed
+# blobs. The functional one does what a developer does — unpack the committed
+# state into a scratch repository, install, commit — because an installer that
+# behaves in a unit test and does nothing on a real clone is the failure mode
+# worth catching.
+#
+# This is not the drift job's job: workflows-drift.yml compares generated
+# workflows with their sources, and a reverted patch is invisible there.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Pre-commit guard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.githooks/**'
+      - '.gitattributes'
+      - 'tools/port-workflows.pl'
+      - '.github/workflows/githooks.yml'
+  pull_request:
+    paths:
+      - '.githooks/**'
+      - '.gitattributes'
+      - 'tools/port-workflows.pl'
+      - '.github/workflows/githooks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Hook files are runnable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Committed mode, line endings, and attributes
+        shell: bash
+        run: |
+          set -uo pipefail
+          fail=0
+
+          for f in .githooks/install .githooks/pre-commit; do
+            # The bit is in the index, so this catches a chmod that was never
+            # staged as well as one that was committed. Linux clones and CI
+            # checkouts both honour it; Windows ignores it, which is why it
+            # must be committed rather than fixed up per machine.
+            #
+            # Asserted here rather than by chmod-and-check in the functional
+            # job, because `chmod` is a silent no-op on some checkouts (NTFS
+            # without ACL support), so that test passes whether the bit was
+            # restored or not.
+            mode=$(git ls-files -s -- "$f" | awk '{print $1}')
+            if [ "$mode" != "100755" ]; then
+              echo "::error file=$f::committed mode is '${mode:-absent}', not 100755 — git will not run a hook without the executable bit"
+              fail=1
+            else
+              echo "ok: $f is committed 100755"
+            fi
+
+            # Byte counts, not a grep for \r: the blob is what git will check
+            # out on a machine with no conversion, and one CR anywhere before
+            # the first newline breaks the shebang.
+            bytes=$(git show "HEAD:$f" | wc -c)
+            stripped=$(git show "HEAD:$f" | tr -d '\r' | wc -c)
+            if [ "$bytes" -ne "$stripped" ]; then
+              echo "::error file=$f::committed with CRLF line endings — git fails with 'bad interpreter' before the hook runs"
+              fail=1
+            else
+              echo "ok: $f is committed LF"
+            fi
+
+            # On Linux a CRLF checkout never happens, so the checkout cannot
+            # prove the attribute is doing anything. Assert it directly: it is
+            # the only thing protecting Windows clones, where the guard would
+            # otherwise disappear.
+            attr=$(git check-attr eol -- "$f" | awk -F': ' '{print $3}')
+            if [ "$attr" != "lf" ]; then
+              echo "::error file=.gitattributes::no 'eol=lf' attribute covers $f — a Windows clone checks it out CRLF and the hook stops running"
+              fail=1
+            else
+              echo "ok: .gitattributes keeps $f at eol=lf"
+            fi
+          done
+
+          exit "$fail"
+
+      - name: Both scripts parse
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n .githooks/pre-commit
+          sh -n .githooks/install
+          echo "ok: pre-commit parses under bash, install parses under sh"
+
+  functional:
+    name: Installer and hook work in a scratch repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install, then earn a block and an allow
+        shell: bash
+        run: |
+          set -uo pipefail
+          fail=0
+
+          ok()   { echo "ok: $1"; }
+          bad()  { echo "::error::$1"; fail=1; }
+          # expect <want-status> <got-status> <description>
+          expect() {
+            if [ "$2" -ne "$1" ]; then
+              bad "$3 — expected exit $1, got $2"
+            else
+              ok "$3"
+            fi
+          }
+          config() { git config --local --get core.hooksPath 2>/dev/null || true; }
+
+          # Unpack the committed tree into a new repository rather than cloning
+          # the checkout: actions/checkout leaves config behind, and a clone of
+          # a detached merge commit is not the state a developer starts from.
+          # `git archive` writes the blobs with their committed modes, so this
+          # repository carries the hook exactly as a clone would.
+          #
+          # Only the surface the guard reads is unpacked — the hook, the
+          # installer, the attributes that keep them LF, the generator that owns
+          # the claims, and the app workflows those claims are about. Archiving
+          # the whole monorepo would spend a minute copying files this test
+          # never inspects (and trips over the native symlinks under apps/).
+          work=$(mktemp -d)
+          repo="$work/repo"
+          mkdir -p "$repo"
+          git -C "$GITHUB_WORKSPACE" archive HEAD -- \
+              .githooks .gitattributes tools/port-workflows.pl 'apps/*/.github/**' \
+              | tar -x -C "$repo" || { echo "::error::could not unpack the committed tree"; exit 1; }
+          git -C "$repo" init -q -b main
+          git -C "$repo" add -A
+          git -C "$repo" -c user.name='hook test' -c user.email='hook-test@example.invalid' \
+              commit -q -m 'committed tree'
+          cd "$repo"
+          git config user.name  'hook test'
+          git config user.email 'hook-test@example.invalid'
+
+          # ── The premise ────────────────────────────────────────────────────
+          if [ -n "$(config)" ]; then
+            bad "a fresh repository already sets core.hooksPath=$(config); the installer would prove nothing"
+          else
+            ok "a fresh repository is unguarded (none of this work is opt-in by accident)"
+          fi
+
+          # ── Installer: converges, is idempotent, and says which case it hit ─
+          out=$(sh .githooks/install 2>&1); st=$?
+          expect 0 "$st" "installer exits 0 on an unconfigured repository"
+          [ "$(config)" = ".githooks" ] \
+            && ok "installer wrote core.hooksPath=.githooks" \
+            || bad "installer exited 0 but core.hooksPath is '$(config)'"
+          printf '%s\n' "$out" | grep -q 'enabled core.hooksPath=.githooks' \
+            && ok "installer announces what it changed" \
+            || bad "installer changed the config without saying so: $out"
+
+          out=$(sh .githooks/install 2>&1); st=$?
+          expect 0 "$st" "installer is idempotent"
+          # The already-installed case must not repeat the install message:
+          # that is how the caller tells a repair from a no-op.
+          printf '%s\n' "$out" | grep -q 'already enabled' \
+            && ok "installer reports the no-op distinctly" \
+            || bad "installer did not report the already-installed case: $out"
+
+          # ── A foreign core.hooksPath is refused, never silently dropped ────
+          git config --local core.hooksPath .someone-elses-hooks
+          out=$(sh .githooks/install 2>&1); st=$?
+          expect 3 "$st" "installer refuses to replace a foreign core.hooksPath"
+          [ "$(config)" = ".someone-elses-hooks" ] \
+            && ok "the foreign hooks path is still intact" \
+            || bad "installer changed a foreign core.hooksPath without --force"
+
+          out=$(sh .githooks/install --force 2>&1); st=$?
+          expect 0 "$st" "installer replaces it with --force"
+          [ "$(config)" = ".githooks" ] \
+            && ok "--force points the clone at .githooks" \
+            || bad "--force did not take: core.hooksPath is '$(config)'"
+
+          # ── The generator repairs the clone too, silently ──────────────────
+          # GitHub Actions sets CI=true, and the generator stays out of the way
+          # there (nothing in CI commits). Unset it to test the local path.
+          git config --local --unset core.hooksPath
+          out=$(env -u CI perl tools/port-workflows.pl --verify-patches 2>&1); st=$?
+          expect 0 "$st" "generator mode used by the hook runs (patches intact)"
+          [ "$(config)" = ".githooks" ] \
+            && ok "generator enables the hook without being asked" \
+            || bad "generator left the clone unguarded (core.hooksPath='$(config)')"
+
+          # ── The guard actually blocks, and only blocks ─────────────────────
+          # Find a patched file by the marker every patch carries instead of
+          # hardcoding a path: this test follows the patch table.
+          target=$(grep -rl --binary-files=without-match 'monorepo-port:' apps/*/.github/ 2>/dev/null | head -n 1)
+          if [ -z "$target" ]; then
+            bad "no file under apps/*/.github/ carries the monorepo-port marker"
+          else
+            ok "found a patched file to revert: $target"
+            base=$(git rev-parse HEAD)
+
+            sed -i '/monorepo-port:/d' "$target"
+            git add -- "$target"
+            out=$(git commit -q -m 'reverted patch' 2>&1); st=$?
+            if [ "$st" -eq 0 ]; then
+              bad "the hook let a reverted patch through"
+            else
+              ok "the hook blocked the commit (exit $st)"
+            fi
+            [ "$(git rev-parse HEAD)" = "$base" ] \
+              && ok "no commit object was created" \
+              || bad "the blocked commit still advanced HEAD"
+            printf '%s\n' "$out" | grep -q 'pre-commit: blocked' \
+              && ok "the block names the hook and the lost patch" \
+              || bad "the failure did not come from the hook: $out"
+
+            # Skipping the hook must be the only difference, or the block
+            # proves nothing about this script.
+            git commit -q --no-verify -m 'reverted patch, hook skipped' 2>/dev/null \
+              && ok "--no-verify commits the same tree" \
+              || bad "the same tree would not commit even with --no-verify"
+            git reset -q --hard "$base"
+
+            # A commit that touches a patch file while the claims hold is work
+            # in progress, not a revert: the guard must not punish it.
+            printf '\n# hook test\n' >> "$target"
+            git add -- "$target"
+            out=$(git commit -q -m 'guarded file, patch intact' 2>&1); st=$?
+            expect 0 "$st" "a commit touching a patch file is allowed while its claims hold"
+            git reset -q --hard "$base"
+
+            # ── Fails closed when the claims cannot be checked ────────────
+            # A guard that cannot run must refuse, not wave the commit
+            # through: the whole point is that a green local commit does not
+            # mean a green CI. Simulated with a generator that dies, because
+            # that exercises the same branch the missing-perl check feeds
+            # (`if ! out=$(perl ...)`) and behaves identically on every
+            # platform — stripping perl from PATH would also strip the git the
+            # hook needs to find the repository.
+            printf '\n# hook test\n' >> "$target"
+            git add -- "$target"
+            printf 'die "simulated broken generator\\n";\n' > tools/port-workflows.pl
+            out=$(git commit -q -m 'unchecked claims' 2>&1); st=$?
+            expect 1 "$st" "the hook refuses the commit when the claims cannot be checked"
+            [ "$(git rev-parse HEAD)" = "$base" ] \
+              && ok "no commit object was created" \
+              || bad "an unchecked commit still advanced HEAD"
+            printf '%s\n' "$out" | grep -q 'pre-commit: blocked' \
+              && ok "it says the commit was blocked rather than checking" \
+              || bad "the refusal did not name the hook: $out"
+            git checkout -- tools/port-workflows.pl
+            git reset -q --hard "$base"
+          fi
+
+          # ── Ordinary commits are not slowed into failing ───────────────────
+          printf '\n' >> README.md
+          git add README.md
+          out=$(git commit -q -m 'unrelated file' 2>&1); st=$?
+          expect 0 "$st" "a commit outside the patch files passes"
+          [ -z "$out" ] \
+            && ok "the hook said nothing about it" \
+            || bad "the hook was noisy on an unguarded commit: $out"
+
+          exit "$fail"
