@@ -5,6 +5,9 @@
 
 # REA: هندسة عكسية لأي شيء
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### خادم MCP واحد للهندسة العكسية للملفات الثنائية والتطبيقات والسلوك أثناء التشغيل.
 
 **وجدت ميزة تعجبك؟ افهم طريقة عملها حتى مستوى الشيفرة الثنائية.**
@@ -63,6 +66,8 @@
 يسجّل الإعداد REA لدى وكيلك ويثبّت تعليمات العمل المطابقة. يمكن للتحليل الأصلي استخدام Hopper أو Ghidra أو IDA المثبّت مسبقًا؛ ويمكن تثبيت Hopper بعد موافقتك. لا يحتاج التحليل الثابت لـ JavaScript إلى محرك تحليل أصلي.
 
 > **[زر موقع REA](https://rea.tools/ar/)** للاطلاع على تعليمات الإعداد والأدلة المصوّرة ودراسات الحالة الفعلية.
+
+مكانه في المنظومة موضّح في [docs/stack.md](../stack.md)؛ والتعريف المرجعي للطبقات المشتركة هو [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## البدء السريع
 

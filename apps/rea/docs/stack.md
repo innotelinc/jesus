@@ -28,13 +28,13 @@ there; this file records only what REA does inside it.
 
 ## Service map
 
-| Component | Technology | Job |
-| --- | --- | --- |
-| REA | Node.js / TypeScript | Reverse engineer anything: one MCP and CLI across binaries, apps and runtime behaviour. |
-| Identity | Cerulean Authentik | Sign-in and role claims, where the repo has a UI |
-| Secrets | Cerulean Vault (KV v2) | Production credentials, referenced as `vault://` |
-| Trust | Cerulean | DNS, TLS and the public hostname |
-| Edge | NPM Edge | The public route in front of the service |
+| Component | Technology             | Job                                                                                     |
+| --------- | ---------------------- | --------------------------------------------------------------------------------------- |
+| REA       | Node.js / TypeScript   | Reverse engineer anything: one MCP and CLI across binaries, apps and runtime behaviour. |
+| Identity  | Cerulean Authentik     | Sign-in and role claims, where the repo has a UI                                        |
+| Secrets   | Cerulean Vault (KV v2) | Production credentials, referenced as `vault://`                                        |
+| Trust     | Cerulean               | DNS, TLS and the public hostname                                                        |
+| Edge      | NPM Edge               | The public route in front of the service                                                |
 
 ## In the ecosystem
 

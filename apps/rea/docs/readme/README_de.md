@@ -5,6 +5,9 @@
 
 # REA: Alles reverse-engineeren
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Ein MCP für das Reverse Engineering von Binärdateien, Anwendungen und Laufzeitverhalten.
 
 **Eine Funktion gefällt dir? Verstehe, wie sie funktioniert – bis hinunter auf die Binärebene.**
@@ -63,6 +66,8 @@ REA verbindet deinen Agenten mit Werkzeugen zum Untersuchen nativer Binärdateie
 Die Einrichtung registriert REA bei deinem Agenten und installiert passende Workflow-Anweisungen. Native Analysen nutzen eine vorhandene Installation von Hopper, Ghidra oder IDA; nach Zustimmung kann die Einrichtung Hopper installieren. Statische JavaScript-Analysen benötigen keine native Analyse-Engine.
 
 > **[Besuche die REA-Website](https://rea.tools/de/)** für Einrichtungshinweise, bebilderte Anleitungen und echte Fallstudien.
+
+Seinen Platz im Stack beschreibt [docs/stack.md](../stack.md); die verbindliche Definition der gemeinsamen Schichten steht im [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Schnellstart
 

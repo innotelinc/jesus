@@ -5,6 +5,9 @@
 
 # REA: Reverse Engineer Anything
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Jeden serwer MCP do inżynierii wstecznej plików binarnych, aplikacji i zachowania w czasie wykonywania.
 
 **Widzisz funkcję, która Ci się podoba? Dowiedz się, jak działa, aż do poziomu kodu binarnego.**
@@ -63,6 +66,8 @@ REA łączy Twojego agenta z narzędziami do analizy natywnych plików binarnych
 Konfigurator rejestruje REA w Twoim agencie i instaluje pasujące instrukcje pracy. Analiza kodu natywnego może korzystać z istniejącej instalacji Hoppera lub Ghidry; konfigurator może też zainstalować Hoppera po uzyskaniu zgody. Statyczna analiza JavaScript nie wymaga żadnego z tych silników.
 
 > **[Odwiedź stronę REA](https://rea.tools/pl/)**, aby znaleźć instrukcje konfiguracji, ilustrowane przewodniki i rzeczywiste studia przypadków.
+
+Jego miejsce w stosie opisuje [docs/stack.md](../stack.md); kanoniczna definicja wspólnych warstw znajduje się w [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Szybki start
 

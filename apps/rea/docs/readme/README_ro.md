@@ -5,6 +5,9 @@
 
 # REA: Reverse Engineer Anything
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Un singur server MCP pentru inginerie inversă: fișiere binare, aplicații și comportament în timpul execuției.
 
 **Ai găsit o funcționalitate care îți place? Înțelege cum funcționează, până la nivel de cod binar.**
@@ -65,6 +68,8 @@ REA conectează agentul tău la unelte pentru inspectarea fișierelor binare nat
 Programul de configurare înregistrează REA în agentul tău și instalează instrucțiunile corespunzătoare pentru fluxul de lucru. Analiza nativă poate folosi o instalare existentă de Hopper, Ghidra sau IDA; programul de configurare poate instala opțional Hopper, cu aprobarea ta. Analiza statică JavaScript nu necesită un motor de analiză nativă.
 
 > **[Vizitează site-ul REA](https://rea.tools/)** pentru instrucțiuni de configurare, ghiduri ilustrate și studii de caz reale.
+
+Locul său în stivă este descris în [docs/stack.md](../stack.md); definiția canonică a straturilor comune este în [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Pornire rapidă
 

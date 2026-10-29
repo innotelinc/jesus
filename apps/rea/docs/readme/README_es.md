@@ -5,6 +5,9 @@
 
 # REA: Ingeniería inversa de cualquier cosa
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Un solo MCP para la ingeniería inversa de binarios, aplicaciones y comportamiento en ejecución.
 
 **¿Ves una función que te gusta? Entiende cómo funciona, hasta el nivel binario.**
@@ -63,6 +66,8 @@ REA conecta tu agente con herramientas para inspeccionar binarios nativos, aplic
 La configuración registra REA con tu agente e instala las instrucciones de trabajo correspondientes. El análisis nativo puede usar Hopper, Ghidra o IDA ya instalados; la configuración puede instalar Hopper con tu aprobación. El análisis estático de JavaScript no requiere un motor de análisis nativo.
 
 > **[Visita el sitio web de REA](https://rea.tools/es/)** para encontrar instrucciones de configuración, guías ilustradas y casos reales.
+
+Su lugar en la pila se describe en [docs/stack.md](../stack.md); la definición canónica de las capas compartidas está en el [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Inicio rápido
 

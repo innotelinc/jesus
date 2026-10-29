@@ -5,6 +5,9 @@
 
 # REA: 무엇이든 리버스 엔지니어링
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### 하나의 MCP로 바이너리, 애플리케이션, 런타임 동작을 리버스 엔지니어링합니다.
 
 **마음에 드는 기능을 발견했다면, 바이너리 수준까지 작동 원리를 이해하세요.**
@@ -63,6 +66,8 @@ REA는 에이전트를 분석 도구에 연결해 네이티브 바이너리, Jav
 설정 과정은 에이전트에 REA를 등록하고 해당 버전에 맞는 워크플로 지침을 설치합니다. 네이티브 분석에는 기존 Hopper, Ghidra 또는 IDA 설치를 사용할 수 있습니다. 승인하면 설정 과정에서 Hopper를 설치할 수도 있습니다. 정적 JavaScript 분석에는 네이티브 분석 엔진이 필요하지 않습니다.
 
 > <strong>[REA 웹사이트](https://rea.tools/ko/)</strong>에서 설정 방법, 그림으로 설명한 가이드, 실제 사례를 확인하세요.
+
+스택에서의 위치는 [docs/stack.md](../stack.md)에 설명되어 있으며, 공유 계층의 표준 정의는 [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)에 있습니다.
 
 ## 빠른 시작
 

@@ -5,6 +5,9 @@
 
 # REA: Реверс-інжиніринг будь-чого
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Один MCP для реверс-інжинірингу бінарних файлів, застосунків і поведінки під час виконання.
 
 **Побачили цікаву функцію? Зрозумійте, як вона працює, аж до рівня двійкового коду.**
@@ -63,6 +66,8 @@ REA підключає вашого агента до інструментів �
 Налаштування реєструє REA в агенті та встановлює відповідні інструкції. Нативний аналіз використовує наявний Hopper, Ghidra або IDA; Hopper можна встановити після схвалення. Статичний аналіз JavaScript не потребує нативного рушія.
 
 > **[Відвідайте сайт REA](https://rea.tools/uk/)**, щоб знайти інструкції налаштування, ілюстровані посібники та реальні дослідження.
+
+Його місце в стеку описано в [docs/stack.md](../stack.md); канонічне визначення спільних шарів — в [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Швидкий старт
 

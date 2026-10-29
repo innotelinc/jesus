@@ -5,6 +5,9 @@
 
 # REA：逆向一切
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### 通过一个 MCP 服务，逆向分析二进制文件、应用程序和运行时行为。
 
 **看到喜欢的功能，弄清它的工作原理，深入到二进制层面。**
@@ -63,6 +66,8 @@ REA 将智能体连接到分析工具，用于检查原生二进制文件、Java
 设置流程会向智能体注册 REA，并安装匹配的工作流指引。原生分析可以使用已有的 Hopper、Ghidra 或 IDA；设置流程也可以在你批准后安装 Hopper。静态 JavaScript 分析不需要原生分析引擎。
 
 > **[访问 REA 网站](https://rea.tools/zh-CN/)**，查看设置说明、图解指南和真实案例。
+
+它在技术栈中的位置记录于 [docs/stack.md](../stack.md)；共享层的规范定义位于 [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)。
 
 ## 快速开始
 

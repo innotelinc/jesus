@@ -5,6 +5,9 @@
 
 # REA: എന്തും Reverse Engineer ചെയ്യുക
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Binaries, applications, runtime behavior എന്നിവയുടെ Reverse Engineering-നായി ഒരൊറ്റ MCP.
 
 **നിങ്ങൾക്ക് ഇഷ്ടപ്പെട്ട ഒരു feature കണ്ടോ? അത് എങ്ങനെ പ്രവർത്തിക്കുന്നു എന്ന് binary തലത്തിലേക്ക് വരെ മനസ്സിലാക്കൂ.**
@@ -65,6 +68,8 @@ Native binaries, JavaScript, Electron apps, .NET assemblies, websites എന്�
 Setup നിങ്ങളുടെ agent-ിൽ REA രജിസ്റ്റർ ചെയ്യുകയും അനുയോജ്യമായ workflow നിർദ്ദേശങ്ങൾ ഇൻസ്റ്റാൾ ചെയ്യുകയും ചെയ്യുന്നു. Native analysis-നായി നിലവിലുള്ള Hopper, Ghidra, അല്ലെങ്കിൽ IDA installation ഉപയോഗിക്കാം; അനുമതി നൽകിയാൽ setup-ന് Hopper ഇൻസ്റ്റാൾ ചെയ്യാനും കഴിയും. Static JavaScript analysis-ന് native analysis engine ആവശ്യമില്ല.
 
 > **[REA വെബ്സൈറ്റ് സന്ദർശിക്കുക](https://rea.tools/)** — setup നിർദ്ദേശങ്ങൾക്കും ചിത്രങ്ങളോടുകൂടിയ ഗൈഡുകൾക്കും യഥാർത്ഥ case study-കൾക്കും.
+
+സ്റ്റാക്കിലെ അതിന്റെ സ്ഥാനം [docs/stack.md](../stack.md) വിശദീകരിക്കുന്നു; പങ്കിട്ട പാളികളുടെ കാനോനിക്കൽ നിർവചനം [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) ലാണ്.
 
 ## ദ്രുതാരംഭം
 
