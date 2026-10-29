@@ -57,7 +57,7 @@ jobs:
           timeout 180s "${GHIDRA_INSTALL_DIR}/support/analyzeHeadless" "${probe_root}/project" ArmContext \
             -import "${probe_root}/arm-thumb.bin" -loader BinaryLoader -processor ARM:LE:32:v7 \
             -noanalysis -readOnly -deleteProject \
-            -scriptPath "${GITHUB_WORKSPACE}/tests/conformance/ghidra;${GITHUB_WORKSPACE}/bridge/ghidra" \
+            -scriptPath "$(pwd)/tests/conformance/ghidra;$(pwd)/bridge/ghidra" \
             -postScript ReaArmContextProbe.java "${GITHUB_WORKSPACE}/bridge/ghidra" \
             > "${probe_root}/output.log" 2>&1 || { cat "${probe_root}/output.log"; exit 1; }
           cat "${probe_root}/output.log"

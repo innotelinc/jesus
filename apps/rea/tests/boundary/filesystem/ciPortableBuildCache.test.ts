@@ -25,6 +25,7 @@ const plan = { tasks: [first, second] };
 const prefix = "rea-portable-build-v2-Linux-X64-toolchain";
 const output = ".cache/ci-build-cache";
 const manifestName = "portable-build-cache.json";
+const actionDirectory = ".github/actions/portable-build-cache";
 
 function run(
   root: string,
@@ -339,6 +340,10 @@ async function workflowFixture(historyKiB: number) {
     "junction",
   );
   await mkdir(join(root, "scripts/ci"), { recursive: true });
+  // A composite action's steps run at the workspace root, so the action
+  // locates its project from GITHUB_ACTION_PATH. The runner always sets it;
+  // the fixture has to stand in for that or the probe looks above the root.
+  await mkdir(join(root, actionDirectory), { recursive: true });
   await writeFile(
     join(root, "scripts/ci/portable-build-cache.mjs"),
     await readFile(script),
@@ -409,6 +414,7 @@ await writeFile("out/" + name + ".bin", bytes.subarray(0, (name === "seed" ? ${h
         env: {
           ...process.env,
           BUILD_CACHE_PREFIX: prefix,
+          GITHUB_ACTION_PATH: join(root, actionDirectory),
           GITHUB_OUTPUT: join(root, ".turbo/action-output"),
           TURBO_CACHE_DIR: ".turbo/cache",
           TURBO_CACHE_MAX_SIZE: "0.125MB",
