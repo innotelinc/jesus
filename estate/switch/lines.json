@@ -1,0 +1,7 @@
+{
+  "lines": [
+    { "ext": "101", "displayName": "Front desk" },
+    { "ext": "102", "displayName": "Interview room" },
+    { "ext": "103", "displayName": "Voicemail" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cantus-estate-console",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "One console for the Cantus estate: the switch, the products on it, and the call in flight.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

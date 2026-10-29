@@ -19,15 +19,16 @@ commit history it earned.
 
 ## What is in here
 
-Thirteen projects under [`apps/`](apps), one directory each:
+Fourteen projects under [`apps/`](apps), one directory each:
 
 | Directory | Project | What it is | Primary language |
 | --- | --- | --- | --- |
 | [apps/cantus](apps/cantus) | [Cantus](https://github.com/innotelinc/cantus) | A realtime voice standard on one socket — no SIP, no SDP, no RTP, no port range — plus a specification and a dependency-free reference stack that survives symmetric NAT. | Perl |
-| [apps/telno](apps/telno) | [Telno](https://github.com/innotelinc/telno) | Self-hosted telephony platform and worldwide phonebook registry: extensions, trunks, IVR, voicemail, fax, SMS, AI voice agents, an encrypted WebRTC softphone, billing and a device estate, in one container. | JavaScript / Node |
+| [apps/telno](apps/telno) | [Telno](https://github.com/innotelinc/telno) | Self-hosted telephony platform and worldwide phonebook registry: extensions, trunks, IVR, voicemail, SMS, AI voice agents, a browser softphone over Cantus, billing and a device estate, in one container. | JavaScript / Node |
+| [apps/cantus-switch](apps/cantus-switch) | cantus-switch | The switch the estate runs on: Cantus 1.0 node, relay, routing document, control API and an ARI-compatible surface so dograh did not have to change. | JavaScript / Node |
 | [apps/webmail](apps/webmail) | [Webmail](https://github.com/innotelinc/webmail) | Self-hosted JMAP webmail for Stalwart Mail Server: mail, calendar, contacts and files in one client. | TypeScript |
 | [apps/ontrak](apps/ontrak) | [OnTrak](https://github.com/innotelinc/OnTrak) | IT support training platform with gradable Linux, Windows and Office simulations. Carries **[ontrak-genie](apps/ontrak/ontrak-genie)** and **[ontrak-sync](apps/ontrak/ontrak-sync)** alongside the portal, lab, tix and sentinel apps. | TypeScript / Next.js |
-| [apps/capstone](apps/capstone) | [Capstone](https://github.com/innotelinc/capstone) | Self-hosted Voice AI Agent platform: AI phone agents over Asterisk/FreePBX with local speech and local LLM — no per-minute fees, no cloud APIs. | Python |
+| [apps/capstone](apps/capstone) | [Capstone](https://github.com/innotelinc/capstone) | Self-hosted Voice AI Agent platform: AI phone agents over Cantus with local speech and local LLM — no per-minute fees, no cloud APIs. | Python |
 | [apps/omniroute](apps/omniroute) | [OmniRoute](https://github.com/innotelinc/omniroute) | Mirror of [`diegosouzapw/OmniRoute`](https://github.com/diegosouzapw/OmniRoute), vendored for the estate gateway's resilience. | TypeScript |
 | [apps/ontrak-mcp](apps/ontrak-mcp) | [ontrak-mcp](https://github.com/innotelinc/ontrak-mcp) | Dependency-free Model Context Protocol client, tool bridge and reference server for agent consoles. | TypeScript |
 | [apps/genie-soulforge](apps/genie-soulforge) | [Soulforge](https://github.com/innotelinc/genie-soulforge) | Local-first studio for authoring, compiling and comparing AI agent system prompts, with a streaming playground. | TypeScript |
@@ -36,6 +37,31 @@ Thirteen projects under [`apps/`](apps), one directory each:
 | [apps/dograh](apps/dograh) | [Dograh](https://github.com/innotelinc/dograh) | Open-source voice agent platform. | Python / TypeScript |
 | [apps/freebuff](apps/freebuff) | [Onyx](https://github.com/innotelinc/freebuff) | The terminal coding agent that runs on your own gateway: any model, any provider, no account, no telemetry. | TypeScript |
 | [apps/claude-mem](apps/claude-mem) | [claude-mem](https://github.com/thedotmack/claude-mem) | Upstream project: persistent context across agent sessions — captures what an agent did, compresses it, injects it into future sessions. Vendored unmodified. | TypeScript / Python |
+
+## The estate
+
+Three applications in this tree are one telephone system:
+
+- **Cantus** (`apps/cantus`, `apps/cantus-switch`) — the voice plane. Signalling and media
+  travel on one signed UDP flow; there is no SIP, no SDP, no RTP range and no AMI.
+- **Telno** (`apps/telno`) — the platform on top: accounts, numbers, the routing document,
+  recordings, the browser softphone.
+- **Capstone** (`apps/capstone`) — the voice-agent stack (dograh plus interviews), which dials
+  the switch over the ARI-compatible surface.
+
+[`estate/`](estate) is the demo that runs all three against one switch:
+
+```sh
+cd estate && ./up.sh          # console :8000, switch :8188, telno :8090
+```
+
+One switch, one console showing live calls and the routing document, and
+[`estate/tools/vultr-demo.sh`](estate/tools/vultr-demo.sh) to put the same stack on a
+throwaway Vultr instance. See [estate/README.md](estate/README.md).
+
+The Asterisk/FreePBX stack these products used to run on is gone: the dialplan is a JSON
+routing document, extension provisioning is `POST /v1/lines`, and the only thing that still
+speaks ARI is dograh, which the switch serves at `/ari/*`.
 
 ## History
 

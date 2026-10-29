@@ -5,3 +5,11 @@ _sources/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Estate demo local state
+estate/.env
+estate/tools/.vultr-demo.json
+estate/tools/.vultr-key
+estate/tools/.vultr-key.pub
+estate/tools/.vultr-key.env
+estate/tools/estate-demo.tgz
