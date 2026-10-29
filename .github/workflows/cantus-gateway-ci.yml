@@ -1,0 +1,72 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# GENERATED FILE — edit the source, not this copy.
+#
+#   source:      apps/cantus-gateway/.github/workflows/ci.yml
+#   regenerate:  perl tools/port-workflows.pl
+#
+# The copy exists because GitHub only reads workflows from the repository root.
+# This one runs only when apps/cantus-gateway/** changes.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# CI — the SIP border's suite, on real UDP sockets.
+#
+# `npm test` drives a real registrar, a dialog and a keypress crossing the
+# border in both directions. Nothing is mocked, and there are no dependencies,
+# so the job is checkout, Node, test.
+#
+# The border imports the switch's Cantus endpoint, so a change under
+# apps/cantus-switch is also a reason to run this. That path is written with its
+# monorepo prefix because the generator leaves `apps/` paths alone; in a
+# standalone checkout it matches nothing and the workflow still runs on `src/**`.
+
+name: "cantus-gateway: CI"
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "apps/cantus-gateway/src/**"
+      - "apps/cantus-gateway/test/**"
+      - "apps/cantus-gateway/package.json"
+      - ".github/workflows/cantus-gateway-ci.yml"
+      - "apps/cantus-switch/**"
+  pull_request:
+    paths:
+      - "apps/cantus-gateway/src/**"
+      - "apps/cantus-gateway/test/**"
+      - "apps/cantus-gateway/package.json"
+      - ".github/workflows/cantus-gateway-ci.yml"
+      - "apps/cantus-switch/**"
+  workflow_dispatch:
+
+concurrency:
+  group: cantus-gateway-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: apps/cantus-gateway
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: SIP border suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Show version
+        run: node --version
+
+      - name: Run the suite
+        run: npm test
