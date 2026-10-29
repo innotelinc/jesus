@@ -97,8 +97,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Both modules are pytest-style functions, not unittest TestCase classes,
+      # and a bare runner image has no pytest: under `unittest discover` they
+      # failed on `import pytest` at collection time, and with pytest merely
+      # installed it would collect none of them and report "Ran 0 tests OK".
+      - name: Install the test runner
+        run: python3 -m pip install --quiet pytest
+
       - name: Unit tests for the switch bootstrap and agent-number sync
-        run: python3 -m unittest discover -s pbx/tests -v
+        run: python3 -m pytest pbx/tests -v
 
       # The routing document and line inventory are the dialplan now, so they
       # are checked the way the switch checks them: schema-shaped, every action
