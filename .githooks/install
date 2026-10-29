@@ -53,6 +53,24 @@ if [ ! -f .githooks/pre-commit ]; then
     exit 2
 fi
 
+# A CRLF checkout of a hook fails at "bad interpreter" before any of it runs,
+# which looks like a broken guard rather than a line-ending problem. Checked
+# before the exit below, because the common path is "already installed".
+#
+# Counted, not pattern-matched: this shell drops a trailing CR from captured
+# command output, so `case $(head -n 1 ...) in *\r)` matched nothing on a real
+# CRLF file and the warning never appeared. Byte counts cannot lie.
+hook_bytes=$(wc -c < .githooks/pre-commit)
+hook_no_cr=$(tr -d '\r' < .githooks/pre-commit | wc -c)
+if [ "$hook_bytes" -ne "$hook_no_cr" ]; then
+    warn "install: .githooks/pre-commit has CRLF line endings, so git cannot"
+    warn "         run it. Re-checkout the file: git checkout -- .githooks"
+fi
+
+if ! command -v bash >/dev/null 2>&1; then
+    warn "install: warning: bash is not on PATH; .githooks/pre-commit needs it."
+fi
+
 current=$(git config --local --get core.hooksPath 2>/dev/null) || current=""
 
 # Only the no-op case is quiet: installing is a change to this clone's config
@@ -88,20 +106,6 @@ if [ "$(git config --local --get core.hooksPath 2>/dev/null)" != ".githooks" ]; 
 fi
 
 chmod +x .githooks/* 2>/dev/null || true
-
-# A CRLF checkout of a hook fails at "bad interpreter" before any of it runs,
-# which looks like a broken guard rather than a line-ending problem.
-first_line=$(head -n 1 .githooks/pre-commit 2>/dev/null)
-case $first_line in
-    *$(printf '\r'))
-        warn "install: .githooks/pre-commit has CRLF line endings, so git cannot"
-        warn "         run it. Re-checkout the file: git checkout -- .githooks"
-        ;;
-esac
-
-if ! command -v bash >/dev/null 2>&1; then
-    warn "install: warning: bash is not on PATH; .githooks/pre-commit needs it."
-fi
 
 printf 'hooks: enabled core.hooksPath=.githooks for this clone\n'
 exit 0
