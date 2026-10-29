@@ -436,25 +436,57 @@ for my $dest (glob("$OUTDIR/*.yml")) {
     $changed = 1;
 }
 
-# Two composite actions locate their project from their own path, because a
-# composite action's steps run at the workspace root no matter what the calling
-# workflow's working-directory says. That patch lives in the app's file, so a
-# re-import can drop it and every job that installs through them would fail at
-# the first step. Warn rather than fail: the workflows are still correct, and
-# the fix is three lines in the two files named below.
+# Three files in apps/ carry a hand fix: two composite actions locate their
+# project from their own path, because an action's steps run at the workspace
+# root no matter what the calling workflow's working-directory says, and
+# capstone's CI installs the test runner its switch tests need.
+#
+# All three live under apps/, which is the upstream project's own tree, so a
+# re-import from the standalone repository overwrites them. That is the quiet
+# case: the revert produces no diff in the generated output at all, because the
+# root copy is faithfully regenerated from the reverted source and stays "in
+# sync" while the breakage the patch existed to fix comes back. Nothing else in
+# CI would notice, which is why the check lives here. Each entry is a claim
+# about the file that must still hold:
+#
+#   marker  the comment the patch carries, so a revert is detectable at all
+#   needs   a pattern the fix depends on (optional)
+#   bans    the pre-fix form, which must not come back (optional)
+#   breaks  what goes wrong when the claim fails, in the operator's terms
 my @PATCHED = (
-    'apps/omniroute/.github/actions/npm-ci-retry/action.yml',
-    'apps/rea/.github/actions/portable-build-cache/action.yml',
+    {
+        path   => 'apps/omniroute/.github/actions/npm-ci-retry/action.yml',
+        breaks => 'every job that installs through it runs npm at the repository root',
+    },
+    {
+        path   => 'apps/rea/.github/actions/portable-build-cache/action.yml',
+        breaks => 'the cache probe and build scripts resolve against the monorepo root',
+    },
+    {
+        path   => 'apps/capstone/.github/workflows/ci.yml',
+        needs  => qr/python3 -m pytest pbx\/tests/,
+        bans   => qr/python3 -m unittest discover -s pbx\/tests/,
+        breaks => 'the switch tests collect nothing and the job passes while running none',
+    },
 );
-for my $p (@PATCHED) {
+for my $fix (@PATCHED) {
+    my $p = $fix->{path};
     next unless -f $p;
     open my $fh, '<', $p or next;
     local $/;
     my $t = <$fh>;
     close $fh;
-    next if $t =~ /monorepo-port:/;
-    warn "WARNING: $p lost its monorepo-port patch; jobs that use it will run\n"
-       . "         at the repository root and fail. Re-apply the `cd` (see git log).\n";
+
+    my @why;
+    push @why, 'the monorepo-port marker is gone' unless $t =~ /monorepo-port:/;
+    push @why, 'the patched command is gone' if $fix->{needs} && $t !~ $fix->{needs};
+    push @why, 'the pre-fix form is back'    if $fix->{bans}  && $t =~ $fix->{bans};
+    next unless @why;
+
+    warn "WARNING: $p: " . join('; ', @why) . "\n"
+       . "         If it was re-imported from upstream, the monorepo patch was lost:\n"
+       . "         $fix->{breaks}.\n"
+       . "         Re-apply the patch (git log for this file has the diff).\n";
     $changed = 1 if $CHECK;
 }
 

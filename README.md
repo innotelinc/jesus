@@ -176,11 +176,21 @@ when a root copy no longer matches its source — an app workflow edited without
 copy edited by hand, or a generated copy whose source was renamed away. It uses only the runner's
 preinstalled perl, so it starts in seconds and needs nothing installed.
 
-Two composite actions needed a hand change, because an action's own steps always run at the
-workspace root: `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` now resolve their
-project root from `${{ github.action_path }}`. That works at either depth, so it is correct in the
-standalone repositories too — but it lives in the app's file, so a re-import of either project
-drops it. `tools/port-workflows.pl` looks for the marker comment and warns if the patch is gone.
+Three files under `apps/` needed a hand change that the port cannot express:
+
+- `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` composite actions resolve their
+  project root from `${{ github.action_path }}`, because an action's own steps always run at the
+  workspace root. That works at either depth, so it is correct in the standalone repositories too.
+- `capstone`'s CI installs `pytest` and runs its switch tests with it. They are pytest-style
+  functions, and `unittest discover` collects none of them, so the job reported a pass while
+  exercising nothing.
+
+All three live in the app's own tree, so a re-import from the standalone repository drops them —
+and that revert is invisible in the generated output, because the root copy is faithfully
+regenerated from the reverted source and stays "in sync" while the breakage returns. So
+`tools/port-workflows.pl` treats each as a checked claim: the marker comment must still be there,
+the patched command must still be there, and the pre-fix form must not be back. It names the file
+and what breaks, and `--check` exits non-zero, which fails the drift job.
 
 **Release, publish, deploy, and Pages workflows are deliberately not ported.** In a monorepo a push
 to `main` would publish thirteen artefacts, thirteen images and thirteen Pages sites instead of one,
