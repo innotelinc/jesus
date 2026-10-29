@@ -26,6 +26,51 @@ function packet({ seq = 1, ts = 0, payload = Buffer.alloc(160, 0x5a) } = {}) {
   return out;
 }
 
+/**
+ * The counter block, against the RFC rather than against ourselves.
+ *
+ * A round trip hides the one bug that matters here: if the IV is built wrongly
+ * in the same way on both sides, protect/unprotect still agree while every
+ * packet decrypts to noise at a real peer. The HMAC covers the ciphertext, so
+ * nothing fails — the call just sounds like a modem. RFC 3711 B.2 gives the
+ * keystream for a known session key and salt, which pins the layout.
+ */
+test('the AES-CM keystream matches RFC 3711 B.2', () => {
+  const context = new SrtpContext({ key, salt });
+  // The vector names the session keys directly, so they replace the derived ones.
+  context.encryptionKey = Buffer.from('2B7E151628AED2A6ABF7158809CF4F3C', 'hex');
+  context.salt = Buffer.from('F0F1F2F3F4F5F6F7F8F9FAFBFCFD', 'hex');
+
+  // SSRC 0 and index 0: the counter block is the salt with the block counter at
+  // 0, and the counter is what walks — 65282 blocks, exactly as the RFC measures
+  // the segment.
+  const blocks = 65282;
+  const segment = context.keystream(0, 0, blocks * 16);
+  const block = (n) => segment.subarray(n * 16, (n + 1) * 16).toString('hex');
+  assert.equal(block(0), 'e03ead0935c95e80e166b16dd92b4eb4');
+  assert.equal(block(0xfeff), 'ec8cdf7398607cb0f2d21675ea9ea1e4');
+  assert.equal(block(0xff01), '6a2cc3787889374fbeb4c81b17ba6c44');
+});
+
+test('the counter block puts the SSRC and the index where the RFC does', () => {
+  // A zero salt leaves the layout visible: salt | SSRC | index | block counter.
+  const context = new SrtpContext({ key, salt });
+  context.salt = Buffer.alloc(14);
+
+  const iv = context.counterBlock(0x0000_0000_1234, 0xcafebabe);
+  // salt (4 bytes shown) | SSRC | 48-bit index | 16-bit block counter
+  assert.equal(iv.toString('hex'), '00000000' + 'cafebabe' + '000000001234' + '0000');
+});
+
+test('two streams with the same sequence number do not share a keystream', () => {
+  // The bug this guards: an IV that ignores the SSRC gives every stream the same
+  // keystream for a given sequence number, and the far end hears noise.
+  const context = new SrtpContext({ key, salt });
+  const one = context.keystream(0x1234, 0x11111111, 16);
+  const two = context.keystream(0x1234, 0x22222222, 16);
+  assert.notEqual(one.toString('hex'), two.toString('hex'));
+});
+
 test('an inline key survives the round trip through an SDP attribute', () => {
   const attribute = cryptoAttribute({ key, salt });
   assert.match(attribute, /^1 AES_CM_128_HMAC_SHA1_80 inline:[A-Za-z0-9+/=]+$/);
