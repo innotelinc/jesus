@@ -122,6 +122,9 @@ export class Switch extends EventEmitter {
     this.lines = new Map();
     this.trunks = new Map();
     this.webSockets = new Set();
+    // When each line socket last proved it was still there: any frame, or the
+    // answer to a ping. A registration that stops answering is dropped.
+    this.socketSeen = new Map();
     this.counters = { calls: 0, answered: 0, rejected: 0, failed: 0 };
     this.startedAt = now();
 
@@ -182,6 +185,7 @@ export class Switch extends EventEmitter {
     // its 20 ms slot instead of inheriting the timer's own jitter.
     this.nextWebMediaAt = 0;
     this.mediaTimer = setInterval(() => this.webMediaTick(), Math.max(5, Math.floor(TIMERS.MEDIA_TICK / 2)));
+    this.lineHealthTimer = setInterval(() => this.lineHealthTick(), TIMERS.LINE_PING);
     if (this.endpoint.relay) {
       this.syncRegistrations();
       this.registrationTimer = setInterval(() => this.syncRegistrations(), 20_000);
@@ -192,6 +196,7 @@ export class Switch extends EventEmitter {
 
   stop() {
     clearInterval(this.mediaTimer);
+    clearInterval(this.lineHealthTimer);
     clearInterval(this.registrationTimer);
     this.endpoint.stop();
     this.relay?.stop();
@@ -566,7 +571,10 @@ export class Switch extends EventEmitter {
     for (const key of targets) {
       const line = this.lineForAddress(key);
       if (!line) continue;
-      for (const socket of line.sockets) ringable.push({ kind: 'web', socket, line });
+      // A socket nobody answers for is not a phone. Ringing it anyway puts
+      // legs on the console that cannot be picked up and makes `bridge` look
+      // like it is ringing a line that never replies.
+      for (const socket of line.sockets) if (this.isLive(socket)) ringable.push({ kind: 'web', socket, line });
       for (const endpointId of line.cantus) ringable.push({ kind: 'cantus', endpointId, line });
     }
     if (!ringable.length) {
@@ -582,6 +590,9 @@ export class Switch extends EventEmitter {
       this.emitCall(call, 'call.unanswered', { reason: 'timeout', target });
       this.endCall(call, 'no-answer');
     }, Math.max(5, Number(timeout)) * 1000);
+    // A ring timeout is a dead-man switch for one call, not a reason for the
+    // process to stay awake: the server's own sockets already do that.
+    timer.unref?.();
 
     const candidates = [];
     for (const entry of ringable) {
@@ -1013,6 +1024,52 @@ export class Switch extends EventEmitter {
 
   // ------------------------------------------------------------- browser lines
 
+  /** Whether a line socket has proved it is still there, recently enough. */
+  isLive(socket, at = now()) {
+    if (!socket || socket.closed) return false;
+    const seen = this.socketSeen.get(socket);
+    return typeof seen === 'number' && at - seen <= TIMERS.LINE_DEAD;
+  }
+
+  /**
+   * A line socket that has stopped answering is not a line.
+   *
+   * A killed container, a NAT that keeps the server half of a connection open,
+   * a laptop lid — all leave a socket in `line.sockets` with nobody behind it,
+   * and it stays there for as long as the switch runs. The next call then rings
+   * the dead socket alongside the live one: the console shows ringing legs that
+   * cannot answer, and the DID rings a phone that was switched off hours ago.
+   * A ping every ten seconds and a thirty second deadline is enough to tell a
+   * quiet line from a gone one.
+   */
+  lineHealthTick(at = now()) {
+    for (const line of this.lines.values()) {
+      for (const socket of [...line.sockets]) {
+        if (this.isLive(socket, at)) {
+          socket.ping?.();
+          continue;
+        }
+        this.forgetSocket(socket, line, 'silent');
+      }
+    }
+  }
+
+  /** Drop a line socket the switch can no longer reach. */
+  forgetSocket(socket, line, reason = 'closed') {
+    if (!line.sockets.delete(socket)) return;
+    this.webSockets.delete(socket);
+    this.socketSeen.delete(socket);
+    this.emit('line', { kind: 'unregistered', ext: line.ext, transport: 'web', reason });
+    try {
+      // Closing is what releases the legs, through the same handler a hangup
+      // takes: a call ringing a socket that has gone ends with `normal` rather
+      // than waiting out its ring timeout.
+      socket.close(4408, 'no heartbeat');
+    } catch {
+      /* already gone */
+    }
+  }
+
   /**
    * Attach a browser softphone. The browser is a first-class line, not a proxy
    * for one: it registers, it rings, it carries its own 20 ms PCM frames over
@@ -1028,6 +1085,7 @@ export class Switch extends EventEmitter {
     const identity = newId('web-');
     line.sockets.add(ws);
     this.webSockets.add(ws);
+    this.socketSeen.set(ws, now());
 
     ws.sendJson({
       type: 'registered',
@@ -1046,6 +1104,7 @@ export class Switch extends EventEmitter {
     };
 
     ws.on('message', (data, isBinary) => {
+      this.socketSeen.set(ws, now());
       if (isBinary) {
         const call = [...this.calls.values()].find((entry) => entry.legs.some((leg) => leg.ws === ws && leg.isAnswered));
         const leg = call?.legs.find((entry) => entry.ws === ws && entry.isAnswered);
@@ -1061,8 +1120,14 @@ export class Switch extends EventEmitter {
       this.onSocketMessage(ws, line, message, legFor);
     });
 
+    ws.on('pong', () => this.socketSeen.set(ws, now()));
+
     ws.on('close', () => {
-      line.sockets.delete(ws);
+      // `registered` is also how a socket the health check has already dropped
+      // is told apart: that one is gone from the line before it gets here, and
+      // must not be announced as unregistering a second time.
+      const registered = line.sockets.delete(ws);
+      this.socketSeen.delete(ws);
       this.webSockets.delete(ws);
       for (const call of this.calls.values()) {
         for (const leg of call.legs) {
@@ -1079,7 +1144,7 @@ export class Switch extends EventEmitter {
           else if (!call.legs.some((entry) => entry !== leg && !entry.isEnded)) this.endCall(call, 'normal');
         }
       }
-      this.emit('line', { kind: 'unregistered', ext: line.ext, transport: 'web' });
+      if (registered) this.emit('line', { kind: 'unregistered', ext: line.ext, transport: 'web' });
     });
 
     return { ext: line.ext, identity };
