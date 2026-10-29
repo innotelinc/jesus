@@ -164,8 +164,12 @@ workflows, `github.workspace`, `hashFiles()` globs, and per-app concurrency grou
 
 ```sh
 perl tools/port-workflows.pl          # rewrite the root copies
-perl tools/port-workflows.pl --check  # exit 1 if they are stale
+perl tools/port-workflows.pl --check  # exit 1 if they are stale; write nothing
 ```
+
+Both modes exit 1 when one of the hand patches below is missing, so a re-import cannot pass as
+a clean regeneration. The plain run still regenerates the root copies to keep the tree consistent,
+but it says they are not safe to commit on their own.
 
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
