@@ -1,0 +1,4 @@
+# git runs hooks by their shebang, so a CRLF checkout of one fails with
+# "bad interpreter" before a single line of it executes. Windows checkouts
+# convert text by default; these files must stay LF everywhere.
+.githooks/* text eol=lf

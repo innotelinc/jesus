@@ -24,6 +24,11 @@
 # release process, and the README says so.
 #
 # Usage: perl tools/port-workflows.pl [--check | --verify-patches]
+#
+# Every mode first points this clone's core.hooksPath at .githooks (see
+# .githooks/install), because git cannot install a hook at clone time. It is a
+# no-op — and silent — when the clone is already configured, and it is skipped
+# under CI, where nothing is committed.
 #   --check           write nothing; exit non-zero if any root file differs from
 #                     what this would write
 #   --verify-patches  write nothing; check only the hand patches under apps/.
@@ -44,6 +49,25 @@ use File::Path      qw(make_path);
 
 my $CHECK  = grep { $_ eq '--check' } @ARGV;
 my $VERIFY = grep { $_ eq '--verify-patches' } @ARGV;
+
+# ── Keep this clone's guard installed ──────────────────────────────────────
+# core.hooksPath is per-clone config, so git cannot carry it: a fresh clone
+# starts with no pre-commit hook, and the patch claims are then checked only
+# after the commit is pushed. Anyone who regenerates workflows is exactly who
+# can commit a reverted patch, so every mode repairs the clone first. The
+# installer says nothing when the clone is already correct, which is what lets
+# the hook's own --verify-patches path call it without paying for it.
+if (!$ENV{CI} && -f '.githooks/install') {
+    my $out = `sh .githooks/install --quiet 2>&1`;
+    my $rc  = $? >> 8;
+    if ($rc) {
+        warn $out if defined $out && length $out;
+        warn "  (the pre-commit guard is not active in this clone; run .githooks/install)\n";
+    }
+    elsif (defined $out && length $out) {
+        print $out;
+    }
+}
 
 # ── The test surface of each app ────────────────────────────────────────────
 # One entry per workflow that runs tests, lints, or static analysis. Anything

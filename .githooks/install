@@ -1,0 +1,107 @@
+#!/usr/bin/env sh
+# ═══════════════════════════════════════════════════════════════════════════
+# install — point this clone's git hooks at .githooks.
+#
+# git cannot install a hook at clone time: core.hooksPath lives in
+# .git/config, which is per clone and outside everything the repository
+# carries. So the repair is this script, and it is idempotent and silent when
+# the clone is already correct — which is what lets the tools call it:
+#
+#   * tools/port-workflows.pl calls it in every mode, so anyone who regenerates
+#     workflows has the guard installed before their next commit;
+#   * a fresh clone runs it once, by hand, and is done:
+#
+#         .githooks/install
+#
+# Options:
+#   -q, --quiet   say nothing when the clone is already correct (tooling)
+#       --force   replace a core.hooksPath that points somewhere else
+# ═══════════════════════════════════════════════════════════════════════════
+set -u
+
+quiet=0
+force=0
+for arg in "$@"; do
+    case $arg in
+        -q|--quiet) quiet=1 ;;
+        --force)    force=1 ;;
+        -h|--help)
+            printf 'usage: .githooks/install [--quiet] [--force]\n'
+            printf '  --quiet  say nothing when the clone is already configured\n'
+            printf '  --force  replace a core.hooksPath that points somewhere else\n'
+            exit 0
+            ;;
+        *)
+            printf 'install: unknown option: %s\n' "$arg" >&2
+            exit 2
+            ;;
+    esac
+done
+
+say()  { [ "$quiet" -eq 1 ] || printf '%s\n' "$*"; }
+warn() { printf '%s\n' "$*" >&2; }
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root=""
+if [ -z "$root" ]; then
+    warn "install: not inside a git work tree; nothing to install."
+    exit 2
+fi
+cd "$root" || exit 2
+
+if [ ! -f .githooks/pre-commit ]; then
+    warn "install: $root/.githooks/pre-commit is missing; nothing to install."
+    exit 2
+fi
+
+current=$(git config --local --get core.hooksPath 2>/dev/null) || current=""
+
+# Only the no-op case is quiet: installing is a change to this clone's config
+# and says so even when the caller asked for quiet, because a guard that
+# appears without notice is one nobody trusts.
+if [ "$current" = ".githooks" ]; then
+    # Already pointed here. Restore the executable bit anyway: a checkout on a
+    # filesystem that drops modes (Windows, a zip export) leaves a hook git
+    # will not run on the machines that do honour it.
+    chmod +x .githooks/* 2>/dev/null || true
+    say "hooks: already enabled (core.hooksPath=.githooks)"
+    exit 0
+fi
+
+if [ -n "$current" ] && [ "$force" -eq 0 ]; then
+    warn "install: this clone sets core.hooksPath=$current, so the monorepo"
+    warn "         patch guard is NOT active. Re-run with --force to point it"
+    warn "         at .githooks instead."
+    exit 3
+fi
+
+git config --local core.hooksPath .githooks || {
+    warn "install: could not write core.hooksPath into $root/.git/config."
+    exit 2
+}
+
+# Read it back. A path that is configured but not effective is the same
+# failure as one that was never installed, and this is the one place that can
+# tell the difference cheaply.
+if [ "$(git config --local --get core.hooksPath 2>/dev/null)" != ".githooks" ]; then
+    warn "install: core.hooksPath did not stick; the guard is not active."
+    exit 2
+fi
+
+chmod +x .githooks/* 2>/dev/null || true
+
+# A CRLF checkout of a hook fails at "bad interpreter" before any of it runs,
+# which looks like a broken guard rather than a line-ending problem.
+first_line=$(head -n 1 .githooks/pre-commit 2>/dev/null)
+case $first_line in
+    *$(printf '\r'))
+        warn "install: .githooks/pre-commit has CRLF line endings, so git cannot"
+        warn "         run it. Re-checkout the file: git checkout -- .githooks"
+        ;;
+esac
+
+if ! command -v bash >/dev/null 2>&1; then
+    warn "install: warning: bash is not on PATH; .githooks/pre-commit needs it."
+fi
+
+printf 'hooks: enabled core.hooksPath=.githooks for this clone\n'
+exit 0

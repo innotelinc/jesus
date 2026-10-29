@@ -11,9 +11,10 @@
 # downstream fails. This hook asks the generator's claim table before the
 # commit exists, so the mistake never reaches a green `--check`.
 #
-# Enable it once per clone (it is local config, so it is not carried by git):
-#
-#     git config core.hooksPath .githooks
+# Install it once per clone with `.githooks/install` (core.hooksPath is local
+# config, so git cannot carry it, and `git clone` cannot run a hook). Running
+# tools/port-workflows.pl in any mode does the same thing, silently, so a clone
+# that has ever regenerated workflows already has this hook.
 #
 # Commits that stage none of the patch files are not delayed: the hook exits
 # before it starts perl. It reads the working tree, which is what you are

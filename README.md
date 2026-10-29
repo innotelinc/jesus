@@ -171,16 +171,25 @@ Both modes exit 1 when one of the hand patches below is missing, so a re-import 
 a clean regeneration. The plain run still regenerates the root copies to keep the tree consistent,
 but it says they are not safe to commit on their own.
 
-A pre-commit hook asks the same question before the commit exists. `core.hooksPath` is local
-config, so every clone enables it once:
+A pre-commit hook asks the same question before the commit exists. It exits immediately when
+nothing under `apps/*/.github/` or the generator is staged, so ordinary commits pay nothing.
+`git commit --no-verify` skips it for one commit; the drift job still checks the committed tree,
+including a patch reverted across a partial stage.
+
+The hook lives in [.githooks/](.githooks) and is enabled by `core.hooksPath`, which is per-clone
+config inside `.git/` — so `git clone` cannot install it, and a fresh clone starts unguarded.
+Every mode of the generator repairs that on its way in, silently and idempotently, so regenerating
+workflows is enough to be guarded next commit. A clone that has not run the generator yet enables
+it once:
 
 ```sh
-git config core.hooksPath .githooks
+.githooks/install     # idempotent; --quiet for tooling, --force to replace a foreign hooksPath
 ```
 
-It exits immediately when nothing under `apps/*/.github/` or the generator is staged, so ordinary
-commits pay nothing. `git commit --no-verify` skips it for one commit; the drift job still checks
-the committed tree, including a patch reverted across a partial stage.
+The installer reads `core.hooksPath` back after writing it, because a path that is configured but
+not effective fails exactly like one that was never installed. It refuses to clobber a different
+`core.hooksPath` without `--force`, since that would silently drop someone else's hooks. Under CI
+the generator skips all of this: a CI checkout never commits.
 
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
