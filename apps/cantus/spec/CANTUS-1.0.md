@@ -34,6 +34,14 @@ extends, the 1990s model in which signalling and media negotiate separate
 addresses and a human reconciles them. Appendix D maps every familiar SIP
 concept to its Cantus equivalent, including the ones deliberately dropped.
 
+A public telephone network is still reached through a carrier that speaks SIP,
+and that is the one place the two protocols meet. [CANTUS-SIP-BORDER.md](CANTUS-SIP-BORDER.md)
+defines that border: a normal Cantus node with a trunk attached, which carries
+calls, audio, keypresses and refusal codes across, and refuses every SIP
+feature that has no Cantus equivalent rather than emulating it. SIP is never an
+interior protocol; a deployment with a second SIP listener has reintroduced the
+attack surface this standard exists to remove.
+
 ---
 
 ## 1. Conformance and terminology
