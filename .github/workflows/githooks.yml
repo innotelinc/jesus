@@ -131,6 +131,11 @@ jobs:
       - name: Install, then earn a block and an allow
         shell: bash
         run: |
+          # GitHub runs `shell: bash` with -e, which would abort on the first
+          # command that is *expected* to fail: the installer exits 3 to refuse
+          # a foreign hooksPath, and `git commit` exits 1 when the hook blocks.
+          # This step reads those codes, so it takes over the decision.
+          set +e
           set -uo pipefail
           fail=0
 
