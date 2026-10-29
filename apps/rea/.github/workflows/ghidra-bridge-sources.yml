@@ -58,7 +58,7 @@ jobs:
             -import "${probe_root}/arm-thumb.bin" -loader BinaryLoader -processor ARM:LE:32:v7 \
             -noanalysis -readOnly -deleteProject \
             -scriptPath "$(pwd)/tests/conformance/ghidra;$(pwd)/bridge/ghidra" \
-            -postScript ReaArmContextProbe.java "${GITHUB_WORKSPACE}/bridge/ghidra" \
+            -postScript ReaArmContextProbe.java "$(pwd)/bridge/ghidra" \
             > "${probe_root}/output.log" 2>&1 || { cat "${probe_root}/output.log"; exit 1; }
           cat "${probe_root}/output.log"
           grep -F 'REA_ARM_CONTEXT_OK arm=0 thumb=1 unavailable=null (injected provider value)' "${probe_root}/output.log"
