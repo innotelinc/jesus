@@ -1,5 +1,5 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, it } from "vitest";
@@ -88,7 +88,9 @@ async function admissionFixture(
   await writeFile(output, "");
   const env = {
     ...process.env,
-    PATH: `${bin}:${process.env.PATH ?? ""}`,
+    // `:` is the POSIX list separator; Windows needs `;` or the whole list is
+    // one unusable entry and nothing on PATH resolves at all.
+    PATH: [bin, process.env.PATH ?? ""].join(delimiter),
     GH_FIXTURE_RESPONSE: fixturePath,
     GH_API_ERROR: String(options.apiError ?? false),
     CI_REPOSITORY: repository,
@@ -125,17 +127,26 @@ async function decide(
   };
 }
 
-it("reuses only a recent trusted full qualification for the exact default-branch SHA", async () => {
-  const { decision, outputText } = await decide();
-  expect(decision).toMatchObject({ run_full: false, run_id: 7 });
-  expect(Object.keys(decision).sort()).toEqual([
-    "reason",
-    "run_full",
-    "run_id",
-  ]);
-  expect(outputText).toContain("run_full=false\n");
-  expect(outputText).toContain("run_id=7\n");
-});
+// The fixture stubs the GitHub CLI with a `#!/bin/sh` script placed on PATH.
+// Windows cannot start an extensionless script, and Node refuses to spawn a
+// `.cmd`/`.bat` without a shell, so there is no way to fake the lookup there.
+// The receipt tests below need no CLI and still run on every platform.
+const itWithGhShim = process.platform === "win32" ? it.skip : it;
+
+itWithGhShim(
+  "reuses only a recent trusted full qualification for the exact default-branch SHA",
+  async () => {
+    const { decision, outputText } = await decide();
+    expect(decision).toMatchObject({ run_full: false, run_id: 7 });
+    expect(Object.keys(decision).sort()).toEqual([
+      "reason",
+      "run_full",
+      "run_id",
+    ]);
+    expect(outputText).toContain("run_full=false\n");
+    expect(outputText).toContain("run_id=7\n");
+  },
+);
 
 const rejectedCandidates: Array<
   [string, () => Record<string, unknown>, () => Record<string, unknown>]
@@ -193,7 +204,7 @@ const rejectedCandidates: Array<
   ["wrong workflow event", artifact, () => run({ event: "push" })],
 ];
 
-it.each(rejectedCandidates)(
+itWithGhShim.each(rejectedCandidates)(
   "runs full qualification for a %s candidate",
   async (_name, makeArtifact, makeRun) => {
     const { decision } = await decide(makeArtifact(), makeRun());
@@ -201,7 +212,7 @@ it.each(rejectedCandidates)(
   },
 );
 
-it.each([
+itWithGhShim.each([
   ["API error", { apiError: true }],
   ["malformed query response", { malformed: true }],
 ] as const)("fails closed on %s", async (_name, options) => {
@@ -209,14 +220,17 @@ it.each([
   expect(decision.run_full).toBe(true);
 });
 
-it("lets the daily force-full setting bypass the GitHub API", async () => {
-  const { decision } = await decide(undefined, undefined, {
-    force: true,
-    apiError: true,
-  });
-  expect(decision).toMatchObject({ run_full: true });
-  expect(decision.reason).toContain("Forced");
-});
+itWithGhShim(
+  "lets the daily force-full setting bypass the GitHub API",
+  async () => {
+    const { decision } = await decide(undefined, undefined, {
+      force: true,
+      apiError: true,
+    });
+    expect(decision).toMatchObject({ run_full: true });
+    expect(decision.reason).toContain("Forced");
+  },
+);
 
 async function workflowContract() {
   const workflowPath = new URL(
