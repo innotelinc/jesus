@@ -170,6 +170,12 @@ perl tools/port-workflows.pl --check  # exit 1 if they are stale
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
 
+The [drift job](.github/workflows/workflows-drift.yml) runs `--check` on every change to
+`tools/port-workflows.pl`, to any `apps/*/.github/` file, or to a root workflow, and fails the build
+when a root copy no longer matches its source — an app workflow edited without regenerating, a root
+copy edited by hand, or a generated copy whose source was renamed away. It uses only the runner's
+preinstalled perl, so it starts in seconds and needs nothing installed.
+
 Two composite actions needed a hand change, because an action's own steps always run at the
 workspace root: `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` now resolve their
 project root from `${{ github.action_path }}`. That works at either depth, so it is correct in the

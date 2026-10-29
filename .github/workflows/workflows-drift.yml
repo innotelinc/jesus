@@ -1,0 +1,107 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# workflows-drift.yml — fail the build when a root workflow stops matching the
+# app workflow it is generated from.
+#
+# The root `.github/workflows/<app>-<file>.yml` copies are produced by
+# tools/port-workflows.pl from `apps/<app>/.github/workflows/<file>`. Nothing in
+# GitHub notices when the two diverge: the copy keeps running, quietly testing
+# what the app used to do. This job regenerates them in memory and compares, so
+# drift is caught by the pull request that causes it (run `--check`).
+#
+# Three states fail:
+#   stale   the root copy differs from what the generator would write now,
+#           which means either an app workflow was edited without regenerating,
+#           or a root copy was hand-edited.
+#   orphan  a generated root copy whose source is gone (workflow renamed or
+#           deleted upstream) — it would run the deleted pipeline forever.
+#   patch   a composite action in apps/ lost its monorepo-port `cd`, which
+#           sends every job that installs through it to the repository root.
+#
+# The fix is always the same: run the generator and commit the result.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: Monorepo workflow drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/port-workflows.pl'
+      - 'apps/*/.github/workflows/**'
+      - 'apps/*/.github/actions/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'tools/port-workflows.pl'
+      - 'apps/*/.github/workflows/**'
+      - 'apps/*/.github/actions/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Root workflows match their sources
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # perl is preinstalled on the runner and the generator uses only core
+      # modules (File::Basename, File::Find, File::Path), so there is nothing
+      # to install and nothing to pin. Print the version anyway: a future
+      # runner image that drops perl should fail here, not at the generator.
+      - name: Check perl
+        run: perl -v | sed -n '2p'
+
+      - name: Regenerate and compare
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Keep the output for the annotation step below, and still show it.
+          out="$(perl tools/port-workflows.pl --check 2>&1)"
+          status=$?
+          printf '%s\n' "$out"
+
+          if [ "$status" -eq 0 ]; then
+            echo "root workflows are up to date"
+            exit 0
+          fi
+
+          # One annotation per offending file, so the diff shows them inline.
+          # `|` delimits the s-command because the paths contain `/`.
+          printf '%s\n' "$out" |
+            sed -n 's|^stale: \(.*\)$|::error file=\1::Stale generated copy — run perl tools/port-workflows.pl and commit the result.|p'
+          printf '%s\n' "$out" |
+            sed -n 's|^orphan: \(.*\)$|::error file=\1::Generated copy has no source — delete it, or restore the app workflow it came from.|p'
+          printf '%s\n' "$out" |
+            sed -n 's|^WARNING: \(.*\)$|::error::\1|p'
+
+          {
+            echo "### Root workflows are out of sync with apps/"
+            echo
+            echo "The root copies are generated. Fix locally:"
+            echo
+            echo '```sh'
+            echo 'perl tools/port-workflows.pl   # rewrite the root copies'
+            echo 'git add .github/workflows      # commit the regenerated files'
+            echo '```'
+            echo
+            echo '<details><summary>Generator output</summary>'
+            echo
+            echo '```'
+            printf '%s\n' "$out"
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit 1
