@@ -81,6 +81,9 @@ async function classify(
   event = "pull_request",
   full = false,
   skipFull = false,
+  // The workflow runs the planner from the project directory, which is the
+  // repository root unless the project is checked out inside a larger tree.
+  projectDirectory = directory,
 ) {
   const output = join(directory, "scope-output");
   await writeFile(output, "");
@@ -88,7 +91,7 @@ async function classify(
     process.execPath,
     [fileURLToPath(new URL("../../../scripts/ci/plan.mjs", import.meta.url))],
     {
-      cwd: directory,
+      cwd: projectDirectory,
       env: {
         ...process.env,
         BASE_SHA: base,
@@ -1731,3 +1734,85 @@ it.each([
     });
   },
 );
+
+it("selects the project's lanes when it is a directory inside the repository", async () => {
+  const directory = await createTestTempDirectory("rea-ci-scope-nested-");
+  await git(directory, ["init", "--initial-branch=main"]);
+  const base = await change(
+    directory,
+    [
+      "apps/rea/src/telemetry.ts",
+      "apps/rea/README.md",
+      "apps/other/src/application.ts",
+    ],
+    "Initial fixture content\n",
+  );
+  const project = join(directory, "apps/rea");
+  const documented = await change(directory, [
+    "apps/rea/docs/readme/README_es.md",
+  ]);
+  const docs = await classify(
+    directory,
+    base,
+    documented,
+    "push",
+    false,
+    false,
+    project,
+  );
+  expect(docs).toMatchObject({
+    tier: "fast",
+    docs: true,
+    // A translated README is also website input, but it is not code.
+    website: true,
+    code: false,
+    runtime: false,
+  });
+  // Git reports repository-root paths; the planner must hand the rest of the
+  // pipeline the project-relative ones its patterns and test selection use.
+  expect(docs.files).toEqual(["docs/readme/README_es.md"]);
+
+  const source = await change(directory, ["apps/rea/src/telemetry.ts"]);
+  const code = await classify(
+    directory,
+    documented,
+    source,
+    "push",
+    false,
+    false,
+    project,
+  );
+  expect(code).toMatchObject({
+    tier: "fast",
+    code: true,
+    runtime: true,
+    docs: false,
+  });
+  expect(code.files).toEqual(["src/telemetry.ts"]);
+});
+
+it("selects no project lane for a push that only changes another directory", async () => {
+  const directory = await createTestTempDirectory("rea-ci-scope-other-");
+  await git(directory, ["init", "--initial-branch=main"]);
+  const base = await change(
+    directory,
+    ["apps/rea/src/telemetry.ts"],
+    "Initial fixture content\n",
+  );
+  const head = await change(directory, ["apps/other/src/application.ts"]);
+  const plan = await classify(
+    directory,
+    base,
+    head,
+    "push",
+    false,
+    false,
+    join(directory, "apps/rea"),
+  );
+  const { CI_FLAGS } = await loadScopes();
+  for (const flag of CI_FLAGS) expect(plan[flag]).toBe(false);
+  expect(plan.files).toEqual([]);
+  expect(plan.reasons).toContain(
+    "Ignored 1 path(s) outside the project directory",
+  );
+});

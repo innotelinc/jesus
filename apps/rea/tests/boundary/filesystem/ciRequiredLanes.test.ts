@@ -203,8 +203,11 @@ it("holds native and provider fan-out behind static validation while portable fe
   expect(jobs["test-shard"]?.needs).not.toContain("static");
   const stepRuns = z.array(z.object({ run: z.string().optional() }));
   expect(jobs["static-deep"]?.needs).toBe("changes");
-  expect(String(jobs["static-deep"]?.if)).toContain("tier == 'full'");
-  expect(String(jobs["static-deep"]?.if)).toContain("code == 'true'");
+  // A code change needs the deep checks on push feedback too; the tier is not
+  // part of the gate, so a scheduled run keeps selecting it by selecting code.
+  expect(String(jobs["static-deep"]?.if)).toBe(
+    "needs.changes.outputs.code == 'true'",
+  );
   const staticRuns = stepRuns.parse(jobs.static?.steps);
   const deepRuns = stepRuns.parse(jobs["static-deep"]?.steps);
   expect(staticRuns.some((step) => step.run === "npm run check:ci:fast")).toBe(

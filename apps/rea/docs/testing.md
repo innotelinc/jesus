@@ -838,8 +838,9 @@ static-check job when workflow changes select it, avoiding a separate runner.
 Native, provider, fixture, SQLite compatibility, and website lanes wait for
 the fast static checks (typecheck, built lint, and format) to succeed before
 allocating their runners. Knip, duplication, architecture guards, test
-discovery, and the Python producer run in the separate full-tier deep static
-job and do not gate provider admission. Portable test shards and documentation
+discovery, and the Python producer run in their own deep static job whenever a
+change selects code checks, on push feedback as well as full qualification, and
+do not gate provider admission. Portable test shards and documentation
 checks remain independent of static results, so they can still provide
 diagnostic feedback. The required gate rejects skipped selected lanes when
 static checks fail; on the full tier it also requires the deep static job.
