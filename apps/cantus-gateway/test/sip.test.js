@@ -38,7 +38,7 @@ test('an inbound INVITE is parsed into something routable', () => {
   assert.match(message.get('to'), /\+14132642700/);
 
   const audio = parseSdpAddress(message.body, '198.51.100.7');
-  assert.deepEqual(audio, { host: '198.51.100.7', port: 49170, pcmu: true });
+  assert.deepEqual(audio, { host: '198.51.100.7', port: 49170, pcmu: true, secure: false, crypto: '' });
 });
 
 test('an SDP without PCMU is recognised as uncarryable', () => {
@@ -67,7 +67,34 @@ test('offered SDP names one codec and the port we bound', () => {
   assert.match(sdp, /c=IN IP4 203\.0\.113\.9/);
   assert.match(sdp, /m=audio 40000 RTP\/AVP 0/);
   assert.match(sdp, /a=rtpmap:0 PCMU\/8000/);
-  assert.deepEqual(parseSdpAddress(sdp, 'ignored'), { host: '203.0.113.9', port: 40000, pcmu: true });
+  assert.deepEqual(parseSdpAddress(sdp, 'ignored'), { host: '203.0.113.9', port: 40000, pcmu: true, secure: false, crypto: '' });
+});
+
+/**
+ * An encrypted carrier's offer, which is the shape VoIP.ms actually sent:
+ * `RTP/SAVP` with an inline SDES key. Reading it as "no audio" turned a
+ * sub-account setting into a 488 that looked like a broken gateway.
+ */
+test('an encrypted offer is read as encrypted media, not as missing audio', () => {
+  const savp = [
+    'v=0',
+    'c=IN IP4 208.100.60.66',
+    'm=audio 15294 RTP/SAVP 0 18 9 101',
+    'a=rtpmap:0 PCMU/8000',
+    'a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:OPnVm9eZz4fu0QmT5/UTBl1HuQnQThvlkVx2rfv/',
+    '',
+  ].join('\r\n');
+  const audio = parseSdpAddress(savp, 'ignored');
+  assert.equal(audio.secure, true);
+  assert.equal(audio.pcmu, true);
+  assert.equal(audio.port, 15294);
+  assert.match(audio.crypto, /^1 AES_CM_128_HMAC_SHA1_80 inline:/);
+
+  const answer = buildSdp({ address: '45.63.1.70', port: 40000, crypto: '1 AES_CM_128_HMAC_SHA1_80 inline:AAAA' });
+  assert.match(answer, /m=audio 40000 RTP\/SAVP 0/);
+  assert.match(answer, /a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:AAAA/);
+  // Plain RTP still produces the attribute-free offer.
+  assert.doesNotMatch(buildSdp({ address: '45.63.1.70', port: 40000 }), /crypto|SAVP/);
 });
 
 test('digest auth computes the RFC 2617 example correctly', () => {

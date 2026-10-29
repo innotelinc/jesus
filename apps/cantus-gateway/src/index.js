@@ -117,6 +117,9 @@ async function main() {
     domain,
     advertise,
     carrier: !!trunk.host,
+    // SIP_SRTP=on offers and answers RTP/SAVP with an SDES key. Off is plain
+    // RTP; a sub-account that requires encryption refuses that with 488.
+    srtp: /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', '')),
     rtpStart: num('GATEWAY_RTP_START', 40000),
     rtpEnd: num('GATEWAY_RTP_END', 40063),
     log: (entry) => log(entry),

@@ -18,6 +18,7 @@
 
 import { RtpSession } from './rtp.js';
 import { buildSdp } from './sip.js';
+import { SrtpContext, cryptoAttribute, newKeyMaterial, parseCryptoAttribute } from './srtp.js';
 
 const SILENCE = Buffer.alloc(320);
 
@@ -36,7 +37,7 @@ export const sipUser = (uri) => {
 };
 
 export class Gateway {
-  constructor({ endpoint, trunk, switchId, domain, advertise, carrier = true, rtpStart = 40000, rtpEnd = 40063, log = () => {} }) {
+  constructor({ endpoint, trunk, switchId, domain, advertise, carrier = true, rtpStart = 40000, rtpEnd = 40063, srtp = false, log = () => {} }) {
     if (!endpoint) throw new Error('Gateway needs a Cantus endpoint');
     if (!trunk) throw new Error('Gateway needs a SIP trunk');
     this.endpoint = endpoint;
@@ -48,6 +49,10 @@ export class Gateway {
     // with a cause instead of hanging them for the switch's ring timeout, and
     // /healthz says why. Refusing to boot would take the estate down with it.
     this.carrier = carrier;
+    // Encrypted carrier legs (RTP/SAVP, SDES). Off by default because a trunk
+    // that does not require it is simpler; a sub-account that does require it
+    // answers 488 to plain RTP, which is exactly what VoIP.ms did.
+    this.srtp = !!srtp;
     this.log = log;
     // callId (Cantus) and SIP Call-ID are different namespaces; each leg holds
     // both so either side ending the call can find the other.
@@ -148,6 +153,28 @@ export class Gateway {
       this.trunk.reject(call, 484, 'Address Incomplete');
       return;
     }
+    // An encrypted offer needs both halves of an SDES pair: their key to read
+    // what they send, and a key of ours for what we send back.
+    let srtp = null;
+    let crypto = '';
+    if (audio?.secure) {
+      const remote = parseCryptoAttribute(audio.crypto);
+      if (!remote || !this.srtp) {
+        this.log({
+          kind: 'call-in-refused',
+          number,
+          from: sipUser(call.request?.get('from')),
+          codec: remote ? 'srtp-disabled' : 'unsupported-crypto',
+          media: audio.host ? `${audio.host}:${audio.port}` : '',
+          offer: String(audio.crypto || '').slice(0, 120),
+        });
+        this.trunk.reject(call, 488, 'Not Acceptable Here');
+        return;
+      }
+      const ours = newKeyMaterial();
+      crypto = cryptoAttribute(ours);
+      srtp = { receive: new SrtpContext(remote), send: new SrtpContext(ours) };
+    }
     if (!audio?.pcmu) {
       // Only PCMU was offered, so anything else is a codec we cannot carry.
       // Logged with what was actually offered: a carrier that wants SRTP or a
@@ -171,6 +198,7 @@ export class Gateway {
     });
     await rtp.start();
     rtp.to(audio.host, audio.port);
+    rtp.srtp = srtp;
 
     const to = `${number}@${this.switchId}`;
     const sessionId = this.endpoint.call(to, {
@@ -186,8 +214,9 @@ export class Gateway {
       sessionId,
       sipCall: call,
       rtp,
-      offer: buildSdp({ address: this.address, port: rtp.port }),
+      offer: buildSdp({ address: this.address, port: rtp.port, crypto }),
       direction: 'inbound',
+      srtp,
     };
     call.audio = audio;
     this.legs.set(sessionId, leg);
@@ -219,13 +248,16 @@ export class Gateway {
     });
     await rtp.start();
 
-    const leg = { sessionId: session.call, sipCall: null, rtp, offer: '', direction: 'outbound', number };
+    // Offering SAVP is a promise to encrypt; the key travels with the offer and
+    // is ours until the answer brings theirs back.
+    const ours = this.srtp ? newKeyMaterial() : null;
+    const leg = { sessionId: session.call, sipCall: null, rtp, offer: '', direction: 'outbound', number, ours };
     this.legs.set(session.call, leg);
     this.counters.outbound += 1;
 
     const sipCall = this.trunk.invite({
       to: number,
-      sdp: buildSdp({ address: this.address, port: rtp.port }),
+      sdp: buildSdp({ address: this.address, port: rtp.port, crypto: ours ? cryptoAttribute(ours) : '' }),
     });
     leg.sipCall = sipCall;
     this.log({ kind: 'call-out', call: session.call, number });
@@ -238,6 +270,17 @@ export class Gateway {
         return;
       }
       rtp.to(audio.host, audio.port);
+      if (ours) {
+        const remote = parseCryptoAttribute(audio.crypto);
+        if (remote) {
+          rtp.srtp = { send: new SrtpContext(ours), receive: new SrtpContext(remote) };
+        } else {
+          // They accepted RTP/SAVP and then answered as if it were plain RTP.
+          // Rather than encrypt into a stream nobody can read, say so and carry
+          // plain audio — a call with a warning beats a call with no sound.
+          this.log({ kind: 'srtp-missing', number, detail: 'answer had no crypto attribute' });
+        }
+      }
       answered.audio = audio;
       this.endpoint.accept(session);
     };

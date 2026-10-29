@@ -169,6 +169,33 @@ With those two running together the whole path is verified: `sip-probe` is the
 carrier, `line-client` is the phone, and the gateway and switch are the ones
 being tested.
 
+### Encrypted carrier legs
+
+Some sub-accounts only accept `RTP/SAVP` with an SDES key in the SDP; a plain
+PCMU offer is answered `488 Not acceptable here`, in both directions. That is a
+setting on the carrier's side, and the gateway matches it with `SIP_SRTP=on` in
+`estate/.env`.
+
+SRTP is not something to trust because the two halves of one implementation
+agree, so `asterisk-srtp/` is a real PJSIP peer — Asterisk with `res_srtp` and
+`media_encryption=sdes` — for the interop run:
+
+```sh
+docker run -d --name srtp-peer --network cantus-estate_default \
+  -v /opt/cantus-estate/estate/tools/asterisk-srtp:/etc/asterisk:ro andrius/asterisk
+
+# point the gateway at it (same network, so advertise the container address)
+VOIPMS_SIP_HOST=srtp-peer VOIPMS_SIP_PORT=5080 \
+VOIPMS_SIP_USERNAME=srtp-test VOIPMS_SIP_PASSWORD=srtp-test-secret \
+VOIPMS_SIP_DOMAIN=srtp-peer SIP_SRTP=on sh estate/up.sh env
+# and PUBLIC_IP must be the gateway's own container address for this one test,
+# because an RTP stream sent to the box's public IP cannot come back in.
+```
+
+A call to any number is answered and echoed by that peer, so audio arriving at
+the line proves both halves: our packets were decrypted by libsrtp, and its
+echo was decrypted by us.
+
 For the real thing, hand the deployed gateway its sub-account in one command —
 it writes the credentials into the box's `.env` (mode 600, never printed back),
 restarts only that container, and exits non-zero unless the carrier accepted

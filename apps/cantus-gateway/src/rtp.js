@@ -42,6 +42,11 @@ export class RtpSession {
     this.queue = [];
     this.received = 0;
     this.sent = 0;
+    // `{ send, receive }` of SrtpContext, attached when the SDP turns out to be
+    // encrypted. SDES keys each direction separately: `send` holds the key we
+    // put in our SDP, `receive` the one the far side gave us.
+    this.srtp = null;
+    this.dropped = 0;
   }
 
   /** Bind an ephemeral port and report the port the carrier should send to. */
@@ -68,9 +73,19 @@ export class RtpSession {
 
   handle(buf) {
     if (!buf || buf.length <= 12) return;
-    const type = buf[1] & 0x7f;
+    let packet = buf;
+    if (this.srtp?.receive) {
+      // An unauthenticated packet is not audio. Dropping it here is the point of
+      // the tag: a forged or replayed frame never reaches the switch.
+      packet = this.srtp.receive.unprotect(buf);
+      if (!packet) {
+        this.dropped += 1;
+        return;
+      }
+    }
+    const type = packet[1] & 0x7f;
     if (type !== PCMU) return; // nothing else was offered, so nothing else arrives
-    const payload = buf.subarray(12);
+    const payload = packet.subarray(12);
     this.received += 1;
     // A three-frame queue is about 60 ms of slack. Beyond that the audio is
     // stale, so the oldest frame is dropped rather than played late — the same
@@ -104,8 +119,9 @@ export class RtpSession {
     this.seq = (this.seq + 1) & 0xffff;
     this.ts = (this.ts + SAMPLES) >>> 0;
     this.sent += 1;
+    const outbound = this.srtp?.send ? this.srtp.send.protect(packet) : packet;
     try {
-      this.socket.send(packet, this.remote.port, this.remote.host);
+      this.socket.send(outbound, this.remote.port, this.remote.host);
     } catch (err) {
       this.onError(err);
     }

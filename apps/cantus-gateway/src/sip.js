@@ -67,32 +67,47 @@ export function buildResponse({ status, reason, headers, body = '' }) {
 }
 
 /** The one SDP answer/offer this gateway ever sends: PCMU, 20 ms, sendrecv. */
-export function buildSdp({ address, port }) {
-  return [
+/**
+ * Our media offer, encrypted when `crypto` is present.
+ *
+ * `RTP/SAVP` is the transport that says "SRTP or nothing": an encrypted carrier
+ * answered `RTP/AVP` with 488, and an offer of `RTP/AVP` to an encrypted
+ * sub-account was refused the same way. The `a=crypto` line carries the master
+ * key for the media we send, which is what SDES means by putting a key in SDP.
+ */
+export function buildSdp({ address, port, crypto = '' }) {
+  const lines = [
     'v=0',
     `o=cantus-gateway ${Date.now()} ${Date.now()} IN IP4 ${address}`,
     's=cantus-gateway',
     `c=IN IP4 ${address}`,
     't=0 0',
-    `m=audio ${port} RTP/AVP ${0}`,
+    crypto ? `m=audio ${port} RTP/SAVP 0` : `m=audio ${port} RTP/AVP ${0}`,
     'a=rtpmap:0 PCMU/8000',
     'a=ptime:20',
     'a=sendrecv',
-    '',
-  ].join(CRLF);
+  ];
+  if (crypto) lines.push(`a=crypto:${crypto}`);
+  lines.push('');
+  return lines.join(CRLF);
 }
 
 /** Where the far side wants audio, from its SDP. */
 export function parseSdpAddress(body, fallbackHost) {
   const text = String(body || '');
-  const media = /m=audio\s+(\d+)\s+RTP\/AVP\s+([\d ]+)/.exec(text);
+  // RTP/SAVP is the same media, encrypted: refusing it as "no audio" is what
+  // made an encrypted carrier look like a codec problem.
+  const media = /m=audio\s+(\d+)\s+RTP\/(AVP|SAVP)\s+([\d ]+)/.exec(text);
   const connection = /c=IN\s+IP4\s+([\d.]+)/.exec(text);
   if (!media) return null;
   return {
     port: Number(media[1]),
     host: connection ? connection[1] : fallbackHost,
     // Payload 0 must be offered; anything else would need a codec we do not carry.
-    pcmu: media[2].split(/\s+/).includes('0'),
+    pcmu: media[3].split(/\s+/).includes('0'),
+    secure: media[2] === 'SAVP',
+    // The key for the media the far side sends, when it sent one.
+    crypto: /^a=crypto:(.+)$/im.exec(text)?.[1]?.trim() || '',
   };
 }
 

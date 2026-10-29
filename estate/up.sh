@@ -112,6 +112,7 @@ ensure_key VOIPMS_SIP_USERNAME "${VOIPMS_SIP_USERNAME:-}"
 ensure_key VOIPMS_SIP_PASSWORD "${VOIPMS_SIP_PASSWORD:-}"
 ensure_key VOIPMS_SIP_FROM_USER "${VOIPMS_SIP_FROM_USER:-}"
 ensure_key VOIPMS_SIP_DOMAIN "${VOIPMS_SIP_DOMAIN:-}"
+ensure_key SIP_SRTP "${SIP_SRTP:-}"
 
 case "${1:-up}" in
   up)
