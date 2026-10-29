@@ -402,9 +402,8 @@ it("runs the existing onboarding and Python producer guards from their selected 
     jobs.static.steps.some((step) => step.run === "npm run check:ci:fast"),
   ).toBe(true);
   const deep = jobs["static-deep"];
-  expect(deep?.if).toBe(
-    "needs.changes.outputs.tier == 'full' && needs.changes.outputs.code == 'true'",
-  );
+  // Deep static follows the code lane, so push feedback runs it too.
+  expect(deep?.if).toBe("needs.changes.outputs.code == 'true'");
   expect(deep?.steps.some((step) => step.run === "npm run check:ci:deep")).toBe(
     true,
   );
