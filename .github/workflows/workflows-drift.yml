@@ -82,8 +82,10 @@ jobs:
             sed -n 's|^stale: \(.*\)$|::error file=\1::Stale generated copy — run perl tools/port-workflows.pl and commit the result.|p'
           printf '%s\n' "$out" |
             sed -n 's|^orphan: \(.*\)$|::error file=\1::Generated copy has no source — delete it, or restore the app workflow it came from.|p'
+          # A monorepo patch reverted under apps/ prints the failed path at two
+          # spaces, then `lost:`/`costs:`/`fix:`. Annotate the path itself.
           printf '%s\n' "$out" |
-            sed -n 's|^WARNING: \(.*\)$|::error::\1|p'
+            sed -n 's|^  \(apps/.*\)$|::error file=\1::Monorepo patch missing under apps/ — restore it before regenerating (git log -p -- \1).|p'
 
           {
             echo "### Root workflows are out of sync with apps/"

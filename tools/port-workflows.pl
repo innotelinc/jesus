@@ -24,7 +24,13 @@
 # release process, and the README says so.
 #
 # Usage: perl tools/port-workflows.pl [--check]
-#   --check  exit non-zero if any root file differs from what this would write
+#   --check  write nothing; exit non-zero if any root file differs from what
+#            this would write
+#
+# Both modes exit non-zero when a hand patch under apps/ is missing, so a
+# re-import cannot be mistaken for a clean regeneration: the root copies are
+# still written (the tree stays consistent), but the run reports failure and
+# says the regenerated files are not safe to commit.
 # ═══════════════════════════════════════════════════════════════════════════
 
 use strict;
@@ -388,6 +394,7 @@ sub fix_precheckout_steps {
 
 # ── Write ──────────────────────────────────────────────────────────────────
 my $changed = 0;
+my @broken;    # monorepo patches under apps/ that a re-import reverted
 my %expected;
 for my $pair (@order) {
     my ($app, $file) = @$pair;
@@ -483,12 +490,36 @@ for my $fix (@PATCHED) {
     push @why, 'the pre-fix form is back'    if $fix->{bans}  && $t =~ $fix->{bans};
     next unless @why;
 
-    warn "WARNING: $p: " . join('; ', @why) . "\n"
-       . "         If it was re-imported from upstream, the monorepo patch was lost:\n"
-       . "         $fix->{breaks}.\n"
-       . "         Re-apply the patch (git log for this file has the diff).\n";
-    $changed = 1 if $CHECK;
+    push @broken, { path => $p, why => [@why], breaks => $fix->{breaks} };
 }
 
 printf "%d workflow(s) ported\n", scalar @order;
-exit($CHECK && $changed ? 1 : 0);
+
+# A missing patch is a failure in both modes, not a warning. The reason is that
+# nothing downstream can catch it: the regenerated copy matches the reverted
+# source exactly, so `--check` on a later commit sees a clean tree and the
+# patch's absence reaches main as an ordinary green change.
+if (@broken) {
+    my $bar = '=' x 77;
+    warn "\n$bar\n";
+    warn sprintf("FAILED: %d monorepo patch%s missing under apps/.\n",
+        scalar(@broken), @broken == 1 ? '' : 'es');
+    warn "\n";
+    warn "A re-import from upstream overwrites these files, and that revert leaves no\n";
+    warn "diff in the generated workflows: they are regenerated from the reverted\n";
+    warn "source and still match it. Restore the patch before committing here.\n";
+    warn $CHECK
+        ? "\nNothing was written (--check).\n"
+        : "\nThe root copies just written were regenerated from the reverted sources and\n"
+        . "are NOT safe to commit on their own.\n";
+    warn "\n";
+    for my $b (@broken) {
+        warn "  $b->{path}\n";
+        warn "      lost:  " . join('; ', @{ $b->{why} }) . "\n";
+        warn "      costs: $b->{breaks}\n";
+        warn "      fix:   git log -p -- $b->{path}\n";
+    }
+    warn "$bar\n";
+}
+
+exit((@broken || ($CHECK && $changed)) ? 1 : 0);
