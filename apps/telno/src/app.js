@@ -10,7 +10,6 @@ import { config } from './config.js';
 import { installAuth } from './plugins/auth.js';
 import { HttpError } from './lib/errors.js';
 import { registerRoutes } from './routes/index.js';
-import { registerWssRelay } from './telephony/wssRelay.js';
 import { registerProvisioning } from './routes/provisioning.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -104,11 +103,6 @@ export async function buildApp(opts = {}) {
   });
 
   await app.register(registerRoutes, { prefix: '/api' });
-
-  // SIP over this origin. Registered at the root, before the static handler and
-  // its wildcard, because the softphone connects here and not to the switch's
-  // own port — see the module for why.
-  registerWssRelay(app);
 
   // Desk phones fetch their config by MAC with no session. Root, before the
   // static handler, because Option 66 points at http://telno.tel itself.

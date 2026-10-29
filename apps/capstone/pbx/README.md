@@ -1,570 +1,88 @@
-# PBX / Asterisk side — FreePBX 17 + dograh ARI wiring
+# The voice plane
 
-Runs the FreePBX fullstack image (`ghcr.io/innotelinc/pbx-portal:latest-fullstack`) and wires it
-to dograh over ARI:
+The switch is **Cantus 1.0** ([`apps/cantus`](../../cantus)) running as
+[`cantus-switch`](../../cantus-switch). It is the `cantus-switch` service in
+`docker-compose.yml`. This directory is everything about it that is specific to
+capstone: the routing document, the line inventory, and two small tools that
+keep them in step with everything else.
 
-| File (in `pbx/asterisk/`) | Injects into `/etc/asterisk/` | Purpose |
+## What used to be here, and why it is not
+
+| removed | what it did | what replaced it |
 |---|---|---|
-| `ari.conf` | converged into `ari.conf` (idempotent) | ARI user `[dograh]` — Stasis app name + password |
-| `http.conf` | `http.conf` (only if missing) | Asterisk HTTP on 8088 |
-| `websocket_client.conf` | `websocket_client.conf` | External media WS → dograh-api |
-| `extensions_custom.conf` | converged into `extensions_custom.conf` (idempotent) | `[dograh-inbound]` dialplan → `Stasis(dograh)` |
-| `asterisk_converge.py` | (sibling of `asterisk/`) | Shared-voice-plane per-context dialplan renderer (`pbx/asterisk_converge.py`) |
-| `tests/test_asterisk_converge.py` | (sibling of `asterisk/`) | Unit tests for the converge tool (`python3 -m unittest discover -s pbx/tests`) |
-| `rtp_custom.conf` | `rtp_custom.conf` (rewritten from env on every boot) | RTP plane: `stunaddr` / `icesupport` + the `rtpstart`/`rtpend` cap. **Entrypoint-owned** — the runtime copy is generated, this is the shape reference |
-| `rtp_settings_guard.py` | (sibling of `asterisk/`) | Re-asserts the two `rtp_additional.conf` rows FreePBX rewrites wrong (`stunaddr`, the lower-cased TURN credential) after each reload — run from the entrypoint as `/opt/rtp_settings_guard.py` |
-| `tests/test_rtp_settings_guard.py` | (sibling of `asterisk/`) | Unit tests for the RTP settings converger |
+| `asterisk/ari.conf` | an ARI user and password in a file | `CANTUS_ARI_USER`/`CANTUS_ARI_PASSWORD` on the service; Basic auth on `/ari` |
+| `asterisk/extensions_custom.conf` | the dialplan, hand-written, per context | `cantus/routes.json`, validated at load |
+| `asterisk/rtp_custom.conf`, `rtp_settings_guard.py` | RTP ranges, and a guard that re-wrote rows FreePBX kept lower-casing | no RTP range to declare; one UDP socket per node |
+| `asterisk/http.conf`, `websocket_client.conf` | the PJSIP WSS listener on 8089 | the softphone socket on 8088, same origin as the console |
+| `asterisk_converge.py` | merged per-context dialplan files at boot | `bootstrap_cantus.py`, one document, idempotent |
+| `entrypoint-dograh.sh` | 185 lines of boot-time surgery on a FreePBX image | the container's own env, plus the two tools below |
+| `fail2ban/` | blocked SIP registrations that guessed passwords | nothing to ban: there is no registration port on the internet |
+| `bootstrap_dograh_route.py`, `scripts/sync_dograh_routes.py` | wrote FreePBX MySQL rows with `docker exec` | `sync_agent_numbers.py`, a merge into the document |
+| the `pbx-sso` gateway | SSO in front of FreePBX's GUI | there is no GUI; the console is `dashboard` |
 
-`pbx/entrypoint-dograh.sh` applies these into the `pbx-asterisk-config` volume
-on every boot, then execs the stock entrypoint (MariaDB → Asterisk → web
-stack). FreePBX regenerates `extensions.conf` on Apply Config but **not** the
-`*_custom.conf` files above, so those injections survive GUI reloads.
-`ari.conf` on the pbx-portal fullstack image is a plain file (verified: not
-a module symlink, no `#include`) and survives `fwconsole reload` too, so the
-`[dograh]` ARI user is converged straight into it — earlier builds wrote
-`ari_additional_custom.conf`, which nothing on this image includes, so a
-fresh install shipped with no ARI user at all.
+FreePBX and AvantFax went with Asterisk: both are administration surfaces for a
+PBX that is no longer there, and a GUI that rewrites configuration is exactly
+the second source of truth this switch removes.
 
-`extensions_custom.conf` goes through the **converge tool**
-(`pbx/asterisk_converge.py`, mirrored from the zeus repo — the single
-renderer for the shared voice plane): `[dograh-inbound]` replaces wholesale,
-while `[from-internal-custom]` is **append-shared** — capstone's entries are
-added under `; >>> begin/end capstone` ownership markers so zeus (or FreePBX
-modules) can add their own entries to the same context without capstone
-clobbering them on a shared PBX. Idempotent by construction — an existing
-capstone segment is refreshed in place, so re-applying either owner alone is
-byte-stable and never shuffles the other owner's entries. The first boot
-after adopting converge absorbs the old markerless injection (a
-byte-identical legacy copy of capstone's own body) into the marked segment
-instead of duplicating the extension definitions; a stock-awk fallback
-covers images without python3.
-
-## Run
-
-The PBX is a service in the main compose file, so the whole stack starts with
-one command:
+## The three things you can do here
 
 ```bash
-# Full capstone stack (dograh + PBX together)
-docker compose up -d
+# Load the document and the inventory into a running switch. Idempotent.
+python3 pbx/bootstrap_cantus.py --url http://localhost:8088
 
-# PBX only (the freepbx service)
-docker compose up -d freepbx
+# Make every number dograh advertises dialable, preserving hand-written routes.
+python3 pbx/sync_agent_numbers.py --dry-run
 
-# Optional: also start the PBX Customer Portal (Next.js)
-docker compose --profile portal up -d
+# Score the document without a switch — the same evaluation the switch does.
+node ../cantus-switch/src/cli.js route-test pbx/cantus/routes.json --to 8001@capstone.local
 ```
 
-Add to `.env` (see `.env.example`):
+`pytest pbx/tests` proves the document's shape, that a second bootstrap changes
+nothing, and that the number sync creates, keeps and removes the routes it owns.
 
-```bash
-# openssl rand -base64 24
-DOGRAH_ARI_PASSWORD=<strong-password>   # MUST match dograh UI "App Password"
-DOGRAH_WS_URI=ws://host.docker.internal:8000/api/v1/telephony/ws/ari  # default
-FREEPBX_AMI_SECRET=<openssl rand -base64 24 | tr -d '/+='>   # only if the portal profile is used — strip '/','+','=' so it can't break the entrypoint sed
-```
-
-## Route calls into dograh (automatic with setup.sh)
-
-The dialplan context `[dograh-inbound]` already exists (injected), and
-`./scripts/setup.sh` wires the FreePBX half automatically: for each DID
-`8000`, `8001`, `8002` it runs `pbx/bootstrap_dograh_route.py`, which creates
-the Custom Destination + Inbound Route (DID → `dograh-inbound,<exten>,1`) and
-verifies the live dialplan.
-
-`scripts/sync_dograh_routes.py` is the general path: it mirrors
-**every** dograh phone number (the shipped agents plus anything created in
-the dograh UI / Workflow Studio) into FreePBX as a **Custom Extension**
-(customappsreg `custom_extensions` table → Applications → Extensions, basic:
-no voicemail, no call waiting), a Custom Destination + Inbound Route, and a
-dynamic `extensions_custom_dograh.conf` dialplan include for numbers beyond
-the static `8000-8007` set. Removing a number in dograh deletes the matching
-dograh-created entries on the next sync run (`capstone-pbx-sync.timer` runs
-it every 12 hours as a drift safety net; the Control Center also syncs
-immediately when an agent is created or edited); user-created FreePBX entries are
-never touched. To (re)run by hand:
-
-```bash
-# requires FREEPBX_CLIENT_ID/SECRET in .env (entrypoint registers the OAuth
-# client on boot — empty allowed_scopes = full GraphQL access)
-python3 pbx/bootstrap_dograh_route.py            # creates route DID 8000
-python3 pbx/bootstrap_dograh_route.py --did 8001 --exten 8001   # second extension
-python3 pbx/bootstrap_dograh_route.py --check    # verify only
-python3 pbx/bootstrap_dograh_route.py --force    # update an existing route
-```
-
-It is idempotent, runs `fwconsole reload`, and verifies the live dialplan:
-`[dograh-inbound]` → `Stasis(dograh)`, and the DID route landing in
-`ext-did-0002` (FreePBX puts normal DID routes there; `dialplan show
-from-trunk` only lists the include chain, so the script checks the context
-the route actually lands in).
-
-### Internal dialing (softphones on the LAN)
-
-`pbx/asterisk/extensions_custom.conf` also defines `[from-internal-custom]`
-with `8000`/`8001`/`8002` → `Goto(dograh-inbound,...)`, so any SIP extension
-registered to the PBX can dial the three interview lines directly (agent
-answers) — no inbound route involved. The entrypoint appends those entries
-into the shared context under capstone ownership markers on boot; edit the
-file in `pbx/asterisk/` (never the volume copy) and restart the freepbx
-container to propagate.
-
-### GUI method (alternative)
-
-1. **Connectivity → Inbound Routes → Add Inbound Route**
-   - DID Number: `8000`
-   - Set Destination → **Custom Destinations** → the destination created next.
-2. **Admin → Custom Destinations → Add Destination**
-   - Description: `Dograh Voice Agent`
-   - Destination: `dograh-inbound,8000,1`
-   - ⚠️ Keep the concrete extension (`8000`) — do **not** use `s`. Dograh
-     matches inbound calls by the channel's dialplan exten at `StasisStart`;
-     with `s` the call is hung up as "no matching phone number".
-3. **Apply Config.**
-
-For each additional extension registered in dograh, the sync script
-(`scripts/sync_dograh_routes.py`) generates the `[dograh-inbound]` /
-`[from-internal-custom]` entries automatically into
-`/etc/asterisk/extensions_custom_dograh.conf` (a persistent `#include` from
-`extensions_custom.conf`) — no manual edit or container restart needed. If
-you'd rather define a static number, add `exten =>` lines to
-`pbx/asterisk/extensions_custom.conf` (or use a pattern like `_8XXX`) and
-`docker compose restart freepbx`; the entrypoint merges the file idempotently
-per context, so static extensions propagate on boot without duplicating
-the sync-generated ones (numbers defined in the static file are skipped by
-the sync).
-
-The current track routing (FreePBX extension → dograh workflow) is managed by
-`scripts/dograh_wire.py` (called by setup.sh) or the Ansible manifest
-(`ansible/dograh-ari.yml`, `dograh_inbound_routes`): `8000` → IT Help Desk,
-`8001` → DevOps, `8002` → SQL. Extensions must exist in the dialplan **and**
-be registered as dograh phone numbers with an inbound workflow — setup.sh
-(or the playbook) does the dograh half; the dialplan + inbound route here do
-the PBX half.
-
-## Configure dograh (Telephony Configurations → Add → Asterisk ARI)
-
-| Field | Value |
-|---|---|
-| ARI Endpoint URL | `http://<host LAN IP>:8088` — the LAN IP, not loopback (see README → Addressing) |
-| Stasis App Name | `dograh` (section name converged into `ari.conf`) |
-| App Password | `DOGRAH_ARI_PASSWORD` value |
-| WebSocket Client Name | `dograh` (section name in `websocket_client.conf`) |
-| From Extensions | optional, e.g. `PJSIP/6001` for outbound |
-
-Save → open the configuration → add extension `8000` as a **phone number** →
-assign an **Inbound workflow**. Then dial `8000` — the voice agent should
-answer.
-
-> **Codec:** dograh's external media channel uses **G.711 µ-law (`ulaw`)**.
-> Make sure the SIP trunk/endpoint that places calls allows `ulaw`
-> (e.g. `allow=ulaw` on the PJSIP endpoint).
-
-### WebRTC, STUN & TURN (automatic)
-
-`pbx/entrypoint-dograh.sh` wires the host coturn into FreePBX on every boot
-(settings-DB level, so the GUI's Apply Config can't undo it):
-
-- **SIP Settings → RTP** — `stunaddr` / `turnaddr` / `turnusername` /
-  `turnpassword` → `rtp_additional.conf`: the RTP engine discovers its
-  external address via STUN and relays media through TURN for ICE peers.
-  `stunaddr` is set from `PJSIP_STUN_ADDR` (`stun.l.google.com:19302` by
-  default) and is deliberately **not** the TURN address — coturn runs
-  `--no-stun` here, and it is RFC 5389 while Asterisk's client is RFC 3489, so
-  it could never answer it. A reload rewrites that file from the settings DB
-  and lower-cases the TURN password on the way, so `pbx/rtp_settings_guard.py`
-  re-asserts both rows afterwards (the same tool, byte-for-byte, as zeus's).
-- **SIP Settings → WebRTC** — `webrtcstunaddr` / `webrtcturnaddr` /
-  `webrtcturnusername` / `webrtcturnpassword` fields.
-- **SIP Settings → binds + HTTP TLS** — the **WSS transport is enabled on
-  `0.0.0.0:8089`**. In Asterisk, a `wss` transport does *not* create its own
-  socket — it registers with the HTTP server's websocket support
-  (`res_http_websocket`), so Asterisk **HTTP TLS must be enabled** on
-  `0.0.0.0:8089` for the WSS listener to exist at all. The entrypoint flips
-  `HTTPTLSENABLE` / `HTTPTLSBINDADDRESS` / `HTTPTLSBINDPORT` in
-  `freepbx_settings` (cert: `/etc/asterisk/keys/integration/`). The
-  transport bind change forces one Asterisk restart at boot (pjsip
-  transports are `allow_reload=no`).
-- **`[webrtc-template](!)` endpoint template** — written into
-  `pjsip.endpoint_custom.conf` (included, never regenerated): WebRTC
-  devices get DTLS-SRTP, ICE, `use_avpf`/`rtcp_mux`, and TURN relay by
-  setting `template=webrtc-template` on the extension.
-- **WebRTC test extension `102`** — endpoint (inherits `webrtc-template`)
-  + auth (`102-auth`) + aor (`102`) written to the `*_custom.conf` files on
-  boot. Register any browser SIP client against
-  `wss://<host>:8089` with user `102` / password `webrtc-test-102`
-  (override via `WEBRTC_TEST_PASSWORD`).
-
-For **no browser certificate warnings**, front the WSS endpoint with a
-reverse proxy that terminates TLS (e.g. Nginx Proxy Manager): create a proxy
-host `voice.<NPM_BASE_DOMAIN>` (e.g. `voice.capstone.innotel.us`) with
-**Websocket Support** enabled and forward `/ws` →
-`https://<host>:8089/ws` (or `http://<host>:8088/ws` for a plain-`ws`
-upstream, if the proxy won't accept the self-signed upstream cert). The
-proxy's Let's Encrypt certificate covers the browser connection
-(`wss://voice.<domain>/ws` — the Control Center softphone picks this up
-automatically from `/api/turnconfig`), and the internal `:8089` listener
-remains the direct-LAN fallback. See README → “NPM proxy hosts” for the
-full host list.
-
-**Simplest path — no extra proxy host.** The Control Center's own nginx
-already serves `/ws` on its origin (`dashboard/nginx.conf`: `location = /ws`
-→ `pbx-freepbx:8089`, upstream TLS verification off) and resolves the PBX per
-request, so the dashboard still boots if the PBX is down. The softphone on an
-HTTPS page targets its own origin (`wss://dashboard.<domain>/ws`), which means
-the **only** certificate the browser sees is the one the outer proxy already
-issued for the dashboard host — no `voice.` subdomain required. Two
-requirements on that outer proxy host: **Websocket Support enabled**, and the
-page itself served over HTTPS (a plain-HTTP origin is not a secure context, so
-`getUserMedia` has no microphone and the softphone can't place calls).
-
-> The browser will **not** accept the PBX's own `:8089` listener directly: the
-> image ships a build-time self-signed cert (`CN=buildkitsandbox`, no SAN) that
-> can't match any host, so the WSS handshake fails and the softphone reports
-> “Registration failed”. That listener is a LAN/`--insecure` fallback only —
-> use the proxied `/ws` path above for browsers.
-
-**Media (STUN/TURN).** `/turnconfig` hands the browser the STUN/TURN addresses
-it must use *and* the credentials: it advertises the host the browser reached
-the dashboard on (a LAN IP in a STUN URL is unreachable from a remote client, so
-ICE never gets a server-reflexive candidate) and returns `TURN_USERNAME` /
-`TURN_PASSWORD` from `.env`. Two `.env` settings make the relay actually work —
-coturn runs behind Docker NAT, so it must be told which public address to
-advertise for relayed candidates, and the credentials must not be the
-template's `turnuser` / `change-me-*` defaults:
-
-```bash
-# .env (see .env.example lines ~106-118)
-TURN_USERNAME=capstone-turn
-TURN_PASSWORD=<random secret>
-TURN_REALM=capstone.innotel.us
-TURN_EXTERNAL_IP=          # empty = auto-detect on every coturn start
-```
-
-`TURN_EXTERNAL_IP` is left **empty** on purpose: the coturn image's entrypoint
-`eval`s its arguments and ships `detect-external-ip` (a DNS query that returns
-the caller's public address), so the compose command uses
-`--external-ip=${TURN_EXTERNAL_IP:-$(detect-external-ip)}` and every container
-start re-detects. Pin an address only where that DNS probe is blocked — a
-pinned value goes stale when the WAN IP changes, and off-LAN calls then set up
-and carry no audio. `scripts/smoke-e2e.sh` fails when the running server
-advertises something other than the address this box resolves to now.
-
-Relay range `49152-49251/udp` plus `3478/tcp+udp` must be forwarded for remote
-clients; on-LAN clients work without the relay.
-
-Verify the browser's exact path (strict TLS, no `--insecure`):
-
-```bash
-# expect: 101 upgrade → 401 challenge → 200 OK → RESULT: PASS
-python3 scripts/webrtc-register-test.py --host dashboard.<domain> --port 443
-```
-
-The **TURN** address defaults to `coturn:<TURN_LISTENING_PORT>` (the coturn
-compose service, same Docker network — always resolvable from inside the
-container). Override with `PJSIP_STUN_TURN_ADDR` in `.env` if needed. The
-**STUN** address is separate (`PJSIP_STUN_ADDR`, default
-`stun.l.google.com:19302`), because coturn runs with `--no-stun` and could not
-answer this Asterisk anyway — see the note below. Browsers get their STUN from
-`PJSIP_WEBRTC_STUN_ADDR` (tracks `PJSIP_STUN_ADDR`), while `webrtcturnaddr`
-stays on coturn. TURN creds come from `TURN_USERNAME` / `TURN_PASSWORD`. For
-remote WebRTC clients, forward `3478/tcp` + `3478/udp` and `49152-49251/udp` on
-the router (see below) and make sure the coturn `TURN_EXTERNAL_IP` is the
-public IP.
-
-#### coturn serves TURN, not STUN
-
-The `coturn` service runs with `--no-stun`. TURN is authenticated
-(`--lt-cred-mech`), but a bare STUN Binding request is unauthenticated *by
-design* — so publishing 3478 on the WAN makes the box a public STUN reflector,
-and the shared box was scanned and then driven as one. Nothing here needs
-coturn's STUN: Asterisk's client is RFC 3489 and coturn is RFC 5389, so
-Asterisk could never use it, and the browsers are handed `PJSIP_WEBRTC_STUN_ADDR`
-instead. Only the STUN row moves — `webrtcturnaddr` stays on coturn, which is
-what actually relays the media. coturn 4.18 *does* ship a deprecated
-`--rfc3489-compatibility`, but enabling it means answering unauthenticated STUN
-on the WAN again, which is the exposure `--no-stun` closes. The zeus compose
-files carry the same flag; keep the two in step.
-
-#### The rows FreePBX rewrites, and the concurrency row nobody wrote
-
-`fwconsole reload` rebuilds `/etc/asterisk/rtp_additional.conf` from
-`kvstore_Sipsettings`, and two rows do not survive the trip — both fail
-silently, with nothing on either side of the wire to say the relay is gone:
-
-| Row | What FreePBX does | What it costs |
-| --- | --- | --- |
-| `turnpassword` / `turnusername` | `Sipsettings::genConfig()` runs every RTP value through `strtolower()` | A TURN password is case-sensitive. coturn logs `credentials are incorrect (check_stun_auth)` once per call and Asterisk's relay candidates are dead |
-| `stunaddr` | written as given — but it must name a server that speaks RFC 3489 | Coturn can't (and here runs `--no-stun`), so every call logs `stun.c: Attempt 3 to send STUN request … timed out` (3 × 3s) and discovers nothing |
-
-`pbx/rtp_settings_guard.py` re-asserts both rows from the values the boot owner
-already knows, and `pbx/entrypoint-dograh.sh` runs it after the post-reload RTP
-write. `--check` is read-only; `--apply` converges.
-
-A *third* silent failure sits next to it: `[macro-user-callerid]` reads
-`DB(AMPUSER/${AMPUSER}/concurrency_limit)` twice to enforce the outbound
-concurrency limit, but FreePBX only creates that AstDB row in `Core::addUser`.
-An extension the legacy migration inserted straight into the database never went
-through it, so both lookups expand to nothing, the expression reads
-`… & 0 & >0 & 0>=]` and Asterisk logs `ast_expr2.fl: ast_yyerror(): … unexpected
-'>'` on **every call** while evaluating the guard false — the limit was never
-enforced. The entrypoint seeds the row (defaulting to `CONCURRENCYLIMITDEFAULT`)
-per extension, idempotently, on every boot.
-
-Seeding **after** the reload is what makes it work: the AstDB these rows live in
-is in the container's writable layer (only `/var/lib/asterisk/sounds` is on a
-volume), so a `--force-recreate` starts it empty and the boot-time extension
-mirror repopulates `AMPUSER` while Asterisk comes up. Seeding earlier finds no
-extensions at all — silently. The block therefore sits in the post-reload
-section, next to the RTP guard.
-
-Verify:
-
-```bash
-docker exec pbx-freepbx asterisk -rx "pjsip show transports"
-# expect 0.0.0.0-udp :5060 and 0.0.0.0-wss :8089
-
-docker exec pbx-freepbx cat /etc/asterisk/rtp_additional.conf
-# expect stunaddr=stun.l.google.com:19302 + turnaddr=coturn:3478 + mixed-case creds
-
-# The guard is read-only with --check; it must be in sync after a boot/reload.
-docker exec pbx-freepbx python3 /opt/rtp_settings_guard.py --check
-# expect: rtp_additional.conf in sync (exit 0)
-
-docker exec pbx-freepbx cat /etc/asterisk/pjsip.endpoint_custom.conf
-# expect the [webrtc-template](!) section and [102](webrtc-template)
-
-# Full WSS registration probe (no browser needed — same signaling path):
-python3 scripts/webrtc-register-test.py --insecure
-# expect: 101 upgrade → 401 challenge → 200 OK → RESULT: PASS
-```
-
-## Verify
-
-```bash
-docker compose ps freepbx                                    # healthy
-
-# From inside the container:
-docker exec -it pbx-freepbx bash
-asterisk -rx "ari show users"                 # expect: dograh
-asterisk -rx "http show status"               # server up on 0.0.0.0:8088
-asterisk -rx "module show like res_websocket_client"   # media WS module loaded
-asterisk -rx "dialplan show dograh-inbound"   # expect: exten 8000, 8001, 8002 → Stasis(dograh)
-asterisk -rx "dialplan show from-internal-custom"  # expect: 8000/8001/8002 → Goto(dograh-inbound,…)
-exit
-
-# From the host (dograh's view of ARI — the LAN IP; loopback is not published):
-curl -s -u dograh:$DOGRAH_ARI_PASSWORD http://$PJSIP_MEDIA_ADDRESS:8088/ari/asterisk/info
-```
-
-Place a test call to `8000` (IT), `8001` (DevOps), or `8002` (SQL). Watch
-dograh logs for the StasisStart, the "Created inbound workflow run N" line
-(run ids increment globally; the bound workflow per extension is IT/DevOps/
-SQL), and the media WebSocket connecting; then check Grafana's **Interview
-Pipeline Latency** dashboard (`:3301`) for the call's STT → LLM → TTS stages — the
-spans behind them are metrics, not stored traces, so the dashboard is the trace
-view.
-
-## NAT / router setup (external callers dialing in)
-
-### This box, right now
+## How a call reaches an agent
 
 ```
-host LAN IP    192.168.1.168   (eth0, static lease via 192.168.1.1)
-gateway        192.168.1.1
-public IP      73.68.203.71    (NAT egress — what the internet sees)
-local firewall  none (ufw inactive, iptables ACCEPT)
+DID 8001 ──▶ cantus-switch ──▶ routes.json ──▶ { answer } { ari: dograh }
+                                                     │
+                                     StasisStart ────▶ dograh (dograh's ARI WS)
+                                                     │
+                            externalMedia + bridge ──▶ audio both ways
 ```
 
-The PBX publishes these ports (freepbx service in `docker-compose.yml`):
+The `ari` action is terminal: it hands the channel to the application, which
+then answers, plays, records and bridges through `/ari`. dograh is unchanged —
+same ARI dialect, same telephony configuration, same scripts — it just dials
+`http://<host>:8088` instead of a FreePBX box, which is what
+`ansible/dograh-ari.yml` now writes.
 
-| Port | Proto | Purpose | Expose externally? |
-|------|-------|---------|--------------------|
-| 5060 | udp   | SIP signalling | ✅ forward |
-| 5061 | tcp   | SIP-TLS (optional) | ✅ if used |
-| 10101-10120 | udp | RTP media | ✅ forward |
-| 8089 | tcp   | PJSIP WSS (WebRTC softphones) | ✅ if using WebRTC |
-| 80   | tcp   | FreePBX web UI | ❌ admin only |
-| 8088 | tcp   | Asterisk HTTP/ARI | ❌ dograh reaches it on the LAN IP |
-| 5038 | tcp   | AMI | ❌ admin only |
-| 10000 | tcp  | Webmin | ❌ admin only |
+An application that is not connected is refused rather than left to fail on the
+first call: `bootstrap_cantus.py` exits 1 and names it.
 
-### 1. Router port-forwarding
+## Ports
 
-Forward on the router (`192.168.1.1`) → `192.168.1.168`:
+| | before | now |
+|---|---|---|
+| SIP / SIP-TLS | 5060/udp, 5061/tcp | — |
+| ARI / HTTP / WSS | 8088, 8089 | 8088 (control, ARI, softphone) |
+| AMI | 5038 | — (the control API) |
+| RTP | 10101–10120/udp | — |
+| Webmin | 10000 | — |
+| Cantus + relay | — | 7443/udp, 7444/udp |
 
-```
-5060/udp        → 192.168.1.168:5060        SIP signalling
-10101-10120/udp → 192.168.1.168:10101-10120 RTP media
-5061/tcp        → 192.168.1.168:5061        (only if you use SIP-TLS)
-8089/tcp        → 192.168.1.168:8089        (only if you use WebRTC softphones)
-```
+Two UDP ports for the whole switch. A firewall rule, not a range — and no
+inbound SIP port, which is why the fail2ban jail has nothing left to watch.
 
-Also on the router: **disable SIP ALG** (it mangles SIP/SDP and breaks
-registration + audio on nearly every consumer router).
+## What is still Asterisk-shaped, stated plainly
 
-### 2. Asterisk must advertise the public IP (SIP/SDP)
-
-Without this, Asterisk writes its private address into `Contact` and SDP, and
-remote callers get **one-way or no audio**. The compose image bakes the
-public IP into `pjsip.transports.conf` at build time; verify it matches THIS
-box and fix it via the FreePBX GUI (`Connectivity → Trunks`, the UDP
-transport) or `pjsip.transports_custom.conf` (survives Apply Config):
-
-```ini
-[0.0.0.0-udp]
-type = transport
-protocol = udp
-bind = 0.0.0.0:5060
-external_media_address = 73.68.203.71
-local_net = 192.168.1.0/24      ; don't NAT the LAN back into itself
-```
-
-Verify what Asterisk thinks it's advertising:
-
-```bash
-docker exec pbx-freepbx asterisk -rx "pjsip show transport 0.0.0.0-udp" | \
-  grep -E "external_(media|signaling)_address"
-```
-
-If the box's public IP ever changes (DHCP WAN), update the transport — the
-`external_*_address` is static in this setup. `local_net` keeps LAN callers
-from being NAT'd back through the router.
-
-### 3. RTP range — must match what Docker publishes
-
-The compose publishes **10101-10120/udp**, while host TCP port `10000` is reserved for Webmin. FreePBX's default RTP range can extend to `20000`; the entrypoint writes the durable `rtpstart`/`rtpend` values into FreePBX's settings database so Asterisk stays inside the published range.
-
-`pbx/asterisk/rtp_custom.conf` provides the fallback cap:
-
-```ini
-[general]
-rtpstart=10101
-rtpend=10120
-```
-
-The range is parameterized by `FREEPBX_RTP_PORT_START` / `FREEPBX_RTP_PORT_END`
-(default `10101-10120`) and **Zeus mirrors this file, these env names and the
-`kvstore_Sipsettings` write one-for-one** (`docs/zeus-integration.md` §3.1). A
-Capstone add-on on a Zeus PBX therefore rides Zeus's range instead of publishing
-a second one — the bundled `freepbx` (and `coturn`) services stay profile-off
-(`standalone`) in add-on mode.
-
-Verify:
-
-```bash
-docker exec pbx-freepbx cat /etc/asterisk/rtp_custom.conf
-# expect rtpstart=10101 rtpend=10120
-```
-
-### 4. Sanity check from the outside
-
-- SIP: `nmap -sU -p 5060 73.68.203.71` or a SIP OPTIONS ping (e.g. `sipsak`)
-  should reach Asterisk.
-- RTP: place a test call and watch one-way audio; if the caller hears nothing,
-  run `docker exec pbx-freepbx asterisk -rx "rtp set debug on"` during the
-  call and confirm the negotiated ports are inside 10101-10120.
-- If calls reach the PBX but drop immediately, the inbound route destination
-  may be `s` — fix the Custom Destination (see Troubleshooting).
-
-## Destination validation & the Blacklist module
-
-FreePBX validates every destination (custom destinations, inbound routes,
-the Blacklist module's own settings) against the **live dialplan** — a
-destination whose context is missing is flagged as a **"bad destination"**
-(Blacklist → Settings, the dashboard notice, and Apply Config all use this
-check). The dograh wiring keeps every destination valid:
-
-- `pbx/bootstrap_dograh_route.py` and `scripts/sync_dograh_routes.py` write
-the `[dograh-inbound]` dialplan **before** creating custom destinations and
-inbound routes, run `fwconsole reload`, then **re-validate** each
-`dograh-inbound,<ext>,1` target against `asterisk -rx "dialplan show"` and
-report any that are missing.
-- Custom destinations are written with `destret = ""` (the customappsreg
-GUI default in FreePBX 17). A truthy `destret` makes the module's dialplan
-hook expect a `dest` return key that the kvstore row has no field for,
-crashing `fwconsole reload` with "Undefined array key `dest`".
-- `fix_blacklist_destination()` (in `bootstrap_dograh_route.py`, called by
-both scripts) repairs the **Blacklist module's** "Destination for
-Blacklisted Calls" when it dangles on a deleted custom destination
-(`custom-app,dest-<n>,1` → reset to the module's own
-`app-blacklist-check,s,1` = Terminate Call). Idempotent, runs on every sync.
-
-## Blocking invalid SIP registrations (fail2ban)
-
-This port is on the public internet, so it is found by scanners within minutes
-and probed forever after: a few hours of `full` log contained **2 321 rejected
-requests** from a handful of hosts (`172.110.223.87` alone accounted for 1 550).
-None of that traffic can be rejected by Asterisk itself, and a ban applied inside
-the container cannot work either — the container is on a bridge network and never
-sees the packets before Docker has already DNAT'd them. The ban has to happen on
-the **host**, in Docker's `DOCKER-USER` chain.
-
-```bash
-sudo scripts/install-fail2ban.sh              # install, start, verify
-sudo scripts/install-fail2ban.sh --status     # jails + live bans
-sudo scripts/install-fail2ban.sh --dry-run    # preview the rendered jail
-sudo scripts/install-fail2ban.sh --uninstall  # stop + remove
-```
-
-| File | Role |
-|---|---|
-| `pbx/fail2ban/jail.local.in` | jail template — rendered to `/etc/fail2ban/jail.local` with the log dir, `ignoreip` and ban policy substituted in |
-| `pbx/fail2ban/filter.d/asterisk-security.conf` | matches `res_security_log` records, anchoring `<HOST>` on `RemoteAddress` (never `SuccessfulAuth`) |
-| `pbx/fail2ban/filter.d/asterisk-registration.conf` | matches the `failed for '<ip>:<port>'` notices in `full` — the wider net, and the one that catches scanner waves |
-| `pbx/fail2ban/action.d/docker-user.conf` | bans into `DOCKER-USER` (idempotent insert, so two jails on one address leave exactly one rule) |
-| `scripts/install-fail2ban.sh` | host installer: volume, package, configs, service, verification |
-
-**Policy.** `maxretry = 1`, `bantime = 172800` (48 h), `findtime = 3600` — the
-first invalid registration from an address drops all of its traffic for two
-days. Loopback and the auto-detected LAN are exempt so the pair of `48h` and
-`first packet` cannot lock out the operator's own softphone; three fresh bans in
-a week escalate to 30 days through `recidive`. Override with `F2B_IGNOREIP`,
-`F2B_BANTIME`, `F2B_MAXRETRY`, `F2B_LOG_DIR` or the matching CLI flags.
-
-**Wiring.** The `freepbx` service mounts the `asterisk-logs` volume at
-`/var/log/asterisk`, and `pbx/entrypoint-dograh.sh` adds `security => security`
-to `logger_logfiles_custom.conf` — the include FreePBX keeps when it regenerates
-`logger.conf`, so a GUI *Apply Config* cannot turn the security log back off.
-The host daemon then reads `security` and `full` straight off disk; there is no
-log shipper and no `docker exec` in the loop.
-
-```bash
-# confirm the channel survived a FreePBX reload
-docker exec pbx-freepbx bash -c 'grep security /etc/asterisk/logger_logfiles_custom.conf'
-docker exec pbx-freepbx bash -c 'tail -1 /var/log/asterisk/security'
-
-# what the host can see
-sudo scripts/install-fail2ban.sh --status
-iptables -S DOCKER-USER | grep DROP
-```
-
-> **Related fix:** the same entrypoint now converges `UCPMGRPASS` onto the real
-> `[ucp_events]` secret. The image only wrote that value when the row was empty,
-> so on an existing MariaDB volume the UCP NodeJS server authenticated with a
-> stale password forever — the node process sat at **100 % CPU with 72 restarts**
-> and every attempt logged an `InvalidPassword`. See `docs/operations.md` →
-> "Blocking invalid SIP registrations" for the measurement.
-
-## Troubleshooting
-
-- **`UNVERIFIED media socket` in dograh logs** — dograh signs the media WS URL
-  with `TELEPHONY_WS_TOKEN_SECRET`; the dograh `.env` and this PBX are out of
-  sync on the token secret (or `DOGRAH_WS_URI` points somewhere wrong).
-- **Call answers but no audio** — check `ulaw` on the trunk/endpoint, then
-  `asterisk -rx "rtp set debug on"` during a test call. Confirm the
-  negotiated RTP port is inside `10101-10120` (the compose publish) — if
-  Asterisk picked a higher port, `rtp_custom.conf` lost its override (it's
-  re-applied by `pbx/entrypoint-dograh.sh` on boot).
-- **"no matching phone number" hang-up** — the inbound route destination is
-  `s` instead of the concrete extension; fix the Custom Destination.
-- **ARI changes not picked up** — the stock entrypoint runs a final
-  `core restart now` after the web stack starts; if you edit configs later,
-  run `asterisk -rx "ari reload"` / `asterisk -rx "dialplan reload"` /
-  `asterisk -rx "module reload res_websocket_client.so"` by hand.
-- **`invalid_client` (401) from the API token endpoint** — the OAuth client
-  is registered by the stock entrypoint on boot, but that step can fail if
-  MariaDB isn't ready yet, leaving `api_applications` empty. Re-run the
-  registration: `docker exec pbx-freepbx php /tmp/register_oauth.php` (with
-  `FREEPBX_CLIENT_ID`/`FREEPBX_CLIENT_SECRET` env vars set), then retry
-  `bootstrap_dograh_route.py`.
+- `dashboard-backend/app/agents.py` and `main.py` still provision extensions by
+  running `fwconsole` and MySQL inside a PBX container. On this switch the same
+  work is `POST /v1/lines` and a merge into `routes.json`; until that is ported,
+  `CAPSTONE_DEPLOY_MODE` defaults to `addon` (dashboard manages dograh only) and
+  the Control Center's PBX panel reports the switch as externally managed.
+- `docs/operations.md`, `docs/zeus-integration.md`, `docs/networking.md` and
+  `CHANGELOG.md` describe the FreePBX topology. The changelog is history and
+  stays; the other three are being rewritten, and where they disagree with this
+  file this file is right.
+- `PJSIP_MEDIA_ADDRESS` is still the name of the host's LAN address in `.env`,
+  because a dozen scripts read it. It is an address, not a SIP setting.

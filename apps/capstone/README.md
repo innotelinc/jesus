@@ -4,12 +4,12 @@
 
 # 🎙️ Capstone — Voice AI Agent Platform
 
-**Self-hosted AI phone agents over Asterisk/FreePBX — local speech, local LLM, no per-minute fees.**
+**Self-hosted AI phone agents over Cantus 1.0 — local speech, local LLM, no per-minute fees.**
 
 Capstone turns your phone line into an AI-powered receptionist and outreach team that runs
 entirely on your own hardware — answers inbound calls, screens callers, runs natural
 conversations, dials out to chase leads, runs surveys and polls, and automates telephony
-workflows over **FreePBX/Asterisk**, with **local speech** (STT + TTS) and an **LLM**
+workflows over **Cantus**, with **local speech** (STT + TTS) and an **LLM**
 driving the conversation. User management and SSO are handled by **Cerulean Authentik**. No cloud
 APIs, no audio leaving the box.
 
@@ -25,13 +25,30 @@ APIs, no audio leaving the box.
 
 ---
 
+## The voice plane is Cantus
+
+Asterisk 22, FreePBX 17, AvantFax and the PBX customer portal are gone. The
+switch is [`cantus-switch`](../../cantus-switch) — Cantus 1.0, the same protocol
+as the rest of the estate — and it is one service: 8088/tcp for control, ARI and
+the browser softphone, 7443-7444/udp for signalling and media. No SIP port, no
+AMI, no RTP range, no Webmin, no MariaDB, and no GUI that rewrites
+configuration.
+
+dograh is unchanged: it speaks the same ARI dialect it always did and now dials
+the switch instead of FreePBX. Inbound numbers are handed to it by an `ari`
+action in the routing document. [pbx/README.md](pbx/README.md) has the mapping
+from every removed file to what replaced it, the ports before and after, and an
+honest list of what is still Asterisk-shaped.
+
+---
+
 ## Why Capstone
 
 | Problem | Capstone answer |
 | --- | --- |
-| Cloud voice APIs leak audio + cost per minute | Local speech (STT+TTS) + local LLM over Asterisk/FreePBX; no audio leaves the box |
+| Cloud voice APIs leak audio + cost per minute | Local speech (STT+TTS) + local LLM over the Cantus switch; no audio leaves the box |
 | Identity sprawl across phone apps | Cerulean Authentik SSO; disable a user and their phone-agent access dies |
-| Telephony vendor lock-in | Skips OpenAI/Vapi/Cartesia/Make — runs on your own FreePBX + local LLM |
+| Telephony vendor lock-in | Skips OpenAI/Vapi/Cartesia/Make — runs on the open Cantus protocol + a local LLM |
 | Agent observability is a black box | OpenTelemetry spans every step; the collector turns them into RED metrics, so pipeline latency is charted without running a trace store |
 
 > **About Capstone** — a completely self-hosted, open-source Voice AI Agent Platform: it
@@ -58,7 +75,7 @@ behind the existing `MINIO_*` contract in a dedicated release.
 | | | |
 |---|---|---|
 | 🗣️ **Voice AI agents** | Prebuilt phone agents (receptionist, outreach, job interview, survey, GOTV poll) plus mock-interview agents for IT Help Desk, DevOps, and SQL | 
-| 📞 **Asterisk/FreePBX** | Dialplan, inbound routes, custom extensions, and ARI wiring are fully automated — agents register as extensions `8000`–`8007` | 
+| 📞 **Cantus switch** | Routing is a JSON document and a DID hands the call to the agent's ARI application — agents answer on `8000`–`8007` with no dialplan to edit | 
 | 📨 **SMS delivery** | Agent and script SMS go through Zeus's DID path, or straight through a local OpenSMS Android gateway — one `SMS_PROVIDER` switch, with `auto` falling back to Zeus | |
 | 🧠 **Local intelligence** | Piper TTS, Speaches Whisper STT, and OmniRoute LLM gateway via Zeus (OpenAI-compatible) — nothing leaves the box | 
 | ✍️ **AI workflow authoring** | Describe an agent in the Workflow Studio and an AI generates the workflow JSON; import + register the next free extension in one click | 
@@ -121,7 +138,7 @@ sudo systemctl enable --now capstone.service
 
 | Layer | Component | Role |
 |---|---|---|
-| Telephony | Asterisk / FreePBX 17 + ARI | PBX, call routing, media |
+| Telephony | Cantus 1.0 (cantus-switch) + ARI | call routing, media |
 | WebRTC traversal | Coturn | TURN relay for clients behind NAT |
 | Voice Agent | Dograh (Pipecat) | Real-time voice pipeline + agent workflows |
 | Voice App | `dograh-ui` (Next.js) — `:3010` | Agents + telephony configuration UI |

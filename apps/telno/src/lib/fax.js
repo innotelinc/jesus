@@ -12,7 +12,8 @@ import { join, extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { db_, newId, now } from '../db/index.js';
 import { config } from '../config.js';
-import { ami } from '../telephony/ami.js';
+import { cantus } from '../telephony/cantus.js';
+
 import { logEvent } from './audit.js';
 import { mediaName, saveMedia } from './media.js';
 
@@ -250,7 +251,19 @@ export async function sendFax(id, actor = 'api') {
   if (!config.fax.enabled) return refuse('fax is disabled on this deployment (FAX_ENABLED)', 409);
   const trunk = trunkForSend();
   if (!trunk) return refuse('no enabled trunk to send the fax over', 409);
-  if (!ami().connected) return refuse('the switch is not reachable over AMI', 503);
+
+  // This is a refusal with a reason, not a queue that never moves. Cantus is a
+  // voice standard: it has no T.38 and no in-band modem path by design, so a
+  // fax cannot be terminated by the switch itself. Sending needs a T.38 gateway
+  // on the trunk, and until one is configured nothing is dialled and nothing is
+  // claimed to have been.
+  const gateway = String(config.fax.gateway || '').trim();
+  if (!gateway) {
+    return refuse(
+      'sending a fax needs a T.38 gateway on the trunk (FAX_GATEWAY): Cantus carries voice only, so there is no modem path to send over. Nothing was dialled.',
+      409
+    );
+  }
 
   const staged = stageDocument(row);
   if (!staged.ok) {
@@ -269,39 +282,24 @@ export async function sendFax(id, actor = 'api') {
   }
   db_.run('UPDATE faxes SET pages = ?, error = ? WHERE id = ?', [pages || row.pages || 1, '', row.id]);
 
-  // Dial and present plain digits: a carrier matches its own number plan, and a
-  // leading `+` in the request URI or the From user is enough for some to refuse
-  // an otherwise authenticated call.
   const digits = String(row.to_e164 || '').replace(/\D/g, '');
-  const callerId = String(row.from_e164 || digits).replace(/\D/g, '');
-  const actionId = `fax-${row.id}`;
-  byAction.set(actionId, row.id);
   setStatus(row.id, 'sending');
-  logEvent({ actor, action: 'fax.sending', subject: row.to_e164, detail: `${trunk.name} · ${pages || '?'} page(s)` });
+  logEvent({ actor, action: 'fax.sending', subject: row.to_e164, detail: `${trunk.name} via ${gateway} · ${pages || '?'} page(s)` });
 
-  const response = await ami().send('Originate', {
-    Channel: `PJSIP/${digits}@trunk-${SAFE_TRUNK(trunk.name)}-endpoint`,
-    Application: 'SendFax',
-    // The path is generated here, never taken from a request, so it cannot be
-    // pointed at another file on the volume.
-    Data: staged.path,
-    CallerID: `"${String(config.fax.stationId || 'Telno').replace(/"/g, '')}" <${callerId}>`,
-    Variable: `TELNO_FAX_ID=${row.id}`,
-    Async: 'true',
-    ActionID: actionId,
+  const client = cantus({
+    baseUrl: config.telephony.url,
+    token: config.telephony.token,
+    domain: config.telephony.domain,
   });
-
-  if (!response) {
-    byAction.delete(actionId);
-    setStatus(row.id, 'failed', { error: 'the switch did not answer the originate request' });
-    return { ok: false, error: 'the switch did not answer the originate request', statusCode: 504 };
-  }
-  if (response.Response === 'Error') {
-    byAction.delete(actionId);
-    const message = response.Message || 'the switch refused the originate';
-    setStatus(row.id, 'failed', { error: message });
-    logEvent({ actor, action: 'fax.send_refused', subject: row.to_e164, detail: message });
-    return { ok: false, error: message, statusCode: 502 };
+  try {
+    // The gateway is a Cantus endpoint that terminates T.38 on the far side. It
+    // is addressed like any other line, which is the whole point of the gateway
+    // living outside this switch.
+    await client.originate({ from: String(row.from_e164 || digits).replace(/\D/g, ''), to: `${digits}@${gateway}` });
+  } catch (err) {
+    setStatus(row.id, 'failed', { error: err.message });
+    logEvent({ actor, action: 'fax.send_refused', subject: row.to_e164, detail: err.message });
+    return { ok: false, error: err.message, statusCode: 502 };
   }
   return { ok: true, fax: db_.get('SELECT * FROM faxes WHERE id = ?', [row.id]) };
 }
@@ -629,28 +627,20 @@ export function stopFax() {
 /** What the Fax screen shows about the engine itself. */
 export async function faxStatus() {
   const d = ensureFaxDirs();
-  let modules = '';
-  if (ami().connected) {
-    const answer = await ami().send('Command', { Command: 'module show like res_fax' });
-    modules = String(answer?.Output || '');
-  }
-  const loaded = /res_fax\.so/.test(modules);
-  const spandsp = /res_fax_spandsp\.so/.test(modules);
+  const gateway = String(config.fax.gateway || '').trim();
   return {
     enabled: config.fax.enabled,
-    transport: config.fax.t38 ? 'T.38 preferred, G.711 passthrough fallback' : 'G.711 passthrough (spandsp)',
+    transport: gateway ? `T.38 through ${gateway}` : 'unavailable: no T.38 gateway configured',
     stationId: config.fax.stationId,
     dir: d.root,
     ghostscript: ghostscript(),
-    modules: { resFax: loaded, spandsp },
-    ready: loaded && !!ghostscript(),
-    note: loaded
-      ? spandsp
-        ? 'The switch can send and receive faxes on the SIP trunk.'
-        : 'res_fax is loaded without spandsp: T.38 works, G.711 fallback does not.'
-      : ami().connected
-        ? 'The fax modules are not loaded in the switch image.'
-        : 'The switch is not reachable, so the fax engine cannot be checked.',
+    gateway: gateway || null,
+    ready: !!config.fax.enabled && !!gateway && !!ghostscript(),
+    note: !config.fax.enabled
+      ? 'Fax is off. Cantus carries voice only; a fax needs a T.38 gateway on the trunk, so this is opt-in rather than advertised and absent.'
+      : gateway
+        ? `Documents are rendered here and sent to the T.38 gateway at ${gateway}.`
+        : 'Set FAX_GATEWAY to the Cantus address of a T.38 gateway. Until then, sending is refused with that reason rather than queued.',
   };
 }
 

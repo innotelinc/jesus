@@ -7,10 +7,11 @@
 #
 # Networking model (the ONE deliberate design decision):
 #
-#   • dograh-api runs with `network_mode: host` so it can bind Asterisk/ARI
-#     media sockets and reach the PBX on loopback. It talks to every other
-#     service through the host's published ports (127.0.0.1:<port>). Use this
-#     when Asterisk runs on the SAME host (the capstone setup).
+#   • dograh-api runs with `network_mode: host` so it can bind its ARI
+#     media sockets and reach the switch on the host's published 8088. It talks
+#     to every other service through the host's published ports
+#     (127.0.0.1:<port>). Use this when the switch runs on the SAME host,
+#     which is every capstone install: cantus-switch publishes 8088 there.
 #   • Everything else joins the `interview-net` bridge and talks by service
 #     name; containers that must call back into host-mode dograh (or the LLM
 #     gateway) use `host.docker.internal` (extra_hosts: host-gateway).
@@ -39,7 +40,7 @@
 # ───────────────
 #  5432  postgres (dograh DB)            6379  redis (dograh)
 #  9000  minio API                       9001  minio console
-#  8000  dograh-api (host mode, original uvicorn port)  8088/8089  Asterisk ARI (on host)
+#  8000  dograh-api (host mode, original uvicorn port)  8088  Cantus control/ARI (on host)
 #  3010  dograh-ui (Next.js web UI)
 #  8881  tts-shim (local TTS — Piper)    8001  speaches (local Whisper STT)
 #  8880  kokoro-fastapi (retired; opt-in via the `kokoro` profile)
@@ -57,12 +58,13 @@
 # n8n reaches Grist as `http://grist:8484` on interview-net, and host-mode
 # dograh reaches n8n on 127.0.0.1:5678, so neither needs a LAN binding.
 # The only exceptions are the ports a LAN client genuinely dials: OmniRoute
-# (20128, dialled by dograh-ui in the browser) and the Asterisk/RTP plane.
+# (20128, dialled by dograh-ui in the browser) and the Cantus plane
+# (8088/tcp for control, ARI and the softphone; 7443-7444/udp for voice).
 # dograh-api is host-mode (port 8000 — its original uvicorn port) and the
 # dograh-ui (port 3010) published 0.0.0.0; both are only reachable on the LAN
 # unless you reverse-proxy them (e.g. Nginx Proxy Manager).
-# Asterisk itself runs on the host (see deploy/asterisk/); its ARI endpoint is
-# configured per-organization in the dograh UI, not here.
+# The switch is `cantus-switch` below: one container, no SIP, no RTP range.
+# dograh's ARI endpoint is configured per-organization in the dograh UI.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Project name is pinned so container/volume names never depend on where this
@@ -73,7 +75,7 @@ name: capstone
 # Authentik SSO gateways (oauth2-proxy)
 ###############################################
 # Every service in this stack that has no OIDC of its own — n8n, Grist, Grafana,
-# the Workflow Studio and the FreePBX/AvantFax GUI — is fronted by a real OIDC
+# the Workflow Studio — is fronted by a real OIDC
 # relying party instead of a password form: oauth2-proxy runs the browser
 # through a code flow against Cerulean Authentik and only then proxies the app.
 # There is no nginx auth_request and no Authentik outpost in the path.
@@ -251,7 +253,7 @@ services:
     ports:
       - "127.0.0.1:9200:9000"   # loopback only; 9000 on the host is Cerulean Authentik
       - "127.0.0.1:9201:9001"
-      # Also reachable on the LAN plane (same convention as the Asterisk ports
+      # Also reachable on the LAN plane (same convention as the switch's ports
       # below). The remote NPM edge serves /voice-audio out of this bucket —
       # browsers fetch recordings/transcripts straight from MinIO through that
       # route — and the edge can only reach the host's LAN address, never its
@@ -311,7 +313,7 @@ services:
       AUTHENTIK_ALLOWED_GROUPS: "${AUTHENTIK_ALLOWED_GROUPS:-}"
       AUTHENTIK_ORGANIZATION_PROVIDER_ID: "${AUTHENTIK_ORGANIZATION_PROVIDER_ID:-}"
       # Dograh's hosted model service is not used: this stack runs its own models
-      # (OmniRoute, Piper, Speaches), its own Asterisk/ARI telephony and its own
+      # (OmniRoute, Piper, Speaches), its own ARI telephony against the switch
       # service keys. Upstream still defaults MPS_API_URL to
       # https://services.dograh.com and calls it on the first authenticated
       # request of a new organization; the local discard port keeps that call on
@@ -424,7 +426,7 @@ services:
 
   # ── TURN server for WebRTC/media traversal ────────────────────────────────
   # Coturn uses static credentials from .env and a dedicated relay range that
-  # does not overlap Webmin (TCP 10000) or Asterisk RTP (UDP 10101-10120).
+  # does not collide with cantus-switch (8088/tcp, 7443-7444/udp).
   coturn:
     image: coturn/coturn:latest
     container_name: coturn
@@ -438,11 +440,12 @@ services:
       # STUN is OFF on purpose. TURN is authenticated (--lt-cred-mech), but a
       # bare STUN Binding request is unauthenticated *by design*, so an open
       # 3478 on the WAN is a public STUN reflector — which is what happened on
-      # the shared box (an internet scanner drove it as one). Nothing here needs
-      # coturn's STUN: Asterisk's client is RFC 3489 and coturn is RFC 5389 (see
-      # pbx/rtp_settings_guard.py), and the browsers get their server-reflexive
-      # candidates from PJSIP_WEBRTC_STUN_ADDR. TURN relay is untouched —
-      # zeus/docker-compose.full.yml carries the same flag; keep the two in step.
+      # the shared box (an internet scanner drove it as one). No switch needs it
+      # any more either: cantus-switch learns its reachable address from its own
+      # probe/report exchange rather than STUN, so --no-stun costs the voice
+      # plane nothing. Browsers get their server-reflexive candidates from the
+      # TURN allocation itself. TURN relay is untouched; a satellite stack that
+      # shares this host keeps the same flag — keep the two in step.
       - --no-stun
       - --user=${TURN_USERNAME:-turnuser}:${TURN_PASSWORD:-change-me-turn-password}
       - --realm=${TURN_REALM:-turn.example.com}
@@ -482,11 +485,11 @@ services:
       retries: 3
       start_period: 10s
     networks: [interview-net]
-    # Note: this is Capstone's standalone-mode coturn only. When the stack runs
-    # in add-on mode (CAPSTONE_PBX=zeus), the shared Asterisk zone already owns
-    # a production coturn (diegosouzapw/omniroute on zeus-pbx:3478); Capstone
-    # consumes it through the TURN_* env vars rather than starting its own.
-    # See docs/zeus-integration.md §4 and .env TURN_EXTERNAL_IP.
+    # Note: this is Capstone's own coturn only. When the stack consumes a
+    # shared voice plane (CAPSTONE_PBX names another host), that host already
+    # runs a production coturn and Capstone uses it through the TURN_* env vars
+    # rather than starting its own. See docs/zeus-integration.md §4 and .env
+    # TURN_EXTERNAL_IP.
 
   # ── Local TTS: Kokoro-82M via kokoro-fastapi (OpenAI-compatible) ──────────
   # RETIRED as of v3.21 — behind the `kokoro` profile, so a plain `up` does not
@@ -506,7 +509,7 @@ services:
     #
     # MEASURED 2026-10-12 — this host can no longer provide that headroom, so
     # this container crash-loops (54+ restarts, ~40-90 s apart) and the reboot
-    # churn starves Asterisk: dograh's ARI websocket handshake began timing out,
+    # churn starves the switch too: dograh's ARI handshake began timing out,
     # it parked its telephony configuration (`ari-timeout`, "Deactivated config
     # 2 after 20 consecutive failures") and inbound calls stopped reaching the
     # agent entirely. The numbers: the cgroup ceiling here is memory.max = 5.5
@@ -1138,191 +1141,65 @@ services:
       start_period: 30s
     networks: [interview-net]
 
-  # ── PBX / FreePBX (Asterisk 22 + FreePBX 17 + AvantFax) ───────────────────
-  # FreePBX fullstack image + dograh ARI wiring. Was a separate compose file
-  # (formerly docker-compose.asterisk.yml); merged here so one `docker compose up -d`
-  # brings up the whole stack. See pbx/README.md for details.
-  freepbx:
-    image: ${FREEPBX_IMAGE:-ghcr.io/innotelinc/pbx-portal:latest-fullstack}
-    container_name: pbx-freepbx
-    # CAPSTONE_PBX=zeus (add-on mode): skip the bundled PBX — dograh's ARI/WS
-    # point at the Zeus-owned shared Asterisk instead (docs/zeus-integration.md
-    # §1.1). Standalone (default) keeps the bundled FreePBX.
-    profiles: ["standalone"]
+  # ── Cantus switch (the voice plane) ──────────────────────────────────────
+  # Asterisk 22 + FreePBX 17 + AvantFax used to live here, with the pbx-portal
+  # image on top. Cantus 1.0 is the switch now — the same protocol the rest of
+  # the estate speaks — so this service replaces both: one UDP socket for
+  # signalling *and* media, one HTTP port for control, ARI and the browser
+  # softphone, and no SIP, no AMI, no RTP port range, no Webmin, no MariaDB.
+  #
+  # dograh is unchanged: it dials ARI on 8088 as user `dograh` with either
+  # CANTUS_ARI_PASSWORD or DOGRAH_ARI_PASSWORD, and cantus-switch serves
+  # /ari/* so its existing scripts, tests and telephony configuration keep
+  # working. See pbx/README.md.
+  #
+  # CAPSTONE_PBX=zeus (add-on mode) still means "someone else owns the switch":
+  # point DOGRAH_ARI_HOST/PORT at that switch and leave this service down.
+  cantus-switch:
+    build:
+      context: ../cantus-switch
+    image: ${CANTUS_SWITCH_IMAGE:-capstone/cantus-switch:local}
+    container_name: capstone-cantus
     restart: unless-stopped
-    security_opt:
-      - apparmor=unconfined
-    entrypoint: ["/bin/bash", "/usr/local/bin/entrypoint-dograh.sh"]
-    ports:
-      - "8083:80"                       # FreePBX web UI (8083 avoids conflict with monarch NPM)
-      - "5060:5060/udp"                 # SIP (standalone mode only; in add-on mode
-      #   Zeus owns 5060/5061 and Capstone consumes them — see .env
-      #   DOGRAH_ARI_HOST / DOGRAH_WS_URI and docs/zeus-integration.md)
-      - "5061:5061/tcp"                 # SIP TLS (standalone-mode only)
-      # Dedicated VoIP.ms trunk port (VOIPMS_REGISTER_PORT): the trunk binds
-      # and advertises this port for signaling; forward it on the router too.
-      - "${VOIPMS_REGISTER_PORT:-5065}:${VOIPMS_REGISTER_PORT:-5065}/udp"
-      # 8088 is dialled at the host LAN IP and nothing else: dograh's ARI
-      # telephony config points there (ansible/group_vars/all.yml, and the live
-      # config was moved to match), as do the edge proxy and LAN clients. The
-      # loopback leg was dropped once dograh — its last client — stopped dialling
-      # 127.0.0.1. 8089 keeps a loopback leg because no client has been measured
-      # on it yet; check `ss -tnp | grep :8089` before narrowing that one.
-      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:8088:8088" # Asterisk HTTP / ARI (LAN + edge proxy)
-      - "127.0.0.1:8089:8089"                            # PJSIP WebSocket (WSS, host-mode)
-      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:8089:8089" # PJSIP WebSocket (WSS, LAN + edge proxy)
-      # AMI answers on the host LAN IP and nothing else — not 0.0.0.0, not a
-      # docker address (project rule: README → Addressing). Binding it on every
-      # interface is what let public scanners reach 5038 and fill the security
-      # log with RequestBadFormat records.
-      #
-      # The portal dials this same LAN IP (`ASTERISK_AMI_HOST` below), so both
-      # ends of the rule agree: the host masquerades the connection, Asterisk
-      # sees the LAN address, and the [pbxportal] ACL's LAN permit admits it.
-      # Point the portal at a docker address instead and the ACL refuses it.
-      #
-      # On a shared Zeus PBX the port belongs to that stack
-      # (zeus/docker-compose.full.yml) and needs the same pin —
-      # that file currently publishes it on 0.0.0.0. See docs/operations.md →
-      # "The PBX".
-      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:5038:5038"  # Asterisk AMI (LAN IP only)
-      - "${FREEPBX_WEBMIN_PORT:-10000}:10000" # Webmin admin panel (optional; host port configurable)
-      - "${FREEPBX_RTP_PORT_START:-10101}-${FREEPBX_RTP_PORT_END:-10120}:10101-10120/udp" # RTP media (20 ports / 10 active calls)
+    profiles: ["standalone"]
     environment:
-      HOSTNAME: ${HOSTNAME:-voice.capstone.innotel.us}
-      DOGRAH_ARI_PASSWORD: ${DOGRAH_ARI_PASSWORD:-}
-      DOGRAH_WS_URI: ${DOGRAH_WS_URI:-}
-      # Stasis app name dograh generated for the ARI config (dograh_<hex>);
-      # the dialplan must route into it. dograh_wire.py persists this.
-      DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
-      # LAN subnet offered the LOCAL media address (pjsip transport local_net)
-      # so LAN softphones aren't told to send RTP to the public IP. See
-      # pbx/entrypoint-dograh.sh inject_pjsip_media_address.
-      PJSIP_LOCAL_NET: ${PJSIP_LOCAL_NET:-192.168.1.0/255.255.255.0}
-      PJSIP_MEDIA_ADDRESS: ${PJSIP_MEDIA_ADDRESS:-192.168.1.30}
-      PJSIP_LAN_ENDPOINTS: ${PJSIP_LAN_ENDPOINTS:-101}
-      # STUN/TURN relay wiring: the entrypoint pushes these into FreePBX's
-      # SIP Settings so Asterisk's RTP engine + WebRTC endpoints use coturn.
-      # PJSIP_STUN_TURN_ADDR overrides the address (default: the `coturn`
-      # compose service on the same network).
-      PJSIP_STUN_TURN_ADDR: ${PJSIP_STUN_TURN_ADDR:-}
-      # STUN discovery server for the RTP engine — deliberately NOT the TURN
-      # address: coturn runs --no-stun here, and it is RFC 5389 while Asterisk's
-      # client is RFC 3489, so it could never answer it. The default answers
-      # both generations and returns MAPPED-ADDRESS, the attribute the legacy
-      # client parses. Empty disables discovery; see pbx/rtp_settings_guard.py.
-      PJSIP_STUN_ADDR: ${PJSIP_STUN_ADDR:-}
-      # STUN server handed to the *browsers* (the webrtcstunaddr row). Tracks
-      # PJSIP_STUN_ADDR by default; only the STUN row moves — webrtcturnaddr
-      # stays on coturn, which is what actually relays the media.
-      PJSIP_WEBRTC_STUN_ADDR: ${PJSIP_WEBRTC_STUN_ADDR:-}
-      TURN_USERNAME: ${TURN_USERNAME:-}
-      TURN_PASSWORD: ${TURN_PASSWORD:-}
-      TURN_LISTENING_PORT: ${TURN_LISTENING_PORT:-3478}
-      FREEPBX_RTP_PORT_START: ${FREEPBX_RTP_PORT_START:-10101}
-      FREEPBX_RTP_PORT_END: ${FREEPBX_RTP_PORT_END:-10120}
-      FREEPBX_AMI_USER: ${FREEPBX_AMI_USER:-pbxportal}
-      FREEPBX_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
-      FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
-      FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
-      # AvantFAX (fax UI at /fax) — the entrypoint converges the DB user +
-      # schema with local_config.php from these on every boot.
-      AVANTFAX_DB_PASS: ${AVANTFAX_DB_PASS:-1d18eb145d805ff7}
-      FAX_EMAIL: ${FAX_EMAIL:-fax@innotel.us}
-      AVANTFAX_HOSTNAME: ${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}
-      ASTERISK_CONVERGE_TOOL: /opt/asterisk_converge.py
-      VOIPMS_SIP_USER: ${VOIPMS_SIP_USER:-}
-      VOIPMS_SIP_PASS: ${VOIPMS_SIP_PASS:-}
-      VOIPMS_SIP_SERVER: ${VOIPMS_SIP_SERVER:-newyork1.voip.ms}
-      # DID → dograh agent extension map, e.g. "2125551234:8003,2125551235:8004"
-      VOIPMS_DIDS: ${VOIPMS_DIDS:-}
-      # Dedicated outbound-only SIP port for the trunk registration (default:
-      # reuse FreePBX's main transport). Set when the router's 5060 port-forward
-      # drops the PBX's own outbound REGISTERs (same source port as the rule).
-      VOIPMS_REGISTER_PORT: ${VOIPMS_REGISTER_PORT:-}
-      # Cloudonix SIP peering (see pbx/entrypoint-dograh.sh setup_cloudonix_trunk).
-      # Enabled when CLOUDONIX_SIP_ENABLED=1, or automatically when a server,
-      # edge IP or SIP credentials are provided.
-      CLOUDONIX_SIP_ENABLED: ${CLOUDONIX_SIP_ENABLED:-}
-      CLOUDONIX_SIP_SERVER: ${CLOUDONIX_SIP_SERVER:-sip.cloudonix.net}
-      CLOUDONIX_EDGE_IP: ${CLOUDONIX_EDGE_IP:-18.219.128.166}
-      CLOUDONIX_SIP_PORT: ${CLOUDONIX_SIP_PORT:-5060}
-      CLOUDONIX_SIP_USER: ${CLOUDONIX_SIP_USER:-}
-      CLOUDONIX_SIP_PASS: ${CLOUDONIX_SIP_PASS:-}
-      # DID → dograh agent extension map, e.g. "4132643964:8000"
-      CLOUDONIX_DIDS: ${CLOUDONIX_DIDS:-}
-      ASTERISK_WATCHDOG_INTERVAL: ${ASTERISK_WATCHDOG_INTERVAL:-30}
-      ASTERISK_WATCHDOG_COOLDOWN: ${ASTERISK_WATCHDOG_COOLDOWN:-60}
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-capstone.local}
+      CANTUS_ID: ${CANTUS_ID:-switch@capstone.local}
+      CANTUS_SECRET: ${CANTUS_SECRET:-}
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:-}
+      CANTUS_ROUTES_FILE: /etc/cantus/routes.json
+      CANTUS_HTTP_PORT: "8088"
+      CANTUS_BIND: "0.0.0.0:7443"
+      CANTUS_RELAY_BIND: "0.0.0.0:7444"
+      # Dials out to dograh for externalMedia; host-mode dograh listens on the
+      # host's own 8000, which is what host.docker.internal resolves to here.
+      CANTUS_RELAY_ADVERTISE: ${CANTUS_RELAY_ADVERTISE:-}
+      CANTUS_RECORD_DIR: /data/recordings
+      CANTUS_PROMPTS: /data/prompts
+      CANTUS_ARI_USER: ${CANTUS_ARI_USER:-dograh}
+      CANTUS_ARI_PASSWORD: ${CANTUS_ARI_PASSWORD:-${DOGRAH_ARI_PASSWORD:-}}
+      CANTUS_ARI_APP: ${DOGRAH_STASIS_APP_NAME:-dograh}
+    ports:
+      # 8088 is dialled at the host LAN IP and nothing else — dograh's ARI
+      # telephony config points there (ansible/group_vars/all.yml), as do the
+      # edge proxy and LAN clients. The softphone socket is on this port too,
+      # so the browser console and the agent share one origin.
+      - "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}:8088:8088"
+      # Cantus signalling and media, then the relay. Two ports replace
+      # 5060/udp, 5061/tcp, 8089/tcp, 5038/tcp and 10101-10120/udp.
+      - "7443:7443/udp"
+      - "7444:7444/udp"
     volumes:
-      - ./pbx/asterisk:/opt/pbx-dograh:ro
-      - ./pbx/entrypoint-dograh.sh:/usr/local/bin/entrypoint-dograh.sh:ro
-      # shared-voice-plane dialplan renderer (per-context merge, markers)
-      - ./pbx/asterisk_converge.py:/opt/asterisk_converge.py:ro
-      # Re-asserts the rtp_additional.conf rows FreePBX rewrites wrong after
-      # every reload (the lower-cased TURN credential and the STUN server).
-      - ./pbx/rtp_settings_guard.py:/opt/rtp_settings_guard.py:ro
-      - asterisk-config:/etc/asterisk
-      - asterisk-sounds:/var/lib/asterisk/sounds
-      - asterisk-spool:/var/spool/asterisk
-      # Asterisk's log dir on a named volume so host-side fail2ban can read the
-      # rejected-registration records straight off disk (scripts/install-fail2ban.sh,
-      # pbx/fail2ban/). See pbx/README.md → "Blocking invalid SIP registrations".
-      - asterisk-logs:/var/log/asterisk
-      - freepbx-www:/var/www/html
-      - mariadb-data:/var/lib/mysql
+      - ./pbx/cantus:/etc/cantus:ro
+      - cantus-recordings:/data/recordings
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "asterisk", "-rx", "core show version"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8088/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 60s
-    networks: [interview-net]
-
-  # ── PBX Customer Portal (Next.js) — optional profile ────────────────────
-  # Enable with `docker compose --profile portal up -d`. Requires the
-  # pbx-portal .env vars (see pbx/README.md).
-  portal:
-    image: ghcr.io/innotelinc/pbx-portal:latest
-    container_name: pbx-portal
-    restart: unless-stopped
-    security_opt:
-      - apparmor=unconfined
-    profiles: ["portal"]
-    # Standalone-mode surface: fronts the bundled FreePBX. In zeus add-on mode
-    # (CAPSTONE_PBX=zeus) the bundled PBX is skipped — don't enable this profile.
-    depends_on:
-      - freepbx
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      HOSTNAME: "0.0.0.0"
-      SESSION_SECRET: ${SESSION_SECRET:-}
-      FREEPBX_URL: http://freepbx
-      FREEPBX_CLIENT_ID: ${FREEPBX_CLIENT_ID:-pbxportal-api}
-      FREEPBX_CLIENT_SECRET: ${FREEPBX_CLIENT_SECRET:-}
-      AVANTFAX_HOSTNAME: ${AVANTFAX_HOSTNAME:-fax.zeus.innotel.us}
-      # The host LAN IP, not a compose service name: docker addresses do not
-      # resolve correctly for this project, and the [pbxportal] ACL admits the
-      # LAN address the host masquerades this connection to.
-      ASTERISK_AMI_HOST: "${PJSIP_MEDIA_ADDRESS:-192.168.1.30}"
-      ASTERISK_AMI_PORT: "5038"
-      ASTERISK_AMI_USERNAME: ${FREEPBX_AMI_USER:-pbxportal}
-      ASTERISK_AMI_SECRET: ${FREEPBX_AMI_SECRET:-}
-      NEXT_PUBLIC_FREEPBX_WSS_URL: ${FREEPBX_WSS_URL:-wss://localhost:8089/ws}
-      # Billing — legacy self-billing mode only. Canonical billing is
-      # Magnate (RevenueOps): agents are a Magnate SKU, Stripe keys live in
-      # Magnate. Leave STRIPE_* empty when Magnate owns billing (the
-      # default); the portal's /api/health reports "degraded" without them.
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
-    volumes:
-      - portal-data:/app/data
-      - asterisk-config:/etc/asterisk:rw
+      start_period: 10s
     networks: [interview-net]
 
   # ── Capstone Control Center (dashboard-api + dashboard) ────────────────
@@ -1394,11 +1271,11 @@ services:
       # minted by scripts/dograh_wire.py; empty = page shows setup guidance.
       DOGRAH_API_ENDPOINT: "http://host.docker.internal:8000"
       DOGRAH_API_TOKEN: "${DOGRAH_API_TOKEN:-}"
-      DOGRAH_CONFIG_NAME: "${DOGRAH_CONFIG_NAME:-Asterisk ARI (dograh)}"
-      # ARI app dograh generates per telephony config (dograh_<hex>). The
-      # generated extensions_custom_dograh.conf must call Stasis(<this>): a
-      # bare Stasis(dograh) names an app no ARI client registered, so
-      # Asterisk falls through to Hangup() and inbound calls die silently.
+      DOGRAH_CONFIG_NAME: "${DOGRAH_CONFIG_NAME:-Cantus ARI (dograh)}"
+      # ARI app dograh registers with the switch (dograh_<hex>, or plain
+      # `dograh`). The routing document names it in a DID route's `ari`
+      # action; a document naming an app no ARI client registered is refused
+      # at load time instead of dying silently on the first call.
       # scripts/dograh_wire.py persists it when it wires the telephony config.
       DOGRAH_STASIS_APP_NAME: "${DOGRAH_STASIS_APP_NAME:-}"
       # "Describe it with AI" workflow authoring on the Workflows page / agent
@@ -1408,10 +1285,12 @@ services:
       OMNIROUTE_URL: "${OMNIROUTE_URL:-http://192.168.1.71:20128}"
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY:-}"
       OMNIROUTE_MODEL: "${OMNIROUTE_MODEL:-auto}"
-      # standalone (default): dashboard provisions FreePBX rows directly
-      # (docker exec). addon: Zeus shared PBX — dashboard only manages dograh;
-      # the shared box applies the *_custom.conf moniker on sync.
-      CAPSTONE_DEPLOY_MODE: "${CAPSTONE_DEPLOY_MODE:-standalone}"
+      # addon (default): the switch owns its own lines and routing, so the
+      # dashboard manages dograh only. standalone used to mean "write FreePBX
+      # rows with docker exec"; there is no FreePBX to write to. Extension
+      # provisioning is `POST /v1/lines` on the switch — see pbx/README.md.
+      # Kept because older hosts still set it in .env.
+      CAPSTONE_DEPLOY_MODE: "${CAPSTONE_DEPLOY_MODE:-addon}"
       # Provider (Zeus) vs local (OpenSMS) SMS for agents and scripts. The
       # Settings card writes this file; scripts/opensms_client.py reads the same
       # host path through the ./data/capstone mount below. `.env` seeds it.
@@ -1420,17 +1299,15 @@ services:
       # closed (503), so an unset secret can never mean "open".
       CAPSTONE_SMS_INBOUND_TOKEN: "${CAPSTONE_SMS_INBOUND_TOKEN:-}"
       CAPSTONE_SMS_INBOUND_STATE: "/state/sms-inbound.jsonl"
-      # PBX self-healing (standalone mode only). The bundled freepbx sits behind
-      # profiles: ["standalone"], so a profile-less `docker compose up -d` stops
-      # it; the API starts it on the next PBX action and a background watchdog
-      # recovers it otherwise. Seconds; PBX_WATCHDOG_INTERVAL=0 disables the
-      # watchdog.
+      # Switch self-healing. cantus-switch is profile-gated the way the PBX it
+      # replaced was, so a profile-less `docker compose up -d` stops it; the API
+      # starts it on the next switch action and the watchdog recovers it
+      # otherwise. Seconds; PBX_WATCHDOG_INTERVAL=0 disables the watchdog.
       PBX_START_WAIT_S: "${PBX_START_WAIT_S:-60}"
       PBX_WATCHDOG_INTERVAL: "${PBX_WATCHDOG_INTERVAL:-60}"
-      # FreePBX serialises `fwconsole reload` with a lock file, so a reload can
-      # collide with one already in flight (the pbx-sync timer, another page's
-      # repair). A collision is waited out and retried rather than reported as a
-      # failed repair. Seconds; PBX_RELOAD_MAX_WAIT=0 fails fast instead.
+      # A reload is a document POST to the switch, so there is no lock file to
+      # collide with. The values are kept because the API still reads them.
+      # Seconds; PBX_RELOAD_MAX_WAIT=0 fails fast instead.
       PBX_RELOAD_MAX_WAIT: "${PBX_RELOAD_MAX_WAIT:-60}"
       PBX_RELOAD_POLL: "${PBX_RELOAD_POLL:-2}"
       # Keep the docker-derived /health, /services and /stats caches warm so a
@@ -1474,11 +1351,10 @@ services:
     container_name: dashboard
     restart: unless-stopped
     environment:
-      # Which host the /ws signaling upstream dials (dashboard/nginx.conf).
-      # Standalone default: the bundled PBX on this compose network. In zeus
-      # add-on mode the real PBX is the shared zeus-freepbx container on the
-      # pbx-net bridge, which this service is joined to below.
-      DASHBOARD_PBX_WSS_HOST: "${DASHBOARD_PBX_WSS_HOST:-pbx-freepbx}"
+      # Which host the softphone socket is proxied to (dashboard/nginx.conf).
+      # The switch serves it on its control port, /ws/line, over plain ws:
+      # there is no self-signed listener and no certificate to bypass.
+      DASHBOARD_PBX_WSS_HOST: "${DASHBOARD_PBX_WSS_HOST:-capstone-cantus}"
     depends_on:
       dashboard-api:
         condition: service_started
@@ -1490,11 +1366,10 @@ services:
       start_period: 5s
     ports:
       - "8096:80"   # the Control Center: http://<host>:8096
-    # pbx-net as well as its own bridge: DASHBOARD_PBX_WSS_HOST names the PBX
-    # from *this* container's networks (Docker's embedded DNS only answers for
-    # names on a network the querier shares). Standalone is unaffected — the
-    # default `pbx-freepbx` resolves over interview-net either way.
-    networks: [interview-net, pbx-net]
+    # interview-net only: DASHBOARD_PBX_WSS_HOST names the switch from *this*
+    # container's networks (Docker's embedded DNS only answers for names on a
+    # network the querier shares), and the switch is on that bridge.
+    networks: [interview-net]
 
   ###############################################
   # SSO gateways — one per app that has no OIDC of its own
@@ -1552,55 +1427,19 @@ services:
       - "${WORKFLOW_SSO_PORT:-14013}:4180"
     networks: [interview-net]
 
-  pbx-sso:
-    <<: *sso-gateway
-    container_name: pbx-sso
-    environment:
-      <<: *sso-gateway-env
-      # FreePBX's own GUI is on the shared voice plane, so the gateway reaches
-      # it by container name over pbx-net (`zeus-freepbx`, owned by Zeus's
-      # compose; the network is declared external above). Its host :8083 mapping
-      # is loopback-only now, so this is the only path in — hence the extra
-      # network rather than a host address.
-      OAUTH2_PROXY_UPSTREAMS: http://zeus-freepbx:80
-      # The voice plane's screen, one click from the door a PBX-first operator
-      # already uses. FreePBX's admin menu is built from installed modules (its
-      # framework reads each module's `<menuitems>`), so a link *inside* the GUI
-      # is a module — deliberately not shipped here (see the Zeus repo,
-      # docs/ava-capstone-convergence.md §7). This page is the module-free
-      # surface, and it was measured against this exact image rather than
-      # assumed: `--banner` is the flag v7.8.2 has (`--signin-message` does not
-      # exist yet there, and setting it is silently ignored), and the value is
-      # rendered as unescaped HTML, so the anchor below is a real link:
-      #   <p class="block">Voice plane — <a href="...">…</a></p>
-      # Default is the same origin the Control Center publishes for the portal
-      # (ZEUS_PORTAL_URL, else ZEUS_API_URL, else the portal's own name) —
-      # override with PBX_SSO_BANNER, or "-" to disable it.
-      OAUTH2_PROXY_BANNER: '${PBX_SSO_BANNER:-Voice plane — <a href="https://app.zeus.innotel.us/dashboard/voice">agents, bindings and live calls</a>}'
-    ports:
-      - "${PBX_SSO_PORT:-14014}:4180"
-    networks: [interview-net, pbx-net]
-
   # ── Technitium's console is not gated from here ───────────────────────────
   # `technitium-sso` used to be the sixth gateway in this stack. That was right
   # only while every product shared one host: Cerulean owns the container
   # (`dns.internal.innotel.us` → `cerulean-technitium`), and the console is
   # host-networked with its web listener pinned to `127.0.0.1,172.17.0.1`, so a
-  # gateway on *another* server has nothing to dial — on `.30` both of those
-  # addresses are that host's own, and every signed-in request to the name
-  # answered `502` while the redirect to Authentik still looked healthy.
-  #
-  # The gateway now runs beside the console it fronts, in the cerulean stack
-  # (`1-primary/cerulean/docker-compose.yml`, profile `technitium`), on the same
-  # shared client, cookie and session store — so nothing about the sign-in
-  # changed and there is still one Authentik session across the platform.
-
+  # gateway on *another* server has nothing to dial. The gateway now runs beside
+  # the console it fronts, in the cerulean stack, on the same shared client,
+  # cookie and session store — one Authentik session across the platform.
 
 volumes:
   # Probe tools for the distroless services — populated by the `healthprobe`
-  # one-shot (see its comment), mounted read-only at /probe by the SSO gateways
-  # and otel-collector. No binaries are committed; the busybox comes from the
-  # image above.
+  # one-shot, mounted read-only at /probe by the SSO gateways and
+  # otel-collector.
   probe-bin:
   postgres_data:
   redis_data:
@@ -1627,32 +1466,11 @@ volumes:
   tts_shim_cache:
   tts_piper_voices:
   sandbox-tls:
-  # PBX volumes (named + external so the stack shares state with a
-  # standalone pbx-portal deployment). Created by scripts/setup.sh on a
-  # fresh host.
-  asterisk-config:
-    name: pbx-asterisk-config
-    external: true
-  asterisk-sounds:
-    name: pbx-asterisk-sounds
-    external: true
-  asterisk-spool:
-    name: pbx-asterisk-spool
-    external: true
-  # Read by host-side fail2ban; created by scripts/setup.sh / the installer.
-  asterisk-logs:
-    name: pbx-asterisk-logs
-    external: true
-  freepbx-www:
-    name: pbx-freepbx-www
-    external: true
-  mariadb-data:
-    name: pbx-mariadb-data
-    external: true
-  portal-data:
-    name: pbx-portal-data
-    external: true
-  # Authentik volumes (internal, compose-managed)
+  # The switch's recordings. Everything the old PBX kept in volumes (dialplan,
+  # sounds, spool, logs, MariaDB, the portal's data) has no equivalent: routing
+  # is a document in pbx/cantus/ and audio is one directory.
+  cantus-recordings:
+    name: capstone-cantus-recordings
 
 networks:
   # Pinned name (not the project-prefixed default) so the stack lands on the
@@ -1664,16 +1482,4 @@ networks:
   # beat compose to it, e.g. on a wiped host).
   interview-net:
     name: interview-net
-    external: true
-  # The shared voice plane's bridge. When Capstone runs as an add-on on a
-  # Zeus-owned PBX, Zeus's compose declares this same pinned name and owns it,
-  # hence `external` — compose refuses to adopt a pinned name it did not label
-  # itself. The dashboard joins it so its /ws signaling upstream can name the
-  # real PBX container (`zeus-freepbx`) instead of the LAN IP; a container name
-  # only resolves from inside the network that container lives on. A
-  # standalone box runs nothing else on it and scripts/setup.sh pre-creates it
-  # (drop the network before handing the voice plane to Zeus, or Zeus's compose
-  # meets these labels).
-  pbx-net:
-    name: pbx-net
     external: true

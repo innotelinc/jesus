@@ -39,7 +39,7 @@ const PAGES = [
   { path: '/calls', title: 'Call history', subtitle: 'Live and completed calls', Component: Calls },
   { path: '/softphone', title: 'Softphone', subtitle: 'Encrypted audio and video in the browser', Component: Softphone },
   { path: '/extensions', title: 'Extensions', subtitle: 'Devices and voicemail boxes', Component: Extensions },
-  { path: '/trunks', title: 'Trunks', subtitle: 'Carrier and SIP connectivity', Component: Trunks },
+  { path: '/trunks', title: 'Trunks', subtitle: 'Carrier and gateway connectivity', Component: Trunks },
   { path: '/ivr', title: 'Call routing', subtitle: 'Menus, inbound DIDs and destinations', Component: Ivr },
   { path: '/voicemail', title: 'Voicemail', subtitle: 'Recorded messages and transcripts', Component: Voicemail },
   { path: '/fax', title: 'Fax', subtitle: 'Inbound documents and outbound sends', Component: Fax },

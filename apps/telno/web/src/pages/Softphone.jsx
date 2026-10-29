@@ -3,7 +3,8 @@ import { api, prettyNumber } from '../api.js';
 import { Badge, Button, Card, Empty, Icon, Input, Loading, PageHeader, Select, Stat, Switch, useToast } from '../ui.jsx';
 import { isSoftphoneWindow, openSoftphoneWindow } from '../softphoneWindow.js';
 import { readLine, saveLine } from '../softphoneLine.js';
-import { MASK_MODES, createVoiceMask } from '../voiceMask.js';
+import { MASK_MODES } from '../voiceMask.js';
+import { createLine } from '../cantus.js';
 import VoicePanel from '../VoicePanel.jsx';
 import { digitsFromSpeech, recognitionSupported, startDictation } from '../speech.js';
 import { watchCalls } from '../native.js';
@@ -20,13 +21,15 @@ import {
 /**
  * Browser softphone.
  *
- * Signaling is SIP over secure WebSocket straight to the switch
- * (chan_pjsip), and media is DTLS-SRTP negotiated end to end — the platform is
- * never in the media path. This page does three things on top of that: it asks
- * the platform for a session, it drives the WebRTC peer connection, and it
- * reports presence so the rest of the console knows the line is busy.
+ * Signalling and media ride one WebSocket to the Cantus switch: a call is
+ * registered on it, answered on it, and carries 20 ms frames of 8 kHz PCM in
+ * both directions. There is no SDP, no ICE, no DTLS and no TURN — the protocol
+ * opens one mapping at startup and keeps the call on it, so NAT traversal is a
+ * property of the line rather than a negotiation this page can get wrong.
  *
- * sip.js is loaded on demand: it is ~120 kB that only this screen needs.
+ * This page does three things on top of that: it asks the platform for a
+ * session, it runs the WebAudio graph for the line, and it reports presence so
+ * the rest of the console knows the line is busy.
  */
 
 const DIALPAD = [
@@ -44,66 +47,17 @@ const DIALPAD = [
   ['#', ''],
 ];
 
-/**
- * Follow the DTLS handshake to its conclusion.
- *
- * A single sample shortly after the answer reads "new"/"connecting" or
- * nothing at all, so the badge would claim a call is unencrypted — or unknown —
- * for a call that becomes encrypted a second later. Poll until the transport
- * reports a final state, and stop as soon as it is connected.
- */
-function watchEncryption(pc, onState) {
-  if (!pc) return () => {};
-  let stopped = false;
-  let timer = null;
-  const deadline = Date.now() + 20000;
 
-  const tick = async () => {
-    if (stopped) return;
-    let dtls = '';
-    try {
-      const stats = await pc.getStats();
-      stats.forEach((report) => {
-        if (report.type === 'transport' && report.dtlsState) dtls = report.dtlsState;
-      });
-    } catch {
-      /* stats unavailable on this tick */
-    }
-    if (dtls) onState(dtls === 'connected');
-    if (dtls === 'connected' || dtls === 'failed' || dtls === 'closed' || Date.now() > deadline) {
-      stopped = true;
-      return;
-    }
-    timer = setTimeout(tick, 750);
-  };
-
-  const start = setTimeout(tick, 500);
-  return () => {
-    stopped = true;
-    clearTimeout(start);
-    clearTimeout(timer);
-  };
-}
 
 /** Turn a transport failure into something an operator can act on. */
 function explain(error, status) {
   const message = String(error?.message || '');
   if (!message) return '';
   if (/WebSocket|1006|transport|connect|certificate/i.test(message)) {
-    // Two ways the socket can fail, and they want different words. Same-origin
-    // (the default) means the app relays to the switch, so the certificate is
-    // already the one the console loaded over and the fault is behind it. The
-    // switch's own port is the other case, and there the certificate is the
-    // usual reason: a browser offers no way past an untrusted one for WSS.
-    if (status?.relay) {
-      return `No secure WebSocket answered at ${status?.wssUrl}. The app relays this to the switch on ${
-        status?.wssPort || 8089
-      }, so check that Asterisk is running (Get started names its state) and that the relay target is set correctly with SOFTPHONE_WSS_INTERNAL. (${message})`;
-    }
-    const fingerprint = status?.tls?.fingerprint ? ` Switch certificate: ${status.tls.fingerprint}.` : '';
-    return `No trusted secure WebSocket answered at ${status?.wssUrl}. Publish port ${
-      status?.wssPort || 8089
-    }, confirm Asterisk is running, and add the switch certificate to the browser's trusted roots (Chrome offers no bypass for WSS) or serve a real one with SOFTPHONE_TLS_CERT.${fingerprint} (${message})`;
+    // The browser talks to this console's own origin; the console pipes the
+    // socket to the switch on the private network. So a failure here is about
+    // the switch, not about a certificate the browser has to trust.
+    return `No Cantus line answered at ${status?.socketUrl || '/softphone/line'}. The console proxies this socket to the switch at its control address, so check that the switch container is up and that CANTUS_URL points at it${status?.switch?.problem ? ` (${status.switch.problem})` : ''}. (${message})`;
   }
   return message;
 }
@@ -173,9 +127,8 @@ export default function Softphone() {
   const voiceTicketRef = useRef('');
   const [voiceNeeded, setVoiceNeeded] = useState(false);
 
-  const uaRef = useRef(null);
+  const lineRef = useRef(null);
   const sessionRef = useRef(null);
-  const pcRef = useRef(null);
   const wsRef = useRef(null);
   const localStreamRef = useRef(null);
   // The mask graph currently in the outbound audio path, and the original track
@@ -403,15 +356,12 @@ export default function Softphone() {
   }, []);
 
   const hangup = useCallback(async () => {
-    const session = sessionRef.current;
     try {
-      if (session?.state === 'Established') await session.bye();
-      else if (session) await session.cancel?.();
+      lineRef.current?.hangup();
     } catch {
       /* already gone */
     }
     sessionRef.current = null;
-    pcRef.current = null;
     stopMedia();
     setCall(null);
     setMuted(false);
@@ -429,12 +379,11 @@ export default function Softphone() {
   const disconnect = useCallback(async () => {
     await hangup();
     try {
-      await uaRef.current?.unregister();
-      await uaRef.current?.stop();
+      lineRef.current?.stop();
     } catch {
       /* ignore */
     }
-    uaRef.current = null;
+    lineRef.current = null;
     sessionRef.current = null;
     setSession(null);
     setRegState('off');
@@ -445,8 +394,7 @@ export default function Softphone() {
 
   useEffect(() => () => {
     // Leaving the page must not leave the microphone hot.
-    sessionRef.current?.bye?.().catch?.(() => {});
-    uaRef.current?.stop?.();
+    lineRef.current?.stop?.();
     maskRef.current?.mask.stop();
     maskRef.current = null;
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -533,122 +481,99 @@ export default function Softphone() {
           });
       }
 
-      const sip = await import('sip.js');
-      const { UserAgent, Registerer } = sip;
-      const domain = new URL(data.wssUrl.replace(/^wss:/, 'https:')).hostname;
+      // One socket, one line: signalling and 20 ms PCM frames share it. There is
+      // no SDP to build, no ICE to fail, no DTLS to negotiate and no port to
+      // forward — a call either has a path or the switch says why it does not.
+      const line = await createLine({
+        socketUrl: data.socketUrl,
+        ticket: data.ticket,
+        ext: data.extension.extension,
+      });
+      lineRef.current = line;
+      // Kept for the rest of the page: a session-shaped handle it already
+      // understands, so the teardown paths stay one implementation.
+      sessionRef.current = line;
 
-      const constraints = {
-        audio: settings.micId ? { deviceId: { exact: settings.micId } } : true,
-        video: settings.video && settings.camId ? { deviceId: { exact: settings.camId } } : settings.video,
+      const attachAudio = () => {
+        if (remoteAudioRef.current && line.outputStream) {
+          remoteAudioRef.current.srcObject = line.outputStream;
+          remoteAudioRef.current.play?.().catch(() => {});
+        }
+        localStreamRef.current = line.localStream || null;
       };
 
-      const attach = (sipSession) => {
-        sessionRef.current = sipSession;
-        sipSession.stateChange.addListener((state) => {
-          if (state === 'Established') {
-            startedAtRef.current = Date.now();
-            setCall((current) => ({ ...current, state: 'incall', startedAt: Date.now() }));
-            sendPresence('incall', sipSession.remoteIdentity?.uri?.user || '');
-            const pc = sipSession.sessionDescriptionHandler?.peerConnection;
-            pcRef.current = pc;
-            if (pc) {
-              const remote = new MediaStream();
-              pc.getReceivers().forEach((receiver) => {
-                if (receiver.track) remote.addTrack(receiver.track);
-              });
-              if (remoteVideoRef.current) {
-                remoteVideoRef.current.srcObject = remote;
-                remoteVideoRef.current.play?.().catch(() => {});
-              }
-              if (remoteAudioRef.current) {
-                remoteAudioRef.current.srcObject = remote;
-                remoteAudioRef.current.play?.().catch(() => {});
-              }
-              const local = new MediaStream();
-              pc.getSenders().forEach((sender) => sender.track && local.addTrack(sender.track));
-              localStreamRef.current = local;
-              if (localVideoRef.current) localVideoRef.current.srcObject = local;
-              // DTLS state is the honest answer to "is this call encrypted".
-              watchEncryption(pc, setSecure);
-            }
-          }
-          if (state === 'Terminated') {
-            sessionRef.current = null;
-            pcRef.current = null;
-            stopMedia();
-            setCall(null);
-            setSecure(null);
-            setSharing(false);
-            setMuted(false);
-            sendPresence('idle', '');
-          }
-        });
+      const established = (peer) => {
+        startedAtRef.current = Date.now();
+        setCall((current) => ({ ...(current || {}), state: 'incall', startedAt: Date.now(), peer: peer || current?.peer }));
+        attachAudio();
+        // The media rides a WebSocket to the switch, so "encrypted" is not a
+        // negotiation that can fail: it is the transport this line is on.
+        setSecure(true);
+        sendPresence('incall', peer || '');
       };
 
-      const ua = new UserAgent({
-        uri: UserAgent.makeURI(data.sip.uri),
-        transportOptions: { server: data.wssUrl },
-        authorizationUsername: data.sip.authUser,
-        authorizationPassword: data.sip.password,
-        // A self-signed switch certificate is the normal case on first boot; a
-        // production deployment should install a real one and drop this.
-        sessionDescriptionHandlerFactoryOptions: {
-          peerConnectionConfiguration: {
-            iceServers: data.iceServers,
-            bundlePolicy: 'max-bundle',
-            rtcpMuxPolicy: 'require',
-          },
-        },
-        logLevel: 'error',
-        delegate: {
-          onDisconnect: (error) => {
-            setRegState('failed');
-            setConnectError(error?.message || 'The switch closed the connection');
-            // A closed transport is exactly the case a kept line should recover
-            // from without a human clicking anything.
-            scheduleReconnect(error?.message || 'the switch closed the connection');
-          },
-          onInvite: (invitation) => {
-            attach(invitation);
-            setCall({ state: 'ringing', direction: 'inbound', peer: invitation.remoteIdentity?.uri?.user || 'unknown' });
-            setIncoming(true);
-            sendPresence('ringing', invitation.remoteIdentity?.uri?.user || '');
-            // Answer with the same media preferences as an outgoing call.
-            constraintsRef.current = constraints;
-          },
-        },
+      line.on('call', (current) => {
+        if (!current) return;
+        if (current.state === 'ringing' && current.direction === 'inbound') {
+          setIncoming(true);
+          setCall({ state: 'ringing', direction: 'inbound', peer: current.from || 'unknown' });
+          sendPresence('ringing', current.from || '');
+          return;
+        }
+        if (current.state === 'answered') {
+          established(current.direction === 'outbound' ? current.to : current.from);
+          return;
+        }
+        if (current.direction === 'outbound') {
+          setCall({ state: 'ringing', direction: 'outbound', peer: current.to });
+        }
       });
 
-      // Start and register first: a session that never reaches the switch must
-      // leave the screen in its setup state, not a dialpad that cannot dial.
-      await ua.start();
-      const registerer = new Registerer(ua);
-      registerer.stateChange.addListener((state) => {
-        setRegState(
-          state === 'Registered' ? 'registered' : state === 'Unregistered' ? 'off' : 'registering'
-        );
-        if (state === 'Registered') {
+      line.on('ended', () => {
+        sessionRef.current = null;
+        lineRef.current = null;
+        stopMedia();
+        setCall(null);
+        setIncoming(false);
+        setSecure(null);
+        setSharing(false);
+        setMuted(false);
+        sendPresence('idle', '');
+      });
+
+      line.on('error', (event) => {
+        toast.error('Line error', event.message || event.error || 'the switch refused it');
+      });
+
+      line.on('state', ({ state, reason }) => {
+        if (state === 'registered') {
           // A registration that lands is the only proof a reconnect worked.
+          setRegState('registered');
           attemptsRef.current = 0;
           setReconnecting(false);
+          return;
         }
-        // A registration that drops while nothing was asked for is a lost line.
-        if (state === 'Unregistered' && keepRef.current) scheduleReconnect('the switch unregistered the line');
+        if (state === 'failed') {
+          setRegState('failed');
+          setConnectError(reason || 'The switch closed the connection');
+          if (keepRef.current) scheduleReconnect(reason || 'the switch closed the connection');
+        }
       });
-      await registerer.register();
 
-      uaRef.current = ua;
-      setRegState('registering');
+      setRegState('registered');
+      setSecure(true);
+      attemptsRef.current = 0;
+      setReconnecting(false);
       setSession(data);
       openSocket(data.ticket);
-      toast.info('Softphone connecting', `Registering ${data.extension.extension} over ${data.wssUrl}`);
+      toast.info('Softphone connecting', `Registering ${data.extension.extension} over Cantus`);
     } catch (err) {
       try {
-        await uaRef.current?.stop();
+        lineRef.current?.stop();
       } catch {
         /* never started */
       }
-      uaRef.current = null;
+      lineRef.current = null;
       setSession(null);
       if (err?.code === 'voice_required') {
         // The line asked for a voice check and did not get one: say where the fix
@@ -658,7 +583,7 @@ export default function Softphone() {
       } else {
         setConnectError(
           explain(err, status) ||
-            `Could not reach the switch at ${status?.wssUrl}. Check that port ${status?.wssPort || 8089} is published and the certificate is trusted.`
+            `Could not open a Cantus line at ${status?.socketUrl || '/softphone/line'}. The console proxies it to the switch; check that the switch is running and reachable at its CANTUS_URL.`
         );
       }
       setRegState('failed');
@@ -800,103 +725,35 @@ export default function Softphone() {
    * that one dials the parking space the push named.
    */
   const dialTarget = async (target, { parked = false } = {}) => {
-    const ua = uaRef.current;
-    if (!ua || !target) return;
-    const sip = await import('sip.js');
-    const domain = new URL(session.wssUrl.replace(/^wss:/, 'https:')).hostname;
-    const media = {
-      audio: settings.micId ? { deviceId: { exact: settings.micId } } : true,
-      video: settings.video ? (settings.camId ? { deviceId: { exact: settings.camId } } : true) : false,
-    };
-    const inviter = new sip.Inviter(ua, sip.UserAgent.makeURI(`sip:${target}@${domain}`), {
-      sessionDescriptionHandlerOptions: { constraints: media },
-    });
-    constraintsRef.current = media;
-    // The far end talks back in SIP responses before it answers: 180 and 183 are
-    // "it is ringing", and a refusal has its own code. Without these a dial sits
-    // on "dialing" through a busy signal and reports nothing at all.
-    inviter.delegate = {
-      onProgress: (response) => {
-        const code = response?.message?.statusCode;
-        if (code === 180 || code === 183) {
-          setCall((current) => (current && current.state === 'dialing' ? { ...current, state: 'ringing' } : current));
-        }
-      },
-      onReject: (response) => reportOutcome(response?.message?.statusCode),
-      onRedirect: () => reportOutcome(302, 'The number has been redirected'),
-    };
+    const line = lineRef.current;
+    if (!line || !target) return;
     setCall({ state: 'dialing', direction: 'outbound', peer: target });
     setOutcome(null);
-    setSecure(null);
+    setSecure(true);
     sendPresence('dialing', target);
-    wsRef.current?.send(JSON.stringify({ type: 'dial', to: target, video: settings.video }));
-
-    inviter.stateChange.addListener(async (state) => {
-      if (state === 'Established') {
-        startedAtRef.current = Date.now();
-        setCall((current) => ({ ...current, state: 'incall', startedAt: Date.now() }));
-        sendPresence('incall', target);
-        const pc = inviter.sessionDescriptionHandler?.peerConnection;
-        pcRef.current = pc;          if (pc) {
-          const remote = new MediaStream();
-          pc.getReceivers().forEach((receiver) => receiver.track && remote.addTrack(receiver.track));
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remote;
-            remoteVideoRef.current.play?.().catch(() => {});
-          }
-          // Audio plays through its own element so the volume slider and the
-          // speaker switch act on the call and nothing else.
-          if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = remote;
-            remoteAudioRef.current.play?.().catch(() => {});
-          }
-          const local = new MediaStream();
-          pc.getSenders().forEach((sender) => sender.track && local.addTrack(sender.track));
-          localStreamRef.current = local;
-          if (localVideoRef.current) localVideoRef.current.srcObject = local;
-          watchEncryption(pc, setSecure);
-          setCameraOn(media.video !== false);
-        }
-      }
-      if (state === 'Terminated') {
-        // A call that ends before it was answered is a refusal, not a call that
-        // happened: say why once, from the inviter's own response.
-        if (!startedAtRef.current) reportOutcome(inviter.inviteResponse?.message?.statusCode);
-        sessionRef.current = null;
-        startedAtRef.current = 0;
-        stopMedia();
-        setCall(null);
-        setSecure(null);
-        setSharing(false);
-        setMuted(false);
-        sendPresence('idle', '');
-      }
-    });
-    sessionRef.current = inviter;
-    inviter.invite().catch(async (err) => {
+    wsRef.current?.send(JSON.stringify({ type: 'dial', to: target }));
+    try {
+      // The switch decides what the number means: a line here, a trunk there,
+      // or a rejection with a reason. The browser does not resolve numbers.
+      line.dial(target);
+    } catch (err) {
       setCall(null);
       // A space is only held for the parking timeout, so failing to reach one
       // means the caller went to voicemail — worth saying plainly.
-      if (parked) {
-        toast.error('The call is no longer parked', 'It may have gone to voicemail already.');
-      } else {
-        toast.error('Call failed', err.message);
-      }
+      if (parked) toast.error('The call is no longer parked', 'It may have gone to voicemail already.');
+      else toast.error('Call failed', err.message);
       sendPresence('idle', '');
-      await inviter.dispose?.();
-    });
+    }
   };
 
   const placeCall = () => dialTarget(dial.trim());
 
   const answer = async () => {
-    const invitation = sessionRef.current;
-    if (!invitation) return;
+    const line = lineRef.current;
+    if (!line) return;
     setIncoming(false);
     try {
-      await invitation.accept({
-        sessionDescriptionHandlerOptions: { constraints: constraintsRef.current || { audio: true, video: false } },
-      });
+      line.answer();
     } catch (err) {
       toast.error('Could not answer', err.message);
     }
@@ -905,7 +762,7 @@ export default function Softphone() {
   const decline = async () => {
     setIncoming(false);
     try {
-      await sessionRef.current?.reject();
+      lineRef.current?.reject();
     } catch {
       /* already ended */
     }
@@ -915,75 +772,25 @@ export default function Softphone() {
   };
 
   const toggleMute = () => {
-    const pc = pcRef.current;
-    if (!pc) return;
     const next = !muted;
-    pc.getSenders()
-      .filter((sender) => sender.track?.kind === 'audio')
-      .forEach((sender) => (sender.track.enabled = !next));
+    lineRef.current?.setMuted(next);
     setMuted(next);
   };
 
   const toggleCamera = async () => {
-    const pc = pcRef.current;
-    if (!pc) return;
-    if (cameraOn) {
-      pc.getSenders()
-        .filter((sender) => sender.track?.kind === 'video')
-        .forEach((sender) => (sender.track.enabled = false));
-      setCameraOn(false);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: settings.camId ? { deviceId: { exact: settings.camId } } : true,
-      });
-      const track = stream.getVideoTracks()[0];
-      const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(track);
-      else await pc.addTrack(track, stream);
-      cameraTrackRef.current = track;
-      setCameraOn(true);
-    } catch (err) {
-      toast.error('Camera unavailable', err.message);
-    }
+    toast.info('Video is not available', 'A Cantus line carries 8 kHz audio on one socket; video needs a different standard.');
   };
 
   const shareScreen = async () => {
-    const pc = pcRef.current;
-    if (!pc) return;
-    try {
-      if (sharing) {
-        const original = cameraTrackRef.current;
-        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender && original) await sender.replaceTrack(original);
-        setSharing(false);
-        return;
-      }
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const track = stream.getVideoTracks()[0];
-      const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(track);
-      else await pc.addTrack(track, stream);
-      track.onended = () => setSharing(false);
-      setSharing(true);
-    } catch (err) {
-      if (err.name !== 'NotAllowedError') toast.error('Screen share failed', err.message);
-    }
+    toast.info('Screen sharing is not available', 'A Cantus line carries 8 kHz audio on one socket; screen share needs a different standard.');
   };
 
   const sendDtmf = async (digit) => {
     setDial((value) => (call ? value : value + digit));
-    const session = sessionRef.current;
-    if (!call || !session?.info) return;
-    try {
-      await session.info({
-        requestOptions: { body: { contentDisposition: 'render', contentType: 'application/dtmf-relay', content: `Signal=${digit}\r\nDuration=160` } },
-      });
-      wsRef.current?.send(JSON.stringify({ type: 'dtmf', digits: digit }));
-    } catch {
-      /* a keypress that cannot be sent must not break the call */
-    }
+    if (!call) return;
+    // A keypress rides the same socket as the audio: one frame, no SIP INFO.
+    lineRef.current?.sendDtmf(digit);
+    wsRef.current?.send(JSON.stringify({ type: 'dtmf', digits: digit }));
   };
 
   /* ---------------------------------------------------------------- SCIF -- */
@@ -1057,64 +864,30 @@ export default function Softphone() {
     }
   };
 
-  // Put the mask into the outbound audio path, or take it out. The sender's own
-  // track is kept, so "off" restores the real microphone exactly rather than a
-  // second-hand copy of it.
+  // Voice masking used to be a graph swapped into a peer connection's sender.
+  // A Cantus line has its own capture graph (`cantus.js`), and that graph does
+  // not yet take a mask — so this says so once per call instead of pretending.
+  // The switch's side of SCIF (caller-ID withholding, no recording) is enforced
+  // regardless; only the disguise itself is outstanding.
   useEffect(() => {
-    const pc = pcRef.current;
-    if (!pc) return undefined;
-    const wanted = scif.enabled ? scif.voiceMask : 'off';
-    const sender = maskRef.current?.sender || pc.getSenders().find((entry) => entry.track?.kind === 'audio');
-    if (!sender) return undefined;
-
-    if (wanted === 'off') {
-      const current = maskRef.current;
-      if (!current) return undefined;
-      maskRef.current = null;
-      current.mask.stop();
-      current.sender.replaceTrack(current.original).catch(() => {});
-      return undefined;
-    }
-    if (maskRef.current) {
-      // A different disguise on a live call: the graph stays, the ratio changes.
-      maskRef.current.mask.setMode(wanted);
-      return undefined;
-    }
-
-    let canceled = false;
-    const original = sender.track;
-    createVoiceMask(original, wanted)
-      .then(async (mask) => {
-        if (canceled) {
-          await mask.stop();
-          return;
-        }
-        await sender.replaceTrack(mask.track);
-        maskRef.current = { sender, original, mask };
-      })
-      .catch((err) => toast.error('Voice masking is unavailable', err.message));
-    return () => {
-      canceled = true;
-    };
+    if (!scif.enabled || scif.voiceMask === 'off' || call?.state !== 'incall') return undefined;
+    toast.info(
+      'Voice mask not applied',
+      'The Cantus media graph does not carry a disguise yet. Caller ID is still withheld and nothing is recorded.'
+    );
+    return undefined;
   }, [scif.enabled, scif.voiceMask, call?.state, toast]);
 
-  // SCIF refuses a call it cannot prove is encrypted. DTLS settles within a
-  // second on a healthy path, so a call still unverified after seven is a call
-  // that was never going to be.
-  useEffect(() => {
-    if (!scif.enabled || call?.state !== 'incall' || secure === true) return undefined;
-    const timer = setTimeout(() => {
-      toast.error('Call ended — media is not encrypted', 'SCIF refuses a call unless DTLS-SRTP is established.');
-      hangup();
-    }, 7000);
-    return () => clearTimeout(timer);
-  }, [scif.enabled, call?.state, secure, hangup, toast]);
+  // SCIF refuses a call it cannot prove is protected. On a Cantus line the proof
+  // is structural: the media shares the WebSocket the line registered on, so
+  // there is no separate transport that could be plaintext. The badge is set on
+  // registration, not negotiated after the answer.
 
   if (!status) return <Loading rows={4} />;
 
   const registered = regState === 'registered';
   const inCall = call?.state === 'incall' || call?.state === 'dialing';
-  const tlsReady = status.tls?.ready;
+  const switchUp = !!status.switch?.connected;
 
   return (
     <>
@@ -1154,31 +927,30 @@ export default function Softphone() {
         />
         <Stat
           label="Media"
-          value={secure === true ? 'DTLS-SRTP' : secure === false ? 'Plain' : '—'}
-          foot={
-            secure === true
-              ? 'Browser leg encrypted'
-              : secure === false
-                ? 'No DTLS on this leg'
-                : 'Checked when the call connects'
-          }
-          tone={secure === true ? 'var(--success)' : secure === false ? 'var(--danger)' : undefined}
+          value={secure === true ? 'Cantus / WSS' : '—'}
+          foot={secure === true ? '8 kHz PCM on the signalling socket' : 'Set when the line registers'}
+          tone={secure === true ? 'var(--success)' : undefined}
         />
-        <Stat label="Signaling" value="WSS" foot={status.wssUrl} />
+        <Stat label="Signalling" value="WSS" foot={status.socketUrl} />
         <Stat
-          label="Relay"
-          value={status.ice?.relay ? 'TURN' : status.ice?.turn ? 'TURN (no secret)' : 'STUN only'}
-          foot={status.ice?.relay ? 'Time-limited credentials' : 'Add TURN_URLS + TURN_SECRET for hard NATs'}
-          tone={status.ice?.relay ? undefined : 'var(--warning)'}
+          label="NAT"
+          value={status.switch?.connected ? 'Traversal always on' : 'Switch unreachable'}
+          foot={
+            status.switch?.connected
+              ? `Relay registered${status.switch.node?.observed ? ` · ${status.switch.node.observed}` : ''}`
+              : status.switch?.problem || 'No Cantus node has answered yet'
+          }
+          tone={status.switch?.connected ? undefined : 'var(--warning)'}
         />
       </div>
 
-      {!tlsReady ? (
-        <Card title="The switch has no TLS certificate" subtitle="WebSocket signaling cannot start until it does">
+      {!switchUp ? (
+        <Card title="The Cantus switch is not answering" subtitle="A line cannot register until it is">
           <p className="tiny muted">
-            Generate one by saving any extension, which rewrites the switch configuration, or point
-            <code> SOFTPHONE_TLS_CERT</code> and <code>SOFTPHONE_TLS_KEY</code> at a real certificate.
-            Browsers will refuse an encrypted WebSocket to a host with no certificate at all.
+            The console proxies this page's socket to the switch, so nothing here is a browser certificate
+            problem. Start the switch (it is a service beside this one, at{' '}
+            <code>{status.socketUrl}</code> behind the proxy) and check that <code>CANTUS_URL</code> names it.
+            {status.switch?.problem ? ` Last error: ${status.switch.problem}.` : ''}
           </p>
         </Card>
       ) : null}
@@ -1424,7 +1196,7 @@ export default function Softphone() {
                           : 'Dialing…'}
                     </Badge>
                     {call.direction === 'inbound' ? <Badge tone="info">inbound</Badge> : null}
-                    {secure ? <Badge tone="success">DTLS-SRTP</Badge> : null}
+                    {secure ? <Badge tone="success">Cantus / WSS</Badge> : null}
                     {scif.enabled ? <Badge tone="info">SCIF</Badge> : null}
                     {reconnecting ? <Badge tone="warning" dot="warn">reconnecting</Badge> : null}
                   </div>

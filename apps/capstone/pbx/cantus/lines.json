@@ -1,0 +1,21 @@
+{
+  "lines": [
+    { "ext": "100", "displayName": "Front desk", "did": "8000" },
+    { "ext": "101", "displayName": "Interview room", "did": "8001" },
+    { "ext": "102", "displayName": "DevOps lab", "did": "8002" },
+    { "ext": "103", "displayName": "Receptionist", "did": "8003" },
+    { "ext": "104", "displayName": "Outreach", "did": "8004" },
+    { "ext": "105", "displayName": "Screening", "did": "8005" },
+    { "ext": "106", "displayName": "Survey", "did": "8006" },
+    { "ext": "107", "displayName": "GOTV poll", "did": "8007" }
+  ],
+  "trunks": [
+    {
+      "name": "carrier",
+      "comment": "The carrier's gateway. Numbers arrive here and are routed by the DID routes above; credentials live in .env, never in this file.",
+      "endpoint": "trunk@carrier.invalid",
+      "numbers": [],
+      "enabled": false
+    }
+  ]
+}

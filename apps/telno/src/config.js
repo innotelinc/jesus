@@ -85,16 +85,20 @@ export const config = {
     requireToken: bool(env.PROVISIONING_REQUIRE_TOKEN, false),
   },
 
-  // Fax: the switch is the fax machine. res_fax negotiates T.38 with the carrier
-  // and falls back to G.711 passthrough (spandsp) when T.38 is refused, so a fax
-  // rides the same SIP trunk as voice and costs nothing per page — no carrier
-  // fax API, no per-page fee.
+  // Fax. Cantus has no T.38 and no in-band modem signalling by design, so a fax
+  // cannot be terminated by this switch: it needs a T.38 gateway on the trunk,
+  // which is the one place a PSTN protocol still exists. Off by default, and the
+  // console says why rather than offering a button that cannot work.
   fax: {
-    enabled: bool(env.FAX_ENABLED, true),
+    enabled: bool(env.FAX_ENABLED, false),
     // Where received documents wait to be ingested, and where an outbound
     // document is staged before the switch sends it.
     dir: env.FAX_DIR || '',
-    t38: bool(env.FAX_T38, true),
+    t38: bool(env.FAX_T38, false),
+    // Cantus address of the T.38 gateway that actually terminates faxes on the
+    // trunk, e.g. `fax@gateway.telno.local`. Empty means sending is refused with
+    // that reason instead of being queued forever.
+    gateway: env.FAX_GATEWAY || '',
     maxRate: int(env.FAX_MAX_RATE, 14400),
     minRate: int(env.FAX_MIN_RATE, 2400),
     // The station ID the receiving machine prints, and the header on a send.
@@ -106,42 +110,20 @@ export const config = {
 
   telephony: {
     enabled: bool(env.TELEPHONY_ENABLED, true),
-    // Asterisk Manager Interface — the control plane's only path into the switch.
-    amiHost: env.AMI_HOST || '127.0.0.1',
-    amiPort: int(env.AMI_PORT, 5038),
-    amiUser: env.AMI_USER || 'telno',
-    amiSecret: env.AMI_SECRET || '',
-    // Asterisk REST Interface (audio, channel control, live recordings).
-    ariUrl: env.ARI_URL || 'http://127.0.0.1:8088',
-    ariUser: env.ARI_USER || 'telno',
-    ariSecret: env.ARI_SECRET || '',
-    configDir: env.ASTERISK_CONFIG_DIR || '',
-    reloadOnApply: bool(env.ASTERISK_RELOAD, true),
-    // NAT: the address a client outside the container can actually reach. On
-    // Docker's bridge network Asterisk would otherwise advertise its container
-    // IP in ICE candidates and media would never arrive.
-    externalAddress: env.ASTERISK_EXTERNAL_ADDRESS || '',
-    localNets: list(env.ASTERISK_LOCAL_NETS, '172.16.0.0/12,10.0.0.0/8,192.168.0.0/16'),
-    // The SIP domain the switch puts in From/To headers. It has to be a name
-    // and not the container's hostname: Docker names containers with a hex id,
-    // and a SIP parser reads a digit-leading host as a malformed IPv4 address
-    // (sip.js rejects the whole message), so a call would ring the browser and
-    // never be offered to the operator.
-    // SIP_DOMAIN/SIP_URI_DOMAIN wins, then the provisioning domain (telno.tel),
-    // then the public host. A deployment that hands out `sip:100@telno.tel` has
-    // to put the same name in every URI, or a handset shows the raw host.
-    sipDomain:
-      env.SIP_DOMAIN ||
-      env.SIP_URI_DOMAIN ||
-      env.PROVISIONING_SIP_DOMAIN ||
-      (() => {
-        try {
-          return new URL(env.PUBLIC_URL || 'http://localhost').hostname;
-        } catch {
-          return 'localhost';
-        }
-      })(),
-    /** Simulated switch for `npm run dev` on machines without Asterisk. */
+    // The Cantus switch's control API. Telephony is one JSON API and one
+    // WebSocket now: the switch can run beside this container, on another host,
+    // or behind a proxy, and every ring event arrives the same way.
+    url: String(env.CANTUS_URL || 'http://127.0.0.1:8088').replace(/\/+$/, ''),
+    token: env.CANTUS_CONTROL_TOKEN || '',
+    // The dialling domain. Every address the switch answers for is
+    // `<line>@<domain>`: it is what a call is routed by and what the console
+    // prints, so it has to be a name and not a container id.
+    domain: (env.CANTUS_DOMAIN || env.SIP_DOMAIN || env.PROVISIONING_SIP_DOMAIN || 'telno.local').toLowerCase(),
+    // Where the generated routing document and line inventory are written. The
+    // switch reads the same directory, so a restart of either side converges.
+    configDir: env.CANTUS_CONFIG_DIR || '',
+    reloadOnApply: bool(env.CANTUS_RELOAD, true),
+    /** No switch on this machine: apply changes locally and say so, never lie. */
     simulate: bool(env.TELEPHONY_SIMULATE, false),
   },
 
@@ -153,34 +135,27 @@ export const config = {
     required: bool(env.ONBOARDING_REQUIRED, true),
   },
 
-  // Browser softphone: the platform mints the session, Asterisk carries the
-  // media. SIP travels over WSS to chan_pjsip; audio and video are DTLS-SRTP.
+  // Browser softphone: the platform mints the session, the switch carries the
+  // media. There is no SDP, no ICE and no port range: one WebSocket carries
+  // signalling and 20 ms PCM frames, and NAT traversal is the protocol's job.
   softphone: {
     enabled: bool(env.SOFTPHONE_ENABLED, true),
-    // Public WSS address of the switch's HTTP transport. Empty means "derive
-    // from the request host", which is right for a same-host deployment.
-    wssUrl: env.SOFTPHONE_WSS_URL || '',
-    wssPort: int(env.SOFTPHONE_WSS_PORT, 8089),
-    // Serve that listener same-origin through the app. The browser then reaches
-    // the switch over the certificate it already trusts, instead of the
-    // switch's own, which on a first boot is self-signed and refused outright.
-    relay: bool(env.SOFTPHONE_WSS_RELAY, true),
-    // Where the switch's WSS listener is from inside this container. Only a
-    // split deployment (switch on another host) needs to set it.
-    wssInternal: env.SOFTPHONE_WSS_INTERNAL || '',
-    // TLS material for that listener; generated under ASTERISK_CONFIG_DIR/keys
-    // on first apply when these are left empty.
-    tlsCert: env.SOFTPHONE_TLS_CERT || '',
-    tlsKey: env.SOFTPHONE_TLS_KEY || '',
-    stunUrls: list(env.SOFTPHONE_STUN_URLS, 'stun:stun.l.google.com:19302'),
-    turnUrls: list(env.TURN_URLS, ''),
-    turnSecret: env.TURN_SECRET || '',
-    turnTtlSec: Math.max(300, int(env.TURN_TTL_SEC, 3600)),
-    video: bool(env.SOFTPHONE_VIDEO, true),
+    // Where the browser opens its socket. Same origin by default: the console
+    // proxies to the switch, so the browser is on the certificate it already
+    // trusts and the switch is never exposed to the internet.
+    socketUrl: env.SOFTPHONE_SOCKET_URL || '/softphone/line',
+    proxy: bool(env.SOFTPHONE_PROXY, true),
+    // Only a split deployment (browser talks to the switch directly) sets this.
+    directUrl: env.SOFTPHONE_DIRECT_URL || '',
+    video: bool(env.SOFTPHONE_VIDEO, false),
     // A ticket is single-use and short-lived: it bootstraps one WebSocket.
     ticketTtlSec: Math.max(15, int(env.SOFTPHONE_TICKET_TTL, 120)),
-    // Where the switch writes call recordings (inside the container).
-    recordingDir: env.ASTERISK_RECORDING_DIR || '/data/recordings',
+    // Where the switch writes call recordings (shared with this container).
+    recordingDir: env.CANTUS_RECORD_DIR || '/data/recordings',
+    // Media is 8 kHz mono PCM16 in 20 ms frames; the client is told the codec
+    // so it can refuse to negotiate anything the switch does not carry.
+    codec: 'pcm-s16/8000/1',
+    frameMs: 20,
   },
 
   // Voice on the line, not in a vendor. Recognition runs in the browser (Web
@@ -225,14 +200,16 @@ export const config = {
     ringOnDial: bool(env.APNS_RING_ON_DIAL, true),
   },
 
-  // Parking: the half of "answer on a locked iPhone" that the switch owns.
+  // Parking. A call that rings a phone in somebody's pocket cannot be joined by
+  // that phone while the switch is still ringing the desk, so the call needs
+  // somewhere to wait with a name the app can dial back.
   //
-  // A call that rings a phone in somebody's pocket cannot be joined by that
-  // phone while the switch is still dialing the desk: Asterisk cannot add a
-  // party to a call it has not answered yet. Parking gives the call somewhere to
-  // wait — a slot with a name — so the app can dial that slot and be bridged.
+  // The routing document still reserves `7XXX` for retrieval, but the lot
+  // itself is not implemented on the Cantus switch yet — so this is off by
+  // default rather than advertised and absent. Turning it on changes nothing
+  // until the switch grows a park action; see `docs/telephony.md`.
   parking: {
-    enabled: bool(env.PARKING_ENABLED, true),
+    enabled: bool(env.PARKING_ENABLED, false),
     // Slots live in 7000-7999 because the dialplan retrieves one by dialing
     // _7XXX; a lot outside that range could not be reached from a phone.
     lot: (env.PARKING_LOT || 'telno').replace(/[^A-Za-z0-9_]/g, '') || 'telno',
@@ -385,8 +362,10 @@ export const config = {
   },
 };
 
-if (!config.telephony.simulate && !config.telephony.amiSecret) {
-  config.telephony.simulate = !env.AMI_SECRET;
+// No switch address means no switch: a dev laptop applying a configuration gets
+// a written document and a clear "not applied", never a silent failure.
+if (!config.telephony.simulate && !config.telephony.url) {
+  config.telephony.simulate = true;
 }
 
 /**

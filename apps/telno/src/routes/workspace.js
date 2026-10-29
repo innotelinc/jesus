@@ -1615,10 +1615,10 @@ export default async function workspaceRoutes(app) {
         status: telephony.connected ? 'up' : telephony.simulated ? 'degraded' : 'down',
         latencyMs: telephony.connected ? switchLatency : 0,
         detail: telephony.simulated
-          ? 'Simulated switch — AMI not connected'
+          ? 'Simulated switch — no Cantus node connected'
           : telephony.connected
-            ? `AMI connected to ${telephony.host || 'switch'}`
-            : telephony.error || 'AMI not connected',
+            ? `Cantus control API connected to ${telephony.host || 'switch'}`
+            : telephony.error || 'Cantus switch not connected',
       },
       {
         target: 'delivery',

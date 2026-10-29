@@ -18,9 +18,13 @@ import setupRoutes from './setup.js';
 import onboardingRoutes from './onboarding.js';
 import secureRoutes from './secure.js';
 import crmRoutes from './crm.js';
+import cantusRoutes from './cantus.js';
 
 /** Everything under /api. */
 export async function registerRoutes(app) {
+  // The switch's own surface: a line inventory and nothing else, authenticated
+  // with the shared control token rather than a session.
+  await app.register(cantusRoutes);
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(registryRoutes);
   await app.register(telephonyRoutes);

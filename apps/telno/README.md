@@ -23,19 +23,19 @@ with one login and one source of truth.
 
 ---
 
-One telephony platform, one API, one number registry, six public directory hostnames — in a single
-container.
+One telephony platform, one API, one number registry, six public directory hostnames. Telephony is
+one service beside it, speaking Cantus, not a switch compiled into the image.
 
 ```
-   ┌─────────────────────────── docker container ───────────────────────────┐
-   │                                                                        │
-   │  Asterisk 20 ──AMI──►  Fastify control API  ◄──HTTP──  React UI (static)│
-   │      │                        │                        + /d/<host>      │
-   │      │                      SQLite                                      │
-   │      └──── SIP / RTP          │                                         │
-   │                               └──►  registry + directory               │
-   └────────────────────────────────────────────────────────────────────────┘
-        one image · two processes · one database · ~200 MB RSS
+┌────────────── cantus ──────────────┐      ┌────────────── telno ───────────────┐
+│  Cantus node  · one UDP port       │◄────►│  Fastify control API               │
+│  Cantus relay · name → address     │ JSON │  React UI (static) + /d/<host>     │
+│  routing document (JSON)           │  +WS │  SQLite · registry · directory     │
+│  ARI-compatible surface :8088      │      │  writes the routing document       │
+└─────────┬──────────────────────────┘      └────────────────────────────────────┘
+          │ 7443/udp signalling + media, 7444/udp relay
+   browser softphone ── one WebSocket ──► the console, which proxies to the switch
+        two images · two processes · one database · no SIP, no RTP port range
 ```
 
 ## What it replaces
@@ -51,7 +51,7 @@ number table and one design system.
 | Robust UI | every screen has loading / empty / error states; forms validate server-side; keyboard + screen-reader paths |
 | New features | worldwide registry, verification queue, DID routing, live channel view, config preview, audit trail |
 | Plug and play | `docker compose up`, secrets self-generate, demo data optional, verification channel set by one env var |
-| All in one | Asterisk + API + UI in one image, one database, one supervisor |
+| All in one | API + UI + directory in one image, one database; the voice stack is one service beside it |
 | Docker container | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml) |
 | Dedupe | E.164 is the primary key; listings dedupe on normalized name; submissions detect duplicates before review |
 | Slimmer platform + API | Node 24 + SQLite (`node:sqlite`, no native modules) + static UI — no SSR runtime, no ORM, no Redis |
@@ -197,35 +197,32 @@ the data — and refreshes its counters after each write so the tiles and the li
 
 ## Softphone and encrypted calling
 
-**Softphone** is a real browser phone: audio and video, screen sharing, DTMF into IVRs, and a live
-read-out of whether the call is encrypted. It registers as a second endpoint on the same extension,
-so calling 101 rings the desk handset and the browser at the same time.
-
-The two endpoints are `<ext>` for the handset and `webrtc-<ext>` for the browser, and each
-authenticates as its own name — chan_pjsip identifies a registration by the user part of the
-request, so a browser that registered as plain `101` would land on the handset endpoint and lose
-DTLS-SRTP. The softphone session endpoint returns the right identity; nothing in the UI has to know.
+**Softphone** is a real browser phone: DTMF into IVRs, a live read-out of the path each call took,
+and a registration that survives a NAT rebinding. It is a Cantus line, not an SDP peer: calling 101
+rings the handset and the browser, and whichever answers first gets the call.
 
 ```
-browser ── SIP over WSS ──▶ chan_pjsip :8089        signaling, TLS only
-browser ◀─ DTLS-SRTP ─────▶ Asterisk   RTP 10000–10100 (published by compose)
-browser ── presence ──────▶ /api/softphone/ws      who is on the line, call intents
+browser ── one WebSocket ──▶ console /softphone/line   JSON control + 20 ms PCM16
+                             │  (ticket spent here, once)
+                             ▼
+                     Cantus switch /ws/line            signalling and media, same socket
+browser ── presence ───────▶ /api/softphone/ws         who is on the line, call intents
 ```
 
-Nothing in the path is optional. The generated `webrtc-<ext>` endpoint is `media_encryption=dtls`,
-`ice_support=yes`, `rtcp_mux=yes`, `use_avpf=yes`, and only offers `opus`, `ulaw`, `alaw` plus `vp8`
-and `h264` when video is enabled — a plaintext RTP attempt cannot negotiate at all. The platform
-never touches media: it mints a single-use ticket, hands the browser its own extension credentials
-and time-limited TURN credentials, and keeps the presence channel. See [docs/API.md](docs/API.md).
+The ticket is single use and tied to an account and a line; the switch is on the private network
+and is never published. There is no certificate for a browser to trust on a second port, no ICE to
+fail, no TURN server and no RTP range: one mapping, opened at registration, carries the call. A
+hard NAT that rebinds mid-call is a failover to the relay and a return to direct, not a dropped call
+— the switch reports the path change in the call's own event stream. See [docs/telephony.md](docs/telephony.md).
 
 | Need | Setting |
 |---|---|
-| Public address of the switch socket | `SOFTPHONE_WSS_URL` (default `wss://<host>:8089/ws`) |
-| Certificate | generated under `ASTERISK_CONFIG_DIR/keys` on first apply, or `SOFTPHONE_TLS_CERT` / `SOFTPHONE_TLS_KEY` |
-| Publish the port | `8089` in compose, plus `10000–10100/udp` for media |
-| Hard NAT | `TURN_URLS` + `TURN_SECRET` (coturn `use-auth-secret`); STUN alone is otherwise fine |
-| Docker NAT | `ASTERISK_EXTERNAL_ADDRESS` (defaults to the `PUBLIC_URL` host) — otherwise ICE advertises the container IP and media never arrives |
-| Video | `SOFTPHONE_VIDEO=false` removes the video codecs and the stream limit |
+| Cantus switch address | `CANTUS_URL` (default `http://cantus:8088`) |
+| Shared control token | `CANTUS_CONTROL_TOKEN` — the same value in both services |
+| Dialling domain | `CANTUS_DOMAIN` (default `telno.local`) |
+| Browser socket | `SOFTPHONE_SOCKET_URL` (default `/softphone/line`, proxied) |
+| Ports | `8080/tcp` for the console; `7443/udp` + `7444/udp` for Cantus, on the switch |
+| Video | not carried: a Cantus line is 8 kHz audio on one socket |
 
 ### The phone in its own window
 

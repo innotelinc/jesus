@@ -88,15 +88,15 @@ seedBrand();
 // which owns its own records — are linked rather than remembered.
 ensureConnectedSystems();
 
-// Generate Asterisk configuration up front so a fresh container can register
-// endpoints before anyone opens the UI.
+// Generate the routing document and line inventory up front, so a fresh
+// container hands the switch a dial plan before anyone opens the UI.
 if (config.telephony.configDir) {
   const written = writeConfigs();
-  console.log(`[telephony] generated Asterisk config in ${written.dir || config.telephony.configDir}`);
+  console.log(`[telephony] generated the Cantus routing document in ${written.dir || config.telephony.configDir}`);
 }
 
-// `node src/index.js --provision-only` boots the switch from the database and
-// exits — the container entrypoint uses it before Asterisk starts.
+// `node src/index.js --provision-only` writes that document from the database
+// and exits — the container entrypoint uses it before the API starts.
 if (process.argv.includes('--provision-only')) {
   console.log('[provision] configuration written, exiting');
   process.exit(0);
@@ -135,7 +135,7 @@ try {
   stopBackups = startBackupSchedule();
   console.log(
     `[telno] ${config.isProd ? 'production' : 'development'} on http://${config.host}:${config.port} ` +
-      `(${config.directory.domains.length} directory hosts, telephony ${config.telephony.simulate ? 'simulated' : 'AMI'})`
+      `(${config.directory.domains.length} directory hosts, telephony ${config.telephony.simulate ? 'simulated' : `Cantus at ${config.telephony.url}`})`
   );
 } catch (err) {
   app.log.error(err);

@@ -6,7 +6,6 @@ import { needsOnboarding, numberCount, lineCount } from '../lib/onboarding.js';
 import { logEvent } from '../lib/audit.js';
 import * as v from '../lib/validate.js';
 import { applyAfterChange, telephonyStatus } from '../telephony/index.js';
-import { tlsPaths } from '../telephony/provision.js';
 import { voipmsConfigured } from '../lib/carriers/voipms.js';
 import { pushStatus } from '../lib/push.js';
 import { config } from '../config.js';
@@ -91,9 +90,10 @@ export default async function setupRoutes(app) {
     const numbers = db_.get('SELECT COUNT(*) AS n FROM numbers').n;
     const trunks = db_.get('SELECT COUNT(*) AS n FROM trunks WHERE enabled = 1').n;
     const switchStatus = await telephonyStatus();
-    const tls = tlsPaths();
     const push = pushStatus();
-    const softphoneReady = config.softphone.enabled && tls.ready;
+    // A softphone is ready when the switch answers, not when a certificate is
+    // generated: the browser talks to this console, which proxies to the switch.
+    const softphoneReady = config.softphone.enabled && !!switchStatus.connected;
 
     return {
       // "First run" is one fact, not a guess: no enabled line means nothing on
@@ -140,7 +140,8 @@ export default async function setupRoutes(app) {
       },
       softphone: {
         enabled: config.softphone.enabled,
-        tls: tls.ready,
+        ready: softphoneReady,
+        socketUrl: config.softphone.socketUrl,
         video: config.softphone.video,
         ticketTtlSec: config.softphone.ticketTtlSec,
       },
