@@ -6,7 +6,7 @@ use warnings;
 use JSON::PP ();
 
 my %PREDICATES = map { $_ => 1 } qw(to from weekday time limit event verified);
-my %ACTIONS    = map { $_ => 1 } qw(answer reject forward bridge play record pause noop);
+my %ACTIONS    = map { $_ => 1 } qw(answer reject forward bridge play record pause noop ari);
 
 sub new {
     my ($class, %a) = @_;
@@ -58,7 +58,16 @@ sub _glob_match {
     my ($pattern, $value) = @_;
     return 1 unless defined $pattern;
     return 0 unless defined $value;
-    my $re = join '.*', map { quotemeta } split /\*/, lc $pattern, -1;
+    # `*` spans anything, `?` spans exactly one character, everything else is
+    # literal. quotemeta turns the `?` into `\?`, so it is rewritten back to a
+    # single-character match — the switch does the same, and the two have to
+    # agree or `cantus route-test` scores a document differently from the node
+    # that runs it.
+    my $re = join '.*', map {
+        my $part = quotemeta;
+        $part =~ s/\\\?/./g;
+        $part;
+    } split /\*/, lc $pattern, -1;
     return lc($value) =~ /^$re$/ ? 1 : 0;
 }
 

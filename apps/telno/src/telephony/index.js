@@ -1,17 +1,23 @@
-import { ami } from './ami.js';
-import { writeConfigs, generateConfigs } from './provision.js';
+import { cantus } from './cantus.js';
+import { writeConfigs, generateConfigs, generateRoutes, generateLines } from './provision.js';
 import { db_, newId, now } from '../db/index.js';
 import { config } from '../config.js';
 import { logEvent } from '../lib/audit.js';
-import { onFaxEvent } from '../lib/fax.js';
 
-const channels = new Map();
-// MixMonitor reports its file when recording starts and stops; the call row is
-// stamped with it so the console can play the audio back after the hangup.
-const recordings = new Map();
+/**
+ * The telephony control plane.
+ *
+ * The switch owns calls; this platform owns records. Every switch event is
+ * mapped onto the same `calls` table the console, the billing ladder and the
+ * audit log already read, so nothing above this file had to learn a new shape
+ * when the switch changed from Asterisk's AMI to Cantus.
+ */
+
+/** Live legs the switch has told us about, keyed by its call id. */
+const legs = new Map();
 let started = false;
 
-const AUDIO_EXT = /\.(wav|wav49|gsm|ulaw|alaw|sln|g722|ogg|mp3)$/i;
+const AUDIO_EXT = /\.(wav)$/i;
 
 function recordingName(raw) {
   const base = String(raw || '').split(/[\\/]/).pop()?.trim();
@@ -19,15 +25,11 @@ function recordingName(raw) {
   return AUDIO_EXT.test(base) ? base : `${base}.wav`;
 }
 
-/** Live channel state, populated from AMI events (bounded, oldest dropped). */
-function track(uniqueid, patch) {
-  const existing = channels.get(uniqueid) || { started: Date.now() };
-  channels.set(uniqueid, { ...existing, ...patch });
-  if (channels.size > 500) {
-    const oldest = channels.keys().next().value;
-    channels.delete(oldest);
-  }
-  return channels.get(uniqueid);
+function track(callId, patch) {
+  const existing = legs.get(callId) || { started: Date.now() };
+  legs.set(callId, { ...existing, ...patch });
+  if (legs.size > 500) legs.delete(legs.keys().next().value);
+  return legs.get(callId);
 }
 
 function upsertCall(callId, patch) {
@@ -60,6 +62,9 @@ function upsertCall(callId, patch) {
     );
     return id;
   }
+  // An undefined value means "this source has no opinion"; an empty one is a
+  // deliberate clear. Writing every undefined would let a CDR wipe the
+  // recording a MixMonitor-equivalent event already attached.
   const sets = [];
   const values = [];
   for (const [key, value] of Object.entries(patch)) {
@@ -67,117 +72,111 @@ function upsertCall(callId, patch) {
     sets.push(`${key} = ?`);
     values.push(value);
   }
-  if (sets.length) {
-    db_.run(`UPDATE calls SET ${sets.join(', ')} WHERE call_id = ?`, [...values, callId]);
-  }
+  if (sets.length) db_.run(`UPDATE calls SET ${sets.join(', ')} WHERE call_id = ?`, [...values, callId]);
   return existing.id;
 }
 
-const DISPOSITIONS = {
-  ANSWERED: 'answered',
-  BUSY: 'busy',
-  'NO ANSWER': 'no-answer',
-  FAILED: 'failed',
-  CONGESTION: 'congestion',
-  CANCEL: 'no-answer',
-};
-
-function directionFor(context) {
-  if (!context) return 'internal';
-  if (context.startsWith('from-trunk') || context.startsWith('from-pstn')) return 'inbound';
-  if (context.startsWith('outbound')) return 'outbound';
+/** Which way a call went, decided from the address the switch was asked for. */
+function directionFor(call) {
+  if (call.direction === 'outbound') return 'outbound';
+  if (call.direction === 'inbound') return 'inbound';
+  const to = String(call.to || '');
+  if (to.startsWith('+') || /^1\d{10}@/.test(to)) return 'outbound';
   return 'internal';
 }
 
-function onEvent(msg) {
+function extensionOf(address) {
+  const [user] = String(address || '').split('@');
+  return /^\d{1,6}$/.test(user) ? user : '';
+}
+
+function onEvent(event) {
   try {
-    // Fax rides the same session: res_fax reports an originate and a result, and
-    // the hangup that follows a silent transmission is a failure, not a lost row.
-    // The switch spells these `FAXStatus`, `SendFAX` and `ReceiveFAX`; a filter
-    // listing `FaxStatus` hears none of them and every send looks hung.
-    if (/^(originate(response)?|faxstatus|sendfax|receivefax|hangup)$/i.test(msg.Event || '')) {
-      // The fax handler needs the call's own state to name an inbound document:
-      // the event says what arrived, the channel says who sent it and to which
-      // number.
-      onFaxEvent(msg, channels.get(msg.Uniqueid) || null);
-    }
-    switch (msg.Event) {
-      case 'Newchannel': {
-        track(msg.Uniqueid, {
-          from: msg.CallerIDNum || 'unknown',
-          to: msg.Exten || '',
-          context: msg.Context || '',
-          channel: msg.Channel || '',
+    const call = event.callId ? legs.get(event.callId) || { id: event.callId } : null;
+    switch (event.type) {
+      case 'call.incoming':
+      case 'call.originated': {
+        track(event.callId, {
+          from: event.from,
+          to: event.to,
+          direction: event.direction || 'inbound',
           started: Date.now(),
+        });
+        upsertCall(event.callId, {
+          direction: directionFor(event),
+          from_number: String(event.from || ''),
+          to_number: String(event.to || ''),
+          extension: extensionOf(event.to),
+          started_at: new Date(event.at || Date.now()).toISOString(),
+          disposition: 'ringing',
         });
         break;
       }
-      case 'Dial': {
-        if (msg.SubEvent === 'Begin') {
-          track(msg.Uniqueid, { dialed: msg.Destination || '' });
-        } else if (msg.SubEvent === 'End' && msg.DialStatus === 'ANSWER') {
-          track(msg.Uniqueid, { answered: Date.now() });
-        }
+      case 'call.answered': {
+        const info = track(event.callId, { answered: Date.now() });
+        upsertCall(event.callId, {
+          answered_at: new Date(event.at || Date.now()).toISOString(),
+          disposition: 'answered',
+          extension: event.ext || extensionOf(info.to),
+        });
         break;
       }
-      case 'Bridge': {
-        track(msg.Uniqueid, { answered: channels.get(msg.Uniqueid)?.answered || Date.now() });
+      case 'call.recording':
+      case 'call.recorded': {
+        const name = recordingName(event.file);
+        if (name) track(event.callId, { recording: name });
         break;
       }
-      case 'Hangup': {
-        const info = channels.get(msg.Uniqueid);
-        if (!info) break;
+      case 'call.ended':
+      case 'call.failed': {
+        const info = legs.get(event.callId) || call || {};
         const endedAt = Date.now();
-        const answered = info.answered ? new Date(info.answered).toISOString() : null;
-        const duration = Math.max(0, Math.round((endedAt - (info.started || endedAt)) / 1000));
-        const billsec = info.answered ? Math.max(0, Math.round((endedAt - info.answered) / 1000)) : 0;
-        const context = msg.Context || info.context;
-        upsertCall(msg.Uniqueid, {
-          direction: directionFor(context),
-          from_number: info.from,
-          to_number: info.dialed || info.to,
-          extension: context === 'internal' ? info.to : '',
-          trunk: (info.channel.match(/trunk-([A-Za-z0-9_.-]+)-/)?.[1] || ''),
-          started_at: new Date(info.started || endedAt).toISOString(),
-          answered_at: answered,
+        const startedAt = info.started || endedAt;
+        const answeredAt = info.answered || null;
+        const duration = Math.max(0, Math.round((endedAt - startedAt) / 1000));
+        const billsec = answeredAt ? Math.max(0, Math.round((endedAt - answeredAt) / 1000)) : 0;
+        const cause = event.cause || event.reason || 'normal';
+        upsertCall(event.callId, {
+          started_at: new Date(startedAt).toISOString(),
+          answered_at: answeredAt ? new Date(answeredAt).toISOString() : null,
           ended_at: new Date(endedAt).toISOString(),
           duration,
           billsec,
-          disposition: !info.answered ? (msg.Cause === '16' ? 'no-answer' : 'failed') : billsec > 0 ? 'answered' : 'no-answer',
-          hangup_cause: msg['Cause-txt'] || '',
-          recording: recordings.get(msg.Uniqueid) || '',
+          disposition: answeredAt ? 'answered' : /busy/i.test(cause) ? 'busy' : /no-answer|no_answer|timeout/i.test(cause) ? 'no-answer' : 'failed',
+          hangup_cause: String(cause),
+          recording: info.recording || undefined,
         });
-        channels.delete(msg.Uniqueid);
+        legs.delete(event.callId);
         break;
       }
-      case 'MixMonitorStart':
-      case 'MixMonitorStop': {
-        const name = recordingName(msg.Filename);
-        if (!name) break;
-        recordings.set(msg.Uniqueid, name);
-        if (recordings.size > 500) recordings.delete(recordings.keys().next().value);
+      case 'cdr': {
+        // The switch's own record wins over these estimates: it has the media
+        // timestamps, so its duration is the authoritative one.
+        upsertCall(event.callId, {
+          direction: event.direction || 'inbound',
+          from_number: event.from || '',
+          to_number: event.to || '',
+          extension: event.extension || extensionOf(event.to),
+          started_at: event.startedAt,
+          answered_at: event.answeredAt,
+          ended_at: event.endedAt,
+          duration: Number(event.duration) || 0,
+          billsec: Number(event.billsec) || 0,
+          disposition: event.disposition || 'unknown',
+          hangup_cause: event.hangupCause || '',
+          recording: recordingName(event.recording) || undefined,
+        });
+        legs.delete(event.callId);
         break;
       }
-      case 'Cdr': {
-        // cdr_manager gives us authoritative values; it wins over estimates.
-        const duration = Number(msg.Duration) || 0;
-        const billsec = Number(msg.BillableSeconds) || 0;
-        upsertCall(msg.Uniqueid || `${msg.Source}-${msg.StartTime}`, {
-          direction: directionFor(msg.DestinationContext),
-          from_number: msg.Source || '',
-          to_number: msg.Destination || '',
-          trunk: msg.LastApplication === 'Dial' ? msg.LastData || '' : '',
-          started_at: msg.StartTime ? new Date(msg.StartTime).toISOString() : now(),
-          answered_at: msg.AnswerTime ? new Date(msg.AnswerTime).toISOString() : null,
-          ended_at: msg.EndTime ? new Date(msg.EndTime).toISOString() : null,
-          duration,
-          billsec,
-          disposition: DISPOSITIONS[msg.Disposition] || 'unknown',
-          hangup_cause: msg['Cause-txt'] || '',
-          cost: Number(msg.Cost) || 0,
-          // Undefined, not empty: a CDR arriving after the Hangup must not wipe
-          // the recording the MixMonitor event already attached.
-          recording: recordings.get(msg.Uniqueid) || undefined,
+      case 'call.path': {
+        // Path decisions are the reason Cantus exists; they belong in the audit
+        // trail so "the audio went through the relay" is answerable later.
+        logEvent({
+          actor: 'switch',
+          action: 'call.path',
+          subject: event.callId,
+          detail: `${event.path}${event.from ? ` (from ${event.from})` : ''}`,
         });
         break;
       }
@@ -186,72 +185,111 @@ function onEvent(msg) {
     }
   } catch (err) {
     // Never let a malformed event take the API down.
-    console.error('[telephony] event handling failed', msg.Event, err.message);
+    console.error('[telephony] event handling failed', event?.type, err.message);
   }
 }
 
 export function startTelephony() {
   if (started) return;
   started = true;
-  const client = ami();
+  const client = cantus({
+    baseUrl: config.telephony.url,
+    token: config.telephony.token,
+    domain: config.telephony.domain,
+  });
   client.on('event', onEvent);
-  client.on('connected', () => console.log('[telephony] AMI connected'));
-  client.on('disconnected', () => console.warn('[telephony] AMI disconnected, retrying'));
+  client.on('connected', () => {
+    console.log('[telephony] Cantus switch connected');
+    // The switch keeps its inventory in memory, so a switch restart comes back
+    // with no lines and no trunks. The platform is the source of truth, so it
+    // re-sends both on every connect rather than waiting for the next edit —
+    // otherwise a reboot silently turns every outbound call into `no-route`
+    // until somebody happens to save a setting.
+    applyConfiguration('switch-connected').catch((err) =>
+      console.error('[telephony] configuration sync failed', err.message)
+    );
+  });
+  client.on('disconnected', () => console.warn('[telephony] Cantus switch disconnected, retrying'));
+  // A first sync even before the socket settles: a switch that is already up
+  // when this container restarts gets its dial plan back immediately.
+  applyConfiguration('boot').catch((err) => console.error('[telephony] boot sync failed', err.message));
 }
 
 export async function telephonyStatus() {
-  const client = ami();
-  const base = await client.status();
-  const active = [...channels.values()].slice(0, 25).map((c) => ({
-    from: c.from,
-    to: c.dialed || c.to,
-    context: c.context,
-    seconds: Math.round((Date.now() - (c.started || Date.now())) / 1000),
-  }));
+  const client = cantus({
+    baseUrl: config.telephony.url,
+    token: config.telephony.token,
+    domain: config.telephony.domain,
+  });
+  let base;
+  try {
+    base = await client.status();
+  } catch (err) {
+    base = {
+      connected: false,
+      transport: 'CANTUS',
+      host: config.telephony.url,
+      error: err.message,
+      activeChannels: [],
+    };
+  }
   return {
     ...base,
-    activeChannels: base.connected ? active : [],
-    transport: 'AMI',
-    configDir: config.telephony.configDir || null,
+    enabled: config.telephony.enabled,
+    domain: config.telephony.domain,
+    routesFile: config.telephony.configDir || null,
+    simulated: false,
   };
 }
 
+/**
+ * Write the routing document and hand it to the switch.
+ *
+ * A saved change is a live change: the database is the source of truth, the
+ * document is derived from it, and the switch is told to load it. If the switch
+ * is unreachable the file is still written, so the next boot — or the switch's
+ * own reload — carries the change; the caller is told which half happened.
+ */
 export async function applyConfiguration(actor = 'system') {
   const write = writeConfigs();
-  let reload = null;
-  if (write.written && config.telephony.reloadOnApply) {
-    reload = await ami().reload('all');
+  const client = cantus({
+    baseUrl: config.telephony.url,
+    token: config.telephony.token,
+    domain: config.telephony.domain,
+  });
+  let applied = null;
+  let error = null;
+  try {
+    applied = await client.applyRoutes(generateRoutes());
+    // Lines and trunks travel together: a route that dials `trunk` is only half
+    // a configuration until the switch knows which endpoint to dial, and the
+    // trunk inventory lives in the database rather than in this function.
+    const inventory = generateLines();
+    for (const line of inventory.lines) await client.setLine(line);
+    for (const trunk of inventory.trunks) await client.setTrunk(trunk);
+  } catch (err) {
+    error = err.message;
   }
   db_.run('INSERT INTO events (actor, action, subject, detail) VALUES (?, ?, ?, ?)', [
     actor,
     'telephony.apply',
-    'asterisk',
-    JSON.stringify({ write, reloaded: !!reload }),
+    'cantus',
+    JSON.stringify({ write, applied: !!applied, error }),
   ]);
-  return { ...write, reloaded: !!reload };
+  return { ...write, reloaded: !!applied, error };
 }
 
-/**
- * Write the switch configuration and reload it after a saved change.
- *
- * The database is the source of truth and every generated file is derived from
- * it, so a saved change is a live change: there is no Apply button to forget,
- * and the UI cannot disagree with the switch. A write that cannot reach the
- * switch is reported to the caller rather than rolling the row back — the row
- * is already committed and the next change, or the next boot, regenerates the
- * files from it anyway.
- */
 export async function applyAfterChange(request) {
-  if (!config.telephony.configDir) return null;
+  if (!config.telephony.enabled) return null;
   const actor = request?.account?.email || request?.apiKey?.label || 'api';
   try {
     const result = await applyConfiguration(actor);
-    return { written: result.written, dir: result.dir, reloaded: result.reloaded };
+    return { written: result.written, dir: result.dir, reloaded: result.reloaded, error: result.error };
   } catch (err) {
     logEvent({
       actor,
       action: 'telephony.apply_failed',
-      subject: 'asterisk',
+      subject: 'cantus',
       detail: err.message,
       ip: request?.ip,
     });
@@ -260,4 +298,4 @@ export async function applyAfterChange(request) {
 }
 
 export const previewConfiguration = () => generateConfigs();
-export const liveChannels = () => [...channels.values()];
+export const liveChannels = () => [...legs.values()];

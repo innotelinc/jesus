@@ -71,26 +71,48 @@ jobs:
       - name: Scan every tracked file for literal secrets
         run: python3 scripts/secret-scan.py
 
-  pbx-converge:
-    name: PBX converge tool
+  pbx-cantus:
+    name: Cantus voice plane
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Unit tests for the per-context dialplan merge tool
+      - name: Unit tests for the switch bootstrap and agent-number sync
         run: python3 -m unittest discover -s pbx/tests -v
 
-      - name: Convergence smoke (capstone fragments are self-stable)
+      # The routing document and line inventory are the dialplan now, so they
+      # are checked the way the switch checks them: schema-shaped, every action
+      # known, every route answerable. A typo here is a call that never lands,
+      # and it should fail in CI rather than on a demo.
+      - name: Routing and line documents are valid
         run: |
           set -euo pipefail
-          tmp=$(mktemp -d)
-          touch "$tmp/extensions_custom.conf"
-          python3 pbx/asterisk_converge.py --target "$tmp/extensions_custom.conf" \
-            --source pbx/asterisk/extensions_custom.conf --owner capstone \
-            --append from-internal-custom
-          python3 pbx/asterisk_converge.py --target "$tmp/extensions_custom.conf" \
-            --source pbx/asterisk/extensions_custom.conf --owner capstone \
-            --append from-internal-custom --check
+          python3 - <<'PY'
+          import json, sys
+          actions = {'answer','reject','forward','bridge','play','record','pause','noop','ari'}
+          one = lambda p: json.load(open(p))
+          for path in ('pbx/cantus/routes.json', 'pbx/cantus/lines.json'):
+              one(path)
+          doc = one('pbx/cantus/routes.json')
+          assert doc.get('version') == 1, 'routes.json version must be 1'
+          routes = doc.get('routes') or []
+          assert routes, 'routes.json has no routes'
+          names = set()
+          for r in routes:
+              assert r.get('name'), f'route without a name: {r}'
+              assert r['name'] not in names, f'duplicate route name {r["name"]}'
+              names.add(r['name'])
+              assert isinstance(r.get('then'), list) and r['then'], f'{r["name"]}: empty then'
+              for action in r['then']:
+                  assert len(action) == 1, f'{r["name"]}: each action is a single-key object'
+                  key = next(iter(action))
+                  assert key in actions, f'{r["name"]}: unknown action {key}'
+          lines = one('pbx/cantus/lines.json').get('lines') or []
+          assert lines, 'lines.json has no lines'
+          exts = [str(l['ext']) for l in lines]
+          assert len(exts) == len(set(exts)), 'duplicate extension in lines.json'
+          print(f'{len(routes)} routes, {len(lines)} lines')
+          PY
 
   # Zeus portal API client (add-on mode, Phase 2): stdlib client implementing
   # the zeus docs/portal-api.md contract. Tests mock urlopen — no network, no
@@ -399,26 +421,27 @@ jobs:
       # The same rule from the other side: a voice-path target may not be a
       # docker alias, a loopback name, or a compose service name either — the
       # address a service dials is the host LAN IP (README → Addressing). Scoped
-      # to the fragments Asterisk itself loads and to the keys that carry a
-      # voice-path target, so the `host.docker.internal` targets other services
-      # keep on purpose (with `extra_hosts: host-gateway`) stay untouched.
+      # to the Cantus routing documents (the dialplan now) and to the keys that
+      # carry a voice-path target, so the `host.docker.internal` targets other
+      # services keep on purpose (with `extra_hosts: host-gateway`) stay
+      # untouched.
       - name: Voice-path targets are the host LAN IP
         run: |
           set -euo pipefail
           bad=0
 
-          # A fragment Asterisk loads must not name the docker alias: the PBX
-          # container carries no extra_hosts entry, so ast_sockaddr_resolve fails
-          # and STUN/media die silently. `;` is the comment leader in Asterisk
-          # conf files. pbx/entrypoint-dograh.sh is deliberately out of scope —
-          # it is the code that repairs a leftover alias.
+          # A routing document dials extensions and DIDs inside the switch. It
+          # never names a container: the switch resolves `100@capstone.local`
+          # through its own registry, and a hostname in a route would fail at
+          # call time with nothing in the log but a no-answer.
           while IFS= read -r f; do
-            if hits=$(sed 's/;.*//' "$f" | grep -nE 'host\.docker\.internal'); then
-              echo "::error file=$f::docker alias in a fragment Asterisk loads"
+            if hits=$(grep -nE 'host\.docker\.internal|(^|[^A-Za-z0-9.-])(localhost|switch|telno|capstone-cantus)([^A-Za-z0-9.-]|$)' "$f" \
+                        | grep -vE '"(name|description)"'); then
+              echo "::error file=$f::container name in a Cantus routing document"
               echo "$hits"
               bad=1
             fi
-          done < <(git ls-files pbx/asterisk)
+          done < <(git ls-files 'pbx/cantus/*.json')
 
           # A key that carries a voice-path target holds the LAN IP, a reference
           # to a variable that does (PJSIP_MEDIA_ADDRESS / LAN_IP /

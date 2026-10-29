@@ -647,7 +647,7 @@ if (!db_.get('SELECT COUNT(*) AS n FROM health_checks').n) {
   const probes = [
     ['database', 'database', 'up', 2, 'SQLite read/write, WAL mode'],
     ['api', 'api', 'up', 1, 'Seeded demo runtime'],
-    ['switch', 'switch', 'degraded', 0, 'Simulated switch — AMI not connected'],
+    ['switch', 'switch', 'degraded', 0, 'Simulated switch — no Cantus node answered'],
     ['delivery', 'delivery', 'degraded', 0, 'Verification channel: console'],
     ['directory hosts', 'dns', 'up', 0, '6/6 hosts enabled'],
   ];

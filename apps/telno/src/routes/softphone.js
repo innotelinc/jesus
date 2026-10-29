@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { db_, now } from '../db/index.js';
 import { config } from '../config.js';
 import { CALLER_ID_MODES, VOICE_MASKS, scifPolicy } from '../lib/scif.js';
@@ -8,9 +8,8 @@ import { normalizeNumber } from '../lib/e164.js';
 import { applyAfterChange } from '../telephony/index.js';
 import { badRequest, forbidden, notFound, voiceRequired } from '../lib/errors.js';
 import { logEvent } from '../lib/audit.js';
-import { tlsFingerprint, tlsPaths } from '../telephony/provision.js';
-import { ami } from '../telephony/ami.js';
-import { relayUrlFor } from '../telephony/wssRelay.js';
+import { cantus } from '../telephony/cantus.js';
+import { proxyToSwitch, socketUrlFor } from '../telephony/wssRelay.js';
 import * as v from '../lib/validate.js';
 
 /**
@@ -18,17 +17,13 @@ import * as v from '../lib/validate.js';
  *
  * The split is deliberate and it is what keeps this container small:
  *
- *   media + SIP   browser <-> Asterisk over WSS/chan_pjsip, DTLS-SRTP, no relay
- *   control       browser <-> here: one short-lived ticket, TURN credentials,
- *                 presence across operators, and call intents for the audit log
+ *   media + signalling   browser <-> switch over one WebSocket, 20 ms PCM16
+ *   control              browser <-> here: one short-lived ticket, presence
+ *                        across operators, and call intents for the audit log
  *
- * So there is no media server, no TURN relay of our own and no SIP stack in
- * Node. What the platform owns is identity, policy and the switch config that
- * makes encryption non-optional.
+ * So there is no media server, no SIP stack, no TURN relay and no port range in
+ * Node. What the platform owns is identity, policy and the routing document.
  */
-
-const EXTENSION_REF = /(?:ext|webrtc)-([A-Za-z0-9_.-]+)/;
-const TURN_USER_MAX = 64;
 
 /* --------------------------------------------------------------- tickets -- */
 
@@ -64,49 +59,24 @@ function takeTicket(value) {
   return ticket.expires >= Date.now() ? ticket : null;
 }
 
-/* ------------------------------------------------------------ ICE / TURN -- */
-
-/**
- * coturn's REST scheme: the username carries the expiry and the password is an
- * HMAC of it, so a leaked credential stops working on its own.
- */
-function iceServers(identity) {
-  const servers = config.softphone.stunUrls.map((urls) => ({ urls }));
-  const { turnUrls, turnSecret, turnTtlSec } = config.softphone;
-  if (turnUrls.length && turnSecret) {
-    const username = `${Math.floor(Date.now() / 1000) + turnTtlSec}:${String(identity).slice(0, TURN_USER_MAX)}`;
-    const credential = createHmac('sha1', turnSecret).update(username).digest('base64');
-    servers.push({ urls: turnUrls, username, credential });
-  }
-  return servers;
-}
-
 /* ------------------------------------------------------------------ host -- */
 
 const hostOf = (value) => String(value || '').split(',')[0].split(':')[0].trim();
 
 /**
- * The host in a WebSocket URL, without its port or path.
+ * The same-origin path the browser opens; the console proxies it to the switch.
  *
- * A SIP domain is a name, nothing else: when this container relays the socket the
- * URL is same-origin and carries a path, and `host/ws` used as a domain is a
- * registration Asterisk refuses.
+ * The route is mounted under `/api`, and the browser concatenates this value
+ * onto the page's own origin, so the prefix has to be advertised: without it the
+ * softphone opened `<origin>/softphone/line`, which nothing upgrades, and every
+ * connection failed with "no Cantus line answered at /softphone/line". A
+ * configured absolute (`ws://…`) URL is passed through untouched.
  */
-const wsHostOf = (url) => hostOf(String(url || '').replace(/^wss?:\/\//, '').split('/')[0]);
-
-/** SIP identity of the browser endpoint for an extension (see pjsip.conf). */
-const webrtcUser = (extension) => `webrtc-${String(extension).replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 60)}`;
-
-function publicWssUrl(request) {
-  if (config.softphone.wssUrl) return config.softphone.wssUrl;
-  const host = hostOf(request.headers['x-forwarded-host'] || request.headers.host) || 'localhost';
-  // Same origin while the app relays the socket: that name is served by the
-  // certificate the browser is already on. The switch's own port presents the
-  // certificate Asterisk was given, which is self-signed on a fresh install and
-  // which a browser refuses for a WebSocket without offering a way past it.
-  if (config.softphone.relay) return relayUrlFor(host);
-  return `wss://${host}:${config.softphone.wssPort}/ws`;
-}
+const publicSocketUrl = () => {
+  const url = socketUrlFor();
+  if (!url || url.startsWith('ws') || url.startsWith('/api/')) return url;
+  return `/api${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 /* -------------------------------------------------------------- policy -- */
 
@@ -132,9 +102,8 @@ function extensionFor(value, account) {
   const row = db_.get('SELECT * FROM extensions WHERE extension = ?', [text]);
   if (!row) throw notFound(`Extension ${text} does not exist`);
   if (!row.enabled) throw badRequest(`Extension ${text} is disabled`);
-  // A session hands over the endpoint's own SIP secret, so a customer may only
-  // mint one for a line that belongs to them. Staff hold the whole switch and
-  // are not narrowed here.
+  // A session binds a browser to a line, so a customer may only mint one for a
+  // line that belongs to them. Staff hold the whole switch and are not narrowed.
   if ((account?.account_kind || 'staff') === 'customer' && row.account_id !== account.id) {
     throw forbidden(`Extension ${text} is not on your account`);
   }
@@ -176,62 +145,46 @@ const presence = () => ({ type: 'presence', operators: [...operators.values()].m
 /* ------------------------------------------------------- line signaling -- */
 
 /**
- * Asterisk's Dial and parking events tell every operator which extension is
- * ringing now, and which calls are waiting in a space.
+ * The switch's line events tell every operator which extension is ringing now.
+ *
+ * The switch reports them; this file only decides who to tell and when a push
+ * is warranted. There is no second protocol in between any more, so a line that
+ * rings on the switch rings in the console in the same event.
  */
 let dialWired = false;
+
+const extensionOfAddress = (address) => {
+  const [user] = String(address || '').split('@');
+  return /^\d{1,6}$/.test(user) ? user : '';
+};
 
 function wireDialEvents() {
   if (dialWired) return;
   dialWired = true;
-  ami().on('event', (msg) => {
-    // A call arriving on a push-enabled line is parked once the desk phone and
-    // any open browser have had their turn; the park is what the phone answers.
-    if (msg.Event === 'ParkedCall' || msg.Event === 'ParkedCallTimeOut' || msg.Event === 'ParkedCallGiveUp' || msg.Event === 'UnParkedCall') {
-      const extension = String(msg.ParkeeExten || '').trim();
-      const space = String(msg.ParkingSpace || '').trim();
-      if (!extension || !space) return;
-      // Only a call parked out of `internal` is a call for a line; parking from
-      // anywhere else has its own meaning and no phone to ring.
-      if (msg.ParkeeContext && msg.ParkeeContext !== 'internal') return;
-      const caller = msg.ParkeeCallerIDNum || msg.ParkeeCallerID || '';
-      const phase =
-        msg.Event === 'ParkedCall'
-          ? 'parked'
-          : msg.Event === 'UnParkedCall'
-            ? 'answered'
-            : 'ended';
-      broadcast({
-        type: 'line',
-        extension,
-        phase,
-        space,
-        caller,
-        at: new Date().toISOString(),
-      });
-      if (phase === 'parked') {
-        const live = new Set([...operators.values()].map((op) => op.extension));
-        maybeRingForParkedCall({
-          extension,
-          space,
-          // Asterisk spells this `Parkinglot`, one word; accepting both keeps a
-          // future rename from silently dropping the lot name.
-          lot: msg.Parkinglot || msg.ParkingLot || '',
-          caller,
-          liveExtensions: live,
-        }).catch((err) => {
-          console.error(`[push] ringing ${extension} for space ${space} failed: ${err.message}`);
-        });
-      }
-      return;
-    }
+  const client = cantus({
+    baseUrl: config.telephony.url,
+    token: config.telephony.token,
+    domain: config.telephony.domain,
+  });
 
-    if (msg.Event !== 'Dial' || !msg.Destination) return;
-    const match = EXTENSION_REF.exec(msg.Destination);
-    if (!match) return;
-    const extension = match[1];
-    const phase = msg.SubEvent === 'Begin' ? 'ringing' : msg.DialStatus === 'ANSWER' ? 'answered' : 'ended';
-    broadcast({ type: 'line', extension, phase, caller: msg.CallerIDNum || '', at: new Date().toISOString() });
+  client.on('event', (event) => {
+    if (!['call.ringing', 'call.answered', 'call.ended', 'call.incoming'].includes(event.type)) return;
+    const extension = String(event.ext || extensionOfAddress(event.to) || '').trim();
+    if (!extension) return;
+    const phase =
+      event.type === 'call.ringing' || event.type === 'call.incoming'
+        ? 'ringing'
+        : event.type === 'call.answered'
+          ? 'answered'
+          : 'ended';
+    broadcast({
+      type: 'line',
+      extension,
+      phase,
+      caller: event.from || '',
+      callId: event.callId || '',
+      at: new Date().toISOString(),
+    });
 
     // A ringing line with no live socket is a phone in somebody's pocket. A VoIP
     // push is the only thing that can make it ring through a locked screen, and
@@ -239,7 +192,7 @@ function wireDialEvents() {
     // must never slow down the switch.
     if (phase === 'ringing') {
       const live = new Set([...operators.values()].map((op) => op.extension));
-      maybeRingForDial({ extension, caller: msg.CallerIDNum || '', liveExtensions: live }).catch((err) => {
+      maybeRingForDial({ extension, caller: event.from || '', liveExtensions: live }).catch((err) => {
         console.error(`[push] ringing ${extension} failed: ${err.message}`);
       });
     }
@@ -266,21 +219,30 @@ export default async function softphoneRoutes(app) {
 
   /** Everything the console needs to show whether the softphone can work here. */
   app.get('/softphone/status', async (request) => {
-    const tls = tlsPaths();
     return {
       enabled: config.softphone.enabled,
-      wssUrl: publicWssUrl(request),
       // How the browser is being told to reach the switch, so the screen can be
       // accurate about what to fix when nothing answers.
-      relay: config.softphone.relay,
-      wssPort: config.softphone.wssPort,
+      socketUrl: publicSocketUrl(),
+      relay: !!config.softphone.proxy,
+      domain: config.telephony.domain,
       video: config.softphone.video,
-      tls: { ready: tls.ready, fingerprint: tlsFingerprint() },
-      ice: {
-        stun: config.softphone.stunUrls,
-        turn: config.softphone.turnUrls.length > 0,
-        relay: config.softphone.turnUrls.length > 0 && !!config.softphone.turnSecret,
-      },
+      codec: config.softphone.codec,
+      // The switch's own view: connected or not, how many calls are live and
+      // which path each call committed. This is the answer to "is telephony up"
+      // that used to be a separate AMI probe.
+      switch: await (async () => {
+        try {
+          const status = await cantus({
+            baseUrl: config.telephony.url,
+            token: config.telephony.token,
+            domain: config.telephony.domain,
+          }).status();
+          return { connected: status.connected, mode: status.version, calls: status.activeChannels.length, node: status.node };
+        } catch (err) {
+          return { connected: false, problem: err.message };
+        }
+      })(),
       recordingDir: config.softphone.recordingDir,
       ticketTtlSec: config.softphone.ticketTtlSec,
       // Voice on the line: recognition is the client's (free, on-device) and the
@@ -330,15 +292,14 @@ export default async function softphoneRoutes(app) {
     }
 
     const ticket = issueTicket(account, extension);
-    const tls = tlsPaths();
     const policy = recordingPolicy(extension);
-    const wssUrl = publicWssUrl(request);
+    const socketUrl = publicSocketUrl();
 
     logEvent({
       actor: account.email,
       action: 'softphone.session',
       subject: extension.extension,
-      detail: `${wssUrl} tls=${tls.ready ? 'ready' : 'missing'}`,
+      detail: `${socketUrl} switch=${config.telephony.url}`,
       ip: request.ip,
     });
 
@@ -346,7 +307,7 @@ export default async function softphoneRoutes(app) {
     return {
       ticket: ticket.value,
       expiresIn: ticket.expiresIn,
-      wssUrl,
+      socketUrl,
       extension: {
         extension: extension.extension,
         displayName: extension.display_name,
@@ -355,27 +316,24 @@ export default async function softphoneRoutes(app) {
           : '',
         voicemail: !!extension.voicemail,
       },
-      // Digest authentication is the only WebRTC registration path chan_pjsip
-      // offers, so the endpoint's own secret is handed to the operator for
-      // their own extension only, over an authenticated session.
-      sip: {
-        // The browser is its own endpoint (`webrtc-<ext>`) next to the desk
-        // phone's `<ext>`. chan_pjsip resolves a registration by the user part
-        // of the request, so the URI and the auth user must both be the WebRTC
-        // endpoint name; sending the bare extension matches the desk endpoint
-        // and the call loses DTLS-SRTP.
-        uri: `sip:${webrtcUser(extension.extension)}@${wsHostOf(wssUrl)}`,
-        authUser: webrtcUser(extension.extension),
-        extensionUser: extension.extension,
-        password: extension.secret || `change-me-${extension.extension}`,
+      // What a Cantus line is identified by: the address the switch routes to.
+      // No password is handed out because there is nothing to authenticate with
+      // — the socket is authorised by the ticket above, once, and the switch
+      // never sees a long-lived credential for this line.
+      line: {
+        address: `${extension.extension}@${config.telephony.domain}`,
+        ext: String(extension.extension),
+        domain: config.telephony.domain,
       },
-      iceServers: iceServers(`${account.id}:${extension.extension}`),
       media: {
         audio: true,
         video: config.softphone.video,
-        // Mandatory: the generated endpoint only allows DTLS-SRTP, so a
-        // plaintext attempt cannot complete the handshake at all.
-        encryption: 'dtls-srtp',
+        codec: config.softphone.codec,
+        sampleRate: 8000,
+        frameMs: config.softphone.frameMs,
+        // One socket, one mapping: there is no SDP to negotiate and no ICE to
+        // fail, so "encrypted media" is the transport's business, not a knob.
+        transport: 'cantus/1',
       },
       recording: policy,
       // What the browser needs to behave like a secure phone: withhold or
@@ -513,6 +471,47 @@ export default async function softphoneRoutes(app) {
       return { ...result, hint: 'Install the SCIF app on a phone and sign in on this line first' };
     }
     return result;
+  });
+
+  /**
+   * The media and signalling socket for a softphone: one WebSocket, 20 ms PCM
+   * frames and JSON control, piped to the Cantus switch.
+   *
+   * The ticket is consumed here, exactly once. A captured URL is useless after
+   * the first connect, and the switch is never reachable from the browser — so
+   * the switch does not need a public listener, a certificate or a firewall rule.
+   */
+  app.get(config.softphone.socketUrl, { websocket: true }, (socket, request) => {
+    const origin = request.headers.origin;
+    if (origin) {
+      let originHost = '';
+      try {
+        originHost = new URL(origin).hostname;
+      } catch {
+        originHost = '';
+      }
+      const allowed = [hostOf(request.headers['x-forwarded-host'] || request.headers.host), hostOf(config.publicUrl.replace(/^https?:\/\//, ''))].filter(Boolean);
+      if (!allowed.some((host) => originHost === host || originHost.endsWith(`.${host}`))) {
+        socket.close(4403, 'origin not allowed');
+        return;
+      }
+    }
+    if (!config.softphone.enabled) {
+      socket.close(4404, 'softphone disabled');
+      return;
+    }
+    const ticket = takeTicket(request.query?.ticket);
+    if (!ticket) {
+      socket.close(4401, 'invalid or expired ticket');
+      return;
+    }
+    const extension = db_.get('SELECT * FROM extensions WHERE extension = ?', [ticket.extension]);
+    if (!extension || !extension.enabled) {
+      socket.close(4401, 'line is not available');
+      return;
+    }
+    logEvent({ actor: ticket.accountEmail, action: 'softphone.line', subject: ticket.extension });
+    proxyToSwitch(socket, { ext: ticket.extension, ticket: request.query?.ticket });
   });
 
   /**

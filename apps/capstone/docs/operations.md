@@ -329,22 +329,17 @@ pretending to have applied it. Switching to add-on stops the bundled FreePBX on 
 Asterisks must not both be serving this host's calls. Switching back keeps the stopped
 container, so the switch can start it again without compose.
 
-### FreePBX web-UI healthcheck + auto-recovery
+### FreePBX web-UI healthcheck + auto-recovery — removed
 
-The freepbx container's own Docker healthcheck probes **Asterisk**, not the web UI — so a
-stale `/var/run/apache2/apache2.pid` kept across a container restart (Docker preserves
-`/var/run`) makes `apache2ctl` refuse to start with `httpd (pid N) already running`, the GUI
-stays down, and the container still reports healthy. `scripts/freepbx-web-recover.sh` closes
-that gap and runs every 2 minutes via the `capstone-freepbx-web.timer` systemd timer:
+The FreePBX container, its Apache pidfile failure mode, its recovery script and
+its systemd timer went with the switch. Cantus serves the control API, ARI and
+the browser softphone from one process with one healthcheck
+(`GET /healthz`), so there is no second web server to keep alive. If an old
+host still has `capstone-freepbx-web.timer` enabled, disable it:
 
 ```bash
-./scripts/freepbx-web-recover.sh check     # probe web UI only (exit 1 if down)
-./scripts/freepbx-web-recover.sh recover   # probe; clear stale pid + restart Apache if needed
+systemctl disable --now capstone-freepbx-web.timer 2>/dev/null || true
 ```
-
-It probes `:80` inside the container, and when the UI is down it clears any stale pidfile
-and restarts Apache (as `asterisk`, preserving the Apply Config fix). Idempotent — a healthy
-UI is a no-op that exits 0.
 
 ### dograh Stasis app healthcheck + auto-recovery
 

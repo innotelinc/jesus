@@ -774,6 +774,10 @@ An endpoint's behaviour on an arriving call is a document, not a script.
 
 Rules:
 
+- Address predicates (`to`, `from`) are patterns, not literals: `*` matches any
+  run of characters including none, `?` matches exactly one, and everything
+  else is compared literally and case-insensitively. An eleven-digit national
+  number is therefore `1??????????@*`, and the 1xx block is `1??@*`.
 - Routes are evaluated **top to bottom, first match wins**. No implicit ordering,
   no priorities to reconcile.
 - Predicates are ANDed inside one `when`. Supported: `to`, `from`, `weekday`,
@@ -781,10 +785,18 @@ Rules:
   (concurrent calls matched by this route), `event` (INFO subtype), `verified`
   (identity status).
 - Actions, each an object with one key: `answer`, `reject`, `forward`, `bridge`,
-  `play` (file), `record` (file, `max_ms`), `pause`, `noop`.
-- `then` runs in order; an action that ends the call (`reject`, `forward`) stops
-  evaluation. `bridge` connects to a declared resource; `play`/`record` are
-  local.
+  `play` (file), `record` (file, `max_ms`), `pause`, `noop`, `ari` (application
+  name).
+- `ari` hands the channel to an external application that speaks ARI
+  (Section 16) — the normative equivalent of `Stasis()`. It is **terminal**:
+  the application owns answer, playback, recording and bridging from that
+  point, and remaining actions MUST NOT run. A route that names an application
+  no ARI client has registered is a document error at load time where the
+  switch knows its subscribers, and otherwise a call error — never a silent
+  hangup.
+- `then` runs in order; an action that ends the call (`reject`, `forward`) or
+  hands it away (`ari`) stops evaluation. `bridge` connects to a declared
+  resource; `play`/`record` are local.
 - Evaluation MUST be side-effect free until the first action executes. This is
   what makes `cantus route-test` able to prove behaviour offline, which the
   dialplan cannot.

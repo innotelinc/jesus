@@ -1,9 +1,9 @@
 ---
 # ═══════════════════════════════════════════════════════════════════════════
-# dograh-ari — wire dograh's Asterisk ARI telephony configuration (Ansible)
+# dograh-ari — wire dograh's ARI telephony configuration (Ansible)
 #
 # Idempotently configures dograh (self-hosted, running on this box) so it
-# connects to the FreePBX/Asterisk ARI endpoint as a Stasis application:
+# connects to the switch (cantus-switch) as an ARI application:
 #
 #   1. auth      — login to the dograh API (signup on first run, idempotent;
 #                   skipped when DOGRAH_API_TOKEN is already in .env)
@@ -16,8 +16,8 @@
 #   DOGRAH_API_ENDPOINT   e.g. http://127.0.0.1:8000   (host-mode dograh-api)
 #   DOGRAH_ADMIN_EMAIL    dograh UI login email (created on first run)
 #   DOGRAH_ADMIN_PASSWORD password for that login
-#   DOGRAH_ARI_PASSWORD   the ARI user password (matches pbx/asterisk/ari.conf)
-#   DOGRAH_INBOUND_EXT    8000 (the FreePBX inbound DID this PBX routes in)
+#   DOGRAH_ARI_PASSWORD   the ARI user password (CANTUS_ARI_PASSWORD on the switch)
+#   DOGRAH_INBOUND_EXT    8000 (the DID the routing document hands to this app)
 #   DOGRAH_INTERVIEW_WORKFLOW_NAME  name of the interview workflow to route to
 #
 # Run (from the repo root, after `source .env` or with the vars passed):
@@ -29,7 +29,7 @@
 #
 # Safe to re-run: every step GETs first and only writes when state differs.
 # ═══════════════════════════════════════════════════════════════════════════
-- name: Wire dograh Asterisk ARI telephony configuration
+- name: Wire dograh's ARI telephony configuration
   hosts: localhost
   gather_facts: false
   vars_files:
@@ -299,4 +299,5 @@
           ws_client='{{ dograh_ws_client_name }}'
           inbound routes:{% for r in dograh_inbound_routes %}{% if dograh_workflow_by_name[r.workflow_name] is not none %}
           {{ r.address }} → workflow #{{ dograh_workflow_by_name[r.workflow_name] }} ({{ r.workflow_name }}){% endif %}{% endfor %}
-          dograh-api will now connect to Asterisk ARI (check `ari show apps`).
+          dograh-api will now connect to the Cantus ARI surface
+          (GET {{ dograh_ari_endpoint }}/ari/applications, user dograh).

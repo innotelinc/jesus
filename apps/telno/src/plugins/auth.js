@@ -7,10 +7,30 @@ import { isAllowedWhileOnboarding, needsOnboarding, onboardingState } from '../l
 
 export const SESSION_COOKIE = 'telno_session';
 
+/**
+ * Whether the session cookie may carry `Secure`.
+ *
+ * In production it must, with one exception: a deployment that deliberately
+ * runs on plain HTTP. `ALLOW_INSECURE_PUBLIC_URL` is what lets such a boot past
+ * the checks in `productionProblems()`, so it has to reach the cookie too —
+ * a browser silently discards a `Secure` cookie that arrives over http, and
+ * the symptom is `POST /auth/login` answering 200 followed by every request
+ * being anonymous, which reads as a broken sign-in rather than a broken flag.
+ */
+function secureCookie() {
+  if (!config.isProd) return false;
+  if (!config.allowInsecurePublicUrl) return true;
+  try {
+    return new URL(config.publicUrl).protocol !== 'http:';
+  } catch {
+    return true;
+  }
+}
+
 export const cookieOptions = {
   httpOnly: true,
   sameSite: 'lax',
-  secure: config.isProd,
+  secure: secureCookie(),
   path: '/',
   maxAge: config.sessionDays * 86400,
 };

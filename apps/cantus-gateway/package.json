@@ -1,0 +1,17 @@
+{
+  "name": "cantus-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cantus 1.0 to SIP/RTP trunk gateway: one Cantus endpoint, one carrier registration, PCM16 to PCMU",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "cantus-gateway": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  }
+}

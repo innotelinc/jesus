@@ -22,21 +22,23 @@
 #     • observability: Prometheus scrape health, the span→metric series the
 #       pipeline dashboard reads, and what the collector refused
 #     • dograh telephony wiring (when DOGRAH_API_TOKEN is in .env): the three
-#       interview agent workflows imported, the Asterisk ARI telephony
+#       interview agent workflows imported, the Cantus ARI telephony
 #       config present, and extensions 8000/8001/8002 bound to their agents
 #       (delegates to scripts/dograh_wire.py --check)
 #
-#   PBX stack   (freepbx service in docker-compose.yml)
-#     • freepbx container healthy; n8n-import completed (workflow activated)
-#     • Asterisk: ARI user [dograh], HTTP server on 8088,
-#       res_websocket_client module, [dograh-inbound] dialplan → Stasis(dograh)
-#     • host-side ARI REST: GET /ari/asterisk/info with the dograh user at the
-#       host LAN IP (8088 is LAN-only — never loopback)
+#   Voice plane   (cantus-switch service in docker-compose.yml)
+#     • switch container healthy; publishes 8088/tcp, 7443/udp, 7444/udp and
+#       nothing that belongs to a SIP stack (5060, 5061, 8089, 5038, RTP)
+#     • control API: /healthz, /v1/status (transport CANTUS), the routing
+#       document and the line inventory
+#     • ARI surface: refuses anonymous GET /ari/asterisk/info, answers the
+#       dograh user, and reports which ARI apps are connected
+#     • browser softphone socket /ws/line upgrades
 #
 # Usage (run from the repo root):
 #   ./scripts/smoke-test.sh            # everything
-#   ./scripts/smoke-test.sh main       # non-PBX services only
-#   ./scripts/smoke-test.sh pbx        # freepbx service only
+#   ./scripts/smoke-test.sh main       # non-telephony services only
+#   ./scripts/smoke-test.sh pbx        # voice plane only (alias: cantus)
 #
 # Exit code: 0 = all checks passed, 1 = one or more failures.
 # Reads DOGRAH_ARI_PASSWORD / DOGRAH_WS_URI from .env for the ARI checks.
@@ -240,23 +242,6 @@ check_exit_code() { # compose_file one-shot_service
   code=$(docker inspect -f '{{.State.ExitCode}}' "$id" 2>/dev/null)
   if [[ "$code" == "0" ]]; then pass "one-shot $2 completed (exit 0)"
   else fail "one-shot $2 exited $code — check its logs"; fi
-}
-
-# Retry an `asterisk -rx` command until its output matches a regex or the
-# deadline hits. The PBX entrypoint does a final `core restart now` AFTER the
-# container healthcheck first passes, so http/dialplan state can be briefly
-# unavailable right after "healthy" — retrying absorbs that startup race.
-wait_asterisk_cmd() { # label regex command... → 0 on match, 1 on timeout
-  local regex="$2"
-  shift 2
-  local deadline=$((SECONDS + 90))
-  while (( SECONDS < deadline )); do
-    if "$@" 2>/dev/null | grep -q "$regex"; then
-      return 0
-    fi
-    sleep 3
-  done
-  return 1
 }
 
 # ── preflight ──────────────────────────────────────────────────────────────
@@ -532,174 +517,163 @@ PYEOF
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PBX STACK
+# VOICE PLANE — Cantus
 # ═══════════════════════════════════════════════════════════════════════════
-if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" ]]; then
-  section "PBX stack — container"
-  check_container "$COMPOSE_PBX" freepbx
-
-  # Resolve the running freepbx container before port and Asterisk checks.
-  FBX=$(docker ps -aq --filter "label=com.docker.compose.service=freepbx" 2>/dev/null | while read -r c; do
-    [[ "$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null)" == "running" ]] && { echo "$c"; break; }
-  done)
-  FBX="${FBX:-pbx-freepbx}"
-  ASTERISK="docker exec ${FBX} asterisk -rx"
-
-  section "PBX stack — Webmin / RTP port wiring"
-  # Webmin is intentionally on host TCP 10000; Asterisk RTP must use only
-  # UDP 10101-10120. These checks catch stale image/volume mappings such as
-  # 10000-10100 and 10121-20000, which can conflict with Webmin or expose
-  # media ports that Asterisk should not use.
-  webmin_code=$(http_code https://127.0.0.1:10000 -k -L)
-  if [[ "$webmin_code" =~ ^[23][0-9][0-9]$ ]]; then
-    pass "Webmin TCP :10000 reachable (HTTP $webmin_code)"
-  else
-    fail "Webmin TCP :10000 unreachable (HTTP '${webmin_code:-no response}')"
-  fi
-
-  # Docker 29 exposes EXPOSEd-but-unpublished ports in NetworkSettings.Ports
-  # (the fullstack image EXPOSEs 10000-20000/udp), so inspect the actual host
-  # bindings via `docker port` instead — that only lists really-published
-  # ports and always reports them expanded to individual entries.
-  pbx_ports=$(docker port "$FBX" 2>/dev/null | awk '{print $1}' | sort -u)
-  if grep -qx '10000/tcp' <<<"$pbx_ports"; then
-    pass "PBX publishes Webmin on TCP 10000"
-  else
-    fail "PBX does not publish Webmin on TCP 10000"
-  fi
-  # Expected published set: 80, 5060, 5061, 8088, 8089, 10000/tcp, 5060/udp,
-  # the exact RTP block 10101-10120/udp, and the dedicated VoIP.ms outbound
-  # register port (VOIPMS_REGISTER_PORT, default 5065) — nothing else on UDP.
-  # AMI (5038) is not part of the off-box set: the compose binds it to the host
-  # LAN IP only, and the portal dials that same address (ASTERISK_AMI_HOST).
-  expected_rtp=$(seq 10101 10120 | sed 's/$/\/udp/')
-  voipms_port="${VOIPMS_REGISTER_PORT:-5065}/udp"
-  actual_rtp=$(grep '/udp$' <<<"$pbx_ports" | grep -v '^5060/udp$' | grep -v "^${voipms_port}$" || true)
-  if [[ -n "$actual_rtp" ]] && [[ "$(printf '%s\n' "$actual_rtp")" == "$(printf '%s\n' "$expected_rtp")" ]]; then
-    pass "PBX publishes exact RTP range UDP 10101-10120 (+ VoIP.ms ${voipms_port})"
-  else
-    fail "PBX RTP mapping is not exactly UDP 10101-10120 (got: $(tr '\n' ' ' <<<"$actual_rtp"))"
-  fi
-  stale=$(grep '/udp$' <<<"$pbx_ports" | awk -F/ '$1+0 >= 10000 && $1+0 <= 10100 || $1+0 >= 10121 && $1+0 <= 20000' || true)
-  if [[ -n "$stale" ]]; then
-    fail "PBX publishes stale RTP range: $(tr '\n' ' ' <<<"$stale")"
-  else
-    pass "PBX does not publish stale RTP ranges"
-  fi
-
-  rtp_settings=$($ASTERISK "rtp show settings" 2>/dev/null)
-  rtp_start=$(awk '/Port start:/ {print $3; exit}' <<<"$rtp_settings")
-  rtp_end=$(awk '/Port end:/ {print $3; exit}' <<<"$rtp_settings")
-  # Asterisk only binds even RTP ports: an odd rtpstart (10101) is rounded up
-  # to the next even port (10102). So assert the effective range is fully
-  # inside the published 10101-10120 window, not byte-equal to it.
-  if [[ -n "$rtp_start" && -n "$rtp_end" ]] &&
-     (( 10#$rtp_start >= 10101 && 10#$rtp_end <= 10120 )) &&
-     (( 10#$rtp_start <= 10#$rtp_end )); then
-    pass "Asterisk effective RTP range ${rtp_start}-${rtp_end} within published 10101-10120"
-  else
-    fail "Asterisk effective RTP range is ${rtp_start:-unknown}-${rtp_end:-unknown}; expected within 10101-10120"
-  fi
-
-  section "PBX stack — Asterisk / ARI wiring"
-
-  if ver=$($ASTERISK "core show version" 2>/dev/null | head -1); then
-    pass "Asterisk up: $ver"
-  else
-    fail "asterisk -rx 'core show version' failed — is the container up?"
-  fi
-
-  if $ASTERISK "ari show users" 2>/dev/null | grep -q "dograh"; then
-    pass "ARI user [dograh] present (ari show users)"
-  else
-    fail "ARI user [dograh] missing — check pbx/asterisk/ari.conf + entrypoint"
-  fi
-
-  # Actual output: "Server Enabled and Bound to 0.0.0.0:8088". Retries for up
-  # to 90s because the entrypoint's final `core restart now` can leave the
-  # HTTP server briefly unavailable after the container healthcheck passes.
-  # shellcheck disable=SC2086  # $ASTERISK expands to "docker exec <c> asterisk -rx"
-  if wait_asterisk_cmd "Asterisk HTTP server" "Server Enabled" $ASTERISK "http show status"; then
-    pass "Asterisk HTTP server enabled (http show status)"
-  else
-    fail "Asterisk HTTP server not enabled on 8088 (after 90s)"
-  fi
-
-  if $ASTERISK "module show like res_websocket_client" 2>/dev/null | grep -q "res_websocket_client"; then
-    pass "res_websocket_client module loaded"
-  else
-    fail "res_websocket_client not loaded — external media WS unavailable"
-  fi
-
-  # Same startup-race handling as the HTTP check: the dialplan may not be
-  # compiled yet until the entrypoint's final restart finishes.
-  # The Stasis app name is dograh_<hex> (generated by dograh per config) or
-  # the legacy "dograh" — match the shared prefix.
-  # shellcheck disable=SC2086  # $ASTERISK expands to "docker exec <c> asterisk -rx"
-  if wait_asterisk_cmd "dialplan [dograh-inbound]" "Stasis(dograh" $ASTERISK "dialplan show dograh-inbound"; then
-    pass "dialplan [dograh-inbound] → Stasis app"
-  else
-    fail "dialplan [dograh-inbound] missing — check pbx/asterisk/extensions_custom.conf"
-  fi
-
-  # Outbound media WebSocket clients live under `ari show outbound-websockets`
-  # (there is no `websocket show clients` command in this Asterisk build).
-  ws_clients=$($ASTERISK "ari show outbound-websockets" 2>/dev/null)
-  if [[ -n "$ws_clients" && $(echo "$ws_clients" | wc -l) -gt 2 ]]; then
-    pass "media WebSocket client connected (ari show outbound-websockets)"
-  elif $ASTERISK "core show version" >/dev/null 2>&1; then
-    warn "media WebSocket: no outbound clients (connects per call when dograh creates externalMedia)"
-  else
-    skip "media WebSocket check — freepbx container not responding"
-  fi
-
-  section "PBX stack — host-side ARI REST"
-  if [[ -z "${DOGRAH_ARI_PASSWORD:-}" || "$DOGRAH_ARI_PASSWORD" == "CHANGE_ME_ARI_PASSWORD" ]]; then
-    skip "ARI REST check — set DOGRAH_ARI_PASSWORD in .env"
-  elif [[ -z "$(ari_base)" ]]; then
-    fail "ARI REST check — cannot resolve the host LAN IP (set PJSIP_MEDIA_ADDRESS in .env)"
-  else
-    ari_url="$(ari_base)/ari/asterisk/info"
-    ari_body=$(mktemp)
-    ari_code=$(curl -sS -o "$ari_body" -w '%{http_code}' --max-time 10 \
-      -u "dograh:${DOGRAH_ARI_PASSWORD}" \
-      "$ari_url" 2>/dev/null)
-    if [[ "$ari_code" == "200" ]] && grep -q '"version"' "$ari_body"; then
-      pass "ARI REST $ari_url → HTTP 200 (Asterisk $(grep -o '"version":"[^"]*"' "$ari_body" | head -1 | cut -d'"' -f4))"
+if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" || "$SCOPE" == "cantus" ]]; then
+  section "Voice plane — container"
+  CTR=$(docker ps -aq --filter "label=com.docker.compose.service=cantus-switch" 2>/dev/null | head -1)
+  if [[ -z "$CTR" ]]; then
+    if [[ "${CAPSTONE_PBX:-standalone}" == "standalone" ]]; then
+      fail "cantus-switch container is not running (compose profile 'standalone')"
     else
-      fail "ARI REST $ari_url → HTTP '$ari_code' (check DOGRAH_ARI_PASSWORD + the 8088 publish on the LAN IP)"
-    fi
-    rm -f "$ari_body"
-  fi
-
-  section "PBX stack — WebRTC (WSS transport + registration)"
-  # The pjsip WSS transport rides the Asterisk HTTP-TLS listener on 8089.
-  # Verify the transport object AND the TLS listener actually exist (both
-  # are required for browser SIP clients to connect).
-  if $ASTERISK "pjsip show transports" 2>/dev/null | grep -q "0.0.0.0-wss"; then
-    pass "WSS transport 0.0.0.0-wss present (pjsip show transports)"
-  else
-    fail "WSS transport 0.0.0.0-wss missing — check kvstore binds + entrypoint"
-  fi
-  if $ASTERISK "http show status" 2>/dev/null | grep -q "HTTPS Server Enabled and Bound to 0.0.0.0:8089"; then
-    pass "Asterisk HTTPS (WSS) listener bound on 0.0.0.0:8089"
-  else
-    fail "HTTPS listener not on 0.0.0.0:8089 — HTTPTLSENABLE must be 1 (entrypoint)"
-  fi
-
-  # The durable WebRTC test extension (endpoint 102 + auth + aor) proves the
-  # whole path with a real WSS REGISTER — same signaling a browser uses.
-  if [[ -f "$ROOT/scripts/webrtc-register-test.py" ]]; then
-    if python3 "$ROOT/scripts/webrtc-register-test.py" --insecure >/tmp/webrtc-register.log 2>&1; then
-      pass "WebRTC WSS registration — extension 102 registered over wss://:8089 (200 OK)"
-    else
-      fail "WebRTC WSS registration failed — see /tmp/webrtc-register.log ($(tail -1 /tmp/webrtc-register.log 2>/dev/null))"
+      skip "cantus-switch is not this host's (CAPSTONE_PBX=${CAPSTONE_PBX}) — the ARI checks below target DOGRAH_ARI_ENDPOINT"
     fi
   else
-    warn "scripts/webrtc-register-test.py missing — WebRTC registration check skipped"
+    status=$(docker inspect -f '{{.State.Status}}' "$CTR" 2>/dev/null)
+    health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$CTR" 2>/dev/null)
+    if [[ "$status" == "running" && ( "$health" == "healthy" || "$health" == "none" ) ]]; then
+      pass "cantus-switch running ($health)"
+    else
+      fail "cantus-switch is $status/$health"
+    fi
+  fi
+
+  SWITCH_URL="http://127.0.0.1:${CANTUS_HTTP_PORT:-8088}"
+  AUTH=()
+  [[ -n "${CANTUS_CONTROL_TOKEN:-}" ]] && AUTH=(-H "authorization: Bearer ${CANTUS_CONTROL_TOKEN}")
+
+  section "Voice plane — published ports"
+  # Cantus needs exactly three host ports: control/ARI/softphone on 8088, then
+  # signalling+media and the relay on UDP. Nothing else — and in particular no
+  # SIP, no WSS listener, no AMI and no RTP block, all of which belonged to
+  # Asterisk and would mean a stale service is still running.
+  if [[ -n "$CTR" ]]; then
+    ports=$(docker port "$CTR" 2>/dev/null | awk '{print $1}' | sort -u)
+    for want in '8088/tcp' '7443/udp' '7444/udp'; do
+      if grep -qx "$want" <<<"$ports"; then
+        pass "switch publishes $want"
+      else
+        fail "switch does not publish $want"
+      fi
+    done
+    stale=$(grep -E '^(5060|5061|8089|5038)/' <<<"$ports" || true)
+    if [[ -n "$stale" ]]; then
+      fail "SIP/WSS/AMI port still published: $(tr '\n' ' ' <<<"$stale")"
+    else
+      pass "no SIP (5060/5061), WSS (8089) or AMI (5038) port published"
+    fi
+  fi
+
+  section "Voice plane — control API"
+  health_code=$(http_code "$SWITCH_URL/healthz")
+  if [[ "$health_code" == "200" ]]; then
+    pass "GET /healthz → 200"
+  else
+    fail "GET /healthz → '${health_code:-no response}' at $SWITCH_URL"
+  fi
+
+  status_body=$(mktemp)
+  status_code=$(curl -sS -o "$status_body" -w '%{http_code}' --max-time 10 "${AUTH[@]}" "$SWITCH_URL/v1/status" 2>/dev/null)
+  if [[ "$status_code" == "200" ]] && grep -q '"CANTUS"' "$status_body"; then
+    pass "GET /v1/status → transport CANTUS ($(grep -o '"addr":"[^"]*"' "$status_body" | head -1 | cut -d'"' -f4))"
+  elif [[ "$status_code" == "401" ]]; then
+    fail "GET /v1/status → 401 (CANTUS_CONTROL_TOKEN does not match the switch)"
+  else
+    fail "GET /v1/status → '${status_code:-no response}'"
+  fi
+  rm -f "$status_body"
+
+  routes_body=$(mktemp)
+  routes_code=$(curl -sS -o "$routes_body" -w '%{http_code}' --max-time 10 "${AUTH[@]}" "$SWITCH_URL/v1/routes" 2>/dev/null)
+  if [[ "$routes_code" == "200" ]] && grep -q '"routes"' "$routes_body"; then
+    route_count=$(grep -o '"name"' "$routes_body" | wc -l | tr -d ' ')
+    if (( route_count > 0 )); then
+      pass "routing document loaded ($route_count routes)"
+    else
+      warn "routing document is empty — no call will land"
+    fi
+    if grep -q '"ari"' "$routes_body"; then
+      pass "routing document hands at least one route to ARI"
+    else
+      warn "no route uses the ari action — dograh will never receive a call"
+    fi
+  else
+    fail "GET /v1/routes → '${routes_code:-no response}'"
+  fi
+  rm -f "$routes_body"
+
+  lines_body=$(mktemp)
+  lines_code=$(curl -sS -o "$lines_body" -w '%{http_code}' --max-time 10 "${AUTH[@]}" "$SWITCH_URL/v1/lines" 2>/dev/null)
+  if [[ "$lines_code" == "200" ]]; then
+    line_count=$(grep -o '"ext"' "$lines_body" | wc -l | tr -d ' ')
+    if (( line_count > 0 )); then
+      pass "line inventory loaded ($line_count lines)"
+    else
+      warn "no lines registered — softphone and extension calls will no-answer"
+    fi
+  else
+    fail "GET /v1/lines → '${lines_code:-no response}'"
+  fi
+  rm -f "$lines_body"
+
+  section "Voice plane — ARI surface (what dograh dials)"
+  if [[ -z "$CTR" && -n "${DOGRAH_ARI_ENDPOINT:-}" ]]; then
+    ARI_BASE="${DOGRAH_ARI_ENDPOINT%/}"
+  else
+    ARI_BASE="$(ari_base)"
+  fi
+  if [[ -z "$ARI_BASE" ]]; then
+    fail "cannot resolve the switch address — set PJSIP_MEDIA_ADDRESS or DOGRAH_ARI_ENDPOINT in .env"
+  else
+    unauth_code=$(http_code "$ARI_BASE/ari/asterisk/info")
+    if [[ "$unauth_code" == "401" ]]; then
+      pass "ARI refuses unauthenticated GET /ari/asterisk/info (401)"
+    else
+      fail "ARI answered unauthenticated with '${unauth_code:-no response}' — the surface must refuse anonymous access"
+    fi
+
+    if [[ -z "${DOGRAH_ARI_PASSWORD:-}" || "$DOGRAH_ARI_PASSWORD" == "CHANGE_ME_ARI_PASSWORD" ]]; then
+      skip "ARI REST check — set DOGRAH_ARI_PASSWORD in .env"
+    else
+      ari_body=$(mktemp)
+      ari_code=$(curl -sS -o "$ari_body" -w '%{http_code}' --max-time 10 \
+        -u "dograh:${DOGRAH_ARI_PASSWORD}" "$ARI_BASE/ari/asterisk/info" 2>/dev/null)
+      if [[ "$ari_code" == "200" ]] && grep -qi '"Cantus"' "$ari_body"; then
+        pass "ARI REST $ARI_BASE/ari/asterisk/info → 200 (engine Cantus)"
+      else
+        fail "ARI REST → '$ari_code' (check DOGRAH_ARI_PASSWORD + the 8088 publish on the LAN IP)"
+      fi
+      rm -f "$ari_body"
+
+      apps_body=$(mktemp)
+      apps_code=$(curl -sS -o "$apps_body" -w '%{http_code}' --max-time 10 \
+        -u "dograh:${DOGRAH_ARI_PASSWORD}" "$ARI_BASE/ari/applications" 2>/dev/null)
+      if [[ "$apps_code" == "200" ]]; then
+        if grep -q '"dograh"' "$apps_body"; then
+          pass "ARI app 'dograh' is connected"
+        else
+          warn "no 'dograh' ARI client connected yet — dograh-api connects when it starts"
+        fi
+      else
+        fail "GET /ari/applications → '${apps_code:-no response}'"
+      fi
+      rm -f "$apps_body"
+    fi
+
+    section "Voice plane — softphone socket"
+    ws_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 6 \
+      -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+      -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+      "$ARI_BASE/ws/line?ext=100" 2>/dev/null)
+    if [[ "$ws_code" == "101" ]]; then
+      pass "browser softphone socket upgrades (/ws/line)"
+    elif [[ -n "$ws_code" && "$ws_code" != "000" ]]; then
+      warn "softphone socket answered HTTP $ws_code (works over a WS client; curl sees the handshake only)"
+    else
+      fail "softphone socket unreachable at $ARI_BASE/ws/line"
+    fi
   fi
 fi
-
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════

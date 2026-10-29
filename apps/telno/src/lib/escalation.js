@@ -191,7 +191,7 @@ export function markFinalNotice(invoice, { at = new Date(), suspendOn = '' } = {
   return accountRow(key);
 }
 
-/** Write the generated Asterisk config and reload the switch, if there is one. */
+/** Push the new routing document to the switch, if one is connected. */
 async function applySwitch() {
   if (!config.telephony.enabled) return { applied: false, reason: 'telephony-disabled' };
   try {

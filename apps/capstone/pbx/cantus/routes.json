@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "default": { "reject": 3 },
+  "routes": [
+    {
+      "name": "agent-dids",
+      "when": { "to": "800*@*" },
+      "then": [{ "answer": {} }, { "ari": { "app": "dograh" } }]
+    },
+    {
+      "name": "voicemail-104",
+      "when": { "to": "104@*" },
+      "then": [
+        { "answer": {} },
+        { "play": { "file": "greeting.wav" } },
+        { "record": { "name": "voicemail-104", "max_ms": 120000 } },
+        { "reject": 0 }
+      ]
+    },
+    {
+      "name": "extensions",
+      "when": { "to": "1*@*" },
+      "then": [{ "answer": {} }, { "bridge": { "to": "*" } }]
+    }
+  ]
+}

@@ -94,7 +94,7 @@ NPM_SUBDOMAINS: dict[str, str] = {
     "dograh-api": "api",
     "dograh-ui": "app",
     "authentik-server": "auth",
-    "pbx-freepbx": "pbx",
+    "cantus-switch": "pbx",
     "omniroute": "omniroute",
     "n8n": "n8n",
     "grist": "grist",
@@ -181,10 +181,10 @@ SERVICE_META: dict[str, dict[str, Any]] = {
         "description": "Identity provider and SSO gateway for user management and authentication across the stack.",
         "tags": ["auth", "sso", "identity"], "deps": ["authentik-postgres", "authentik-redis"],
     },
-    "freepbx": {
-        "name": "FreePBX", "owner": "PBX Ops",
-        "description": "Asterisk/FreePBX PBX hosting SIP registrations, dialplan, and inbound route mappings for Capstone agents.",
-        "tags": ["pbx", "asterisk", "sip"], "deps": ["dograh-api"],
+    "cantus-switch": {
+        "name": "Cantus switch", "owner": "Voice Ops",
+        "description": "Cantus 1.0 voice plane: signalling, media, the control API, the ARI surface dograh dials and the browser softphone socket — one process, three ports.",
+        "tags": ["pbx", "cantus", "telephony"], "deps": ["dograh-api"],
     },
     "omniroute": {
         "name": "OmniRoute", "owner": "Platform",
@@ -320,8 +320,7 @@ LINK_PORTS: dict[str, dict[str, str]] = {
     "dograh-api": {"port": "8000", "name": "Capstone Voice API"},
     "dograh-ui": {"port": "3010", "name": "Capstone Voice App"},
     "authentik-server": {"port": "9100", "name": "Authentik"},
-    "pbx-freepbx": {"port": "80", "name": "FreePBX"},
-    "portal": {"port": "3000", "name": "PBX Portal"},
+    "cantus-switch": {"port": "8088", "name": "Cantus switch"},
     "omniroute": {"port": "20128", "name": "OmniRoute"},
     "n8n": {"port": "5678", "name": "n8n"},
     "grist": {"port": "8484", "name": "Grist"},
@@ -335,7 +334,7 @@ ONE_SHOT = {"sandbox-certs", "n8n-import", "healthprobe"}
 
 # List of compose service labels we consider "apps" (used for active-session
 # stand-in and to exclude infra-only noise from some tallies).
-APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "grafana", "speaches", "freepbx", "workflow-studio", "coturn"}
+APP_SERVICES = {"dograh-api", "dograh-ui", "n8n", "omniroute", "grist", "grafana", "speaches", "cantus-switch", "workflow-studio", "coturn"}
 
 # Static documentation / repository / support links (real URLs; unaffected by
 # Docker state).
@@ -343,8 +342,7 @@ STATIC_LINKS = [
     {"id": "doc-capstone", "name": "Capstone README", "description": "Project overview, release notes, and non-negotiables.", "url": "https://capstone.innotel.us", "category": "documentation", "status": "verified", "lastVerified": None},
     {"id": "doc-upstream", "name": "Dograh Platform", "description": "Upstream dograh voice-agent platform used by this stack.", "url": "https://github.com/dograh-hq/dograh", "category": "repositories", "status": "verified", "lastVerified": None},
     {"id": "doc-otel", "name": "OpenTelemetry Docs", "description": "OTel collector config patterns used in this stack.", "url": "https://opentelemetry.io/docs/", "category": "documentation", "status": "verified", "lastVerified": None},
-    {"id": "doc-asterisk", "name": "Asterisk Project", "description": "PBX core documentation for FreePBX and ARI.", "url": "https://www.asterisk.org/", "category": "external", "status": "verified", "lastVerified": None},
-    {"id": "doc-freepbx", "name": "FreePBX Docs", "description": "FreePBX module and dialplan documentation.", "url": "https://wiki.freepbx.org/", "category": "documentation", "status": "verified", "lastVerified": None},
+    {"id": "doc-cantus", "name": "Cantus 1.0 spec", "description": "The voice plane this stack runs: node, relay, routing document and the ARI surface.", "url": "https://github.com/innotelinc/jesus/tree/main/apps/cantus/spec", "category": "documentation", "status": "verified", "lastVerified": None},
     {"id": "doc-authentik", "name": "Authentik Docs", "description": "Self-hosted identity provider used for authentication and SSO.", "url": "https://docs.goauthentik.io/", "category": "documentation", "status": "verified", "lastVerified": None},
 ]
 
