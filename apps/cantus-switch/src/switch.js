@@ -177,7 +177,11 @@ export class Switch extends EventEmitter {
       this.endpoint.relay = this.relay.addr;
     }
     await this.endpoint.start();
-    this.mediaTimer = setInterval(() => this.webMediaTick(), TIMERS.MEDIA_TICK);
+    // Polled finer than the frame interval on purpose: the ticker decides what
+    // it owes from the clock, so a 10 ms poll lands the frame within 10 ms of
+    // its 20 ms slot instead of inheriting the timer's own jitter.
+    this.nextWebMediaAt = 0;
+    this.mediaTimer = setInterval(() => this.webMediaTick(), Math.max(5, Math.floor(TIMERS.MEDIA_TICK / 2)));
     if (this.endpoint.relay) {
       this.syncRegistrations();
       this.registrationTimer = setInterval(() => this.syncRegistrations(), 20_000);
@@ -642,9 +646,19 @@ export class Switch extends EventEmitter {
     // still answers for itself.
     for (const other of call.legs) {
       if (other === leg || other.isEnded) continue;
-      if (other.role === 'inbound' && other.endpoint && !other.endpoint.accepted) {
-        this.endpoint.accept(other.endpoint);
-      }
+      if (other.role !== 'inbound' || !other.endpoint) continue;
+      if (!other.endpoint.accepted && !this.endpoint.accept(other.endpoint)) continue;
+      if (other.state === 'answered') continue;
+      // The caller is a participant from the moment somebody picks up, and its
+      // leg has to say so. It used to keep the state it arrived with — `new` —
+      // while the session underneath was accepted, so `peerOf` (the function
+      // that decides who an answered line hears) found no answered peer for the
+      // browser leg and fed it silence at 50 frames a second. The call
+      // connected, the recording had audio, the caller heard the line, and the
+      // line heard nothing.
+      other.state = 'answered';
+      other.answeredAt = now();
+      this.emitCall(call, 'call.leg-answered', { leg: other.id, ext: other.ext });
     }
     call.state = 'answered';
     call.answeredAt = call.answeredAt || now();
@@ -765,33 +779,55 @@ export class Switch extends EventEmitter {
     leg.received += 1;
     const call = leg.call;
     if (call.recordBuffer && leg.role !== 'web') this.appendRecording(call, payload);
-    // Push straight to a browser leg: a WebSocket has no poll tick of its own
-    // worth waiting for, and 20 ms of added latency is audible on a narrowband
-    // call.
-    const peer = this.peerOf(leg);
-    if (peer?.ws) {
-      peer.ws.send(Buffer.from(payload), { binary: true });
-      // Remembered so the 20 ms ticker does not send a second frame — silence —
-      // on top of this one. A browser that is fed twice plays both, and the
-      // audio it hears is halved into noise.
-      peer.pushedAt = now();
-    }
+    // Nothing is written to a browser socket here on purpose. Media arrives
+    // when the carrier feels like it — 18 ms, 22 ms, two frames in a burst —
+    // while a browser plays on a fixed 20 ms clock. Writing from both the media
+    // path and the ticker put 55 frames a second into a socket that should get
+    // 50, so a 1 kHz tone arrived interleaved with the switch's own silence and
+    // played back as chopping. `webMediaTick` is the only writer.
   }
 
-  /** Pacing for browser legs: they send and receive at the same 20 ms cadence. */
-  webMediaTick() {
-    for (const call of this.calls.values()) {
-      if (call.state === 'ended') continue;
-      for (const leg of call.legs) {
-        if (!leg.ws || !leg.isAnswered) continue;
-        // A leg the peer has just pushed to has its frame for this tick already.
-        // The ticker is here to fill silence, not to interleave with real audio.
-        if (leg.pushedAt && now() - leg.pushedAt < TIMERS.MEDIA_TICK) continue;
-        const peer = this.peerOf(leg);
-        const payload = peer?.rx && now() - peer.rxAt < 400 ? peer.rx : FRAME;
-        leg.ws.send(Buffer.from(payload), { binary: true });
-        leg.sent += 1;
+  /**
+   * Pacing for browser legs: exactly one 20 ms frame per 20 ms of wall clock,
+   * whoever the peer is and however irregularly its frames arrive.
+   *
+   * The clock is kept here rather than inferred from when the timer happened to
+   * fire, so the cadence does not drift: a tick that fires late sends the
+   * frames it owes, and one that fires early sends none.
+   */
+  webMediaTick(at = now()) {
+    if (!this.nextWebMediaAt) this.nextWebMediaAt = at;
+    // A stalled event loop — a synchronous recording flush, a slow prompt read —
+    // must not be repaid as a burst: 200 ms of audio in one tick is a click, not
+    // a catch-up. Drop the debt before deciding what this poll owes.
+    if (this.nextWebMediaAt < at - 200) this.nextWebMediaAt = at;
+    let sent = 0;
+    while (at >= this.nextWebMediaAt && sent < 3) {
+      for (const call of this.calls.values()) {
+        if (call.state === 'ended') continue;
+        for (const leg of call.legs) {
+          if (!leg.ws || !leg.isAnswered || leg.isEnded) continue;
+          let payload;
+          if (leg.play?.length) {
+            // A queued prompt wins over the conversation: that is what playing
+            // a file into a call means.
+            payload = leg.play.subarray(leg.playAt, leg.playAt + 320);
+            leg.playAt += 320;
+            if (leg.playAt >= leg.play.length) {
+              leg.play = null;
+              leg.playAt = 0;
+            }
+            if (payload.length < 320) payload = Buffer.concat([payload, FRAME.subarray(payload.length)]);
+          } else {
+            const peer = this.peerOf(leg);
+            payload = peer?.rx && at - peer.rxAt < 400 ? peer.rx : FRAME;
+          }
+          leg.ws.send(Buffer.from(payload), { binary: true });
+          leg.sent += 1;
+        }
       }
+      this.nextWebMediaAt += TIMERS.MEDIA_TICK;
+      sent += 1;
     }
   }
 
@@ -811,6 +847,15 @@ export class Switch extends EventEmitter {
     }
     try {
       const pcm = readWavPcm(resolved);
+      // A browser leg gets the prompt as a queue the ticker drains, not as its
+      // own 20 ms interval: two clocks writing to one socket is the same defect
+      // that put 55 frames a second into a 50 frame player and turned a tone
+      // into chopping.
+      if (leg.ws) {
+        leg.play = Buffer.from(pcm);
+        leg.playAt = 0;
+        return true;
+      }
       let offset = 0;
       const timer = setInterval(() => {
         if (leg.isEnded || offset >= pcm.length) {
@@ -820,7 +865,6 @@ export class Switch extends EventEmitter {
         const chunk = pcm.subarray(offset, offset + 320);
         offset += 320;
         if (leg.endpoint) leg.rx = chunk; // a Cantus leg's media source reads rx
-        if (leg.ws) leg.ws.send(Buffer.from(chunk), { binary: true });
       }, 20);
       timer.unref?.();
       return true;
@@ -1023,9 +1067,16 @@ export class Switch extends EventEmitter {
       for (const call of this.calls.values()) {
         for (const leg of call.legs) {
           if (leg.ws !== ws || leg.isEnded) continue;
+          // A socket that goes away is a handset put down, which is a hangup:
+          // the whole call ends, the way the explicit `hangup` message does.
+          // Ending only this leg left the call `answered` with the other legs
+          // still live, so the switch kept feeding media into a call nobody was
+          // part of and the console never saw it finish.
+          const live = leg.state === 'ringing' || leg.state === 'answered';
           leg.state = 'ended';
           leg.endedAt = now();
-          if (!call.legs.some((entry) => entry !== leg && !entry.isEnded)) this.endCall(call, 'normal');
+          if (live) this.endCall(call, 'normal');
+          else if (!call.legs.some((entry) => entry !== leg && !entry.isEnded)) this.endCall(call, 'normal');
         }
       }
       this.emit('line', { kind: 'unregistered', ext: line.ext, transport: 'web' });
