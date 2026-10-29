@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# pre-commit — refuse a commit that carries a reverted monorepo patch.
+#
+# Three files under apps/ carry a hand fix the port cannot express: two
+# composite actions that must resolve their project from their own path, and
+# capstone's CI, which installs the test runner its switch tests need.
+# Re-importing a project from its standalone repository overwrites them, and
+# that revert is invisible in the generated workflows — the root copies are
+# regenerated from the reverted source and still match it, so nothing
+# downstream fails. This hook asks the generator's claim table before the
+# commit exists, so the mistake never reaches a green `--check`.
+#
+# Enable it once per clone (it is local config, so it is not carried by git):
+#
+#     git config core.hooksPath .githooks
+#
+# Commits that stage none of the patch files are not delayed: the hook exits
+# before it starts perl. It reads the working tree, which is what you are
+# about to commit in any ordinary flow; .github/workflows/workflows-drift.yml
+# checks the committed tree exactly, including partial staging.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" || exit 0
+
+# Anything that can carry one of the claims.
+staged=$(git diff --cached --name-only --diff-filter=ACMR -- \
+    'apps/*/.github/*' 'tools/port-workflows.pl' 2>/dev/null || true)
+[ -n "$staged" ] || exit 0
+
+# A generator that cannot run is not a silent skip: this repo's CI runs it, and
+# a commit that only looks clean locally is the failure mode being prevented.
+if ! command -v perl >/dev/null 2>&1; then
+    echo "pre-commit: perl is not installed, so the monorepo patches cannot be checked." \
+         "Install perl, or commit with --no-verify and let CI decide." >&2
+    exit 1
+fi
+
+if ! out=$(perl tools/port-workflows.pl --verify-patches 2>&1); then
+    printf '%s\n' "$out" >&2
+    {
+        echo
+        echo "pre-commit: blocked — a monorepo patch under apps/ is missing from"
+        echo "            the files in this commit. Restore it and commit again."
+        echo "            (git commit --no-verify skips this hook; CI does not.)"
+    } >&2
+    exit 1
+fi
+
+exit 0

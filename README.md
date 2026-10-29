@@ -171,6 +171,17 @@ Both modes exit 1 when one of the hand patches below is missing, so a re-import 
 a clean regeneration. The plain run still regenerates the root copies to keep the tree consistent,
 but it says they are not safe to commit on their own.
 
+A pre-commit hook asks the same question before the commit exists. `core.hooksPath` is local
+config, so every clone enables it once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+It exits immediately when nothing under `apps/*/.github/` or the generator is staged, so ordinary
+commits pay nothing. `git commit --no-verify` skips it for one commit; the drift job still checks
+the committed tree, including a patch reverted across a partial stage.
+
 Edit the file under `apps/` and regenerate; a hand edit to a root copy is overwritten, and each one
 says so in its first comment.
 

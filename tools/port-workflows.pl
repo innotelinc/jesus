@@ -23,14 +23,17 @@
 # They stay in apps/<app>/.github/workflows as documentation of each project's
 # release process, and the README says so.
 #
-# Usage: perl tools/port-workflows.pl [--check]
-#   --check  write nothing; exit non-zero if any root file differs from what
-#            this would write
+# Usage: perl tools/port-workflows.pl [--check | --verify-patches]
+#   --check           write nothing; exit non-zero if any root file differs from
+#                     what this would write
+#   --verify-patches  write nothing; check only the hand patches under apps/.
+#                     This is what .githooks/pre-commit runs, so a reverted
+#                     patch cannot enter a commit at all.
 #
-# Both modes exit non-zero when a hand patch under apps/ is missing, so a
+# Every mode exits non-zero when a hand patch under apps/ is missing, so a
 # re-import cannot be mistaken for a clean regeneration: the root copies are
-# still written (the tree stays consistent), but the run reports failure and
-# says the regenerated files are not safe to commit.
+# still written in the default mode (the tree stays consistent), but the run
+# reports failure and says the regenerated files are not safe to commit.
 # ═══════════════════════════════════════════════════════════════════════════
 
 use strict;
@@ -39,7 +42,8 @@ use File::Basename qw(basename dirname);
 use File::Find      ();
 use File::Path      qw(make_path);
 
-my $CHECK = grep { $_ eq '--check' } @ARGV;
+my $CHECK  = grep { $_ eq '--check' } @ARGV;
+my $VERIFY = grep { $_ eq '--verify-patches' } @ARGV;
 
 # ── The test surface of each app ────────────────────────────────────────────
 # One entry per workflow that runs tests, lints, or static analysis. Anything
@@ -392,9 +396,105 @@ sub fix_precheckout_steps {
     return join("\n", @out);
 }
 
+# ── Hand patches under apps/, and how to know they survived a re-import ────
+# Three files in apps/ carry a hand fix: two composite actions locate their
+# project from their own path, because an action's steps run at the workspace
+# root no matter what the calling workflow's working-directory says, and
+# capstone's CI installs the test runner its switch tests need.
+#
+# All three live under apps/, which is the upstream project's own tree, so a
+# re-import from the standalone repository overwrites them. That is the quiet
+# case: the revert produces no diff in the generated output at all, because the
+# root copy is faithfully regenerated from the reverted source and stays "in
+# sync" while the breakage the patch existed to fix comes back. Nothing else in
+# CI would notice, which is why the check lives here. Each entry is a claim
+# about the file that must still hold:
+#
+#   marker  the comment the patch carries, so a revert is detectable at all
+#   needs   a pattern the fix depends on (optional)
+#   bans    the pre-fix form, which must not come back (optional)
+#   breaks  what goes wrong when the claim fails, in the operator's terms
+my @PATCHED = (
+    {
+        path   => 'apps/omniroute/.github/actions/npm-ci-retry/action.yml',
+        breaks => 'every job that installs through it runs npm at the repository root',
+    },
+    {
+        path   => 'apps/rea/.github/actions/portable-build-cache/action.yml',
+        breaks => 'the cache probe and build scripts resolve against the monorepo root',
+    },
+    {
+        path   => 'apps/capstone/.github/workflows/ci.yml',
+        needs  => qr/python3 -m pytest pbx\/tests/,
+        bans   => qr/python3 -m unittest discover -s pbx\/tests/,
+        breaks => 'the switch tests collect nothing and the job passes while running none',
+    },
+);
+
+# The entries whose claims no longer hold.
+sub check_patches {
+    my @out;
+    for my $fix (@PATCHED) {
+        my $p = $fix->{path};
+        next unless -f $p;
+        open my $fh, '<', $p or next;
+        local $/;
+        my $t = <$fh>;
+        close $fh;
+
+        my @why;
+        push @why, 'the monorepo-port marker is gone' unless $t =~ /monorepo-port:/;
+        push @why, 'the patched command is gone' if $fix->{needs} && $t !~ $fix->{needs};
+        push @why, 'the pre-fix form is back'    if $fix->{bans}  && $t =~ $fix->{bans};
+        next unless @why;
+
+        push @out, { path => $p, why => [@why], breaks => $fix->{breaks} };
+    }
+    return @out;
+}
+
+# A missing patch is a failure in every mode, never a warning: nothing
+# downstream can catch it, because the regenerated copy matches the reverted
+# source exactly and a later `--check` sees a clean tree.
+sub report_missing {
+    my ($mode, @broken) = @_;
+    return unless @broken;
+
+    my $bar = '=' x 77;
+    warn "\n$bar\n";
+    warn sprintf("FAILED: %d monorepo patch%s missing under apps/\n",
+        scalar(@broken), @broken == 1 ? '' : 'es');
+    warn "\n";
+    warn "A re-import from upstream overwrites these files, and that revert leaves no\n";
+    warn "diff in the generated workflows: they are regenerated from the reverted\n";
+    warn "source and still match it. Restore the patch before committing here.\n";
+    warn "\n";
+    warn $mode eq 'check'  ? "Nothing was written (--check).\n"
+       : $mode eq 'verify' ? "Nothing was written (--verify-patches). The commit is blocked.\n"
+       : "The root copies just written were regenerated from the reverted sources and\n"
+       . "are NOT safe to commit on their own.\n";
+    warn "\n";
+    for my $b (@broken) {
+        warn "  $b->{path}\n";
+        warn "      lost:  " . join('; ', @{ $b->{why} }) . "\n";
+        warn "      costs: $b->{breaks}\n";
+        warn "      fix:   git log -p -- $b->{path}\n";
+    }
+    warn "$bar\n";
+}
+
+# Claims only: no writes, no regeneration, no staleness. This is the hook's
+# entry point, so it must stay fast and must never touch the tree.
+if ($VERIFY) {
+    my @broken = check_patches();
+    report_missing('verify', @broken);
+    exit 1 if @broken;
+    print "monorepo patches: intact\n";
+    exit 0;
+}
+
 # ── Write ──────────────────────────────────────────────────────────────────
 my $changed = 0;
-my @broken;    # monorepo patches under apps/ that a re-import reverted
 my %expected;
 for my $pair (@order) {
     my ($app, $file) = @$pair;
@@ -443,83 +543,10 @@ for my $dest (glob("$OUTDIR/*.yml")) {
     $changed = 1;
 }
 
-# Three files in apps/ carry a hand fix: two composite actions locate their
-# project from their own path, because an action's steps run at the workspace
-# root no matter what the calling workflow's working-directory says, and
-# capstone's CI installs the test runner its switch tests need.
-#
-# All three live under apps/, which is the upstream project's own tree, so a
-# re-import from the standalone repository overwrites them. That is the quiet
-# case: the revert produces no diff in the generated output at all, because the
-# root copy is faithfully regenerated from the reverted source and stays "in
-# sync" while the breakage the patch existed to fix comes back. Nothing else in
-# CI would notice, which is why the check lives here. Each entry is a claim
-# about the file that must still hold:
-#
-#   marker  the comment the patch carries, so a revert is detectable at all
-#   needs   a pattern the fix depends on (optional)
-#   bans    the pre-fix form, which must not come back (optional)
-#   breaks  what goes wrong when the claim fails, in the operator's terms
-my @PATCHED = (
-    {
-        path   => 'apps/omniroute/.github/actions/npm-ci-retry/action.yml',
-        breaks => 'every job that installs through it runs npm at the repository root',
-    },
-    {
-        path   => 'apps/rea/.github/actions/portable-build-cache/action.yml',
-        breaks => 'the cache probe and build scripts resolve against the monorepo root',
-    },
-    {
-        path   => 'apps/capstone/.github/workflows/ci.yml',
-        needs  => qr/python3 -m pytest pbx\/tests/,
-        bans   => qr/python3 -m unittest discover -s pbx\/tests/,
-        breaks => 'the switch tests collect nothing and the job passes while running none',
-    },
-);
-for my $fix (@PATCHED) {
-    my $p = $fix->{path};
-    next unless -f $p;
-    open my $fh, '<', $p or next;
-    local $/;
-    my $t = <$fh>;
-    close $fh;
-
-    my @why;
-    push @why, 'the monorepo-port marker is gone' unless $t =~ /monorepo-port:/;
-    push @why, 'the patched command is gone' if $fix->{needs} && $t !~ $fix->{needs};
-    push @why, 'the pre-fix form is back'    if $fix->{bans}  && $t =~ $fix->{bans};
-    next unless @why;
-
-    push @broken, { path => $p, why => [@why], breaks => $fix->{breaks} };
-}
+my @broken = check_patches();
 
 printf "%d workflow(s) ported\n", scalar @order;
 
-# A missing patch is a failure in both modes, not a warning. The reason is that
-# nothing downstream can catch it: the regenerated copy matches the reverted
-# source exactly, so `--check` on a later commit sees a clean tree and the
-# patch's absence reaches main as an ordinary green change.
-if (@broken) {
-    my $bar = '=' x 77;
-    warn "\n$bar\n";
-    warn sprintf("FAILED: %d monorepo patch%s missing under apps/.\n",
-        scalar(@broken), @broken == 1 ? '' : 'es');
-    warn "\n";
-    warn "A re-import from upstream overwrites these files, and that revert leaves no\n";
-    warn "diff in the generated workflows: they are regenerated from the reverted\n";
-    warn "source and still match it. Restore the patch before committing here.\n";
-    warn $CHECK
-        ? "\nNothing was written (--check).\n"
-        : "\nThe root copies just written were regenerated from the reverted sources and\n"
-        . "are NOT safe to commit on their own.\n";
-    warn "\n";
-    for my $b (@broken) {
-        warn "  $b->{path}\n";
-        warn "      lost:  " . join('; ', @{ $b->{why} }) . "\n";
-        warn "      costs: $b->{breaks}\n";
-        warn "      fix:   git log -p -- $b->{path}\n";
-    }
-    warn "$bar\n";
-}
+report_missing($CHECK ? 'check' : 'write', @broken);
 
 exit((@broken || ($CHECK && $changed)) ? 1 : 0);
