@@ -50,7 +50,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/scripts/env-lib.sh"   # env_lib_load: .env as data, never as shell code
 ENV_FILE="$ROOT/.env"
 COMPOSE_MAIN="$ROOT/docker-compose.yml"
-COMPOSE_PBX="$ROOT/docker-compose.yml"  # freepbx is a service in the main compose now
 SCOPE="${1:-all}"
 
 # ── colors (only when attached to a tty) ───────────────────────────────────

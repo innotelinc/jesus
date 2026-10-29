@@ -321,6 +321,12 @@ LINK_PORTS: dict[str, dict[str, str]] = {
     "dograh-ui": {"port": "3010", "name": "Capstone Voice App"},
     "authentik-server": {"port": "9100", "name": "Authentik"},
     "cantus-switch": {"port": "8088", "name": "Cantus switch"},
+    # Not a compose service: the portal is Zeus's app, answered under Zeus's own
+    # names, so `build_links` replaces this port with `portal_origin()`. The row
+    # still has to be in the map: it is what gives the Links page a portal entry
+    # to resolve, and dropping it (as the Asterisk removal briefly did, along
+    # with the retired FreePBX rows) removes the row entirely.
+    "portal": {"port": "3000", "name": "Zeus Portal"},
     "omniroute": {"port": "20128", "name": "OmniRoute"},
     "n8n": {"port": "5678", "name": "n8n"},
     "grist": {"port": "8484", "name": "Grist"},
