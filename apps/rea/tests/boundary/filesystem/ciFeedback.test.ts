@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -295,49 +295,70 @@ it("starts source feedback before build and requires both groups without waiving
   }
 });
 
-it("records the actual static task graph with explicit source identity and no ambient environment", async () => {
-  const directory = await createTestTempDirectory("rea-ci-context-");
-  const context = await recordStaticTaskContext({ outputDirectory: directory });
-  const head = await execute("git", ["rev-parse", "HEAD"]);
-  expect(context.sourceSha).toBe(head.stdout.trim());
-  expect(context.taskHashes.lint).toMatch(/^[a-f0-9]{16}$/u);
-  expect(context.taskHashes.typecheck).toMatch(/^[a-f0-9]{16}$/u);
-  expect(context.taskHashes["format:check"]).toMatch(/^[a-f0-9]{16}$/u);
-  expect(context.taskHashes).not.toHaveProperty("jscpd");
-  expect(context.taskHashes).not.toHaveProperty("knip");
-  const deep = await recordStaticTaskContext({
-    outputDirectory: `${directory}/deep`,
-    script: "check:ci:deep:tasks",
-  });
-  expect(deep.taskHashes.jscpd).toMatch(/^[a-f0-9]{16}$/u);
-  expect(deep.taskHashes.knip).toMatch(/^[a-f0-9]{16}$/u);
-  expect(deep.taskHashes).not.toHaveProperty("lint");
-  await expect(
-    recordStaticTaskContext({
+// Recording the graph runs the real turbo the repository pins. A bundled
+// platform binary that cannot load on this host is a missing toolchain, not a
+// regressing recorder, so the case reports itself skipped with that reason
+// instead of adding a failure nobody can act on.
+const turboRunsOnThisHost =
+  spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(new URL("../../../scripts/run-turbo.mjs", import.meta.url)),
+      "--version",
+    ],
+    { encoding: "utf8", timeout: 60_000 },
+  ).status === 0;
+
+it.skipIf(!turboRunsOnThisHost)(
+  "records the actual static task graph with explicit source identity and no ambient environment",
+  async () => {
+    const directory = await createTestTempDirectory("rea-ci-context-");
+    const context = await recordStaticTaskContext({
       outputDirectory: directory,
-      script: "check:ci",
-    }),
-  ).rejects.toThrow("Static context script is not a known check");
-  await expect(
-    recordStaticTaskContext({
-      outputDirectory: directory,
-      script: "check:ci:fast",
-    }),
-  ).rejects.toThrow("Static context script is not a known check");
-  expect(context).not.toHaveProperty("environmentVariables");
-  expect(context).not.toHaveProperty("env");
-  expect(
-    JSON.parse(await readFile(`${directory}/static-task-context.json`, "utf8")),
-  ).toEqual(context);
-  for (const invalid of [
-    undefined,
-    {},
-    { ...context, sourceSha: "bad" },
-    { ...context, prHeadSha: "bad" },
-    { ...context, taskHashes: { jscpd: "stale" } },
-  ])
-    expect(() => parseStaticTaskContext(invalid)).toThrow();
-});
+    });
+    const head = await execute("git", ["rev-parse", "HEAD"]);
+    expect(context.sourceSha).toBe(head.stdout.trim());
+    expect(context.taskHashes.lint).toMatch(/^[a-f0-9]{16}$/u);
+    expect(context.taskHashes.typecheck).toMatch(/^[a-f0-9]{16}$/u);
+    expect(context.taskHashes["format:check"]).toMatch(/^[a-f0-9]{16}$/u);
+    expect(context.taskHashes).not.toHaveProperty("jscpd");
+    expect(context.taskHashes).not.toHaveProperty("knip");
+    const deep = await recordStaticTaskContext({
+      outputDirectory: `${directory}/deep`,
+      script: "check:ci:deep:tasks",
+    });
+    expect(deep.taskHashes.jscpd).toMatch(/^[a-f0-9]{16}$/u);
+    expect(deep.taskHashes.knip).toMatch(/^[a-f0-9]{16}$/u);
+    expect(deep.taskHashes).not.toHaveProperty("lint");
+    await expect(
+      recordStaticTaskContext({
+        outputDirectory: directory,
+        script: "check:ci",
+      }),
+    ).rejects.toThrow("Static context script is not a known check");
+    await expect(
+      recordStaticTaskContext({
+        outputDirectory: directory,
+        script: "check:ci:fast",
+      }),
+    ).rejects.toThrow("Static context script is not a known check");
+    expect(context).not.toHaveProperty("environmentVariables");
+    expect(context).not.toHaveProperty("env");
+    expect(
+      JSON.parse(
+        await readFile(`${directory}/static-task-context.json`, "utf8"),
+      ),
+    ).toEqual(context);
+    for (const invalid of [
+      undefined,
+      {},
+      { ...context, sourceSha: "bad" },
+      { ...context, prHeadSha: "bad" },
+      { ...context, taskHashes: { jscpd: "stale" } },
+    ])
+      expect(() => parseStaticTaskContext(invalid)).toThrow();
+  },
+);
 
 it("rejects mutation methods at the shared GitHub transport before invoking the CLI", async () => {
   const request = createGhApiRequest({ env: { PATH: "" } });

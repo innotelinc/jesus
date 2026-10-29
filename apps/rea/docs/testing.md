@@ -41,6 +41,15 @@ semantics. Compare failures against the base revision, or run the suite on
 Linux or WSL, before attributing them to a change. See `CONTRIBUTING.md` →
 Windows source checkouts.
 
+Two fixtures state the host limitation instead of failing on it. The scheduled
+admission cases stub the GitHub CLI with a `#!/bin/sh` script on PATH, and
+Windows cannot start an extensionless script (Node also refuses a `.cmd`/`.bat`
+without a shell), so those cases skip there; their receipt cases need no CLI and
+run everywhere. The static task-graph recorder skips only when the pinned turbo
+binary itself will not run: it probes `scripts/run-turbo.mjs --version` first, so
+a host missing the toolchain's runtime reports a skip, while a broken recorder
+still fails on every platform that can run turbo. Linux CI runs both.
+
 The CI documentation lane runs both `docs:check` and `docs:build` when the
 existing change classifier selects documentation or its producing inputs.
 Generated facts and rendered page links have separate checks. VitePress does not
