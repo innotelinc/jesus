@@ -33,7 +33,9 @@ function twoLegs() {
   const frames = [];
   const browser = {
     role: 'web',
-    ws: { send: (buffer) => frames.push(buffer) },
+    // A socket stub: it carries media, and now also the control frames the
+    // switch raises at the call's own transitions.
+    ws: { send: (buffer) => frames.push(buffer), sendJson: () => {} },
     isAnswered: true,
     isEnded: false,
     received: 0,
@@ -156,7 +158,9 @@ test('the caller is marked answered when a line picks up, and the line hears it'
     id: 'leg-web',
     role: 'web',
     ext: '101',
-    ws: { send: (buffer) => frames.push(buffer) },
+    // A socket stub: it carries media, and now also the control frames the
+    // switch raises at the call's own transitions.
+    ws: { send: (buffer) => frames.push(buffer), sendJson: () => {} },
     state: 'ringing',
     isEnded: false,
     received: 0,

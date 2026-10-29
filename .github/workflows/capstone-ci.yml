@@ -319,6 +319,12 @@ jobs:
       - name: Type-check + production build (tsc && vite build)
         run: npm run build
 
+      # `test` was declared and never called by any job, so the page tests
+      # could regress without a red board — the softphone's line protocol is
+      # asserted here, not just rendered in a browser below.
+      - name: Unit tests
+        run: npm test
+
   # The unit tests mount pages against mocked modules and never run the built
   # bundle in a real browser, so a page can be green there and still fail where
   # an operator looks: a chunk that 404s, a route that no longer matches, a
@@ -327,6 +333,17 @@ jobs:
   # asserts the operator entry points actually paint — with no uncaught error
   # and no failed request behind them. It is hermetic (no estate, no backend),
   # so it always runs rather than skipping like the live jobs above.
+  #
+  # The softphone is exercised rather than merely painted: a fake switch answers
+  # its line socket, rings it, and the page is driven through both directions of
+  # a call — dial → mute → unmute → hold → resume → hangup, then an inbound ring
+  # → answer → hold → resume → hangup, then a ring that is declined — so a phone
+  # that connects to nothing, never shows an incoming call, leaves the banner up
+  # after a refusal, or has a Hold button that sends nothing fails the run
+  # instead of reaching an operator's browser. The fake switch counts the media
+  # frames it receives, so Mute is checked at the wire — the count must stop
+  # growing while muted and advance again after Unmute — rather than by reading
+  # the button's own label.
   #
   # Point it at a real deployment with CAPSTONE_BASE (and CAPSTONE_COOKIE to
   # walk it authenticated); a base this runner cannot reach is reported as a

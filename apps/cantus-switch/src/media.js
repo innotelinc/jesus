@@ -34,6 +34,45 @@ export function silence(samples = 160) {
   return Buffer.alloc(samples * 2);
 }
 
+// ------------------------------------------------------------------ hold music --
+
+/**
+ * The melody a held caller hears, 4 seconds long and synthesised here.
+ *
+ * A switch that needs a licensed music file to put somebody on hold either
+ * ships one nobody can redistribute or plays nothing at all, which is heard as
+ * a dropped call. Eight notes of a pentatonic phrase cost no bytes on disk, loop
+ * without a seam, and are quiet enough to sit under a conversation.
+ */
+export const HOLD_NOTES = [329.63, 392.0, 440.0, 523.25, 440.0, 392.0, 293.66, 329.63];
+export const HOLD_NOTE_SAMPLES = PCM_RATE / 2; // 0.5 s a note
+
+export function holdMusicFrame(sampleIndex = 0, { samples = 160, rate = PCM_RATE } = {}) {
+  const out = Buffer.alloc(samples * 2);
+  const noteSamples = Math.round((rate / PCM_RATE) * HOLD_NOTE_SAMPLES);
+  const attack = Math.round(rate * 0.015);
+  const release = Math.round(rate * 0.1);
+  for (let i = 0; i < samples; i += 1) {
+    const position = sampleIndex + i;
+    const note = HOLD_NOTES[Math.floor(position / noteSamples) % HOLD_NOTES.length];
+    const into = position % noteSamples;
+    const t = into / rate;
+    // A plucked envelope: a short attack, a gentle decay, and a cosine release
+    // over the last 100 ms so the loop has no step in it. A hard cut at the
+    // note boundary is a click once every half second, which reads as a fault.
+    const decay = Math.exp(-1.2 * t);
+    const shape =
+      Math.min(1, into / Math.max(1, attack)) *
+      (into > noteSamples - release
+        ? 0.5 * (1 + Math.cos((Math.PI * (into - (noteSamples - release))) / release))
+        : 1);
+    const value =
+      Math.sin(2 * Math.PI * note * t) * 0.55 + Math.sin(4 * Math.PI * note * t) * 0.1;
+    out.writeInt16LE(Math.round(value * shape * decay * 4200), i * 2);
+  }
+  return out;
+}
+
 export function peak(payload) {
   let max = 0;
   for (let i = 0; i + 1 < payload.length; i += 2) {

@@ -101,6 +101,7 @@ still written and the console reports "written, not applied".
 | Call recording (agent policy) | `record` action, SCIF lines excluded in the document |
 | Parallel ring (desk + browser) | `bridge` to the line's own endpoints |
 | Softphone | one WebSocket, `web/src/cantus.js` |
+| Hold | `hold`/`unhold` on the line socket; the waiting party hears switch-generated music, the holder hears silence, and resuming keeps the same call |
 | Trunks | a Cantus endpoint on the carrier gateway (`<trunk>@<host>`) |
 | ARI agents (dograh/capstone) | the switch's ARI-compatible surface on `:8088` |
 | Fax (T.38) | **not terminated here**: Cantus has no T.38. Sending needs `FAX_GATEWAY`, and is refused with that reason when it is absent |

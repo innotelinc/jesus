@@ -34,6 +34,7 @@ const PATHS = {
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5',
   play: 'M6 4l14 8-14 8z',
+  pause: 'M9 4v16M15 4v16',
   edit: 'M4 20h4L20 8l-4-4L4 16zM14 6l4 4',
   download: 'M12 3v12M7 11l5 5 5-5M4 21h16',
   paperclip: 'M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.5 3.5 0 0 1 5 5L10 18a2 2 0 0 1-3-3l7.5-7.5',

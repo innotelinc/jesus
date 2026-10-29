@@ -62,6 +62,25 @@ FEEDBACK every 200 ms ────────────▶  recv_high: proof 
 peak amplitude of the audio that arrived. A call is not reported as passing
 unless audio actually landed.
 
+## Hold
+
+The line socket controls a connected call with `call`, `answer`, `hangup`,
+`dtmf`, `hold` and `unhold`. The switch answers a `call` with
+`{type: "dialing", callId, state}` — the id is minted here, so a console has
+something to name while the call is still ringing — and every browser leg on a
+call receives `{type: "answered", callId}` when the far end picks up, the socket
+that dialled included. Without that frame a console could only know it had
+*sent* a call: its own state stayed on "Calling…" for the whole conversation,
+so its hold and keypad had no connected call to act on while audio was already
+flowing. Hold is a property of the leg, not a second call:
+the call stays answered and the far leg stays up. The party who was put on hold
+hears music — synthesised in `src/media.js`, eight notes looping every four
+seconds, so no licensed file has to ship — and the party who pressed hold hears
+silence, which is the point of holding. `unhold` restores both directions on the
+same call. The switch answers with `{type: "held", callId, held}` so a console
+shows the call's state rather than the last thing somebody clicked, and refuses
+a leg that is not connected.
+
 ## Files
 
 | | |

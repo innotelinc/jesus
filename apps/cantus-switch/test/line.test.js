@@ -179,6 +179,99 @@ test('a call ringing a socket that goes silent ends instead of timing out', () =
   assert.equal(call.state, 'ended', 'the caller is not left listening to a ringback nobody can answer');
 });
 
+test('a line that dials learns its call id, and when the call connects', () => {
+  const sw = lineSwitch();
+  sw.setLine({ ext: '102', displayName: 'Second' });
+  const caller = lineSocket();
+  const callee = lineSocket();
+  sw.attachSocket(caller, { ext: '101' });
+  sw.attachSocket(callee, { ext: '102' });
+
+  const legFor = (ws) => (callId) => {
+    const call = sw.calls.get(callId);
+    return call?.legs.find((leg) => leg.ws === ws && !leg.isEnded);
+  };
+
+  // The console dials another line on the same switch.
+  sw.onSocketMessage(caller, sw.lines.get('101'), { type: 'call', to: '102' }, legFor(caller));
+  const dialing = caller.text.find((message) => message.type === 'dialing');
+  assert.ok(dialing, 'the dialling socket is told the id of the call it placed');
+  assert.equal(typeof dialing.callId, 'string');
+
+  const incoming = callee.text.find((message) => message.type === 'incoming');
+  assert.equal(incoming.callId, dialing.callId, 'and it is the same call the other line rings for');
+
+  // Until the far end answers, the caller's console has nothing to hold: the
+  // switch says so rather than pretending.
+  assert.equal(
+    caller.text.some((message) => message.type === 'answered'),
+    false,
+    'no answered frame while the call is still ringing'
+  );
+
+  const call = sw.calls.get(dialing.callId);
+  const ringing = call.legs.find((leg) => leg.ws === callee && leg.state === 'ringing');
+  assert.ok(ringing, 'the callee has a ringing leg');
+  sw.answerLeg(call, ringing);
+
+  const answered = caller.text.find((message) => message.type === 'answered');
+  assert.ok(
+    answered,
+    'the socket that dialled must learn the call connected, or its console sits on "Calling…" for the whole conversation'
+  );
+  assert.equal(answered.callId, call.id);
+  assert.ok(
+    callee.text.some((message) => message.type === 'answered'),
+    'and the line that answered is confirmed rather than left guessing'
+  );
+
+  // Now the console can hold the call it dialled, with the id it was given.
+  const callerLeg = call.legs.find((leg) => leg.ws === caller);
+  assert.equal(sw.setHold(callerLeg, true), true, 'a dialled call can be held once it connects');
+  assert.deepEqual(
+    caller.text.filter((message) => message.type === 'held').map((message) => message.held),
+    [true]
+  );
+
+  sw.onSocketMessage(caller, sw.lines.get('101'), { type: 'unhold', callId: call.id }, legFor(caller));
+  assert.deepEqual(
+    caller.text.filter((message) => message.type === 'held').map((message) => message.held),
+    [true, false],
+    'and resuming is the same call, not a new one'
+  );
+
+  sw.endCall(call, 'normal');
+});
+
+test('a call cancelled while ringing ends for both lines', () => {
+  const sw = lineSwitch();
+  sw.setLine({ ext: '102', displayName: 'Second' });
+  const caller = lineSocket();
+  const callee = lineSocket();
+  sw.attachSocket(caller, { ext: '101' });
+  sw.attachSocket(callee, { ext: '102' });
+
+  const legFor = (ws) => (callId) => {
+    const call = sw.calls.get(callId);
+    return call?.legs.find((leg) => leg.ws === ws && !leg.isEnded);
+  };
+
+  sw.onSocketMessage(caller, sw.lines.get('101'), { type: 'call', to: '102' }, legFor(caller));
+  const { callId } = caller.text.find((message) => message.type === 'dialing');
+
+  // The `dialing` frame is what makes this possible: without the id, a stop
+  // button had no call to name and the far line kept ringing.
+  sw.onSocketMessage(caller, sw.lines.get('101'), { type: 'hangup', callId }, legFor(caller));
+  assert.equal(sw.calls.get(callId).state, 'ended');
+  const farewell = callee.text.filter(
+    (message) => message.callId === callId && (message.type === 'ended' || message.type === 'cancelled')
+  );
+  assert.ok(
+    farewell.length > 0,
+    'the line that was ringing is told the call is gone, instead of ringing until its timeout'
+  );
+});
+
 test('a line that dials carries the audio of the call it placed', async (t) => {
   const sw = new Switch({
     domain: 'line.test',

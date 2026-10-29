@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Web } from 'sip.js';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import { dashboardBaseUrl } from '../lib/config';
+import { CantusLine, type LineCall } from '../lib/cantusLine';
 import { cn } from '../lib/utils';
-
-const { SimpleUser } = Web;
 
 type RegState = 'idle' | 'connecting' | 'registered' | 'failed';
 type CallState = 'idle' | 'calling' | 'ringing' | 'active' | 'held';
@@ -18,11 +15,6 @@ interface LogEntry {
 
 const DIAL_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
-/** Host part of a WSS endpoint — the SIP domain a bare extension is dialed at. */
-function hostFromServer(server: string) {
-  try { return new URL(server).hostname; } catch { return window.location.hostname; }
-}
-
 // Phone-specific status chips. An idle phone is *not* an error — a generic
 // StatusBadge would have shown two “Critical” chips for a phone that simply
 // hasn't registered yet.
@@ -34,10 +26,10 @@ function RegChip({ state }: { state: RegState }) {
     failed: 'border-danger/40 text-danger',
   };
   const labels: Record<RegState, string> = {
-    idle: 'Not registered',
+    idle: 'Not connected',
     connecting: 'Connecting…',
-    registered: 'Registered',
-    failed: 'Registration failed',
+    registered: 'Connected',
+    failed: 'Not connected',
   };
   return (
     <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium', styles[state])}>
@@ -69,32 +61,25 @@ function CallChip({ state }: { state: CallState }) {
   );
 }
 
+function fromLineCall(call: LineCall | null): CallState {
+  if (!call) return 'idle';
+  if (call.held) return 'held';
+  if (call.state === 'ringing') return 'ringing';
+  if (call.state === 'dialing') return 'calling';
+  if (call.state === 'active') return 'active';
+  return 'idle';
+}
+
 export default function Softphone() {
-  // Connection settings (defaults match the durable test extension 101 that
-  // pbx/entrypoint-dograh.sh provisions on every boot).
-  //
-  // Preferred: the aggregator's /turnconfig returns the public WSS endpoint
-  // (wss://voice.<NPM_BASE_DOMAIN>/ws) when a proxy domain is configured — set
-  // below. Without a proxy domain we fall back to the page origin: same-host
-  // /ws when served over HTTPS (the dashboard's nginx proxies it to the PBX's
-  // WSS listener, so the browser sees the reverse proxy's trusted cert —
-  // Asterisk's own cert is self-signed and browsers refuse it), or the PBX's
-  // raw WSS listener on :8089 when served over plain HTTP (direct LAN access).
-  //
-  // window.location.host (not .hostname) so a page served on a non-default
-  // port keeps it: wss://host:8443/ws, not wss://host/ws on :443.
-  const pageOriginServer = typeof window !== 'undefined'
-    ? `wss://${window.location.host}/ws`
-    : 'wss://localhost/ws';
-  const pbxDirectServer = typeof window !== 'undefined'
-    ? `wss://${window.location.hostname}:8089/ws`
-    : 'wss://localhost:8089/ws';
-  const defaultServer = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    ? pageOriginServer
-    : pbxDirectServer;
-  const [server, setServer] = useState(defaultServer);
+  // Connection settings. The socket is same-origin by default: this dashboard's
+  // proxy forwards /ws to the voice plane's line socket, so the browser reuses
+  // the certificate it already trusts and there is nothing to open in a
+  // firewall. An absolute ws:// or wss:// URL is accepted instead, for a
+  // console served without the proxy.
+  const [socketPath, setSocketPath] = useState('/ws');
   const [extension, setExtension] = useState('101');
-  const [password, setPassword] = useState('webrtc-test-101');
+  // Only a deployment whose platform mints per-socket tickets needs this.
+  const [ticket, setTicket] = useState('');
 
   const [regState, setRegState] = useState<RegState>('idle');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -104,273 +89,188 @@ export default function Softphone() {
   const [held, setHeld] = useState(false);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [incoming, setIncoming] = useState(false);
+  const [failure, setFailure] = useState('');
 
-  const simpleUserRef = useRef<InstanceType<typeof SimpleUser> | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const callStateRef = useRef<CallState>('idle');
+  const lineRef = useRef<CantusLine | null>(null);
   const autoStartedRef = useRef(false);
-  const [iceServers, setIceServers] = useState<RTCIceServer[]>([]);
-  const [configLoaded, setConfigLoaded] = useState(!dashboardBaseUrl);
 
   const pushLog = useCallback((text: string, kind: LogEntry['kind'] = 'info') => {
     const t = new Date().toLocaleTimeString();
-    setLog(prev => [{ time: t, text, kind }, ...prev].slice(0, 40));
+    setLog((prev) => [{ time: t, text, kind }, ...prev].slice(0, 40));
   }, []);
 
-  // Pull the real coturn STUN/TURN endpoints + creds from the aggregator
-  // (reads the stack .env), so the browser's ICE config matches the PBX.
-  // Also uses the aggregator's public WSS endpoint (voice.<NPM_BASE_DOMAIN>/ws)
-  // when a proxy domain is configured — otherwise the page-origin default
-  // above stays in effect.
-  useEffect(() => {
-    if (!dashboardBaseUrl) {
-      setConfigLoaded(true);
-      return;
-    }
-    let cancelled = false;
-    fetch(`${dashboardBaseUrl}/turnconfig`)
-      .then(r => (r.ok ? r.json() : null))
-      .then((cfg: { stunServers?: RTCIceServer[]; turnServers?: RTCIceServer[]; wssServer?: string } | null) => {
-        if (cancelled || !cfg) return;
-        const list = [...(cfg.stunServers ?? []), ...(cfg.turnServers ?? [])];
-        if (list.length) {
-          setIceServers(list);
-          pushLog('Loaded STUN/TURN ICE config from aggregator', 'ok');
-        }
-        // Only adopt the advertised endpoint on an HTTPS page: off HTTPS there
-        // is no secure context for the microphone anyway, and a wss:// URL
-        // pointing at a plain-HTTP origin would just fail. The page-origin /
-        // direct-PBX defaults above stay in effect instead.
-        if (cfg.wssServer && window.location.protocol === 'https:') {
-          setServer(cfg.wssServer);
-          pushLog(`WSS endpoint: ${cfg.wssServer}`, 'ok');
-        }
-      })
-      .catch(() => { /* aggregator unavailable — fall back to defaults */ })
-      .finally(() => { if (!cancelled) setConfigLoaded(true); });
-    return () => { cancelled = true; };
-  }, [pushLog]);
-
-
-
-  // Keep a ref mirror of callState so async SIP.js callbacks read fresh state.
-  useEffect(() => {
-    callStateRef.current = callState;
-  }, [callState]);
-
-  const ensureSimpleUser = useCallback(() => {
-    if (simpleUserRef.current) return simpleUserRef.current;
-    const host = hostFromServer(server);
-    const su = new SimpleUser(server, {
-      aor: `sip:${extension}@${host}`,
-      media: {
-        constraints: { audio: true, video: false },
-        remote: { audio: audioRef.current ?? undefined },
-      },
-      userAgentOptions: {
-        authorizationUsername: extension,
-        authorizationPassword: password,
-        sessionDescriptionHandlerFactoryOptions: {
-          peerConnectionConfiguration: {
-            iceServers: iceServers.length
-              ? iceServers
-              : [{ urls: `stun:${host}:3478` }],
-          },
-        },
-      },
-      delegate: {
-        onServerConnect: () => pushLog(`WebSocket connected to ${server}`, 'ok'),
-        onServerDisconnect: (error?: Error) => {
-          pushLog(`WebSocket disconnected${error ? ` — ${error.message}` : ''}`, 'err');
-          setRegState('idle');
-        },
-        onRegistered: () => {
-          setRegState('registered');
-          pushLog(`Registered as ${extension}@${host}`, 'ok');
-        },
-        onUnregistered: () => {
-          setRegState('idle');
-          pushLog('Unregistered', 'info');
-        },
-        onCallReceived: () => {
-          setIncoming(true);
-          setCallState('ringing');
-          pushLog(`Incoming call from ${remoteParty || 'unknown'}`, 'info');
-        },
-        onCallAnswered: () => {
-          setIncoming(false);
-          setCallState('active');
-          setHeld(false);
-          pushLog('Call answered — audio active', 'ok');
-        },
-        onCallHangup: () => {
-          setIncoming(false);
-          setCallState('idle');
-          setHeld(false);
-          setMuted(false);
-          pushLog('Call ended', 'info');
-        },
-        onCallHold: (isHeld) => {
-          setHeld(isHeld);
-          setCallState(isHeld ? 'held' : 'active');
-          pushLog(isHeld ? 'Call on hold' : 'Call resumed', 'info');
-        },
-        onCallDTMFReceived: (tone: string) => pushLog(`Received DTMF: ${tone}`, 'info'),
-      },
-    });
-    simpleUserRef.current = su;
-    return su;
-  }, [server, extension, password, iceServers, pushLog, remoteParty]);
-
-  const connectAndRegister = useCallback(async () => {
-    try {
-      const su = ensureSimpleUser();
-      setRegState('connecting');
-      pushLog(`Connecting to ${server}…`);
-      await su.connect();
-      await su.register();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setRegState('failed');
-      pushLog(`Registration failed: ${msg}`, 'err');
-      if (server === pageOriginServer) {
-        pushLog(
-          'Hint: this origin must forward /ws to the PBX with WebSocket support and a trusted certificate — check the reverse proxy (and that the PBX is up).',
-          'err',
-        );
-      } else if (server === pbxDirectServer) {
-        pushLog(
-          'Hint: the PBX serves its own self-signed certificate on :8089, which browsers reject — serve this page over HTTPS so it uses the same-origin /ws path instead.',
-          'err',
-        );
-      }
-    }
-  }, [ensureSimpleUser, server, pushLog, pageOriginServer, pbxDirectServer]);
-
-  // Register automatically once the ICE/WSS config has settled (or we know
-  // there is none), so the phone is live as soon as the page opens. If the
-  // registration is later torn down the Register button starts it again.
-  useEffect(() => {
-    if (!configLoaded || autoStartedRef.current) return;
-    autoStartedRef.current = true;
-    const t = window.setTimeout(() => { void connectAndRegister(); }, 350);
-    return () => window.clearTimeout(t);
-  }, [configLoaded, connectAndRegister]);
-
-  const unregister = useCallback(async () => {
-    const su = simpleUserRef.current;
-    if (!su) { setRegState('idle'); return; }
-    try {
-      await su.unregister();
-      await su.disconnect();
-    } catch (e) {
-      pushLog(`Unregister error: ${e instanceof Error ? e.message : String(e)}`, 'err');
-    }
-    simpleUserRef.current = null;
-    setRegState('idle');
-  }, [pushLog]);
-
-  const call = useCallback(async () => {
-    const dialed = dialInput.trim().replace(/^sips?:/i, '');
-    if (!dialed) return;
-    // SimpleUser.call() hands its argument straight to UserAgent.makeURI(), so a
-    // bare extension throws "Failed to create a valid URI from the target."
-    // Build the URI here: a full SIP URI passes through, a bare number/extension
-    // is dialed at this UA's own host (the PBX sees it in from-internal).
-    const target = dialed.includes('@')
-      ? `sip:${dialed}`
-      : `sip:${dialed}@${hostFromServer(server)}`;
-    const su = ensureSimpleUser();
-    if (!(await su.isConnected())) {
-      try {
-        await su.connect();
-      } catch (e) {
-        pushLog(`Connect failed: ${e instanceof Error ? e.message : String(e)}`, 'err');
+  const attach = useCallback((line: CantusLine) => {
+    line.on('state', ({ state, displayName, reason }) => {
+      if (state === 'registered') {
+        setRegState('registered');
+        setFailure('');
+        setSocketPath(line.socketPath);
+        setExtension(line.ext);
+        pushLog(`Line ${line.ext}${displayName ? ` (${displayName})` : ''} is on the voice plane`, 'ok');
         return;
       }
-    }
-    setRemoteParty(dialed);
-    setCallState('calling');
-    setIncoming(false);
-    pushLog(`Calling ${dialed}…`);
-    try {
-      await su.call(target);
-    } catch (e) {
+      if (state === 'registering') {
+        setRegState('connecting');
+        pushLog(`Opening ${line.url}`);
+        return;
+      }
+      if (state === 'failed') {
+        setRegState('failed');
+        setFailure(reason || 'the voice plane closed the line');
+        pushLog(`Line closed: ${reason || 'no reason given'}`, 'err');
+        setCallState('idle');
+        setIncoming(false);
+        setHeld(false);
+        return;
+      }
+      setRegState('idle');
+      setFailure('');
+    });
+
+    line.on('call', (call) => {
+      setRemoteParty(call.remote);
+      setCallState(fromLineCall(call));
+      setIncoming(call.state === 'ringing');
+      pushLog(
+        call.state === 'ringing' ? `Incoming call from ${call.remote}` : `Calling ${call.remote}…`,
+        'info',
+      );
+    });
+
+    line.on('held', ({ held: onHold }) => {
+      setHeld(onHold);
+      setCallState((prev) => (prev === 'idle' ? prev : onHold ? 'held' : 'active'));
+      pushLog(onHold ? 'Call on hold — the other party hears hold music' : 'Call resumed', 'info');
+    });
+
+    line.on('ended', ({ reason }) => {
       setCallState('idle');
-      pushLog(`Call failed: ${e instanceof Error ? e.message : String(e)}`, 'err');
+      setIncoming(false);
+      setHeld(false);
+      setMuted(false);
+      line.setMuted(false);
+      setRemoteParty('');
+      pushLog(`Call ended (${reason})`, 'info');
+    });
+
+    line.on('error', ({ error, message }) => {
+      // The voice plane's own refusal, e.g. holding a call it cannot hold.
+      setFailure(message);
+      pushLog(`${error}: ${message}`, 'err');
+    });
+  }, [pushLog]);
+
+  const connect = useCallback(async () => {
+    if (lineRef.current) return lineRef.current;
+    const line = new CantusLine({ socketPath, ext: extension, ticket });
+    attach(line);
+    lineRef.current = line;
+    setRegState('connecting');
+    try {
+      await line.start();
+    } catch (err) {
+      lineRef.current = null;
+      setRegState('failed');
+      const message = err instanceof Error ? err.message : String(err);
+      setFailure(message);
+      pushLog(`Could not open the line: ${message}`, 'err');
+      return null;
     }
-  }, [dialInput, ensureSimpleUser, pushLog, server]);
+    return line;
+  }, [attach, socketPath, extension, ticket, pushLog]);
+
+  const disconnect = useCallback(() => {
+    lineRef.current?.stop();
+    lineRef.current = null;
+    setRegState('idle');
+    setCallState('idle');
+    setIncoming(false);
+    setHeld(false);
+    setRemoteParty('');
+    pushLog('Line closed', 'info');
+  }, [pushLog]);
+
+  // Connect automatically on load, so the phone is live as soon as an operator
+  // opens the page; the button is for reconnecting after a drop.
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    const timer = window.setTimeout(() => { void connect(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [connect]);
+
+  // One line per page: leaving the page closes the socket, which ends any call
+  // that line was on rather than leaving a leg the voice plane keeps feeding.
+  useEffect(() => () => {
+    lineRef.current?.stop();
+    lineRef.current = null;
+  }, []);
+
+  const dial = useCallback(async () => {
+    const target = dialInput.trim();
+    if (!target) return;
+    const line = lineRef.current ?? (await connect());
+    if (!line) return;
+    setRemoteParty(target);
+    setCallState('calling');
+    try {
+      await line.dial(target);
+    } catch (err) {
+      setCallState('idle');
+      const message = err instanceof Error ? err.message : String(err);
+      setFailure(message);
+      pushLog(`Call failed: ${message}`, 'err');
+    }
+  }, [dialInput, connect, pushLog]);
 
   const answer = useCallback(async () => {
-    const su = simpleUserRef.current;
-    if (!su) return;
     try {
-      await su.answer();
-    } catch (e) {
-      pushLog(`Answer failed: ${e instanceof Error ? e.message : String(e)}`, 'err');
+      await lineRef.current?.answer();
+      setIncoming(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setFailure(message);
+      pushLog(`Answer failed: ${message}`, 'err');
     }
   }, [pushLog]);
 
-  const decline = useCallback(async () => {
-    const su = simpleUserRef.current;
-    if (!su) return;
-    try {
-      await su.decline();
-    } catch (e) {
-      pushLog(`Decline failed: ${e instanceof Error ? e.message : String(e)}`, 'err');
-    }
+  const decline = useCallback(() => {
+    lineRef.current?.hangup();
     setIncoming(false);
     setCallState('idle');
-  }, [pushLog]);
+    setRemoteParty('');
+  }, []);
 
-  const hangup = useCallback(async () => {
-    const su = simpleUserRef.current;
-    if (!su) return;
-    try {
-      await su.hangup();
-    } catch (e) {
-      pushLog(`Hangup error: ${e instanceof Error ? e.message : String(e)}`, 'err');
-    }
+  const hangup = useCallback(() => {
+    lineRef.current?.hangup();
     setCallState('idle');
-  }, [pushLog]);
+    setIncoming(false);
+    setHeld(false);
+    setRemoteParty('');
+  }, []);
 
   const toggleMute = useCallback(() => {
-    const su = simpleUserRef.current;
-    if (!su) return;
-    if (muted) { su.unmute(); setMuted(false); pushLog('Microphone unmuted', 'info'); }
-    else { su.mute(); setMuted(true); pushLog('Microphone muted', 'info'); }
+    const line = lineRef.current;
+    if (!line) return;
+    const next = !muted;
+    line.setMuted(next);
+    setMuted(next);
+    pushLog(next ? 'Microphone muted' : 'Microphone unmuted', 'info');
   }, [muted, pushLog]);
 
-  const toggleHold = useCallback(async () => {
-    const su = simpleUserRef.current;
-    if (!su) return;
-    try {
-      if (held) await su.unhold();
-      else await su.hold();
-    } catch (e) {
-      pushLog(`Hold error: ${e instanceof Error ? e.message : String(e)}`, 'err');
-    }
-  }, [held, pushLog]);
+  const toggleHold = useCallback(() => {
+    const line = lineRef.current;
+    if (!line) return;
+    // `held` is the voice plane's answer, so this asks for the opposite of what
+    // the switch last said rather than of what the button last showed.
+    if (held) line.unhold();
+    else line.hold();
+  }, [held]);
 
-  const sendDTMF = useCallback(async (tone: string) => {
-    const su = simpleUserRef.current;
-    if (!su) return;
-    try {
-      await su.sendDTMF(tone);
-      pushLog(`Sent DTMF: ${tone}`, 'info');
-    } catch { /* ignore — tone sent via INFO */ }
+  const sendDTMF = useCallback((tone: string) => {
+    lineRef.current?.sendDtmf(tone);
+    pushLog(`Sent DTMF: ${tone}`, 'info');
   }, [pushLog]);
-
-  // Teardown the SIP UA when leaving the page.
-  useEffect(() => {
-    return () => {
-      const su = simpleUserRef.current;
-      if (su) {
-        try { su.disconnect(); } catch { /* noop */ }
-        simpleUserRef.current = null;
-      }
-    };
-  }, []);
 
   const inCall = callState === 'active' || callState === 'held';
   const busy = callState !== 'idle' && callState !== 'ringing';
@@ -381,8 +281,9 @@ export default function Softphone() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Softphone</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            In-browser WebRTC phone — registers as extension {extension} over WSS and can place
-            and receive calls through the PBX.
+            In-browser line on the Cantus voice plane — connects as extension {extension}, dials and
+            answers over one socket, and carries 20 ms frames of 8 kHz audio with no SIP, ICE or TURN
+            in the path.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -391,35 +292,59 @@ export default function Softphone() {
         </div>
       </div>
 
-      {/* Hidden audio element — SIP.js attaches the remote stream here. */}
-      <audio ref={audioRef} autoPlay className="hidden" />
-
       <div className="grid gap-6 lg:grid-cols-5">
         {/* ── Connection panel ── */}
         <div className="space-y-4 lg:col-span-2">
           <div className="rounded-2xl border bg-card p-4 shadow-sm space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Connection</h2>
             <div className="space-y-2">
-              <label className="block text-sm font-medium">WSS server</label>
-              <Input value={server} onChange={e => setServer(e.target.value)} placeholder="wss://host/ws" spellCheck={false} />
+              <label className="block text-sm font-medium" htmlFor="line-socket">Line socket</label>
+              <Input
+                id="line-socket"
+                value={socketPath}
+                onChange={(e) => setSocketPath(e.target.value)}
+                placeholder="/ws"
+                spellCheck={false}
+                disabled={regState === 'registered'}
+              />
+              <p className="text-xs text-muted-foreground">
+                Same-origin path, or a full ws:// or wss:// URL when this console is served without the
+                proxy.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Extension</label>
-                <Input value={extension} onChange={e => setExtension(e.target.value.replace(/\D/g, ''))} placeholder="101" />
+                <label className="block text-sm font-medium" htmlFor="line-ext">Extension</label>
+                <Input
+                  id="line-ext"
+                  value={extension}
+                  onChange={(e) => setExtension(e.target.value.replace(/\D/g, ''))}
+                  placeholder="101"
+                  disabled={regState === 'registered'}
+                />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Password</label>
-                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="webrtc-test-101" />
+                <label className="block text-sm font-medium" htmlFor="line-ticket">Ticket</label>
+                <Input
+                  id="line-ticket"
+                  type="password"
+                  value={ticket}
+                  onChange={(e) => setTicket(e.target.value)}
+                  placeholder="optional"
+                  disabled={regState === 'registered'}
+                />
               </div>
             </div>
+            {failure && regState !== 'registered' && (
+              <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{failure}</p>
+            )}
             {regState === 'registered' ? (
-              <Button variant="outline" className="w-full" onClick={unregister}>
-                Unregister
+              <Button variant="outline" className="w-full" onClick={disconnect}>
+                Disconnect
               </Button>
             ) : (
-              <Button className="w-full" onClick={connectAndRegister} disabled={regState === 'connecting'}>
-                {regState === 'connecting' ? 'Connecting…' : 'Register'}
+              <Button className="w-full" onClick={() => { void connect(); }} disabled={regState === 'connecting'}>
+                {regState === 'connecting' ? 'Connecting…' : 'Connect'}
               </Button>
             )}
           </div>
@@ -427,7 +352,7 @@ export default function Softphone() {
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Activity log</h2>
             <div className="mt-2 max-h-64 space-y-1 overflow-y-auto font-mono text-xs">
-              {log.length === 0 && <p className="text-muted-foreground">No activity yet — register to begin.</p>}
+              {log.length === 0 && <p className="text-muted-foreground">No activity yet — the line connects on load.</p>}
               {log.map((entry, i) => (
                 <div key={i} className={cn('flex gap-2', entry.kind === 'err' ? 'text-danger' : entry.kind === 'ok' ? 'text-success' : 'text-muted-foreground')}>
                   <span className="shrink-0">{entry.time}</span>
@@ -451,13 +376,13 @@ export default function Softphone() {
             <div className="mt-3 flex gap-2">
               <Input
                 value={dialInput}
-                onChange={e => setDialInput(e.target.value.replace(/[^\d*#+]/g, ''))}
+                onChange={(e) => setDialInput(e.target.value.replace(/[^\d*#+]/g, ''))}
                 placeholder="Number or extension (e.g. 101, 8000)"
                 className="h-10 text-base font-mono"
                 disabled={busy}
               />
               {!inCall && callState !== 'calling' && (
-                <Button className="h-10 px-6" onClick={call} disabled={!dialInput || busy}>
+                <Button className="h-10 px-6" onClick={() => { void dial(); }} disabled={!dialInput || busy || regState !== 'registered'}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
                   Call
                 </Button>
@@ -475,11 +400,11 @@ export default function Softphone() {
               <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-warning">Incoming call from {remoteParty || 'unknown'}</div>
-                  <div className="text-xs text-muted-foreground">Answer to start audio (DTLS-SRTP over the WSS session).</div>
+                  <div className="text-xs text-muted-foreground">Answer to start audio on this line.</div>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={decline}>Decline</Button>
-                  <Button size="sm" className="bg-success hover:bg-success/90" onClick={answer}>Answer</Button>
+                  <Button size="sm" className="bg-success hover:bg-success/90" onClick={() => { void answer(); }}>Answer</Button>
                 </div>
               </div>
             )}
@@ -493,19 +418,21 @@ export default function Softphone() {
                 <Button variant={held ? 'default' : 'outline'} size="sm" onClick={toggleHold}>
                   {held ? 'Resume' : 'Hold'}
                 </Button>
-                <span className="ml-auto text-xs text-muted-foreground">DTMF keys send via INFO during the call</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  {held ? 'The caller is hearing hold music' : 'DTMF keys send during the call'}
+                </span>
               </div>
             )}
 
             {/* Dial pad */}
             <div className="mt-4 grid grid-cols-3 gap-2 sm:max-w-xs">
-              {DIAL_KEYS.map(key => (
+              {DIAL_KEYS.map((key) => (
                 <button
                   key={key}
                   disabled={regState !== 'registered' || busy}
                   onClick={() => {
                     if (inCall) { sendDTMF(key); return; }
-                    setDialInput(prev => prev + key);
+                    setDialInput((prev) => prev + key);
                   }}
                   className="flex h-12 items-center justify-center rounded-lg border bg-background text-base font-semibold transition-colors hover:bg-muted disabled:opacity-40"
                 >
@@ -518,10 +445,10 @@ export default function Softphone() {
           <div className="rounded-2xl border bg-card p-4 shadow-sm text-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Notes</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-              <li>Registration starts automatically on load. The WSS endpoint is <span className="font-mono">{server}</span>{server === defaultServer ? ' (page-origin fallback — configure a proxy domain for the PBX to serve it at the edge)' : ''} — same TLS as this page, so no certificate warnings.</li>
-              <li>STUN/TURN come from the host coturn (fetched via the aggregator) so remote clients behind NAT get a working media path.</li>
-              <li>Media (audio) uses DTLS-SRTP with ICE; STUN/TURN point at the host coturn, so remote WebRTC clients behind NAT work too.</li>
-              <li>Only one WebRTC session at a time — open a second browser tab, register again as extension <span className="font-mono">101</span> (password <span className="font-mono">webrtc-test-101</span>, or <span className="font-mono">WEBRTC_TEST_PASSWORD</span>) to call yourself.</li>
+              <li>The line connects on load to <span className="font-mono">{socketPath}</span>, which this console proxies to the voice plane's line socket. Nothing else has to be reachable from the browser.</li>
+              <li>Hold is a change in what each side hears, not a second call: the caller gets hold music and this handset hears silence, so resuming always returns the same conversation.</li>
+              <li>The microphone is opened on the first call or answer, not on registration — an operator watching a line is never met by a permission prompt.</li>
+              <li>There is no SDP, no ICE candidate pair and no TURN allocation, so a call either has a path or the switch says why it does not.</li>
             </ul>
           </div>
         </div>

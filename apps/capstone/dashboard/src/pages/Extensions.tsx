@@ -195,7 +195,7 @@ export default function Extensions() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Extensions</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            WebRTC endpoints on the Zeus PBX — create, edit, and route inbound numbers to them. Devices register over WSS from the Softphone page or any SIP client.
+            Extensions on the voice plane — create, edit, and route inbound numbers to them. The Softphone page connects as one of these over the Cantus line socket; a SIP client reaches the same extensions through the SIP border.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>Add extension</Button>

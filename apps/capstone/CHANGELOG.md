@@ -35,6 +35,109 @@ of that gap, and the sections without a release of their own:
 | `v3.30`, `v3.31` | 15–16 Oct | OnTrak in the platform stack references — no section |
 | `v3.32` | next cut | the section below |
 
+## v3.35 — The softphone is a line on the voice plane, and Hold works
+
+Work landed after `v3.34`: the Control Center's Softphone page spoke SIP.js at
+its own `/ws`, which this dashboard's nginx forwards to `cantus-switch`'s
+`/ws/line`. The transport was right and the client was wrong: the switch has
+spoken Cantus on that socket since the Asterisk replacement, so the page's
+`REGISTER` got a Cantus `registered` frame it could not parse, registration
+never completed, and **Hold** had nothing behind it — there is no `hold` in SIP
+to send and no INVITE to re-negotiate. The comment in `Softphone.tsx` promising
+that "the page-origin /ws is proxied to the PBX's WSS listener" described a
+listener that no longer exists.
+
+**`dashboard/src/lib/cantusLine.ts` is now the phone.** One socket carries
+registration, call control and 20 ms frames of 8 kHz PCM16 in both directions:
+no SDP, no ICE candidate pair, no DTLS handshake, no TURN allocation and no
+`/turnconfig` fetch, so a call either has a path or the switch says why it does
+not. The wire contract is the switch's own (`attachSocket`, `onSocketMessage`,
+`setHold`), and the telno console speaks the same protocol.
+
+**One gap sat underneath the port.** The switch never told the socket that
+dialled that its call had been answered, so a call placed *from* the console
+stayed on "Calling…" for the whole conversation: audio flowed, its own controls
+stayed disabled, and Hold had no connected call to apply to. `cantus-switch` now
+answers a `call` with `{type:"dialing", callId}` — the id is minted on the switch,
+so a stop button has a call to name while it rings — and sends
+`{type:"answered", callId}` to every browser leg when the far end picks up. The
+telno client takes the same two frames, so its Hold button works on calls it
+placed too. Verified against a live switch over real sockets: two lines
+registered on the line socket, 101 dialled 102, 102 answered, 101 held — the
+held party received 20 frames of music (peak 2392) while the handset received 20
+frames of silence (peak 0) — and `unhold` stopped the music on the same call
+before 102's hangup ended it.
+
+**Hold is a change in what each side hears, not a second call.** `hold` asks the
+switch to put the leg on hold; the switch plays hold music to the caller, sends
+this handset silence, and echoes `{type:'held'}`. The page shows the echo rather
+than the click, so a refused hold reports the switch's `not-connected` instead
+of leaving a button that says "Resume" on a live call — and because nothing was
+torn down, resuming always returns the same conversation.
+
+**Registration no longer asks for the microphone.** The media graph is built on
+the first call or answer — which is also a user gesture, so autoplay policy has
+nothing to object to — instead of at connect time. An operator watching a line
+is not met by a permission prompt.
+
+**`sip.js` is gone.** It was the only consumer; the softphone chunk dropped from
+**265.6 kB to 18.1 kB** (gzip 60.5 kB → 6.3 kB) and the dependency left
+`package.json` and the lockfile. The proxy now forwards `$is_args$args`
+explicitly: a `proxy_pass` that names a URI through a variable does not append
+the original query string on its own, and the switch needs `ext` to know which
+line rang.
+
+**The page is now walked in a browser, not just painted.** `dashboard/e2e/smoke.mjs`
+visits `/softphone` with a fake switch answering its line socket, then drives the
+page through both directions of a call: connect → dial → hold → resume → hangup,
+then an inbound ring → the banner → answer → hold → resume → hangup, then a third
+ring that is declined. The inbound path is a different one, not a repeat — the
+call id and the peer arrive from the switch instead of from the dial form, and
+the banner is the only thing that tells an operator a call is waiting. Declining
+is checked for the opposite outcome: banner gone, no call started, the "Not
+connected" chip absent and the dialer back, because a refused call must not take
+the line down with it.
+
+The decline check immediately caught a bug in itself, which is the argument for
+running it: it waited for "Incoming call from …" to leave the body, but the
+activity log keeps that line as history, so the assertion could never pass. It is
+now scoped to the banner's own copy ("Answer to start audio on this line."), which
+nothing else prints.
+
+**Mute is checked at the switch, not at the button.** A held or muted line sends
+nothing, so the fake switch now counts the binary frames it receives and the run
+asserts the three things that make a mute real: frames are flowing before the
+click (otherwise a silent capture path would make the muted count a false pass),
+the count is **unchanged** over 900 ms while muted, and it advances again after
+Unmute. Text assertions cannot see any of this — a page whose Mute only swapped
+its own label keeps sending 50 frames a second and would pass them all. A frame
+already clocked through at the moment of the click still arrives, so the count is
+sampled after a 400 ms settle rather than at the click.
+
+The first attempt at this guard was worthless and is worth recording: it waited
+for the text "Connected", which also matches the chip's *failure* label "Not
+connected", so a line that could not connect passed. It now waits for the log
+line the page writes only after the switch has answered the socket. Each leg was
+proved by breaking what it depends on: refusing the line fails the run with
+`/softphone the softphone never showed a registered line`, ringing with a frame
+the page does not know fails it with `/softphone the softphone never showed the
+incoming call banner`, and never pressing Decline fails it with `/softphone the
+softphone kept the banner after declining`. Each exits 1. Both halves of the mute
+leg are proved the same way: a build whose capture path ignores `muted` fails with
+`/softphone kept sending media while muted (45 frames in 900ms)` — the exact 50-per
+-second cadence — and one that sends no media at all fails with `/softphone the
+softphone never sent audio frames on a connected call`.
+
+The line protocol is covered by nine vitest cases (`cantusLine.test.ts`): the
+socket asks for `ext` and its ticket, hold and resume are two messages plus the
+switch's echo, a refused hold surfaces as an error rather than a held call, the
+call id and the `answered` frame are taken from the switch (so a placed call
+connects and can be cancelled while ringing), a call the switch could not route
+reports failure, and a socket closed before `registered` reports failure instead
+of an idle phone.
+`npm test` now runs in the dashboard's CI job — it was declared in
+`package.json` and called by no job.
+
 ## v3.34 — Calls answer again, on our own models
 
 Work landed after `v3.33`: an inbound call to the interview line was ending in a

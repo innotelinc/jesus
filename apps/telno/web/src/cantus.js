@@ -30,6 +30,9 @@ export class CantusLine {
     this.sampleRate = sampleRate;
     this.state = 'off';
     this.muted = false;
+    // Set by the switch, never hoped for locally: a hold that the switch
+    // refused would otherwise show as held while the call is still live.
+    this.held = false;
     this.call = null;
     this.socket = null;
     this.context = null;
@@ -40,7 +43,14 @@ export class CantusLine {
     this.analyser = null;
     this.outputStream = null;
     this.localStream = null;
-    this.listeners = { state: new Set(), incoming: new Set(), call: new Set(), ended: new Set(), error: new Set() };
+    this.listeners = {
+      state: new Set(),
+      incoming: new Set(),
+      call: new Set(),
+      ended: new Set(),
+      error: new Set(),
+      held: new Set(),
+    };
   }
 
   on(name, fn) {
@@ -114,6 +124,29 @@ export class CantusLine {
       case 'registered':
         this.setState('registered', { codec: message.codec, displayName: message.displayName });
         return;
+      case 'dialing':
+        // The switch mints the call's id, so a stop button has something to
+        // name while it rings — and a call that failed on the spot is reported
+        // as failed instead of ringing forever on this side.
+        if (this.call) {
+          this.call.callId = message.callId;
+          if (message.state === 'ended') {
+            this.call = null;
+            this.emit('ended', { callId: message.callId, reason: message.cause || 'failed' });
+            return;
+          }
+          this.emit('call', this.call);
+        }
+        return;
+      case 'answered':
+        // The far end picked up: the switch is the authority, so the handset
+        // stops saying "Calling…" when the switch says the call connected.
+        if (this.call) {
+          if (message.callId) this.call.callId = message.callId;
+          this.call.state = 'answered';
+          this.emit('call', this.call);
+        }
+        return;
       case 'incoming':
         this.call = { ...message, state: 'ringing', direction: 'inbound' };
         this.emit('incoming', message);
@@ -121,11 +154,19 @@ export class CantusLine {
         return;
       case 'cancelled':
         this.call = null;
+        this.held = false;
         this.emit('ended', { callId: message.callId, reason: 'cancelled' });
         return;
       case 'ended':
         this.call = null;
+        this.held = false;
         this.emit('ended', { callId: message.callId, reason: message.cause || 'ended' });
+        return;
+      case 'held':
+        // The switch decides; the page shows what it decided.
+        this.held = !!message.held;
+        if (this.call) this.call.held = this.held;
+        this.emit('held', { callId: message.callId, held: this.held });
         return;
       case 'error':
         this.emit('error', message);
@@ -214,7 +255,9 @@ export class CantusLine {
     let pendingLength = 0;
     this.capture.onaudioprocess = (event) => {
       const input = event.inputBuffer.getChannelData(0);
-      if (this.muted) return;
+      // A held line sends nothing. The switch also drops frames from a held
+      // leg, so this is the courtesy, not the enforcement.
+      if (this.muted || this.held) return;
       pending.push(input.slice(0));
       pendingLength += input.length;
       while (pendingLength >= FRAME_SAMPLES) {
@@ -269,6 +312,23 @@ export class CantusLine {
     this.call = { state: 'dialing', direction: 'outbound', to: target };
     this.emit('call', this.call);
     this.socket.send(JSON.stringify({ type: 'call', to: target }));
+  }
+
+  /**
+   * Hold: the other party hears music and this line hears nothing.
+   *
+   * Nothing is torn down, because hold is a change in what each side hears, not
+   * a change to the call. That is also why `unhold()` can always bring the
+   * conversation back: the call was never ended.
+   */
+  hold() {
+    if (!this.call?.callId) return;
+    this.socket?.send(JSON.stringify({ type: 'hold', callId: this.call.callId }));
+  }
+
+  unhold() {
+    if (!this.call?.callId) return;
+    this.socket?.send(JSON.stringify({ type: 'unhold', callId: this.call.callId }));
   }
 
   answer() {

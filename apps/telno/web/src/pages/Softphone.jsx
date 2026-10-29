@@ -91,6 +91,9 @@ export default function Softphone() {
   const [dial, setDial] = useState('');
   const [call, setCall] = useState(null);
   const [muted, setMuted] = useState(false);
+  // Hold is the switch's answer, not this page's: the line reports what the
+  // call is doing so a refused hold cannot show as "Resume".
+  const [held, setHeld] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [incoming, setIncoming] = useState(false);
@@ -529,6 +532,15 @@ export default function Softphone() {
         }
       });
 
+      line.on('held', ({ held: onHold }) => {
+        setHeld(onHold);
+        if (onHold)
+          toast.info(
+            'Call on hold',
+            'The other party hears music. Press Resume to bring them back.',
+          );
+      });
+
       line.on('ended', () => {
         sessionRef.current = null;
         lineRef.current = null;
@@ -538,6 +550,7 @@ export default function Softphone() {
         setSecure(null);
         setSharing(false);
         setMuted(false);
+        setHeld(false);
         sendPresence('idle', '');
       });
 
@@ -770,6 +783,13 @@ export default function Softphone() {
     sessionRef.current = null;
     sendPresence('idle', '');
   };
+
+  const toggleHold = useCallback(() => {
+    const line = lineRef.current;
+    if (!line || call?.state !== 'incall') return;
+    if (held) line.unhold();
+    else line.hold();
+  }, [call?.state, held]);
 
   const toggleMute = () => {
     const next = !muted;
@@ -1131,6 +1151,19 @@ export default function Softphone() {
                 </Button>
                 <Button variant="ghost" icon={muted ? 'micOff' : 'mic'} onClick={toggleMute} disabled={!inCall}>
                   {muted ? 'Unmute' : 'Mute'}
+                </Button>
+                <Button
+                  variant={held ? 'primary' : 'ghost'}
+                  icon={held ? 'play' : 'pause'}
+                  onClick={toggleHold}
+                  disabled={call?.state !== 'incall'}
+                  title={
+                    held
+                      ? 'Bring the call back: the other party stops hearing music'
+                      : 'Play music to the other party and hear nothing'
+                  }
+                >
+                  {held ? 'Resume' : 'Hold'}
                 </Button>
                 <span className="row" style={{ gap: 6, alignItems: 'center' }} title="Call volume">
                   <Icon name="volume" size={14} />

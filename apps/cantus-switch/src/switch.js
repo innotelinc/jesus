@@ -20,7 +20,7 @@ import { CantusEndpoint, TIMERS } from './endpoint.js';
 import { CantusRelay } from './relay.js';
 import { Router, RoutingError, firstAction } from './router.js';
 import { reasonId, reasonName } from './session.js';
-import { silence, wavWrap, PCM_RATE } from './media.js';
+import { silence, wavWrap, PCM_RATE, holdMusicFrame } from './media.js';
 import { asString } from './wire.js';
 
 const FRAME = silence(160);
@@ -43,6 +43,11 @@ export class Leg {
     this.answeredAt = 0;
     this.endedAt = 0;
     this.muted = false;
+    // A held leg is still answered and still part of its call: hold changes
+    // what each side hears, never who is on the call.
+    this.held = false;
+    this.heldAt = 0;
+    this.mohAt = 0;
     this.received = 0;
     this.sent = 0;
   }
@@ -694,6 +699,17 @@ export class Switch extends EventEmitter {
     call.answeredAt = call.answeredAt || now();
     this.counters.answered += 1;
     this.emitCall(call, 'call.answered', { leg: leg.id, ext: leg.ext });
+    // Every browser leg learns that its call connected, including the socket
+    // that dialled. Without this the dialling console only ever knew that it
+    // sent `call`, so it stayed on "Calling…" for the whole conversation —
+    // audio flowed while its own controls said the call had not started, and a
+    // hold or a keypad press had no connected call to apply to. The socket that
+    // answered gets the same frame, so a phone's state is the switch's answer
+    // rather than its last click.
+    for (const other of call.legs) {
+      if (other.isEnded || !other.ws) continue;
+      other.ws.sendJson({ type: 'answered', callId: call.id, from: call.from, to: call.to });
+    }
     return true;
   }
 
@@ -779,6 +795,38 @@ export class Switch extends EventEmitter {
     return true;
   }
 
+  /**
+   * Put one leg of a connected call on hold, or bring it back.
+   *
+   * Hold is a property of a leg, not a second call: the call stays answered,
+   * the far leg stays up, and the only thing that changes is what each side
+   * hears. The party who was put on hold gets music; the party who pressed
+   * hold gets silence, so the two of them can no longer hear each other. That
+   * is the whole of it, which is also why resuming is immediate: nothing was
+   * torn down to hold the call, so there is nothing to rebuild to resume it.
+   */
+  setHold(leg, held) {
+    if (!leg || leg.isEnded || !leg.isAnswered) return false;
+    const next = !!held;
+    if (next === leg.held) return true;
+    leg.held = next;
+    leg.heldAt = now();
+    // A prompt queued for the conversation must not talk over the music, and a
+    // microphone frame captured before the hold must not come back on resume:
+    // one is noise into the far end, the other is a word said minutes ago.
+    leg.play = null;
+    leg.playAt = 0;
+    leg.mohAt = 0;
+    leg.rx = undefined;
+    leg.rxAt = 0;
+    const call = leg.call;
+    this.emitCall(call, next ? 'call.held' : 'call.resumed', { leg: leg.id, ext: leg.ext });
+    // The browser is told what the switch did, so its button shows the call's
+    // state rather than the last thing the user clicked.
+    if (leg.ws) leg.ws.sendJson({ type: 'held', callId: call.id, held: next });
+    return true;
+  }
+
   // --------------------------------------------------------------------- media
 
   /**
@@ -789,9 +837,29 @@ export class Switch extends EventEmitter {
   mediaFor(session) {
     const leg = this.legOf(session);
     if (!leg) return FRAME;
+    return this.audioTo(leg);
+  }
+
+  /**
+   * What one leg hears right now.
+   *
+   * The rule a hold has in every telephone system: the party who was put on
+   * hold hears music, the party who pressed hold hears nothing, and neither
+   * hears the other. Both the browser ticker and the Cantus media source ask
+   * this one question, so a call between two browsers, a browser and a gateway,
+   * or two gateways all hold the same way.
+   */
+  audioTo(leg, at = now()) {
+    if (leg.isEnded) return FRAME;
+    if (leg.held) return FRAME;
     const peer = this.peerOf(leg);
     if (!peer) return null; // keepalive loopbacks are not audio
-    if (peer.rx && now() - peer.rxAt < 400) return peer.rx;
+    if (peer.held) {
+      const frame = holdMusicFrame(leg.mohAt);
+      leg.mohAt += FRAME.length / 2;
+      return frame;
+    }
+    if (peer.rx && at - peer.rxAt < 400) return peer.rx;
     return FRAME;
   }
 
@@ -804,6 +872,13 @@ export class Switch extends EventEmitter {
 
   onMedia(leg, payload) {
     if (!leg) return;
+    // A held leg's microphone is not part of the call. Keeping the last frame
+    // would put a word said before the hold back on the wire the moment the far
+    // side is resumed.
+    if (leg.held) {
+      leg.received += 1;
+      return;
+    }
     leg.rx = payload;
     leg.rxAt = now();
     leg.received += 1;
@@ -849,8 +924,8 @@ export class Switch extends EventEmitter {
             }
             if (payload.length < 320) payload = Buffer.concat([payload, FRAME.subarray(payload.length)]);
           } else {
-            const peer = this.peerOf(leg);
-            payload = peer?.rx && at - peer.rxAt < 400 ? peer.rx : FRAME;
+            // Music for the party on hold, silence for the one who pressed it.
+            payload = this.audioTo(leg, at) ?? FRAME;
           }
           leg.ws.send(Buffer.from(payload), { binary: true });
           leg.sent += 1;
@@ -1176,7 +1251,14 @@ export class Switch extends EventEmitter {
         if (!target) return;
         // `ws` and `ext` travel with the dial: the same socket that asked for
         // the call is the leg that carries it.
-        this.originate({ from: line.ext, to: target, callerName: line.displayName, ws, ext: line.ext });
+        const call = this.originate({ from: line.ext, to: target, callerName: line.displayName, ws, ext: line.ext });
+        // The id lives on this side — `originate` mints it — so a console that
+        // was never told would have nothing to put in `hangup` or `hold`: its
+        // stop button could not cancel a call that is still ringing, and its
+        // hold button had no call to name. Sent even when the call failed on
+        // the spot, because the alternative is a page that says "Calling…"
+        // about a call the switch has already given up on.
+        ws.sendJson({ type: 'dialing', callId: call.id, to: target, state: call.state, cause: call.cause || null });
         return;
       }
       case 'answer': {
@@ -1187,6 +1269,20 @@ export class Switch extends EventEmitter {
       case 'hangup': {
         const leg = legFor(message.callId);
         if (leg) this.endCall(leg.call, 'normal');
+        return;
+      }
+      case 'hold':
+      case 'unhold': {
+        const leg = legFor(message.callId);
+        if (leg && this.setHold(leg, message.type === 'hold')) return;
+        // Only a connected call can be held, and saying so is better than a
+        // button that appears to do nothing.
+        ws.sendJson({
+          type: 'error',
+          error: 'not-connected',
+          callId: message.callId,
+          message: 'Only a connected call can be held.',
+        });
         return;
       }
       case 'dtmf': {
