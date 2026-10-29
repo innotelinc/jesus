@@ -5,6 +5,9 @@
 
 # REA : rétro-ingénierie de tout
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Un seul MCP pour la rétro-ingénierie des binaires, des applications et du comportement à l'exécution.
 
 **Repérez une fonctionnalité qui vous plaît. Comprenez son fonctionnement, jusqu'au niveau du binaire.**
@@ -63,6 +66,8 @@ REA connecte votre agent à des outils d'inspection de binaires natifs, d'applic
 Setup enregistre REA auprès de votre agent et installe les instructions de workflow correspondantes. L'analyse native peut utiliser une installation existante de Hopper, de Ghidra ou d'IDA ; Setup peut aussi installer Hopper après votre accord. L'analyse statique JavaScript ne nécessite aucun moteur d'analyse natif.
 
 > **[Visitez le site web de REA](https://rea.tools/fr/)** pour les instructions d'installation, des guides illustrés et des études de cas réelles.
+
+Sa place dans la pile est décrite dans [docs/stack.md](../stack.md) ; la définition de référence des couches partagées se trouve dans l’[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Démarrage rapide
 

@@ -5,6 +5,9 @@
 
 # REA: مهندسی معکوس هر چیزی
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### یک MCP برای مهندسی معکوس فایل‌های باینری، برنامه‌ها و رفتار زمان اجرا.
 
 **قابلیتی دیده‌اید که دوستش دارید؟ سازوکارش را تا سطح باینری درک کنید.**
@@ -55,6 +58,8 @@ REA ایجنت شما را به ابزارهایی برای بررسی باین�
 راه‌اندازی، REA را در ایجنت ثبت و دستورالعمل‌های متناظر را نصب می‌کند. تحلیل بومی می‌تواند از Hopper، Ghidra یا IDA موجود استفاده کند؛ نصب Hopper پس از تأیید شما ممکن است. تحلیل ایستای JavaScript به موتور تحلیل بومی نیاز ندارد.
 
 > برای دستورالعمل‌های راه‌اندازی، راهنماهای تصویری و مطالعات موردی واقعی، **[به وب‌سایت REA مراجعه کنید](https://rea.tools/fa/)**.
+
+جایگاه آن در پشته در [docs/stack.md](../stack.md) آمده است؛ تعریف مرجع لایه‌های مشترک در [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) است.
 
 ## شروع سریع
 

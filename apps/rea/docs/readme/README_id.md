@@ -5,6 +5,9 @@
 
 # REA: Rekayasa Balik Apa Pun
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Satu MCP untuk rekayasa balik pada berbagai biner, aplikasi, dan perilaku saat runtime.
 
 **Melihat fitur yang Anda sukai. Pahami cara kerjanya hingga ke tingkat biner.**
@@ -63,6 +66,8 @@ REA menghubungkan agen Anda dengan berbagai alat untuk memeriksa biner native, a
 Proses penyiapan mendaftarkan REA ke agen Anda dan memasang instruksi alur kerja yang sesuai. Analisis native dapat menggunakan instalasi Hopper, Ghidra, atau IDA yang sudah ada. Proses penyiapan juga dapat memasang Hopper secara opsional setelah mendapatkan persetujuan. Analisis JavaScript statis tidak memerlukan mesin analisis native.
 
 > **[Kunjungi situs web REA](https://rea.tools/id/)** untuk mendapatkan petunjuk penyiapan, panduan bergambar, dan studi kasus nyata.
+
+Kedudukannya dalam stack dijelaskan di [docs/stack.md](../stack.md); definisi kanonis lapisan bersama ada di [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Mulai Cepat
 

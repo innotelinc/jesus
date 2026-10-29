@@ -5,6 +5,9 @@
 
 # REA: Kỹ thuật dịch ngược cho mọi thứ
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Một MCP để dịch ngược tệp nhị phân, ứng dụng và hành vi khi chạy.
 
 **Thấy một tính năng bạn thích? Hiểu cách nó hoạt động, đến tận mức mã nhị phân.**
@@ -63,6 +66,8 @@ REA kết nối tác nhân của bạn với các công cụ kiểm tra tệp nh
 Thiết lập đăng ký REA với tác nhân và cài hướng dẫn công việc tương ứng. Phân tích native dùng Hopper, Ghidra hoặc IDA có sẵn; có thể cài Hopper sau khi bạn chấp thuận. Phân tích tĩnh JavaScript không cần công cụ phân tích native.
 
 > **[Truy cập trang web REA](https://rea.tools/vi/)** để xem cách thiết lập, hướng dẫn có hình minh họa và các nghiên cứu điển hình thực tế.
+
+Vị trí của nó trong stack được mô tả trong [docs/stack.md](../stack.md); định nghĩa chuẩn tắc của các lớp dùng chung nằm ở [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
 
 ## Bắt đầu nhanh
 

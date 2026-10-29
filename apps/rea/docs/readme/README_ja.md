@@ -5,6 +5,9 @@
 
 # REA：あらゆるものをリバースエンジニアリング
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### バイナリ、アプリケーション、実行時の動作を、ひとつの MCP でリバースエンジニアリング。
 
 **気に入った機能を見つけたら、その仕組みをバイナリのレベルまで理解する。**
@@ -63,6 +66,8 @@ REA はエージェントを分析ツールにつなぎ、ネイティブバイ�
 セットアップはエージェントに REA を登録し、対応するワークフロー指示をインストールします。ネイティブ解析には既存の Hopper、Ghidra、IDA を使用でき、承認すれば Hopper をインストールできます。静的 JavaScript 解析にネイティブ解析エンジンは不要です。
 
 > **[REA のウェブサイト](https://rea.tools/ja/)**で、セットアップ手順、図解ガイド、実際の事例を確認できます。
+
+スタック内での位置づけは [docs/stack.md](../stack.md) に記しています。共通レイヤーの正典的な定義は [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) にあります。
 
 ## クイックスタート
 

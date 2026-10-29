@@ -5,6 +5,9 @@
 
 # REA: Reverse Engineer Anything
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### MCP เดียวสำหรับวิศวกรรมย้อนกลับ ทั้งไบนารี แอปพลิเคชัน และพฤติกรรมขณะทำงาน
 
 **เห็นฟีเจอร์ที่ชอบแล้วอยากรู้ว่าทำงานอย่างไร? เข้าใจได้ลึกถึงระดับไบนารี**
@@ -63,6 +66,8 @@ REA เชื่อมเอเจนต์ของคุณกับเคร�
 การตั้งค่าลงทะเบียน REA กับเอเจนต์และติดตั้งคำแนะนำการทำงานที่ตรงกัน การวิเคราะห์เนทีฟใช้ Hopper, Ghidra หรือ IDA ที่มีอยู่ได้ และติดตั้ง Hopper ได้เมื่อคุณอนุมัติ การวิเคราะห์ JavaScript แบบสแตติกไม่ต้องใช้เอนจินวิเคราะห์เนทีฟ
 
 > **[เยี่ยมชมเว็บไซต์ REA](https://rea.tools/th/)** เพื่อดูคำแนะนำการตั้งค่า คู่มือพร้อมภาพประกอบ และกรณีศึกษาจริง
+
+ตำแหน่งของมันในสแตกอธิบายไว้ใน [docs/stack.md](../stack.md) ส่วนคำจำกัดความหลักของเลเยอร์ที่ใช้ร่วมกันอยู่ใน [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack)
 
 ## เริ่มต้นอย่างรวดเร็ว
 

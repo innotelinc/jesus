@@ -5,6 +5,9 @@
 
 # REA: Reverse Engineer Anything
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### Binaries, applications aur runtime behavior ki reverse engineering ke liye ek MCP.
 
 **Koi feature pasand aaya? Samjhein ke woh kaise kaam karta hai, binary level tak.**
@@ -65,6 +68,8 @@ REA aapke agent ko native binaries, JavaScript aur Electron apps, .NET assemblie
 Setup REA ko aapke agent ke saath register karta hai aur uske mutabiq workflow instructions install karta hai. Native analysis ke liye pehle se installed Hopper, Ghidra ya IDA use ho sakta hai; aapki approval par setup Hopper bhi install kar sakta hai. Static JavaScript analysis ke liye native analysis engine ki zaroorat nahi.
 
 > Setup instructions, tasveeron ke saath guides aur asli case studies ke liye **[REA ki website dekhein](https://rea.tools/)**.
+
+Stack mein iski jagah [docs/stack.md](../stack.md) mein bayan ki gayi hai; mushtarak layers ki canonical tareef [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) mein hai.
 
 ## Jaldi shuru karein
 

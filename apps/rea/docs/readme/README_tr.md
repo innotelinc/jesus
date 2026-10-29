@@ -5,6 +5,9 @@
 
 # REA: Her şeyi tersine mühendislikle inceleyin
 
+[![CI](https://github.com/innotelinc/rea/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/rea/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
+
 ### İkili dosyaların, uygulamaların ve çalışma zamanı davranışının tersine mühendisliği için tek bir MCP.
 
 **Beğendiğiniz bir özellik mi gördünüz? İkili kod düzeyine kadar nasıl çalıştığını anlayın.**
@@ -63,6 +66,8 @@ REA, ajanınızı yerel makine kodu içeren ikili dosyaları, JavaScript ve Elec
 Kurulum, REA'yı ajanınıza kaydeder ve uyumlu iş akışı talimatlarını yükler. Yerel makine kodu analizi mevcut bir Hopper, Ghidra veya IDA kurulumunu kullanabilir; kurulum işlemi, onayınızla isteğe bağlı olarak Hopper da yükleyebilir. Statik JavaScript analizi bu yerel analiz motorlarından hiçbirine ihtiyaç duymaz.
 
 > Kurulum talimatları, görselli rehberler ve gerçek örnek çalışmalar için **[REA web sitesini ziyaret edin](https://rea.tools/tr/)**.
+
+Yığındaki yeri [docs/stack.md](../stack.md) dosyasında açıklanır; ortak katmanların kanonik tanımı [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack) içindedir.
 
 ## Hızlı başlangıç
 
