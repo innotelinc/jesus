@@ -14,8 +14,7 @@ import assert from 'node:assert/strict';
 
 import { Switch } from '../src/switch.js';
 import { CantusEndpoint } from '../src/endpoint.js';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { waitUntil } from './wait.js';
 
 async function bootstrap(t) {
   const sw = new Switch({
@@ -63,21 +62,28 @@ test('answering the line answers the caller that came in through the gateway', a
   });
   await peer.start();
   t.after(() => peer.stop());
+  // The switch and the gateway both have to be known to the relay before a call
+  // between them means anything; a sleep here was a guess at how long that takes.
+  await waitUntil(() => peer.handle, { label: 'the gateway to register with the relay' });
 
   const socket = fakeLineSocket();
   sw.attachSocket(socket, { ext: '101' });
-  await sleep(80);
 
   // The carrier's call: the gateway dials the DID at the switch.
   const session = peer.call('14132642700@switch@in.test', { context: { from: '14134210134' } });
   assert.ok(session, 'the gateway leg should be accepted by the relay');
 
-  await sleep(200);
-  const call = [...sw.calls.values()].find((entry) => entry.direction === 'inbound');
+  const call = await waitUntil(
+    () => [...sw.calls.values()].find((entry) => entry.direction === 'inbound'),
+    { label: 'the DID route to create an inbound call' }
+  );
   assert.ok(call, 'the DID route should have created an inbound call');
   assert.equal(call.route, 'did-14132642700');
 
-  const ringing = socket.inbox.find((message) => message.type === 'incoming');
+  const ringing = await waitUntil(
+    () => socket.inbox.find((message) => message.type === 'incoming'),
+    { label: 'line 101 to ring' }
+  );
   assert.ok(ringing, 'line 101 should be ringing');
   assert.match(ringing.to, /^14132642700/);
   // Known limit: Cantus has no field for caller identity on an INVITE (field 8
@@ -91,8 +97,10 @@ test('answering the line answers the caller that came in through the gateway', a
   assert.ok(leg, 'the web leg is on the call');
   assert.equal(sw.answerLeg(call, leg), true);
 
-  await sleep(150);
   assert.equal(call.state, 'answered');
+  await waitUntil(() => peerEvents.some((event) => event.kind === 'accepted'), {
+    label: 'the gateway to be told the call is answered',
+  });
   const accepted = peerEvents.filter((event) => event.kind === 'accepted');
   assert.ok(
     accepted.length > 0,

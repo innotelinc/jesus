@@ -10,8 +10,7 @@ import assert from 'node:assert/strict';
 import { Switch } from '../src/switch.js';
 import { CantusServer } from '../src/server.js';
 import { connectWebSocket } from '../src/ws.js';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { waitUntil } from './wait.js';
 
 async function bootstrap({ controlToken = '', routes } = {}) {
   const switchRef = new Switch({
@@ -95,7 +94,7 @@ test('a browser softphone registers, rings and answers', async (t) => {
     else messages.push(JSON.parse(String(data)));
   });
   ws.sendJson({ type: 'hello' });
-  await sleep(120);
+  await waitUntil(() => messages.length > 0, { label: 'the line to register' });
   assert.equal(messages[0].type, 'registered');
   assert.equal(messages[0].ext, '100');
   assert.equal(messages[0].codec, 'pcm-s16/8000/1');
@@ -103,21 +102,26 @@ test('a browser softphone registers, rings and answers', async (t) => {
   // Dialling the line from inside the switch rings the browser, not a SIP
   // proxy: there is no port to forward and no registration to refresh.
   switchRef.originate({ from: '998', to: '100@test.local' });
-  await sleep(120);
-  const incoming = messages.find((message) => message.type === 'incoming');
+  const incoming = await waitUntil(
+    () => messages.find((message) => message.type === 'incoming'),
+    { label: 'the browser to be rung' }
+  );
   assert.ok(incoming, 'the browser should have been rung');
   assert.equal(incoming.to, '100@test.local');
 
   ws.sendJson({ type: 'answer', callId: incoming.callId });
-  await sleep(160);
+  await waitUntil(
+    () => messages.some((message) => message.type === 'call.answered') || switchRef.calls.get(incoming.callId)?.answeredAt,
+    { label: 'the call to be answered' }
+  );
   assert.ok(messages.some((message) => message.type === 'call.answered') || switchRef.calls.get(incoming.callId).answeredAt);
-  await sleep(120);
+  await waitUntil(() => media.length > 0, { label: 'the first media frame' });
   assert.ok(media.length > 0, 'answered line should be receiving 20 ms frames');
   assert.equal(media[0], 320, '20 ms of 8 kHz PCM16 is 320 octets');
 
   const call = switchRef.calls.get(incoming.callId);
   switchRef.hangup(call.id);
-  await sleep(80);
+  await waitUntil(() => call.state === 'ended', { label: 'the hangup to end the call' });
   ws.close();
 });
 
@@ -211,13 +215,14 @@ test('a DID route hands the call to an ARI application', async (t) => {
   ws.on('message', (data, isBinary) => {
     if (!isBinary) events.push(JSON.parse(String(data)));
   });
-  await sleep(120);
+  await waitUntil(() => events.length > 0, { label: 'the ARI event socket to open' });
   assert.equal(events[0].type, 'SystemInfo');
 
   const call = caller.originate({ from: '5551234@ari.test', to: '2125551234@ari.test' });
-  await sleep(400);
-
-  const start = events.find((event) => event.type === 'StasisStart');
+  const start = await waitUntil(
+    () => events.find((event) => event.type === 'StasisStart'),
+    { label: 'the application to be handed the call' }
+  );
   assert.ok(start, 'the application should have been handed the call');
   assert.equal(start.application, 'dograh');
   assert.match(start.channel.dialplan.exten, /^2125551234/);
@@ -231,7 +236,9 @@ test('a DID route hands the call to an ARI application', async (t) => {
   assert.equal(routed.state, 'stasis');
 
   caller.hangup(call.id);
-  await sleep(200);
+  await waitUntil(() => events.some((event) => event.type === 'StasisEnd'), {
+    label: 'the application to be told it lost the channel',
+  });
   assert.ok(events.some((event) => event.type === 'StasisEnd'), 'the application should be told it lost the channel');
   ws.close();
 });
@@ -258,7 +265,6 @@ test('an originated call follows the routing document and names its route', asyn
   t.after(() => sw.stop());
 
   const call = sw.originate({ from: 'console', to: '8000@route.test' });
-  await sleep(120);
   assert.equal(call.route, 'agents');
   const routed = call.events.find((event) => event.type === 'call.routed');
   assert.ok(routed, 'the call should report the route it took');
@@ -281,7 +287,6 @@ test('a hand-off to an ARI app with no client ends the call instead of parking i
   t.after(() => sw.stop());
 
   const call = sw.originate({ from: 'console', to: '8000@noari.test' });
-  await sleep(120);
   assert.equal(call.state, 'ended');
   assert.equal(call.cause, 'app-unavailable');
 });
@@ -308,7 +313,6 @@ test('an originated call to a local line runs its route and rings the line', asy
   t.after(() => sw.stop());
 
   const call = sw.originate({ from: 'console', to: '101@line.test' });
-  await sleep(120);
   assert.equal(call.route, 'front-desk');
   // Nothing is holding 101 open in this test, so the ring ends at once with a
   // cause rather than hanging — the same shape the console shows for a line
@@ -364,7 +368,10 @@ test('a call reports the media counters a console needs for a rate', async (t) =
     return server.close();
   });
 
-  const browser = { role: 'web', ext: '100', ws: { send: () => {} }, isAnswered: true, isEnded: false, received: 41, sent: 50, rx: null, rxAt: 0 };
+  // No socket on the leg: the live ticker only feeds legs it can write to, and
+  // this test is about the counters it reports, not about it writing. A socket
+  // here made the counters move under the assertion between fixture and fetch.
+  const browser = { role: 'web', ext: '100', ws: null, isAnswered: true, isEnded: false, received: 41, sent: 50, rx: null, rxAt: 0 };
   const carrier = { role: 'inbound', ext: '', ws: null, isAnswered: true, isEnded: false, received: 50, sent: 41, rx: null, rxAt: 0 };
   const call = { id: 'call-media', direction: 'inbound', from: 'voipms', to: '100@test.local', state: 'answered', route: 'did', events: [], legs: [carrier, browser], startedAt: Date.now(), answeredAt: Date.now() };
   browser.call = call;

@@ -12,8 +12,7 @@ import assert from 'node:assert/strict';
 
 import { Switch } from '../src/switch.js';
 import { CantusEndpoint } from '../src/endpoint.js';
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { waitUntil } from './wait.js';
 
 async function bootstrap(t, routes) {
   const sw = new Switch({
@@ -39,7 +38,6 @@ test('a `trunk` action dials the number at the gateway endpoint', async (t) => {
   });
 
   const call = sw.originate({ from: '101@out.test', to: '+14134210134' });
-  await sleep(80);
 
   assert.equal(call.route, 'outbound');
   const dialled = call.events.filter((event) => event.type === 'call.originated').at(-1);
@@ -69,10 +67,10 @@ test('a refused trunk leg ends the call instead of ringing forever', async (t) =
   peer.onIncoming = (session) => peer.reject(session, 'UNAVAILABLE');
   await peer.start();
   t.after(() => peer.stop());
-  await sleep(150);
+  await waitUntil(() => peer.handle, { label: 'the gateway to register with the relay' });
 
   const call = sw.originate({ from: '101@out.test', to: '+14134210134' });
-  await sleep(250);
+  await waitUntil(() => call.state === 'ended', { label: 'the refused leg to end the call' });
 
   assert.equal(call.state, 'ended', 'a refused leg is not a live call');
   assert.equal(call.cause, 'unavailable');
