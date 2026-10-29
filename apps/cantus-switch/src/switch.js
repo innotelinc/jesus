@@ -769,7 +769,13 @@ export class Switch extends EventEmitter {
     // worth waiting for, and 20 ms of added latency is audible on a narrowband
     // call.
     const peer = this.peerOf(leg);
-    if (peer?.ws) peer.ws.send(Buffer.from(payload), { binary: true });
+    if (peer?.ws) {
+      peer.ws.send(Buffer.from(payload), { binary: true });
+      // Remembered so the 20 ms ticker does not send a second frame — silence —
+      // on top of this one. A browser that is fed twice plays both, and the
+      // audio it hears is halved into noise.
+      peer.pushedAt = now();
+    }
   }
 
   /** Pacing for browser legs: they send and receive at the same 20 ms cadence. */
@@ -778,6 +784,9 @@ export class Switch extends EventEmitter {
       if (call.state === 'ended') continue;
       for (const leg of call.legs) {
         if (!leg.ws || !leg.isAnswered) continue;
+        // A leg the peer has just pushed to has its frame for this tick already.
+        // The ticker is here to fill silence, not to interleave with real audio.
+        if (leg.pushedAt && now() - leg.pushedAt < TIMERS.MEDIA_TICK) continue;
         const peer = this.peerOf(leg);
         const payload = peer?.rx && now() - peer.rxAt < 400 ? peer.rx : FRAME;
         leg.ws.send(Buffer.from(payload), { binary: true });
