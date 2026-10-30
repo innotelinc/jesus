@@ -1,0 +1,90 @@
+# switch-gate.yml — the check that `main` can actually require.
+#
+# Every app workflow here is path-filtered, and that is right for the runners:
+# a pull request that touches one app does not start twelve other pipelines. It
+# is wrong for a required check, because GitHub waits for a check that was never
+# asked for and the pull request can never be merged. So this file carries no
+# `paths:` filter — and no GENERATED banner, because tools/port-workflows.pl
+# adds a path filter to every copy it writes and could not produce it.
+#
+# The job always runs and always posts the same check name. When the change
+# touches apps/cantus-switch it runs the switch suite, so a red suite fails the
+# check. When it does not, it says so and passes, so an unrelated pull request is
+# never held hostage by a suite that has nothing to do with it.
+#
+# When the base commit cannot be fetched — a shallow clone, a force-push, a
+# branch whose history was rewritten — the suite runs anyway. A second of
+# redundant work is cheaper than a gate that quietly skips the one thing it
+# exists to check.
+
+name: Switch gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: switch-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Switch gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # One commit is enough: the comparison below is a tree diff against a
+          # base fetched on demand, and this repository's history is measured in
+          # gigabytes.
+          fetch-depth: 1
+
+      - name: Decide whether the switch changed
+        id: scope
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          touched=""
+          if [ -n "${BASE_REF:-}" ]; then
+            if git fetch --no-tags --depth=1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null; then
+              touched="$(git diff --name-only "origin/${BASE_REF}" HEAD || true)"
+            fi
+          elif [ -n "${BEFORE_SHA:-}" ] && [ "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+            if git fetch --no-tags --depth=1 origin "${BEFORE_SHA}" 2>/dev/null; then
+              touched="$(git diff --name-only "${BEFORE_SHA}" HEAD || true)"
+            fi
+          fi
+
+          if [ -z "$touched" ]; then
+            echo "::notice::no base commit to compare against — running the suite rather than passing blind"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if printf '%s\n' "$touched" | grep -qE '^apps/cantus-switch/'; then
+            echo "the switch changed:"
+            printf '%s\n' "$touched" | grep -E '^apps/cantus-switch/' | sed 's/^/  /'
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "nothing under apps/cantus-switch changed — the suite has nothing to say about this change"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the switch suite
+        if: steps.scope.outputs.run == 'true'
+        working-directory: apps/cantus-switch
+        run: npm test
+
+      - name: Nothing to check
+        if: steps.scope.outputs.run != 'true'
+        run: echo "the check passes because the switch was not touched"

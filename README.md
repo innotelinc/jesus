@@ -207,6 +207,15 @@ when a root copy no longer matches its source — an app workflow edited without
 copy edited by hand, or a generated copy whose source was renamed away. It uses only the runner's
 preinstalled perl, so it starts in seconds and needs nothing installed.
 
+**One root workflow is hand-written, on purpose**: [switch-gate.yml](.github/workflows/switch-gate.yml).
+A status check that `main` requires has to run on *every* pull request, and every copy the port
+writes carries a path filter — a required check that never runs leaves the pull request
+unmergeable forever, which is worse than no check. So the gate has no `paths:` filter and no
+GENERATED banner: it runs the switch suite when a change touches `apps/cantus-switch/`, and says
+so and passes when it does not. `main` requires that check by name (`Switch gate`) through a
+repository ruleset, so a red switch suite blocks a pull-request merge while direct pushes to
+`main` behave exactly as they did before.
+
 Three files under `apps/` needed a hand change that the port cannot express:
 
 - `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` composite actions resolve their
