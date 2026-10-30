@@ -178,12 +178,25 @@ test('a silent carrier fails the registration instead of hanging the trunk', asy
   });
   const sent = [];
   trunk.socket = { send: (message) => sent.push(message.toString()) };
-  const ok = await trunk.register();
-  assert.equal(ok, false);
-  assert.equal(trunk.registered, false);
-  assert.match(trunk.lastRegisterError, /no answer from 203\.0\.113\.9:5060/);
-  assert.match(sent[0], /^REGISTER sip:203\.0\.113\.9 SIP\/2\.0/);
-  assert.match(sent[0], /Expires: 300/);
+
+  // The registration deadline is unref'd on purpose: a pending REGISTER must
+  // never hold a shutting-down process open. What keeps the loop alive in
+  // production is the bound socket, and this stub has no handle — so without
+  // one here the loop drains before the 80 ms deadline can fire and the runner
+  // reports the test as cancelled by its parent ("Promise resolution is still
+  // pending but the event loop has already resolved"). That is a race against
+  // the machine, which is why it passed on one runner and failed on another.
+  const keepAlive = setTimeout(() => {}, 1_000);
+  try {
+    const ok = await trunk.register();
+    assert.equal(ok, false);
+    assert.equal(trunk.registered, false);
+    assert.match(trunk.lastRegisterError, /no answer from 203\.0\.113\.9:5060/);
+    assert.match(sent[0], /^REGISTER sip:203\.0\.113\.9 SIP\/2\.0/);
+    assert.match(sent[0], /Expires: 300/);
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('digest without qop omits the qop fields', () => {
