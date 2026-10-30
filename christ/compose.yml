@@ -1,0 +1,263 @@
+# CHRIST — one AI voice system, in containers you choose.
+#
+# There is no single "up". Every service carries the profile of the capability
+# it belongs to, so a box runs only what it was asked to run:
+#
+#   docker compose --profile core up -d                     # the floor: switch + front door
+#   docker compose --profile core --profile pstn up -d      # + a carrier and a DID
+#   docker compose --profile core --profile platform up -d  # + numbers, voicemail, softphone
+#   docker compose --profile core --profile pstn --profile platform --profile console up -d
+#
+# `node cli.js select ai` resolves a wish into exactly those flags; see
+# catalog.json. `core` is the floor and is always included.
+#
+# Build contexts reach into the jesus tree (`../apps/<app>`), because CHRIST is
+# the composition root of that tree and not a copy of it. A standalone checkout
+# needs the apps beside it — see README.md → "Where the code comes from".
+#
+# The four AI capabilities are deliberately *not* containers here: Capstone and
+# dograh are a stack of their own, claude-mem and REA are their own repos, and
+# pretending otherwise would double the memory this file costs without making
+# the voice plane any better. They are attached by URL, which the catalog names.
+
+name: christ
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  # ── core ────────────────────────────────────────────────────────────────────
+  # The voice plane. Cantus 1.0: signalling and media on one UDP socket, control
+  # API, ARI for the agents and /ws/line for every softphone. No SIP, no AMI, no
+  # RTP range, no database.
+  switch:
+    profiles: ["core"]
+    build:
+      context: ../apps/cantus-switch
+    image: christ-switch:${CHRIST_TAG:-local}
+    container_name: christ-switch
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      CANTUS_ID: ${CANTUS_ID:-switch@estate.local}
+      CANTUS_SECRET: ${CANTUS_SECRET:?set CANTUS_SECRET — every Cantus node shares it}
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?set CANTUS_CONTROL_TOKEN — the front door authenticates with it}
+      CANTUS_ROUTES_FILE: /etc/cantus/routes.json
+      CANTUS_LINES_FILE: /etc/cantus/lines.json
+      CANTUS_RECORD_DIR: /data/recordings
+      CANTUS_PROMPTS: /data/prompts
+      CANTUS_BIND: 0.0.0.0:7443
+      CANTUS_RELAY_BIND: 0.0.0.0:7444
+      CANTUS_HTTP_PORT: "8088"
+      CANTUS_ARI_USER: ${CANTUS_ARI_USER:-dograh}
+      CANTUS_ARI_PASSWORD: ${CANTUS_ARI_PASSWORD:-dograh}
+      CANTUS_ARI_APP: ${CANTUS_ARI_APP:-dograh}
+    volumes:
+      - ./switch:/etc/cantus:ro
+      - switch-data:/data
+    ports:
+      - "${SWITCH_PORT:-8188}:8088"
+      - "${CANTUS_SIGNAL_PORT:-7443}:7443/udp"
+      - "${CANTUS_RELAY_PORT:-7444}:7444/udp"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8088/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # The front door: the live board, the wiring engine and the souls. It reads
+  # the switch and never writes a call — a dashboard that can hang up a call is
+  # a dashboard that can hang up the wrong one.
+  christ:
+    profiles: ["core"]
+    build:
+      # The repository root, so the image carries the switch's own Router at the
+      # path the wiring engine imports it from. One implementation, not two.
+      context: ..
+      dockerfile: christ/Dockerfile
+    image: christ:${CHRIST_TAG:-local}
+    container_name: christ
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      PORT: "8001"
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      TELNO_URL: ${TELNO_URL:-http://telno:8080}
+      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:7454}
+      CAPSTONE_URL: ${CAPSTONE_URL:-}
+      DOGRAH_URL: ${DOGRAH_URL:-}
+      OMNIROUTE_URL: ${OMNIROUTE_URL:-}
+      GENIE_URL: ${GENIE_URL:-}
+      CLAUDE_MEM_URL: ${CLAUDE_MEM_URL:-}
+      ONTRAK_URL: ${ONTRAK_URL:-}
+      WEBMAIL_URL: ${WEBMAIL_URL:-}
+      OPENSMS_URL: ${OPENSMS_URL:-}
+    ports:
+      - "${CHRIST_PORT:-8001}:8001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── pstn ────────────────────────────────────────────────────────────────────
+  # The SIP border. The only process here with a port range to open, and the
+  # only one that ever holds a carrier credential.
+  gateway:
+    profiles: ["pstn"]
+    build:
+      context: ..
+      dockerfile: apps/cantus-gateway/Dockerfile
+    image: christ-gateway:${CHRIST_TAG:-local}
+    container_name: christ-gateway
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      CANTUS_ID: ${GATEWAY_CANTUS_ID:-voipms@gateway}
+      CANTUS_SECRET: ${CANTUS_SECRET:?}
+      CANTUS_RELAY: switch:7444
+      CANTUS_SWITCH: ${CANTUS_ID:-switch@estate.local}
+      CANTUS_BIND: 0.0.0.0:7453
+      SIP_HOST: ${VOIPMS_SIP_HOST:-}
+      SIP_PORT: ${VOIPMS_SIP_PORT:-5060}
+      SIP_USERNAME: ${VOIPMS_SIP_USERNAME:-}
+      SIP_PASSWORD: ${VOIPMS_SIP_PASSWORD:-}
+      SIP_FROM_USER: ${VOIPMS_SIP_FROM_USER:-}
+      SIP_DOMAIN: ${VOIPMS_SIP_DOMAIN:-}
+      SIP_SRTP: ${SIP_SRTP:-}
+      SRTP_STATE_FILE: /data/srtp.json
+      SIP_ADVERTISE: ${PUBLIC_IP:-}
+      SIP_LOCAL_PORT: "5060"
+      GATEWAY_RTP_START: ${GATEWAY_RTP_START:-40000}
+      GATEWAY_RTP_END: ${GATEWAY_RTP_END:-40063}
+      GATEWAY_HTTP_PORT: "7454"
+    volumes:
+      - ./state/gateway:/data
+    ports:
+      - "5060:5060/udp"
+      - "${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}:${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}/udp"
+      - "7454:7454"
+
+  # ── platform ────────────────────────────────────────────────────────────────
+  # Telno owns the inventory and generates the routing document; the switch
+  # executes it. It never sees a datagram, which is why it can be a normal web
+  # app with a database.
+  telno:
+    profiles: ["platform"]
+    build:
+      context: ../apps/telno
+    image: christ-telno:${CHRIST_TAG:-local}
+    container_name: christ-telno
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8090}
+      DATA_DIR: /data
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
+      CANTUS_CONFIG_DIR: /data/cantus
+      CANTUS_RECORD_DIR: /data/recordings
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@estate.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SOFTPHONE_ENABLED: "true"
+      NOTIFY_CHANNEL: console
+      PAYMENTS_ENABLED: "false"
+      ALLOW_INSECURE_PUBLIC_URL: "true"
+    volumes:
+      - telno-data:/data
+    ports:
+      - "${TELNO_PORT:-8090}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── console ─────────────────────────────────────────────────────────────────
+  console:
+    profiles: ["console"]
+    build:
+      context: ../estate/console
+    image: christ-console:${CHRIST_TAG:-local}
+    container_name: christ-console
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      switch:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      TELNO_URL: ${TELNO_URL:-http://telno:8080}
+      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:7454}
+      CAPSTONE_URL: ${CAPSTONE_URL:-}
+      VOIPMS_SUB_ACCOUNT: ${VOIPMS_SIP_USERNAME:-}
+      VOIPMS_API_USERNAME: ${VOIPMS_API_USERNAME:-}
+      VOIPMS_API_PASSWORD: ${VOIPMS_API_PASSWORD:-}
+    ports:
+      - "${ESTATE_PORT:-8000}:8080"
+
+  # ── models ──────────────────────────────────────────────────────────────────
+  # One OpenAI-compatible endpoint in front of every provider. Heavy on a first
+  # build, cheap to run; the only container the AI capabilities truly need.
+  omniroute:
+    profiles: ["models"]
+    build:
+      context: ../apps/omniroute
+    image: christ-omniroute:${CHRIST_TAG:-local}
+    container_name: christ-omniroute
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      PORT: "20128"
+    ports:
+      - "${OMNIROUTE_PORT:-20128}:20128"
+
+  # ── mail ────────────────────────────────────────────────────────────────────
+  # A JMAP client, not a mail server: point it at your own Stalwart.
+  webmail:
+    profiles: ["mail"]
+    build:
+      context: ../apps/webmail
+    image: christ-webmail:${CHRIST_TAG:-local}
+    container_name: christ-webmail
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      JMAP_URL: ${WEBMAIL_JMAP_URL:-}
+    ports:
+      - "${WEBMAIL_PORT:-3000}:3000"
+
+  # ── support ─────────────────────────────────────────────────────────────────
+  ontrak:
+    profiles: ["support"]
+    build:
+      context: ../apps/ontrak
+    image: christ-ontrak:${CHRIST_TAG:-local}
+    container_name: christ-ontrak
+    restart: unless-stopped
+    <<: *logging
+    ports:
+      - "${ONTRAK_PORT:-3001}:3000"
+
+volumes:
+  switch-data:
+  telno-data:

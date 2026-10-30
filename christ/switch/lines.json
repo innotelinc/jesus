@@ -1,0 +1,42 @@
+{
+  "domain": "estate.local",
+  "lines": [
+    {
+      "ext": "101",
+      "displayName": "Front desk",
+      "numbers": [
+        "14132642700"
+      ],
+      "voicemail": true,
+      "dnd": false,
+      "forwardTo": ""
+    },
+    {
+      "ext": "102",
+      "displayName": "Interview room",
+      "numbers": [],
+      "voicemail": true,
+      "dnd": false,
+      "forwardTo": ""
+    },
+    {
+      "ext": "103",
+      "displayName": "Voicemail",
+      "numbers": [],
+      "voicemail": true,
+      "dnd": false,
+      "forwardTo": ""
+    }
+  ],
+  "trunks": [
+    {
+      "name": "voipms",
+      "endpoint": "voipms@gateway",
+      "numbers": [
+        "14132642700"
+      ],
+      "from": "14132642700",
+      "enabled": true
+    }
+  ]
+}

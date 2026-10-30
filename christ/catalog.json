@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "note": "A capability is what you want to do; a service is a container. CHRIST resolves the first into the second, so nobody has to remember the second.",
+  "capabilities": [
+    {
+      "id": "voice",
+      "name": "Voice plane",
+      "about": "Cantus on one socket: calls, media, routing, the browser softphone. Everything else is a client of this.",
+      "services": ["switch", "christ"],
+      "requires": []
+    },
+    {
+      "id": "pstn",
+      "name": "PSTN",
+      "about": "A carrier, a DID, caller ID and the SIP border. Without it the switch still routes extension to extension.",
+      "services": ["gateway"],
+      "requires": ["voice"],
+      "env": ["VOIPMS_SIP_HOST", "VOIPMS_SIP_USERNAME", "VOIPMS_SIP_PASSWORD", "VOIPMS_SIP_FROM_USER"]
+    },
+    {
+      "id": "platform",
+      "name": "Platform (VoiceOps)",
+      "about": "Accounts, numbers, the routing document, voicemail, CDRs and the softphone — Telno, which fills zeus's role in this tree.",
+      "services": ["telno"],
+      "requires": ["voice"]
+    },
+    {
+      "id": "console",
+      "name": "Estate console",
+      "about": "The operator's window: live calls, lines, the routing document and the encryption switch.",
+      "services": ["console"],
+      "requires": ["voice"]
+    },
+    {
+      "id": "models",
+      "name": "Model gateway",
+      "about": "One OpenAI-compatible endpoint in front of every provider, local or hosted. Every AI capability below wants it.",
+      "services": ["omniroute"],
+      "requires": []
+    },
+    {
+      "id": "agents",
+      "name": "Voice agents",
+      "about": "Capstone (AgentOps) and dograh (the runtime that speaks). Their stack is large, so CHRIST attaches to it by URL instead of pretending to own it.",
+      "services": [],
+      "requires": ["voice", "models"],
+      "external": [
+        {
+          "name": "Capstone + dograh",
+          "path": "apps/capstone",
+          "env": ["CAPSTONE_URL", "DOGRAH_URL"],
+          "note": "docker compose up in apps/capstone, then point these at it. CHRIST wires its numbers either way."
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "name": "Agent memory",
+      "about": "claude-mem: what an agent did last time, compressed and injected into this time.",
+      "services": [],
+      "requires": [],
+      "external": [
+        { "name": "claude-mem", "path": "apps/claude-mem", "env": ["CLAUDE_MEM_URL"], "note": "start it from its own repo and set the URL." }
+      ]
+    },
+    {
+      "id": "mail",
+      "name": "Mail",
+      "about": "Loomix Mail over JMAP against your own Stalwart server — where voicemail and transcripts land.",
+      "services": ["webmail"],
+      "requires": [],
+      "env": ["WEBMAIL_JMAP_URL"]
+    },
+    {
+      "id": "support",
+      "name": "Training and service desk",
+      "about": "OnTrak: the graded range and the ticket queue a call escalates into.",
+      "services": ["ontrak"],
+      "requires": []
+    },
+    {
+      "id": "messaging",
+      "name": "SMS",
+      "about": "OpenSMS turns an Android phone on your network into the SMS API. A phone is not a container, so this one is attached.",
+      "services": [],
+      "requires": ["voice"],
+      "external": [
+        { "name": "OpenSMS", "path": "apps/opensms-android", "env": ["OPENSMS_URL"], "note": "run the app on the phone; set the URL it prints." }
+      ]
+    },
+    {
+      "id": "tools",
+      "name": "Agent tools",
+      "about": "REA and ontrak-mcp: what an agent can do with its hands, over MCP on stdio.",
+      "services": [],
+      "requires": [],
+      "external": [
+        { "name": "REA", "path": "apps/rea", "env": [], "note": "MCP server on stdio; the agent console launches it." },
+        { "name": "ontrak-mcp", "path": "apps/ontrak-mcp", "env": [], "note": "MCP bridge on stdio; no port to publish." }
+      ]
+    },
+    {
+      "id": "ai",
+      "name": "AI, all of it",
+      "about": "The bundle: model gateway, voices, memory and tools. This is the \"I want AI\" answer.",
+      "services": [],
+      "requires": [],
+      "capabilities": ["models", "agents", "memory", "tools"]
+    }
+  ]
+}

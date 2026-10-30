@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CHRIST — one AI voice system</title>
+    <meta name="description" content="A working telephone system with an AI receptionist: Cantus for the call, Telno for the numbers, Capstone and dograh for the voice, in containers you choose." />
+    <meta property="og:title" content="CHRIST — one AI voice system" />
+    <meta property="og:description" content="One real number, one switch, one platform, one AI receptionist — assembled from every project in the Jesus tree." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%236366f1'/%3E%3Ctext x='50' y='68' font-size='54' text-anchor='middle' fill='white' font-family='system-ui'%3E✝%3C/text%3E%3C/svg%3E" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0d12; --panel: #12151d; --line: #232937; --ink: #e7eaf3;
+        --muted: #8b93a7; --accent: #6366f1; --accent-2: #8b5cf6; --ok: #22c55e;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      a { color: inherit; }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+      header.top { display: flex; align-items: center; gap: 12px; padding: 22px 0; }
+      .mark { font-weight: 800; letter-spacing: 0.16em; }
+      .mark span { color: var(--accent); }
+      nav { margin-left: auto; display: flex; gap: 18px; font-size: 14px; color: var(--muted); }
+      nav a { text-decoration: none; }
+      nav a:hover { color: var(--ink); }
+
+      .hero { padding: 64px 0 40px; background: radial-gradient(900px 420px at 15% -10%, #1c2144 0%, transparent 70%), radial-gradient(700px 380px at 90% 0%, #2a1b46 0%, transparent 65%); }
+      .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+      h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; margin: 14px 0 18px; letter-spacing: -0.02em; }
+      h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .lede { font-size: 19px; color: #b9c0d2; max-width: 720px; }
+      .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+      .btn { display: inline-block; padding: 11px 18px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px; border: 1px solid var(--line); }
+      .btn.primary { background: linear-gradient(180deg, #6f72ff, #575ae8); border-color: #7a7dfa; color: white; box-shadow: 0 10px 30px #6366f133; }
+      .btn:hover { transform: translateY(-1px); }
+      .meta { margin-top: 22px; font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; }
+
+      section { padding: 44px 0; border-top: 1px solid var(--line); }
+      h2 { font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+      h3 { font-size: 24px; margin: 0 0 18px; letter-spacing: -0.01em; }
+
+      pre { background: #0e1118; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 13px; color: #cfd6e6; }
+      pre b { color: #9ae6b4; font-weight: 500; }
+      pre i { color: var(--muted); font-style: normal; }
+
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+      .card h4 { margin: 0 0 6px; font-size: 16px; }
+      .card p { margin: 0; color: #a9b1c4; font-size: 14px; }
+      .card .tag { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+      .flow { display: grid; gap: 8px; font-family: var(--mono); font-size: 13px; }
+      .flow .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+      .flow .row span:first-child { color: var(--muted); min-width: 130px; }
+      .flow .arrow { color: var(--accent); }
+
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 600; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+      td code { font-family: var(--mono); color: #c7d2fe; }
+
+      footer { padding: 34px 0 56px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+      footer a { color: #aab2c8; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 7px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="mark">CHRIST<span>.</span></div>
+        <nav>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#wiring">Wiring</a>
+          <a href="#honest">Honest</a>
+          <a href="https://github.com/innotelinc/christ">GitHub</a>
+        </nav>
+      </header>
+    </div>
+
+    <div class="hero">
+      <div class="wrap">
+        <div class="kicker">Cantus 1.0 · VoiceOps · AgentOps</div>
+        <h1>One AI voice system,<br /><em>assembled from nine programs.</em></h1>
+        <p class="lede">
+          A real phone number rings a person in office hours and an AI receptionist after
+          them. One switch owns every call; the platform owns the numbers; the agent owns
+          the conversation. You choose which containers exist.
+        </p>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/innotelinc/christ#quick-start">Start it</a>
+          <a class="btn" href="https://github.com/innotelinc/jesus">The tree behind it</a>
+        </div>
+        <div class="meta">
+          <span><span class="dot"></span>SIP only at the border</span>
+          <span>no telemetry</span>
+          <span>local speech · local LLM</span>
+          <span>9 containers, 1 profile each</span>
+        </div>
+      </div>
+    </div>
+
+    <section id="capabilities">
+      <div class="wrap">
+        <h2>What do you want it to do?</h2>
+        <h3>Name the capability. Do not learn the containers.</h3>
+        <pre><i>$</i> node cli.js select ai
+<b>capabilities:</b> models, voice, agents, memory, tools
+<b>containers:</b>   omniroute, switch, christ
+<b>attached:</b>     Capstone + dograh <i>→ set CAPSTONE_URL, DOGRAH_URL</i>
+<b>run:</b> docker compose --profile core --profile models --profile voice … up -d</pre>
+        <div class="grid" style="margin-top: 18px">
+          <div class="card"><div class="tag">voice</div><h4>The floor</h4><p>Calls, media, routing and the browser softphone on one socket. No SIP, no AMI, no RTP range.</p></div>
+          <div class="card"><div class="tag">pstn</div><h4>A real number</h4><p>A carrier trunk, a DID and caller ID — in the only process that speaks SIP.</p></div>
+          <div class="card"><div class="tag">platform</div><h4>VoiceOps</h4><p>Accounts, extensions, IVR, voicemail, CDRs and the softphone. It writes the routing document; the switch executes it.</p></div>
+          <div class="card"><div class="tag">agents</div><h4>The conversation</h4><p>Capstone and dograh take the call over ARI, with STT, an LLM and TTS around it.</p></div>
+          <div class="card"><div class="tag">models</div><h4>One endpoint</h4><p>OmniRoute in front of every provider, or a local model with nothing leaving the box.</p></div>
+          <div class="card"><div class="tag">souls</div><h4>The identity</h4><p>Souls compiled into prompts: extension, voice, model and the text the agent is spoken from.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="wiring">
+      <div class="wrap">
+        <h2>The wiring</h2>
+        <h3>One declaration in, the switch's whole dial plan out.</h3>
+        <div class="flow">
+          <div class="row"><span>carrier</span>14132642700 <span class="arrow">→</span> gateway <span class="arrow">→</span> switch</div>
+          <div class="row"><span>in hours</span>line 101 <span class="arrow">→</span> bridge 25s <span class="arrow">→</span> voicemail</div>
+          <div class="row"><span>after hours</span>answer <span class="arrow">→</span> ari <code>dograh</code> <span class="arrow">→</span> the receptionist</div>
+          <div class="row"><span>outbound</span>1&#8203;?????????? <span class="arrow">→</span> trunk <span class="arrow">→</span> the carrier</div>
+        </div>
+        <p class="lede" style="margin-top: 20px; font-size: 16px">
+          The document is validated with the switch's own router, posted, and then read
+          back — a 200 that leaves the old plan loaded is a failure. The DID is answered
+          in all three forms a carrier might send: eleven digits, ten, and <code>+1</code>.
+        </p>
+      </div>
+    </section>
+
+    <section id="honest">
+      <div class="wrap">
+        <h2>Stated plainly</h2>
+        <h3>What is a container, and what is a neighbour.</h3>
+        <table>
+          <tr><th>Claim</th><th>Reality</th></tr>
+          <tr><td>One system</td><td>One switch, one routing document, one DID. The products stay separate processes with their own repositories.</td></tr>
+          <tr><td>AI integrated</td><td>Numbers, routes and prompts are wired. Importing a compiled prompt into a dograh workflow is a paste today, not an API call.</td></tr>
+          <tr><td>Composable</td><td>Nine services behind profiles. Capstone, dograh, claude-mem, REA, OpenSMS and Soulforge are attached by URL, and the catalog says so.</td></tr>
+          <tr><td>Tested</td><td>The wiring suite checks the plan against the switch's router and against a real HTTP stub; the front door is tested over real sockets.</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        CHRIST · part of the <a href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a> ·
+        <a href="https://github.com/innotelinc/christ">source</a> ·
+        <a href="https://github.com/innotelinc/jesus">the tree</a>
+      </div>
+    </footer>
+  </body>
+</html>
