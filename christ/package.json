@@ -1,0 +1,21 @@
+{
+  "name": "christ",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "One AI voice system: Cantus voice plane, Telno platform, Capstone/dograh agents and Soulforge souls, in containers you choose",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "christ": "./cli.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "board": "node cli.js board",
+    "wire": "node cli.js wire",
+    "souls": "node cli.js souls",
+    "select": "node cli.js select"
+  }
+}

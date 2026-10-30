@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "domain": "estate.local",
+  "did": "14132642700",
+  "trunk": {
+    "name": "voipms",
+    "endpoint": "voipms@gateway",
+    "from": "14132642700"
+  },
+  "lines": [
+    { "ext": "101", "displayName": "Front desk", "numbers": ["14132642700"], "voicemail": true },
+    { "ext": "102", "displayName": "Interview room", "voicemail": true },
+    { "ext": "103", "displayName": "Voicemail", "voicemail": true }
+  ],
+  "agents": [
+    { "ext": "8000", "name": "IT help desk", "soul": "helpdesk.md" },
+    { "ext": "8003", "name": "Receptionist", "soul": "receptionist.md" },
+    { "ext": "8004", "name": "Outreach", "soul": "outreach.md" }
+  ],
+  "agentApp": "dograh",
+  "officeHours": {
+    "weekday": ["mon", "tue", "wed", "thu", "fri"],
+    "time": "09:00-17:00",
+    "line": "101"
+  },
+  "afterHours": { "agent": "8003" }
+}

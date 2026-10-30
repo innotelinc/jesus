@@ -1,0 +1,109 @@
+# CHRIST — the composition root's own suite.
+#
+# Hand-written, like the Cantus gate, and for the same class of reason: the
+# generator in tools/port-workflows.pl ports `apps/<app>/.github/workflows`, and
+# `christ/` lives at the tree root because it is not one of the products — it is
+# what wires them into a system. The workflow's source of truth is
+# christ/.github/workflows/ci.yml in the standalone repository; this copy is the
+# one GitHub runs here, where the switch's Router is a sibling directory.
+#
+# It is path-filtered on purpose and is not a required check: a required check
+# that never runs on an unrelated pull request leaves that pull request
+# unmergeable forever.
+
+name: "christ: CI"
+
+on:
+  push:
+    paths:
+      - "christ/**"
+      - "apps/cantus-switch/src/router.js"
+      - ".github/workflows/christ-ci.yml"
+    branches: [main, master]
+  pull_request:
+    paths:
+      - "christ/**"
+      - "apps/cantus-switch/src/router.js"
+  workflow_dispatch:
+
+concurrency:
+  group: christ-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: Suite (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22", "24"]
+    defaults:
+      run:
+        working-directory: christ
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run the suite
+        # Real sockets: a stub switch, a proxied product, a front door in a
+        # child process. The switch's Router validates the plan, so a schema
+        # change in one app fails here rather than on the first call.
+        run: node --test test/*.test.js
+
+  plan:
+    name: Select, souls and the dial plan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: christ
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Compile the souls
+        run: |
+          set -euo pipefail
+          node cli.js souls
+          node -e "const a=require('./out/agents.json'); if(a.agents.length!==3) throw new Error('expected three agents, got '+a.agents.length); for (const x of a.agents) if (x.prompt.length<200) throw new Error(x.name+' has no prompt')"
+
+      - name: Resolve a selection into containers
+        run: |
+          set -euo pipefail
+          node cli.js select ai --json > /tmp/select.json
+          node -e "const s=require('/tmp/select.json'); if(!s.services.includes('switch')) throw new Error('the voice plane is missing from an AI selection'); if(!s.command.includes('--profile core')) throw new Error('core is not the floor')"
+
+      - name: Plan the wiring without touching a switch
+        run: |
+          set -euo pipefail
+          node cli.js wire --dry-run
+          node -e "const r=require('./switch/routes.json'); if(!r.routes.find(x=>x.name==='did-14132642700-office')) throw new Error('the DID has no office-hours route'); if(!r.routes.find(x=>x.name==='did-14132642700-after-hours')) throw new Error('the DID has no after-hours route')"
+
+      - name: The compose file is valid with every profile on
+        env:
+          CANTUS_SECRET: ci-secret
+          CANTUS_CONTROL_TOKEN: ci-token
+        run: |
+          set -euo pipefail
+          docker compose config --quiet
+          docker compose --profile core --profile pstn --profile platform --profile console --profile models config --services > /tmp/services.txt
+          for service in switch christ gateway telno console omniroute; do
+            grep -qx "$service" /tmp/services.txt || { echo "::error::compose does not declare $service"; exit 1; }
+          done

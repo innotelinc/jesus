@@ -19,7 +19,7 @@ commit history it earned.
 
 ## What is in here
 
-Fourteen projects under [`apps/`](apps), one directory each:
+Fourteen projects under [`apps/`](apps), one directory each, plus [`christ/`](christ) — the product that wires them into one system:
 
 | Directory | Project | What it is | Primary language |
 | --- | --- | --- | --- |
@@ -37,6 +37,7 @@ Fourteen projects under [`apps/`](apps), one directory each:
 | [apps/dograh](apps/dograh) | [Dograh](https://github.com/innotelinc/dograh) | Open-source voice agent platform. | Python / TypeScript |
 | [apps/freebuff](apps/freebuff) | [Onyx](https://github.com/innotelinc/freebuff) | The terminal coding agent that runs on your own gateway: any model, any provider, no account, no telemetry. | TypeScript |
 | [apps/claude-mem](apps/claude-mem) | [claude-mem](https://github.com/thedotmack/claude-mem) | Upstream project: persistent context across agent sessions — captures what an agent did, compresses it, injects it into future sessions. Vendored unmodified. | TypeScript / Python |
+| [christ](christ) | [CHRIST](https://github.com/innotelinc/christ) | The composition root: one DID, one switch, one platform, one AI receptionist, and a live board — with nine composable containers and a capability catalog, so a box runs only the parts it was asked to run. | JavaScript / Node |
 
 ## The estate
 
@@ -62,6 +63,28 @@ throwaway Vultr instance. See [estate/README.md](estate/README.md).
 The Asterisk/FreePBX stack these products used to run on is gone: the dialplan is a JSON
 routing document, extension provisioning is `POST /v1/lines`, and the only thing that still
 speaks ARI is dograh, which the switch serves at `/ari/*`.
+
+## CHRIST — the system, not the parts
+
+[`estate/`](estate) is a demo. [`christ/`](christ) is the product: the same voice plane,
+plus the wiring that makes it one system and the page that shows it live.
+
+- `christ/estate.json` is the whole telephone system in one file — the DID, the lines, the
+trunk, the agents, and the hours at which a machine answers instead of a person.
+- `node cli.js wire` turns that into the switch's routing document, validates it with the
+  switch's own `Router`, applies it and reads it back.
+- `node cli.js souls` compiles the agents in `christ/souls/` into prompts and an
+  `agents.json` the AI plane can be populated from.
+- `node cli.js select ai` turns a wish into the exact compose profiles that satisfy it:
+  nine containers, one profile each, and an honest list of what stays outside.
+- `node server.js` is the front door: the live board, the plan, the souls, and one origin
+  in front of every product (`/p/<id>/`).
+
+It is a directory here rather than a project under `apps/` because it is not one of the
+products — it is what makes them a telephone system. Its own repository is
+[`innotelinc/christ`](https://github.com/innotelinc/christ); this directory is the
+canonical copy, and its CI workflow is the one hand-written root workflow that the
+workflow generator does not own (it lives outside `apps/`).
 
 ## History
 

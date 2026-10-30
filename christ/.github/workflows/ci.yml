@@ -1,0 +1,115 @@
+# CI — the wiring, the souls, the catalog and the front door.
+#
+# The suites start real sockets: a stub switch that answers the control API, a
+# product to proxy to, and a front door in a child process. Nothing is mocked
+# into agreement with itself, so a red run means the system stopped working
+# rather than a stub drifting from the code.
+#
+# CHRIST is the composition root of the jesus tree: the wiring engine validates
+# a routing document with the switch's own Router instead of keeping a second
+# copy of the schema. A job therefore checks out jesus as well, and runs *this*
+# commit's CHRIST inside it. That is the same layout a developer has.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: Suite (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor package.json claims; 24 is what the estate runs.
+        node: ["20", "22", "24"]
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check out the tree that owns the voice plane
+        uses: actions/checkout@v7
+        with:
+          repository: innotelinc/jesus
+          path: tree
+          persist-credentials: false
+
+      - name: Put this commit's CHRIST inside the tree
+        run: |
+          set -euo pipefail
+          rm -rf tree/christ
+          mkdir -p tree/christ
+          rsync -a --exclude tree --exclude .git ./ tree/christ/
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run the suite
+        working-directory: tree/christ
+        run: node --test test/*.test.js
+
+  contract:
+    name: Commands, compose and the plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check out the tree
+        uses: actions/checkout@v7
+        with:
+          repository: innotelinc/jesus
+          path: tree
+          persist-credentials: false
+
+      - name: Put this commit's CHRIST inside the tree
+        run: |
+          set -euo pipefail
+          rm -rf tree/christ
+          mkdir -p tree/christ
+          rsync -a --exclude tree --exclude .git ./ tree/christ/
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Select, compile and plan — without a switch
+        working-directory: tree/christ
+        run: |
+          set -euo pipefail
+          node cli.js select ai --json > /tmp/select.json
+          node -e "const s=require('/tmp/select.json'); if(!s.services.includes('switch')) throw new Error('the voice plane is missing from an AI selection'); if(!s.command.includes('--profile core')) throw new Error('core is not the floor')"
+          node cli.js souls
+          node -e "const a=require('./out/agents.json'); if(a.agents.length!==3) throw new Error('expected three agents, got '+a.agents.length); for (const x of a.agents) if (x.prompt.length<200) throw new Error(x.name+' has no prompt')"
+          node cli.js wire --dry-run
+          node -e "const r=require('./switch/routes.json'); if(!r.routes.find(x=>x.name==='did-14132642700-office')) throw new Error('the DID has no office-hours route'); if(!r.routes.find(x=>x.name==='did-14132642700-after-hours')) throw new Error('the DID has no after-hours route')"
+
+      - name: The compose file is valid with every profile on
+        working-directory: tree/christ
+        env:
+          CANTUS_SECRET: ci-secret
+          CANTUS_CONTROL_TOKEN: ci-token
+        run: |
+          set -euo pipefail
+          docker compose config --quiet
+          docker compose --profile core --profile pstn --profile platform --profile console --profile models config --services > /tmp/services.txt
+          for service in switch christ gateway telno console omniroute; do
+            grep -qx "$service" /tmp/services.txt || { echo "::error::compose does not declare $service"; exit 1; }
+          done

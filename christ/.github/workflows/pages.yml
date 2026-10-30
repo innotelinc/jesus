@@ -1,0 +1,50 @@
+# Publish the landing page (web/landing/) to GitHub Pages.
+#
+#   https://innotelinc.github.io/christ/
+#
+# Enable once: Settings → Pages → Source: "GitHub Actions". The workflow also
+# attempts to enable it, so a fresh repository needs no manual step.
+# workflow_dispatch works too.
+
+name: GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "web/landing/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+        with:
+          enablement: true
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/landing
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
