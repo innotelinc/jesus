@@ -79,17 +79,16 @@ services:
   # serves what" is a file rather than a memory. TLS terminates here and nowhere
   # else; the services behind it speak plain HTTP on the container network.
   #
-  # EDGE_AUTO_HTTPS=off turns the same map into plain HTTP on :80, which is how a
-  # box without DNS pointing at it is tested with Host headers.
+  # There is no TLS knob here: the map decides the hosts and the certificate for
+  # each is automatic. `node cli.js edge --http` renders the same map as plain
+  # HTTP for a probe container, which is how a box whose DNS points elsewhere is
+  # tested with Host headers without weakening the deployed front door.
   edge:
     profiles: ["core"]
     image: caddy:2-alpine
     container_name: christ-edge
     restart: unless-stopped
     <<: *logging
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL:-ops@telno.services}
-      EDGE_AUTO_HTTPS: ${EDGE_AUTO_HTTPS:-on}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - edge-data:/data
