@@ -30,7 +30,7 @@
       "about": "The switch is the fax machine, or rather the two software modems beside it: iaxmodem over IAX2 with HylaFAX behind them, so a page leaves as modem tones with no carrier fax API and no per-page fee. It needs the platform, because Telno is where a fax is queued and read.",
       "services": ["fax-engine"],
       "requires": ["platform"],
-      "env": ["FAX_NUMBER", "FAX_ENGINE_TOKEN", "FAX_SIP_USERNAME", "FAX_SIP_PASSWORD"]
+      "env": ["FAX_NUMBER", "FAX_NUMBER0", "FAX_NUMBER1", "FAX_ENGINE_TOKEN", "FAX_IAX_USERNAME", "FAX_IAX_PASSWORD", "FAX_IAX_HOST", "FAX_SIP_USERNAME", "FAX_SIP_PASSWORD"]
     },
     {
       "id": "console",

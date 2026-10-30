@@ -53,6 +53,7 @@ RUN set -eux; \
     chown uucp:uucp /var/spool/hylafax
 
 COPY asterisk/iax.conf /etc/asterisk/iax.conf.tmpl
+COPY asterisk/iax-carrier.conf.tmpl /etc/asterisk/iax-carrier.conf.tmpl
 COPY asterisk/extensions.conf /etc/asterisk/extensions.conf.tmpl
 COPY asterisk/pjsip.conf.tmpl /etc/asterisk/pjsip.conf.tmpl
 COPY asterisk/pjsip-carrier.conf.tmpl /etc/asterisk/pjsip-carrier.conf.tmpl

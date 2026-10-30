@@ -1,0 +1,32 @@
+; The carrier trunk for the fax DID, over IAX2.
+;
+; VoIP.ms hands a fax sub-account an IAX2 identity as readily as a SIP one, and
+; for a fax that is the better door: the modem already speaks IAX2, so the call
+; crosses no SIP stack, needs no SDP, no ICE and no RTP/RTCP, and the modem's
+; 16-bit linear samples are transcoded once (to ulaw) rather than twice.
+;
+; Appended only when the estate supplies FAX_IAX_USER / FAX_IAX_SECRET; with no
+; credentials this file is not rendered at all and the engine stays
+; loopback-only, which is what the container self-test needs.
+;
+; The `register` line is not here — Asterisk only reads that in [general], so
+; the entrypoint substitutes it into iax.conf instead.
+[carrier]
+type=friend
+host=__IAX_HOST__
+username=__IAX_USER__
+secret=__IAX_SECRET__
+context=fax-in
+; One trunk carries every DID on the sub-account, so inbound calls are matched
+; by the peer rather than by a number in the peer name.
+trunk=yes
+; iaxmodem's libiax2 predates call tokens; a carrier that offers one is not
+; helped by this, but nothing breaks if the option is present.
+requirecalltoken=no
+qualify=yes
+qualifyfreq=60
+disallow=all
+allow=ulaw
+allow=alaw
+transfer=no
+callerid="Telno fax" <__NUMBER0__>

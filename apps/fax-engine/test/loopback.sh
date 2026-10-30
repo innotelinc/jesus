@@ -12,6 +12,17 @@ SPOOL=${FAX_SPOOL:-/var/spool/hylafax}
 TO=${1:-9999}
 WAIT=${2:-150}
 
+# With a carrier sub-account configured, a modem's outbound call goes to the
+# carrier, so "dial 9999" is a real and billed call to a stranger's number. The
+# self-test exists to prove the loopback rig; on a live engine it would be a
+# phone call, so it refuses instead of being clever about it.
+if [ -n "${FAX_IAX_USER:-}" ] && [ "${FAX_SELFTEST_FORCE:-}" != "1" ]; then
+  echo "[self-test] a carrier sub-account is configured ($FAX_IAX_USER), so this" >&2
+  echo "[self-test] engine dials the carrier rather than the sibling modem: not" >&2
+  echo "[self-test] placing a real call to $TO. Run with FAX_SELFTEST_FORCE=1 to." >&2
+  exit 1
+fi
+
 # A marker newer than the file we are waiting for: recvq gains a zero-length
 # placeholder the moment the call is answered, so counting files is not enough —
 # the page is only there once faxinfo can read it.

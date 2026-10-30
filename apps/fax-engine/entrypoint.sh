@@ -8,6 +8,17 @@ set -eu
 
 FAX_SECRET=${FAX_SECRET:-telno-fax-local}
 FAX_NUMBER=${FAX_NUMBER:-14132642700}
+# One modem can sit on its own line: modem 0 on the first DID, modem 1 on the
+# second. Both default to FAX_NUMBER, because a single line is the normal case
+# and a two-line engine that says which modem is which is the useful one.
+FAX_NUMBER0=${FAX_NUMBER0:-$FAX_NUMBER}
+FAX_NUMBER1=${FAX_NUMBER1:-$FAX_NUMBER}
+# The fax's own carrier sub-account. An IAX2 identity is the better door for a
+# fax — the modem already speaks IAX2 — so it is preferred over SIP when both
+# are present.
+FAX_IAX_USER=${FAX_IAX_USER:-}
+FAX_IAX_SECRET=${FAX_IAX_SECRET:-}
+FAX_IAX_HOST=${FAX_IAX_HOST:-newyork1.voip.ms}
 FAX_STATION_ID=${FAX_STATION_ID:-Telno}
 FAX_ENGINE_TOKEN=${FAX_ENGINE_TOKEN:-}
 FAX_ENGINE_PORT=${FAX_ENGINE_PORT:-8080}
@@ -37,7 +48,8 @@ index=0
 while [ "$index" -lt 2 ]; do
   device="ttyIAX$index"
   port=$((4570 + index))
-  sed -e "s|__NUMBER__|$FAX_NUMBER|g" \
+  if [ "$index" -eq 0 ]; then number=$FAX_NUMBER0; else number=$FAX_NUMBER1; fi
+  sed -e "s|__NUMBER__|$number|g" \
       -e "s|__STATION__|$FAX_STATION_ID|g" \
       -e "s|__DEVICE__|$device|g" \
       /opt/fax/config.ttyIAX > "$SPOOL/etc/config.$device"
@@ -46,26 +58,61 @@ while [ "$index" -lt 2 ]; do
       -e "s|__PEER__|iax$index|g" \
       -e "s|__SECRET__|$FAX_SECRET|g" \
       -e "s|__STATION__|$FAX_STATION_ID|g" \
-      -e "s|__NUMBER__|$FAX_NUMBER|g" \
+      -e "s|__NUMBER__|$number|g" \
       /etc/iaxmodem/iaxmodem.conf.ttyIAX > "/etc/iaxmodem/$device.conf"
   index=$((index + 1))
 done
 
-# 3. Asterisk: the IAX2 switchboard, and the SIP door when a carrier is set.
+# 3. Asterisk: the IAX2 switchboard, the carrier door when one is set, and the
+#    SIP door for a carrier that only offers SIP.
+#
+#    One switch, two shapes: without a sub-account a modem's outbound call goes
+#    to the sibling modem (the loopback rig), with one it goes to the carrier.
+#    The dialplan is rendered either way, so there is no half-configured state
+#    where a page is queued and never leaves.
+if [ -n "$FAX_IAX_USER" ] && [ -n "$FAX_IAX_SECRET" ]; then
+  register="register => $FAX_IAX_USER:$FAX_IAX_SECRET@$FAX_IAX_HOST"
+  outbound0="IAX2/carrier"
+  outbound1="IAX2/carrier"
+  log "carrier trunk enabled over IAX2 for $FAX_IAX_USER@$FAX_IAX_HOST"
+else
+  register="; no carrier sub-account: loopback only (the self-test rig)"
+  outbound0="IAX2/iax1"
+  outbound1="IAX2/iax0"
+fi
+
 sed -e "s|__FAX_SECRET__|$FAX_SECRET|g" \
-    -e "s|__FAX_NUMBER__|$FAX_NUMBER|g" \
+    -e "s|__NUMBER0__|$FAX_NUMBER0|g" \
+    -e "s|__NUMBER1__|$FAX_NUMBER1|g" \
+    -e "s|; __IAX_REGISTER__|$register|" \
     /etc/asterisk/iax.conf.tmpl > /etc/asterisk/iax.conf
-sed -e "s|__FAX_NUMBER__|$FAX_NUMBER|g" \
+sed -e "s|__OUTBOUND0__|$outbound0|g" \
+    -e "s|__OUTBOUND1__|$outbound1|g" \
+    -e "s|__NUMBER0__|$FAX_NUMBER0|g" \
+    -e "s|__NUMBER1__|$FAX_NUMBER1|g" \
     /etc/asterisk/extensions.conf.tmpl > /etc/asterisk/extensions.conf
 
+if [ -n "$FAX_IAX_USER" ] && [ -n "$FAX_IAX_SECRET" ]; then
+  sed -e "s|__IAX_USER__|$FAX_IAX_USER|g" \
+      -e "s|__IAX_SECRET__|$FAX_IAX_SECRET|g" \
+      -e "s|__IAX_HOST__|$FAX_IAX_HOST|g" \
+      -e "s|__NUMBER0__|$FAX_NUMBER0|g" \
+      /etc/asterisk/iax-carrier.conf.tmpl >> /etc/asterisk/iax.conf
+fi
+
+# Two substitutions, not one: a replacement containing a newline ends the sed
+# command, so a single two-line value silently made this file unrenderable on
+# every host that sets PUBLIC_IP.
 if [ -n "$PUBLIC_IP" ]; then
-  external="external_media_address=$PUBLIC_IP
-external_signaling_address=$PUBLIC_IP"
+  media_line="external_media_address=$PUBLIC_IP"
+  signaling_line="external_signaling_address=$PUBLIC_IP"
 else
-  external="; no PUBLIC_IP given: the carrier sees the container's own address"
+  media_line="; no PUBLIC_IP given: the carrier sees the container's own address"
+  signaling_line="; (no PUBLIC_IP: signalling address left to the container)"
 fi
 sed -e "s|__SIP_BIND_PORT__|$FAX_SIP_BIND_PORT|g" \
-    -e "s|; __SIP_EXTERNAL_LINES__|$external|" \
+    -e "s|; __SIP_EXTERNAL_MEDIA__|$media_line|" \
+    -e "s|; __SIP_EXTERNAL_SIGNALING__|$signaling_line|" \
     /etc/asterisk/pjsip.conf.tmpl > /etc/asterisk/pjsip.conf
 
 if [ -n "$FAX_SIP_USER" ] && [ -n "$FAX_SIP_SECRET" ]; then
@@ -85,6 +132,7 @@ chown -R uucp:uucp "$SPOOL"
 mkdir -p /var/run/asterisk /var/log/asterisk
 chown -R asterisk:asterisk /var/run/asterisk /var/log/asterisk
 
-export FAX_ENGINE_TOKEN FAX_ENGINE_PORT FAX_NUMBER FAX_STATION_ID
-log "station $FAX_STATION_ID · number $FAX_NUMBER · status on :$FAX_ENGINE_PORT"
+export FAX_ENGINE_TOKEN FAX_ENGINE_PORT FAX_NUMBER FAX_NUMBER0 FAX_NUMBER1 \
+       FAX_STATION_ID FAX_IAX_USER FAX_IAX_HOST
+log "station $FAX_STATION_ID · numbers $FAX_NUMBER0/$FAX_NUMBER1 · status on :$FAX_ENGINE_PORT"
 exec supervisord -n -c /etc/supervisor/supervisord.conf
