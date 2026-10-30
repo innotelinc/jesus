@@ -57,31 +57,34 @@ export function pickTarball(packJsonOutput) {
  *
  * `npm pack` runs `prepare` before it packs, and that script is free to print:
  * `husky` writes "husky - .git can't be found" to stdout whenever the package is
- * not at the root of its own repository. Under this monorepo that is every run —
- * apps/omniroute has no .git of its own — so a strict JSON.parse of stdout failed
- * the boot gate on a hook's sentence instead of on the artifact. The pack calls
- * also set HUSKY=0, so there should be nothing to skip; this keeps a future hook
- * from turning into a red gate either way.
+ * not at the root of its own repository, and "HUSKY=0 skip install" — with no
+ * trailing newline, so npm's own `[` begins on the same line — when it is told to
+ * stay quiet. Under this monorepo that is every run: apps/omniroute has no .git
+ * of its own. A strict JSON.parse of stdout therefore failed the boot gate on a
+ * hook's sentence rather than on the artifact it exists to boot.
+ *
+ * The document is the last thing npm writes, so the array ends at the final `]`;
+ * the first `[` that parses against that end is the top-level one. Chatter need
+ * not be newline-aligned for that to work.
  */
 function parsePackJson(output) {
   try {
-    return JSON.parse(output);
+    const whole = JSON.parse(output);
+    if (Array.isArray(whole)) return whole;
   } catch {
     // Fall through: the document is in there, just not at byte 0.
   }
-  const lines = output.split(/\r?\n/);
-  const first = lines.findIndex((line) => /^\s*[[{]/.test(line));
-  if (first === -1) throw new Error("npm pack --json printed no JSON document");
-  // Shrink from the tail until the parser accepts it, so trailing chatter is
-  // skipped too rather than becoming part of the parse.
-  for (let end = lines.length; end > first; end -= 1) {
+  const end = output.lastIndexOf("]") + 1;
+  for (let start = output.indexOf("["); start !== -1 && start < end; ) {
     try {
-      return JSON.parse(lines.slice(first, end).join("\n"));
+      const parsed = JSON.parse(output.slice(start, end));
+      if (Array.isArray(parsed)) return parsed;
     } catch {
-      // One more line of noise; keep going.
+      // An inner array, or a bracket in the chatter; try the next one.
     }
+    start = output.indexOf("[", start + 1);
   }
-  throw new Error("npm pack --json printed no parseable JSON document");
+  throw new Error("npm pack --json printed no JSON array");
 }
 
 /**
