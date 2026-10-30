@@ -40,3 +40,37 @@ jobs:
 
       - name: Run the suite
         run: npm test
+
+  stability:
+    name: Ten consecutive runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Run the suite ten times
+        # One green run cannot tell a fixed suite from a lucky one, and this
+        # suite has an intermittent failure in its past. A flake that reaches
+        # main does more damage than a bug: it turns a red build into something
+        # people re-run until it passes. Ten runs in a row is the cheapest
+        # evidence that red means a real regression, and at a second each it
+        # costs less than the checkout above it.
+        run: |
+          set -euo pipefail
+          log="$(mktemp)"
+          for i in $(seq 1 10); do
+            if ! npm test --silent >"$log" 2>&1; then
+              echo "::error::run $i of 10 failed — treat this as a timing bug in the suite, not a runner having a bad day"
+              cat "$log"
+              exit 1
+            fi
+            printf 'run %d: %s\n' "$i" "$(grep -m1 '^ℹ pass' "$log")"
+          done
+          rm -f "$log"
