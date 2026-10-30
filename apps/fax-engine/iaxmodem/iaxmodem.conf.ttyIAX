@@ -1,0 +1,19 @@
+# One software modem, rendered per device by the entrypoint.
+#
+# iaxmodem is an IAX2 client: it registers to the Asterisk in this container and
+# is reached by dialling its peer name. The tty it creates is what HylaFAX opens
+# as a fax machine, so everything HylaFAX believes about the modem is true — the
+# modulation happens in spandsp inside this process.
+device		__DEVICE__
+owner		uucp:uucp
+mode		660
+# The local IAX2 port the Asterisk server talks to. One per modem.
+port		__PORT__
+refresh		60
+server		127.0.0.1
+peername	__PEER__
+secret		__SECRET__
+cidname		__STATION__
+cidnumber	__NUMBER__
+# 16-bit linear: the modem's own samples, untouched by a codec.
+codec		slinear

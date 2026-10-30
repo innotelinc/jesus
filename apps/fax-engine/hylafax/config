@@ -1,0 +1,23 @@
+# HylaFAX server configuration — the file faxsetup writes.
+#
+# It exists in the image before `hylafax-server` is installed, on purpose: when
+# this file is present faxsetup skips the country/area-code dialogue that hangs
+# a build with no stdin. The values here are the estate's station.
+CountryCode:		1
+AreaCode:		585
+FAXNumber:		+1.413.264.2700
+LongDistancePrefix:	1
+InternationalPrefix:	011
+DialStringRules:	etc/dialrules
+ServerTracing:		1
+SessionTracing:		11
+RecvFileMode:		0600
+LogFileMode:		0600
+DeviceMode:		0600
+RingsBeforeAnswer:	1
+SpeakerVolume:		off
+GettyArgs:		"-h %l dx_%s"
+LocalIdentifier:	"Telno"
+TagLineFont:		etc/lutRS18.pcf
+TagLineFormat:		"From %%l|%c|Page %%P of %%T"
+MaxRecvPages:		50

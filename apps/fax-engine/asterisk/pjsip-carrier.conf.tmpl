@@ -1,0 +1,44 @@
+; The carrier trunk for the fax DID. Appended only when the estate supplies a
+; sub-account (FAX_SIP_USER / FAX_SIP_SECRET); with no credentials this file is
+; not rendered at all and the engine runs loopback-only, which is what the
+; container self-test needs.
+[carrier]
+type=endpoint
+transport=transport-udp
+context=fax-in
+disallow=all
+allow=ulaw
+allow=alaw
+direct_media=no
+force_rport=yes
+rewrite_contact=yes
+rtp_symmetric=yes
+from_user=__SIP_USER__
+from_domain=__SIP_HOST__
+outbound_auth=carrier-auth
+aors=carrier
+
+[carrier]
+type=aor
+contact=sip:__SIP_HOST__:__SIP_PORT__
+qualify_frequency=30
+
+[carrier]
+type=identify
+endpoint=carrier
+match=__SIP_HOST__
+
+[carrier-reg]
+type=registration
+transport=transport-udp
+outbound_auth=carrier-auth
+server_uri=sip:__SIP_HOST__:__SIP_PORT__
+client_uri=sip:__SIP_USER__@__SIP_HOST__
+retry_interval=60
+forbidden_retry_interval=600
+
+[carrier-auth]
+type=outbound_auth
+auth_type=userpass
+username=__SIP_USER__
+password=__SIP_SECRET__

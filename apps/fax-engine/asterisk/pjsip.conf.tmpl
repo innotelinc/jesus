@@ -1,0 +1,17 @@
+; A SIP door, because a carrier cannot speak IAX2.
+;
+; The modem path (IAX2) is internal and loopback-bound; this is the one place a
+; fax call can enter from outside. It is only meaningful when the estate gives
+; the fax its own sub-account: a fax DID has to arrive here directly, not
+; through the Cantus switch, which carries voice only and would transcode the
+; modem tones it was never meant to carry.
+[global]
+type=global
+user_agent=Telno fax (Cantus estate)
+
+[transport-udp]
+type=transport
+protocol=udp
+bind=0.0.0.0:__SIP_BIND_PORT__
+allow_reload=yes
+; __SIP_EXTERNAL_LINES__
