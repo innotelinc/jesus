@@ -14,4 +14,9 @@ type=transport
 protocol=udp
 bind=0.0.0.0:__SIP_BIND_PORT__
 allow_reload=yes
-; __SIP_EXTERNAL_LINES__
+; One placeholder per line on purpose. Both addresses used to be substituted as
+; a single two-line value, and `sed` reads the newline in a replacement as the
+; end of the command — so any host that set PUBLIC_IP failed to render this file
+; at all, with "unterminated `s' command" and no mention of the address.
+; __SIP_EXTERNAL_MEDIA__
+; __SIP_EXTERNAL_SIGNALING__

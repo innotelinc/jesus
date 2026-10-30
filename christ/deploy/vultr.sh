@@ -280,13 +280,21 @@ VOIPMS_SIP_PASSWORD=${VOIPMS_SIP_PASSWORD:-}
 VOIPMS_SIP_FROM_USER=${VOIPMS_SIP_FROM_USER:-}
 VOIPMS_SIP_DOMAIN=${VOIPMS_SIP_DOMAIN:-}
 SIP_SRTP=${SIP_SRTP:-on}
-# The fax machine. FAX_SECRET stays on this box; the THREE FAX_SIP_* values are
-# the fax's own carrier sub-account, because a fax DID must reach the modem
-# directly instead of being carried as a voice call through the switch.
+# The fax machine. FAX_SECRET stays on this box; the FAX_IAX_* / FAX_SIP_*
+# values are the fax's own carrier sub-account, because a fax DID must reach the
+# modem directly instead of being carried as a voice call through the switch.
+# An IAX2 sub-account is preferred: the modem already speaks IAX2, so the page
+# crosses no SIP stack and is transcoded once instead of twice.
 FAX_SECRET=$fax_secret
 FAX_STATION_ID=${FAX_STATION_ID:-Telno}
 FAX_NUMBER=${FAX_NUMBER:-}
+# One modem per line; both default to FAX_NUMBER on a single-line engine.
+FAX_NUMBER0=${FAX_NUMBER0:-}
+FAX_NUMBER1=${FAX_NUMBER1:-}
 FAX_ENGINE_TOKEN=$token
+FAX_IAX_USERNAME=${FAX_IAX_USERNAME:-}
+FAX_IAX_PASSWORD=${FAX_IAX_PASSWORD:-}
+FAX_IAX_HOST=${FAX_IAX_HOST:-newyork1.voip.ms}
 FAX_SIP_USERNAME=${FAX_SIP_USERNAME:-}
 FAX_SIP_PASSWORD=${FAX_SIP_PASSWORD:-}
 FAX_SIP_HOST=${FAX_SIP_HOST:-}

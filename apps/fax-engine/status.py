@@ -55,7 +55,9 @@ def registrations():
         fields = line.split()
         if len(fields) < 6:
             continue
-        username, state = fields[2], fields[-1]
+        # The state is the rest of the line, not the last word: "Request Sent"
+        # truncated to "Sent" is the difference between waiting and failing.
+        username, state = fields[2], " ".join(fields[5:])
         rows[username] = {
             "host": fields[0],
             "state": state,
@@ -68,7 +70,8 @@ def links():
     """Peer reachability, which catches a registered modem whose UDP path died."""
     rows = {}
     for line in asterisk("iax2", "show", "peers").splitlines():
-        match = re.match(r"^(iax\d+)(?:/\S+)?\s+(\S+)\s+\(S\)\s+\S+\s+(\d+)\s+(.*)$", line)
+        # Named peers only: iax0/iax1 for the modems, carrier for the trunk.
+        match = re.match(r"^([\w.-]+)(?:/\S+)?\s+(\S+)\s+\(S\)\s+\S+\s+(\d+)\s+(.*)$", line)
         if match:
             rows[match.group(1)] = {
                 "address": match.group(2),
@@ -119,6 +122,7 @@ def modems():
         out.append(
             {
                 "device": "/dev/%s" % device,
+                "number": os.environ.get("FAX_NUMBER%d" % index) or NUMBER or None,
                 "peer": peer,
                 "registered": alive,
                 "state": reg.get("state") if reg.get("registered") else (link.get("status") or "unknown"),
@@ -129,19 +133,52 @@ def modems():
     return out
 
 
+def carrier():
+    """The trunk to the carrier, when this engine has one.
+
+    An engine with two healthy modems and no registered trunk is the state that
+    looks fine and cannot send: Telno would queue a page that never leaves. So
+    the trunk's registration is reported beside the modems' qualify, and
+    `serving` accounts for it.
+    """
+    user = os.environ.get("FAX_IAX_USER", "").strip()
+    if not user:
+        return {"configured": False}
+    entry = registrations().get(user, {})
+    link = links().get("carrier", {})
+    return {
+        "configured": True,
+        "transport": "iax2",
+        "username": user,
+        "host": entry.get("host") or os.environ.get("FAX_IAX_HOST") or None,
+        "registered": bool(entry.get("registered")),
+        "state": entry.get("state") or link.get("status") or "not registered",
+    }
+
+
 def status():
     m = modems()
     fax = hylafax()
-    serving = bool(m) and any(x["registered"] for x in m)
+    trunk = carrier()
+    # A modem that is alive is only half of it: with a carrier configured, a
+    # page needs the trunk too, and saying otherwise is how a fax looks queued
+    # for ever.
+    trunk_ready = trunk["registered"] if trunk.get("configured") else True
+    serving = bool(m) and any(x["registered"] for x in m) and trunk_ready
     return {
         "engine": "iax+hylafax",
         "station": STATION,
         "number": NUMBER,
+        # One entry per modem, because a two-line engine has two DIDs and
+        # picking one of them to be "the" number is how the other one gets
+        # missed on an invoice.
+        "numbers": [x["number"] for x in m if x.get("number")],
         "serving": serving and fax["ready"],
         # Telno reads `modem`; `modems` is here so a two-modem engine can say
         # which one is dead instead of flattening both into one state.
         "modem": m[0] if m else {"device": None, "registered": False, "state": "no modem configured"},
         "modems": m,
+        "carrier": trunk,
         "hylafax": fax,
         "spool": counts(),
         "uptime": int(time.time() - STARTED),

@@ -269,21 +269,32 @@ services:
   fax-engine:
     profiles: ["fax"]
     build:
-      context: ..
-      dockerfile: apps/fax-engine/Dockerfile
+      # The app directory is the context, like every other service here: the
+      # Dockerfile's COPY paths are relative to the context, not to itself, so
+      # `context: ..` made `COPY test/loopback.sh` look for /repo/test/.
+      context: ../apps/fax-engine
+      dockerfile: Dockerfile
     image: christ-fax:${CHRIST_TAG:-local}
     container_name: christ-fax
     restart: unless-stopped
     <<: *logging
     environment:
       FAX_NUMBER: ${FAX_NUMBER:-}
+      # One modem per line: a two-line fax puts its second DID here, and both
+      # fall back to FAX_NUMBER when the engine holds a single number.
+      FAX_NUMBER0: ${FAX_NUMBER0:-}
+      FAX_NUMBER1: ${FAX_NUMBER1:-}
       FAX_STATION_ID: ${FAX_STATION_ID:-Telno}
       # The secret the iaxmodems authenticate to their switchboard with. Local
       # to this container pair; it never appears on the wire outside the box.
       FAX_SECRET: ${FAX_SECRET:?}
       FAX_ENGINE_TOKEN: ${FAX_ENGINE_TOKEN:-}
       # A fax DID has to reach the modem directly, so the fax carries its own
-      # carrier sub-account rather than borrowing the voice trunk.
+      # carrier sub-account rather than borrowing the voice trunk. An IAX2
+      # sub-account is the better door for a fax and wins when both are set.
+      FAX_IAX_USER: ${FAX_IAX_USERNAME:-}
+      FAX_IAX_SECRET: ${FAX_IAX_PASSWORD:-}
+      FAX_IAX_HOST: ${FAX_IAX_HOST:-newyork1.voip.ms}
       FAX_SIP_USER: ${FAX_SIP_USERNAME:-}
       FAX_SIP_SECRET: ${FAX_SIP_PASSWORD:-}
       FAX_SIP_HOST: ${FAX_SIP_HOST:-}
