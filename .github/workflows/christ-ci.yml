@@ -100,10 +100,13 @@ jobs:
         env:
           CANTUS_SECRET: ci-secret
           CANTUS_CONTROL_TOKEN: ci-token
+          # Required, never defaulted: a session-signing key with a fallback is
+          # an install that signs with a value from the repository.
+          DOGRAH_JWT_SECRET: ci-dograh-secret
         run: |
           set -euo pipefail
           docker compose config --quiet
-          docker compose --profile core --profile pstn --profile platform --profile console --profile models config --services > /tmp/services.txt
-          for service in switch christ gateway telno console omniroute; do
+          docker compose --profile core --profile pstn --profile platform --profile console --profile models --profile agents config --services > /tmp/services.txt
+          for service in switch christ gateway telno console omniroute dograh-api dograh-ui; do
             grep -qx "$service" /tmp/services.txt || { echo "::error::compose does not declare $service"; exit 1; }
           done
