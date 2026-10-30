@@ -1291,11 +1291,14 @@ test("chat stream", async (t) => {
 
     const events = await chat({ message: "hi" });
     assert.ok(first(events, "error"), "the turn should fail immediately");
-    assert.equal(
-      events.filter((event) => event.type === "notice").length,
-      0,
-      "nothing should claim to be waiting",
-    );
+    // A 400 is also what a gateway answers for an id it does not serve, so the
+    // chain walks past this one and says so (unknown-model.test.ts pins that).
+    // What it must not do is announce a cooldown: waiting cannot fix a 400.
+    const waiting = events
+      .filter((event) => event.type === "notice")
+      .map((event) => String(event.text))
+      .filter((text) => /retrying in \d+s|attempt \d+ of \d+|throttled|busy/i.test(text));
+    assert.deepEqual(waiting, [], "nothing should claim to be waiting");
   });
 
   await t.test("a turn with no message is a bad request", async () => {
