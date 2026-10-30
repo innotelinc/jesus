@@ -111,6 +111,8 @@ services:
       DOGRAH_URL: ${DOGRAH_URL:-}
       OMNIROUTE_URL: ${OMNIROUTE_URL:-}
       DOGRAH_UI_URL: ${DOGRAH_UI_URL:-}
+      # The voice, so the board shows whether the agent can actually speak.
+      TTS_SHIM_URL: ${TTS_SHIM_URL:-}
       GENIE_URL: ${GENIE_URL:-}
       CLAUDE_MEM_URL: ${CLAUDE_MEM_URL:-}
       ONTRAK_URL: ${ONTRAK_URL:-}

@@ -278,8 +278,10 @@ GATEWAY_URL=http://gateway:7454" ;;
 OMNIROUTE_URL=http://omniroute:20128" ;;
       speech) env_file="$env_file
 # Where the agent's voice is. A hostname on the compose network, not
-# loopback: dograh is a container, and 127.0.0.1 there is dograh.
-DOGRAH_TTS_BASE_URL=${DOGRAH_TTS_BASE_URL:-http://tts-shim:8880/v1}" ;;
+# loopback: dograh is a container, and 127.0.0.1 there is dograh. The same
+# address is what the board probes, so a shim that is down shows as down.
+DOGRAH_TTS_BASE_URL=${DOGRAH_TTS_BASE_URL:-http://tts-shim:8880/v1}
+TTS_SHIM_URL=${TTS_SHIM_URL:-http://tts-shim:8880}" ;;
       agents) env_file="$env_file
 DOGRAH_URL=http://dograh-api:8000
 DOGRAH_UI_URL=http://dograh-ui:3010
