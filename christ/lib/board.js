@@ -25,9 +25,18 @@ export function loadSystem(file) {
   return system;
 }
 
-/** The URL a project answers on, from the environment first, then its default. */
+/**
+ * The URL a project answers on, from the environment first, then its default.
+ *
+ * A variable that is present but empty is a decision, not a missing value: the
+ * compose file sets `TELNO_URL=` when the platform profile is off, and falling
+ * back to a loopback default there would probe a port that nothing owns and
+ * report a product as broken rather than absent.
+ */
 export function projectUrl(project, env = process.env) {
-  if (project.urlEnv && env[project.urlEnv]) return String(env[project.urlEnv]).replace(/\/$/, '');
+  if (project.urlEnv && Object.prototype.hasOwnProperty.call(env, project.urlEnv)) {
+    return String(env[project.urlEnv] || '').replace(/\/$/, '');
+  }
   return String(project.defaultUrl || '').replace(/\/$/, '');
 }
 
