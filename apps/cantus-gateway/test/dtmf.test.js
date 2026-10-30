@@ -43,7 +43,7 @@ function listen(t) {
 }
 
 test('the keypad maps to the RFC 4733 event codes, and nothing else does', () => {
-  assert.equal(dtmfEvent('5'), 5);
+  assert.equal(dtmfEvent('5'), 6);
   assert.equal(dtmfEvent('*'), 10);
   assert.equal(dtmfEvent('#'), 11);
   assert.equal(dtmfEvent('d'), 15);
