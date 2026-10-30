@@ -10,6 +10,12 @@ out/
 # The gateway's remembered encryption choice, written by the container.
 state/
 
+# Deployment state and the dedicated SSH key a deploy generates.
+deploy/.vultr-key*
+deploy/.vultr-christ.json
+deploy/.vultr-key.env
+
 # OS and editor noise
 .DS_Store
 Thumbs.db
+deploy/.cloud-init.sh
