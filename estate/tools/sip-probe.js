@@ -12,12 +12,22 @@
  *   node sip-probe.js --gateway 127.0.0.1:5060 --did 14132642700 --ring 20 --no-audio
  *   node sip-probe.js --gateway 45.63.1.70:5060 --did 14132642700 --srtp
  *
+ * It can also hold a conversation's end of the line: `--speak` synthesises a
+ * sentence through the local TTS shim, waits for the agent's greeting, sends it
+ * as PCMU, and `--record` writes everything that came back to a WAV so the reply
+ * can be measured instead of assumed.
+ *
+ *   node sip-probe.js --gateway 127.0.0.1:5060 --did 14132642700 --from 14134210134 \
+ *     --speak 'Hi, I need to book an appointment for Friday.' --seconds 40 \
+ *     --record /tmp/call.wav
+ *
  * Exit status is 0 only when the call was answered (200 OK) and the ACK landed,
  * which is the answer to "does the DID actually ring a line?".
  */
 
 import dgram from 'node:dgram';
 import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 
 import { SrtpContext, cryptoAttribute, newKeyMaterial, parseCryptoAttribute } from '../../apps/cantus-gateway/src/srtp.js';
@@ -43,10 +53,18 @@ const secure = has('srtp');
 // the box has to use the gateway's container address: its SDP advertises the
 // public IP, which does not route back in from the Docker network.
 const mediaHost = flag('media-host', '');
+// What the caller says, and when. The delay is the agent's greeting: speaking
+// over it would be measured as a barge-in, not as a turn.
+const speakText = flag('speak', '');
+const ttsUrl = flag('tts', 'http://127.0.0.1:8881');
+const speakDelayMs = Number(flag('speak-delay', '6000'));
+const callSeconds = Number(flag('seconds', '0'));
+const recordPath = flag('record', '');
 
 if (!did) {
   console.error(
-    'usage: node sip-probe.js --gateway <host:port> --did <number> [--from <number>] [--ring 15] [--no-audio] [--srtp] [--media-host <addr>]'
+    'usage: node sip-probe.js --gateway <host:port> --did <number> [--from <number>] [--ring 15] [--no-audio] [--srtp] [--media-host <addr>]\n' +
+      '                        [--speak "<sentence>"] [--tts <url>] [--speak-delay <ms>] [--seconds <n>] [--record <file.wav>]'
   );
   process.exit(2);
 }
@@ -108,7 +126,104 @@ const tone = () => {
   return frames;
 };
 
-const probe = { frame: 0, rtpPort: 0, remoteAudio: null, rtpPackets: 0, authFailures: 0, answered: false, rtpSocket: undefined, out: null, in: null };
+const SILENCE = Buffer.alloc(160, 0xff); // µ-law zero, which is not silence
+const speech = { ulaw: null, offset: 0, started: false, at: 0 };
+
+function ulawToLinear(byte) {
+  const value = ~byte & 0xff;
+  const sign = value & 0x80;
+  const exponent = (value >> 4) & 0x07;
+  const mantissa = value & 0x0f;
+  let sample = ((mantissa << 3) + 0x84) << exponent;
+  sample -= 0x84;
+  return sign ? -sample : sample;
+}
+
+/** 24 kHz speech from the TTS shim, decimated to the 8 kHz the carrier speaks. */
+function toCallerAudio(pcm24) {
+  const frames = Math.floor(pcm24.length / 6);
+  const out = Buffer.alloc(frames);
+  for (let i = 0; i < frames; i += 1) {
+    const a = pcm24.readInt16LE(i * 6);
+    const b = pcm24.readInt16LE(i * 6 + 2);
+    const c = pcm24.readInt16LE(i * 6 + 4);
+    out[i] = ulaw(Math.round((a + b + c) / 3));
+  }
+  return out;
+}
+
+async function synthesize(text) {
+  const response = await fetch(`${ttsUrl.replace(/\/$/, '')}/v1/audio/speech`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ input: text, model: 'piper', voice: 'en_US-amy-medium', response_format: 'pcm' }),
+  });
+  if (!response.ok) throw new Error(`tts answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
+/**
+ * One 20 ms frame of what the caller is doing: silent until the greeting is
+ * over, then the sentence, then silence again. A probe that only ever sends a
+ * tone cannot tell "the agent did not answer me" from "the agent did not hear
+ * me", which are different bugs in different containers.
+ */
+function frameFor() {
+  if (!speech.ulaw) return tone();
+  if (!speech.started) {
+    if (Date.now() < speech.at) return SILENCE;
+    speech.started = true;
+  }
+  if (speech.offset >= speech.ulaw.length) return SILENCE;
+  const chunk = speech.ulaw.subarray(speech.offset, speech.offset + 160);
+  speech.offset += chunk.length;
+  probe.spoken += chunk.length;
+  if (chunk.length === 160) return chunk;
+  const padded = Buffer.alloc(160, 0xff);
+  chunk.copy(padded);
+  return padded;
+}
+
+/** Everything the agent said, as a WAV: a measurement, not a claim. */
+function writeWav(path, ulawBytes) {
+  const pcm = Buffer.alloc(ulawBytes.length * 2);
+  for (let i = 0; i < ulawBytes.length; i += 1) pcm.writeInt16LE(ulawToLinear(ulawBytes[i]), i * 2);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVEfmt ', 8);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(8000, 24);
+  header.writeUInt32LE(16000, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  try {
+    writeFileSync(path, Buffer.concat([header, pcm]));
+    return `${path} (${(pcm.length / 16000).toFixed(1)}s)`;
+  } catch (err) {
+    log(`could not write ${path}: ${err.message}`);
+    return '';
+  }
+}
+
+const probe = {
+  frame: 0,
+  rtpPort: 0,
+  remoteAudio: null,
+  rtpPackets: 0,
+  authFailures: 0,
+  answered: false,
+  rtpSocket: undefined,
+  out: null,
+  in: null,
+  received: [],
+  peak: 0,
+  spoken: 0,
+};
 
 // Our key goes in the offer; theirs comes back in the answer. One context per
 // direction, exactly as the gateway keys its own leg.
@@ -192,6 +307,7 @@ function onResponse(message, rinfo) {
   }
   sendAck(rinfo);
   startAudio();
+  speech.at = Date.now() + (Number.isFinite(speakDelayMs) ? speakDelayMs : 6000);
 }
 
 function sendAck(rinfo) {
@@ -212,14 +328,24 @@ function startAudio() {
   if (!sendAudio || !probe.remoteAudio) return;
   probe.rtpSocket = dgram.createSocket('udp4');
   probe.rtpSocket.on('message', (buf) => {
-    if (!probe.in) {
-      probe.rtpPackets += 1;
-      return;
+    let packet = buf;
+    if (probe.in) {
+      // An encrypted packet that fails its tag is not audio: counting it would
+      // report a working call when nothing decryptable arrived.
+      if (!probe.in.unprotect(buf)) {
+        probe.authFailures += 1;
+        return;
+      }
+      packet = buf;
     }
-    // An encrypted packet that fails its tag is not audio: counting it would
-    // report a working call when nothing decryptable arrived.
-    if (probe.in.unprotect(buf)) probe.rtpPackets += 1;
-    else probe.authFailures += 1;
+    probe.rtpPackets += 1;
+    // 12-byte header, no CSRCs, no extension: what the gateway sends for PCMU.
+    const payload = packet.subarray(12);
+    probe.received.push(Buffer.from(payload));
+    for (const byte of payload) {
+      const level = Math.abs(ulawToLinear(byte));
+      if (level > probe.peak) probe.peak = level;
+    }
   });
   // The port in the SDP is `probe.rtpPort`, so that is the port the gateway
   // sends to. Binding 0 instead gave the probe a socket on some other port and
@@ -234,7 +360,7 @@ function startAudio() {
       packet.writeUInt16BE(seq.value & 0xffff, 2);
       packet.writeUInt32BE((probe.frame * 160) & 0xffffffff, 4);
       packet.writeUInt32BE(0xdeadbeef, 8); // SSRC
-      tone().copy(packet, 12);
+      frameFor().copy(packet, 12);
       seq.value += 1;
       const outbound = probe.out ? probe.out.protect(packet) : packet;
       probe.rtpSocket.send(outbound, probe.remoteAudio.port, probe.remoteAudio.host);
@@ -259,9 +385,13 @@ function hangup() {
   socket.send(Buffer.from(message + CRLF + CRLF, 'utf8'), Number(gatewayPort), gatewayHost);
   log('BYE sent');
   setTimeout(() => {
+    const record = recordPath ? writeWav(recordPath, Buffer.concat(probe.received)) : '';
     log(
       `result: ${probe.answered ? 'answered' : 'not answered'}, ${probe.rtpPackets} RTP packets received` +
-        (probe.in ? `, ${probe.authFailures} failed authentication` : '')
+        (probe.in ? `, ${probe.authFailures} failed authentication` : '') +
+        `, peak ${probe.peak}/32767` +
+        (probe.spoken ? `, spoke ${(probe.spoken / 8000).toFixed(1)}s` : '') +
+        (record ? `, recorded ${record}` : '')
     );
     try {
       probe.rtpSocket?.close();
@@ -307,9 +437,22 @@ socket.on('message', (buf, rinfo) => {
   );
 });
 
-socket.bind(0, () => {
+socket.bind(0, async () => {
   probe.rtpPort = 40000 + Math.floor(Math.random() * 3000);
   log(`local ${local().address}:${local().port}, calling ${did} from ${from}`);
+  if (speakText) {
+    // Synthesised before the INVITE so the carrier's ring does not eat into the
+    // sentence. A failure here is fatal on purpose: a call made to test the
+    // agent's speech that carries no speech tests nothing.
+    try {
+      const pcm = await synthesize(speakText);
+      speech.ulaw = toCallerAudio(pcm);
+      log(`will speak ${(speech.ulaw.length / 8000).toFixed(1)}s after ${speakDelayMs} ms: "${speakText}"`);
+    } catch (err) {
+      console.error(`[sip-probe] could not synthesise the caller's line: ${err.message}`);
+      process.exit(3);
+    }
+  }
   sendInvite();
-  setTimeout(hangup, Math.max(2, ringSeconds) * 1000);
+  setTimeout(hangup, Math.max(2, ringSeconds, callSeconds) * 1000);
 });

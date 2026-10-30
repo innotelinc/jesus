@@ -831,6 +831,11 @@ export class Switch extends EventEmitter {
     leg.mohAt = 0;
     leg.rx = undefined;
     leg.rxAt = 0;
+    // Audio already buffered for this leg was said before the hold. Releasing
+    // the buffer is what stops the first syllable of a resumed call being a
+    // word from ten seconds ago.
+    leg.playout = null;
+    leg.playoutSeq = 0;
     const call = leg.call;
     this.emitCall(call, next ? 'call.held' : 'call.resumed', { leg: leg.id, ext: leg.ext });
     // The browser is told what the switch did, so its button shows the call's
@@ -865,14 +870,54 @@ export class Switch extends EventEmitter {
     if (leg.isEnded) return FRAME;
     if (leg.held) return FRAME;
     const peer = this.peerOf(leg);
-    if (!peer) return null; // keepalive loopbacks are not audio
+    if (!peer) {
+      // An unanswered leg with no peer is a keepalive loopback, and null tells
+      // the endpoint to send its test tone. An *answered* leg with no peer is
+      // not that: the agent's media channel hung up while the caller was still
+      // on the line, and a caller left holding a steady 440 Hz tone reads as a
+      // fault. Silence is what a PBX sends.
+      return leg.isAnswered ? FRAME : null;
+    }
     if (peer.held) {
       const frame = holdMusicFrame(leg.mohAt);
       leg.mohAt += FRAME.length / 2;
       return frame;
     }
-    if (peer.rx && at - peer.rxAt < 400) return peer.rx;
-    return FRAME;
+    return this.peerFrameTo(leg, peer);
+  }
+
+  /**
+   * Exactly one 20 ms frame of whatever this leg's peer is sending.
+   *
+   * A peer does not owe the switch 20 ms chunks. chan_websocket hands dograh's
+   * audio over in 40 ms pieces, a carrier can deliver 22 ms of G.711, and a
+   * softphone sends whatever its audio graph produced. Relaying those sizes
+   * unchanged on a fixed 20 ms clock made every caller hear the agent slowed by
+   * the over-sized frames: a 40 ms frame went out on this tick, the next tick
+   * sent it again because no new frame had arrived, and the doubling arrived as
+   * a stammer while the RTP timestamp advanced 20 ms at a time.
+   *
+   * So the peer's media is buffered and cut into one frame per tick, with the
+   * surplus carried to the next tick: nothing repeated, nothing dropped. A
+   * partial frame at a stall is padded with silence, because a short frame
+   * desynchronises the far end's sample count.
+   */
+  peerFrameTo(leg, peer) {
+    if ((leg.playoutSeq ?? 0) !== (peer.rxSeq ?? 0)) {
+      leg.playoutSeq = peer.rxSeq ?? 0;
+      if (peer.rx?.length) {
+        const pending = leg.playout?.length ? Buffer.concat([leg.playout, peer.rx]) : peer.rx;
+        // 200 ms of slack and no more: a peer that bursts must not build a
+        // backlog the caller would hear long after it was said.
+        const cap = FRAME.length * 10;
+        leg.playout = pending.length > cap ? pending.subarray(pending.length - cap) : pending;
+      }
+    }
+    if (!leg.playout?.length) return FRAME;
+    let frame = leg.playout.subarray(0, FRAME.length);
+    leg.playout = leg.playout.subarray(FRAME.length);
+    if (frame.length < FRAME.length) frame = Buffer.concat([frame, FRAME.subarray(frame.length)]);
+    return frame;
   }
 
   /**
@@ -921,6 +966,10 @@ export class Switch extends EventEmitter {
     }
     leg.rx = payload;
     leg.rxAt = now();
+    // Bumped so the leg that listens to this one can tell a new frame from the
+    // one it has already played. Size is the peer's business; the playout
+    // buffer is what turns it into 20 ms frames.
+    leg.rxSeq = (leg.rxSeq ?? 0) + 1;
     leg.received += 1;
     const call = leg.call;
     if (call.recordBuffer && leg.role !== 'web') this.appendRecording(call, payload);

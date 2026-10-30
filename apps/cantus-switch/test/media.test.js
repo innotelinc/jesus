@@ -229,3 +229,84 @@ test('a stalled loop is not repaid as a burst', () => {
   sw.webMediaTick(1_500);
   assert.equal(frames.length - afterFirst, 1);
 });
+
+test('an answered call whose peer went away hears silence, not the test tone', () => {
+  // Measured on a live call: the receptionist hung up its media channel, the
+  // caller stayed on the line, and the endpoint filled the gap with its 440 Hz
+  // keepalive tone — a loud beep for as long as the caller waited. Null means
+  // "send the tone", so an answered leg must not return it.
+  const { sw, browser, carrier } = twoLegs();
+  assert.equal(sw.audioTo(browser).length, 320);
+
+  carrier.isEnded = true;
+  const silence = sw.audioTo(browser);
+  assert.equal(silence.length, 320);
+  assert.equal(silence.every((byte) => byte === 0), true, 'silence, not a tone');
+
+  // An unanswered leg with no peer is still a keepalive loopback.
+  browser.isAnswered = false;
+  carrier.isAnswered = false;
+  assert.equal(sw.audioTo(browser), null);
+});
+
+test('a peer that sends 40 ms frames is cut into 20 ms frames, not replayed', () => {
+  const { sw, browser, carrier, frames } = twoLegs();
+  sw.nextWebMediaAt = 1_000;
+
+  // chan_websocket hands dograh's audio over in 40 ms pieces: 320 samples of
+  // PCM16. Four of them, one every 40 ms, with the ticker on its own 20 ms grid.
+  const frames40 = [];
+  for (let n = 0; n < 4; n += 1) {
+    const chunk = Buffer.alloc(640);
+    for (let i = 0; i < 320; i += 1) chunk.writeInt16LE((n + 1) * 100, i * 2);
+    frames40.push(chunk);
+  }
+
+  let pulled = 0;
+  for (let at = 1_000; at < 1_160; at += 10) {
+    if (at % 40 === 0 && pulled < frames40.length) {
+      sw.onMedia(carrier, frames40[pulled]);
+      pulled += 1;
+    }
+    sw.webMediaTick(at);
+  }
+
+  assert.equal(frames.length, 8, 'eight ticks in 160 ms is eight frames');
+  const pcm = Buffer.concat(frames);
+  // Half of the audio the peer sent, and every byte of it in order: the doubling
+  // showed up here as each 40 ms chunk arriving twice.
+  assert.equal(pcm.length, 4 * 640, 'no frame may be repeated to fill a tick');
+  assert.deepEqual(
+    pcm,
+    Buffer.concat(frames40),
+    'the 40 ms chunks must arrive as 20 ms frames in the order they were sent'
+  );
+});
+
+test('a peer that sends 20 ms frames passes through unchanged', () => {
+  const { sw, carrier, frames } = twoLegs();
+  sw.nextWebMediaAt = 1_000;
+  const chunks = [1, 2, 3, 4].map((n) => Buffer.alloc(320, n));
+  let pulled = 0;
+  for (let at = 1_000; at < 1_080; at += 10) {
+    if (at % 20 === 0 && pulled < chunks.length) {
+      sw.onMedia(carrier, chunks[pulled]);
+      pulled += 1;
+    }
+    sw.webMediaTick(at);
+  }
+  assert.deepEqual(Buffer.concat(frames), Buffer.concat(chunks));
+  assert.equal(frames.every((frame) => frame.length === 320), true);
+});
+
+test('a non-20 ms frame and an empty tick still deliver exactly one frame', () => {
+  const { sw, carrier, browser } = twoLegs();
+  const peer = Buffer.alloc(500, 7); // 31 ms, the sort of size a codec may hand over
+  sw.onMedia(carrier, peer);
+  const first = sw.audioTo(browser);
+  const second = sw.audioTo(browser);
+  assert.equal(first.length, 320);
+  assert.equal(second.length, 320, 'the surplus fills the next tick rather than being dropped');
+  assert.deepEqual(first, peer.subarray(0, 320), 'the first tick is the first 20 ms of the peer');
+  assert.equal(sw.audioTo(browser).length, 320, 'then silence, padded to a full frame');
+});
