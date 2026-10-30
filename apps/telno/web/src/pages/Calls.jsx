@@ -39,7 +39,7 @@ export default function Calls() {
 
   return (
     <>
-      <PageHeader title="Call history" subtitle="Ingested from the switch over AMI; idempotent on call id" />
+      <PageHeader title="Call history" subtitle="Ingested from the Cantus switch; idempotent on call id" />
 
       <div className="grid stats">
         <Stat label="Last 24h" value={last24.total} foot="All directions" />
@@ -138,7 +138,7 @@ export default function Calls() {
           </div>
         ) : (
           <Empty icon="calls" title="No calls recorded">
-            The platform writes a row per leg from AMI events. Place a test call, or run the seed for demo data.
+            The platform writes a row per leg from the switch's own events. Place a test call, or run the seed for demo data.
           </Empty>
         )}
       </Card>

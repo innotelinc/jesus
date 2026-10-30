@@ -133,7 +133,7 @@ export default function Shell({ path, title, subtitle, children }) {
 
         <span
           className="badge neutral"
-          title={telephony?.error ? `AMI: ${telephony.error}` : statusLabel}
+          title={telephony?.error ? `${telephony.transport || 'Switch'}: ${telephony.error}` : statusLabel}
           style={{ marginRight: 2 }}
         >
           <span className={`dot ${statusTone}`} />

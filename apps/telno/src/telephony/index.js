@@ -90,7 +90,11 @@ function extensionOf(address) {
   return /^\d{1,6}$/.test(user) ? user : '';
 }
 
-function onEvent(event) {
+/**
+ * Apply one switch event to the call record. Exported so a test can drive it
+ * without a switch or a socket.
+ */
+export function onEvent(event) {
   try {
     const call = event.callId ? legs.get(event.callId) || { id: event.callId } : null;
     switch (event.type) {
@@ -102,13 +106,18 @@ function onEvent(event) {
           direction: event.direction || 'inbound',
           started: Date.now(),
         });
+        // No disposition is written here on purpose. `ringing` is a state, not an
+        // outcome, and the column's CHECK constraint is a list of outcomes —
+        // writing it made every INSERT throw, so an inbound call left no row at
+        // all and the history, the dashboards and the billing ladder saw nothing
+        // until somebody hung up. The row is created with the schema's own
+        // default and the outcome lands when the call ends.
         upsertCall(event.callId, {
           direction: directionFor(event),
           from_number: String(event.from || ''),
           to_number: String(event.to || ''),
           extension: extensionOf(event.to),
           started_at: new Date(event.at || Date.now()).toISOString(),
-          disposition: 'ringing',
         });
         break;
       }
