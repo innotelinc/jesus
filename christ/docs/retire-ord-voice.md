@@ -49,12 +49,15 @@ These volumes looked like data sources and contained nothing worth keeping:
 
 ## Before destroying the instance
 
-1. **Domains** — measured on 2026-10-30: only `telno.services` resolves, to
-   `45.77.221.158`, and serves `200` over TLS from the box. `telno.digital`,
-   `telno.directory`, `telno.mobi`, `telno.network`, `telno.online` and `telno.tel`
-   return NXDOMAIN — no records exist for them yet, so they serve nothing from either
-   box. The proxy map is already rendered for all seven (see
-   [domains.md](domains.md)); what is missing is DNS, not wiring.
+1. **Domains** — none of the seven depend on ord-voice. Verified on 2026-10-30: the
+   edge already holds a valid Let's Encrypt certificate for every one of them and
+   answers `200` (or `302` to `/d/telno.directory`) when the name is pointed at
+   `45.77.221.158`. The zones were rebuilt in Vultr DNS with the apex `A`, `www`,
+   `CAA`, SPF and DMARC, and answer authoritatively from `ns1.vultr.com`. What is
+   still missing is the delegation: the seven names are registered at Namecheap and
+   still list the retired `ns1.<zone>`/`ns2.<zone>`, so public resolvers ask a host
+   that no longer answers. Changing that is the registrar's, not the box's — see
+   [domains.md](domains.md).
 2. **Carrier** — the SIP trunk registers on `christ-gateway` and the DID
    `14132642700` rings line 101; the IAX trunk (`235662_iax`) registers on
    `christ-fax` and owns `7745057136` / `4135614101`.
