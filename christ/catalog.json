@@ -6,68 +6,133 @@
       "id": "voice",
       "name": "Voice plane",
       "about": "Cantus on one socket: calls, media, routing, the browser softphone. Everything else is a client of this.",
-      "services": ["switch", "christ"],
+      "services": [
+        "switch",
+        "christ"
+      ],
       "requires": []
     },
     {
       "id": "pstn",
       "name": "PSTN",
       "about": "A carrier, a DID, caller ID and the SIP border. Without it the switch still routes extension to extension.",
-      "services": ["gateway"],
-      "requires": ["voice"],
-      "env": ["VOIPMS_SIP_HOST", "VOIPMS_SIP_USERNAME", "VOIPMS_SIP_PASSWORD", "VOIPMS_SIP_FROM_USER"]
+      "services": [
+        "gateway"
+      ],
+      "requires": [
+        "voice"
+      ],
+      "env": [
+        "VOIPMS_SIP_HOST",
+        "VOIPMS_SIP_USERNAME",
+        "VOIPMS_SIP_PASSWORD",
+        "VOIPMS_SIP_FROM_USER"
+      ]
     },
     {
       "id": "platform",
       "name": "Platform (VoiceOps)",
       "about": "Accounts, numbers, the routing document, voicemail, CDRs and the softphone — Telno, which fills zeus's role in this tree.",
-      "services": ["telno"],
-      "requires": ["voice"]
+      "services": [
+        "telno"
+      ],
+      "requires": [
+        "voice"
+      ]
     },
     {
       "id": "fax",
       "name": "Fax",
       "about": "The switch is the fax machine, or rather the two software modems beside it: iaxmodem over IAX2 with HylaFAX behind them, so a page leaves as modem tones with no carrier fax API and no per-page fee. It needs the platform, because Telno is where a fax is queued and read.",
-      "services": ["fax-engine"],
-      "requires": ["platform"],
-      "env": ["FAX_NUMBER", "FAX_NUMBER0", "FAX_NUMBER1", "FAX_ENGINE_TOKEN", "FAX_IAX_USERNAME", "FAX_IAX_PASSWORD", "FAX_IAX_HOST", "FAX_SIP_USERNAME", "FAX_SIP_PASSWORD"]
+      "services": [
+        "fax-engine"
+      ],
+      "requires": [
+        "platform"
+      ],
+      "env": [
+        "FAX_NUMBER",
+        "FAX_NUMBER0",
+        "FAX_NUMBER1",
+        "FAX_ENGINE_TOKEN",
+        "FAX_IAX_USERNAME",
+        "FAX_IAX_PASSWORD",
+        "FAX_IAX_HOST",
+        "FAX_SIP_USERNAME",
+        "FAX_SIP_PASSWORD"
+      ]
     },
     {
       "id": "console",
       "name": "Estate console",
       "about": "The operator's window: live calls, lines, the routing document and the encryption switch.",
-      "services": ["console"],
-      "requires": ["voice"]
+      "services": [
+        "console"
+      ],
+      "requires": [
+        "voice"
+      ]
     },
     {
       "id": "models",
       "name": "Model gateway",
       "about": "One OpenAI-compatible endpoint in front of every provider, local or hosted. Every AI capability below wants it.",
-      "services": ["omniroute"],
+      "services": [
+        "omniroute"
+      ],
       "requires": []
     },
     {
       "id": "speech",
       "name": "Speech",
       "about": "The voice the agent speaks with: Piper behind an OpenAI-compatible /v1/audio/speech door, 24 kHz PCM. Without it an AI call connects and stays silent.",
-      "services": ["tts-shim"],
-      "requires": ["agents"],
-      "env": ["TTS_SHIM_PIPER_VOICE"]
+      "services": [
+        "tts-shim"
+      ],
+      "requires": [
+        "agents"
+      ],
+      "env": [
+        "TTS_SHIM_PIPER_VOICE"
+      ]
     },
     {
       "id": "agents",
       "name": "Voice agents",
-      "about": "dograh, the runtime that speaks: its ARI bridge takes 8003, its UI builds the workflow. Capstone's evaluation stack stays outside — it is ops, not a voice path.",
-      "services": ["dograh-api", "dograh-ui"],
-      "requires": ["voice"],
-      "env": ["DOGRAH_JWT_SECRET"],
+      "about": "dograh, the runtime that speaks: its ARI bridge takes 8003, its UI builds the workflow. The console over it is a separate capability (`capstone`).",
+      "services": [
+        "dograh-api",
+        "dograh-ui"
+      ],
+      "requires": [
+        "voice"
+      ],
+      "env": [
+        "DOGRAH_JWT_SECRET"
+      ],
       "external": [
         {
           "name": "Capstone (AgentOps)",
           "path": "apps/capstone",
-          "env": ["CAPSTONE_URL"],
+          "env": [
+            "CAPSTONE_URL"
+          ],
           "note": "its own compose: clickhouse, n8n, grafana, a second switch. Point CAPSTONE_URL at it when you want graded calls."
         }
+      ]
+    },
+    {
+      "id": "capstone",
+      "name": "Capstone control center",
+      "about": "Capstone's console, its aggregator and the workflow studio: the panels that manage the agents this box runs, on this switch, with a softphone in the same window.",
+      "services": [
+        "dashboard-api",
+        "capstone",
+        "capstone-studio"
+      ],
+      "requires": [
+        "agents",
+        "voice"
       ]
     },
     {
@@ -77,22 +142,35 @@
       "services": [],
       "requires": [],
       "external": [
-        { "name": "claude-mem", "path": "apps/claude-mem", "env": ["CLAUDE_MEM_URL"], "note": "start it from its own repo and set the URL." }
+        {
+          "name": "claude-mem",
+          "path": "apps/claude-mem",
+          "env": [
+            "CLAUDE_MEM_URL"
+          ],
+          "note": "start it from its own repo and set the URL."
+        }
       ]
     },
     {
       "id": "mail",
       "name": "Mail",
       "about": "Loomix Mail over JMAP against your own Stalwart server — where voicemail and transcripts land.",
-      "services": ["webmail"],
+      "services": [
+        "webmail"
+      ],
       "requires": [],
-      "env": ["WEBMAIL_JMAP_URL"]
+      "env": [
+        "WEBMAIL_JMAP_URL"
+      ]
     },
     {
       "id": "support",
       "name": "Training and service desk",
       "about": "OnTrak: the graded range and the ticket queue a call escalates into.",
-      "services": ["ontrak"],
+      "services": [
+        "ontrak"
+      ],
       "requires": []
     },
     {
@@ -100,9 +178,18 @@
       "name": "SMS",
       "about": "OpenSMS turns an Android phone on your network into the SMS API. A phone is not a container, so this one is attached.",
       "services": [],
-      "requires": ["voice"],
+      "requires": [
+        "voice"
+      ],
       "external": [
-        { "name": "OpenSMS", "path": "apps/opensms-android", "env": ["OPENSMS_URL"], "note": "run the app on the phone; set the URL it prints." }
+        {
+          "name": "OpenSMS",
+          "path": "apps/opensms-android",
+          "env": [
+            "OPENSMS_URL"
+          ],
+          "note": "run the app on the phone; set the URL it prints."
+        }
       ]
     },
     {
@@ -112,8 +199,18 @@
       "services": [],
       "requires": [],
       "external": [
-        { "name": "REA", "path": "apps/rea", "env": [], "note": "MCP server on stdio; the agent console launches it." },
-        { "name": "ontrak-mcp", "path": "apps/ontrak-mcp", "env": [], "note": "MCP bridge on stdio; no port to publish." }
+        {
+          "name": "REA",
+          "path": "apps/rea",
+          "env": [],
+          "note": "MCP server on stdio; the agent console launches it."
+        },
+        {
+          "name": "ontrak-mcp",
+          "path": "apps/ontrak-mcp",
+          "env": [],
+          "note": "MCP bridge on stdio; no port to publish."
+        }
       ]
     },
     {
@@ -122,7 +219,14 @@
       "about": "The bundle: model gateway, voices, memory and tools. This is the \"I want AI\" answer.",
       "services": [],
       "requires": [],
-      "capabilities": ["models", "agents", "speech", "memory", "tools"]
+      "capabilities": [
+        "models",
+        "agents",
+        "speech",
+        "memory",
+        "tools",
+        "capstone"
+      ]
     }
   ]
 }

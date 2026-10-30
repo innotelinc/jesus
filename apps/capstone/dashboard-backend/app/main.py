@@ -3663,6 +3663,86 @@ def _pbx_dialplan_text() -> str:
         return val
 
 
+# ── the voice plane this deployment actually has ───────────────────────────
+# FreePBX is what this console was written against, and the writer half still
+# speaks to it (`_pbx_exec`). A CHRIST box has no FreePBX at all: the voice
+# plane is the Cantus switch, whose lines are set with `POST /v1/lines` and
+# whose dial plan is one JSON routing document. Asking the switch is therefore
+# the same question the PBX branch asks, in the only dialect that answers here —
+# without this, every agent on a Cantus stack reported "PBX container not
+# running", which is true and useless: there is no PBX to run.
+CANTUS_URL = (os.environ.get("CANTUS_URL") or "").rstrip("/")
+CANTUS_CONTROL_TOKEN = os.environ.get("CANTUS_CONTROL_TOKEN") or ""
+
+
+def _cantus_get(path: str) -> Any:
+    """One read from the switch's control API, or None when it is unreachable."""
+    if not CANTUS_URL:
+        return None
+    try:
+        import json as _json
+        import urllib.request as _url
+
+        req = _url.Request(f"{CANTUS_URL}{path}")
+        if CANTUS_CONTROL_TOKEN:
+            req.add_header("authorization", f"Bearer {CANTUS_CONTROL_TOKEN}")
+        with _url.urlopen(req, timeout=5) as res:
+            return _json.loads(res.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - an unreachable switch is a state, not a crash
+        return None
+
+
+def _cantus_state() -> tuple[dict[str, dict], list[dict]] | None:
+    """(lines by extension, the routing document's routes) — None if unreachable."""
+    lines = _cantus_get("/v1/lines")
+    if not isinstance(lines, list):
+        return None
+    doc = _cantus_get("/v1/routes")
+    routes = (doc or {}).get("routes") if isinstance(doc, dict) else None
+    return ({str(l.get("ext")): l for l in lines if isinstance(l, dict) and l.get("ext")},
+            routes if isinstance(routes, list) else [])
+
+
+def _cantus_status_payload(ext: str, line: dict | None, routes: list[dict]) -> dict:
+    """Provisioning status for an agent's extension on a Cantus stack.
+
+    The three FreePBX pieces map onto three real things here: a line on the
+    switch, a route that lands on that line, and a DID whose chain bridges to
+    it. Answering with the switch's own inventory means "not provisioned" is a
+    fact an operator can act on rather than a missing container.
+    """
+    wired = any(
+        str(((step.get("bridge") or {}).get("to") or "")) == ext
+        for route in routes if isinstance(route, dict)
+        for step in (route.get("then") or []) if isinstance(step, dict)
+    )
+    reachable = any(
+        str(((route.get("when") or {}).get("to") or "")).split("@")[0].rstrip("*") == ext
+        for route in routes if isinstance(route, dict)
+    )
+    has_did = any(
+        isinstance(route, dict)
+        and any(str(((step.get("bridge") or {}).get("to") or "")) == ext for step in (route.get("then") or []) if isinstance(step, dict))
+        and not str(((route.get("when") or {}).get("to") or "")).startswith("line-")
+        for route in routes
+    )
+    has_line = bool(line)
+    payload = {"status": "provisioned" if (has_line and reachable) else ("partial" if (has_line or reachable) else "not-provisioned"),
+               "customExtension": has_line, "inboundRoute": has_did, "dialplan": reachable}
+    if line:
+        numbers = line.get("numbers") or []
+        payload["detail"] = (
+            f"line {ext} on the Cantus switch"
+            + (f" · {numbers[0]}" if numbers else "")
+            + (" · phone registered" if line.get("registered") else " · no phone registered")
+        )
+    elif wired or reachable:
+        payload["detail"] = f"routed on the switch, no line {ext} of its own"
+    else:
+        payload["detail"] = f"no line and no route for {ext} on the Cantus switch"
+    return payload
+
+
 def _pbx_status_payload(has_ext: bool, has_route: bool, has_dp: bool) -> dict:
     """Provisioning status for one extension, in the shape the list expects.
 
@@ -3728,6 +3808,13 @@ def _agent_pbx_statuses(exts: list[str]) -> dict[str, dict]:
     Whole page in one PBX query plus one cached `dialplan show`: the Agents list
     probes every agent, and each probe used to be its own `docker exec`.
     """
+    # No FreePBX and a Cantus switch configured: ask the switch. This is the
+    # normal case on a CHRIST box, where the voice plane never was Asterisk.
+    if _pbx_container() is None:
+        state = _cantus_state()
+        if state is not None:
+            lines, routes = state
+            return {e: _cantus_status_payload(e, lines.get(e), routes) for e in exts}
     try:
         counts = _pbx_provisioning_counts(exts)
         dp = _pbx_dialplan_text()

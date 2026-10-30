@@ -304,7 +304,7 @@ nobody changed.
 |---|---|
 | "One system" | One switch, one routing document, one DID. The products are still separate processes with separate repositories — that is the point. |
 | "AI integrated" | Verified on a live box: a call to the DID routes after hours into the agent app, dograh receives `StasisStart`, creates an inbound run, answers the channel, then asks the switch for an external media channel. The switch dials dograh's media endpoint, announces `MEDIA_START format=ulaw`, the media channel enters Stasis, the bridge is created with both channels — and the pipeline starts on 8 kHz audio. |
-| "Composable" | Sixteen services in this compose, each behind a profile; dograh, its database and the voice are containers now. Capstone's evaluation stack, claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
+| "Composable" | Twenty services in this compose, each behind a profile; dograh, its database, the voice and Capstone's control center are containers now. Capstone's evaluation stack (n8n, grafana, its own switch), claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
 | "Works" | The switch, wiring, catalog and front-door suites run on every push. Verified live: 15/15 routes loaded and read back, line 101 registered over the public URL from a headless client, a real DID INVITE reaching the agent app. |
 | "The agent speaks" | Yes, and measured. `POST /ari/channels/externalMedia` resolves `external_host` through `CANTUS_WS_CLIENTS`, dials it, sends `MEDIA_START`, carries ulaw both ways and completes the bridge (`test/external-media.test.js`); the `speech` profile runs capstone's Piper shim behind the `/v1/audio/speech` contract dograh's `speaches` provider speaks. Verified on a live SIP call to the DID: 200 OK with media to the caller, two TTS requests served, and **2233 RTP packets received** by the calling side — the greeting reaches the phone. |
 
@@ -320,7 +320,7 @@ nobody changed.
 | `lib/catalog.js` | A wish → the containers that satisfy it. |
 | `server.js` | The front door: board API, plan API, souls API, and one-origin proxy. |
 | `souls/` | The agents, authored. |
-| `compose.yml` | Nine containers, one profile each. |
+| `compose.yml` | Twenty containers, one profile each. |
 
 ## About
 
