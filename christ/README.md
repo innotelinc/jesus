@@ -60,6 +60,20 @@ One switch owns the calls. The platform owns the inventory and generates the rou
 document; the switch executes it. The AI does not get a second dial plan — it gets a
 route (`{ "ari": { "app": "dograh" } }`) and an extension, like everything else.
 
+## Why CHRIST
+
+| Problem | Answer |
+| --- | --- |
+| Nine products, nine READMEs, no telephone system. | One declaration of the DID, lines, trunks and agents, applied to the switch and read back. |
+| "Do I need all of this to answer one phone?" | A capability catalog: `select voice` is two containers, `select ai` adds the model gateway and names what stays outside. |
+| A dial plan is the hardest thing to review in telephony. | It is one JSON document, generated, validated by the switch's own router, and scored offline. |
+| AI agents arrive as a second, parallel phone system. | An agent is a route to an ARI app with an extension and a compiled prompt — no second dial plan. |
+| A dashboard that can hang up a call will hang up the wrong one. | The board is read-only; wiring is a command with a dry run. |
+
+Its place in the stack is [docs/stack.md](docs/stack.md); the canonical definition of
+the shared layers is the
+[Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
+
 ## What do you want it to do?
 
 A capability is what you want; a service is a container. You name the first, CHRIST
@@ -242,7 +256,12 @@ container. CHRIST exists because nine good programs that do not know about each 
 are not a telephone system, and because "which of these do I actually need?" should be
 a question with an answer.
 
-Part of the [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack).
-Licences are per project: Cantus and Soulforge are MIT, Telno, Capstone and Loomix are
-AGPL-3.0, OpenSMS and claude-mem are Apache-2.0, and the mirrors keep the licences they
-were forked under. Read the licence in the directory you are using.
+Part of the [Innotel Platform Stack](https://github.com/innotelinc/innotel-platform-stack),
+and its role there is recorded in [docs/stack.md](docs/stack.md).
+
+## License
+
+Apache-2.0 for this repository ([LICENSE](LICENSE)). The products it wires keep their
+own licences: Cantus and Soulforge are MIT, Telno, Capstone and Loomix are AGPL-3.0,
+OpenSMS and claude-mem are Apache-2.0, and the mirrors keep the licences they were
+forked under. Read the licence in the directory you are using.
