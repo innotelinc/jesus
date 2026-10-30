@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { gotoDashboardRoute } from "./helpers/dashboardAuth";
 
 const NAVIGATION_TIMEOUT_MS = 300_000;
@@ -64,6 +64,33 @@ async function waitForNextDevCompileToFinish(page: Page) {
   const nextDevToolsButton = page.getByRole("button", { name: /open next\.js dev tools/i });
   if ((await nextDevToolsButton.count()) === 0) return;
   await expect(nextDevToolsButton).not.toContainText(/compiling/i, { timeout: 120_000 });
+}
+
+/**
+ * Open the permissions dialog for a key row, once the previous one is really gone.
+ *
+ * Saving leaves the modal mounted for one more round-trip: `handleUpdatePermissions`
+ * awaits `fetchData()` and only then clears `showPermissionsModal`/`editingKey`.
+ * A click aimed at the row's button in that window lands on the overlay instead, and
+ * because nothing reopens the dialog afterwards the caller then waits out its whole
+ * timeout — which is how this flow failed intermittently on CI. Waits for the close,
+ * clicks without `force` so the overlay is a real failure instead of a silent no-op,
+ * and retries the attempt because a click that straddles a list re-render is dropped.
+ */
+async function openPermissionsDialog(page: Page, keyRow: Locator) {
+  const dialog = page.getByRole("dialog", { name: /permissions: provider scope key/i });
+
+  await expect(dialog).toBeHidden({ timeout: UI_STABILITY_TIMEOUT_MS });
+  await expect(async () => {
+    // Guard the click: once the dialog is open, another click aims at its overlay and
+    // would throw on every retry instead of letting a slow render be observed.
+    if (!(await dialog.isVisible())) {
+      await keyRow.locator('button[title="Edit permissions"]').click();
+    }
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: UI_STABILITY_TIMEOUT_MS });
+
+  return dialog;
 }
 
 test.describe("API keys flow", () => {
@@ -951,12 +978,7 @@ test.describe("API keys flow", () => {
       .locator("div")
       .filter({ has: page.getByText("Provider Scope Key", { exact: true }) })
       .first();
-    await keyRow.locator('button[title="Edit permissions"]').click({ force: true });
-
-    const permissionsDialog = page.getByRole("dialog", {
-      name: /permissions: provider scope key/i,
-    });
-    await expect(permissionsDialog).toBeVisible({ timeout: UI_STABILITY_TIMEOUT_MS });
+    const permissionsDialog = await openPermissionsDialog(page, keyRow);
 
     // Enter Restrict mode via the primary Access Mode toggle (accessible name includes the lock icon text).
     const accessModeRestrict = permissionsDialog.getByRole("button", {
@@ -1009,11 +1031,7 @@ test.describe("API keys flow", () => {
     await expect(permissionsDialog).not.toBeVisible({ timeout: UI_STABILITY_TIMEOUT_MS });
 
     // Reopen after state/refetch: provider scope restored; children inherited/non-toggleable.
-    await keyRow.locator('button[title="Edit permissions"]').click({ force: true });
-    const reopened = page.getByRole("dialog", {
-      name: /permissions: provider scope key/i,
-    });
-    await expect(reopened).toBeVisible({ timeout: UI_STABILITY_TIMEOUT_MS });
+    const reopened = await openPermissionsDialog(page, keyRow);
 
     // Restrict mode should remain selected after reopen.
     await expect(reopened.getByRole("button", { name: /^lock\s+restrict$/i })).toHaveClass(
@@ -1045,13 +1063,14 @@ test.describe("API keys flow", () => {
     expect(denyAllPatch.modelAccessMode).toBe("restricted");
     expect(denyAllPatch.allowedModels).toEqual([]);
 
-    await keyRow.locator('button[title="Edit permissions"]').click({ force: true });
-    const denyAllReopened = page.getByRole("dialog", {
-      name: /permissions: provider scope key/i,
-    });
-    await expect(denyAllReopened).toBeVisible({ timeout: UI_STABILITY_TIMEOUT_MS });
+    const denyAllReopened = await openPermissionsDialog(page, keyRow);
     await expect(denyAllReopened.getByRole("button", { name: /^lock\s+restrict$/i })).toHaveClass(
       /bg-primary/
     );
+    // The deny-all state itself has to survive the reopen: Restrict with nothing
+    // selected must come back closed, not silently re-widened to the catalog.
+    await expect(
+      denyAllReopened.getByRole("checkbox", { name: /ollama[- ]?cloud/i })
+    ).not.toBeChecked();
   });
 });
