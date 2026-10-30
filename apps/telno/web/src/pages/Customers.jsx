@@ -74,6 +74,10 @@ export default function Customers() {
   const [editOpen, setEditOpen] = useState(false);
   const [profile, setProfile] = useState({});
   const [payOpen, setPayOpen] = useState(false);
+  // The one confirmation dialog the four lifecycle actions share. Three of them
+  // are not reversible from this screen, so the dialog states the consequence
+  // rather than asking "are you sure".
+  const [lifecycle, setLifecycle] = useState(null);
   const [payment, setPayment] = useState({ invoiceId: '', amount: '', method: 'manual', reference: '', note: '' });
   const [newTicket, setNewTicket] = useState(null);
 
@@ -199,6 +203,67 @@ export default function Customers() {
       loadList();
     } catch (err) {
       toast.error('Could not update the customer', err.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const LIFECYCLE_COPY = {
+    suspend: {
+      verb: 'Suspend',
+      title: 'Suspend this customer',
+      detail:
+        'They keep their account, numbers and history, and lose the ability to sign in — every open session stops working now. Reversible with Reinstate.',
+      done: 'Customer suspended',
+      failed: 'Could not suspend the customer',
+    },
+    reinstate: {
+      verb: 'Reinstate',
+      title: 'Reinstate this customer',
+      detail:
+        'The suspension is lifted and they can sign in again. Their previous sessions were invalidated, so they will need to sign in once more.',
+      done: 'Customer reinstated',
+      failed: 'Could not reinstate the customer',
+    },
+    cancel: {
+      verb: 'Cancel plan',
+      title: 'Cancel what this customer pays for',
+      detail:
+        'The subscription stops renewing. The account, its lines and its invoices stay, and the paid gate closes on its own because access reads the subscription.',
+      done: 'Subscription cancelled',
+      failed: 'Could not cancel the subscription',
+    },
+    remove: {
+      verb: 'Remove customer',
+      title: 'Remove this customer entirely',
+      detail:
+        'The account is deleted, along with its subscription, keys and lines. This cannot be undone from here — suspend or cancel instead if the history matters.',
+      done: 'Customer removed',
+      failed: 'Could not remove the customer',
+    },
+  };
+
+  const runLifecycle = async () => {
+    if (!lifecycle || !selectedId) return;
+    setBusy('lifecycle');
+    try {
+      if (lifecycle.action === 'remove') {
+        await api.del(`/customers/${selectedId}`);
+        setSelectedId('');
+        setDetail(null);
+      } else {
+        await api.post(`/customers/${selectedId}/${lifecycle.action}`, {
+          reason: lifecycle.reason || undefined,
+        });
+      }
+      toast.success(LIFECYCLE_COPY[lifecycle.action].done);
+      setLifecycle(null);
+      await areload();
+      loadList();
+    } catch (err) {
+      // A 409 here is the "active subscription" refusal, which is the API
+      // telling the operator to cancel first — say that, not "request failed".
+      toast.error(LIFECYCLE_COPY[lifecycle.action].failed, err.message);
     } finally {
       setBusy('');
     }
@@ -487,6 +552,23 @@ export default function Customers() {
                   </Button>
                   <Button size="sm" variant="ghost" icon="plus" onClick={() => setNewTicket({ subject: '', description: '', category: 'support', priority: 'normal', assignee: '', accountId: customer.id })}>
                     Ticket
+                  </Button>
+                  {detail?.customer?.suspendedAt ? (
+                    <Button size="sm" variant="ghost" onClick={() => setLifecycle({ action: 'reinstate' })}>
+                      Reinstate
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="ghost" onClick={() => setLifecycle({ action: 'suspend' })}>
+                      Suspend
+                    </Button>
+                  )}
+                  {detail?.subscription && detail.subscription.status !== 'canceled' ? (
+                    <Button size="sm" variant="ghost" onClick={() => setLifecycle({ action: 'cancel' })}>
+                      Cancel plan
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="danger" onClick={() => setLifecycle({ action: 'remove' })}>
+                    Remove
                   </Button>
                 </>
               ) : null
@@ -1046,6 +1128,39 @@ export default function Customers() {
             </div>
             <Input label="Reference" value={payment.reference} onChange={(event) => setPayment({ ...payment, reference: event.target.value })} placeholder="cheque 1042, wire 88…" />
             <Input label="Note" value={payment.note} onChange={(event) => setPayment({ ...payment, note: event.target.value })} />
+          </div>
+        </Modal>
+      ) : null}
+
+      {lifecycle ? (
+        <Modal
+          title={LIFECYCLE_COPY[lifecycle.action].title}
+          subtitle={customer ? `${customer.name || customer.company || customer.email} · ${customer.email}` : ''}
+          onClose={() => setLifecycle(null)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setLifecycle(null)}>Keep as is</Button>
+              <Button
+                variant={lifecycle.action === 'remove' ? 'danger' : 'primary'}
+                loading={busy === 'lifecycle'}
+                onClick={runLifecycle}
+              >
+                {LIFECYCLE_COPY[lifecycle.action].verb}
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            <p className="muted">{LIFECYCLE_COPY[lifecycle.action].detail}</p>
+            {lifecycle.action === 'suspend' ? (
+              <Input
+                label="Reason"
+                value={lifecycle.reason || ''}
+                placeholder="non-payment, abuse, customer request…"
+                hint="Written to the audit trail beside your name, so the next operator knows why."
+                onChange={(event) => setLifecycle({ ...lifecycle, reason: event.target.value })}
+              />
+            ) : null}
           </div>
         </Modal>
       ) : null}
