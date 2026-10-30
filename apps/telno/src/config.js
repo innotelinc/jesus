@@ -91,6 +91,14 @@ export const config = {
   // console says why rather than offering a button that cannot work.
   fax: {
     enabled: bool(env.FAX_ENABLED, false),
+    // Where the fax engine is, when there is one. Cantus carries voice only, so
+    // a fax needs a machine that terminates the modem: `FAX_ENGINE_URL` is the
+    // IAX2 + iaxmodem + HylaFAX box that does it, and `FAX_GATEWAY` is the
+    // older T.38-on-the-trunk route. Exactly one of them, or neither, and the
+    // Fax screen says which.
+    engineUrl: String(env.FAX_ENGINE_URL || '').replace(/\/+$/, ''),
+    engineToken: env.FAX_ENGINE_TOKEN || '',
+    transport: String(env.FAX_TRANSPORT || '').toLowerCase(),
     // Where received documents wait to be ingested, and where an outbound
     // document is staged before the switch sends it.
     dir: env.FAX_DIR || '',

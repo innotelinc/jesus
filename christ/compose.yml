@@ -239,6 +239,14 @@ services:
       # one the message is written to the log and the console says so.
       NOTIFY_FROM: ${NOTIFY_FROM:-no-reply@telno.services}
       PAYMENTS_ENABLED: "false"
+      # Fax needs a machine that terminates the modem: Cantus carries voice
+      # only. Either point FAX_ENGINE_URL at an IAX2 + iaxmodem + HylaFAX box, or
+      # set FAX_GATEWAY to a T.38 gateway on the trunk. With neither, the Fax
+      # screen says so instead of claiming an engine is broken.
+      FAX_ENABLED: ${FAX_ENABLED:-false}
+      FAX_ENGINE_URL: ${FAX_ENGINE_URL:-}
+      FAX_ENGINE_TOKEN: ${FAX_ENGINE_TOKEN:-}
+      FAX_GATEWAY: ${FAX_GATEWAY:-}
       ALLOW_INSECURE_PUBLIC_URL: "true"
     volumes:
       - telno-data:/data
