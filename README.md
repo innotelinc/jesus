@@ -213,16 +213,26 @@ writes carries a path filter — a required check that never runs leaves the pul
 unmergeable forever, which is worse than no check. So the gate has no `paths:` filter and no
 GENERATED banner: it runs the suite of each voice-plane app the change touches — the switch
 (`apps/cantus-switch`) and the SIP gateway (`apps/cantus-gateway`) — and says so and passes when
-it touches neither. `main` requires that check by name (`Cantus gate`) through a repository
-ruleset, so a red switch or gateway suite blocks a pull-request merge while direct pushes to
-`main` behave exactly as they did before. One check, whichever app is red: a second required
-check would have to be satisfied by every pull request, including the ones it knows nothing
-about.
+it touches neither. One check, whichever app is red: a second required check would have to be
+satisfied by every pull request, including the ones it knows nothing about.
 
-To see that requirement, or change it: `gh api repos/innotelinc/jesus/rulesets` lists the ruleset
-(`main requires the Cantus gate`), and `gh api repos/innotelinc/jesus/rules/branches/main` shows
-the rule currently applying to the default branch. Removing the ruleset turns the gate back into
-advice; the workflow itself still runs on every pull request.
+`main` requires that check by name (`Cantus gate`) through branch protection, so a pull request
+with a red switch or gateway suite is marked BLOCKED. There is one caveat, and it is the whole
+story: protection runs with `enforce_admins` **off**. A required check enforced on administrators
+also refuses their *direct pushes* — GitHub answers a push to `main` with `GH013: Required status
+check "Cantus gate" is expected`, which no commit can satisfy, because the check runs on the
+commit the push would create. Since most work here lands by pushing to `main`, enforcement is off:
+a red check blocks every other actor, and an administrator can still merge past it.
+
+```sh
+# What is required right now
+gh api repos/innotelinc/jesus/branches/main/protection \
+  --jq '{checks: .required_status_checks.contexts, enforce_admins: .enforce_admins.enabled}'
+
+# Make a red run block an administrator's merge too — and accept that every
+# change to main then has to arrive as a pull request, because pushes stop.
+gh api -X POST repos/innotelinc/jesus/branches/main/protection/enforce_admins
+```
 
 Three files under `apps/` needed a hand change that the port cannot express:
 
