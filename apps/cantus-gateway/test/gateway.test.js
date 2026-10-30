@@ -238,3 +238,32 @@ test('addresses are read the way the switch writes them', () => {
   assert.equal(sipUser('<sip:+14132642700@atlanta.voip.ms>'), '+14132642700');
   assert.equal(sipUser('nonsense'), '');
 });
+
+test('the RTP timestamp advances by the audio in the packet, not by a constant', async (t) => {
+  const a = new RtpSession();
+  const b = new RtpSession();
+  t.after(() => {
+    a.close();
+    b.close();
+  });
+  await a.start();
+  await b.start();
+  a.to('127.0.0.1', b.port);
+  b.to('127.0.0.1', a.port);
+
+  // An upstream leg handing over 40 ms instead of 20: the old code advertised
+  // 160 samples of time for 320 samples of audio, so the carrier played the
+  // stream at double speed with overlapping packets.
+  const frames = [];
+  b.onFrame = (pcm) => frames.push(pcm);
+  const before = a.ts;
+  a.send(Buffer.alloc(320 * 2));
+  await sleep(60);
+  assert.equal(a.ts - before, 320, '320 samples take 320 samples of timestamp');
+
+  // And an ordinary 20 ms frame still advances by 160.
+  const mid = a.ts;
+  a.send(Buffer.alloc(SAMPLES * 2));
+  await sleep(60);
+  assert.equal(a.ts - mid, SAMPLES);
+});

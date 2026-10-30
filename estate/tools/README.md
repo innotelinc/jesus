@@ -181,6 +181,33 @@ With those two running together the whole path is verified: `sip-probe` is the
 carrier, `line-client` is the phone, and the gateway and switch are the ones
 being tested.
 
+### Proving the agent actually converses
+
+The probe can hold the caller's end of a conversation with the after-hours
+agent, and record what it heard, so "the agent answers" and "the agent speaks"
+are two separate measurements:
+
+```sh
+node estate/tools/sip-probe.js --gateway 127.0.0.1:5060 --did 14132642700 \
+  --from 14134210134 --speak 'Yes, Friday at three works for me. Thank you.' \
+  --tts http://127.0.0.1:8881 --speak-delay 12000 --seconds 50 \
+  --record /tmp/call.wav
+```
+
+`--speak` synthesises the sentence through the local voice shim and sends it as
+PCMU once the greeting is over; `--record` writes everything the carrier sent
+back. Then compare that recording with the agent's own bot track — the pipeline
+upload one `recordings/<run>/bot.wav` — because a call can connect, transcribe
+and answer while the caller hears stuttered, doubled audio:
+
+```sh
+python3 estate/tools/audio-compare.py /tmp/call.wav bot.wav
+```
+
+A faithful path peaks near 1.0 at the right offset; a doubled or re-framed
+stream decorrelates, which is how the 40 ms/20 ms frame mismatch that made
+every caller hear the agent at half speed was found.
+
 ### Encryption on or off, with the carrier in step
 
 The console at `:8000` has a **Carrier encryption** card, and it is the honest

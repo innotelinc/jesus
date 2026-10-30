@@ -188,7 +188,7 @@ export class RtpSession {
     return true;
   }
 
-  /** Send 20 ms of PCM16 to the carrier, as PCMU. */
+  /** Send one frame of PCM16 to the carrier, as PCMU. */
   send(pcm16) {
     if (!this.socket || !this.remote) return;
     const payload = pcm16ToUlaw(pcm16);
@@ -200,7 +200,12 @@ export class RtpSession {
     packet.writeUInt32BE(this.ssrc, 8);
     payload.copy(packet, 12);
     this.seq = (this.seq + 1) & 0xffff;
-    this.ts = (this.ts + SAMPLES) >>> 0;
+    // The timestamp advances by the audio actually in the packet, not by a
+    // constant. µ-law is one byte per sample at 8 kHz, so a payload that is not
+    // 160 bytes (an upstream leg that sent 40 ms instead of 20) would otherwise
+    // advertise 20 ms of time for 40 ms of audio and the carrier would play the
+    // stream back at double speed with the packets overlapping.
+    this.ts = (this.ts + payload.length) >>> 0;
     this.sent += 1;
     this.transmit(packet);
   }

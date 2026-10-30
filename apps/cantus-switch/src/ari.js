@@ -656,6 +656,10 @@ export class AriBridge {
       if (direction === 'out') return; // the application only listens
       leg.rx = codec.fromWire(Buffer.from(data));
       leg.rxAt = Date.now();
+      // The agent's frames are its own size (chan_websocket hands over 40 ms at
+      // a time). The caller's leg buffers them and plays 20 ms a tick, so the
+      // size stops here rather than reaching a carrier that expects 20 ms.
+      leg.rxSeq = (leg.rxSeq ?? 0) + 1;
       leg.received += 1;
     });
     socket.on('close', () => this.closeExternal(id, 'media socket closed'));
