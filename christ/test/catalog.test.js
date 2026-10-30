@@ -16,10 +16,18 @@ test('"voice" is the floor: the switch and the front door', () => {
 
 test('"ai" resolves to containers and to the stacks that stay outside', () => {
   const resolution = resolve(catalog, ['ai']);
-  assert.deepEqual(resolution.capabilities, ['models', 'voice', 'agents', 'memory', 'tools']);
-  // dograh is the half that speaks, so it is containers; Capstone's evaluation
-  // stack is not a voice path and stays attached.
-  assert.deepEqual(resolution.services, ['omniroute', 'switch', 'christ', 'dograh-api', 'dograh-ui']);
+  assert.deepEqual(resolution.capabilities, ['models', 'voice', 'agents', 'speech', 'memory', 'tools']);
+  // dograh is the half that speaks and the shim is the voice it speaks with, so
+  // both are containers; Capstone's evaluation stack is not a voice path and
+  // stays attached.
+  assert.deepEqual(resolution.services, [
+    'omniroute',
+    'switch',
+    'christ',
+    'dograh-api',
+    'dograh-ui',
+    'tts-shim',
+  ]);
   const attached = resolution.external.map((entry) => entry.name);
   assert.ok(attached.includes('Capstone (AgentOps)'), 'the evaluation stack is attached, not pretended');
   assert.ok(attached.includes('claude-mem'));
@@ -64,7 +72,10 @@ test('a cycle in the catalog is named instead of silently resolved', () => {
 
 test('the command carries every profile the selection needs', () => {
   const command = composeCommand(resolve(catalog, ['ai']));
-  assert.match(command, /docker compose --profile core --profile models --profile voice --profile agents --profile memory --profile tools up -d --build/);
+  assert.match(
+    command,
+    /docker compose --profile core --profile models --profile voice --profile agents --profile speech --profile memory --profile tools up -d --build/
+  );
   assert.doesNotMatch(command, /--profile ai/, 'a bundle must not become a profile of its own');
 });
 
