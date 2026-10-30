@@ -117,6 +117,26 @@ CANTUS_URL=http://127.0.0.1:8288 CANTUS_CONTROL_TOKEN=dev PORT=8001 node server.
 Open <http://localhost:8001>. Every project in the tree is on the board, with its role
 and its live state; a product that is running is one click away at `/p/<id>/`.
 
+### On a box
+
+`deploy/vultr.sh` creates a fresh instance, installs Docker through cloud-init, uploads
+only the directories the selected profiles build — 169 KB, not the tree's 2.8 GB of
+history — boots the stack and applies the wiring:
+
+```sh
+export VULTR_API_KEY=…                       # or deploy/.vultr-key.env
+VOIPMS_SIP_HOST=… VOIPMS_SIP_USERNAME=… VOIPMS_SIP_PASSWORD=… VOIPMS_SIP_FROM_USER=14132642700 \
+  ./deploy/vultr.sh up                     # core + pstn + console by default
+./deploy/vultr.sh status                   # addresses and the public URLs
+./deploy/vultr.sh wire                     # after editing estate.json
+VULTR_PROFILES="core pstn platform console" ./deploy/vultr.sh up   # add telno
+./deploy/vultr.sh down                     # destroy it
+```
+
+Carrier credentials travel in the environment and land in the box's `.env`; they are
+never written into the repository, and the deploy's own state (instance id, IP, the
+generated signing secret and control token) is git-ignored beside the script.
+
 ## The wiring, and why it is a command
 
 `estate.json` is the whole system in one file: the DID, the lines, the trunk, the
