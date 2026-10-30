@@ -83,7 +83,7 @@
       "interface": "cantus-ari",
       "urlEnv": "DOGRAH_URL",
       "defaultUrl": "",
-      "healthPath": "/",
+      "healthPath": "/api/v1/health",
       "docs": "apps/dograh/README.md"
     },
     {

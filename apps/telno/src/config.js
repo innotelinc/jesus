@@ -122,6 +122,13 @@ export const config = {
     // Where the generated routing document and line inventory are written. The
     // switch reads the same directory, so a restart of either side converges.
     configDir: env.CANTUS_CONFIG_DIR || '',
+    // Routes the platform does not own but must not drop. The composition root
+    // (christ) writes the AI plane's dial plan here — the DID's office-hours and
+    // after-hours branches, the agent extensions, the outbound pattern — and
+    // this generator prepends them to its own. Without it, the first settings
+    // save in the console re-sends a document with no agent in it, and the
+    // receptionist stops answering without anything on either side changing.
+    extraRoutes: env.CANTUS_ROUTES_EXTRA || '',
     reloadOnApply: bool(env.CANTUS_RELOAD, true),
     /** No switch on this machine: apply changes locally and say so, never lie. */
     simulate: bool(env.TELEPHONY_SIMULATE, false),

@@ -50,7 +50,9 @@ test('in office hours the DID rings the front desk and falls back to voicemail',
 test('outside office hours the DID answers with the AI receptionist', () => {
   const decision = dialPlanFor(plan, '14132642700@estate.local', { now: MONDAY_22 });
   assert.equal(decision.route, 'did-14132642700-after-hours');
-  assert.deepEqual(decision.actions, [{ answer: {} }, { ari: { app: 'dograh' } }]);
+  // Handed over still ringing, so the runtime sees an inbound call and answers
+  // it; an `answer` here made every inbound call look outbound.
+  assert.deepEqual(decision.actions, [{ ari: { app: 'dograh' } }]);
 });
 
 test('the DID also answers the ten-digit and plus forms a carrier might use', () => {

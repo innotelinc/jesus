@@ -17,9 +17,11 @@ test('"voice" is the floor: the switch and the front door', () => {
 test('"ai" resolves to containers and to the stacks that stay outside', () => {
   const resolution = resolve(catalog, ['ai']);
   assert.deepEqual(resolution.capabilities, ['models', 'voice', 'agents', 'memory', 'tools']);
-  assert.deepEqual(resolution.services, ['omniroute', 'switch', 'christ']);
+  // dograh is the half that speaks, so it is containers; Capstone's evaluation
+  // stack is not a voice path and stays attached.
+  assert.deepEqual(resolution.services, ['omniroute', 'switch', 'christ', 'dograh-api', 'dograh-ui']);
   const attached = resolution.external.map((entry) => entry.name);
-  assert.ok(attached.includes('Capstone + dograh'), 'the agent stack is attached, not pretended');
+  assert.ok(attached.includes('Capstone (AgentOps)'), 'the evaluation stack is attached, not pretended');
   assert.ok(attached.includes('claude-mem'));
 });
 
@@ -27,7 +29,7 @@ test('a capability brings what it requires, once, dependency first', () => {
   const resolution = resolve(catalog, ['agents']);
   assert.equal(resolution.capabilities.indexOf('voice') < resolution.capabilities.indexOf('agents'), true);
   assert.equal(resolution.capabilities.filter((id) => id === 'voice').length, 1);
-  assert.ok(resolution.services.includes('omniroute'));
+  assert.ok(resolution.services.includes('dograh-api'));
 });
 
 test('pstn needs the voice plane and asks for carrier credentials', () => {

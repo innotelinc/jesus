@@ -102,7 +102,11 @@ export function buildRoutes(estate) {
         routes.push({
           name: `did-${name}-after-hours`,
           when: { to: `${name}*` },
-          then: [{ answer: {} }, { ari: { app: agentApp } }],
+          // No `answer` first: an ARI app has to receive the call still ringing so
+          // it knows this is an inbound call (state=Ring) and answers it itself.
+          // Answering here made every inbound call look like an outbound channel
+          // the runtime had originated, and it dropped it for want of a run id.
+          then: [{ ari: { app: agentApp } }],
         });
       }
     }
@@ -115,7 +119,7 @@ export function buildRoutes(estate) {
     routes.push({
       name: `agent-${plain(agent.ext)}`,
       when: { to: `${plain(agent.ext)}@*` },
-      then: [{ answer: {} }, { ari: { app: agentApp } }],
+      then: [{ ari: { app: agentApp } }],
     });
   }
 
@@ -211,11 +215,17 @@ async function call(baseUrl, path, { method = 'GET', body, token, fetchImpl = fe
  * document loaded is not a wiring change, and the difference only shows up
  * during the first call if nobody checks.
  */
-export async function apply(plan, { baseUrl, token = '', fetchImpl = fetch } = {}) {
+export async function apply(plan, { baseUrl, token = '', fetchImpl = fetch, routesOnly = false } = {}) {
   if (!baseUrl) throw new Error('apply: a switch base URL is required');
 
-  for (const trunk of plan.trunks) await call(baseUrl, '/v1/trunks', { method: 'POST', body: trunk, token, fetchImpl });
-  for (const line of plan.lines) await call(baseUrl, '/v1/lines', { method: 'POST', body: line, token, fetchImpl });
+  // `routesOnly` is for a switch that already has an inventory owner. Telno
+  // pushes its own lines with its own secrets, and re-pushing christ's copy
+  // would blank those secrets — a softphone then fails to register with nothing
+  // on either side to explain it. The routes are the part christ owns.
+  if (!routesOnly) {
+    for (const trunk of plan.trunks) await call(baseUrl, '/v1/trunks', { method: 'POST', body: trunk, token, fetchImpl });
+    for (const line of plan.lines) await call(baseUrl, '/v1/lines', { method: 'POST', body: line, token, fetchImpl });
+  }
   await call(baseUrl, '/v1/routes', { method: 'POST', body: plan.routes, token, fetchImpl });
 
   const [routes, lines, status] = await Promise.all([
@@ -230,11 +240,11 @@ export async function apply(plan, { baseUrl, token = '', fetchImpl = fetch } = {
   if (missing.length) throw new Error(`switch did not load ${missing.length} route(s): ${missing.join(', ')}`);
 
   const registered = Array.isArray(lines) ? lines.map((line) => String(line.ext)) : [];
-  const absent = plan.lines.map((line) => line.ext).filter((ext) => !registered.includes(ext));
+  const absent = routesOnly ? [] : plan.lines.map((line) => line.ext).filter((ext) => !registered.includes(ext));
 
   return {
-    trunks: plan.trunks.length,
-    lines: plan.lines.length,
+    trunks: routesOnly ? 0 : plan.trunks.length,
+    lines: routesOnly ? 0 : plan.lines.length,
     routes: wanted.length,
     loadedRoutes: loaded.length,
     linesMissing: absent,
