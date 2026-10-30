@@ -124,6 +124,14 @@ node cli.js souls             # souls → out/agents.json
 node cli.js up                # the board on :8001
 ```
 
+For the AI receptionist, add the two profiles that make it a voice rather than
+silence — the runtime and a TTS service:
+
+```sh
+node cli.js select agents speech
+DOGRAH_TTS_BASE_URL=http://tts-shim:8880/v1 python3 ../apps/capstone/scripts/dograh_wire.py
+```
+
 No Docker? The voice plane and the board are Node only:
 
 ```sh
@@ -256,10 +264,10 @@ nobody changed.
 | Claim | Reality |
 |---|---|
 | "One system" | One switch, one routing document, one DID. The products are still separate processes with separate repositories — that is the point. |
-| "AI integrated" | Verified on a live box: a SIP call to the DID routes after hours into the agent app, dograh receives `StasisStart` with the channel still ringing, creates an inbound run and answers the channel. The audio hand-off is the last gap — see below. |
-| "Composable" | Fourteen services in this compose, each behind a profile; dograh and telno are containers now. Capstone's evaluation stack, claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
+| "AI integrated" | Verified on a live box: a call to the DID routes after hours into the agent app, dograh receives `StasisStart`, creates an inbound run, answers the channel, then asks the switch for an external media channel. The switch dials dograh's media endpoint, announces `MEDIA_START format=ulaw`, the media channel enters Stasis, the bridge is created with both channels — and the pipeline starts on 8 kHz audio. |
+| "Composable" | Sixteen services in this compose, each behind a profile; dograh, its database and the voice are containers now. Capstone's evaluation stack, claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
 | "Works" | The switch, wiring, catalog and front-door suites run on every push. Verified live: 15/15 routes loaded and read back, line 101 registered over the public URL from a headless client, a real DID INVITE reaching the agent app. |
-| "The agent speaks" | Not yet end to end. dograh hands media to the switch with `POST /ari/channels/{id}/externalMedia` (`transport=websocket`, `connection_type=client`) — the chan_websocket call this ARI surface does not implement yet — and its TTS is pointed at a shim that is not running in this selection. Both are container/config work, not redesigns. |
+| "The agent speaks" | Yes, and measured. `POST /ari/channels/externalMedia` resolves `external_host` through `CANTUS_WS_CLIENTS`, dials it, sends `MEDIA_START`, carries ulaw both ways and completes the bridge (`test/external-media.test.js`); the `speech` profile runs capstone's Piper shim behind the `/v1/audio/speech` contract dograh's `speaches` provider speaks. Verified on a live SIP call to the DID: 200 OK with media to the caller, two TTS requests served, and **2233 RTP packets received** by the calling side — the greeting reaches the phone. |
 
 ## Layout
 

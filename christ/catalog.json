@@ -39,6 +39,14 @@
       "requires": []
     },
     {
+      "id": "speech",
+      "name": "Speech",
+      "about": "The voice the agent speaks with: Piper behind an OpenAI-compatible /v1/audio/speech door, 24 kHz PCM. Without it an AI call connects and stays silent.",
+      "services": ["tts-shim"],
+      "requires": ["agents"],
+      "env": ["TTS_SHIM_PIPER_VOICE"]
+    },
+    {
       "id": "agents",
       "name": "Voice agents",
       "about": "dograh, the runtime that speaks: its ARI bridge takes 8003, its UI builds the workflow. Capstone's evaluation stack stays outside — it is ops, not a voice path.",
@@ -106,7 +114,7 @@
       "about": "The bundle: model gateway, voices, memory and tools. This is the \"I want AI\" answer.",
       "services": [],
       "requires": [],
-      "capabilities": ["models", "agents", "memory", "tools"]
+      "capabilities": ["models", "agents", "speech", "memory", "tools"]
     }
   ]
 }

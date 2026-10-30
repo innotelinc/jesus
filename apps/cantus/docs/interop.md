@@ -139,8 +139,8 @@ ARI-compatible surface so an agent runtime does not have to be rewritten:
 
 | ARI resource | Implemented | Notes |
 |---|---|---|
-| `channels` | list, get, create, delete, answer, hangup, play, dtmf, `externalMedia` | media is PCM16 over a WebSocket, exactly as before |
-| `bridges` | create, list, get, delete, addChannel, removeChannel | audio is mixed by the switch, not by the agent |
+| `channels` | list, get, create, delete, answer, hangup, play, dtmf, `POST channels/externalMedia` | chan_websocket's protocol: `external_host` is a connection name, `MEDIA_START` declares the format, and audio crosses as ulaw/slin/slin16 binary frames. `transport_data` becomes query parameters, so the ids an agent routes a call by survive |
+| `bridges` | create, list, get, delete, addChannel, removeChannel | the bridge decides who hears whom; two channels is a true pair, more than two is not a mixer yet and says so |
 | `applications` | list, get, subscribe | `/ari/events?app=…` |
 | `endpoints` | list | shows Cantus peers, not SIP endpoints |
 | `asterisk/info` | yes | enough for a client that probes versions |

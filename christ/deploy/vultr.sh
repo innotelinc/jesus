@@ -195,7 +195,8 @@ pack() {
     --exclude 'apps/telno/node_modules' --exclude 'apps/cantus-gateway/node_modules' \
     --exclude 'apps/telno/.env' --exclude 'apps/telno/web/dist' \
     christ apps/cantus-switch apps/cantus-gateway estate/console apps/telno \
-    apps/capstone/dograh apps/capstone/scripts/dograh_wire.py
+    apps/capstone/dograh apps/capstone/scripts/dograh_wire.py \
+    apps/capstone/tts-shim
   [ -s "$out" ] || { echo "pack produced no archive" >&2; exit 1; }
   printf '%s' "$out"
 }
@@ -275,9 +276,18 @@ TELNO_URL=http://telno:8080" ;;
 GATEWAY_URL=http://gateway:7454" ;;
       models) env_file="$env_file
 OMNIROUTE_URL=http://omniroute:20128" ;;
+      speech) env_file="$env_file
+# Where the agent's voice is. A hostname on the compose network, not
+# loopback: dograh is a container, and 127.0.0.1 there is dograh.
+DOGRAH_TTS_BASE_URL=${DOGRAH_TTS_BASE_URL:-http://tts-shim:8880/v1}" ;;
       agents) env_file="$env_file
 DOGRAH_URL=http://dograh-api:8000
-DOGRAH_UI_URL=http://dograh-ui:3010" ;;
+DOGRAH_UI_URL=http://dograh-ui:3010
+# The agent runtime's media endpoint, under the connection name its ARI
+# configuration dials (external_host). Filled in here because only this
+# profile runs dograh, and a name pointing at a container that was never
+# selected is a socket that refuses every call.
+CANTUS_WS_CLIENTS=${CANTUS_WS_CLIENTS:-dograh=ws://dograh-api:8000/api/v1/telephony/ws/ari}" ;;
     esac
   done
 
