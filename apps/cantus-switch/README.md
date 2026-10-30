@@ -7,7 +7,7 @@ ARI-compatible surface — in Node, with **no dependencies**.
 node src/cli.js selftest        # two switches, one relay, one real call
 node src/cli.js run             # serve it
 node src/cli.js route-test routes.json --to 101@telno.local
-npm test                        # 17 tests, including byte-for-byte parity with the Perl stack
+npm test                        # 46 tests, including byte-for-byte parity with the Perl stack
 ```
 
 ## Why this exists
