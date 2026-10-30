@@ -124,7 +124,7 @@ test('capability negotiation follows the caller order', () => {
 });
 
 test('call, path and probe derivations are deterministic', () => {
-  assert.equal(challenge('c1', 1).length, 16);
+  assert.equal(challenge('c1', 1).length, 17);
   assert.equal(candidateToken('c1', 1).length, 8);
   assert.notDeepEqual(challenge('c1', 1), challenge('c2', 1));
   assert.equal(describe(TYPES.INVITE, { [F.to]: s('100') }), 'INVITE to="100"');
