@@ -49,9 +49,12 @@ These volumes looked like data sources and contained nothing worth keeping:
 
 ## Before destroying the instance
 
-1. **Domains** — all seven (`telno.digital`, `telno.directory`, `telno.mobi`,
-   `telno.network`, `telno.online`, `telno.services`, `telno.tel`) must A-record to
-   `45.77.221.158`. See [domains.md](domains.md).
+1. **Domains** — measured on 2026-10-30: only `telno.services` resolves, to
+   `45.77.221.158`, and serves `200` over TLS from the box. `telno.digital`,
+   `telno.directory`, `telno.mobi`, `telno.network`, `telno.online` and `telno.tel`
+   return NXDOMAIN — no records exist for them yet, so they serve nothing from either
+   box. The proxy map is already rendered for all seven (see
+   [domains.md](domains.md)); what is missing is DNS, not wiring.
 2. **Carrier** — the SIP trunk registers on `christ-gateway` and the DID
    `14132642700` rings line 101; the IAX trunk (`235662_iax`) registers on
    `christ-fax` and owns `7745057136` / `4135614101`.
