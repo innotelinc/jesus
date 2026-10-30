@@ -63,6 +63,10 @@ These volumes looked like data sources and contained nothing worth keeping:
 4. **Keep the archives** — if the import volumes matter long-term, copy
    `/opt/christ/import/` off the box before Christ itself is ever rebuilt. They are not
    part of `christ/deploy/` and are not captured by the deployment.
+5. **Revoke the transfer key** — the copy ran over a key minted on ord-voice
+   (`/root/.ssh/christ_k`) whose public half was appended to Christ's
+   `/root/.ssh/authorized_keys`. Destroying ord-voice makes it unusable, but remove
+   that line first: until then ord-voice holds root on Christ.
 
 ## Reading the archives
 
