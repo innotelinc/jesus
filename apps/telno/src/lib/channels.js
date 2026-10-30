@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { brand } from './brand.js';
 import { getSecret } from './vault.js';
 import { sendSmsMessage, smsFrom, voipmsConfigured } from './carriers/voipms.js';
 
@@ -188,8 +189,15 @@ export const resendConfigured = () => !!resendKey();
 // a working configuration, and saying so beats a 401 from the provider.
 export const mailjetConfigured = () => !!(mailjetKey() && mailjetSecret());
 
-/** A From address can be stored too: providers reject a sender they do not own. */
-const emailFrom = () => getSecret('EMAIL_FROM') || config.notify.from;
+/**
+ * A From address can be stored too: providers reject a sender they do not own.
+ *
+ * Three sources, in order of how specific they are: the vault entry an operator
+ * set for the mail channel, the estate address from the brand settings — the
+ * one somebody can change in the portal without a redeploy — and finally the
+ * environment default.
+ */
+const emailFrom = () => getSecret('EMAIL_FROM') || brand().estateEmail || config.notify.from;
 
 /** Where a credential came from, without disclosing it. */
 const sourceOf = (name, environment) => (getSecret(name) ? 'vault' : environment ? 'environment' : 'none');

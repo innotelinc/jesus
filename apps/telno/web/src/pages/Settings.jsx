@@ -1304,6 +1304,13 @@ export default function Settings() {
                 onChange={(event) => setBrandForm({ ...brandForm, salesEmail: event.target.value })}
               />
               <Input
+                label="Estate email"
+                type="email"
+                value={brandForm.estateEmail || ''}
+                hint="The address this estate speaks from: the From on notices and the reply-to a customer reaches. Empty uses the environment default."
+                onChange={(event) => setBrandForm({ ...brandForm, estateEmail: event.target.value })}
+              />
+              <Input
                 label="Footer note"
                 value={brandForm.footerNote}
                 onChange={(event) => setBrandForm({ ...brandForm, footerNote: event.target.value })}
