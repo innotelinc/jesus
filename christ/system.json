@@ -87,6 +87,19 @@
       "docs": "apps/dograh/README.md"
     },
     {
+      "id": "tts-shim",
+      "name": "Piper voice",
+      "dir": "apps/capstone/tts-shim",
+      "layer": "agentops",
+      "role": "The voice itself: Piper behind an OpenAI-compatible /v1/audio/speech door, 24 kHz PCM, one voice loaded in-process and a cache so a fixed greeting is not re-synthesised every call. dograh's speaches TTS provider dials it; without it the agent connects and stays silent.",
+      "contributes": ["the agent's voice", "ulaw-sized latency on CPU", "a cache keyed on the spoken text"],
+      "interface": "openai-compatible",
+      "urlEnv": "TTS_SHIM_URL",
+      "defaultUrl": "",
+      "healthPath": "/health",
+      "docs": "apps/capstone/tts-shim/README.md"
+    },
+    {
       "id": "genie-soulforge",
       "name": "Soulforge",
       "dir": "apps/genie-soulforge",
