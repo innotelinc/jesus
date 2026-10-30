@@ -37,29 +37,37 @@ telno.directory     A   <edge ip>      www CNAME -> apex
 telno.network       A   <edge ip>      www CNAME -> apex
 ```
 
-The zones are hosted by **Cerulean's Technitium** on the `cerulean` host, not by
-the edge box, so the record is written there — and because that server *is* the
-authoritative nameserver for these zones, the public answer changes the moment
-the record does. There is no provider to wait on and no second zone to keep in
-step. `deploy/publish-dns.py` is the one way to make the change, because it is
-the only path that keeps the credential out of the shell and out of the repo:
+The zones are hosted in **Vultr DNS** (`ns1.vultr.com`, `ns2.vultr.com`). They were
+self-hosted before: the registry delegated each name to `ns1.<zone>`/`ns2.<zone>`
+with glue pointing at a home connection, and Technitium on the `cerulean` host
+answered. An in-bailiwick delegation has no second path — when that host stopped
+answering, all seven names went `SERVFAIL` at once and stayed there, because the
+only thing that could answer for them was the thing that was down. Out-of-bailiwick
+nameservers need no glue and cannot be orphaned by a home IP change, which is why
+the zones live at Vultr now.
+
+`deploy/publish-vultr-dns.py` is the one way to write them, and it is idempotent —
+it reads each zone, changes only what disagrees with this file, and says what it
+touched:
 
 ```sh
-VAULT_ADDR=http://127.0.0.1:8200 \
-VAULT_TOKEN_FILE=<cerulean>/data/vault/token/cerulean.token \
-  ./deploy/publish-dns.py --show                    # apex and www, per zone
-  ./deploy/publish-dns.py --apply --ip <edge ip>    # the apex A of all seven
-  ./deploy/publish-dns.py --verify --ip <edge ip>   # public answers, then TLS
+VULTR_API_KEY=... ./deploy/publish-vultr-dns.py --show
+VULTR_API_KEY=... ./deploy/publish-vultr-dns.py --apply --ip <edge ip>
+./deploy/publish-vultr-dns.py --verify --ip <edge ip>   # asks ns1.vultr.com
 ```
 
-The Technitium credential (`url`, `user`, `password`) lives in Vault at
-`cerulean/technitium`; the tool prints which source it used and never the value.
-Two things about that API are worth knowing before scripting it by hand.
-`zones/records/get` without a `domain` returns the **apex only** — so a check
-that asks for the zone will report `www` as missing when it is right there, which
-is why `--show` asks for it by name. And `zones/records/update` at an apex is
-refused with "the record does not exists to be updated" while listing that very
-record, so the tool falls back to delete-then-add, which the API does accept.
+It sets the apex `A`, `www` as a CNAME of the apex, `CAA issue "letsencrypt.org"`
+(the only CA the edge uses), and on `telno.services` the SPF and DMARC records. It
+also removes the catch-all `CNAME *` that a fresh Vultr zone arrives with: a name
+that answers for every host is the opposite of a declared map.
+
+**The registrar is the one step no script here can do.** The seven names are
+registered at Namecheap, and delegation is that account's to change: set each
+zone's nameservers to `ns1.vultr.com` and `ns2.vultr.com` and the zones below are
+what the world then sees. Until that happens the zones answer authoritatively but
+no resolver asks them, so the names do not resolve publicly however correct the
+zone is. `deploy/publish-dns.py` still exists and still works against Cerulean's
+Technitium, for the day that host is the authority again for some other zone.
 
 `www.` has to exist. Each edge site block answers for `<zone>` **and**
 `www.<zone>`, and Caddy requests one certificate covering both names, so a
@@ -69,11 +77,12 @@ box has an IPv6 address, add the `AAAA` records as well: a name with only `A`
 records still works, but a client that prefers IPv6 spends a round trip finding
 that out.
 
-Delegation stays where it is: every zone lists `lab.innotel.us`, `ns1.<zone>` and
-`ns2.<zone>`, and all three resolve to the Cerulean box. Moving the apex `A`
-therefore does not touch who answers for the zone. `CAA` is `issue
-letsencrypt.org` in all seven, which is exactly the CA the edge uses, so
-certificate issuance succeeds on the first request after the record moves.
+`CAA` is `issue "letsencrypt.org"` in all seven, which is exactly the CA the edge
+uses, so certificate issuance succeeds on the first request after the record
+moves. Certificates are not tied to who answers DNS: the edge already holds a
+valid Let's Encrypt certificate for every one of the seven names, issued while the
+old delegation still answered, so moving the delegation makes them live rather
+than re-issuing them.
 
 Moving the record is the whole change: the edge already carries a block for each
 name and its `www.`, so issuing the certificate is simply what happens next. An
@@ -98,8 +107,8 @@ or the Mailjet pair. The console reports which provider is live and refuses to
 claim a message was delivered when none is configured — it writes the message to
 the log instead.
 
-These are zone records, so they go into the `telno.services` zone in Technitium
-(the Cerulean console) rather than to the registrar — delegation is what lives at
+These are zone records, so they go into the `telno.services` zone with
+`publish-vultr-dns.py` rather than to the registrar — delegation is what lives at
 the registrar, and it does not change. The zone already carries
 `v=spf1 mx include:spf.mailjet.com ip4:<old edge ip> ~all`; the `ip4` has to
 follow the box if anything ever sends straight from it, and the provider's
