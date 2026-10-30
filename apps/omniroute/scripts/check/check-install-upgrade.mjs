@@ -38,6 +38,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
+// One implementation, so both install gates read the tarball name the same way.
+import { pickTarball } from "./check-pack-boot.mjs";
+
 const BOOT_DEADLINE_MS = 180_000;
 const POLL_INTERVAL_MS = 2_000;
 const ALLOWLIST_PATH = "config/quality/install-upgrade-allowlist.json";
@@ -96,12 +99,6 @@ function derivePackagedCliToken(prefix) {
     // probe running (it will fail loudly on its own) instead of crashing the gate here.
     return null;
   }
-}
-
-function pickTarball(packJson) {
-  const filename = JSON.parse(packJson)?.[0]?.filename;
-  if (!filename) throw new Error("npm pack --json returned no filename");
-  return filename;
 }
 
 /** Free-ish port per phase so a leaked child from a previous run cannot collide. */
@@ -377,6 +374,9 @@ async function main() {
       cwd: ROOT,
       encoding: "utf8",
       maxBuffer: 128 * 1024 * 1024,
+      // `prepare` is `husky`, which prints to stdout when it finds no .git — as it
+      // always does for a package nested inside this monorepo.
+      env: { ...process.env, HUSKY: "0" },
     });
     const tarball = path.join(tmp, pickTarball(packOut));
     const packMb = (fs.statSync(tarball).size / 1024 / 1024).toFixed(1);

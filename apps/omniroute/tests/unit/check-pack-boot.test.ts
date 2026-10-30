@@ -38,6 +38,23 @@ test("pickTarball normalizes scoped slashes to the on-disk dash form", () => {
   assert.equal(pickTarball('[{"filename":"@scope/pkg-1.0.0.tgz"}]'), "@scope-pkg-1.0.0.tgz");
 });
 
+test("pickTarball skips hook chatter printed before the npm JSON", () => {
+  // `npm pack` runs `prepare` first, and husky says this on stdout when it finds
+  // no .git — which is every run from inside the monorepo. The gate used to fail
+  // on that sentence instead of on the artifact.
+  assert.equal(
+    pickTarball("husky - .git can't be found\n[{\"filename\":\"omniroute-3.8.49.tgz\"}]"),
+    "omniroute-3.8.49.tgz"
+  );
+});
+
+test("pickTarball ignores a line printed after the npm JSON", () => {
+  assert.equal(
+    pickTarball('[{"filename":"omniroute-3.8.49.tgz"}]\nnode: a warning\n'),
+    "omniroute-3.8.49.tgz"
+  );
+});
+
 test("pickTarball throws on empty/odd npm output instead of booting garbage", () => {
   assert.throws(() => pickTarball("[]"));
   assert.throws(() => pickTarball("{}"));

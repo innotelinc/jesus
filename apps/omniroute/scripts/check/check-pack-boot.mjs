@@ -45,11 +45,43 @@ export const REQUIRED_MACHINE_TOKEN_RUNTIME_FILES = Object.freeze([
 
 /** Parse `npm pack --json` output into the generated tarball filename. */
 export function pickTarball(packJsonOutput) {
-  const parsed = JSON.parse(packJsonOutput);
+  const parsed = parsePackJson(String(packJsonOutput ?? ""));
   const filename = Array.isArray(parsed) ? parsed[0]?.filename : undefined;
   if (!filename) throw new Error("npm pack --json returned no filename");
   // npm >=9 may emit scoped names with "/" — normalize to the on-disk file name.
   return filename.replace(/\//g, "-");
+}
+
+/**
+ * The JSON document npm printed, wherever it actually starts.
+ *
+ * `npm pack` runs `prepare` before it packs, and that script is free to print:
+ * `husky` writes "husky - .git can't be found" to stdout whenever the package is
+ * not at the root of its own repository. Under this monorepo that is every run —
+ * apps/omniroute has no .git of its own — so a strict JSON.parse of stdout failed
+ * the boot gate on a hook's sentence instead of on the artifact. The pack calls
+ * also set HUSKY=0, so there should be nothing to skip; this keeps a future hook
+ * from turning into a red gate either way.
+ */
+function parsePackJson(output) {
+  try {
+    return JSON.parse(output);
+  } catch {
+    // Fall through: the document is in there, just not at byte 0.
+  }
+  const lines = output.split(/\r?\n/);
+  const first = lines.findIndex((line) => /^\s*[[{]/.test(line));
+  if (first === -1) throw new Error("npm pack --json printed no JSON document");
+  // Shrink from the tail until the parser accepts it, so trailing chatter is
+  // skipped too rather than becoming part of the parse.
+  for (let end = lines.length; end > first; end -= 1) {
+    try {
+      return JSON.parse(lines.slice(first, end).join("\n"));
+    } catch {
+      // One more line of noise; keep going.
+    }
+  }
+  throw new Error("npm pack --json printed no parseable JSON document");
 }
 
 /**
@@ -426,6 +458,10 @@ async function main() {
       cwd: ROOT,
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
+      // `prepare` is `husky` here. It has no hooks to install while packing, and
+      // it prints to stdout when it cannot find .git — which is always the case
+      // for a package nested inside a monorepo.
+      env: { ...process.env, HUSKY: "0" },
     });
     const tarball = path.join(tmp, pickTarball(packOut));
     log(`installing ${path.basename(tarball)} into a clean prefix (postinstall runs for real)…`);
