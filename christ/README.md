@@ -241,6 +241,30 @@ nine are attached, and the difference is visible rather than implied.
 The board is read-only. A board that can hang up a call is a board that can hang up the
 wrong one; the wiring is a command with a dry run, not a button.
 
+## The front door, and the seven domains
+
+`edge` is a Caddy proxy in the `core` profile and the only place TLS terminates.
+Every public hostname is declared once — in
+[domains.json](domains.json) — and rendered into [deploy/Caddyfile](deploy/Caddyfile)
+by `node cli.js edge --write`, so "which domain serves what" is a file that a test
+compares the proxy against rather than a memory:
+
+| Domain | What it is for |
+|---|---|
+| `telno.services` | the product, the price and the signup — and the domain every message is sent from |
+| `telno.online` | self-serve: a plan, a card, a working extension |
+| `telno.mobi` | the phone in a pocket: the browser softphone and the native app |
+| `telno.digital` | numbers as records: the registry and the lookup |
+| `telno.tel` | handsets, sign-in and `/<vendor>/<mac>.cfg` provisioning; also the SIP domain |
+| `telno.directory` | the worldwide phonebook itself, with no landing page in front of it |
+| `telno.network` | the estate, layer by layer — this board |
+
+The DNS, the mail records (SPF, DKIM, DMARC for the sending domain) and how to test
+the routing before a name resolves are in [docs/domains.md](docs/domains.md).
+`EDGE_AUTO_HTTPS` is not a knob: certificates are automatic, and
+`node cli.js edge --http` renders the same map as plain HTTP for a box whose records
+still point elsewhere.
+
 ## Where the code comes from
 
 CHRIST is the composition root of the [Jesus tree](https://github.com/innotelinc/jesus):

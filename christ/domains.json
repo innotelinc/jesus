@@ -1,0 +1,54 @@
+{
+  "note": "One door per job. Every host in the estate is declared here and nowhere else: the edge proxy is rendered from this file (christ/deploy/Caddyfile, checked by christ/test/domains.test.js), so a domain that is not listed is a domain that does not answer.",
+  "acmeEmail": "ops@telno.services",
+  "mail": {
+    "from": "Telno <no-reply@telno.services>",
+    "replyTo": "support@telno.services",
+    "about": "telno.services is the sending domain: every notice, verification code, invoice and report leaves with this From, so its SPF, DKIM and DMARC records are the ones that decide whether mail lands."
+  },
+  "hosts": [
+    {
+      "host": "telno.services",
+      "role": "product",
+      "upstream": "telno:8080",
+      "about": "The company: what the product is, what it costs, and the signup that buys it. Also the address every message is sent from."
+    },
+    {
+      "host": "telno.online",
+      "role": "signup",
+      "upstream": "telno:8080",
+      "about": "Self-serve: a plan, a card and a working extension without talking to anybody."
+    },
+    {
+      "host": "telno.mobi",
+      "role": "mobile",
+      "upstream": "telno:8080",
+      "about": "The phone in a pocket: the browser softphone and the native app."
+    },
+    {
+      "host": "telno.digital",
+      "role": "numbers",
+      "upstream": "telno:8080",
+      "about": "Numbers as records: the registry, the lookup and what a DID is worth."
+    },
+    {
+      "host": "telno.tel",
+      "role": "phones",
+      "upstream": "telno:8080",
+      "about": "Handsets and handsets' provisioning: sign-in, the softphone, and the /<vendor>/<mac>.cfg a desk phone fetches on boot. This is also the SIP domain."
+    },
+    {
+      "host": "telno.directory",
+      "role": "directory",
+      "upstream": "telno:8080",
+      "redirect": "/d/telno.directory",
+      "about": "The worldwide phonebook. The root redirects into the directory itself rather than a landing page that would sit in front of it."
+    },
+    {
+      "host": "telno.network",
+      "role": "network",
+      "upstream": "christ:8001",
+      "about": "The estate itself: every layer of the system and whether it is up, served by the CHRIST board."
+    }
+  ]
+}

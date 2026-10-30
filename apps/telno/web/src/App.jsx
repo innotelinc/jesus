@@ -32,6 +32,7 @@ import Customer from './pages/Customer.jsx';
 import Customers from './pages/Customers.jsx';
 import Setup, { useSetupStatus } from './pages/Setup.jsx';
 import Onboarding from './pages/Onboarding.jsx';
+import { entryPath } from './sites.js';
 
 const PAGES = [
   { path: '/', title: 'Dashboard', subtitle: 'Platform and registry at a glance', Component: Dashboard },
@@ -70,6 +71,16 @@ function Router() {
   // Public directory: /d/<host> and /lookup?number=...
   if (pathname.startsWith('/d/') || pathname === '/lookup') {
     return <PublicDirectory host={decodeURIComponent(pathname.replace('/d/', ''))} search={search} />;
+  }
+
+  // A directory domain has no shop window: telno.directory *is* the phonebook,
+  // so its root opens the directory rather than a landing page about it. The
+  // edge proxy sends the same redirect; doing it here as well means the domain
+  // behaves the same behind any proxy, or on a port with no proxy at all.
+  const directoryEntry = entryPath(window.location.host);
+  if (directoryEntry && pathname === '/') {
+    navigate(directoryEntry, { replace: true });
+    return null;
   }
 
   // The shop window. Public on purpose: a stranger has to be able to reach it,

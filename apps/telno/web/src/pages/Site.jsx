@@ -3,6 +3,7 @@ import { api, compactNumber, qs } from '../api.js';
 import { BrandMark, useBrand } from '../brand.jsx';
 import { Badge, Button, Icon, Input, Loading } from '../ui.jsx';
 import { Link, navigate } from '../router.jsx';
+import { siteFor } from '../sites.js';
 
 /**
  * The public site: introduction, product, pricing, signup.
@@ -68,6 +69,12 @@ const FAQ = [
 
 export default function Site() {
   const brand = useBrand();
+  // Which door the visitor came through. Seven domains serve this one page, and
+  // the hero is the only thing that has to know: the plans, the registry and the
+  // signup below are the same product whichever name is on the door. Read on
+  // every render rather than memoised, so `?site=` — the preview a box without
+  // DNS uses — changes the page it is asked for.
+  const site = siteFor(window.location.host, window.location.search);
   const [pricing, setPricing] = useState(null);
   const [stats, setStats] = useState(null);
   const [domains, setDomains] = useState([]);
@@ -88,6 +95,24 @@ export default function Site() {
   const scrollToSignup = (plan) => {
     if (plan) setSignupPlan(plan.slug);
     document.getElementById('signup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  /**
+   * A door's call to action: a section of this page, or a screen of the app.
+   *
+   * Writing it as a target rather than a callback keeps the copy in `sites.js`
+   * inert data — a domain cannot smuggle behaviour in through its headline.
+   */
+  const runHeroAction = (to) => {
+    if (!to) return;
+    if (to.startsWith('#')) {
+      const id = to.slice(1);
+      if (id === 'signup') scrollToSignup(defaultPlan);
+      else if (id === 'lookup') document.getElementById('site-lookup-number')?.focus();
+      else document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    navigate(to);
   };
 
   /** The hero lookup: the registry answering, on the page that sells it. */
@@ -203,17 +228,27 @@ export default function Site() {
       <main>
         <section className="site-hero">
           <span className="site-eyebrow">
-            <span className="dot live" /> {brand.vendor}
+            <span className="dot live" /> {site ? site.eyebrow : brand.vendor}
           </span>
-          <h1>{brand.tagline}</h1>
-          <p className="site-lede">{brand.description}</p>
+          <h1>{site?.headline || brand.tagline}</h1>
+          <p className="site-lede">{site?.lede || brand.description}</p>
 
           <div className="site-cta">
-            <Button variant="primary" size="lg" onClick={() => scrollToSignup(defaultPlan)}>
-              Start with {defaultPlan ? defaultPlan.name : 'a plan'}
-            </Button>
-            <Button variant="ghost" size="lg" onClick={() => navigate('/login')}>
-              Open the console
+            {site?.primary ? (
+              <Button variant="primary" size="lg" onClick={() => runHeroAction(site.primary.to)}>
+                {site.primary.label}
+              </Button>
+            ) : (
+              <Button variant="primary" size="lg" onClick={() => scrollToSignup(defaultPlan)}>
+                Start with {defaultPlan ? defaultPlan.name : 'a plan'}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={() => runHeroAction(site?.secondary?.to || '/login')}
+            >
+              {site?.secondary?.label || 'Open the console'}
             </Button>
           </div>
 

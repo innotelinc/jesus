@@ -1,0 +1,63 @@
+# CHRIST edge — generated from christ/domains.json by `node cli.js edge` — do not edit by hand.
+#
+# One block per host in christ/domains.json. TLS is automatic for every name
+# here, which is why the box has to be able to reach Let's Encrypt on 80/443
+# and why the DNS records have to point at it.
+
+{
+	email ops@telno.services
+	admin off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# Shared by every host: compression, the headers a public site should carry,
+# no server banner, and one probe that never touches an upstream — so the
+# edge answers while a service behind it is restarting.
+(edge) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	respond /healthz 200 "edge ok"
+}
+
+telno.services, www.telno.services {
+	import edge
+	reverse_proxy telno:8080
+}
+
+telno.online, www.telno.online {
+	import edge
+	reverse_proxy telno:8080
+}
+
+telno.mobi, www.telno.mobi {
+	import edge
+	reverse_proxy telno:8080
+}
+
+telno.digital, www.telno.digital {
+	import edge
+	reverse_proxy telno:8080
+}
+
+telno.tel, www.telno.tel {
+	import edge
+	reverse_proxy telno:8080
+}
+
+telno.directory, www.telno.directory {
+	import edge
+	redir / /d/telno.directory 302
+	reverse_proxy telno:8080
+}
+
+telno.network, www.telno.network {
+	import edge
+	reverse_proxy christ:8001
+}
