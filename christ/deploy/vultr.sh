@@ -69,7 +69,7 @@ b64e() { printf '%s' "$1" | base64 | tr -d '\n'; }
 ensure_key() {
   if [ ! -f "$KEY_FILE" ]; then
     ssh-keygen -t ed25519 -N '' -C "$LABEL" -f "$KEY_FILE" >/dev/null
-    echo "generated $KEY_FILE"
+    echo "generated $KEY_FILE" >&2
   fi
   [ -f "$KEY_FILE.pub" ] || ssh-keygen -y -f "$KEY_FILE" >"$KEY_FILE.pub"
 }
@@ -87,7 +87,7 @@ ensure_account_key() {
     | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(j.ssh_key?.id||'')})")"
   [ -n "$id" ] || { echo "could not register the SSH key" >&2; exit 1; }
   state_set ssh_key_id "$id"
-  echo "registered SSH key $id"
+  echo "registered SSH key $id" >&2
 }
 
 wait_for_ip() {
@@ -110,7 +110,7 @@ create() {
 
   local ip; ip="$(state_get ip)"
   if [ -n "$ip" ]; then
-    echo "instance already recorded: $ip (run 'down' first for a fresh one)"
+    echo "instance already recorded: $ip (run 'down' first for a fresh one)" >&2
     printf '%s' "$ip"; return 0
   fi
 
@@ -154,7 +154,9 @@ CLOUD
   id="$(api POST '/instances' "$body" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(j.instance?.id||'')})")"
   [ -n "$id" ] || { echo "instance creation failed: $(api POST '/instances' "$body")" >&2; exit 1; }
   state_set instance_id "$id"
-  echo "created instance $id ($PLAN, $REGION) — waiting for an address"
+  # Progress goes to stderr: this function's stdout is the address, and a
+  # comment on that line becomes a hostname scp refuses.
+  echo "created instance $id ($PLAN, $REGION) — waiting for an address" >&2
 
   ip="$(wait_for_ip "$id")" || { echo "instance did not become active in 5 minutes" >&2; exit 1; }
   state_set ip "$ip"
