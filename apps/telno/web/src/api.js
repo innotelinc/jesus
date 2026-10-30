@@ -43,6 +43,9 @@ export const api = {
   get: (path, opts) => request(path, opts),
   post: (path, body, opts) => request(path, { ...opts, method: 'POST', body }),
   patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body }),
+  // DELETE takes a body too: "remove this customer" sometimes has to say why,
+  // or carry the force flag that acknowledges an active subscription.
+  del: (path, body, opts) => request(path, { ...opts, method: 'DELETE', body }),
   put: (path, body, opts) => request(path, { ...opts, method: 'PUT', body }),
   del: (path, opts) => request(path, { ...opts, method: 'DELETE' }),
   /** Raw body upload (audio, PDF, images). The file's own type is the header. */
