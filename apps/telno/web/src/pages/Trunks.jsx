@@ -44,6 +44,13 @@ export default function Trunks() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  // Which trunk's password is being replaced, and what with. A carrier rotates
+  // a sub-account's password without telling anyone, and until now the only way
+  // to follow was to delete the trunk and retype it.
+  const [secretFor, setSecretFor] = useState(null);
+  const [secretValue, setSecretValue] = useState('');
+  const [secretBusy, setSecretBusy] = useState(false);
+  const [secretError, setSecretError] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +73,29 @@ export default function Trunks() {
       load();
     } catch (err) {
       toast.error('Update failed', err.message);
+    }
+  };
+
+  const saveSecret = async () => {
+    if (!secretFor) return;
+    if (!secretValue.trim()) {
+      setSecretError('A password is required, even to replace one.');
+      return;
+    }
+    setSecretBusy(true);
+    setSecretError('');
+    try {
+      // The API has always accepted this; the screen is what was missing. The
+      // value is never read back — `hasSecret` is all anyone can see afterwards.
+      await api.patch(`/trunks/${secretFor.id}`, { secret: secretValue.trim() });
+      toast.success('Password updated', `${secretFor.name} · the next registration uses it`);
+      setSecretFor(null);
+      setSecretValue('');
+      load();
+    } catch (err) {
+      setSecretError(err.message);
+    } finally {
+      setSecretBusy(false);
     }
   };
 
@@ -122,6 +152,18 @@ export default function Trunks() {
               <div className="row" style={{ marginTop: 14 }}>
                 <Switch checked={trunk.enabled} onChange={(value) => toggle(trunk, value)} label="Enabled" />
                 <div className="spacer" />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon="lock"
+                  onClick={() => {
+                    setSecretFor(trunk);
+                    setSecretValue('');
+                    setSecretError('');
+                  }}
+                >
+                  Password
+                </Button>
                 <Button size="sm" variant="ghost" icon="trash" onClick={() => remove(trunk)}>
                   Delete
                 </Button>
@@ -138,6 +180,41 @@ export default function Trunks() {
       )}
 
       {creating ? <CreateTrunk onClose={() => setCreating(false)} onSaved={load} /> : null}
+
+      {secretFor ? (
+        <Modal
+          title={`Password for ${secretFor.name}`}
+          subtitle={`${secretFor.provider} · ${String(secretFor.transport || 'sip').toUpperCase()} · ${secretFor.host}`}
+          onClose={() => setSecretFor(null)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setSecretFor(null)}>Cancel</Button>
+              <Button variant="primary" loading={secretBusy} onClick={saveSecret}>
+                Save password
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            <Input
+              label="New password"
+              type="password"
+              autoComplete="new-password"
+              value={secretValue}
+              onChange={(event) => setSecretValue(event.target.value)}
+              placeholder="••••••••••"
+              hint={`Replaces the secret stored for ${secretFor.name}. Nothing displays it afterwards — only whether one is stored.`}
+            />
+            {secretError ? (
+              <p className="tiny" style={{ margin: 0, color: 'var(--danger)' }} role="alert">{secretError}</p>
+            ) : null}
+            <p className="tiny dim" style={{ margin: 0 }}>
+              A carrier that rotated the sub-account&apos;s password rejects the next registration; this is where that
+              is fixed, without recreating the trunk.
+            </p>
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 }

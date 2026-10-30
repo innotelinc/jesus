@@ -250,7 +250,14 @@ export default async function telephonyRoutes(app) {
     if (body.transport !== undefined) patch.transport = v.oneOf(body.transport, ['sip', 'iax2'], 'transport');
     if (body.host !== undefined) patch.host = v.str(body.host, { name: 'host', max: 120, pattern: /^[A-Za-z0-9.:_-]+$/ });
     if (body.username !== undefined) patch.username = v.str(body.username, { name: 'username', max: 80, required: false });
-    if (body.secret !== undefined) patch.secret = v.str(body.secret, { name: 'secret', max: 200, required: false });
+    // A blank secret is not a secret, it is a trunk that cannot register: the
+    // row would look configured while every call out of it fails. Refused here
+    // as well as in the console, because the API is the contract.
+    if (body.secret !== undefined) {
+      const secret = v.str(body.secret, { name: 'secret', max: 200, required: false });
+      if (!secret.trim()) throw badRequest('A trunk password cannot be blank');
+      patch.secret = secret.trim();
+    }
     if (body.fromUser !== undefined) patch.from_user = v.str(body.fromUser, { name: 'fromUser', max: 40, required: false });
     if (body.codecs !== undefined) patch.codecs = v.str(body.codecs, { name: 'codecs', max: 60 });
     if (body.context !== undefined) patch.context = v.str(body.context, { name: 'context', max: 40 });

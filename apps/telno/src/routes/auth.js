@@ -1,6 +1,6 @@
 import { db_, now } from '../db/index.js';
 import { hashPassword, verifyPassword, signSession } from '../lib/security.js';
-import { unauthorized, badRequest, paymentRequired } from '../lib/errors.js';
+import { unauthorized, badRequest, conflict, paymentRequired } from '../lib/errors.js';
 import { loginSuspension } from '../lib/escalation.js';
 import { money } from '../lib/mail.js';
 import { cookieOptions, SESSION_COOKIE } from '../plugins/auth.js';
@@ -84,6 +84,44 @@ export default async function authRoutes(app) {
         ? { pending: firstRunPasswordPending(), file: firstRunPasswordFile() }
         : null,
   }));
+
+  /**
+   * Change the address this account signs in with.
+   *
+   * The current password is required for the same reason the password change
+   * requires it: a browser somebody walked away from should not be enough to
+   * move an account to an address its owner does not read. Sessions are *not*
+   * invalidated — the address is not a credential, and signing every device out
+   * because mail moved elsewhere is a worse trade than it looks.
+   */
+  app.post('/email', { preHandler: app.authenticate }, async (request, reply) => {
+    const body = request.body || {};
+    const current = v.str(body.currentPassword, { name: 'currentPassword', max: 200 });
+    const next = v.email(body.email);
+    if (!verifyPassword(current, request.account.password_hash)) {
+      throw unauthorized('Current password is incorrect');
+    }
+    if (next.toLowerCase() === String(request.account.email).toLowerCase()) {
+      throw badRequest('That is already the address this account signs in with');
+    }
+    // The column is UNIQUE case-sensitively; two accounts differing only by case
+    // would be two accounts one person cannot tell apart at the sign-in form.
+    if (db_.get('SELECT id FROM accounts WHERE lower(email) = lower(?)', [next])) {
+      throw conflict('Another account already signs in with that address');
+    }
+    db_.run('UPDATE accounts SET email = ? WHERE id = ?', [next, request.account.id]);
+    const fresh = db_.get('SELECT * FROM accounts WHERE id = ?', [request.account.id]);
+    const token = signSession({ sub: fresh.id, role: fresh.role, tv: fresh.token_version });
+    reply.setCookie(SESSION_COOKIE, token, cookieOptions);
+    logEvent({
+      actor: request.account.email,
+      action: 'auth.email_changed',
+      subject: fresh.email,
+      detail: `was ${request.account.email}`,
+      ip: request.ip,
+    });
+    return { ok: true, token, user: view(fresh), previous: request.account.email };
+  });
 
   app.post('/password', { preHandler: app.authenticate }, async (request, reply) => {
     const body = request.body || {};
