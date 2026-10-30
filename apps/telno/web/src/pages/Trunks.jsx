@@ -106,6 +106,8 @@ export default function Trunks() {
               }
             >
               <dl className="kv">
+                <dt>Transport</dt>
+                <dd className="mono">{(trunk.transport || 'sip').toUpperCase()}</dd>
                 <dt>Username</dt>
                 <dd className="mono">{trunk.username || '—'}</dd>
                 <dt>Codecs</dt>
@@ -147,6 +149,9 @@ function CreateTrunk({ onClose, onSaved }) {
   const [form, setForm] = useState({
     name: 'voip.ms',
     provider: 'voipms',
+    // SIP reaches a voice sub-account; IAX2 is what a fax modem speaks. Same
+    // carrier, two trunks, and this is the field that keeps them apart.
+    transport: 'sip',
     host: 'atlanta.voip.ms',
     username: '',
     secret: '',
@@ -218,14 +223,22 @@ function CreateTrunk({ onClose, onSaved }) {
           <option value="voipms">VoIP.ms — fill the rest in</option>
           <option value="generic">Another carrier — I know the details</option>
         </Select>
-        <Input
-          label="Name"
-          value={form.name}
+        <Input          label="Name"
+              value={form.name}
           onChange={(event) => setForm({ ...form, name: event.target.value })}
           placeholder="primary"
           hint="Letters, digits, dot, dash"
           autoFocus
         />
+        <Select
+          label="Transport"
+          value={form.transport}
+          onChange={(event) => setForm({ ...form, transport: event.target.value })}
+          hint="SIP for a voice trunk; IAX2 for the sub-account a fax modem speaks."
+        >
+          <option value="sip">SIP (pjsip)</option>
+          <option value="iax2">IAX2</option>
+        </Select>
         {kind === 'voipms' ? (
           <Select label="Media server (POP)" value={pop} onChange={(event) => choosePop(event.target.value)}>
             {VOIPMS_POPS.map(([value, label]) => (

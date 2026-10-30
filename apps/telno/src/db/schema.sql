@@ -258,6 +258,10 @@ CREATE TABLE IF NOT EXISTS trunks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL UNIQUE,
   provider    TEXT NOT NULL DEFAULT 'generic',
+  -- How the carrier is reached. Two sub-accounts on the same provider are two
+  -- trunks here, and this is the column that says why: a fax on IAX2 beside a
+  -- voice trunk on SIP is the ordinary case, not an exotic one.
+  transport   TEXT NOT NULL DEFAULT 'sip' CHECK (transport IN ('sip', 'iax2')),
   host        TEXT NOT NULL,
   username    TEXT NOT NULL DEFAULT '',
   secret      TEXT NOT NULL DEFAULT '',
