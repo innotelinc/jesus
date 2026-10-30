@@ -4514,8 +4514,14 @@ check('the fax engine reports what it can do', faxEngine.status === 200 && !!fax
 check(
   'and says plainly what the switch can carry, and what a fax still needs',
   typeof faxEngine.body.engine?.ready === 'boolean' &&
-    /T\.38|unavailable/.test(String(faxEngine.body.engine?.transport || '')) &&
-    /voice only|T\.38 gateway/.test(String(faxEngine.body.engine?.note || '')),
+    // The transport is one of the two a deployment can actually have, or off:
+    // a fabricated engine name is what this check exists to catch.
+    /^(off|none|T\.38|IAX2)/.test(String(faxEngine.body.engine?.transport || '')) &&
+    /voice only|FAX_ENGINE_URL|T\.38 gateway|Ghostscript is missing/.test(String(faxEngine.body.engine?.note || '')) &&
+    // Every claim carries the check it rests on, so the screen can show which
+    // part is missing instead of one opaque "not ready".
+    Array.isArray(faxEngine.body.engine?.checks) &&
+    faxEngine.body.engine.checks.every((check) => check.id && check.state && check.detail),
   faxEngine.body.engine
 );
 
