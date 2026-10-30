@@ -199,6 +199,8 @@ soul nobody wired is reported — a prompt that never meets a caller is not an a
 
 ## The board
 
+![CHRIST on a Vultr instance: the DID, the office-hours line, the after-hours agent and every project with its live state](docs/board.png)
+
 `/` is the system, live: the call as one line of topology (carrier → line → agent →
 switch), then every project grouped by the layer it belongs to — protocol, voice plane,
 VoiceOps, AgentOps, AI, tools — with its role and its real state. Six projects run here,
