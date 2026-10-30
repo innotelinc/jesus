@@ -21,8 +21,14 @@ const MIN_LENGTH = 10;
 
 export default function Account() {
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  // The address this account signs in with. Separated from the password form
+  // because the two are different promises: one changes a credential, the other
+  // changes where the platform reaches you, and both need the same proof.
+  const [address, setAddress] = useState({ email: '', current: '' });
+  const [addressBusy, setAddressBusy] = useState(false);
+  const [addressError, setAddressError] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [firstRun, setFirstRun] = useState(null);
@@ -44,6 +50,34 @@ export default function Account() {
   }, []);
 
   const field = (key) => (event) => setForm((state) => ({ ...state, [key]: event.target.value }));
+
+  const submitAddress = async (event) => {
+    event.preventDefault();
+    setAddressError('');
+    const next = address.email.trim().toLowerCase();
+    if (next === String(user?.email || '').toLowerCase()) {
+      setAddressError('That is already the address you sign in with.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
+      setAddressError('That is not an email address.');
+      return;
+    }
+    setAddressBusy(true);
+    try {
+      const result = await api.post('/auth/email', { email: next, currentPassword: address.current });
+      // The session survives a change of address, and the answer carries the
+      // account as the database now sees it — so the header updates without a
+      // reload that would strand the operator on a page about a stale identity.
+      setUser(result.user);
+      toast.success('Email address changed', `${result.previous} → ${result.user.email}`);
+      setAddress({ email: '', current: '' });
+    } catch (err) {
+      setAddressError(err.message);
+    } finally {
+      setAddressBusy(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -128,6 +162,46 @@ export default function Account() {
           </div>
         </Card>
       ) : null}
+
+      <Card
+        title="Email address"
+        subtitle="The address this console signs in with, and where the platform writes to you"
+        actions={<Badge tone="neutral"><Icon name="mail" size={12} /> {user?.email || '—'}</Badge>}
+      >
+        <form className="stack" onSubmit={submitAddress} noValidate>
+          <div className="grid two">
+            <Input
+              label="New email address"
+              type="email"
+              autoComplete="email"
+              value={address.email}
+              onChange={(event) => setAddress({ ...address, email: event.target.value })}
+              placeholder="you@example.com"
+              hint="The address the next sign-in uses. Letters only differ in case, not identity."
+            />
+            <Input
+              label="Current password"
+              type="password"
+              autoComplete="current-password"
+              value={address.current}
+              onChange={(event) => setAddress({ ...address, current: event.target.value })}
+              placeholder="••••••••••"
+              hint="Proves it is you, not whoever has the browser open."
+            />
+          </div>
+          {addressError ? (
+            <p className="tiny" style={{ margin: 0, color: 'var(--danger)' }} role="alert">
+              {addressError}
+            </p>
+          ) : null}
+          <div className="row wrap" style={{ gap: 10, alignItems: 'center' }}>
+            <Button type="submit" variant="primary" icon="check" loading={addressBusy} disabled={!address.email || !address.current}>
+              Change email
+            </Button>
+            <span className="tiny dim">Sessions stay signed in: an address is not a credential.</span>
+          </div>
+        </form>
+      </Card>
 
       <Card
         title="Change password"
