@@ -1,7 +1,7 @@
 {
   "name": "IT Help Desk Mock Interview",
   "workflow_configurations": {
-    "max_call_duration": 0
+    "max_call_duration": 1200
   },
   "nodes": [
     {
