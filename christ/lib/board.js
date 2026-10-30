@@ -38,7 +38,10 @@ export async function probe(project, env = process.env, { fetchImpl = fetch, tim
     const response = await fetchImpl(`${url}${project.healthPath || '/'}`, { signal: AbortSignal.timeout(timeoutMs) });
     return { url, state: response.ok ? 'up' : `HTTP ${response.status}`, detail: '' };
   } catch (error) {
-    return { url, state: `unreachable (${error.code || error.name || 'error'})`, detail: error.message };
+    // A DNS failure on Windows arrives as `TypeError: fetch failed` with the
+    // real reason in `cause`; showing the class name told a reader nothing.
+    const code = error.cause?.code || error.code || error.cause?.name || error.name || 'error';
+    return { url, state: `unreachable (${code})`, detail: error.cause?.message || error.message };
   }
 }
 

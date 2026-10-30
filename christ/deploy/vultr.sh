@@ -211,7 +211,19 @@ ENV
 )"
 
   local profiles='' p
-  for p in $PROFILES; do profiles="$profiles --profile $p"; done
+  for p in $PROFILES; do
+    profiles="$profiles --profile $p"
+    # A URL for a container this selection does not run would make the board
+    # report a broken product instead of an absent one.
+    case "$p" in
+      platform) env_file="$env_file
+TELNO_URL=http://telno:8080" ;;
+      pstn) env_file="$env_file
+GATEWAY_URL=http://gateway:7454" ;;
+      models) env_file="$env_file
+OMNIROUTE_URL=http://omniroute:20128" ;;
+    esac
+  done
 
   local script
   script="$(cat <<REMOTE
