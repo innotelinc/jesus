@@ -147,7 +147,7 @@ export default function Dashboard() {
         >
           <dl className="kv">
             <dt>Transport</dt>
-            <dd className="mono">{telephony.transport || 'AMI'} · {telephony.host || '127.0.0.1'}:{telephony.port || 5038}</dd>
+            <dd className="mono">{telephony.transport || 'CANTUS'} · {telephony.host || 'not configured'}</dd>
             <dt>Uptime</dt>
             <dd>{telephony.uptime || (telephony.simulated ? '—' : 'unknown')}</dd>
             <dt>Live channels</dt>
@@ -171,7 +171,7 @@ export default function Dashboard() {
             {!telephony.activeChannels?.length ? (
               <p className="tiny dim">
                 {telephony.simulated
-                  ? 'No switch attached. Set AMI_HOST and AMI_SECRET to go live.'
+                  ? 'No switch attached. Point CANTUS_URL at the switch and set CANTUS_CONTROL_TOKEN to go live.'
                   : 'No active calls right now.'}
               </p>
             ) : null}

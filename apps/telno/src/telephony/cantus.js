@@ -18,6 +18,43 @@ import { EventEmitter } from 'node:events';
 const HEARTBEAT_MS = 15_000;
 const RECONNECT_MAX_MS = 30_000;
 
+/**
+ * Turn a failed fetch into a sentence that names the switch and the reason.
+ *
+ * `cause.code` is the useful part: ECONNREFUSED means the address is right and
+ * nothing is listening (the switch is down), ENOTFOUND/EAI_AGAIN means the name
+ * does not resolve (the wrong CANTUS_URL, or a different docker network), and
+ * UND_ERR_CONNECT_TIMEOUT means something in between is dropping packets. The
+ * original error is kept as `cause` so a log can still show the stack.
+ */
+export function transportError(baseUrl, method, path, err) {
+  const code = err?.cause?.code || err?.code || '';
+  const host = (() => {
+    try {
+      return new URL(baseUrl).host;
+    } catch {
+      return String(baseUrl);
+    }
+  })();
+  const reason =
+    code === 'ECONNREFUSED'
+      ? 'nothing is listening there'
+      : code === 'ENOTFOUND' || code === 'EAI_AGAIN'
+        ? 'that name does not resolve'
+        : code === 'UND_ERR_CONNECT_TIMEOUT' || code === 'ETIMEDOUT'
+          ? 'the connection timed out'
+          : code === 'ECONNRESET'
+            ? 'the connection was reset'
+            : err?.cause?.message || err?.message || 'the request failed';
+  const error = new Error(`cannot reach the switch at ${host} — ${reason}${code ? ` (${code})` : ''}`);
+  error.code = code || 'ENOTREACHED';
+  error.status = 0;
+  error.path = path;
+  error.method = method;
+  error.cause = err;
+  return error;
+}
+
 export class CantusClient extends EventEmitter {
   constructor({ baseUrl, token = '', domain = 'telno.local', fetchImpl } = {}) {
     super();
@@ -140,11 +177,22 @@ export class CantusClient extends EventEmitter {
   }
 
   async request(method, path, body) {
-    const response = await this.fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: this.headers(),
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    let response;
+    try {
+      response = await this.fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: this.headers(),
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    } catch (err) {
+      // undici's own message is the four words "fetch failed", which tells an
+      // operator nothing: the address, the path and the cause (a refused
+      // connection, a name that does not resolve, a timeout) are all one layer
+      // down, in `cause`. Say them here, once, so every caller — the health
+      // probe, the status pill, the settings save — reports something a person
+      // can act on instead of a phrase that sends them looking at the network.
+      throw transportError(this.baseUrl, method, path, err);
+    }
     const text = await response.text();
     let parsed = {};
     try {

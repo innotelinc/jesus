@@ -83,8 +83,14 @@ export default function Health() {
               </Badge>
             </strong>
           </div>
-          <div className="kv"><span>Transport</span><strong className="mono">{data?.telephony?.transport || 'AMI'}</strong></div>
+          <div className="kv"><span>Transport</span><strong className="mono">{data?.telephony?.transport || 'CANTUS'}</strong></div>
           <div className="kv"><span>Host</span><strong className="mono">{data?.telephony?.host || '—'}</strong></div>
+          {data?.telephony?.error ? (
+            <div className="kv">
+              <span>Why</span>
+              <strong className="mono tiny">{data.telephony.error}</strong>
+            </div>
+          ) : null}
           <div className="kv"><span>Version</span><strong className="mono">{data?.telephony?.version || '—'}</strong></div>
         </Card>
         <Card title="Delivery">
