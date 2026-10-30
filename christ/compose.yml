@@ -56,6 +56,10 @@ services:
       CANTUS_ARI_USER: ${CANTUS_ARI_USER:-dograh}
       CANTUS_ARI_PASSWORD: ${CANTUS_ARI_PASSWORD:-dograh}
       CANTUS_ARI_APP: ${CANTUS_ARI_APP:-dograh}
+      # `websocket_client.conf`, as a variable: the name an ARI client asks for
+      # in externalMedia's external_host, and the URI the switch dials for it.
+      # Empty unless the agents profile is on — see the same note in cli.js.
+      CANTUS_WS_CLIENTS: ${CANTUS_WS_CLIENTS:-}
     volumes:
       - ./switch:/etc/cantus:ro
       - switch-data:/data
@@ -330,6 +334,67 @@ services:
     ports:
       - "${DOGRAH_UI_PORT:-3010}:3010"
 
+  # ── speech ──────────────────────────────────────────────────────────────────
+  # The voice. dograh's TTS provider is `speaches`, which is pipecat's name for
+  # "anything speaking the OpenAI /v1/audio/speech contract" — so what it needs
+  # is a service, not a fork. Capstone's shim is that service: Piper in-process
+  # on CPU (RTF ~0.3, the voice loaded once), 24 kHz PCM out, and a cache so a
+  # fixed script is not re-synthesised on every call.
+  #
+  # Without this profile an AI call connects, the media path works, and the
+  # caller hears silence: the agent has nothing to speak with. That is a
+  # deployment choice, not a bug in the call.
+  tts-voices:
+    profiles: ["speech"]
+    build:
+      context: ../apps/capstone/tts-shim
+    image: christ-tts-shim:${CHRIST_TAG:-local}
+    container_name: christ-tts-voices
+    # One-shot: fetches the voice into the shared volume and exits. A voice is
+    # data (60 MB of ONNX), so it lives on a volume rather than in the image and
+    # survives a rebuild.
+    restart: "no"
+    <<: *logging
+    command:
+      - sh
+      - -c
+      - |
+        test -f /opt/piper-voices/${TTS_SHIM_PIPER_VOICE:-en_US-amy-medium}.onnx \
+          || python -m piper.download_voices ${TTS_SHIM_PIPER_VOICE:-en_US-amy-medium} --data-dir /opt/piper-voices
+    volumes:
+      - tts-voices:/opt/piper-voices
+
+  tts-shim:
+    profiles: ["speech"]
+    build:
+      context: ../apps/capstone/tts-shim
+    image: christ-tts-shim:${CHRIST_TAG:-local}
+    container_name: christ-tts-shim
+    restart: unless-stopped
+    <<: *logging
+    mem_limit: 2g
+    depends_on:
+      tts-voices:
+        condition: service_completed_successfully
+    environment:
+      TTS_SHIM_ENGINES: piper
+      TTS_SHIM_DEFAULT_ENGINE: piper
+      TTS_SHIM_PIPER_VOICE: ${TTS_SHIM_PIPER_VOICE:-en_US-amy-medium}
+      TTS_SHIM_PIPER_VOICE_DIR: /opt/piper-voices
+      TTS_SHIM_CACHE_ENABLED: "true"
+      TTS_SHIM_SAMPLE_RATE: "24000"
+    volumes:
+      - tts-voices:/opt/piper-voices
+      - tts-cache:/var/cache/tts-shim
+    ports:
+      - "${TTS_PORT:-8881}:8880"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:8880/health', timeout=5)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # ── models ──────────────────────────────────────────────────────────────────
   # One OpenAI-compatible endpoint in front of every provider. Heavy on a first
   # build, cheap to run; the only container the AI capabilities truly need.
@@ -378,3 +443,5 @@ volumes:
   telno-data:
   dograh-db-data:
   dograh-minio-data:
+  tts-voices:
+  tts-cache:

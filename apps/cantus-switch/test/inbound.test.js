@@ -108,3 +108,29 @@ test('answering the line answers the caller that came in through the gateway', a
   );
   assert.equal(accepted.at(-1).call, session);
 });
+
+test('a call from the carrier arrives ringing, so an agent can answer it', () => {
+  // ARI's answer path goes through `answerLeg`, which only answers a leg that is
+  // ringing. An inbound leg that stayed `new` turned the agent's answer into a
+  // 200 with nothing behind it: the pipeline ran, the carrier kept ringing.
+  const sw = new Switch({
+    domain: 'inaring.test',
+    id: 'switch@inaring.test',
+    secret: 'in-test',
+    bind: '127.0.0.1:0',
+    relayBind: '127.0.0.1:0',
+    recordDir: './data/test-recordings',
+    prompts: './data/test-prompts',
+    routes: {
+      version: 1,
+      default: { reject: 3 },
+      routes: [{ name: 'did-ari', when: { to: '14132642700*' }, then: [{ ari: { app: 'dograh' } }] }],
+    },
+  });
+  sw.onIncoming({ peer: 'voipms@gateway', dialedTo: '14132642700@inaring.test' }, '14132642700@inaring.test');
+
+  const call = [...sw.calls.values()][0];
+  const leg = call.legs.find((entry) => entry.role === 'inbound');
+  assert.equal(leg.state, 'ringing');
+  assert.equal(call.route, 'did-ari');
+});

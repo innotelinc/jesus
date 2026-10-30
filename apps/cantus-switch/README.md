@@ -37,7 +37,22 @@ Asterisk was the thing it replaces. That decision is measured, not asserted:
 
 **ARI-compatible surface** (`/ari/*`) — so capstone and dograh do not have to be
 rewritten to change switch. Channels (list/get/create/delete/answer/hangup/play/
-dtmf/externalMedia), bridges, applications, endpoints, and `/ari/events`.
+dtfm/externalMedia), bridges (`create/list/get/delete/addChannel/removeChannel`),
+applications, endpoints, and `/ari/events`.
+
+externalMedia is chan_websocket's, not a private dialect: `external_host` is a
+connection name (or a literal `ws://` URL), the switch dials it, sends
+`MEDIA_START` with the format and 20 ms frame size, and then carries raw audio
+in `ulaw`, `slin` or `slin16` over binary frames — 160-byte ulaw being what
+pipecat decodes. Names come from `CANTUS_WS_CLIENTS`
+(`dograh=ws://dograh-api:8000/api/v1/telephony/ws/ari`), the switch's stand-in
+for `websocket_client.conf`. `transport_data` (`v(key=value,…)`) is appended as
+query parameters, which is how an agent runtime receives the workflow ids it
+routes the call by. The channel is created by `POST /ari/channels/externalMedia`
+with `channelId`, exactly as ARI documents it; the bridge that follows is what
+puts the caller and the agent in the same conversation, and a bridge of more
+than two channels pairs each with the first other rather than pretending to be
+a mixer (stated, not hidden).
 
 Routing is not only for inbound calls. `POST /v1/calls` evaluates the same
 document, so dialling `8000@…` from a console reaches the same `ari` hand-off a

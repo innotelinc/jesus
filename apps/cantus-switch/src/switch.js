@@ -127,6 +127,12 @@ export class Switch extends EventEmitter {
     this.lines = new Map();
     this.trunks = new Map();
     this.webSockets = new Set();
+    // Who hears whom when a bridge says so. A Call's legs are already each
+    // other's audio; a media channel created by ARI is in no call at all, so the
+    // bridge is the only thing that can tell the two of them about each other.
+    this.mediaPairs = new Map();
+    // Set by the ARI surface: a resolver for channels that are in no call.
+    this.externalLeg = undefined;
     // When each line socket last proved it was still there: any frame, or the
     // answer to a ping. A registration that stops answering is dropped.
     this.socketSeen = new Map();
@@ -439,6 +445,12 @@ export class Switch extends EventEmitter {
 
     const leg = new Leg({ call, role: 'inbound', endpoint: session, ext: '' });
     session.callId = call.id;
+    // It is ringing: the carrier has sent an INVITE and is waiting for a 200.
+    // It used to keep the constructor's `new`, and `answerLeg` only answers a
+    // leg in `ringing` — so an agent that answered the channel over ARI got a
+    // 200 from us, a pipeline that started, and a caller the carrier was still
+    // ringing: the agent talked into a call nobody had picked up.
+    leg.state = 'ringing';
     call.legs.push(leg);
     this.emitCall(call, 'call.incoming', { from: call.from, to: call.to });
 
@@ -863,10 +875,38 @@ export class Switch extends EventEmitter {
     return FRAME;
   }
 
+  /**
+   * Who this channel is exchanging audio with.
+   *
+   * A bridge pairing wins over the call's own legs: an external media channel
+   * belongs to no call, and the caller it was bridged to belongs to one whose
+   * other legs are not in that conversation. Falling back to the call is what
+   * keeps every ordinary two-leg call working unchanged.
+   */
   peerOf(leg) {
+    const partnerId = this.mediaPairs.get(leg.id);
+    if (partnerId) {
+      const partner = this.legById(partnerId);
+      if (partner && partner.isAnswered && !partner.isEnded) return partner;
+    }
     const call = leg.call;
+    if (!call) return undefined;
     const answered = call.legs.filter((entry) => entry.isAnswered && entry !== leg);
     if (answered.length) return answered[0];
+    return undefined;
+  }
+
+  legById(id) {
+    // Media channels created through ARI belong to no call, so a pairing that
+    // names one has to ask whoever owns them. Without this the caller's partner
+    // was looked for among call legs only, found nothing, and the call went
+    // silent the moment it was bridged.
+    const external = this.externalLeg?.(id);
+    if (external) return external;
+    for (const call of this.calls.values()) {
+      const leg = call.legs.find((entry) => entry.id === id);
+      if (leg) return leg;
+    }
     return undefined;
   }
 
