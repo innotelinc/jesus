@@ -1,0 +1,107 @@
+# cantus-gate.yml — the check that `main` requires.
+#
+# Every app workflow here is path-filtered, and that is right for the runners: a
+# pull request that touches one app does not start twelve other pipelines. It is
+# wrong for a required check, because GitHub waits for a check that was never
+# asked for and the pull request can never be merged. So this file carries no
+# `paths:` filter — and no GENERATED banner, because tools/port-workflows.pl
+# adds a path filter to every copy it writes and could not produce it.
+#
+# The job always runs and always posts the same check name. It runs the suite of
+# each voice-plane app the change touches — `apps/cantus-switch` and
+# `apps/cantus-gateway` — and says so and passes when it touches neither, so an
+# unrelated pull request is never held hostage by a suite that has nothing to do
+# with it.
+#
+# When the base commit cannot be fetched — a shallow clone, a force-push, a
+# branch whose history was rewritten — both suites run. A few seconds of
+# redundant work is cheaper than a gate that quietly skips the one thing it
+# exists to check.
+
+name: Cantus gate
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: cantus-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Cantus gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # One commit is enough: the comparison below is a tree diff against a
+          # base fetched on demand, and this repository's history is measured in
+          # gigabytes.
+          fetch-depth: 1
+
+      - name: Decide which suites this change needs
+        id: scope
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          touched=""
+          if [ -n "${BASE_REF:-}" ]; then
+            if git fetch --no-tags --depth=1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" 2>/dev/null; then
+              touched="$(git diff --name-only "origin/${BASE_REF}" HEAD || true)"
+            fi
+          elif [ -n "${BEFORE_SHA:-}" ] && [ "${BEFORE_SHA}" != "0000000000000000000000000000000000000000" ]; then
+            if git fetch --no-tags --depth=1 origin "${BEFORE_SHA}" 2>/dev/null; then
+              touched="$(git diff --name-only "${BEFORE_SHA}" HEAD || true)"
+            fi
+          fi
+
+          switch=false
+          gateway=false
+
+          if [ -z "$touched" ]; then
+            echo "::notice::no base commit to compare against — running both suites rather than passing blind"
+            switch=true
+            gateway=true
+          else
+            if printf '%s\n' "$touched" | grep -qE '^apps/cantus-switch/'; then
+              echo "the switch changed:"
+              printf '%s\n' "$touched" | grep -E '^apps/cantus-switch/' | sed 's/^/  /'
+              switch=true
+            fi
+            if printf '%s\n' "$touched" | grep -qE '^apps/cantus-gateway/'; then
+              echo "the gateway changed:"
+              printf '%s\n' "$touched" | grep -E '^apps/cantus-gateway/' | sed 's/^/  /'
+              gateway=true
+            fi
+            if [ "$switch" = false ] && [ "$gateway" = false ]; then
+              echo "nothing in the voice plane changed — these suites have nothing to say about this change"
+            fi
+          fi
+
+          echo "switch=$switch" >> "$GITHUB_OUTPUT"
+          echo "gateway=$gateway" >> "$GITHUB_OUTPUT"
+
+      - name: Switch suite
+        if: steps.scope.outputs.switch == 'true'
+        working-directory: apps/cantus-switch
+        run: npm test
+
+      - name: Gateway suite
+        if: steps.scope.outputs.gateway == 'true'
+        working-directory: apps/cantus-gateway
+        run: npm test
+
+      - name: Nothing to check
+        if: steps.scope.outputs.switch != 'true' && steps.scope.outputs.gateway != 'true'
+        run: echo "the check passes because neither app was touched"

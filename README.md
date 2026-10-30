@@ -207,17 +207,20 @@ when a root copy no longer matches its source — an app workflow edited without
 copy edited by hand, or a generated copy whose source was renamed away. It uses only the runner's
 preinstalled perl, so it starts in seconds and needs nothing installed.
 
-**One root workflow is hand-written, on purpose**: [switch-gate.yml](.github/workflows/switch-gate.yml).
+**One root workflow is hand-written, on purpose**: [cantus-gate.yml](.github/workflows/cantus-gate.yml).
 A status check that `main` requires has to run on *every* pull request, and every copy the port
 writes carries a path filter — a required check that never runs leaves the pull request
 unmergeable forever, which is worse than no check. So the gate has no `paths:` filter and no
-GENERATED banner: it runs the switch suite when a change touches `apps/cantus-switch/`, and says
-so and passes when it does not. `main` requires that check by name (`Switch gate`) through a
-repository ruleset, so a red switch suite blocks a pull-request merge while direct pushes to
-`main` behave exactly as they did before.
+GENERATED banner: it runs the suite of each voice-plane app the change touches — the switch
+(`apps/cantus-switch`) and the SIP gateway (`apps/cantus-gateway`) — and says so and passes when
+it touches neither. `main` requires that check by name (`Cantus gate`) through a repository
+ruleset, so a red switch or gateway suite blocks a pull-request merge while direct pushes to
+`main` behave exactly as they did before. One check, whichever app is red: a second required
+check would have to be satisfied by every pull request, including the ones it knows nothing
+about.
 
 To see that requirement, or change it: `gh api repos/innotelinc/jesus/rulesets` lists the ruleset
-(`main requires the switch gate`), and `gh api repos/innotelinc/jesus/rules/branches/main` shows
+(`main requires the Cantus gate`), and `gh api repos/innotelinc/jesus/rules/branches/main` shows
 the rule currently applying to the default branch. Removing the ruleset turns the gate back into
 advice; the workflow itself still runs on every pull request.
 
