@@ -653,8 +653,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          # 22 because that is what Genie's image is built on; a suite green on a
-          # different major would still be one that never ran in the container.
+          # 24, like the rest of the monorepo. Genie's own image is still built on
+          # node:22-alpine, so this suite runs one major ahead of the container it
+          # ships in; bringing the Dockerfile to 24 is what closes that gap.
           node-version: 24
           cache: npm
           cache-dependency-path: ontrak-genie/package-lock.json
