@@ -194,10 +194,13 @@ pack() {
     --exclude 'christ/deploy/.vultr-key*' --exclude 'christ/deploy/.env.passthrough' \
     --exclude 'apps/telno/node_modules' --exclude 'apps/cantus-gateway/node_modules' \
     --exclude 'apps/telno/.env' --exclude 'apps/telno/web/dist' \
+    --exclude 'apps/capstone/dashboard/node_modules' --exclude 'apps/capstone/dashboard/dist' \
+    --exclude 'apps/capstone/dashboard-backend/__pycache__' --exclude 'apps/capstone/dashboard/e2e' \
     christ apps/cantus-switch apps/cantus-gateway estate/console apps/telno \
     apps/fax-engine \
-    apps/capstone/dograh apps/capstone/scripts/dograh_wire.py \
-    apps/capstone/tts-shim
+    apps/capstone/dograh apps/capstone/dashboard apps/capstone/dashboard-backend \
+    apps/capstone/workflow-studio.Dockerfile apps/capstone/scripts/generate_ui.py \
+    apps/capstone/scripts/generate_dograh_workflow.py apps/capstone/tts-shim
   [ -s "$out" ] || { echo "pack produced no archive" >&2; exit 1; }
   printf '%s' "$out"
 }
@@ -321,6 +324,18 @@ GATEWAY_URL=http://gateway:7454" ;;
 # loopback, because telno is a different container from it.
 FAX_ENABLED=true
 FAX_ENGINE_URL=http://fax-engine:8080" ;;
+      capstone) env_file="$env_file
+# The control center is the AgentOps door: the console, its aggregator and the
+# workflow studio, all reading this stack rather than a second estate.
+CAPSTONE_PORT=${CAPSTONE_PORT:-8096}
+CAPSTONE_API_PORT=${CAPSTONE_API_PORT:-8095}
+CAPSTONE_STUDIO_PORT=${CAPSTONE_STUDIO_PORT:-8093}
+CAPSTONE_PUBLIC_URL=http://$ip:${CAPSTONE_PORT:-8096}"
+                # Its links and its switch are this stack's, so the studio and
+                # the aggregator get the same model gateway the rest of the AI
+                # plane uses when one is selected beside it.
+                case " $PROFILES " in *" models "*) env_file="$env_file
+OMNIROUTE_URL=http://omniroute:20128" ;; esac ;;
       models) env_file="$env_file
 OMNIROUTE_URL=http://omniroute:20128" ;;
       speech) env_file="$env_file
