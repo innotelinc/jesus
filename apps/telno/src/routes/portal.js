@@ -500,6 +500,119 @@ export default async function portalRoutes(app) {
     };
   });
 
+  /* ------------------------------------------- customer lifecycle (admin) -- */
+  /**
+   * One customer, by id, with the two facts an admin action needs: is it an
+   * owner (never suspendable) and what is it subscribed to (what cancel and
+   * remove would take away).
+   */
+  const customerById = (id) => {
+    const row = db_.get('SELECT * FROM accounts WHERE id = ?', [id]);
+    if (!row) throw notFound('Customer not found');
+    const subscriptions = db_.all('SELECT * FROM subscriptions WHERE account_id = ?', [id]);
+    return { row, subscriptions };
+  };
+
+  const refuseOwner = (row, action) => {
+    if (row.role === 'owner') {
+      throw badRequest(`That account is an owner; ${action} it would lock the platform out of itself`);
+    }
+  };
+
+  /**
+   * Suspend a customer. Same shape as a billing suspension — `suspended_at` plus
+   * a bumped `token_version`, so an open session stops working immediately
+   * instead of at the next expiry — because a suspension the customer can keep
+   * using is not a suspension.
+   */
+  app.post('/customers/:id/suspend', { preHandler: requireAdmin }, async (request) => {
+    const { row } = customerById(request.params.id);
+    refuseOwner(row, 'suspending');
+    const reason = v.str((request.body || {}).reason, { name: 'reason', max: 200, required: false });
+    if (row.suspended_at) {
+      return { customer: { id: row.id, suspended: true, suspendedAt: row.suspended_at } };
+    }
+    db_.run(
+      'UPDATE accounts SET suspended_at = ?, token_version = token_version + 1 WHERE id = ?',
+      [now(), row.id]
+    );
+    logEvent({
+      actor: request.account.email,
+      action: 'portal.customer_suspended',
+      subject: row.email,
+      detail: reason || 'suspended by an operator',
+      ip: request.ip,
+    });
+    return { customer: { id: row.id, email: row.email, suspended: true } };
+  });
+
+  /** Lift a suspension. The customer's sessions were invalidated, so this does
+   *  not restore a login — it restores the right to log in. */
+  app.post('/customers/:id/reinstate', { preHandler: requireAdmin }, async (request) => {
+    const { row } = customerById(request.params.id);
+    if (!row.suspended_at) {
+      return { customer: { id: row.id, suspended: false } };
+    }
+    db_.run('UPDATE accounts SET suspended_at = NULL WHERE id = ?', [row.id]);
+    logEvent({
+      actor: request.account.email,
+      action: 'portal.customer_reinstated',
+      subject: row.email,
+      detail: v.str((request.body || {}).reason, { name: 'reason', max: 200, required: false }) || 'reinstated by an operator',
+      ip: request.ip,
+    });
+    return { customer: { id: row.id, email: row.email, suspended: false } };
+  });
+
+  /**
+   * Cancel what a customer is paying for, without deleting them: the account,
+   * its numbers and its history stay, the subscription does not renew. An
+   * account that is cancelled rather than suspended loses its entitlement on
+   * the same gate, because `entitlementFor` reads the subscription.
+   */
+  app.post('/customers/:id/cancel', { preHandler: requireAdmin }, async (request) => {
+    const { row, subscriptions } = customerById(request.params.id);
+    refuseOwner(row, 'cancelling');
+    const active = subscriptions.filter((sub) => sub.status !== 'canceled');
+    for (const sub of active) setSubscriptionStatus(sub.id, 'canceled', request.account.email);
+    if (active.length) {
+      logEvent({
+        actor: request.account.email,
+        action: 'portal.customer_cancelled',
+        subject: row.email,
+        detail: `${active.length} subscription(s) cancelled`,
+        ip: request.ip,
+      });
+    }
+    return {
+      customer: { id: row.id, email: row.email },
+      cancelled: active.map((sub) => sub.id),
+    };
+  });
+
+  /**
+   * Remove a customer outright. Owner only, and never the last owner: the
+   * schema cascades subscriptions, keys and lines, which is exactly why this is
+   * a separate, deliberate door rather than a flag on suspend.
+   */
+  app.delete('/customers/:id', { preHandler: requireOwner }, async (request) => {
+    const { row, subscriptions } = customerById(request.params.id);
+    refuseOwner(row, 'removing');
+    const active = subscriptions.filter((sub) => sub.status === 'active');
+    if (active.length && String(request.query?.force || '') !== '1') {
+      throw conflict('This customer has an active subscription. Cancel it first, or repeat with force=1.');
+    }
+    db_.run('DELETE FROM accounts WHERE id = ?', [row.id]);
+    logEvent({
+      actor: request.account.email,
+      action: 'portal.customer_removed',
+      subject: row.email,
+      detail: active.length ? 'removed with an active subscription' : 'removed',
+      ip: request.ip,
+    });
+    return { removed: row.id, email: row.email };
+  });
+
   /** Re-seed the starter catalog. Idempotent: only ever adds what is missing. */
   app.post('/plans/seed', { preHandler: requireOwner }, async () => {
     seedCommerce();

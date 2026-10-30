@@ -22,6 +22,11 @@ const KEYS = {
   logoUrl: 'brand.logo_url',
   supportEmail: 'brand.support_email',
   salesEmail: 'brand.sales_email',
+  // The address the estate itself speaks from: the From on notices and the
+  // Reply-To a customer reaches when they answer one. Separate from support so
+  // a deployment can send from its own domain without inventing a mailbox for
+  // every role.
+  estateEmail: 'brand.estate_email',
   domain: 'brand.domain',
   footerNote: 'brand.footer_note',
 };
@@ -36,6 +41,7 @@ export const BRAND_DEFAULTS = {
   logoUrl: '',
   supportEmail: '',
   salesEmail: '',
+  estateEmail: '',
   domain: '',
   footerNote: 'One registry, many doors.',
 };
@@ -65,6 +71,7 @@ export function brand() {
     logoUrl: pick('logoUrl', BRAND_DEFAULTS.logoUrl),
     supportEmail: pick('supportEmail', BRAND_DEFAULTS.supportEmail),
     salesEmail: pick('salesEmail', BRAND_DEFAULTS.salesEmail),
+    estateEmail: pick('estateEmail', BRAND_DEFAULTS.estateEmail),
     domain: pick('domain', BRAND_DEFAULTS.domain),
     footerNote: pick('footerNote', BRAND_DEFAULTS.footerNote),
   };
@@ -105,6 +112,20 @@ export function saveBrand(payload = {}) {
     return trimmed;
   };
 
+  // Only the shape is checked, never deliverability: the estate address is put
+  // in a From header, so a value that is not an address is a bounce with no
+  // stated cause later. Empty means "fall back to the environment".
+  const email = (value, name) => {
+    if (value === undefined) return undefined;
+    const trimmed = String(value).trim();
+    if (!trimmed) return '';
+    if (trimmed.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      errors.push(`${name} must be an email address such as ops@example.com`);
+      return undefined;
+    }
+    return trimmed;
+  };
+
   const next = {
     name: text(payload.name, 'name', 40),
     vendor: text(payload.vendor, 'vendor', 60),
@@ -114,6 +135,9 @@ export function saveBrand(payload = {}) {
     logoUrl: text(payload.logoUrl, 'logoUrl', 500),
     supportEmail: text(payload.supportEmail, 'supportEmail', 160),
     salesEmail: text(payload.salesEmail, 'salesEmail', 160),
+    // An address that will be put in a From header: refusing something that is
+    // not an address here is better than a provider bounce that names no cause.
+    estateEmail: email(payload.estateEmail, 'estateEmail'),
     domain: text(payload.domain, 'domain', 120),
     footerNote: text(payload.footerNote, 'footerNote', 160),
   };
