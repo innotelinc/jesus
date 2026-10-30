@@ -216,6 +216,11 @@ so and passes when it does not. `main` requires that check by name (`Switch gate
 repository ruleset, so a red switch suite blocks a pull-request merge while direct pushes to
 `main` behave exactly as they did before.
 
+To see that requirement, or change it: `gh api repos/innotelinc/jesus/rulesets` lists the ruleset
+(`main requires the switch gate`), and `gh api repos/innotelinc/jesus/rules/branches/main` shows
+the rule currently applying to the default branch. Removing the ruleset turns the gate back into
+advice; the workflow itself still runs on every pull request.
+
 Three files under `apps/` needed a hand change that the port cannot express:
 
 - `omniroute`'s `npm-ci-retry` and `rea`'s `portable-build-cache` composite actions resolve their
