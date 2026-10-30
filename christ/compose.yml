@@ -562,6 +562,12 @@ services:
       DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
       OMNIROUTE_URL: ${OMNIROUTE_URL:-}
       OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY:-}
+      # Interview Reports reads the same Grist document the grading workflow
+      # writes, so the page is the record rather than a second copy of it.
+      GRIST_URL: http://grist:8484
+      GRIST_DOC_ID: ${GRIST_DOC_ID:-}
+      GRIST_API_KEY: ${GRIST_API_KEY:-}
+      GRIST_ADMIN_EMAIL: ${GRIST_ADMIN_EMAIL:-}
       # The switch is `switch` here, and its control API is not public. The
       # console only reads it; the watchdog that used to restart a stopped PBX
       # is off, because this stack's lifecycle is compose's to own.
@@ -633,6 +639,70 @@ services:
       retries: 5
       start_period: 15s
 
+  # The two stores the agent work actually lives in. n8n runs the grading
+  # workflow; Grist is the record it writes, and the console's Interview Reports
+  # page reads that same document. Both were on the old host and both move here
+  # with their volumes, because a workflow with no runs and a report with no rows
+  # is a demo of a workflow rather than the thing itself.
+  n8n:
+    profiles: ["capstone"]
+    # Pinned: this image carries the migrations for the database that came with
+    # the stack. A floating tag would migrate it silently on first start.
+    image: n8nio/n8n:${N8N_TAG:-2.43.5}
+    container_name: christ-n8n
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_HOST: ${N8N_HOST:-localhost}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://christ-n8n:5678/}
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # The grader reads GRIST_DOC_ID from $env; n8n 2.x refuses env access in
+      # expressions unless this is off.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      GENERIC_TIMEZONE: ${N8N_TIMEZONE:-UTC}
+      GRIST_URL: http://grist:8484
+      GRIST_DOC_ID: ${GRIST_DOC_ID:-}
+      GRIST_API_KEY: ${GRIST_API_KEY:-}
+      NODE_OPTIONS: --max-old-space-size=768
+    volumes:
+      - n8n-data:/home/node/.n8n
+    ports:
+      - "127.0.0.1:${N8N_PORT_PUBLISHED:-5678}:5678"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5678/healthz || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  grist:
+    profiles: ["capstone"]
+    image: gristlabs/grist:${GRIST_TAG:-latest}
+    container_name: christ-grist
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      # Single-identity mode: every request is attributed to this address, so the
+      # grader's REST writes need no session, and GRIST_IN_SERVICE skips the
+      # first-run quick-setup gate.
+      GRIST_DEFAULT_EMAIL: ${GRIST_ADMIN_EMAIL:-ops@innotel.us}
+      GRIST_IN_SERVICE: "true"
+      GRIST_SERVE_SAME_ORIGIN: "true"
+    volumes:
+      - grist-data:/persist
+    ports:
+      - "127.0.0.1:${GRIST_PORT:-8484}:8484"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8484/ >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # ── support ─────────────────────────────────────────────────────────────────
   ontrak:
     profiles: ["support"]
@@ -656,3 +726,5 @@ volumes:
   tts-cache:
   fax-spool:
   capstone-state:
+  n8n-data:
+  grist-data:
