@@ -74,6 +74,40 @@ services:
       retries: 5
       start_period: 5s
 
+  # The estate's front door: seven domains, one proxy. Every public hostname is
+  # declared in domains.json and rendered into deploy/Caddyfile, so "which domain
+  # serves what" is a file rather than a memory. TLS terminates here and nowhere
+  # else; the services behind it speak plain HTTP on the container network.
+  #
+  # EDGE_AUTO_HTTPS=off turns the same map into plain HTTP on :80, which is how a
+  # box without DNS pointing at it is tested with Host headers.
+  edge:
+    profiles: ["core"]
+    image: caddy:2-alpine
+    container_name: christ-edge
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-ops@telno.services}
+      EDGE_AUTO_HTTPS: ${EDGE_AUTO_HTTPS:-on}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - edge-data:/data
+      - edge-config:/config
+    ports:
+      - "${EDGE_HTTP_PORT:-80}:80"
+      - "${EDGE_HTTPS_PORT:-443}:443"
+      - "${EDGE_HTTPS_PORT:-443}:443/udp"
+    # A listener check, not a request: on a box whose DNS does not point here yet
+    # the proxy answers on :80 perfectly well while it waits for a certificate,
+    # and calling that unhealthy would hide the working half of the edge.
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "80"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   # The front door: the live board, the wiring engine and the souls. It reads
   # the switch and never writes a call — a dashboard that can hang up a call is
   # a dashboard that can hang up the wrong one.
@@ -199,6 +233,12 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SOFTPHONE_ENABLED: "true"
       NOTIFY_CHANNEL: console
+      # telno.services is the sending domain: every notice, verification code,
+      # invoice and report leaves with this From whichever door the app was used
+      # through, so one set of SPF, DKIM and DMARC records covers all of them.
+      # A Resend or Mailjet key in the vault is what actually delivers; without
+      # one the message is written to the log and the console says so.
+      NOTIFY_FROM: ${NOTIFY_FROM:-no-reply@telno.services}
       PAYMENTS_ENABLED: "false"
       ALLOW_INSECURE_PUBLIC_URL: "true"
     volumes:
@@ -442,6 +482,8 @@ services:
 
 volumes:
   switch-data:
+  edge-data:
+  edge-config:
   telno-data:
   dograh-db-data:
   dograh-minio-data:

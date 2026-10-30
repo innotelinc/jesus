@@ -239,7 +239,23 @@ CANTUS_ARI_USER=${CANTUS_ARI_USER:-dograh}
 CANTUS_ARI_PASSWORD=$ari_password
 CANTUS_ARI_APP=${CANTUS_ARI_APP:-dograh}
 PUBLIC_IP=$ip
-PUBLIC_URL=http://$ip:8090
+# The address the app puts in its own links. It stays the box's IP until the
+# domains resolve here: a PUBLIC_URL of https://telno.services on a box whose
+# records still point elsewhere sends every softphone and invoice link to
+# somebody else's server. Set PUBLIC_URL=https://telno.services once the records
+# are in place — see christ/docs/domains.md.
+PUBLIC_URL=${PUBLIC_URL:-http://$ip:8090}
+# The estate's front door. Its domain map lives in christ/domains.json and is
+# rendered into deploy/Caddyfile; these four lines are what the proxy needs to
+# serve it. EDGE_AUTO_HTTPS=off makes the same map plain HTTP on :80, which is
+# how a box whose DNS does not point at it yet is tested with Host headers.
+EDGE_HTTP_PORT=${EDGE_HTTP_PORT:-80}
+EDGE_HTTPS_PORT=${EDGE_HTTPS_PORT:-443}
+EDGE_AUTO_HTTPS=${EDGE_AUTO_HTTPS:-on}
+ACME_EMAIL=${ACME_EMAIL:-ops@telno.services}
+# telno.services is the sending domain: every notice, code, invoice and report
+# leaves with this From, whatever host the app is being used from.
+NOTIFY_FROM=${NOTIFY_FROM:-no-reply@telno.services}
 SWITCH_PORT=8188
 CHRIST_PORT=8001
 ESTATE_PORT=8000

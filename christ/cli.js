@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { loadCatalog, resolve, composeCommand, explain } from './lib/catalog.js';
+import { loadDomains, renderCaddyfile } from './lib/edge.js';
 import { loadSouls, agentsDocument, writeAgentsDocument } from './lib/souls.js';
 import { buildPlan, apply } from './lib/wire.js';
 import { loadSystem, board } from './lib/board.js';
@@ -99,6 +100,7 @@ async function main() {
   node cli.js board                  what is running right now
   node cli.js check                  like board, but exits 1 when the switch is down
   node cli.js up                     start the front door on :${process.env.PORT || 8001}
+  node cli.js edge [--write] [--http]  render the domain map into the edge Caddyfile
 
 capabilities: ${[...catalog.byId.keys()].join(', ')}
 `);
@@ -113,6 +115,23 @@ capabilities: ${[...catalog.byId.keys()].join(', ')}
     }
     process.stdout.write(explain(resolution, catalog));
     process.stdout.write(`\nrun:\n  ${composeCommand(resolution)}\n`);
+    return 0;
+  }
+
+  // The front door: seven domains, one map. `--write` is what a deploy runs,
+  // and what `domains.test.js` compares the committed Caddyfile against.
+  if (command === 'edge') {
+    const doc = loadDomains(join(HERE, 'domains.json'));
+    // --http is the probe render: the same map with TLS off, so every door can
+    // be checked with a Host header before its DNS record exists.
+    const text = renderCaddyfile(doc, { httpOnly: flags.has('http') });
+    const target = join(HERE, 'deploy/Caddyfile');
+    if (flags.has('write')) {
+      writeFileSync(target, text);
+      process.stdout.write(`wrote ${target} — ${doc.hosts.length} hosts\n`);
+    } else {
+      process.stdout.write(text);
+    }
     return 0;
   }
 
