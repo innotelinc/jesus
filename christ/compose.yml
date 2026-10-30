@@ -18,8 +18,10 @@
 # The agent runtime is containers (`agents`); claude-mem and REA are not, and
 # stay attached by URL. dograh is the process that actually speaks on a call, so
 # leaving it outside made "the AI answers the phone" a diagram rather than a
-# system. Capstone's evaluation stack (clickhouse, n8n, grafana, its own switch)
-# remains outside: it is an ops environment, not a voice path.
+# system. Capstone's control center is containers too (`capstone`): the console,
+# its aggregator and the workflow studio, which run a softphone on this switch
+# and manage this dograh. Its evaluation stack (n8n, grafana, clickhouse, its own
+# switch) still stays outside: that is an ops environment, not a voice path.
 
 name: christ
 
@@ -527,6 +529,110 @@ services:
     ports:
       - "${WEBMAIL_PORT:-3000}:3000"
 
+  # ── capstone ────────────────────────────────────────────────────────────────
+  # The AgentOps control center that used to live on its own host: the console
+  # that reads the stack, manages dograh's agents and opens a softphone on the
+  # same switch as everything else. It is stateless — no database of its own —
+  # which is why it moves here as three containers and not as a second estate.
+  #
+  # The service name is `dashboard-api` because the console's nginx proxies
+  # `/api` to that literal name; renaming it here would mean rebuilding the
+  # image for a label. `capstone` is the browser door.
+  dashboard-api:
+    profiles: ["capstone"]
+    build:
+      context: ../apps/capstone/dashboard-backend
+    image: christ-capstone-api:${CHRIST_TAG:-local}
+    container_name: christ-capstone-api
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      SELF_CONTAINER: "christ-capstone-api"
+      # Where this console is reached, for the links it builds.
+      DASHBOARD_HOST: ${CAPSTONE_PUBLIC_URL:-http://localhost:8096}
+      DASHBOARD_PROJECTS: christ
+      # The aggregator inventories the stack by reading this file, so it is the
+      # one place a secret is looked up rather than copied into an environment.
+      DASHBOARD_ENV_FILE: /config/.env
+      # dograh is a service here, not a host daemon: the Agents page talks to it
+      # by name over the compose network.
+      DOGRAH_API_ENDPOINT: http://dograh-api:8000
+      DOGRAH_API_TOKEN: ${DOGRAH_API_TOKEN:-}
+      DOGRAH_CONFIG_NAME: ${DOGRAH_CONFIG_NAME:-Cantus ARI (dograh)}
+      DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
+      OMNIROUTE_URL: ${OMNIROUTE_URL:-}
+      OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY:-}
+      # The switch is `switch` here, and its control API is not public. The
+      # console only reads it; the watchdog that used to restart a stopped PBX
+      # is off, because this stack's lifecycle is compose's to own.
+      CANTUS_URL: http://switch:8088
+      CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:-}
+      PBX_WATCHDOG_INTERVAL: "0"
+      CAPSTONE_DEPLOY_MODE: addon
+    volumes:
+      # Read-only: this container reports on the stack and must not be able to
+      # restart the phone system from a web page.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./.env:/config/.env:ro
+      - capstone-state:/state
+    ports:
+      - "127.0.0.1:${CAPSTONE_API_PORT:-8095}:8095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8095/healthz', timeout=5)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  capstone:
+    profiles: ["capstone"]
+    build:
+      context: ../apps/capstone/dashboard
+    image: christ-capstone:${CHRIST_TAG:-local}
+    container_name: christ-capstone
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      # The softphone socket: the browser talks to this origin's /ws, and nginx
+      # forwards it to the switch's line socket on the compose network.
+      DASHBOARD_PBX_WSS_HOST: switch
+    depends_on:
+      dashboard-api:
+        condition: service_started
+    ports:
+      - "${CAPSTONE_PORT:-8096}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  capstone-studio:
+    profiles: ["capstone"]
+    build:
+      context: ../apps/capstone
+      dockerfile: workflow-studio.Dockerfile
+    image: christ-capstone-studio:${CHRIST_TAG:-local}
+    container_name: christ-capstone-studio
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      PORT: "8090"
+      DOGRAH_API_ENDPOINT: http://dograh-api:8000
+      DOGRAH_API_TOKEN: ${DOGRAH_API_TOKEN:-}
+      OMNIROUTE_URL: ${OMNIROUTE_URL:-}
+    ports:
+      # Loopback only: the studio is opened from the console, not as its own
+      # door, and 8090 on this host already belongs to the platform.
+      - "127.0.0.1:${CAPSTONE_STUDIO_PORT:-8093}:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8090/', timeout=5)"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
   # ── support ─────────────────────────────────────────────────────────────────
   ontrak:
     profiles: ["support"]
@@ -549,3 +655,4 @@ volumes:
   tts-voices:
   tts-cache:
   fax-spool:
+  capstone-state:
