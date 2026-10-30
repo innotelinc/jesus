@@ -41,6 +41,9 @@ const trunkView = (row) => ({
   id: row.id,
   name: row.name,
   provider: row.provider,
+  // sip or iax2: the same carrier can be two trunks, and which protocol
+  // reaches one is the difference between a voice line and a fax modem.
+  transport: row.transport || 'sip',
   host: row.host,
   username: row.username,
   fromUser: row.from_user,
@@ -218,12 +221,13 @@ export default async function telephonyRoutes(app) {
     if (db_.get('SELECT id FROM trunks WHERE name = ?', [name])) throw conflict(`Trunk ${name} already exists`);
     const id = newId('trk_');
     db_.run(
-      `INSERT INTO trunks (id, name, provider, host, username, secret, from_user, codecs, context, enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO trunks (id, name, provider, transport, host, username, secret, from_user, codecs, context, enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         name,
         v.str(body.provider, { name: 'provider', max: 40, required: false, fallback: 'generic' }),
+        v.oneOf(body.transport || 'sip', ['sip', 'iax2'], 'transport'),
         v.str(body.host, { name: 'host', max: 120, pattern: /^[A-Za-z0-9.:_-]+$/ }),
         v.str(body.username, { name: 'username', max: 80, required: false }),
         v.str(body.secret, { name: 'secret', max: 200, required: false }),
@@ -243,6 +247,7 @@ export default async function telephonyRoutes(app) {
     if (!row) throw notFound('Trunk not found');
     const body = request.body || {};
     const patch = {};
+    if (body.transport !== undefined) patch.transport = v.oneOf(body.transport, ['sip', 'iax2'], 'transport');
     if (body.host !== undefined) patch.host = v.str(body.host, { name: 'host', max: 120, pattern: /^[A-Za-z0-9.:_-]+$/ });
     if (body.username !== undefined) patch.username = v.str(body.username, { name: 'username', max: 80, required: false });
     if (body.secret !== undefined) patch.secret = v.str(body.secret, { name: 'secret', max: 200, required: false });

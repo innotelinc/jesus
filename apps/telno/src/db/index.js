@@ -152,6 +152,11 @@ function migrate(db) {
     // The switch's own file for a fax: the TIFF staged for a send, or the
     // document a receive produced, so the row points at the artefact.
     ['faxes', 'station_id', "TEXT NOT NULL DEFAULT ''"],
+    // v22: one carrier, several tranks. VoIP.ms sells a SIP sub-account and an
+    // IAX2 one beside it, and a fax needs the second while voice needs the
+    // first — so a trunk now says which protocol reaches it. Existing rows are
+    // SIP, which is what everything here was before this column existed.
+    ['trunks', 'transport', "TEXT NOT NULL DEFAULT 'sip'"],
   ];
   for (const [table, column, type] of additions) {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((existing) => existing.name === column)) {
