@@ -902,6 +902,64 @@ def main() -> int:
         else:
             print(f"PASS extension {ext} → agent id {wf_id} ({label})")
 
+    # ── 4b. the published number → the agent that answers it ────────────────
+    # A DID reaches the PBX as itself, so the runtime resolves an inbound call
+    # by the number dialled, not by the extension the dial plan picked. Without
+    # this row a correctly-routed call is refused after hand-off, which reads as
+    # "the agent hung up on me" and is blamed on the voice stack.
+    inbound_number = cfg(args, "DOGRAH_INBOUND_NUMBER", "")
+    inbound_workflow = cfg(args, "DOGRAH_INBOUND_WORKFLOW", "Business Receptionist")
+    if inbound_number:
+        # dograh stores this table in E.164, and refuses a bare North American
+        # number outright ("needs a country_code"). A DID is always written as
+        # +1XXXXXXXXXX here so the same value is compared and stored.
+        digits_only = "".join(ch for ch in inbound_number if ch.isdigit())
+        number = inbound_number if inbound_number.startswith("+") else f"+{digits_only}"
+        if len(digits_only) == 10:
+            number = f"+1{digits_only}"
+        wf_id = existing.get(inbound_workflow)
+        current = by_address.get(number) or by_address.get(digits_only) or by_address.get(inbound_number)
+        if wf_id is None:
+            problems.append(
+                f"inbound number {number}: workflow '{inbound_workflow}' is not imported"
+            )
+        elif current is None:
+            if args.check:
+                problems.append(f"inbound number {number} not registered as a phone number")
+            else:
+                api.request(
+                    "POST",
+                    f"/api/v1/organizations/telephony-configs/{config_id}/phone-numbers",
+                    {
+                        "address": number,
+                        "label": f"{inbound_workflow} — inbound DID",
+                        "inbound_workflow_id": wf_id,
+                        "is_active": True,
+                        "is_default_caller_id": False,
+                        "extra_metadata": {},
+                    },
+                )
+                print(f"PASS number {number} → agent id {wf_id} ({inbound_workflow})")
+        elif current.get("inbound_workflow_id") != wf_id:
+            if args.check:
+                problems.append(
+                    f"inbound number {number} bound to workflow "
+                    f"{current.get('inbound_workflow_id')} instead of {wf_id}"
+                )
+            else:
+                api.request(
+                    "PUT",
+                    f"/api/v1/organizations/telephony-configs/{config_id}/phone-numbers/{current['id']}",
+                    {
+                        "label": f"{inbound_workflow} — inbound DID",
+                        "inbound_workflow_id": wf_id,
+                        "is_active": True,
+                    },
+                )
+                print(f"PASS number {number} re-pointed → agent id {wf_id} ({inbound_workflow})")
+        else:
+            print(f"PASS number {number} → agent id {wf_id} ({inbound_workflow})")
+
     # ── 5. report ────────────────────────────────────────────────────────────
     print()
     print("  Telephony wiring (dograh side):")

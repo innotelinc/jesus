@@ -1,4 +1,4 @@
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { db_ } from '../db/index.js';
 import { config } from '../config.js';
@@ -84,6 +84,36 @@ export function generateLines() {
 }
 
 /**
+ * Routes this platform does not generate but must preserve.
+ *
+ * The AI plane's dial plan lives outside this database — the composition root
+ * owns who answers the DID after hours. Reading it from a file keeps the two
+ * halves in one document: whatever this platform generates next, the agent
+ * branches are still in front of it, in the order that makes them win.
+ *
+ * A malformed file is ignored rather than fatal. A stale or half-written
+ * route must not be able to stop the switch from getting a dial plan at all.
+ */
+export function extraRoutes() {
+  const file = config.telephony.extraRoutes;
+  if (!file) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    const list = Array.isArray(parsed) ? parsed : parsed?.routes || [];
+    return list.filter(
+      (route) => route && typeof route.name === 'string' && route.when && Array.isArray(route.then) && route.then.length
+    );
+  } catch (error) {
+    // A missing file is the documented normal (the composition root has not run
+    // yet). Anything else is a real fault — a bad import or a half-written file
+    // — and is said out loud, because a silently empty list reads exactly like
+    // "this platform has no agent routes", which is how one bug hid another.
+    if (error?.code !== 'ENOENT') console.warn('[telephony] could not read extra routes', file, error.message);
+    return [];
+  }
+}
+
+/**
  * The routing document.
  *
  * Order matters and it is the whole dial plan: a specific DID beats an
@@ -92,7 +122,10 @@ export function generateLines() {
  */
 export function generateRoutes() {
   const { extensions, trunks, flows, dids, policy } = inventory();
-  const routes = [];
+  // Prepended, not appended: the DID's office-hours branch is time-limited and
+  // the after-hours branch behind it is a catch-all, so both have to be reached
+  // before this platform's own unconditional DID route.
+  const routes = [...extraRoutes()];
   const extensionNumbers = new Set(extensions.map((ext) => String(ext.extension)));
   const parkedLines = new Set(
     config.parking.enabled && config.apns.enabled && config.apns.ringOnDial
@@ -221,6 +254,15 @@ export function generateRoutes() {
   }
 
   const scif = extensions.filter((ext) => ext.scif).map((ext) => String(ext.extension));
+  // One route per name: a preserved route and a generated one can only collide
+  // when both describe the same address, and the preserved one is the deliberate
+  // override. Keeping the first is what makes prepending mean "wins".
+  const seen = new Set();
+  const plan = routes.filter((route) => {
+    if (seen.has(route.name)) return false;
+    seen.add(route.name);
+    return true;
+  });
   return {
     version: 1,
     // The document names its own domain so a reader can tell which box it came
@@ -231,7 +273,7 @@ export function generateRoutes() {
     // SCIF line in the first place.
     notes: scif.length ? [`SCIF lines never record: ${scif.join(', ')}`] : [],
     default: { reject: 3 },
-    routes,
+    routes: plan,
   };
 }
 

@@ -41,15 +41,16 @@
     {
       "id": "agents",
       "name": "Voice agents",
-      "about": "Capstone (AgentOps) and dograh (the runtime that speaks). Their stack is large, so CHRIST attaches to it by URL instead of pretending to own it.",
-      "services": [],
-      "requires": ["voice", "models"],
+      "about": "dograh, the runtime that speaks: its ARI bridge takes 8003, its UI builds the workflow. Capstone's evaluation stack stays outside — it is ops, not a voice path.",
+      "services": ["dograh-api", "dograh-ui"],
+      "requires": ["voice"],
+      "env": ["DOGRAH_JWT_SECRET"],
       "external": [
         {
-          "name": "Capstone + dograh",
+          "name": "Capstone (AgentOps)",
           "path": "apps/capstone",
-          "env": ["CAPSTONE_URL", "DOGRAH_URL"],
-          "note": "docker compose up in apps/capstone, then point these at it. CHRIST wires its numbers either way."
+          "env": ["CAPSTONE_URL"],
+          "note": "its own compose: clickhouse, n8n, grafana, a second switch. Point CAPSTONE_URL at it when you want graded calls."
         }
       ]
     },

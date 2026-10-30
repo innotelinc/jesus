@@ -15,10 +15,11 @@
 # the composition root of that tree and not a copy of it. A standalone checkout
 # needs the apps beside it — see README.md → "Where the code comes from".
 #
-# The four AI capabilities are deliberately *not* containers here: Capstone and
-# dograh are a stack of their own, claude-mem and REA are their own repos, and
-# pretending otherwise would double the memory this file costs without making
-# the voice plane any better. They are attached by URL, which the catalog names.
+# The agent runtime is containers (`agents`); claude-mem and REA are not, and
+# stay attached by URL. dograh is the process that actually speaks on a call, so
+# leaving it outside made "the AI answers the phone" a diagram rather than a
+# system. Capstone's evaluation stack (clickhouse, n8n, grafana, its own switch)
+# remains outside: it is an ops environment, not a voice path.
 
 name: christ
 
@@ -90,6 +91,14 @@ services:
       PORT: "8001"
       CANTUS_URL: http://switch:8088
       CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
+      # `node cli.js seed` logs into the platform as this account: the first run
+      # of a box nobody is sitting at has no browser to finish onboarding in.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@estate.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # Where the AI plane's dial plan is handed to the platform. A path, not a
+      # default: written inside this container it is invisible to telno, and the
+      # first settings save then silently drops the agent branch.
+      ESTATE_DIR: /estate
       # Empty unless the profile is on: a URL for a container that was never
       # selected reads as a broken product, and it is not broken, it is absent.
       TELNO_URL: ${TELNO_URL:-}
@@ -97,11 +106,15 @@ services:
       CAPSTONE_URL: ${CAPSTONE_URL:-}
       DOGRAH_URL: ${DOGRAH_URL:-}
       OMNIROUTE_URL: ${OMNIROUTE_URL:-}
+      DOGRAH_UI_URL: ${DOGRAH_UI_URL:-}
       GENIE_URL: ${GENIE_URL:-}
       CLAUDE_MEM_URL: ${CLAUDE_MEM_URL:-}
       ONTRAK_URL: ${ONTRAK_URL:-}
       WEBMAIL_URL: ${WEBMAIL_URL:-}
       OPENSMS_URL: ${OPENSMS_URL:-}
+    volumes:
+      # The other half of the platform's mount: what this writes, telno reads.
+      - ./state/estate:/estate
     ports:
       - "${CHRIST_PORT:-8001}:8001"
     healthcheck:
@@ -174,6 +187,7 @@ services:
       CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
       CANTUS_DOMAIN: ${CANTUS_DOMAIN:-estate.local}
       CANTUS_CONFIG_DIR: /data/cantus
+      CANTUS_ROUTES_EXTRA: /estate/estate-routes.json
       CANTUS_RECORD_DIR: /data/recordings
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@estate.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
@@ -183,6 +197,7 @@ services:
       ALLOW_INSECURE_PUBLIC_URL: "true"
     volumes:
       - telno-data:/data
+      - ./state/estate:/estate:ro
     ports:
       - "${TELNO_PORT:-8090}:8080"
     healthcheck:
@@ -216,6 +231,104 @@ services:
       VOIPMS_API_PASSWORD: ${VOIPMS_API_PASSWORD:-}
     ports:
       - "${ESTATE_PORT:-8000}:8080"
+
+  # ── agents ──────────────────────────────────────────────────────────────────
+  # The runtime that answers 8003. It connects to the switch's ARI event socket
+  # and takes the media over a WebSocket, so nothing here needs a SIP port: the
+  # only thing that has to be reachable is the switch.
+  dograh-db:
+    profiles: ["agents"]
+    image: pgvector/pgvector:pg17
+    container_name: christ-dograh-db
+    restart: unless-stopped
+    <<: *logging
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DOGRAH_DB_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    volumes:
+      - dograh-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dograh-redis:
+    profiles: ["agents"]
+    image: redis:7
+    container_name: christ-dograh-redis
+    restart: unless-stopped
+    <<: *logging
+    command: ["redis-server", "--requirepass", "${DOGRAH_REDIS_PASSWORD:-redissecret}", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${DOGRAH_REDIS_PASSWORD:-redissecret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dograh-minio:
+    profiles: ["agents"]
+    image: dograhai/minio:2026.09.22
+    container_name: christ-dograh-minio
+    restart: unless-stopped
+    <<: *logging
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - dograh-minio-data:/data
+
+  dograh-api:
+    profiles: ["agents"]
+    image: ${DOGRAH_API_IMAGE:-dograhai/dograh-api:latest}
+    container_name: christ-dograh-api
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      dograh-db:
+        condition: service_healthy
+      dograh-redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+      ENABLE_SIGNUP: "${DOGRAH_SIGNUP:-true}"
+      OSS_JWT_SECRET: ${DOGRAH_JWT_SECRET:?set DOGRAH_JWT_SECRET — dograh's session signing key}
+      PUBLIC_BASE_URL: ${DOGRAH_PUBLIC_URL:-http://localhost:8100}
+      BACKEND_API_ENDPOINT: ${DOGRAH_PUBLIC_URL:-http://localhost:8100}
+      DATABASE_URL: postgresql+asyncpg://postgres:${DOGRAH_DB_PASSWORD:-postgres}@dograh-db:5432/postgres
+      REDIS_URL: redis://:${DOGRAH_REDIS_PASSWORD:-redissecret}@dograh-redis:6379
+      MINIO_ENDPOINT: dograh-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: voice-audio
+      MINIO_SECURE: "false"
+      FASTAPI_WORKERS: "1"
+      ENABLE_ARI_MANAGER: "true"
+      ENABLE_CAMPAIGN_ORCHESTRATOR: "true"
+      ENABLE_TELEMETRY: "false"
+      FORWARDED_ALLOW_IPS: "*"
+    ports:
+      - "${DOGRAH_PORT:-8100}:8000"
+
+  dograh-ui:
+    profiles: ["agents"]
+    image: ${DOGRAH_UI_IMAGE:-dograhai/dograh-ui:latest}
+    container_name: christ-dograh-ui
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      dograh-api:
+        condition: service_started
+    environment:
+      HOSTNAME: 0.0.0.0
+      BACKEND_URL: http://dograh-api:8000
+      NODE_ENV: oss
+      ENABLE_TELEMETRY: "false"
+    ports:
+      - "${DOGRAH_UI_PORT:-3010}:3010"
 
   # ── models ──────────────────────────────────────────────────────────────────
   # One OpenAI-compatible endpoint in front of every provider. Heavy on a first
@@ -263,3 +376,5 @@ services:
 volumes:
   switch-data:
   telno-data:
+  dograh-db-data:
+  dograh-minio-data:

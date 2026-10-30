@@ -39,7 +39,12 @@ function channelJson(leg, extra = {}) {
     accountcode: '',
     channelvars: {},
     creationtime: new Date(call.startedAt).toISOString(),
-    dialplan: { context: call.route || 'cantus', exten: call.to, priority: 1, app_name: 'Cantus' },
+    // `exten` is the number that was dialled, without the domain. An ARI client
+    // resolves an inbound call by this value, so `14132642700@estate.local`
+    // looked up nothing and the call was refused after being handed over
+    // correctly — the most confusing kind of failure, because both sides did
+    // their job.
+    dialplan: { context: call.route || 'cantus', exten: String(call.to || '').split('@')[0], priority: 1, app_name: 'Cantus' },
     ...extra,
   };
 }
@@ -59,10 +64,29 @@ export class AriBridge {
     switchRef.on('cdr', () => {});
   }
 
+  /**
+   * ARI credentials arrive one of two ways.
+   *
+   * HTTP requests carry them as Basic auth. The event socket does not: every ARI
+   * client builds `ws://host/ari/events?api_key=<user>:<pass>&app=<name>`, which
+   * is what Asterisk documents, and dograh follows it exactly. Accepting only
+   * the header refused every event socket, so an agent runtime would answer
+   * nothing while its HTTP calls all looked healthy.
+   */
   authorized(request) {
     const header = request.headers.authorization || '';
-    if (!header.startsWith('Basic ')) return false;
-    const [user, pass] = Buffer.from(header.slice(6), 'base64').toString('utf8').split(':');
+    let user;
+    let pass;
+    if (header.startsWith('Basic ')) {
+      [user, pass] = Buffer.from(header.slice(6), 'base64').toString('utf8').split(':');
+    } else {
+      const url = new URL(request.url, 'http://localhost');
+      const key = url.searchParams.get('api_key') || '';
+      const at = key.indexOf(':');
+      if (at < 1) return false;
+      user = key.slice(0, at);
+      pass = key.slice(at + 1);
+    }
     return user === this.username && pass === this.password;
   }
 

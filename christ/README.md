@@ -82,8 +82,8 @@ resolves the second:
 ```sh
 node cli.js select ai
 # capabilities: models, voice, agents, memory, tools
-# containers:   omniroute, switch, christ
-# attached:     Capstone + dograh → set CAPSTONE_URL, DOGRAH_URL
+# containers:   omniroute, switch, christ, dograh-api, dograh-ui
+# attached:     Capstone (AgentOps), claude-mem, REA, ontrak-mcp
 # run: docker compose --profile core --profile models --profile voice ... up -d --build
 ```
 
@@ -94,7 +94,7 @@ node cli.js select ai
 | `platform` | `+ telno` | Accounts, numbers, IVR, voicemail, CDRs, the softphone, billing. |
 | `console` | `+ console` | The operator's window: live calls, lines, the encryption switch. |
 | `models` | `+ omniroute` | One OpenAI-compatible endpoint in front of every provider. |
-| `agents` | *attached* | Capstone + dograh: the agents, their workflows, their runtime. |
+| `agents` | `+ dograh-api`, `dograh-ui` | The runtime that answers: ARI bridge, workflows, the builder. |
 | `memory` | *attached* | claude-mem: what an agent did last time. |
 | `mail` | `+ webmail` | Loomix Mail over JMAP: where voicemail and transcripts land. |
 | `support` | `+ ontrak` | The graded range and the ticket queue a call escalates into. |
@@ -104,7 +104,11 @@ node cli.js select ai
 
 Nothing in the catalog is aspirational. A row that says *attached* means that stack is
 its own repository and its own compose file; CHRIST points at it by URL and wires its
-numbers, and says so instead of quietly starting half of it.
+numbers, and says so instead of quietly starting half of it. `agents` used to be in
+that list, and that was the problem: the half that speaks was outside the box, so
+"the AI answers the phone" was a diagram. It is containers now. Capstone's evaluation
+stack still is not — clickhouse, n8n, grafana and a second switch are an ops
+environment, not a voice path.
 
 ## Quick start
 
@@ -150,6 +154,26 @@ VULTR_PROFILES="core pstn platform console" ./deploy/vultr.sh up   # add telno
 Carrier credentials travel in the environment and land in the box's `.env`; they are
 never written into the repository, and the deploy's own state (instance id, IP, the
 generated signing secret and control token) is git-ignored beside the script.
+
+`up` also does the two things a box with nobody sitting at it cannot do by hand: it
+seeds the platform's first line and the DID through telno's own API (`node cli.js
+seed`), and it wires dograh to the switch — importing the receptionist workflow,
+creating the ARI configuration, binding `8003`, and registering the DID on that
+workflow so an inbound call is resolved by the number the caller dialled.
+
+### Prove it
+
+```sh
+node deploy/onboard.mjs http://<ip>:8090 <owner> <password>   # finish the first-run gate headlessly
+node ../apps/telno/scripts/softphone-check.mjs http://<ip>:8090 <owner> <password> 101
+node ../estate/tools/sip-probe.js --gateway <ip>:5060 --did 14132642700 --from 14134210134
+```
+
+The first prints the gate's state and a session; the second opens the media socket the
+browser opens and prints the socket's first frame plus the switch's view of the line;
+the third is a real INVITE to the carrier port, so `180 Ringing` followed by `200 OK`
+means the switch answered the call — and, outside office hours, that it was the agent
+app that answered it.
 
 ## The wiring, and why it is a command
 
@@ -232,9 +256,10 @@ nobody changed.
 | Claim | Reality |
 |---|---|
 | "One system" | One switch, one routing document, one DID. The products are still separate processes with separate repositories — that is the point. |
-| "AI integrated" | The DID, the agent extensions and the ARI routes are wired, and the prompts are compiled and addressable. Importing `agents.json` into a dograh workflow is a paste today, not an API call: Capstone has no endpoint for it in this tree. |
-| "Composable" | Nine services in this compose, each behind a profile. Capstone, dograh, claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
-| "Works" | The switch suite, the wiring suite and the front-door suite run on every push; `node cli.js wire` was verified against a running switch, 15/15 routes loaded and read back. |
+| "AI integrated" | Verified on a live box: a SIP call to the DID routes after hours into the agent app, dograh receives `StasisStart` with the channel still ringing, creates an inbound run and answers the channel. The audio hand-off is the last gap — see below. |
+| "Composable" | Fourteen services in this compose, each behind a profile; dograh and telno are containers now. Capstone's evaluation stack, claude-mem, REA, OpenSMS and Soulforge stay outside by design, and the catalog names them instead of pretending. |
+| "Works" | The switch, wiring, catalog and front-door suites run on every push. Verified live: 15/15 routes loaded and read back, line 101 registered over the public URL from a headless client, a real DID INVITE reaching the agent app. |
+| "The agent speaks" | Not yet end to end. dograh hands media to the switch with `POST /ari/channels/{id}/externalMedia` (`transport=websocket`, `connection_type=client`) — the chan_websocket call this ARI surface does not implement yet — and its TTS is pointed at a shim that is not running in this selection. Both are container/config work, not redesigns. |
 
 ## Layout
 
