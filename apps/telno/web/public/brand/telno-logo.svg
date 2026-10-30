@@ -1,99 +1,52 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900" role="img" aria-label="Telno">
   <title>Telno</title>
-  <desc>An audio waveform that becomes circuit traces with connection nodes, above the TELNO wordmark, on a dark navy grid.</desc>
+  <desc>A leaning white T on an aqua-to-indigo tile, with one hot pink dot breaking the corner.</desc>
 
   <defs>
-    <radialGradient id="stage" cx="50%" cy="38%" r="78%">
-      <stop offset="0" stop-color="#0e1d42"/>
-      <stop offset="0.55" stop-color="#081026"/>
-      <stop offset="1" stop-color="#04070f"/>
+    <linearGradient id="aqua" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2af0d8"/>
+      <stop offset="0.52" stop-color="#2f7bff"/>
+      <stop offset="1" stop-color="#1b2e8f"/>
+    </linearGradient>
+    <!-- Light catching the top edge, so the tile reads as a solid object. -->
+    <linearGradient id="sweep" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2af0d8" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#2af0d8" stop-opacity="0"/>
     </radialGradient>
-
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0v48" fill="none" stroke="#1b2f57" stroke-width="1" opacity="0.55"/>
-    </pattern>
-
-    <!-- Emblem-local coordinates (0 0 120 88): cyan at the low left, cobalt at the high right. -->
-    <linearGradient id="pulse" gradientUnits="userSpaceOnUse" x1="0" y1="88" x2="120" y2="0">
-      <stop offset="0" stop-color="#22d3ee"/>
-      <stop offset="0.45" stop-color="#3b82f6"/>
-      <stop offset="1" stop-color="#1e3a8a"/>
-    </linearGradient>
-
-    <linearGradient id="word" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.58" stop-color="#e2efff"/>
-      <stop offset="1" stop-color="#93c5fd"/>
-    </linearGradient>
-
-    <filter id="bloom" x="-45%" y="-45%" width="190%" height="190%">
-      <feGaussianBlur stdDeviation="16"/>
-    </filter>
-
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="5" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Five waveform bars, then the trace that leaves them and forks into nodes. -->
-    <g id="emblem" transform="translate(408 200) scale(3.2)">
-      <g fill="none" stroke="url(#pulse)" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 35v18" stroke-width="8"/>
-        <path d="M26 26v36" stroke-width="8"/>
-        <path d="M42 15v58" stroke-width="8"/>
-        <path d="M58 26v36" stroke-width="8"/>
-        <path d="M74 35v18" stroke-width="8"/>
-        <path d="M82 44h4" stroke-width="6"/>
-        <rect x="88" y="32" width="24" height="24" rx="7" stroke-width="6"/>
-        <path d="M100 32V18" stroke-width="6"/>
-      </g>
-      <g fill="url(#pulse)">
-        <circle cx="100" cy="44" r="4.5"/>
-        <circle cx="100" cy="13" r="5"/>
-      </g>
-      <g fill="none" stroke="url(#pulse)" stroke-width="2" opacity="0.45">
-        <circle cx="100" cy="13" r="9"/>
-      </g>
-    </g>
+    <clipPath id="tile">
+      <rect x="240" y="200" width="320" height="320" rx="84"/>
+    </clipPath>
   </defs>
 
-  <rect width="1200" height="900" fill="url(#stage)"/>
-  <rect width="1200" height="900" fill="url(#grid)" opacity="0.5"/>
-
-  <!-- Traces running off the canvas, so the emblem reads as part of a larger circuit. -->
-  <g fill="none" stroke="#1d4a7a" stroke-width="2" opacity="0.45">
-    <path d="M0 742h300v96h180"/>
-    <path d="M1200 168H968V72H860"/>
-    <path d="M1200 742h-210v-70"/>
-    <path d="M0 168h150v84"/>
-  </g>
-  <g fill="#2a6ba8" opacity="0.55">
-    <circle cx="480" cy="838" r="4"/>
-    <circle cx="860" cy="72" r="4"/>
-    <circle cx="990" cy="672" r="4"/>
-    <circle cx="150" cy="252" r="4"/>
-  </g>
-  <g fill="#7dd3fc" opacity="0.35">
-    <circle cx="316" cy="212" r="2.5"/>
-    <circle cx="902" cy="318" r="2"/>
-    <circle cx="248" cy="640" r="2"/>
-    <circle cx="1054" cy="826" r="2.5"/>
-    <circle cx="676" cy="120" r="2"/>
+  <rect width="1200" height="900" fill="#060a18"/>
+  <circle cx="600" cy="330" r="520" fill="url(#halo)"/>
+  <g stroke="#8fb7ff" stroke-opacity="0.1" stroke-width="3">
+    <path d="M96 128H336"/>
+    <path d="M864 806H1104"/>
   </g>
 
-  <use href="#emblem" filter="url(#bloom)" opacity="0.55"/>
-  <use href="#emblem" filter="url(#glow)"/>
+  <!-- Tile drawn in its own 320-space, then centred. -->
+  <g transform="translate(600 330) scale(1.1875) translate(-400 -360)">
+    <rect x="240" y="218" width="320" height="320" rx="84" fill="#03060f" opacity="0.85"/>
+    <rect x="240" y="200" width="320" height="320" rx="84" fill="url(#aqua)"/>
+    <rect x="240" y="200" width="320" height="320" rx="84" fill="url(#sweep)" clip-path="url(#tile)"/>
+    <rect x="243" y="203" width="314" height="314" rx="81" fill="none" stroke="#ffffff" stroke-opacity="0.26" stroke-width="3"/>
+    <g transform="translate(400 360) skewX(-8) translate(-400 -360)">
+      <rect x="300" y="246" width="200" height="62" rx="26" fill="#ffffff"/>
+      <rect x="368" y="246" width="64" height="240" rx="22" fill="#ffffff"/>
+    </g>
+    <circle cx="548" cy="508" r="33" fill="#ff4fa3"/>
+    <circle cx="548" cy="508" r="33" fill="none" stroke="#060a18" stroke-width="7" opacity="0.8"/>
+  </g>
 
-  <g transform="translate(600 700) skewX(-8)"
-     text-anchor="middle"
+  <g transform="translate(600 700) skewX(-8)" text-anchor="middle"
      font-family="'Segoe UI', Inter, 'Helvetica Neue', Arial, sans-serif"
-     font-weight="800"
-     font-size="150"
-     letter-spacing="14">
-    <text y="7" fill="#061024" opacity="0.9">TELNO</text>
-    <text y="0" fill="url(#word)" filter="url(#glow)">TELNO</text>
+     font-weight="900" font-size="150" letter-spacing="12">
+    <text y="0" fill="#ffffff">TELNO</text>
   </g>
 </svg>
