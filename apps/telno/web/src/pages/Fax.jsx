@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { api, relativeTime } from '../api.js';
 import {
   Badge,
@@ -133,12 +133,16 @@ export default function Fax() {
           <dl className="kv">
             <dt>Transport</dt>
             <dd className="tiny">{engine?.transport || '…'}</dd>
-            <dt>res_fax</dt>
-            <dd className="tiny mono">{engine?.modules?.resFax ? 'loaded' : 'not loaded'}</dd>
-            <dt>spandsp</dt>
-            <dd className="tiny mono">{engine?.modules?.spandsp ? 'loaded — G.711 fallback works' : 'absent — T.38 only'}</dd>
-            <dt>Ghostscript</dt>
-            <dd className="tiny mono">{engine?.ghostscript || 'not installed'}</dd>
+            {/* What is actually missing, one line each. Asterisk's res_fax and
+                spandsp are named nowhere: this estate has no Asterisk on the
+                call path, so reporting them "not loaded" described a machine
+                that does not exist instead of the fax machine that is absent. */}
+            {(engine?.checks || []).map((check) => (
+              <Fragment key={check.id}>
+                <dt>{check.label}</dt>
+                <dd className={`tiny mono ${check.state === 'ready' ? '' : 'bad'}`}>{check.detail}</dd>
+              </Fragment>
+            ))}
             <dt>Station ID</dt>
             <dd className="tiny mono">{engine?.stationId || '—'}</dd>
           </dl>

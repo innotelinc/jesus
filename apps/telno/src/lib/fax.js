@@ -624,24 +624,146 @@ export function stopFax() {
   sweeper = null;
 }
 
+/**
+ * What the Fax screen shows about the engine itself.
+ *
+ * Pure, so the screen can be tested without a fax machine: `facts` is what this
+ * process can see (its own config, ghostscript) and `engine` is what the fax box
+ * answered, or null when there is no box or it did not answer.
+ *
+ * The honesty rule this encodes: this estate has no Asterisk on the call path,
+ * so `res_fax` and `spandsp` can never be loaded and a screen that reports them
+ * "not loaded" is describing a machine that does not exist. What is missing is
+ * either a T.38 gateway on the trunk or an IAX2 modem running HylaFAX, and the
+ * report names whichever the deployment has to supply.
+ */
+export function faxEngineReport(facts, engine) {
+  const checks = [];
+  const hasIax = !!facts.engineUrl;
+  const gateway = facts.gateway;
+
+  checks.push({
+    id: 'ghostscript',
+    label: 'Document rendering',
+    state: facts.ghostscript ? 'ready' : 'missing',
+    detail: facts.ghostscript ? `Ghostscript ${facts.ghostscript}` : 'Ghostscript is not installed, so nothing can be rendered to TIFF',
+  });
+
+  if (hasIax) {
+    const modem = engine?.modem || {};
+    checks.push({
+      id: 'engine',
+      label: 'Fax engine',
+      state: engine?.reachable ? 'ready' : engine ? 'degraded' : 'missing',
+      detail: engine?.reachable ? `${engine.engine || 'iax+hylafax'} at ${facts.engineUrl}` : engine ? 'the engine answered but is not serving' : `no answer from ${facts.engineUrl}`,
+    });
+    checks.push({
+      id: 'iax',
+      label: 'IAX2 modem',
+      state: modem.registered ? 'ready' : 'missing',
+      detail: modem.registered
+        ? `${modem.device || 'modem'} registered${modem.state ? ` · ${modem.state}` : ''}`
+        : 'iaxmodem is not registered with its Asterisk peer, so nothing can answer a fax call',
+    });
+    checks.push({
+      id: 'hylafax',
+      label: 'HylaFAX',
+      state: engine?.hylafax?.ready ? 'ready' : 'missing',
+      detail: engine?.hylafax?.ready ? `faxq running · ${engine.hylafax.version || 'ready'}` : 'the HylaFAX scheduler is not answering',
+    });
+  } else if (gateway) {
+    checks.push({
+      id: 'gateway',
+      label: 'T.38 gateway',
+      state: 'ready',
+      detail: `${gateway} terminates the fax on the trunk`,
+    });
+  } else {
+    checks.push({
+      id: 'engine',
+      label: 'Fax engine',
+      state: 'missing',
+      detail: 'No fax machine is configured: set FAX_ENGINE_URL for the IAX2/HylaFAX box, or FAX_GATEWAY for a T.38 gateway on the trunk',
+    });
+  }
+
+  // Ready means a page could actually leave or arrive: an engine that answers
+  // but has no registered modem is a fax machine with no line, which is not
+  // ready however healthy its HTTP door looks.
+  const ready =
+    !!facts.enabled &&
+    !!facts.ghostscript &&
+    (hasIax ? !!engine?.reachable && !!engine?.modem?.registered : !!gateway);
+  const transport = !facts.enabled
+    ? 'off'
+    : hasIax
+      ? `IAX2 \u2192 iaxmodem \u2192 HylaFAX${engine?.reachable ? '' : ' (not answering)'}`
+      : gateway
+        ? `T.38 through ${gateway}`
+        : 'none \u2014 Cantus carries voice only';
+
+  let note;
+  if (!facts.enabled) {
+    note = 'Fax is off (FAX_ENABLED). Cantus carries voice only, so a fax needs a machine that terminates the modem; this is opt-in rather than advertised and absent.';
+  } else if (!facts.ghostscript) {
+    note = 'Ghostscript is missing, so a document cannot be turned into the TIFF a fax machine transmits.';
+  } else if (hasIax && !engine?.reachable) {
+    note = `The fax engine at ${facts.engineUrl} is not answering. Nothing is dialled until it does — a fax queued into a dead engine looks sent and never arrives.`;
+  } else if (hasIax && !engine?.modem?.registered) {
+    note = 'The engine is up but its IAX2 modem is not registered, so an inbound call has nothing to answer and an outbound one has no line.';
+  } else if (hasIax) {
+    note = `Documents are rendered here and transmitted by the IAX2 modem at ${facts.engineUrl}. No carrier fax API and no per-page fee.`;
+  } else if (gateway) {
+    note = `Documents are rendered here and sent to the T.38 gateway at ${gateway}.`;
+  } else {
+    note = 'Set FAX_ENGINE_URL to an IAX2 + HylaFAX engine (the modem is the fax machine), or FAX_GATEWAY to a T.38 gateway on the trunk. Until one is there, sending is refused with that reason rather than queued.';
+  }
+
+  return {
+    enabled: !!facts.enabled,
+    transport,
+    stationId: facts.stationId,
+    dir: facts.dir,
+    ghostscript: facts.ghostscript,
+    gateway: gateway || null,
+    engineUrl: facts.engineUrl || null,
+    checks,
+    engine: engine || null,
+    ready,
+    note,
+  };
+}
+
+/** Ask the fax engine what it is, if one is configured. A slow or dead engine is
+ *  an answer too \u2014 null, which the report renders as "not answering". */
+async function probeEngine(url, token) {
+  if (!url) return null;
+  try {
+    const res = await fetch(`${url}/status`, {
+      headers: token ? { 'x-fax-token': token } : {},
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!res.ok) return { reachable: false, error: `http_${res.status}` };
+    const body = await res.json();
+    return { reachable: true, ...body };
+  } catch (err) {
+    return { reachable: false, error: err.message };
+  }
+}
+
 /** What the Fax screen shows about the engine itself. */
 export async function faxStatus() {
   const d = ensureFaxDirs();
-  const gateway = String(config.fax.gateway || '').trim();
-  return {
+  const facts = {
     enabled: config.fax.enabled,
-    transport: gateway ? `T.38 through ${gateway}` : 'unavailable: no T.38 gateway configured',
     stationId: config.fax.stationId,
     dir: d.root,
     ghostscript: ghostscript(),
-    gateway: gateway || null,
-    ready: !!config.fax.enabled && !!gateway && !!ghostscript(),
-    note: !config.fax.enabled
-      ? 'Fax is off. Cantus carries voice only; a fax needs a T.38 gateway on the trunk, so this is opt-in rather than advertised and absent.'
-      : gateway
-        ? `Documents are rendered here and sent to the T.38 gateway at ${gateway}.`
-        : 'Set FAX_GATEWAY to the Cantus address of a T.38 gateway. Until then, sending is refused with that reason rather than queued.',
+    gateway: String(config.fax.gateway || '').trim(),
+    engineUrl: config.fax.engineUrl,
   };
+  const engine = await probeEngine(config.fax.engineUrl, config.fax.engineToken);
+  return faxEngineReport(facts, engine);
 }
 
 export { countPages };
