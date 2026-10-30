@@ -1,0 +1,38 @@
+# One HylaFAX modem — one iaxmodem tty.
+#
+# Rendered per device by the entrypoint (__DEVICE__, __NUMBER__, __STATION__),
+# because a fax machine has to know its own number: it is printed in the page
+# header and used as the Caller*ID on an outbound transmission.
+CountryCode:		1
+AreaCode:		585
+FAXNumber:		__NUMBER__
+LongDistancePrefix:	1
+InternationalPrefix:	011
+DialStringRules:	etc/dialrules
+ServerTracing:		1
+SessionTracing:		11
+RecvFileMode:		0600
+LogFileMode:		0600
+DeviceMode:		0600
+RingsBeforeAnswer:	1
+SpeakerVolume:		off
+GettyArgs:		"-h %l dx_%s"
+LocalIdentifier:	"__STATION__"
+TagLineFont:		etc/lutRS18.pcf
+TagLineFormat:		"From %%l|%c|Page %%P of %%T"
+MaxRecvPages:		50
+#
+# The modem is iaxmodem, which speaks the same Class 1 AT dialect a serial
+# modem does. Class1AdaptRecvCmd and Class1TMConnectDelay are the two settings
+# every iaxmodem install needs: without them a quick CONNECT response or an
+# adaptive-receive probe makes V.17 fall back or fail.
+#
+ModemType:		Class1
+Class1AdaptRecvCmd:	AT+FAR=1
+Class1TMConnectDelay:	400
+ModemResetCmds:		AT+VCID=1
+ModemDialCmd:		ATDT%s
+PagerTTYParity:		none
+CallIDPattern:		"NMBR="
+CallIDPattern:		"NAME="
+CallIDPattern:		"ANID="

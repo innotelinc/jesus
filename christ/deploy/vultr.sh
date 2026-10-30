@@ -195,6 +195,7 @@ pack() {
     --exclude 'apps/telno/node_modules' --exclude 'apps/cantus-gateway/node_modules' \
     --exclude 'apps/telno/.env' --exclude 'apps/telno/web/dist' \
     christ apps/cantus-switch apps/cantus-gateway estate/console apps/telno \
+    apps/fax-engine \
     apps/capstone/dograh apps/capstone/scripts/dograh_wire.py \
     apps/capstone/tts-shim
   [ -s "$out" ] || { echo "pack produced no archive" >&2; exit 1; }
@@ -218,13 +219,19 @@ upload_and_boot() {
   # Secrets that must survive a redeploy: re-generating them would change the
   # ARI password the agent runtime holds and the admin password already in use,
   # and both failures look like a bug in the feature rather than a changed key.
-  local admin_password ari_password dograh_jwt
+  local admin_password ari_password dograh_jwt fax_secret
   admin_password="${ADMIN_PASSWORD:-$(state_get admin_password)}"
   admin_password="${admin_password:-$(node -e "process.stdout.write(require('crypto').randomBytes(12).toString('hex'))")}"
   ari_password="${CANTUS_ARI_PASSWORD:-$(state_get ari_password)}"
   ari_password="${ari_password:-$(node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))")}"
   dograh_jwt="${DOGRAH_JWT_SECRET:-$(state_get dograh_jwt)}"
   dograh_jwt="${dograh_jwt:-$(node -e "process.stdout.write(require('crypto').randomBytes(24).toString('hex'))")}"
+  # The fax engine's two modems authenticate to its own switchboard with this.
+  # It is generated here and kept, because rotating it silently turns two
+  # healthy modems into "unreachable" peers on the next boot.
+  fax_secret="${FAX_SECRET:-$(state_get fax_secret)}"
+  fax_secret="${fax_secret:-$(node -e "process.stdout.write(require('crypto').randomBytes(16).toString('hex'))")}"
+  state_set fax_secret "$fax_secret"
   local dograh_email="${DOGRAH_ADMIN_EMAIL:-ops@innotel.us}"
   state_set admin_password "$admin_password"
   state_set ari_password "$ari_password"
@@ -273,6 +280,18 @@ VOIPMS_SIP_PASSWORD=${VOIPMS_SIP_PASSWORD:-}
 VOIPMS_SIP_FROM_USER=${VOIPMS_SIP_FROM_USER:-}
 VOIPMS_SIP_DOMAIN=${VOIPMS_SIP_DOMAIN:-}
 SIP_SRTP=${SIP_SRTP:-on}
+# The fax machine. FAX_SECRET stays on this box; the THREE FAX_SIP_* values are
+# the fax's own carrier sub-account, because a fax DID must reach the modem
+# directly instead of being carried as a voice call through the switch.
+FAX_SECRET=$fax_secret
+FAX_STATION_ID=${FAX_STATION_ID:-Telno}
+FAX_NUMBER=${FAX_NUMBER:-}
+FAX_ENGINE_TOKEN=$token
+FAX_SIP_USERNAME=${FAX_SIP_USERNAME:-}
+FAX_SIP_PASSWORD=${FAX_SIP_PASSWORD:-}
+FAX_SIP_HOST=${FAX_SIP_HOST:-}
+FAX_SIP_HOST_PORT=${FAX_SIP_HOST_PORT:-5062}
+FAX_STATUS_PORT=${FAX_STATUS_PORT:-8091}
 ADMIN_EMAIL=${ADMIN_EMAIL:-admin@estate.local}
 ADMIN_PASSWORD=$admin_password
 ENV
@@ -288,6 +307,12 @@ ENV
 TELNO_URL=http://telno:8080" ;;
       pstn) env_file="$env_file
 GATEWAY_URL=http://gateway:7454" ;;
+      fax) env_file="$env_file
+# The Fax screen only offers to send when it has an engine it can reach, and
+# the engine is this compose file's fax container — a name on the network, not
+# loopback, because telno is a different container from it.
+FAX_ENABLED=true
+FAX_ENGINE_URL=http://fax-engine:8080" ;;
       models) env_file="$env_file
 OMNIROUTE_URL=http://omniroute:20128" ;;
       speech) env_file="$env_file
@@ -390,8 +415,8 @@ status() {
   echo "  board    http://$ip:8001/"
   echo "  switch   http://$ip:8188/v1/status"
   echo "  console  http://$ip:8000/"
-  echo "  telno    http://$ip:8090/   (only with the platform profile)"
-  echo "  dograh   http://$ip:3010/   (only with the agents profile; API on :8100)"
+  echo "  telno    http://$ip:8090/   (only with the platform profile)"    echo "  dograh   http://$ip:3010/   (only with the agents profile; API on :8100)"
+    echo "  fax      http://$ip:8091/status   (only with the fax profile)"
   echo "  wire     ./vultr.sh wire"
 }
 

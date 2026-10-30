@@ -93,6 +93,7 @@ node cli.js select ai
 | `pstn` | `+ gateway` | A real number, caller ID, and SIP only where it has to exist. |
 | `platform` | `+ telno` | Accounts, numbers, IVR, voicemail, CDRs, the softphone, billing. |
 | `console` | `+ console` | The operator's window: live calls, lines, the encryption switch. |
+| `fax` | `+ fax-engine` | The fax machine: two iaxmodems over IAX2 with HylaFAX behind them. No carrier fax API. |
 | `models` | `+ omniroute` | One OpenAI-compatible endpoint in front of every provider. |
 | `agents` | `+ dograh-api`, `dograh-ui` | The runtime that answers: ARI bridge, workflows, the builder. |
 | `memory` | *attached* | claude-mem: what an agent did last time. |
@@ -130,6 +131,20 @@ silence — the runtime and a TTS service:
 ```sh
 node cli.js select agents speech
 DOGRAH_TTS_BASE_URL=http://tts-shim:8880/v1 python3 ../apps/capstone/scripts/dograh_wire.py
+```
+
+Fax is a profile of its own, and it is deliberately not on the voice path: Cantus
+carries voice only, so a page needs a process that terminates the modem.
+
+```sh
+node cli.js select fax          # voice, platform, fax-engine
+```
+
+The engine proves itself without a carrier — it sends a page from one of its
+modems to the other and checks that it arrived:
+
+```sh
+docker compose --profile fax exec -T fax-engine sh /opt/fax/loopback.sh
 ```
 
 No Docker? The voice plane and the board are Node only:
