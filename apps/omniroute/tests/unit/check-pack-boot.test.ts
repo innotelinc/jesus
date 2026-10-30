@@ -48,6 +48,23 @@ test("pickTarball skips hook chatter printed before the npm JSON", () => {
   );
 });
 
+test("pickTarball reads the JSON when the hook prints without a newline", () => {
+  // What CI actually produced once the hook was silenced: husky's "HUSKY=0 skip
+  // install" has no trailing newline, so npm's `[` opens on that same line and a
+  // line-based scan started inside the first object instead of at the array.
+  const packed = [
+    {
+      id: "omniroute-3.8.50",
+      filename: "omniroute-3.8.50.tgz",
+      files: [{ path: "dist/server.js" }],
+    },
+  ];
+  assert.equal(
+    pickTarball(`HUSKY=0 skip install${JSON.stringify(packed, null, 2)}`),
+    "omniroute-3.8.50.tgz"
+  );
+});
+
 test("pickTarball ignores a line printed after the npm JSON", () => {
   assert.equal(
     pickTarball('[{"filename":"omniroute-3.8.49.tgz"}]\nnode: a warning\n'),
