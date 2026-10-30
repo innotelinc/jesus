@@ -44,7 +44,8 @@ prefers IPv6 will spend a round trip discovering that.
 
 Ports 80 and 443 have to reach the box for Let's Encrypt to complete the
 `http-01` challenge; `EDGE_HTTP_PORT`/`EDGE_HTTPS_PORT` exist so a box behind a
-NAT can publish them somewhere else.
+NAT can publish them somewhere else. There is no TLS switch in the Caddyfile: a
+host in the map gets a certificate or it does not answer.
 
 ## Mail
 
@@ -79,13 +80,25 @@ at whatever server currently holds the record. Set
 
 ## Testing without DNS
 
-`EDGE_AUTO_HTTPS=off` turns the same map into plain HTTP on `:80`, so a box whose
-records still point elsewhere can be checked with a header:
+A box whose records still point elsewhere cannot get a certificate, so its front
+door answers `308` to `https://` and nothing more. The routing itself is still
+testable: `node cli.js edge --http` renders the same map with TLS off, and a
+throwaway Caddy on the compose network serves it:
 
 ```sh
-curl -sI -H 'Host: telno.services' http://<edge ip>/ | head -1
-curl -s  -H 'Host: telno.directory' http://<edge ip>/ | grep -i location
+docker run --rm -v /opt/christ/jesus:/jesus -w /jesus/christ node:22-alpine \
+  node cli.js edge --http > /tmp/Caddyfile.http
+docker run -d --name edge-probe --network christ_default -p 127.0.0.1:8099:80 \
+  -v /tmp/Caddyfile.http:/etc/caddy/Caddyfile:ro caddy:2-alpine
+
+for h in telno.services telno.online telno.mobi telno.digital telno.tel \
+         telno.directory telno.network; do
+  printf '%-16s ' "$h"
+  curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Host: $h" http://127.0.0.1:8099/
+done
+docker rm -f edge-probe
 ```
 
-The directory answers `302` to `/d/telno.directory` and everything else answers
-from its own upstream — which is the whole routing decision, in one line each.
+Five hosts answer `200` from the platform, `telno.directory` answers `302` to
+`/d/telno.directory`, and `telno.network` answers `200` from the CHRIST board —
+which is the whole routing decision, one line each.

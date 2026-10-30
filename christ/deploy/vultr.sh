@@ -247,12 +247,10 @@ PUBLIC_IP=$ip
 PUBLIC_URL=${PUBLIC_URL:-http://$ip:8090}
 # The estate's front door. Its domain map lives in christ/domains.json and is
 # rendered into deploy/Caddyfile; these four lines are what the proxy needs to
-# serve it. EDGE_AUTO_HTTPS=off makes the same map plain HTTP on :80, which is
-# how a box whose DNS does not point at it yet is tested with Host headers.
+# serve it. Ports only: a box behind a NAT can publish 80/443 elsewhere, and
+# `node cli.js edge --http` is how the map is tested before DNS points here.
 EDGE_HTTP_PORT=${EDGE_HTTP_PORT:-80}
 EDGE_HTTPS_PORT=${EDGE_HTTPS_PORT:-443}
-EDGE_AUTO_HTTPS=${EDGE_AUTO_HTTPS:-on}
-ACME_EMAIL=${ACME_EMAIL:-ops@telno.services}
 # telno.services is the sending domain: every notice, code, invoice and report
 # leaves with this From, whatever host the app is being used from.
 NOTIFY_FROM=${NOTIFY_FROM:-no-reply@telno.services}
