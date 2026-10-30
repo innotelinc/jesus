@@ -1,124 +1,77 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Telno and Innotel.US">
   <title>Telno &#215; Innotel.US</title>
-  <desc>Side-by-side brand identity: the Telno and Innotel.US marks sharing one emblem, on a dark navy circuit grid.</desc>
+  <desc>The pair: a leaning T and a leaning i on matching aqua tiles, each marked with one hot pink dot.</desc>
 
   <defs>
-    <radialGradient id="stage" cx="50%" cy="36%" r="82%">
-      <stop offset="0" stop-color="#0e1d42"/>
-      <stop offset="0.55" stop-color="#081026"/>
-      <stop offset="1" stop-color="#04070f"/>
+    <linearGradient id="aqua" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2af0d8"/>
+      <stop offset="0.52" stop-color="#2f7bff"/>
+      <stop offset="1" stop-color="#1b2e8f"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="haloLeft" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2af0d8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#2af0d8" stop-opacity="0"/>
     </radialGradient>
+    <radialGradient id="haloRight" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ff4fa3" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ff4fa3" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tileLeft">
+      <rect x="240" y="200" width="320" height="320" rx="84"/>
+    </clipPath>
+    <clipPath id="tileRight">
+      <rect x="1040" y="200" width="320" height="320" rx="84"/>
+    </clipPath>
+  </defs>
 
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0v48" fill="none" stroke="#1b2f57" stroke-width="1" opacity="0.55"/>
-    </pattern>
+  <rect width="1600" height="900" fill="#060a18"/>
+  <circle cx="400" cy="330" r="470" fill="url(#haloLeft)"/>
+  <circle cx="1200" cy="330" r="470" fill="url(#haloRight)"/>
+  <g stroke="#8fb7ff" stroke-opacity="0.1" stroke-width="3">
+    <path d="M120 96H360"/>
+    <path d="M1240 804H1480"/>
+  </g>
 
-    <linearGradient id="pulse" gradientUnits="userSpaceOnUse" x1="0" y1="88" x2="120" y2="0">
-      <stop offset="0" stop-color="#22d3ee"/>
-      <stop offset="0.45" stop-color="#3b82f6"/>
-      <stop offset="1" stop-color="#1e3a8a"/>
-    </linearGradient>
-
-    <linearGradient id="word" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.58" stop-color="#e2efff"/>
-      <stop offset="1" stop-color="#93c5fd"/>
-    </linearGradient>
-
-    <filter id="bloom" x="-45%" y="-45%" width="190%" height="190%">
-      <feGaussianBlur stdDeviation="14"/>
-    </filter>
-
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <g id="emblem">
-      <g fill="none" stroke="url(#pulse)" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 35v18" stroke-width="8"/>
-        <path d="M26 26v36" stroke-width="8"/>
-        <path d="M42 15v58" stroke-width="8"/>
-        <path d="M58 26v36" stroke-width="8"/>
-        <path d="M74 35v18" stroke-width="8"/>
-        <path d="M82 44h4" stroke-width="6"/>
-        <rect x="88" y="32" width="24" height="24" rx="7" stroke-width="6"/>
-        <path d="M100 32V18" stroke-width="6"/>
-      </g>
-      <g fill="url(#pulse)">
-        <circle cx="100" cy="44" r="4.5"/>
-        <circle cx="100" cy="13" r="5"/>
-      </g>
-      <g fill="none" stroke="url(#pulse)" stroke-width="2" opacity="0.45">
-        <circle cx="100" cy="13" r="9"/>
-      </g>
+  <!-- TELNO -->
+  <g>
+    <rect x="240" y="218" width="320" height="320" rx="84" fill="#03060f" opacity="0.85"/>
+    <rect x="240" y="200" width="320" height="320" rx="84" fill="url(#aqua)"/>
+    <rect x="240" y="200" width="320" height="320" rx="84" fill="url(#sweep)" clip-path="url(#tileLeft)"/>
+    <rect x="243" y="203" width="314" height="314" rx="81" fill="none" stroke="#ffffff" stroke-opacity="0.26" stroke-width="3"/>
+    <g transform="translate(400 360) skewX(-8) translate(-400 -360)">
+      <rect x="300" y="246" width="200" height="62" rx="26" fill="#ffffff"/>
+      <rect x="368" y="246" width="64" height="240" rx="22" fill="#ffffff"/>
     </g>
-  </defs>
-
-  <rect width="1600" height="900" fill="url(#stage)"/>
-  <rect width="1600" height="900" fill="url(#grid)" opacity="0.5"/>
-
-  <g fill="none" stroke="#1d4a7a" stroke-width="2" opacity="0.4">
-    <path d="M0 806h260v66h190"/>
-    <path d="M1600 118h-232V64h-96"/>
-    <path d="M0 132h172v78"/>
-    <path d="M1600 806h-196v-62"/>
-  </g>
-  <g fill="#2a6ba8" opacity="0.5">
-    <circle cx="450" cy="872" r="4"/>
-    <circle cx="1272" cy="64" r="4"/>
-    <circle cx="172" cy="210" r="4"/>
-    <circle cx="1404" cy="744" r="4"/>
-  </g>
-  <g fill="#7dd3fc" opacity="0.32">
-    <circle cx="196" cy="276" r="2.5"/>
-    <circle cx="1388" cy="236" r="2"/>
-    <circle cx="284" cy="662" r="2"/>
-    <circle cx="1330" cy="700" r="2.5"/>
-    <circle cx="800" cy="92" r="2"/>
-    <circle cx="248" cy="470" r="1.8"/>
-    <circle cx="1352" cy="486" r="1.8"/>
+    <circle cx="548" cy="508" r="33" fill="#ff4fa3"/>
+    <circle cx="548" cy="508" r="33" fill="none" stroke="#060a18" stroke-width="7" opacity="0.8"/>
   </g>
 
-  <!-- Left: TELNO -->
-  <use href="#emblem" transform="translate(244 246) scale(2.6)" filter="url(#bloom)" opacity="0.5"/>
-  <use href="#emblem" transform="translate(244 246) scale(2.6)" filter="url(#glow)"/>
-
-  <!-- Right: INNOTEL.US -->
-  <use href="#emblem" transform="translate(1044 246) scale(2.6)" filter="url(#bloom)" opacity="0.5"/>
-  <use href="#emblem" transform="translate(1044 246) scale(2.6)" filter="url(#glow)"/>
-
-  <g transform="translate(400 585) skewX(-8)"
-     text-anchor="middle"
+  <g transform="translate(400 700) skewX(-8)" text-anchor="middle"
      font-family="'Segoe UI', Inter, 'Helvetica Neue', Arial, sans-serif"
-     font-weight="800"
-     font-size="112"
-     letter-spacing="11">
-    <text y="5" fill="#061024" opacity="0.9">TELNO</text>
-    <text y="0" fill="url(#word)" filter="url(#glow)">TELNO</text>
+     font-weight="900" font-size="112" letter-spacing="10">
+    <text y="0" fill="#ffffff">TELNO</text>
   </g>
 
-  <g transform="translate(1200 585) skewX(-8)"
-     text-anchor="middle"
+  <!-- INNOTEL.US -->
+  <g>
+    <rect x="1040" y="218" width="320" height="320" rx="84" fill="#03060f" opacity="0.85"/>
+    <rect x="1040" y="200" width="320" height="320" rx="84" fill="url(#aqua)"/>
+    <rect x="1040" y="200" width="320" height="320" rx="84" fill="url(#sweep)" clip-path="url(#tileRight)"/>
+    <rect x="1043" y="203" width="314" height="314" rx="81" fill="none" stroke="#ffffff" stroke-opacity="0.26" stroke-width="3"/>
+    <g transform="translate(1200 360) skewX(-8) translate(-1200 -360)">
+      <rect x="1168" y="330" width="64" height="158" rx="32" fill="#ffffff"/>
+      <circle cx="1200" cy="278" r="34" fill="#ff4fa3"/>
+    </g>
+  </g>
+
+  <g transform="translate(1200 700) skewX(-8)" text-anchor="middle"
      font-family="'Segoe UI', Inter, 'Helvetica Neue', Arial, sans-serif"
-     font-weight="800"
-     font-size="92"
-     letter-spacing="8">
-    <text y="5" fill="#061024" opacity="0.9">INNOTEL.US</text>
-    <text y="0" fill="url(#word)" filter="url(#glow)">INNOTEL.US</text>
+     font-weight="900" font-size="92" letter-spacing="8">
+    <text y="0" fill="#ffffff">INNOTEL.US</text>
   </g>
-
-  <rect x="799" y="250" width="2" height="380" fill="url(#seam)" opacity="0.85"/>
-  <defs>
-    <linearGradient id="seam" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1e3a8a" stop-opacity="0"/>
-      <stop offset="0.25" stop-color="#1e3a8a"/>
-      <stop offset="0.5" stop-color="#3b82f6"/>
-      <stop offset="0.75" stop-color="#1e3a8a"/>
-      <stop offset="1" stop-color="#1e3a8a" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
 </svg>
