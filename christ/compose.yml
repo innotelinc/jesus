@@ -90,8 +90,10 @@ services:
       PORT: "8001"
       CANTUS_URL: http://switch:8088
       CANTUS_CONTROL_TOKEN: ${CANTUS_CONTROL_TOKEN:?}
-      TELNO_URL: ${TELNO_URL:-http://telno:8080}
-      GATEWAY_URL: ${GATEWAY_URL:-http://gateway:7454}
+      # Empty unless the profile is on: a URL for a container that was never
+      # selected reads as a broken product, and it is not broken, it is absent.
+      TELNO_URL: ${TELNO_URL:-}
+      GATEWAY_URL: ${GATEWAY_URL:-}
       CAPSTONE_URL: ${CAPSTONE_URL:-}
       DOGRAH_URL: ${DOGRAH_URL:-}
       OMNIROUTE_URL: ${OMNIROUTE_URL:-}
