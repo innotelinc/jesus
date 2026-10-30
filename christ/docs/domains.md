@@ -28,19 +28,58 @@ All seven names point at the same box, and the proxy issues a certificate for
 each. Nothing else in the estate needs a public name.
 
 ```
-telno.services      A   <edge ip>
-telno.online        A   <edge ip>
-telno.mobi          A   <edge ip>
-telno.digital       A   <edge ip>
-telno.tel           A   <edge ip>
-telno.directory     A   <edge ip>
-telno.network       A   <edge ip>
+telno.services      A   <edge ip>      www CNAME -> apex
+telno.online        A   <edge ip>      www CNAME -> apex
+telno.mobi          A   <edge ip>      www CNAME -> apex
+telno.digital       A   <edge ip>      www CNAME -> apex
+telno.tel           A   <edge ip>      www CNAME -> apex
+telno.directory     A   <edge ip>      www CNAME -> apex
+telno.network       A   <edge ip>      www CNAME -> apex
 ```
 
-`www.` for each of them is served by the same blocks (Caddy answers for both and
-the app does not care which arrived). If the box has an IPv6 address, add the
-`AAAA` records too — a name with only `A` records still works, but a client that
-prefers IPv6 will spend a round trip discovering that.
+The zones are hosted by **Cerulean's Technitium** on the `cerulean` host, not by
+the edge box, so the record is written there — and because that server *is* the
+authoritative nameserver for these zones, the public answer changes the moment
+the record does. There is no provider to wait on and no second zone to keep in
+step. `deploy/publish-dns.py` is the one way to make the change, because it is
+the only path that keeps the credential out of the shell and out of the repo:
+
+```sh
+VAULT_ADDR=http://127.0.0.1:8200 \
+VAULT_TOKEN_FILE=<cerulean>/data/vault/token/cerulean.token \
+  ./deploy/publish-dns.py --show                    # apex and www, per zone
+  ./deploy/publish-dns.py --apply --ip <edge ip>    # the apex A of all seven
+  ./deploy/publish-dns.py --verify --ip <edge ip>   # public answers, then TLS
+```
+
+The Technitium credential (`url`, `user`, `password`) lives in Vault at
+`cerulean/technitium`; the tool prints which source it used and never the value.
+Two things about that API are worth knowing before scripting it by hand.
+`zones/records/get` without a `domain` returns the **apex only** — so a check
+that asks for the zone will report `www` as missing when it is right there, which
+is why `--show` asks for it by name. And `zones/records/update` at an apex is
+refused with "the record does not exists to be updated" while listing that very
+record, so the tool falls back to delete-then-add, which the API does accept.
+
+`www.` has to exist. Each edge site block answers for `<zone>` **and**
+`www.<zone>`, and Caddy requests one certificate covering both names, so a
+`www` that resolves nowhere fails the certificate for the apex too — the edge
+logs it as a challenge against the *old* address and retries with backoff. If the
+box has an IPv6 address, add the `AAAA` records as well: a name with only `A`
+records still works, but a client that prefers IPv6 spends a round trip finding
+that out.
+
+Delegation stays where it is: every zone lists `lab.innotel.us`, `ns1.<zone>` and
+`ns2.<zone>`, and all three resolve to the Cerulean box. Moving the apex `A`
+therefore does not touch who answers for the zone. `CAA` is `issue
+letsencrypt.org` in all seven, which is exactly the CA the edge uses, so
+certificate issuance succeeds on the first request after the record moves.
+
+Moving the record is the whole change: the edge already carries a block for each
+name and its `www.`, so issuing the certificate is simply what happens next. An
+edge that has already failed while the old address was live is sitting in ACME
+backoff, though, so `docker restart edge` is what makes the next attempt happen
+now rather than in an hour — a nudge, not a requirement.
 
 Ports 80 and 443 have to reach the box for Let's Encrypt to complete the
 `http-01` challenge; `EDGE_HTTP_PORT`/`EDGE_HTTPS_PORT` exist so a box behind a
@@ -59,11 +98,16 @@ or the Mailjet pair. The console reports which provider is live and refuses to
 claim a message was delivered when none is configured — it writes the message to
 the log instead.
 
-At the registrar, for `telno.services`:
+These are zone records, so they go into the `telno.services` zone in Technitium
+(the Cerulean console) rather than to the registrar — delegation is what lives at
+the registrar, and it does not change. The zone already carries
+`v=spf1 mx include:spf.mailjet.com ip4:<old edge ip> ~all`; the `ip4` has to
+follow the box if anything ever sends straight from it, and the provider's
+`include:` is what covers the usual path:
 
 ```
-telno.services.        TXT  "v=spf1 include:_spf.resend.com -all"      # or include:spf.mailjet.com
-_dmarc.telno.services. TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@telno.services; adkim=r; aspf=r"
+telno.services.                    TXT  "v=spf1 mx include:spf.mailjet.com ip4:<edge ip> ~all"
+_dmarc.telno.services.             TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@telno.services; adkim=r; aspf=r"
 resend._domainkey.telno.services.  TXT  <the DKIM key the provider gives you>
 ```
 
@@ -77,6 +121,21 @@ One thing follows the DNS rather than leading it: the platform's own
 because the softphone links and invoice links it generates would otherwise point
 at whatever server currently holds the record. Set
 `PUBLIC_URL=https://telno.services` in the env once the A records are live.
+
+## Checking it
+
+```sh
+./deploy/domains.sh                        # names → whatever DNS says, certificates verified
+./deploy/domains.sh --ip 45.77.221.158     # that box directly, SNI intact
+```
+
+A row that answers `200` with a Let's Encrypt certificate is a name that is
+finished. The pinned form is what to run while records are still moving: it keeps
+the SNI and the `Host` header, so the edge either serves the name or says why —
+`ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR` means it holds no certificate for it, which
+happens for exactly one reason. Let's Encrypt answers an `http-01` challenge by
+asking the address the record names, so as long as the record points at the old
+server, the new one can never be signed into.
 
 ## Testing without DNS
 
