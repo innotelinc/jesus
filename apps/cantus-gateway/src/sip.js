@@ -66,6 +66,28 @@ export function buildResponse({ status, reason, headers, body = '' }) {
   return Buffer.from(lines.join(CRLF) + CRLF + CRLF + body, 'utf8');
 }
 
+/**
+ * Why a request cannot be from a carrier at all.
+ *
+ * §7.2 of the border profile: the trunk account is a credential, never an
+ * identity, so nothing is authorised by a header — but a message missing the
+ * headers a dialog is built from cannot be answered either, and a spliced
+ * address (`002421220412287@switch@estate.local`) is what a scanner produces
+ * by pasting our own domain into a URI it guessed.
+ */
+export function unroutable(message, text) {
+  if (!text || text.length > 8192) return 'size';
+  for (const header of ['call-id', 'from', 'to', 'via']) {
+    if (!message.get(header)) return `missing-${header}`;
+  }
+  for (const value of [message.uri, message.get('from'), message.get('to')]) {
+    if (!value) continue;
+    const head = String(value).split('>')[0];
+    if ((head.match(/@/g) || []).length > 1) return 'double-at';
+  }
+  return '';
+}
+
 /** The dynamic payload type this gateway offers for RFC 4733 keypresses. */
 export const DTMF_PT = 101;
 
@@ -189,6 +211,14 @@ export class SipTrunk {
     onCancel = () => {},
     onBye = () => {},
     onLog = () => {},
+    // A SIP socket sits on the public internet, so every byte that arrives is
+    // untrusted and a burst is the normal case, not the exception. A carrier
+    // sends a handful of messages per second; a hundred from one address is a
+    // scan, and answering it is how a border becomes an amplifier.
+    maxPerSecond = 25,
+    burst = 50,
+    abuseDrops = 200,
+    blockMs = 30_000,
   } = {}) {
     if (!host) throw new Error('SipTrunk needs a host');
     this.host = host;
@@ -208,6 +238,13 @@ export class SipTrunk {
     this.onCancel = onCancel;
     this.onBye = onBye;
     this.onLog = onLog;
+    this.maxPerSecond = Math.max(1, Number(maxPerSecond) || 25);
+    this.burst = Math.max(1, Number(burst) || 50);
+    this.abuseDrops = Math.max(1, Number(abuseDrops) || 200);
+    this.blockMs = Math.max(1000, Number(blockMs) || 30_000);
+    // address → token bucket. Kept per source address, because the only
+    // identity an unauthenticated datagram has is where it came from.
+    this.sources = new Map();
 
     this.socket = null;
     this.bound = 0;
@@ -605,11 +642,63 @@ export class SipTrunk {
     call.onFailed?.(reason);
   }
 
+  /**
+   * Take one token for this source, or refuse the datagram.
+   *
+   * Nothing here is authenticated: a UDP source address is all a flood gives
+   * you, and it can be spoofed. The bucket is therefore a bound on work, not on
+   * a person — it stops one address from turning a ring into a busy loop, and
+   * the table is swept so the defence is not itself a memory leak.
+   */
+  admit(rinfo) {
+    const now = Date.now();
+    let source = this.sources.get(rinfo.address);
+    if (!source) {
+      source = { tokens: this.burst, at: now, drops: 0, blockedUntil: 0, logged: 0 };
+      this.sources.set(rinfo.address, source);
+      if (this.sources.size > 4096) {
+        // A spoofed-source flood creates a bucket per address, so the table is
+        // swept by age rather than only by staleness: keeping only the oldest
+        // 3000 by last activity is what stops the defence becoming the leak.
+        const ordered = [...this.sources.entries()].sort((left, right) => left[1].at - right[1].at);
+        for (const [key] of ordered.slice(0, Math.max(1, ordered.length - 3000))) this.sources.delete(key);
+      }
+    }
+    if (source.blockedUntil > now) return false;
+    source.tokens = Math.min(this.burst, source.tokens + ((now - source.at) / 1000) * this.maxPerSecond);
+    source.at = now;
+    if (source.tokens < 1) {
+      source.drops += 1;
+      if (source.drops >= this.abuseDrops) {
+        source.blockedUntil = now + this.blockMs;
+        source.drops = 0;
+        this.log({ kind: 'sip-flood-blocked', from: rinfo.address, ms: this.blockMs });
+      } else if (now - source.logged > 5000) {
+        source.logged = now;
+        this.log({ kind: 'sip-rate-limited', from: rinfo.address, drops: source.drops });
+      }
+      return false;
+    }
+    source.tokens -= 1;
+    return true;
+  }
+
   handle(text, rinfo) {
+    if (!this.admit(rinfo)) return;
     const message = parseMessage(text);
     if (message.type === 'response') {
       const call = this.calls.get(message.get('call-id'));
       call?.onResponse?.(message);
+      return;
+    }
+
+    const problem = unroutable(message, text);
+    if (problem) {
+      // Silence makes a carrier retry; a 400 ends the attempt and leaves a log
+      // line naming what arrived. The flood in the call logs was repeated
+      // garbage aimed at a userinfo with two @ in it, which no dialog can be.
+      this.log({ kind: 'malformed', from: rinfo.address, reason: problem });
+      if (message.method !== 'ACK') this.reply(rinfo, message, 400, 'Bad Request');
       return;
     }
 
