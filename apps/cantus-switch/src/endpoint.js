@@ -43,6 +43,7 @@ import {
 } from './reach.js';
 import { pcmFrame, encodeReport, decodeReport, frameSamples, PCM_RATE } from './media.js';
 import { Session, reasonId, reasonName } from './session.js';
+import { connect as connectTls, listen as listenTls } from './tls-binding.js';
 
 export const TIMERS = {
   RING: 32_000,
@@ -118,6 +119,8 @@ export class CantusEndpoint {
     secret,
     caps = telephoneSet(),
     bind = '0.0.0.0:7443',
+    transport = 'udp',
+    tls,
     advertise,
     relay,
     limits = {},
@@ -135,6 +138,13 @@ export class CantusEndpoint {
     this.secret = secret || 'cantus-loopback';
     this.caps = caps;
     this.bind = bind;
+    // `udp` is the baseline binding (§4.1); `tls` is the only one that carries
+    // media off a trusted link (§4.4). There is deliberately no default that
+    // silently upgrades or downgrades.
+    this.transport = transport;
+    this.tls = tls || {};
+    this.link = undefined;
+    this.channelBinding = undefined;
     this.peerSecrets = peerSecrets || {};
     this.allowTestProfile = allowTestProfile;
     // §10.2 is decided by where the socket listens, not by what the operator
@@ -178,24 +188,28 @@ export class CantusEndpoint {
   async start() {
     if (this.running) return this;
     const [host, port] = this.bind.split(':');
-    this.socket = dgram.createSocket('udp4');
-    this.socket.on('message', (buf, rinfo) => {
-      try {
-        this.handleDatagram(buf, `${rinfo.address}:${rinfo.port}`, false);
-      } catch (err) {
-        this.emit({ kind: 'error', error: err.message });
-      }
-    });
-    this.socket.on('error', (err) => this.emit({ kind: 'error', error: err.message }));
-    await new Promise((resolve, reject) => {
-      this.socket.once('error', reject);
-      this.socket.bind(Number(port || 7443), host === 'localhost' ? '127.0.0.1' : host, () => {
-        this.socket.off('error', reject);
-        resolve();
+    if (this.transport === 'tls') {
+      await this.startTls(host, Number(port || 7443));
+    } else {
+      this.socket = dgram.createSocket('udp4');
+      this.socket.on('message', (buf, rinfo) => {
+        try {
+          this.handleDatagram(buf, `${rinfo.address}:${rinfo.port}`, false);
+        } catch (err) {
+          this.emit({ kind: 'error', error: err.message });
+        }
       });
-    });
-    const { address } = this.socket.address();
-    this.localAddr = `${address}:${this.socket.address().port}`;
+      this.socket.on('error', (err) => this.emit({ kind: 'error', error: err.message }));
+      await new Promise((resolve, reject) => {
+        this.socket.once('error', reject);
+        this.socket.bind(Number(port || 7443), host === 'localhost' ? '127.0.0.1' : host, () => {
+          this.socket.off('error', reject);
+          resolve();
+        });
+      });
+      const { address } = this.socket.address();
+      this.localAddr = `${address}:${this.socket.address().port}`;
+    }
     this.running = true;
 
     this.mediaTimer = setInterval(() => this.mediaTick(), TIMERS.MEDIA_TICK);
@@ -209,6 +223,61 @@ export class CantusEndpoint {
     return this;
   }
 
+  /**
+   * The encrypted binding (§4.4): one TLS 1.3 session, one peer.
+   *
+   * `tls.peer` makes this side the dialler; without it the endpoint listens.
+   * Either way the session's exporter becomes `channelBinding`, which every
+   * signature made on this endpoint then covers, so a message is valid on this
+   * session and no other.
+   */
+  async startTls(host, port) {
+    const bindHost = host === 'localhost' ? '127.0.0.1' : host;
+    const adopt = (session) => {
+      this.link = session;
+      const bound = () => {
+        this.channelBinding = session.binding;
+        this.localAddr = session.remote;
+        this.emit({ kind: 'tls', remote: session.remote, protocol: session.protocol, pinned: session.peerPin });
+      };
+      if (session.binding) bound();
+      else session.once('secure', bound);
+      session.on('datagram', (bytes, src) => {
+        try {
+          this.handleDatagram(bytes, src, false);
+        } catch (err) {
+          this.emit({ kind: 'error', error: err.message });
+        }
+      });
+      session.on('fault', (reason) => this.emit({ kind: 'tls-fault', error: reason }));
+      session.on('close', () => this.emit({ kind: 'tls-close' }));
+    };
+
+    if (this.tls.peer) {
+      const [peerHost, peerPort] = String(this.tls.peer).split(':');
+      const session = await connectTls({
+        host: peerHost,
+        port: Number(peerPort || 7443),
+        pin: this.tls.pin,
+        cert: this.tls.cert,
+        key: this.tls.key,
+      });
+      adopt(session);
+      return;
+    }
+
+    this.tlsServer = await listenTls({
+      host: bindHost,
+      port,
+      cert: this.tls.cert,
+      key: this.tls.key,
+      pin: this.tls.pin,
+      onSession: adopt,
+    });
+    this.tlsPort = this.tlsServer.port;
+    this.localAddr = `${bindHost}:${this.tlsPort}`;
+  }
+
   stop() {
     this.running = false;
     clearInterval(this.mediaTimer);
@@ -218,6 +287,8 @@ export class CantusEndpoint {
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
     try {
+      this.link?.close();
+      this.tlsServer?.close?.();
       this.socket?.close();
     } catch {
       /* already closed */
@@ -249,6 +320,9 @@ export class CantusEndpoint {
   // ------------------------------------------------------------------- transport
 
   sendto(dest, bytes) {
+    // On `cantus/tls` the destination is the session, not an address: there is
+    // exactly one peer on the link and the exporter is bound to it (§4.4).
+    if (this.link) return this.link.send(bytes);
     if (!dest || !this.socket) return false;
     const index = dest.lastIndexOf(':');
     const host = dest.slice(0, index);
@@ -263,6 +337,9 @@ export class CantusEndpoint {
   }
 
   relaySend(route, name, inner) {
+    // A relay would see plaintext, so a TLS session never hands it media and
+    // never wraps one (§4.4): the session is the path.
+    if (this.link) return this.link.send(inner);
     return this.sendto(this.relay, encodeRelay(route, inner, name));
   }
 
@@ -299,7 +376,7 @@ export class CantusEndpoint {
       out[F.nonce] = v(this.nonce);
     }
     const name = TYPE_NAMES[type];
-    if (sign || SIGNED.has(name)) out[F.sig] = b(this.identity.sign(type, out));
+    if (sign || SIGNED.has(name)) out[F.sig] = b(this.identity.sign(type, out, this.channelBinding));
     return encodeMsg(type, out);
   }
 
@@ -316,7 +393,7 @@ export class CantusEndpoint {
     const peerField = fields[F.from];
     const peerId = peerField?.v ? Buffer.from(peerField.v).toString('utf8') : '';
     const peerSecret = (peerId && this.peerSecrets[peerId]) || this.secret;
-    const ok = this.identity.verify(type, copy, signature, peerSecret);
+    const ok = this.identity.verify(type, copy, signature, peerSecret, this.channelBinding);
     if (!ok) this.emit({ kind: 'auth-fail', type: TYPE_NAMES[type] });
     return ok;
   }
@@ -846,7 +923,8 @@ export class CantusEndpoint {
     });
     session.ts += samples;
 
-    if (session.committed === PATH_DIRECT && session.peerAddr) this.sendto(session.peerAddr, bytes);
+    if (this.link) this.sendto(undefined, bytes);
+    else if (session.committed === PATH_DIRECT && session.peerAddr) this.sendto(session.peerAddr, bytes);
     else if (session.committed) this.relaySend(session.peerHandle ?? 0, session.peer, bytes);
     else return;
     session.sent += 1;

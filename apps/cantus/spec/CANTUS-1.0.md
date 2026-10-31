@@ -151,6 +151,9 @@ Same framing, carried on a single TCP connection to port 7443, prefixed by a
 2-octet big-endian length instead of the magic byte. Used when UDP is blocked.
 Reach treats a TCP binding as a `relay` path with the relay as the far end.
 
+This binding is **cleartext**. It may carry signalling on a trusted link, but it
+MUST NOT carry media across an untrusted network; that is §4.4.
+
 ### 4.3 Datagram kinds
 
 | Kind | Name | Purpose |
@@ -173,6 +176,50 @@ address to be reached** (section 8).
 
 A relay MUST drop an inner datagram whose kind is `RELAY` (no nesting), and MUST
 NOT forward to an address with no live registration.
+
+### 4.4 `cantus/tls` (the only binding that carries media)
+
+`cantus/tcp` carried inside TLS 1.3 on port 7443. §9.6 makes confidentiality a
+property of the transport, so this is the binding a node MUST use whenever media
+leaves a trusted link.
+
+- **TLS 1.3 only.** A node MUST refuse a session that negotiates TLS 1.2 or
+  lower, MUST NOT offer renegotiation, compression, session resumption or early
+  data, and MUST advertise ALPN `cantus/1`. The negotiated protocol is checked
+  after the handshake, not merely requested before it.
+- **Framing is §4.2's.** Each datagram is prefixed with a 2-octet big-endian
+  length. The 1150-octet ceiling of §13 applies to the datagram. A frame longer
+  than that closes the session: a byte stream has no way to resynchronise past a
+  length the peer should never have sent.
+- **The peer is pinned, not merely certified.** The SHA-256 of the peer
+  certificate's SubjectPublicKeyInfo MUST equal the pin published for that
+  `EndpointId` (§10.1). A public CA proves who owns a name, which is not the
+  question a call asks; a valid certificate that is not the pinned key is
+  refused.
+- **One session, one peer.** A `cantus/tls` connection carries exactly one
+  remote endpoint, and the switch keeps one session per peer.
+- **Channel binding.** Both ends export 32 octets with the TLS exporter
+  `EXPORTER-Channel-Binding`, label `cantus/1-binding`, and fold them into every
+  signature of §10.2:
+
+  ```
+  digest = SHA-256( "cantus/1-sig" || binding:32 || msg_type:varint ||
+                    for each present field in ascending id order, excluding 5:
+                        id:varint len:varint value_bytes )
+  ```
+
+  The binding is empty on the datagram bindings, so a signature made on
+  `cantus/udp` never verifies on `cantus/tls` and the reverse. An interposer that
+  terminates TLS and re-originates it produces two different exports; its
+  forwarded `INVITE` then fails authentication instead of being read and passed
+  on. This is what makes "the keys are bound to the handshake of §5.3" true in a
+  way that can be tested.
+- **No relay downgrade.** A relay terminates TCP, so it would see plaintext. A
+  `cantus/tls` node MUST NOT send media through a `RELAY` path; when Reach would
+  commit a relay path for a call whose media must be confidential, the call is
+  refused with `UNAVAILABLE` rather than downgraded. Carrying encrypted media
+  through a relay needs a record-forwarding message that Cantus 1.0 does not
+  define, and a binding that silently falls back is worse than one that fails.
 
 ---
 
@@ -690,6 +737,11 @@ Section 5.3. Cantus defines no in-band keying, no `a=crypto`, no MIKEY, no
 `ZRTP`. A relay can forward a call it cannot understand, which is the only
 property that makes a relay acceptable in a secure design.
 
+Of the bindings in this version, only `cantus/tls` (§4.4) satisfies this
+requirement. `cantus/udp` and `cantus/tcp` are cleartext and MAY carry
+signalling only; a node that carries media over them on an untrusted network is
+not conformant to this section.
+
 ---
 
 ## 10. Identity and integrity
@@ -711,6 +763,10 @@ digest = SHA-256( "cantus/1-sig" || msg_type:varint ||
                   for each present field in ascending id order, excluding 5:
                       id:varint len:varint value_bytes )
 ```
+
+On `cantus/tls` the session's channel binding is inserted immediately after the
+prefix (see §4.4), so a signature is valid on exactly one transport session. On
+the datagram bindings the binding is absent and the digest above is unchanged.
 
 - Normative: **Ed25519** over `digest`.
 - Test profile `sig-hmac-sha256`: HMAC-SHA256 with a shared key, permitted only on
@@ -868,6 +924,10 @@ A conformant implementation MUST pass, and SHOULD ship, tests for:
    equality with live evaluation.
 7. Limits: exceeding `max_calls`, oversize datagram, oversize control message.
 8. Signature verification failure and the 30 s discard window.
+9. Binding: a datagram through `cantus/tls` arrives intact; cleartext, TLS 1.2,
+   an unpinned key and an oversize frame are each refused; the exporter differs
+   between two sessions and a signature made under one does not verify under the
+   other.
 
 Test 5's relay case must be run behind a **symmetric NAT emulator** whose mapping
 differs per destination. That is the only test that demonstrates the property this

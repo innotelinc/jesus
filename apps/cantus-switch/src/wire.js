@@ -283,8 +283,13 @@ export function datagramKind(buf) {
 // --------------------------------------------------------------- signatures --
 
 /** Canonical signing input, §10.2. Field 5 (sig) is excluded. */
-export function signingInput(type, fields) {
-  const parts = [Buffer.from(`${VERSION_TOKEN}-sig`, 'utf8'), varint(type)];
+export function signingInput(type, fields, binding) {
+  const parts = [Buffer.from(`${VERSION_TOKEN}-sig`, 'utf8')];
+  // §4.4: on `cantus/tls` the session's exporter sits between the prefix and
+  // the message type, so a signature made on one session cannot be replayed
+  // onto another (or onto a cleartext binding, where the binding is absent).
+  if (binding && binding.length) parts.push(Buffer.from(binding));
+  parts.push(varint(type));
   for (const id of Object.keys(fields).map(Number).sort((a, b2) => a - b2)) {
     if (id === 5) continue;
     const spec = fields[id];

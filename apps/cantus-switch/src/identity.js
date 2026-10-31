@@ -83,13 +83,13 @@ export class Identity {
     return this._pub;
   }
 
-  sign(type, fields) {
-    return createHmac('sha256', keyBytes(this.secret)).update(signingInput(type, fields)).digest();
+  sign(type, fields, binding) {
+    return createHmac('sha256', keyBytes(this.secret)).update(signingInput(type, fields, binding)).digest();
   }
 
-  verify(type, fields, signature, peerSecret = this.secret) {
+  verify(type, fields, signature, peerSecret = this.secret, binding) {
     if (!signature || !signature.length) return false;
-    const want = createHmac('sha256', keyBytes(peerSecret)).update(signingInput(type, fields)).digest();
+    const want = createHmac('sha256', keyBytes(peerSecret)).update(signingInput(type, fields, binding)).digest();
     const got = Buffer.from(signature);
     return want.length === got.length && timingSafeEqual(want, got);
   }
