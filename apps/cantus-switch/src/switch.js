@@ -101,6 +101,8 @@ export class Switch extends EventEmitter {
     id = `switch@${domain}`,
     secret = 'cantus-loopback',
     bind = '0.0.0.0:7443',
+    transport = 'udp',
+    tls,
     relay,
     relayAddress = '',
     relayBind = '0.0.0.0:7444',
@@ -122,6 +124,7 @@ export class Switch extends EventEmitter {
     this.domain = domain;
     this.id = id;
     this.secret = secret;
+    this.transport = transport;
     this.recordDir = recordDir;
     this.prompts = prompts;
     this.debug = debug;
@@ -167,6 +170,8 @@ export class Switch extends EventEmitter {
       allowTestProfile,
       peerSecrets,
       bind,
+      transport,
+      tls,
       advertise,
       caps,
       requireSig,
