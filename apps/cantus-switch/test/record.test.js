@@ -109,11 +109,21 @@ test('a call crosses the relay as records it cannot read, and drops a replay', a
   assert.ok(session.recordKey, 'the key exchange in INVITE/ACCEPT must have produced a record key');
   sw.commitPath(session, PATH_RELAY);
 
+  // Media is a stream, not a packet: a relay path that loses one datagram must
+  // not fail the call, so the test keeps sending until it is heard rather than
+  // betting the whole assertion on a single UDP send.
   const payload = Buffer.alloc(320, 0x7f);
-  const inner = encodeMedia({ stream: 0, tag: session.tag, seq: 1, ts: 0, codec: 2, flags: 0, payload });
-  assert.equal(sw.sendSealed(session, inner), true);
-
-  await waitUntil(() => loudest === 0x7f7f, { label: 'the sealed frame to reach the ATA' });
+  let mediaSeq = 0;
+  const heard = await waitUntil(
+    () => {
+      mediaSeq += 1;
+      const inner = encodeMedia({ stream: 0, tag: session.tag, seq: mediaSeq, ts: 0, codec: 2, flags: 0, payload });
+      assert.equal(sw.sendSealed(session, inner), true);
+      return loudest === 0x7f7f;
+    },
+    { label: 'the sealed frame to reach the ATA', interval: 20 }
+  );
+  assert.equal(heard, true);
   assert.equal(loudest, 0x7f7f, 'the frame must arrive exactly as it was sealed');
   assert.ok(sw.stats.sealedFrames > 0);
   assert.ok(relay.sealed > 0, 'the relay must have carried a record');
@@ -130,11 +140,13 @@ test('a call crosses the relay as records it cannot read, and drops a replay', a
   // second time. A blind forwarder makes packets cheap to repeat; the sequence
   // number inside the AEAD is what makes them useless.
   const replay = records[0].bytes;
+  const replays = ata.stats.sealedReplay;
   ata.handleDatagram(replay, relay.addr, false);
-  assert.equal(ata.stats.sealedReplay, 1, 'the replayed record must be recognised and dropped');
+  assert.equal(ata.stats.sealedReplay, replays + 1, 'the replayed record must be recognised and dropped');
 
   // A record sealed for nobody costs a counter, not a session.
-  const stranger = seal({ key: otherKey(), tag: session.tag, seq: 1, payload: inner }).record;
+  const strangerInner = encodeMedia({ stream: 0, tag: session.tag, seq: 1, ts: 0, codec: 2, flags: 0, payload });
+  const stranger = seal({ key: otherKey(), tag: session.tag, seq: 1, payload: strangerInner }).record;
   ata.handleDatagram(Buffer.concat([Buffer.from([0xca, KIND_RECORD, 0]), stranger]), relay.addr, false);
   assert.ok(ata.stats.sealedRejected > 0, 'a record that opens for no call is dropped unread');
 });
