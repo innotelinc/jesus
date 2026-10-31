@@ -24,6 +24,9 @@ import {
   decodeMedia,
   encodeRelay,
   decodeRelay,
+  encodeRecord,
+  decodeRecord,
+  KIND_RECORD,
   varint,
   datagramKind,
   describe,
@@ -44,6 +47,7 @@ import {
 import { pcmFrame, encodeReport, decodeReport, frameSamples, PCM_RATE } from './media.js';
 import { Session, reasonId, reasonName } from './session.js';
 import { connect as connectTls, listen as listenTls } from './tls-binding.js';
+import { seal, open, deriveKey, newKeyPair } from './record.js';
 
 export const TIMERS = {
   RING: 32_000,
@@ -129,6 +133,10 @@ export class CantusEndpoint {
     peerSecrets = {},
     onEvent = () => {},
     mediaSource = undefined,
+    // §9.7: sealed records are what lets media cross a relay without the relay
+    // reading it. On the encrypted binding they are mandatory; a cleartext node
+    // may ask for them for confidentiality it otherwise does not have.
+    sealRecords = transport === 'tls',
     toneHz = 440,
     debug = false,
     now = () => Date.now(),
@@ -156,6 +164,10 @@ export class CantusEndpoint {
     this.requireSig = requireSig;
     this.onEvent = onEvent;
     this.mediaSource = mediaSource;
+    this.sealRecords = !!sealRecords;
+    // One X25519 key pair per endpoint; the public half rides in INVITE and
+    // ACCEPT, and the per-call key is derived from the pair plus the CallId.
+    this.kex = newKeyPair();
     this.toneHz = toneHz;
     this.debug = debug;
     this.now = now;
@@ -174,7 +186,16 @@ export class CantusEndpoint {
     this.ready = false;
     this.startedAt = now();
     this.running = false;
-    this.stats = { receivedFrames: 0, sentFrames: 0, relayFrames: 0, directFrames: 0, receivePeak: 0 };
+    this.stats = {
+      receivedFrames: 0,
+      sentFrames: 0,
+      relayFrames: 0,
+      directFrames: 0,
+      receivePeak: 0,
+      sealedFrames: 0,
+      sealedRejected: 0,
+      sealedReplay: 0,
+    };
     this.timers = new Set();
     this.counters = { calls: 0, planned: 0 };
     this.socket = undefined;
@@ -429,6 +450,18 @@ export class CantusEndpoint {
       return;
     }
 
+    if (kind === KIND_RECORD) {
+      let sealed;
+      try {
+        sealed = decodeRecord(buf);
+      } catch {
+        return;
+      }
+      this.relayFrames += 1;
+      this.onSealed(sealed, src);
+      return;
+    }
+
     if (kind === 2) {
       let relayed;
       try {
@@ -584,6 +617,7 @@ export class CantusEndpoint {
       [F.caps]: b(encodeCaps(this.caps)),
       [F.cands]: b(encodeCandidates(this.candidates())),
       [F.handle]: v(this.handle),
+      [F.kex]: b(this.kex.publicKey),
     });
     this.emit({ kind: 'invite', call: id, to });
     this.after(TIMERS.RING, () => {
@@ -611,6 +645,7 @@ export class CantusEndpoint {
     // document sees: a call to `100@telno.local` and a call to
     // `support@telno.local` are different calls to the same socket.
     session.dialedTo = fields[F.to]?.v?.toString('utf8') || this.id;
+    session.peerKex = fields[F.kex]?.v;
     try {
       session.candidates = decodeCandidates(fields[F.cands]?.v);
     } catch {
@@ -641,10 +676,14 @@ export class CantusEndpoint {
     }
     session.codec = agreed;
     session.fire('accept_sent');
+    if (session.peerKex) {
+      session.recordKey = deriveKey({ privateKey: this.kex.privateKey, peerRaw: session.peerKex, call: session.call });
+    }
     this.sendCallMsg(session, TYPES.ACCEPT, {
       [F.caps]: b(encodeCaps(this.caps)),
       [F.cands]: b(encodeCandidates(this.candidates())),
       [F.handle]: v(this.handle),
+      [F.kex]: b(this.kex.publicKey),
     });
     this.emit({ kind: 'accepted', call: session.call, codec: agreed.name });
     this.startReach(session);
@@ -707,6 +746,10 @@ export class CantusEndpoint {
     }
     session.codec = agreed;
     session.peerHandle = fields[F.handle]?.v ?? session.peerHandle;
+    const peerKex = fields[F.kex]?.v;
+    if (peerKex) {
+      session.recordKey = deriveKey({ privateKey: this.kex.privateKey, peerRaw: peerKex, call: session.call });
+    }
     try {
       session.candidates = decodeCandidates(fields[F.cands]?.v);
     } catch {
@@ -924,11 +967,61 @@ export class CantusEndpoint {
     session.ts += samples;
 
     if (this.link) this.sendto(undefined, bytes);
-    else if (session.committed === PATH_DIRECT && session.peerAddr) this.sendto(session.peerAddr, bytes);
-    else if (session.committed) this.relaySend(session.peerHandle ?? 0, session.peer, bytes);
-    else return;
+    else    if (session.committed === PATH_DIRECT && session.peerAddr) this.sendto(session.peerAddr, bytes);
+    else if (!session.committed) return;
+    else if (session.recordKey) this.sendSealed(session, bytes);
+    else if (this.sealRecords) {
+      // §9.7: a node that promised sealed media must not put plaintext on a
+      // relay path. Dropping the frame is the failure §4.4 asks for, and saying
+      // so once per call is how an operator learns the key never arrived.
+      if (!session.sealRefused) {
+        session.sealRefused = true;
+        this.emit({ kind: 'error', error: 'relay media refused: no record key', call: session.call });
+      }
+      return;
+    } else this.relaySend(session.peerHandle ?? 0, session.peer, bytes);
     session.sent += 1;
     this.stats.sentFrames += 1;
+  }
+
+  /** One MEDIA datagram wrapped in a sealed record and handed to the relay. */
+  sendSealed(session, inner) {
+    if (!this.relay) return false;
+    session.recordSeq = (session.recordSeq ?? 0) + 1;
+    const { record } = seal({ key: session.recordKey, tag: session.tag, seq: session.recordSeq, payload: inner });
+    this.sendto(this.relay, encodeRecord(session.peerHandle ?? 0, record, session.peer));
+    this.stats.sealedFrames += 1;
+    return true;
+  }
+
+  /**
+   * A sealed record arrived: the relay moved octets it could not read.
+   *
+   * The record names no call — that is the header's whole purpose — so the
+   * session is found by trying the key of each active call and accepting the
+   * one whose AEAD tag verifies. A wrong key fails closed; there is no plaintext
+   * fallback, and a record that opens for no session is dropped unread (§9.7).
+   */
+  onSealed(relayed, src) {
+    for (const session of this.sessions.values()) {
+      if (!session.recordKey || session.isEnded) continue;
+      let opened;
+      try {
+        opened = open({ key: session.recordKey, tag: session.tag, record: relayed.record });
+      } catch {
+        continue;
+      }
+      if (opened.seq <= (session.lastRecordSeq ?? 0)) {
+        this.stats.sealedReplay += 1;
+        this.emit({ kind: 'replay', call: session.call, seq: opened.seq });
+        return;
+      }
+      session.lastRecordSeq = opened.seq;
+      this.handleDatagram(opened.payload, src, true);
+      return;
+    }
+    this.stats.sealedRejected += 1;
+    this.emit({ kind: 'sealed-unroutable', src });
   }
 
   onMedia(media, src) {

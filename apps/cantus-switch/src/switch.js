@@ -881,11 +881,16 @@ export class Switch extends EventEmitter {
     if (leg.held) return FRAME;
     const peer = this.peerOf(leg);
     if (!peer) {
+      // A leg with no peer on this switch is a call to another node, and the
+      // audio it owes that node is what its own side produced: a microphone
+      // frame, a played prompt, an injected tone. `rxLocal` marks those, because
+      // `rx` alone cannot tell them from media the far end sent us — and echoing
+      // a peer's own audio back is an echo, not a call.
+      if (leg.tx?.length && at - (leg.txAt ?? 0) < 400) return leg.tx;
       // An unanswered leg with no peer is a keepalive loopback, and null tells
-      // the endpoint to send its test tone. An *answered* leg with no peer is
-      // not that: the agent's media channel hung up while the caller was still
-      // on the line, and a caller left holding a steady 440 Hz tone reads as a
-      // fault. Silence is what a PBX sends.
+      // the endpoint to send its test tone. An answered one with nothing to
+      // play sends silence: a caller left holding a steady 440 Hz tone reads as
+      // a fault, and silence is what a PBX sends.
       return leg.isAnswered ? FRAME : null;
     }
     if (peer.held) {
@@ -965,6 +970,32 @@ export class Switch extends EventEmitter {
     return undefined;
   }
 
+  /**
+   * Audio produced on this switch for a leg — a microphone frame, a prompt, a
+   * test tone — as opposed to media the far end sent us.
+   *
+   * The distinction is the whole of the silence-versus-tone rule: a leg's `rx`
+   * is "the frame most recently associated with this leg", which is the local
+   * speaker's audio when it came from the browser or a prompt and the far end's
+   * audio when it came from the endpoint. Only the first may be sent back out
+   * to a node that has no peer leg here.
+   */
+  pushLocalAudio(leg, payload) {
+    if (!leg || leg.isEnded) return false;
+    // `rx` is what a peer leg plays, `tx` is what a call to another node sends.
+    // They have to be separate fields: inbound media from the far end is also
+    // written to `rx`, so a single buffer meant the first frame the far end sent
+    // overwrote the caller's own audio and the call went silent in both
+    // directions.
+    leg.rx = payload;
+    leg.rxAt = now();
+    leg.rxLocal = true;
+    leg.rxSeq = (leg.rxSeq ?? 0) + 1;
+    leg.tx = payload;
+    leg.txAt = leg.rxAt;
+    return true;
+  }
+
   onMedia(leg, payload) {
     if (!leg) return;
     // A held leg's microphone is not part of the call. Keeping the last frame
@@ -976,6 +1007,7 @@ export class Switch extends EventEmitter {
     }
     leg.rx = payload;
     leg.rxAt = now();
+    leg.rxLocal = false;
     // Bumped so the leg that listens to this one can tell a new frame from the
     // one it has already played. Size is the peer's business; the playout
     // buffer is what turns it into 20 ms frames.
@@ -1068,7 +1100,7 @@ export class Switch extends EventEmitter {
         }
         const chunk = pcm.subarray(offset, offset + 320);
         offset += 320;
-        if (leg.endpoint) leg.rx = chunk; // a Cantus leg's media source reads rx
+        if (leg.endpoint) this.pushLocalAudio(leg, chunk); // a Cantus leg's media source reads rx
       }, 20);
       timer.unref?.();
       return true;
@@ -1301,7 +1333,9 @@ export class Switch extends EventEmitter {
       if (isBinary) {
         const call = [...this.calls.values()].find((entry) => entry.legs.some((leg) => leg.ws === ws && leg.isAnswered));
         const leg = call?.legs.find((entry) => entry.ws === ws && entry.isAnswered);
-        if (leg) this.onMedia(leg, Buffer.from(data));
+        // A browser's binary frame is the local microphone: it goes out to the
+        // far end, so it is marked local audio rather than inbound media.
+        if (leg) this.pushLocalAudio(leg, Buffer.from(data));
         return;
       }
       let message;
