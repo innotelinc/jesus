@@ -6,7 +6,7 @@
  */
 
 import dgram from 'node:dgram';
-import { Identity } from './identity.js';
+import { Identity, isLoopbackHost } from './identity.js';
 import {
   TYPES,
   F,
@@ -25,9 +25,11 @@ import { encodeObserved } from './reach.js';
 const REGISTRATION_TTL_MS = 60_000;
 
 export class CantusRelay {
-  constructor({ bind = '0.0.0.0:7444', secret = 'cantus-loopback', onEvent = () => {}, debug = false, advertise } = {}) {
+  constructor({ bind = '0.0.0.0:7444', secret = 'cantus-loopback', allowTestProfile = false, onEvent = () => {}, debug = false, advertise } = {}) {
     this.binding = bind;
     this.secret = secret;
+    this.allowTestProfile = allowTestProfile;
+    this.loopback = isLoopbackHost(String(bind).split(':')[0]);
     this.onEvent = onEvent;
     this.debug = debug;
     this.advertise = advertise;
@@ -75,7 +77,12 @@ export class CantusRelay {
     });
     const { address } = this.socket.address();
     this.address = `${this.advertise || address}:${this.socket.address().port}`;
-    this.identity = new Identity({ name: `relay@${this.address}`, secret: this.secret });
+    this.identity = new Identity({
+      name: `relay@${this.address}`,
+      secret: this.secret,
+      loopback: this.loopback,
+      allowTestProfile: this.allowTestProfile,
+    });
     this.emit({ kind: 'listening', addr: this.address });
     return this;
   }

@@ -12,6 +12,7 @@ import { Switch } from './switch.js';
 import { CantusServer } from './server.js';
 import { AriBridge } from './ari.js';
 import { Router } from './router.js';
+import { isLoopbackHost } from './identity.js';
 
 const env = process.env;
 const arg = (name, fallback) => env[name] ?? fallback;
@@ -28,6 +29,10 @@ export async function run() {
     id: arg('CANTUS_ID', `switch@${domain}`),
     secret: arg('CANTUS_SECRET', 'cantus-loopback'),
     bind: arg('CANTUS_BIND', '0.0.0.0:7443'),
+    // §10.2: the test profile is loopback-only. A deployment that runs it off
+    // loopback (because Ed25519 is not implemented yet) has to say so, so a
+    // missing key cannot silently become a published one.
+    allowTestProfile: /^(1|true|yes)$/i.test(arg('CANTUS_ALLOW_TEST_PROFILE', '')),
     advertise: arg('CANTUS_ADVERTISE', ''),
     relayBind: arg('CANTUS_RELAY_BIND', '0.0.0.0:7444'),
     relayAdvertise: arg('CANTUS_RELAY_ADVERTISE', ''),
@@ -38,6 +43,17 @@ export async function run() {
 
   const routes = routesFromFile(arg('CANTUS_ROUTES_FILE', ''));
   const switchRef = new Switch({ ...config, routes });
+  if (!isLoopbackHost(String(config.bind).split(':')[0])) {
+    if (config.allowTestProfile && config.secret === 'cantus-loopback') {
+      throw new Error(
+        'cantus: CANTUS_ALLOW_TEST_PROFILE does not permit the published default key off loopback; ' +
+          'set CANTUS_SECRET to a deployment key (Cantus 1.0 §10.2, §14)'
+      );
+    }
+    console.warn(
+      '[cantus] WARNING: sig-hmac-sha256 on a non-loopback bind; Cantus 1.0 §10.2 requires Ed25519 here'
+    );
+  }
 
   // A file of lines is the stand-alone demo's inventory: no platform to ask,
   // no database. A platform that does have one overrides it through

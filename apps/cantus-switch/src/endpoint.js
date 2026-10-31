@@ -28,7 +28,7 @@ import {
   datagramKind,
   describe,
 } from './wire.js';
-import { Identity } from './identity.js';
+import { Identity, isLoopbackHost } from './identity.js';
 import { encodeCaps, decodeCaps, negotiate, telephoneSet } from './caps.js';
 import {
   encodeCandidates,
@@ -122,6 +122,8 @@ export class CantusEndpoint {
     relay,
     limits = {},
     requireSig = true,
+    allowTestProfile = false,
+    peerSecrets = {},
     onEvent = () => {},
     mediaSource = undefined,
     toneHz = 440,
@@ -133,6 +135,11 @@ export class CantusEndpoint {
     this.secret = secret || 'cantus-loopback';
     this.caps = caps;
     this.bind = bind;
+    this.peerSecrets = peerSecrets || {};
+    this.allowTestProfile = allowTestProfile;
+    // §10.2 is decided by where the socket listens, not by what the operator
+    // intended, so the bind address is what the guard reads.
+    this.loopback = isLoopbackHost(String(bind).split(':')[0]);
     this.advertise = advertise || '';
     this.relay = relay;
     this.limits = { ...DEFAULT_LIMITS, ...limits };
@@ -143,7 +150,12 @@ export class CantusEndpoint {
     this.debug = debug;
     this.now = now;
 
-    this.identity = new Identity({ name: id, secret: this.secret });
+    this.identity = new Identity({
+      name: id,
+      secret: this.secret,
+      loopback: this.loopback,
+      allowTestProfile,
+    });
     this.sessions = new Map();
     this.peers = new Map();
     this.nonce = 0;
@@ -298,7 +310,13 @@ export class CantusEndpoint {
     if (!signature) return false;
     const copy = { ...fields };
     delete copy[F.sig];
-    const ok = this.identity.verify(type, copy, signature, this.secret);
+    // §14: keys are per-endpoint, so a message is checked against the key of
+    // the endpoint that claims to have sent it. The shared secret is the test
+    // profile's fallback, not a licence for one node to speak for another.
+    const peerField = fields[F.from];
+    const peerId = peerField?.v ? Buffer.from(peerField.v).toString('utf8') : '';
+    const peerSecret = (peerId && this.peerSecrets[peerId]) || this.secret;
+    const ok = this.identity.verify(type, copy, signature, peerSecret);
     if (!ok) this.emit({ kind: 'auth-fail', type: TYPE_NAMES[type] });
     return ok;
   }

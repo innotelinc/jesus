@@ -113,6 +113,8 @@ export class Switch extends EventEmitter {
     prompts = './data/prompts',
     caps,
     requireSig = true,
+    allowTestProfile = false,
+    peerSecrets,
     debug = false,
     mediaPort = 0,
   } = {}) {
@@ -153,6 +155,7 @@ export class Switch extends EventEmitter {
     this.relay = relay === false || relayAddress ? null : new CantusRelay({
       bind: relayBind,
       secret,
+      allowTestProfile,
       advertise: relayAdvertise,
       debug,
       onEvent: (event) => this.emit('relay', event),
@@ -161,6 +164,8 @@ export class Switch extends EventEmitter {
     this.endpoint = new CantusEndpoint({
       id,
       secret,
+      allowTestProfile,
+      peerSecrets,
       bind,
       advertise,
       caps,
