@@ -150,6 +150,15 @@ test('a call and its audio cross the encrypted binding, and only this session', 
   });
   await ata.start();
   ata.onIncoming = (session) => ata.accept(session);
+  // "Media arrived" and "audio arrived" are different claims: a buffer of
+  // zeros is a connected call nobody can hear. The peak is what makes this
+  // test evidence of a working call rather than of a working counter.
+  let loudest = 0;
+  ata.onInboundMedia = (session, media) => {
+    for (let i = 0; i + 1 < media.payload.length; i += 2) {
+      loudest = Math.max(loudest, Math.abs(media.payload.readInt16LE(i)));
+    }
+  };
   t.after(() => ata.stop());
 
   const sw = new CantusEndpoint({
@@ -172,7 +181,9 @@ test('a call and its audio cross the encrypted binding, and only this session', 
   assert.ok(call, 'the call should be placed');
 
   await waitUntil(() => switchEvents.some((event) => event.kind === 'accepted'), { label: 'the ATA to answer' });
-  await waitUntil(() => ata.stats.receivedFrames > 0, { label: 'audio to arrive at the ATA' });
+  await waitUntil(() => ata.stats.receivedFrames > 0, { label: 'media to arrive at the ATA' });
+  await waitUntil(() => loudest > 0, { label: 'non-silent audio to arrive at the ATA' });
+  assert.ok(loudest > 0, 'the encrypted path must carry the speaker, not a buffer of zeros');
   assert.ok(sw.channelBinding.equals(ata.channelBinding), 'one session, one binding');
 
   // A message signed under a different session's exporter must not verify here.
