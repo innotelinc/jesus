@@ -54,8 +54,8 @@ An implementation is **Cantus 1.0 conformant** if it:
 - completes the handshake of Section 5.3,
 - negotiates capability sets per Section 6,
 - follows the call state machine of Section 7 exactly,
-- performs Reach path selection per Section 8, including the relay fallback,
-- accepts media on the relay path at all times while a call is ACTIVE.
+- performs Reach path selection per Section 8, including the relay fallback,   - accepts media on the relay path at all times while a call is ACTIVE, sealed
+     as records (9.7) when the binding requires it.
 
 The `cantus/tcp` binding (Section 4.2) is RECOMMENDED. The `pcm-s16` codec of
 Section 9.3 is a conformance aid and MUST NOT be used on a production path.
@@ -214,12 +214,13 @@ leaves a trusted link.
   forwarded `INVITE` then fails authentication instead of being read and passed
   on. This is what makes "the keys are bound to the handshake of §5.3" true in a
   way that can be tested.
-- **No relay downgrade.** A relay terminates TCP, so it would see plaintext. A
-  `cantus/tls` node MUST NOT send media through a `RELAY` path; when Reach would
-  commit a relay path for a call whose media must be confidential, the call is
-  refused with `UNAVAILABLE` rather than downgraded. Carrying encrypted media
-  through a relay needs a record-forwarding message that Cantus 1.0 does not
-  define, and a binding that silently falls back is worse than one that fails.
+- **No cleartext downgrade.** A relay terminates TCP, so plain media handed to
+  it is read media. A `cantus/tls` node MUST NOT send media through a `RELAY`
+  path in the clear and MUST NOT fall back to `cantus/udp` media. When Reach
+  commits a relay path, media is carried as the sealed records of Section 9.7;
+  a node that cannot seal a call refuses it with `UNAVAILABLE` rather than
+  downgrading it. A binding that silently falls back is worse than one that
+  fails.
 
 ---
 
@@ -276,6 +277,7 @@ Ids are global; a given id keeps its meaning in every message.
 | 22 | `stream` | varint | media-related | Stream id, default 0 |
 | 23 | `report` | bytes | FEEDBACK | Quality report, Section 9.5 |
 | 24 | `key` | bytes | HELLO, REGISTER | Long-term public key |
+| 25 | `kex` | bytes | INVITE, ACCEPT | X25519 public key for sealing records, Section 9.7 |
 
 ### 5.3 Handshake
 
@@ -741,6 +743,49 @@ Of the bindings in this version, only `cantus/tls` (§4.4) satisfies this
 requirement. `cantus/udp` and `cantus/tcp` are cleartext and MAY carry
 signalling only; a node that carries media over them on an untrusted network is
 not conformant to this section.
+
+### 9.7 Relayed sealed records
+
+A relay forwards a call it cannot understand (9.6) only if it never holds a
+readable copy of it. A record is that: one AEAD envelope, sealed between the two
+endpoints, carried by a relay that reads a route and nothing else.
+
+```
+RECORD = 0xCA 0x03 route:varint [name:string when route == 0] record
+record  = seq:u64 ciphertext:bytes tag:16
+```
+
+- `route` has the meaning it has in `RELAY` (8.4): a relay-issued handle, or `0`
+  with an `EndpointId` for the relay to resolve.
+- `record` is opaque to the relay. A relay MUST forward the datagram unchanged,
+  MUST NOT parse, re-encrypt or re-order records, and MUST drop one whose route
+  it does not know. Nesting is not defined: a `RECORD` never contains another
+  `RECORD`.
+- The seal is AES-256-GCM. The key is per call:
+
+  ```
+  key    = HKDF-SHA256( X25519(own_private, peer_public),
+                        salt = SHA-256(CallId), info = "cantus/1-record", 32 )
+  nonce  = 12 octets: four zero octets, then seq as 64-bit big-endian
+  aad    = tag:2 (big-endian) || seq:8 (big-endian)
+  ```
+
+- `INVITE` and `ACCEPT` each carry the sender's ephemeral X25519 public key in
+  `kex` (field 25). Both ends derive the key before media starts; a message
+  without `kex` leaves the call unsealable, and 4.4 then applies.
+- The plaintext is a complete `MEDIA` datagram (9.1), so the media path is the
+  same frame, timestamp and codec arithmetic on both bindings. What changes is
+  who can read it.
+- A receiver MUST drop a record whose tag does not verify, MUST drop one that
+  opens for no ACTIVE call, and MUST drop a record whose `seq` is not greater
+  than the last one accepted for that call. A replay is a dropped packet, never
+  a state change; a relay makes duplicates cheap, so the sequence number inside
+  the AEAD is what makes them useless.
+- A `cantus/tls` node uses records on every relay path and MAY use them on a
+  direct path. A `cantus/udp` node MAY use them for confidentiality it does not
+  otherwise have; the relay is blind either way, but the endpoints already
+  depend on the relay's honesty without TLS, so this buys less than it appears
+  to.
 
 ---
 

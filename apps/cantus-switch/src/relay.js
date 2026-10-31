@@ -17,6 +17,8 @@ import {
   encodeMsg,
   decodeMsg,
   decodeRelay,
+  decodeRecord,
+  KIND_RECORD,
   datagramKind,
   encodeMedia,
 } from './wire.js';
@@ -38,6 +40,10 @@ export class CantusRelay {
     this.nextHandle = 1000;
     this.forwarded = 0;
     this.dropped = 0;
+    // Records forwarded without being read (§9.7). Reported apart from
+    // `forwarded` because "the relay carried encrypted media" and "the relay
+    // carried a call it could see" are different operational facts.
+    this.sealed = 0;
     this.startedAt = Date.now();
   }
 
@@ -50,7 +56,12 @@ export class CantusRelay {
   }
 
   get stats() {
-    return { forwarded: this.forwarded, dropped: this.dropped, endpoints: this.byHandle.size };
+    return { forwarded: this.forwarded, dropped: this.dropped, sealed: this.sealed, endpoints: this.byHandle.size };
+  }
+
+  resolve(route, name) {
+    const handle = route === 0 ? this.byId.get(name) ?? this.suffixHandle(name) : route;
+    return handle !== undefined ? this.byHandle.get(handle) : undefined;
   }
 
   emit(event) {
@@ -142,6 +153,28 @@ export class CantusRelay {
       if (datagramKind(relayed.inner) === 0) {
         this.emit({ kind: 'forward', route: relayed.route, name: relayed.name, dest, len: relayed.inner.length });
       }
+      return;
+    }
+
+    if (kind === KIND_RECORD) {
+      // §9.7. The record is sealed end-to-end; this node reads the route and
+      // forwards the octets unchanged. Re-encoding would be a chance to alter
+      // them, and a relay that can alter a record is not a blind relay.
+      let sealed;
+      try {
+        sealed = decodeRecord(buf);
+      } catch {
+        return;
+      }
+      const dest = this.resolve(sealed.route, sealed.name)?.addr;
+      if (!dest) {
+        this.dropped += 1;
+        return;
+      }
+      this.sendto(dest, buf);
+      this.forwarded += 1;
+      this.sealed += 1;
+      this.emit({ kind: 'sealed', route: sealed.route, dest, len: buf.length });
       return;
     }
 

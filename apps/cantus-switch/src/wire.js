@@ -16,6 +16,7 @@ export const MAX_DATAGRAM = 1150;
 export const KIND_CONTROL = 0;
 export const KIND_MEDIA = 1;
 export const KIND_RELAY = 2;
+export const KIND_RECORD = 3;
 
 export const TYPES = {
   HELLO: 1,
@@ -65,6 +66,7 @@ export const F = {
   stream: 22,
   report: 23,
   key: 24,
+  kex: 25,
 };
 
 // ---------------------------------------------------------------- varints ---
@@ -272,6 +274,43 @@ export function decodeRelay(buf) {
     pos += len.value;
   }
   return { route, name, inner: buf.subarray(pos) };
+}
+
+/**
+ * RECORD = magic 0x03 route:varint [name:string when route == 0] record.
+ *
+ * The record itself is an AEAD envelope sealed between the two endpoints
+ * (§9.7); a relay reads the route and nothing else. Unlike RELAY there is no
+ * inner datagram for a forwarder to parse: the whole point is that it cannot.
+ */
+export function encodeRecord(route, record, name = '') {
+  const parts = [Buffer.from([MAGIC, KIND_RECORD]), varint(route)];
+  if (!route) {
+    const bytes = Buffer.from(String(name), 'utf8');
+    parts.push(varint(bytes.length), bytes);
+  }
+  parts.push(Buffer.from(record));
+  return Buffer.concat(parts);
+}
+
+export function decodeRecord(buf) {
+  if (buf.length < 4) throw new Error('cantus: bad record datagram');
+  if (buf[0] !== MAGIC) throw new Error('cantus: bad magic');
+  if (buf[1] !== KIND_RECORD) throw new Error('cantus: not a record datagram');
+  let pos = 2;
+  const read = readVarint(buf, pos);
+  const route = read.value;
+  pos = read.pos;
+  let name = '';
+  if (route === 0) {
+    const len = readVarint(buf, pos);
+    pos = len.pos;
+    if (pos + len.value > buf.length) throw new Error('cantus: truncated record name');
+    name = buf.subarray(pos, pos + len.value).toString('utf8');
+    pos += len.value;
+  }
+  if (pos >= buf.length) throw new Error('cantus: empty record');
+  return { route, name, record: buf.subarray(pos) };
 }
 
 export function datagramKind(buf) {

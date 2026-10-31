@@ -13,6 +13,7 @@ import { CantusServer } from './server.js';
 import { AriBridge } from './ari.js';
 import { Router } from './router.js';
 import { isLoopbackHost } from './identity.js';
+import { pcmFrame } from './media.js';
 
 const env = process.env;
 const arg = (name, fallback) => env[name] ?? fallback;
@@ -195,7 +196,16 @@ export async function selftest() {
   await a.start();
 
   const call = a.originate({ from: `200@${domain}`, to: `100@${domain}` });
+  // A caller that says nothing proves only that two sockets are open. Push a
+  // tone into the caller's leg the way a microphone would, so "audio arrived"
+  // means the caller's audio crossed the node boundary — which is the claim
+  // the switch is actually making.
+  const tone = setInterval(() => {
+    const leg = call.legs[0];
+    if (leg && !leg.isEnded) a.pushLocalAudio(leg, pcmFrame({ hz: 1000, amp: 6000 }).payload);
+  }, 20);
   await sleep(1600);
+  clearInterval(tone);
   const answered = call.legs.some((leg) => leg.isAnswered);
   a.hangup(call.id);
   await sleep(300);
