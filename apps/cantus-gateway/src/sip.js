@@ -722,6 +722,12 @@ export class SipTrunk {
 
     const remote = `${rinfo.address}:${rinfo.port}`;
     if (message.method === 'INVITE') {
+      const denied = this.inviteSourceProblem(message, rinfo);
+      if (denied) {
+        this.log({ kind: 'invite-refused', from: rinfo.address, reason: denied });
+        this.reply(rinfo, message, 403, 'Forbidden');
+        return;
+      }
       const callId = message.get('call-id') || randomToken(8);
       const existing = this.calls.get(callId);
       if (existing) {
@@ -790,6 +796,35 @@ export class SipTrunk {
     if (message.method === 'REGISTER') {
       this.handleRegister(message, rinfo);
     }
+  }
+
+  /**
+   * Who may call this socket.
+   *
+   * With a carrier configured this is the carrier's socket, and the border
+   * profile (§7.2) already says a header is never an identity — the address is
+   * what the network can vouch for, so that decision stays where it was. With no
+   * carrier the socket is a registrar, and then the only callers it serves are
+   * the handsets it registered: an INVITE from an extension nobody registered,
+   * or from an address other than that extension's registration, is refused
+   * instead of being bridged into the switch as a call.
+   */
+  inviteSourceProblem(message, rinfo) {
+    if (this.host) return '';
+    const from = userOf(message.get('from'));
+    const contact = this.contacts.get(from);
+    if (!contact) return `extension ${from || '(none)'} is not registered`;
+    if (contact.expires <= Date.now()) {
+      this.contacts.delete(from);
+      return `extension ${from} registration expired`;
+    }
+    // Host, not port: a NATed handset can leave from a different source port
+    // on each binding, and refusing that would break the handsets this exists
+    // for. The address is what a spoofed datagram cannot choose.
+    if (rinfo.address !== contact.addr.host) {
+      return `extension ${from} calling from ${rinfo.address}, registered from ${contact.addr.host}`;
+    }
+    return '';
   }
 
   /** Contacts that have not expired, newest first. */
