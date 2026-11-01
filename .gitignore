@@ -15,3 +15,8 @@ estate/tools/.vultr-key
 estate/tools/.vultr-key.pub
 estate/tools/.vultr-key.env
 estate/tools/estate-demo.tgz
+
+.env
+env.local
+.env.*
+!.env.example

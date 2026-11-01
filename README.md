@@ -5,7 +5,8 @@
 [![Organisation](https://img.shields.io/badge/org-innotelinc-18181b)](https://github.com/innotelinc)
 [![Projects](https://img.shields.io/badge/projects-13-2ea043)](#what-is-in-here)
 [![History](https://img.shields.io/badge/history-per%20project%2C%20not%20squashed-4fe3c1)](#history)
-[![License](https://img.shields.io/badge/license-per%20project-f5b95b)](#licenses)
+[![CI](https://github.com/innotelinc/jesus/actions/workflows/ci.yml/badge.svg)](https://github.com/innotelinc/jesus/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Everything Innotel builds, in one tree.**
 
@@ -16,6 +17,14 @@ commit history it earned.
 </div>
 
 ---
+
+## Why JESUS
+
+| Problem | Answer |
+| --- | --- |
+| A merge squashes the history that explains a product. | Each directory keeps the commits it earned; nothing is re-authored. |
+| Every new product rediscovers the same rules. | Licence, environment posture, attribution guard and stack role are stated once at the root. |
+| One monorepo CI stalls on the slowest product. | Each product keeps its own workflow; the root job only guards the shared contract. |
 
 ## What is in here
 
@@ -304,3 +313,28 @@ Each project keeps its own `LICENSE` file and its own terms apply to it: Cantus 
 and claude-mem are Apache-2.0, and the mirrors (`omniroute`, `rea`, `dograh`, `freebuff`) keep the
 licences they were forked under. Read the licence in the directory you are using rather than
 assuming one for the tree.
+
+## Documentation
+
+| Doc | What it covers |
+| --- | --- |
+| [docs/stack.md](docs/stack.md) | the estate's role in the Innotel Platform Stack |
+| [README.md#what-is-in-here](README.md#what-is-in-here) | every product and where it lives |
+| [.env.example](.env.example) | the shared environment contract |
+
+## License
+
+The tree is **MIT** — see [LICENSE](LICENSE) — so the repository as a whole is
+unambiguous. A product directory that carries its own `LICENSE` is governed by
+that file inside its directory; [docs/stack.md](docs/stack.md) records the
+arrangement.
+
+## 🏛️ Platform stack
+
+JESUS is the estate that holds the ecosystem's products in the
+[**Innotel Platform Stack**](https://github.com/innotelinc/innotel-platform-stack) —
+the canonical single-responsibility architecture where Authentik owns identity,
+Cerulean Vault owns secrets, Cerulean owns trust, ONYX owns storage, Magnate owns
+revenue, NPM Edge owns the edge, and every other platform is a business function
+that consumes them. See [docs/stack.md](docs/stack.md) for this tree's
+owns/consumes boundaries.

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JESUS — every Innotel product in one tree</title>
+  <meta name="description" content="The Innotel estate in one repository: the voice standard, the telephony platform, the mail client, the training platform, the agent tooling and the gateways — each product in its own directory, each with the history it earned.">
+  <meta property="og:title" content="JESUS — every Innotel product in one tree">
+  <meta property="og:description" content="The Innotel estate in one repository: each product in its own directory, each with the history it earned.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='30' text-anchor='middle' fill='%2322d3ee'%3EJ%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --p-bg: #0b0d10; --p-bg-elevated: #12151a; --p-surface: #181c22;
+      --p-border: #262c35; --p-text: #f4f7fb; --p-text-secondary: #cdd6e0;
+      --p-text-muted: #a8b2bf; --p-accent: #22d3ee; --p-accent-hover: #67e8f9;
+      --radius-sm: 6px; --radius-md: 10px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--p-bg); color: var(--p-text);
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+      font-size: 16px; line-height: 1.6; }
+    a { color: var(--p-accent); text-decoration: none; }
+    a:hover { color: var(--p-accent-hover); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    header { border-bottom: 1px solid var(--p-border); }
+    .bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; }
+    .brand { display: flex; gap: 10px; align-items: center; font-weight: 600; letter-spacing: .04em; }
+    .mark { color: var(--p-accent); }
+    nav { display: flex; gap: 18px; font-size: 14px; }
+    .hero { padding: 64px 0 40px; }
+    .kicker { font-size: 13px; color: var(--p-text-muted); text-transform: uppercase; letter-spacing: .12em; }
+    h1 { font-size: 2.4rem; line-height: 1.2; margin: 14px 0; }
+    .accent { color: var(--p-accent); }
+    .lede { font-size: 1.05rem; color: var(--p-text-secondary); max-width: 68ch; }
+    .cta { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; }
+    .btn { padding: 10px 18px; border-radius: var(--radius-sm); border: 1px solid var(--p-border); font-size: 14px; }
+    .btn-primary { background: var(--p-accent); color: #08171a; font-weight: 600; border-color: var(--p-accent); }
+    section { padding: 34px 0; }
+    h2 { font-size: 1.2rem; margin: 0 0 16px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .card { padding: 20px; border: 1px solid var(--p-border); border-radius: var(--radius-md); background: var(--p-surface); }
+    .card h3 { margin: 0 0 6px; font-size: 1rem; }
+    .card p { margin: 0; color: var(--p-text-secondary); font-size: 14px; }
+    footer { border-top: 1px solid var(--p-border); margin-top: 20px; padding: 26px 0 48px; color: var(--p-text-muted); font-size: 13px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } h1 { font-size: 1.9rem; } }
+  </style>
+  <link rel="stylesheet" href="unity-theme.css">
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <span class="brand"><span class="mark">◼</span>JESUS</span>
+      <nav>
+        <a href="https://github.com/innotelinc/jesus">Source</a>
+        <a href="https://github.com/innotelinc/jesus/blob/main/docs/stack.md">Stack role</a>
+        <a href="https://github.com/innotelinc/innotel-platform-stack">Platform</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="kicker">the estate · per-project history</div>
+      <h1>Every Innotel product, <span class="accent">in one tree.</span></h1>
+      <p class="lede">The voice standard, the telephony platform, the mail client, the training
+      platform, the agent tooling and the gateways — one directory each, each with the commit
+      history it earned. Nothing squashed, nothing re-authored.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/innotelinc/jesus">Browse the tree</a>
+        <a class="btn" href="https://github.com/innotelinc/jesus#what-is-in-here">What is in here</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Why one tree</h2>
+      <div class="grid">
+        <div class="card"><h3>History is the product</h3><p>A merged monorepo loses the commit history that explains why each product looks the way it does. Here each directory keeps its own.</p></div>
+        <div class="card"><h3>The shared contract is stated once</h3><p>Licence, environment posture, attribution guard and the stack role live at the root, so a new product inherits them instead of rediscovering them.</p></div>
+        <div class="card"><h3>Each product still builds alone</h3><p>Per-product workflows run where the code is; the root CI only guards the contract that goes wrong quietly.</p></div>
+        <div class="card"><h3>One place to see the estate</h3><p>Fourteen products under <code>apps/</code> plus the containers that wire them into one voice system.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Where to go</h2>
+      <div class="grid">
+        <div class="card"><h3>apps/cantus</h3><p>The realtime voice standard: one socket, no SIP, no SDP, no RTP, plus a reference stack.</p></div>
+        <div class="card"><h3>apps/telno</h3><p>Self-hosted telephony: extensions, trunks, IVR, voicemail, SMS and AI voice agents in one container.</p></div>
+        <div class="card"><h3>apps/webmail</h3><p>Self-hosted JMAP webmail for Stalwart: mail, calendar, contacts and files in one client.</p></div>
+        <div class="card"><h3>apps/ontrak</h3><p>The training platform with gradable Linux, Windows and Office simulations.</p></div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      MIT · part of the <a href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a>
+      · <a href="https://github.com/innotelinc/jesus/blob/main/docs/stack.md">docs/stack.md</a>
+    </div>
+  </footer>
+</body>
+</html>

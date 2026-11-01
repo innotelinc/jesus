@@ -1,0 +1,61 @@
+# ci.yml — what this tree can prove without building fourteen products.
+#
+# Each product carries its own workflow; this one only guards the estate's
+# shared contract, which is the part that goes wrong silently.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  estate:
+    name: Estate contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Required files
+        run: |
+          set -euo pipefail
+          for f in README.md LICENSE .env.example web/landing/index.html docs/stack.md; do
+            [ -f "$f" ] || { echo "::error::missing required file: $f"; exit 1; }
+          done
+          echo "structure: ok"
+
+      - name: No product ships without a README
+        run: |
+          set -euo pipefail
+          missing=0
+          for d in apps/*/ christ/; do
+            [ -d "$d" ] || continue
+            if [ ! -f "${d}README.md" ]; then
+              echo "::error::${d} has no README.md"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: No environment file is tracked
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env$|(^|/)env\.local$'; then
+            echo "::error::a live environment file is tracked"
+            exit 1
+          fi
+          echo "no tracked env files"
+
+      - name: Landing sanity
+        run: |
+          set -euo pipefail
+          grep -qi '<title>' web/landing/index.html
+          grep -qi 'og:title' web/landing/index.html
+          echo "landing: ok"
