@@ -7,6 +7,7 @@
 
 import dgram from 'node:dgram';
 import { Identity, isLoopbackHost } from './identity.js';
+import { listen as listenTls } from './tls-binding.js';
 import {
   TYPES,
   F,
@@ -27,8 +28,14 @@ import { encodeObserved } from './reach.js';
 const REGISTRATION_TTL_MS = 60_000;
 
 export class CantusRelay {
-  constructor({ bind = '0.0.0.0:7444', secret = 'cantus-loopback', allowTestProfile = false, onEvent = () => {}, debug = false, advertise } = {}) {
+  constructor({ bind = '0.0.0.0:7444', secret = 'cantus-loopback', allowTestProfile = false, onEvent = () => {}, debug = false, advertise, tls } = {}) {
     this.binding = bind;
+    // §9.7: a relay that carries sealed records is reached over the same binding
+    // the records came from, so a TLS deployment has no reason to open a UDP
+    // door as well. `tls` makes the listener encrypted; the forwarding logic is
+    // identical because the records are opaque either way.
+    this.tls = tls;
+    this.tlsSessions = undefined;
     this.secret = secret;
     this.allowTestProfile = allowTestProfile;
     this.loopback = isLoopbackHost(String(bind).split(':')[0]);
@@ -69,6 +76,7 @@ export class CantusRelay {
   }
 
   async start() {
+    if (this.tls) return this.startTls();
     const [host, port] = this.binding.split(':');
     this.socket = dgram.createSocket('udp4');
     this.socket.on('message', (buf, rinfo) => {
@@ -98,15 +106,55 @@ export class CantusRelay {
     return this;
   }
 
+  /** The encrypted listener: one session per endpoint, same registry and routes. */
+  async startTls() {
+    const [host, port] = this.binding.split(':');
+    this.tlsSessions = new Map();
+    this.listener = await listenTls({
+      host: host === 'localhost' ? '127.0.0.1' : host,
+      port: Number(port || 7444),
+      cert: this.tls.cert,
+      key: this.tls.key,
+      pin: this.tls.pin,
+      onSession: (session) => {
+        this.tlsSessions.set(session.remote, session);
+        session.on('datagram', (bytes) => {
+          try {
+            this.handleDatagram(bytes, session.remote);
+          } catch (err) {
+            this.emit({ kind: 'error', error: err.message });
+          }
+        });
+        session.on('fault', (reason) => this.emit({ kind: 'fault', error: reason }));
+        session.on('close', () => this.tlsSessions.delete(session.remote));
+      },
+    });
+    this.address = `${this.advertise || this.listener.address}:${this.listener.port}`;
+    this.identity = new Identity({
+      name: `relay@${this.address}`,
+      secret: this.secret,
+      loopback: this.loopback,
+      allowTestProfile: this.allowTestProfile,
+    });
+    this.emit({ kind: 'listening', addr: this.address, tls: true });
+    return this;
+  }
+
   stop() {
     try {
       this.socket?.close();
     } catch {
       /* already closed */
     }
+    this.listener?.close?.();
   }
 
   sendto(dest, bytes) {
+    // A registered endpoint on the encrypted binding is a session, not an
+    // address: the reply to a REGISTER and the record to a caller both go back
+    // the way they came.
+    const session = this.tlsSessions?.get(dest);
+    if (session) return session.send(bytes);
     const index = dest.lastIndexOf(':');
     const host = dest.slice(0, index);
     const port = Number(dest.slice(index + 1));
@@ -214,6 +262,9 @@ export class CantusRelay {
       [F.node]: s(`relay@${this.address}`),
       [F.nonce]: v(Date.now() & 0x7fffffff),
     };
+    // Signed bare, because a relay is a hop and not the call's peer: the
+    // endpoint does not bind this reply to the session exporter (§9.7), since
+    // the same rule has to hold for a call whose peer is on another session.
     reply[F.sig] = b(this.identity.sign(TYPES.REGISTER_ACK, reply));
     this.sendto(src, encodeMsg(TYPES.REGISTER_ACK, reply));
     this.emit({ kind: 'registered', id, handle, addr: src });

@@ -257,7 +257,13 @@ export class CantusEndpoint {
     const adopt = (session) => {
       this.link = session;
       const bound = () => {
-        this.channelBinding = session.binding;
+        // §9.7: the exporter binds a signature to *this* session. When the
+        // session is a relay, the signature has to be verified by an endpoint on
+        // a different session, so binding it here would make every relayed
+        // INVITE fail authentication. The relay hop is authenticated by the
+        // handshake; the call's integrity comes from the signed key exchange
+        // and the sealed records it produces.
+        this.channelBinding = this.relay ? undefined : session.binding;
         this.localAddr = session.remote;
         this.emit({ kind: 'tls', remote: session.remote, protocol: session.protocol, pinned: session.peerPin });
       };
@@ -358,9 +364,12 @@ export class CantusEndpoint {
   }
 
   relaySend(route, name, inner) {
-    // A relay would see plaintext, so a TLS session never hands it media and
-    // never wraps one (§4.4): the session is the path.
-    if (this.link) return this.link.send(inner);
+    // A TLS session to a *peer* has no relay in it: the session is the path and
+    // the datagram goes bare. A TLS session to a *relay* is the opposite — the
+    // relay resolves the route, so the wrapper is still the wrapper. Sending
+    // `inner` bare in that case made a relayed TLS call look like a direct one
+    // and lost every message to a relay that could not resolve it.
+    if (this.link && !this.relay) return this.link.send(inner);
     return this.sendto(this.relay, encodeRelay(route, inner, name));
   }
 
@@ -913,7 +922,13 @@ export class CantusEndpoint {
   }
 
   viaRelaySource(src) {
-    return !!this.relay && src === this.relay;
+    if (!this.relay) return false;
+    // On the encrypted binding the relay is the session itself, so every
+    // datagram arrives from its ephemeral address. That address proves nothing
+    // about a direct path, and treating it as one would commit `direct` and
+    // send the media unsealed.
+    if (this.link) return true;
+    return src === this.relay;
   }
 
   commitPath(session, path) {

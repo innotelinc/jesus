@@ -92,6 +92,19 @@ const endpoint = new CantusEndpoint({
 });
 
 const carrierHost = arg('SIP_HOST', '');
+// `SIP_ATA_USERS=101:secret,102:secret`. A registrar with no carrier is a valid
+// deployment: internal calls, a box whose PSTN trunk is not configured yet.
+const ataUsers = new Map(
+  arg('SIP_ATA_USERS', '')
+    .split(',')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const index = pair.indexOf(':');
+      return index === -1 ? [pair, ''] : [pair.slice(0, index).trim(), pair.slice(index + 1).trim()];
+    })
+    .filter(([ext, password]) => ext && password)
+);
 const TRUNK_STUB = {
   // The surface the gateway uses, for a deployment with no carrier yet. Every
   // call is refused with a reason, and nothing pretends to be registered.
@@ -100,6 +113,8 @@ const TRUNK_STUB = {
   bound: 0,
   registered: false,
   registerExpiresAt: 0,
+  contacts: new Map(),
+  registeredAtas: [],
   lastRegisterError: 'SIP_HOST is empty',
   onInvite: () => {},
   onBye: () => {},
@@ -111,16 +126,18 @@ const TRUNK_STUB = {
   stop: () => {},
 };
 
-const trunk = carrierHost
+const trunk = carrierHost || ataUsers.size
   ? new SipTrunk({
       host: carrierHost,
+      ataUsers,
+      // A registrar needs a realm even when there is no carrier to ask for one.
+      domain: arg('SIP_DOMAIN', '') || domain,
       port: num('SIP_PORT', 5060),
       username: arg('SIP_USERNAME', ''),
       password: arg('SIP_PASSWORD', ''),
       // The number this trunk presents, which is the trunk's own DID: a carrier
       // that honours From shows the line the call was placed from.
       fromUser: arg('SIP_FROM_USER', ''),
-      domain: arg('SIP_DOMAIN', ''),
       contactHost: advertise,
       localPort: num('SIP_LOCAL_PORT', 0),
       registerSeconds: num('SIP_REGISTER_SECONDS', 300),
@@ -176,7 +193,7 @@ async function main() {
     log: (entry) => log(entry),
   });
 
-  if (trunk.host) await trunk.start();
+  if (trunk.host || ataUsers.size) await trunk.start();
 
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
@@ -211,19 +228,24 @@ async function main() {
       // Healthy means both halves are usable, which is the only question an
       // operator has: Cantus reachable and the trunk registered.
       const configured = !!trunk.host;
-      const ok = configured && !!trunk.registered && !!endpoint.localAddr;
+      const atas = trunk.registeredAtas?.length || 0;
+      // With a registrar and no carrier the box is whole: it can take calls
+      // from its own handsets. With a carrier it is whole only when the trunk
+      // is registered too.
+      const ok = !!endpoint.localAddr && (configured ? !!trunk.registered : ataUsers.size > 0);
       send(ok ? 200 : 503, {
         ok,
         configured,
         registered: !!trunk.registered,
+        atas,
         cantus: endpoint.localAddr || '',
         reason: ok
           ? ''
-          : !configured
-            ? 'SIP_HOST is empty: set the carrier SIP server and sub-account credentials'
-            : !trunk.registered
-              ? trunk.lastRegisterError || 'not registered yet'
-              : 'cantus socket not bound',
+          : !endpoint.localAddr
+            ? 'cantus socket not bound'
+            : !configured
+              ? 'SIP_HOST is empty: set the carrier SIP server and sub-account credentials'
+              : trunk.lastRegisterError || 'not registered yet',
       });
       return;
     }

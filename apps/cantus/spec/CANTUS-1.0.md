@@ -781,6 +781,14 @@ record  = seq:u64 ciphertext:bytes tag:16
   than the last one accepted for that call. A replay is a dropped packet, never
   a state change; a relay makes duplicates cheap, so the sequence number inside
   the AEAD is what makes them useless.
+- **Binding scope on a relay link.** §4.4 folds the session exporter into every
+  signature so a message cannot be moved between sessions. A session to a relay
+  is a hop, not the call's peer: the far endpoint verifies on a different
+  session, so a signature bound to the relay session would fail there. A node
+  whose TLS session is its relay therefore signs and verifies without the
+  exporter. The call's integrity does not depend on it — `kex` is carried in
+  signed `INVITE`/`ACCEPT`, and the AEAD keyed from it is what a relay cannot
+  forge or read.
 - A `cantus/tls` node uses records on every relay path and MAY use them on a
   direct path. A `cantus/udp` node MAY use them for confidentiality it does not
   otherwise have; the relay is blind either way, but the endpoints already
