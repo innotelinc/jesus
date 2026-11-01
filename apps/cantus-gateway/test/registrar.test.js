@@ -140,6 +140,87 @@ test('a registrar with no carrier still starts', async () => {
   assert.throws(() => new SipTrunk({}), /host or at least one ATA user/);
 });
 
+/** Register `ext` the way a handset does, through the challenge. */
+function registerExtension(trunk, replies, { ext = '101', password = 'front-desk', port = 5062 } = {}) {
+  const first = register({ ext, port });
+  trunk.handle(first.text, first.rinfo);
+  const challenge = challengeOf(replies);
+  const authorization = digestResponse({
+    username: ext,
+    password,
+    realm: challenge.realm,
+    nonce: challenge.nonce,
+    uri: 'sip:estate.local',
+    method: 'REGISTER',
+    qop: challenge.qop ? 'auth' : undefined,
+    nc: '00000001',
+    cnonce: 'ata1',
+  });
+  const second = register({ ext, port, authorization });
+  trunk.handle(second.text, second.rinfo);
+}
+
+function invite({ ext = '101', caller = '101', port = 5062, host = '127.0.0.1' } = {}) {
+  const headers = [
+    ['Via', `SIP/2.0/UDP ${host}:${port};branch=z9hG4bKinv${Math.random().toString(16).slice(2)};rport`],
+    ['Max-Forwards', '70'],
+    ['From', `<sip:${caller}@estate.local>;tag=ata`],
+    ['To', `<sip:${ext}@estate.local>`],
+    ['Call-ID', `inv-${port}-${Math.random().toString(16).slice(2)}@estate.local`],
+    ['CSeq', '1 INVITE'],
+    ['Contact', `<sip:${caller}@${host}:${port}>`],
+    ['Content-Type', 'application/sdp'],
+  ];
+  const body = 'v=0\r\nc=IN IP4 127.0.0.1\r\nt=0 0\r\nm=audio 4000 RTP/AVP 0\r\n';
+  return {
+    text: buildRequest({ method: 'INVITE', uri: `sip:${ext}@estate.local`, headers, body }).toString('utf8'),
+    rinfo: { address: host, port },
+  };
+}
+
+test('a registered handset may call, and an unregistered caller may not', () => {
+  const { trunk, replies } = registrar();
+  const invites = [];
+  trunk.onInvite = (call) => invites.push(call);
+  registerExtension(trunk, replies);
+
+  const allowed = invite();
+  trunk.handle(allowed.text, allowed.rinfo);
+  assert.equal(invites.length, 1, 'a registered extension is bridged into the switch');
+
+  const stranger = invite({ caller: '999' });
+  trunk.handle(stranger.text, stranger.rinfo);
+  assert.equal(invites.length, 1, 'an extension nobody registered is not bridged');
+  assert.equal(replies.at(-1).status, 403);
+});
+
+test('a registered extension calling from another address is refused', () => {
+  const { trunk, replies } = registrar();
+  const invites = [];
+  trunk.onInvite = (call) => invites.push(call);
+  registerExtension(trunk, replies);
+
+  const spoofed = invite({ caller: '101', host: '10.9.9.9' });
+  trunk.handle(spoofed.text, spoofed.rinfo);
+  assert.equal(invites.length, 0, 'the registration names the only address that may speak for it');
+  assert.equal(replies.at(-1).status, 403);
+});
+
+test('with a carrier configured the trunk is still the carrier\'s socket', () => {
+  const trunk = new SipTrunk({
+    host: 'carrier.example',
+    domain: 'estate.local',
+    ataUsers: new Map([['101', 'front-desk']]),
+  });
+  const invites = [];
+  trunk.onInvite = (call) => invites.push(call);
+  trunk.reply = () => {};
+  const call = invite({ caller: '+14155550100', ext: '14132642700', host: '203.0.113.7', port: 5060 });
+  assert.equal(trunk.inviteSourceProblem(parseMessage(call.text), call.rinfo), '', 'carrier traffic is not gated on a registrar');
+  trunk.handle(call.text, call.rinfo);
+  assert.equal(invites.length, 1);
+});
+
 // Keep the parser import honest: a REGISTER is a request, not a response.
 test('a REGISTER parses as a request', () => {
   const message = parseMessage(register().text);
