@@ -193,6 +193,10 @@ services:
       SIP_FROM_USER: ${VOIPMS_SIP_FROM_USER:-}
       SIP_DOMAIN: ${VOIPMS_SIP_DOMAIN:-}
       SIP_SRTP: ${SIP_SRTP:-}
+      # Local handsets: `ext:password,...`. The border is also their registrar,
+      # so an analog telephone adapter is a client of this box rather than of a
+      # carrier it cannot authenticate to.
+      SIP_ATA_USERS: ${SIP_ATA_USERS:-}
       SRTP_STATE_FILE: /data/srtp.json
       SIP_ADVERTISE: ${PUBLIC_IP:-}
       SIP_LOCAL_PORT: "5060"
@@ -202,7 +206,9 @@ services:
     volumes:
       - ./state/gateway:/data
     ports:
-      - "5060:5060/udp"
+      # Host side is configurable: a box that already runs a softswitch on 5060
+      # still needs its registrar reachable for the ATAs.
+      - "${SIP_BIND_PORT:-5060}:5060/udp"
       - "${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}:${GATEWAY_RTP_START:-40000}-${GATEWAY_RTP_END:-40063}/udp"
       - "7454:7454"
 

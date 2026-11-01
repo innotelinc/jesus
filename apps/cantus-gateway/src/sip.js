@@ -149,6 +149,12 @@ export function parseSdpAddress(body, fallbackHost) {
   };
 }
 
+/** The user part of a SIP URI: `sip:101@estate.local` → `101`. */
+function userOf(uri) {
+  const match = /sip:([^@>;]+)@/.exec(String(uri || ''));
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
 function authParams(header) {
   const params = {};
   const source = String(header || '');
@@ -211,6 +217,12 @@ export class SipTrunk {
     onCancel = () => {},
     onBye = () => {},
     onLog = () => {},
+    // The other side of the border: local handsets. A PBX that only speaks to a
+    // carrier is a trunk, not a phone system — an analog telephone adapter has
+    // to be able to register here, so this socket is also a registrar. The map
+    // is ext → password, and nothing else: an ATA's identity is the extension
+    // its administrator configured, not a header it chose.
+    ataUsers = new Map(),
     // A SIP socket sits on the public internet, so every byte that arrives is
     // untrusted and a burst is the normal case, not the exception. A carrier
     // sends a handful of messages per second; a hundred from one address is a
@@ -220,8 +232,12 @@ export class SipTrunk {
     abuseDrops = 200,
     blockMs = 30_000,
   } = {}) {
-    if (!host) throw new Error('SipTrunk needs a host');
-    this.host = host;
+    this.ataUsers = ataUsers instanceof Map ? ataUsers : new Map(Object.entries(ataUsers || {}));
+    // A registrar with no carrier is a working deployment: internal calls on a
+    // box whose PSTN trunk is not configured yet. What cannot happen is neither.
+    if (!host && !this.ataUsers.size) throw new Error('SipTrunk needs a host or at least one ATA user');
+    this.host = host || '';
+    this.contacts = new Map(); // ext → { addr, expires, contact, userAgent }
     this.port = Number(port);
     this.username = username;
     this.password = password;
@@ -298,11 +314,13 @@ export class SipTrunk {
           if (this.retryTimer.unref) this.retryTimer.unref();
         });
     };
-    if (this.username) kick();
-    this.registerTimer = setInterval(() => {
-      this.register().catch((err) => this.log({ kind: 'register-error', error: err.message }));
-    }, Math.max(30, this.registerSeconds - 60) * 1000);
-    if (this.registerTimer.unref) this.registerTimer.unref();
+    if (this.username && this.host) kick();
+    if (this.host) {
+      this.registerTimer = setInterval(() => {
+        this.register().catch((err) => this.log({ kind: 'register-error', error: err.message }));
+      }, Math.max(30, this.registerSeconds - 60) * 1000);
+      if (this.registerTimer.unref) this.registerTimer.unref();
+    }
     return this;
   }
 
@@ -770,7 +788,95 @@ export class SipTrunk {
     }
 
     if (message.method === 'REGISTER') {
-      this.reply(rinfo, message, 405, 'Method Not Allowed');
+      this.handleRegister(message, rinfo);
     }
+  }
+
+  /** Contacts that have not expired, newest first. */
+  get registeredAtas() {
+    const now = Date.now();
+    return [...this.contacts.values()].filter((entry) => entry.expires > now);
+  }
+
+  /**
+   * A local handset registering. Digest, MD5, qop when the ATA answers with it.
+   *
+   * The first REGISTER is answered `401` with a nonce the ATA signs; the second
+   * is checked against the password for the extension in `to`, and only then is
+   * the contact stored. Nothing about the request's From or Contact decides
+   * who the caller is (§7.2 of the border profile applies here too): the
+   * extension is the identity and the password is the credential.
+   */
+  handleRegister(message, rinfo) {
+    const ext = userOf(message.get('to')) || userOf(message.uri);
+    const password = this.ataUsers.get(ext);
+    const toTag = randomToken(4);
+    if (!password) {
+      this.log({ kind: 'ata-unknown', ext, from: rinfo.address });
+      this.reply(rinfo, message, 403, 'Forbidden', { toTag });
+      return;
+    }
+
+    const authorization = message.get('authorization');
+    if (!authorization) {
+      const nonce = randomToken(8);
+      this.reply(rinfo, message, 401, 'Unauthorized', {
+        toTag,
+        extra: [['WWW-Authenticate', `Digest realm="${this.domain}", nonce="${nonce}", algorithm=MD5, qop="auth"`]],
+      });
+      return;
+    }
+
+    const params = authParams(authorization);
+    const expected = digestResponse({
+      username: ext,
+      password,
+      realm: this.domain,
+      nonce: params.nonce || '',
+      uri: params.uri || message.uri,
+      method: 'REGISTER',
+      qop: params.qop,
+      nc: params.nc,
+      cnonce: params.cnonce,
+      opaque: params.opaque,
+    });
+    const want = /response="([^"]+)"/.exec(expected)?.[1];
+    const got = /response="([^"]+)"/.exec(authorization)?.[1];
+    if (params.username !== ext || !want || want !== got) {
+      this.log({ kind: 'ata-auth-failed', ext, from: rinfo.address });
+      this.reply(rinfo, message, 403, 'Forbidden', { toTag });
+      return;
+    }
+
+    const contact = message.get('contact') || '';
+    const uri = /<([^>]+)>/.exec(contact)?.[1] || contact;
+    const asked = /expires=(\d+)/i.exec(contact)?.[1] ?? message.get('expires');
+    const expires = asked === undefined ? this.registerSeconds : Number(asked);
+    if (!Number.isFinite(expires) || expires <= 0) {
+      this.contacts.delete(ext);
+      this.log({ kind: 'ata-unregistered', ext, from: rinfo.address });
+      this.reply(rinfo, message, 200, 'OK', { toTag, extra: [['Expires', '0']] });
+      return;
+    }
+
+    // The address the datagram came from wins over the Contact URI: behind
+    // NAT the two disagree, and the one that can actually receive is the one
+    // that just spoke. `rport` is what makes an ATA on a home router work.
+    const entry = {
+      ext,
+      addr: { host: rinfo.address, port: rinfo.port },
+      contact: uri,
+      userAgent: message.get('user-agent') || '',
+      expires: Date.now() + expires * 1000,
+    };
+    this.contacts.set(ext, entry);
+    this.log({ kind: 'ata-registered', ext, addr: `${entry.addr.host}:${entry.addr.port}`, expires });
+    this.reply(rinfo, message, 200, 'OK', {
+      toTag,
+      extra: [
+        ['Contact', `<${uri}>;expires=${expires}`],
+        ['Expires', String(expires)],
+      ],
+    });
   }
 }
