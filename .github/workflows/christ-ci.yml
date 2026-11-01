@@ -103,6 +103,10 @@ jobs:
           # Required, never defaulted: a session-signing key with a fallback is
           # an install that signs with a value from the repository.
           DOGRAH_JWT_SECRET: ci-dograh-secret
+          # The fax engine's modem password is required the same way, and this
+          # step turns every profile on: without it `compose config` fails and
+          # the service list is empty, which reads as a missing switch.
+          FAX_SECRET: ci-fax-secret
         run: |
           set -euo pipefail
           docker compose config --quiet
