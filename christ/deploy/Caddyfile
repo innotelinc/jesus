@@ -23,7 +23,7 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
-	respond /healthz 200 "edge ok"
+	respond /healthz 200
 }
 
 telno.services, www.telno.services {

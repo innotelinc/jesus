@@ -116,7 +116,10 @@ export function renderCaddyfile(document, { httpOnly = false } = {}) {
     '\t\tReferrer-Policy strict-origin-when-cross-origin',
     '\t\t-Server',
     '\t}',
-    '\trespond /healthz 200 "edge ok"',
+    // Status only, no body: with two trailing arguments Caddy reads the last
+    // one as the status, so `200 "edge ok"` made every /healthz answer 500
+    // (`strconv.Atoi: parsing "edge ok"`).
+    '\trespond /healthz 200',
     '}',
     '',
   ];
