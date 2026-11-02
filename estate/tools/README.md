@@ -181,33 +181,6 @@ With those two running together the whole path is verified: `sip-probe` is the
 carrier, `line-client` is the phone, and the gateway and switch are the ones
 being tested.
 
-### Proving the agent actually converses
-
-The probe can hold the caller's end of a conversation with the after-hours
-agent, and record what it heard, so "the agent answers" and "the agent speaks"
-are two separate measurements:
-
-```sh
-node estate/tools/sip-probe.js --gateway 127.0.0.1:5060 --did 14132642700 \
-  --from 14134210134 --speak 'Yes, Friday at three works for me. Thank you.' \
-  --tts http://127.0.0.1:8881 --speak-delay 12000 --seconds 50 \
-  --record /tmp/call.wav
-```
-
-`--speak` synthesises the sentence through the local voice shim and sends it as
-PCMU once the greeting is over; `--record` writes everything the carrier sent
-back. Then compare that recording with the agent's own bot track — the pipeline
-upload one `recordings/<run>/bot.wav` — because a call can connect, transcribe
-and answer while the caller hears stuttered, doubled audio:
-
-```sh
-python3 estate/tools/audio-compare.py /tmp/call.wav bot.wav
-```
-
-A faithful path peaks near 1.0 at the right offset; a doubled or re-framed
-stream decorrelates, which is how the 40 ms/20 ms frame mismatch that made
-every caller hear the agent at half speed was found.
-
 ### Encryption on or off, with the carrier in step
 
 The console at `:8000` has a **Carrier encryption** card, and it is the honest
@@ -271,24 +244,18 @@ setting on the carrier's side, and the gateway matches it with `SIP_SRTP=on` in
 `estate/.env`.
 
 SRTP is not something to trust because the two halves of one implementation
-agree, so `asterisk-srtp/` is a real PJSIP peer — Asterisk with `res_srtp` and
-`media_encryption=sdes` — for the interop run:
+agree. The old interop run used a PJSIP peer in `asterisk-srtp/`; that peer is
+gone, because Asterisk is not part of this estate any more. The carrier leg is
+proved against the switch's own sealed path instead:
 
 ```sh
-docker run -d --name srtp-peer --network cantus-estate_default \
-  -v /opt/cantus-estate/estate/tools/asterisk-srtp:/etc/asterisk:ro andrius/asterisk
-
-# point the gateway at it (same network, so advertise the container address)
-VOIPMS_SIP_HOST=srtp-peer VOIPMS_SIP_PORT=5080 \
-VOIPMS_SIP_USERNAME=srtp-test VOIPMS_SIP_PASSWORD=srtp-test-secret \
-VOIPMS_SIP_DOMAIN=srtp-peer SIP_SRTP=on sh estate/up.sh env
-# and PUBLIC_IP must be the gateway's own container address for this one test,
-# because an RTP stream sent to the box's public IP cannot come back in.
+cd apps/cantus-gateway && node --test test/srtp.test.js test/srtp-required.test.js
+node scripts/e2e-srtp-call.mjs        # a sealed call through the relay, end to end
 ```
 
-A call to any number is answered and echoed by that peer, so audio arriving at
-the line proves both halves: our packets were decrypted by libsrtp, and its
-echo was decrypted by us.
+The e2e script places a call through the relay as a registered handset and
+records what arrives, so audio at the far end proves both halves: our packets
+were sealed, and the far side's return was opened by us.
 
 For the real thing, hand the deployed gateway its sub-account in one command —
 it writes the credentials into the box's `.env` (mode 600, never printed back),

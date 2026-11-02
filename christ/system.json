@@ -62,6 +62,19 @@
       "docs": "apps/telno/README.md"
     },
     {
+      "id": "estate",
+      "name": "Estate console",
+      "dir": "estate/console",
+      "layer": "voiceops",
+      "role": "The operator's window on the switch: the live call tape, the lines and the routing document it is actually running, the gateway's encryption state beside the carrier's. It holds no state the switch does not have — it is a read of the system, on one page, so a call is diagnosed where it happens.",
+      "contributes": ["the live call tape", "the encryption switch", "route and line truth"],
+      "interface": "cantus-control",
+      "urlEnv": "ESTATE_URL",
+      "defaultUrl": "http://127.0.0.1:8000",
+      "healthPath": "/healthz",
+      "docs": "estate/README.md"
+    },
+    {
       "id": "capstone",
       "name": "Capstone",
       "dir": "apps/capstone",

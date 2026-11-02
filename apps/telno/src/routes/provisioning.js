@@ -11,7 +11,8 @@ import { logEvent } from '../lib/audit.js';
  * (or dials the URL somebody typed into its web page) and fetches a file named
  * after its own MAC. So this has to be reachable without authentication, which
  * is exactly why the only thing it will answer for is a MAC that is already in
- * the inventory — a stranger cannot enumerate extensions here.
+ * the inventory — a stranger cannot enumerate extensions here. A device that
+ * has no MAC on file is addressed by its row id, which is just as unguessable.
  *
  * `telno.tel` is the address handed out. The same name is the SIP domain in the
  * generated config, so the URI a handset registers is sip:<extension>@telno.tel
@@ -27,9 +28,20 @@ function resolveFormat(vendor, file) {
   return FORMAT_BY_EXT[ext] || 'yealink';
 }
 
-/** A phone asks with whatever its firmware prefers; compare on hex only. */
-function deviceByMac(raw) {
-  const hex = String(raw || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+/**
+ * Find the device a provisioning request belongs to.
+ *
+ * A handset with a MAC on file asks by MAC, the only name its firmware knows.
+ * An ATA wired before anyone recorded its MAC asks by the row id printed in
+ * its URL: the id is minted with the row and never changes, so the URL typed
+ * into the box keeps working across reboots while the check-in token in the
+ * file still rotates on every fetch. Either way the answer only exists for a
+ * device already in the inventory, so this cannot enumerate extensions.
+ */
+function deviceFor(raw) {
+  const text = String(raw || '').trim();
+  if (/^dev_[A-Za-z0-9]+$/.test(text)) return db_.get('SELECT * FROM devices WHERE id = ?', [text]) || null;
+  const hex = text.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
   if (hex.length !== 12) return null;
   return db_.get('SELECT * FROM devices WHERE UPPER(REPLACE(mac, \':\', \'\')) = ?', [hex]) || null;
 }
@@ -42,11 +54,11 @@ function serve(request, reply, vendor, file) {
   // Yealink asks for its common file first; answer with a valid empty config so
   // the phone moves on to its MAC-specific one instead of retrying forever.
   const base = String(file || '').replace(/\.(cfg|xml|boot)$/i, '');
-  const device = deviceByMac(base);
+  const device = deviceFor(base);
   if (!device) {
-    request.log.info({ file }, 'provisioning request for an unknown MAC');
+    request.log.info({ file }, 'provisioning request for an unknown device');
     reply.status(404).type('text/plain');
-    return 'This MAC is not in the device inventory.\n';
+    return 'This device is not in the inventory.\n';
   }
 
   const format = resolveFormat(vendor, file);

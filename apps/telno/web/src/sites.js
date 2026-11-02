@@ -82,6 +82,19 @@ export const SITES = {
     // Served by CHRIST, not this app; the entry exists so the map is complete.
     upstream: 'christ',
   },
+  // The front door itself. CHRIST answers here and proxies every product, so
+  // the page behind it is the board — the platform's own entry only names the
+  // door so the domain map stays complete.
+  'christ.telno.services': {
+    role: 'front-door',
+    eyebrow: 'CHRIST',
+    headline: 'One AI voice system, assembled from every project in the tree.',
+    lede:
+      'This is the front door: the switch, the platform, the border and the agents on one origin, with the live board showing which of them are up right now.',
+    primary: { label: 'Open the board', to: '/' },
+    secondary: { label: 'Open the console', to: '/login' },
+    upstream: 'christ',
+  },
 };
 
 /** `Example.TEL:8090` → `example.tel`. */

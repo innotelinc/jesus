@@ -24,6 +24,9 @@ const safe = (value, fallback = '') =>
     .slice(0, 96) || fallback;
 
 const digits = (value) => String(value ?? '').replace(/\D/g, '');
+/** How long a caller may record a message before the switch hangs up. */
+const VOICEMAIL_MAX_MS = 180_000;
+
 const plain = (value) => String(value ?? '').replace(/[\r\n"]/g, ' ').slice(0, 80);
 
 /** Where the generated switch documents live (shared with the switch volume). */
@@ -35,7 +38,7 @@ export function inventory() {
   const trunks = db_.all('SELECT * FROM trunks WHERE enabled = 1 ORDER BY name');
   const flows = db_.all('SELECT * FROM ivr_flows WHERE enabled = 1 ORDER BY extension');
   const dids = db_.all(
-    `SELECT n.id AS number_id, n.e164, n.fax_mode, e.extension, e.display_name
+    `SELECT n.id AS number_id, n.e164, n.fax_mode, e.extension, e.display_name, e.voicemail
        FROM numbers n
        JOIN extensions e ON e.number_id = n.id
       WHERE e.enabled = 1`
@@ -55,6 +58,16 @@ export function inventory() {
 }
 
 /** The line inventory the switch registers, one entry per extension. */
+/**
+ * The Cantus node that answers for a trunk: the gateway.
+ *
+ * `CANTUS_GATEWAY_NODE` exists because the gateway's node id is a deployment
+ * choice (`voipms@gateway` on christ); the trunk name is the half this platform
+ * owns, and the node half has to match what the gateway actually registers.
+ */
+const gatewayNode = () => String(process.env.CANTUS_GATEWAY_NODE || 'gateway').replace(/^@+/, '').replace(/@$/, '');
+const cantusEndpointFor = (trunk) => `${safe(trunk.name, 'trunk')}@${gatewayNode()}`;
+
 export function generateLines() {
   const { extensions, trunks } = inventory();
   return {
@@ -69,13 +82,22 @@ export function generateLines() {
       dnd: ext.dnd === 1,
       forwardTo: ext.forward_to ? String(ext.forward_to) : '',
       callername: callerIdString(ext),
+      // The switch authenticates a registering phone with this and nothing else holds it: a registrar asks the switch whether a digest is right rather
+      // than being handed the secret of every line.
+      secret: String(ext.secret || ''),
     })),
     trunks: trunks.map((trunk) => ({
       name: String(trunk.name),
       // A trunk is a Cantus endpoint on the carrier gateway. The gateway speaks
       // Cantus to us and whatever it likes to the carrier; that boundary is the
       // one place a PSTN protocol still exists, and it is not in this platform.
-      endpoint: `${safe(trunk.name, 'trunk')}@${safe(trunk.host, 'gateway.invalid')}`,
+      //
+      // The node id is the gateway's, not the carrier's: the gateway registers
+      // once as `<name>@gateway` (compose's CANTUS_ID) and the relay resolves
+      // names exactly. Writing the carrier's SIP host here —
+      // `voipms@newyork1.voip.ms` — named a node nobody registers, so every
+      // call to a trunk was dropped at the relay before it reached a carrier.
+      endpoint: cantusEndpointFor(trunk),
       numbers: trunk.from_user ? [digits(trunk.from_user)] : [],
       from: digits(trunk.from_user),
       enabled: true,
@@ -147,8 +169,26 @@ export function generateRoutes() {
     }
     if (did.extension) {
       actions.push({ bridge: { to: String(did.extension), timeout: 25 } });
-      actions.push({ play: { file: 'voicemail-greeting' } });
-      actions.push({ record: { name: `vm-${safe(did.extension)}-${number}` } });
+      // Nobody picked up. `answer` is what accepts the caller's media, `play`
+      // is the greeting, `record` is the message and the `pause` is the window
+      // it is recorded in — three minutes, or as long as the caller takes to
+      // hang up, whichever comes first. The `reject 0` that used to sit directly
+      // behind `record` hung up the instant recording began, which is what left
+      // every message a RIFF header with no audio in it.
+      //
+      // Only a line that has voicemail switched on gets the tail: a DID for a
+      // line whose owner asked for no messages keeps ringing and releasing.
+      if (did.voicemail) {
+        actions.push({ answer: {} });
+        // The greeting ships with the routing document — a prompt is a file,
+        // and the switch already reads a prompts directory.
+        actions.push({ play: { file: 'voicemail-greeting' } });
+        // The line is named, not the number: the platform imports the
+        // recordings volume by file name and the extension is the one fact it
+        // cannot recover from the audio.
+        actions.push({ record: { voicemail: { ext: String(did.extension) } } });
+        actions.push({ pause: { ms: VOICEMAIL_MAX_MS } });
+      }
       actions.push({ reject: 0 });
     } else {
       actions.push({ play: { file: 'no-service' } });
@@ -171,12 +211,9 @@ export function generateRoutes() {
       actions.push({ forward: { to: String(ext.forward_to) } });
     } else {
       actions.push({ bridge: { to: number, timeout: 25 } });
-      // Nobody answered: the line's greeting, a recorded message, and a normal
-      // release. Parking comes first for a line with a phone that can be woken.
-      if (ext.voicemail) {
-        actions.push({ play: { file: 'voicemail-greeting' } });
-        actions.push({ record: { name: `vm-${safe(number)}` } });
-      }
+      // Nobody answered. There is no greeting prompt to play (see the DID
+      // branch above), and a `record` before `reject 0` saves nothing, so the
+      // line is released normally rather than pretending to take a message.
       actions.push({ reject: 0 });
     }
     routes.push({ name: `line-${number}`, when: { to: `${number}@*` }, then: actions });

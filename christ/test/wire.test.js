@@ -43,16 +43,25 @@ test('in office hours the DID rings the front desk and falls back to voicemail',
   assert.equal(decision.matched, true);
   assert.equal(decision.route, 'did-14132642700-office');
   const actions = decision.actions.map((action) => Object.keys(action)[0]);
-  assert.deepEqual(actions, ['bridge', 'play', 'record', 'reject']);
+  // `answer` before the greeting, and a pause before the release: a greeting
+  // played into an unanswered call is never heard, and `record` followed
+  // straight by a hangup closes an empty file.
+  assert.deepEqual(actions, ['bridge', 'answer', 'play', 'record', 'pause', 'reject']);
   assert.equal(decision.actions[0].bridge.to, '101');
 });
 
-test('outside office hours the DID answers with the AI receptionist', () => {
+test('outside office hours the DID still rings a person, then takes a message', () => {
   const decision = dialPlanFor(plan, '14132642700@estate.local', { now: MONDAY_22 });
   assert.equal(decision.route, 'did-14132642700-after-hours');
-  // Handed over still ringing, so the runtime sees an inbound call and answers
-  // it; an `answer` here made every inbound call look outbound.
-  assert.deepEqual(decision.actions, [{ ari: { app: 'dograh' } }]);
+  // A DID is a phone number that has to answer. Handing it to the agent
+  // runtime made every inbound call `app-unavailable` in under a second when no
+  // ARI client was attached, so after hours rings the line and then records;
+  // the agents keep their own extensions, so the AI plane is still dialable.
+  assert.deepEqual(
+    decision.actions.map((action) => Object.keys(action)[0]),
+    ['bridge', 'answer', 'play', 'record', 'pause', 'reject']
+  );
+  assert.equal(decision.actions[0].bridge.to, '101');
 });
 
 test('the DID also answers the ten-digit and plus forms a carrier might use', () => {
@@ -86,7 +95,7 @@ test('agent extensions hand the call to the agent runtime', () => {
 test('a line rings its extension, then takes a message, then releases the call', () => {
   const decision = dialPlanFor(plan, '101@estate.local');
   assert.equal(decision.route, 'line-101');
-  assert.deepEqual(decision.actions.map((action) => Object.keys(action)[0]), ['bridge', 'play', 'record', 'reject']);
+  assert.deepEqual(decision.actions.map((action) => Object.keys(action)[0]), ['bridge', 'answer', 'play', 'record', 'pause', 'reject']);
 });
 
 test('an internal short number bridges, and anything unclaimed is rejected', () => {
