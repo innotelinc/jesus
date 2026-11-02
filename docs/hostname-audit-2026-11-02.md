@@ -61,3 +61,36 @@ None of these can be repaired from here: their upstreams are processes on boxes 
 `rizzaura.net` (apex, `www`, `app`, `api`, `auth`, `admin`, `mail`, `community`, `com.unity`) and `atheniq.online` / `atheniq.courses` / `atheniq.institute` (plus `class`, `mail`, `ns1`) all answer on `73.68.203.71` today. The applications behind them — the Rizzaura site and API, the Atheniq course platform and its Grafana — exist nowhere in this stack: the edge has no container, image or volume that serves them, so an A record moved to `45.77.221.158` today would not consolidate anything, it would take down a working site and answer 404 from the front door. They move when their applications move, one line of `domains.json` and one record each.
 
 That is the same reason `docs/dns-retired-66.42.116.17.json` exists: a name follows its application, not the other way round.
+
+## What the proxy box actually looks like, and what was repaired on it
+
+`73.68.203.71` is the WAN address of the home LAN; the box behind it is `proxy` at `192.168.1.71`, and it runs the estate's existing edge (`cerulean-npm`, an OpenResty build of Nginx Proxy Manager) with **204 proxy hosts and 24 redirections**, 229 enabled vhosts in all. Every name that answers on that address answers because of one of those hosts. The names that refuse the handshake simply have none — they were vhosted on the retired `66.42.116.17` and only their DNS was carried over.
+
+Where the applications behind those vhosts live:
+
+| application | served by | names |
+|---|---|---|
+| **Atheniq** | `104.238.162.5` — institute `:8085`, courses/apps/studio/catalog/learn `:18080`, workforce `:8087` | `atheniq.institute`, `atheniq.courses`, `atheniq.online`, subdomains |
+| Zeus | `104.238.162.5:8088` | `zeus.innotel.us` |
+| Rizzaura | `192.168.1.62` — site/app `:3021`, api `:3020`, admin `:3013`, rankings `:3022` | `rizzaura.net`, `app.`, `api.`, `admin.`, `rankings.` |
+| Onyx | `192.168.1.60` — app `:2080`, api `:2081`, storage `:2090`, backup `:2084` | `onyx.innotel.us`, `app.`, `api.`, `storage.`, `backup.` |
+| Oasis / mail | `192.168.1.15` — `:3000`, admin `:8091`, mail `:8080` | `oasis.innotel.us`, `files.`, `mail.` |
+| Loomix | `192.168.1.15:3000` | `loomix.art`, `loomix.lol` |
+| Atlas (Gitea), Genie | `192.168.1.90:3004`, `192.168.1.21:3400` | `atlas.innotel.us`, `genie.innotel.us` |
+
+Repaired on that box and in DNS:
+
+| name | was | change |
+|---|---|---|
+| `admin.onyx.innotel.us` | 404 — pointed at the API (`:2081`), which has no route for a panel | forwarded to the app (`:2080`); **now 200** |
+| `blueprint.innotel.us` | 502 — upstream `192.168.1.52:8787` gone | host disabled, record retired |
+| `pm4.innotel.us` | refused — upstream `192.168.1.4:8006` gone, no vhost | record retired |
+| `i3.innotel.us` | refused, no vhost | record retired |
+| `app.loomix.art`, `app.loomix.lol` | refused, no vhost | record retired (the Loomix app answers on the apex) |
+| `accounts.`, `acme.`, `astpp.`, `ansible.`, `auth1.innotel.us` | refused, no vhost, no application | records retired |
+
+Retired records are in `docs/dns-retired-2026-11-02.json` — type, rdata and zone per name — so any of them can be republished.
+
+Deliberately left alone: `app.onyx.innotel.us` answers 401 because oauth2-proxy in front of it is asking for a credential (correct, not broken); `pi.innotel.us` answers 403 because Pi-hole refuses the admin UI from outside (correct); `api.rizzaura.net` answers `{"ok":false,"error":"not found"}` at `/` because the API has no route there — the service is alive and the path is the caller's; `admin.oasis.innotel.us` answers 501 from the application at `:8091`, which is an upstream answer, not a proxy one.
+
+What is left are the ~190 names of the retired box's family (`*.capstone.*`, `*.rizz.*`, `*.zeus.*`, `*.atlas.*`, `ns1/ns2`, `mail.*`). The `ns1`/`ns2` names are delegation records and need no vhost; the `mail.*`/`autoconfig`/`mta-sts` names exist for MX and autodiscovery. The rest need either their application added to a host on this box (which means a certificate re-issue per host, since a new name in a block is a new name on the certificate) or retirement — a decision per family, not a sweep.

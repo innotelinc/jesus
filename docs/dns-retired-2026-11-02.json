@@ -1,0 +1,112 @@
+{
+ "blueprint.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "pm4.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "i3.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "A",
+    "rData": {
+     "ipAddress": "73.68.203.71"
+    }
+   }
+  ]
+ },
+ "app.loomix.art": {
+  "zone": "loomix.art",
+  "records": [
+   {
+    "type": "A",
+    "rData": {
+     "ipAddress": "73.68.203.71"
+    }
+   }
+  ]
+ },
+ "app.loomix.lol": {
+  "zone": "loomix.lol",
+  "records": [
+   {
+    "type": "A",
+    "rData": {
+     "ipAddress": "73.68.203.71"
+    }
+   }
+  ]
+ },
+ "accounts.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "acme.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "astpp.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "ansible.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "auth1.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ }
+}
