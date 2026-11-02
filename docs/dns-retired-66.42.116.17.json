@@ -1,0 +1,224 @@
+{
+  "retired": "66.42.116.17",
+  "capturedAt": "2026-11-02",
+  "count": 31,
+  "records": [
+    {
+      "zone": "innotel.us",
+      "name": "pbx.capstone.innotel.us",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "innotel.us",
+      "name": "voice.capstone.innotel.us",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "innotel.us",
+      "name": "ord-voice.innotel.us",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "innotel.us",
+      "name": "pbx.innotel.us",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "innotel.us",
+      "name": "voice.innotel.us",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "admin.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "api.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "backend.api.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "app.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "dashboard.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "dograh.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "grafana.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "grist.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "n8n.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "pbx.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "voice.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "workflow.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.it.com",
+      "name": "www.pbx.it.com",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "admin.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "api.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "app.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "coturn.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "fax.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "pbx.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "portal.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "subscribe.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "ws.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.services",
+      "name": "www.pbx.services",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    },
+    {
+      "zone": "pbx.technology",
+      "name": "fax.pbx.technology",
+      "type": "A",
+      "value": "66.42.116.17",
+      "ttl": 300
+    }
+  ]
+}
