@@ -82,6 +82,18 @@ export const SITES = {
     // Served by CHRIST, not this app; the entry exists so the map is complete.
     upstream: 'christ',
   },
+  'capstone.telno.services': {
+    role: 'agentops',
+    eyebrow: 'Capstone · AgentOps',
+    headline: 'The agents, the studio and the numbers they answer.',
+    lede:
+      'Agent definitions, the workflow studio that gives each one its script, and the supervision that keeps the runtime answering — with every agent number already routed on the switch.',
+    primary: { label: 'Open the Control Center', to: '/' },
+    secondary: { label: 'Open the studio', to: '/studio' },
+    // Served by the Capstone console, not this app; the entry exists so the map
+    // is complete and the tests can hold the declaration to it.
+    upstream: 'capstone',
+  },
   // The front door itself. CHRIST answers here and proxies every product, so
   // the page behind it is the board — the platform's own entry only names the
   // door so the domain map stays complete.

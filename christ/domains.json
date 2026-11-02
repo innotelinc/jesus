@@ -56,6 +56,12 @@
       "role": "front-door",
       "upstream": "christ:8001",
       "about": "The CHRIST board under its own name: the front door to the estate, what is running and whether it is up."
+    },
+    {
+      "host": "capstone.telno.services",
+      "role": "agentops",
+      "upstream": "capstone:80",
+      "about": "AgentOps: the Capstone Control Center — the agent definitions, the workflow studio, the dashboards and the supervision that keeps dograh answering, over cantus-control and cantus-ari. It gets its own origin because the console is a single-page app: its assets, its /api aggregator and its /ws softphone socket all live at the root, and a page served under another product's prefix loads blank."
     }
   ]
 }
