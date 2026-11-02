@@ -28,6 +28,7 @@
 
 telno.services, www.telno.services {
 	import edge
+	redir / /login 302
 	reverse_proxy telno:8080
 }
 

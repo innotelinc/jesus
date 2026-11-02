@@ -33,7 +33,7 @@ import Customer from './pages/Customer.jsx';
 import Customers from './pages/Customers.jsx';
 import Setup, { useSetupStatus } from './pages/Setup.jsx';
 import Onboarding from './pages/Onboarding.jsx';
-import { entryPath } from './sites.js';
+import { entryPath, hostOf } from './sites.js';
 
 const PAGES = [
   { path: '/', title: 'Dashboard', subtitle: 'Platform and registry at a glance', Component: Dashboard },
@@ -132,9 +132,16 @@ function Router() {
   }
 
   if (status === 'anon') {
-    // A visitor who is not signed in lands on the site, not on a login form:
-    // the console is a paid product and the site is how somebody buys it — and
-    // its "Open the console" link is the way to the sign-in from there.
+    // The product door opens on the sign-in. telno.services is where an operator
+    // lands, so it goes straight to the login; the marketing page is still one
+    // link away at /welcome, and every other door keeps it as its front page.
+    if (pathname === '/' && hostOf(window.location.host) === 'telno.services') {
+      navigate('/login', { replace: true });
+      return <Login />;
+    }
+    // Any other door: a visitor who is not signed in lands on the site, not on a
+    // login form — the site is how somebody buys the product, and its "Open the
+    // console" link is the way to the sign-in from there.
     if (pathname === '/') return <Site />;
     navigate('/login', { replace: true });
     return <Login />;

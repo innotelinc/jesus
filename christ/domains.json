@@ -11,7 +11,8 @@
       "host": "telno.services",
       "role": "product",
       "upstream": "telno:8080",
-      "about": "The company: what the product is, what it costs, and the signup that buys it. Also the address every message is sent from."
+      "redirect": "/login",
+      "about": "The company: what the product is, what it costs, and the signup that buys it. Also the address every message is sent from. The root opens on the sign-in; the marketing page moved to /welcome."
     },
     {
       "host": "telno.online",
