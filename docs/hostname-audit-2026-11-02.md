@@ -94,3 +94,13 @@ Retired records are in `docs/dns-retired-2026-11-02.json` — type, rdata and zo
 Deliberately left alone: `app.onyx.innotel.us` answers 401 because oauth2-proxy in front of it is asking for a credential (correct, not broken); `pi.innotel.us` answers 403 because Pi-hole refuses the admin UI from outside (correct); `api.rizzaura.net` answers `{"ok":false,"error":"not found"}` at `/` because the API has no route there — the service is alive and the path is the caller's; `admin.oasis.innotel.us` answers 501 from the application at `:8091`, which is an upstream answer, not a proxy one.
 
 What is left are the ~190 names of the retired box's family (`*.capstone.*`, `*.rizz.*`, `*.zeus.*`, `*.atlas.*`, `ns1/ns2`, `mail.*`). The `ns1`/`ns2` names are delegation records and need no vhost; the `mail.*`/`autoconfig`/`mta-sts` names exist for MX and autodiscovery. The rest need either their application added to a host on this box (which means a certificate re-issue per host, since a new name in a block is a new name on the certificate) or retirement — a decision per family, not a sweep.
+
+## 2026-11-02, second pass: names served, names retired
+
+Two rules, applied name by name against what the proxy box actually hosts.
+
+**Served.** A name whose parent is a live host on the proxy box joins that host, and the host gets a fresh certificate covering every name in the block. Ten names came back this way: the whole `zeus.innotel.us` family (`admin`, `app`, `api`, `auth`, `ws`, `portal`, `teams`, `pbx` — all now 200 behind one certificate), `api.atlas.innotel.us` (200, Gitea) and `dns.proxy.innotel.us` (302). `admin.onyx.innotel.us` had already been moved off the API port to the app.
+
+**Retired.** A name with no host and no live parent is a name nobody can resolve to anything, so its record is gone rather than left refusing the handshake: twelve `*.capstone.innotel.us`, six `*.rizz.innotel.us` (the parent `rizz.innotel.us` does not exist anywhere on the box), and the ten leftovers retired earlier. Twenty-eight names in total; every record is in `dns-retired-2026-11-02.json`.
+
+**Not done, and why.** The three redirection hosts (`atheniq.innotel.us`, `learn.innotel.us`, `ontrak.innotel.us`) refuse a write through this fork's API — `data must NOT have additional properties` for every field set that omits only the read-only ones — so `auth.atheniq.innotel.us`, `apps.learn.innotel.us` and the `*.ontrak.innotel.us` names still refuse the handshake. They need the write done in the NPM UI, or the fork's schema read first. Also unplanned: the proxy box rebooted at 02:26Z and came back with its containers up; the public names were verified answering afterwards.

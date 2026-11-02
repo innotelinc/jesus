@@ -108,5 +108,203 @@
     }
    }
   ]
+ },
+ "admin.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "api.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "backend.api.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "app.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "auth.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "dashboard.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "dograh.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "grafana.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "A",
+    "rData": {
+     "ipAddress": "73.68.203.71"
+    }
+   }
+  ]
+ },
+ "grist.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "n8n.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "portal.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "workflow.capstone.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "admin.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "api.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "app.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "auth.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "community.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
+ },
+ "rankings.rizz.innotel.us": {
+  "zone": "innotel.us",
+  "records": [
+   {
+    "type": "CNAME",
+    "rData": {
+     "cname": "innotel.us"
+    }
+   }
+  ]
  }
 }
