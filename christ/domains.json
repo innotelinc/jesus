@@ -104,6 +104,33 @@
       "alias": true,
       "upstream": "grist:8484",
       "about": "The document store the grading workflow writes interview reports into."
+    },
+    {
+      "host": "christ.innotel.us",
+      "alias": true,
+      "upstream": "christ:8001",
+      "about": "The estate's own front door under the name it was given first. It answered on the retired edge until now; christ.telno.services and this are the same board."
+    },
+    {
+      "host": "directory.pbx.services",
+      "alias": true,
+      "upstream": "telno:8080",
+      "redirect": "/d/directory.pbx.services",
+      "about": "A phonebook name the retired edge answered with 502: the registry has always carried this host (see DIRECTORY_HOSTS in apps/telno/src/config.js), so the root goes to its page rather than a dead upstream."
+    },
+    {
+      "host": "directory.pbx.technology",
+      "alias": true,
+      "upstream": "telno:8080",
+      "redirect": "/d/directory.pbx.technology",
+      "about": "The same phonebook under its other name, for the same reason: the registry carries it, the box that used to answer for it does not answer any more."
+    },
+    {
+      "host": "directory.telno.services",
+      "alias": true,
+      "upstream": "telno:8080",
+      "redirect": "/d/directory.telno.services",
+      "about": "The directory's own name. It is in DIRECTORY_HOSTS, so it was always meant to answer here; until now its only vhost was on the retired edge."
     }
   ]
 }

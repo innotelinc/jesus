@@ -2,323 +2,62 @@
 
 Every A/CNAME record in the 27 authoritative zones that points at an estate address was probed over HTTPS (414 distinct names). Grouped by the address it reaches.
 
-## 45.77.221.158 — 18 names
+Two corrections to the first pass of this document are recorded below, because both change what the estate's problem actually is: the initial run called names "no TLS" that were in fact never reached, and it counted failures that a re-probe fifteen minutes later showed answering.
+
+## 45.77.221.158 — the consolidated edge: 22 names
 
 | result | count | meaning |
 |---|---|---|
-| ok | 17 | answers with a page |
+| ok | 21 | answers with a page, certificate valid for the name |
 | auth | 1 | answers, asks for a sign-in (correct) |
 
-## 73.68.203.71 — 144 names
+Four of these arrived during this audit, moved off `73.68.203.71` and verified after the move:
 
-| result | count | meaning |
+| name | answers | certificate |
 |---|---|---|
-| no-tls | 102 | no usable certificate for this name, or nothing listening on 443 |
-| ok | 41 | answers with a page |
-| 502 | 1 | certificate fine, upstream behind the edge is down |
+| `christ.innotel.us` | 200, the CHRIST board | issued 05:56Z, expires 2027-01-31 |
+| `directory.pbx.services` | 302 → `/d/directory.pbx.services` → 200 | issued 05:56Z, expires 2027-01-31 |
+| `directory.pbx.technology` | 302 → `/d/directory.pbx.technology` → 200 | issued 05:56Z, expires 2027-01-31 |
+| `directory.telno.services` | 302 → `/d/directory.telno.services` → 200 | issued 05:56Z, expires 2027-01-31 |
 
-<details><summary>names that do not answer</summary>
+The three phonebook names were 502s on the old box: the registry has always carried them (`DIRECTORY_HOSTS` in `apps/telno/src/config.js`), so the names were pointed at the box that owns the work rather than the box that used to forward it. They are declared in `christ/domains.json` and rendered from there.
 
-- `*.genie.innotel.us`
-- `*.lab.innotel.us`
-- `admin.mail.innotel.us`
-- `admin.rizzaura.net`
-- `api.atlas.innotel.us`
-- `api.rizzaura.net`
-- `app.loomix.art`
-- `app.loomix.lol`
-- `app.rizzaura.net`
-- `atheniq.courses`
-- `atheniq.institute`
-- `atheniq.online`
-- `atlas.innotel.us`
-- `auth.pbx.it.com`
-- `auth.pbx.services`
-- `auth.rizzaura.net`
-- `chef.atlas.innotel.us`
-- `christ.innotel.us`
-- `class.atheniq.courses`
-- `cm.innotel.tech`
-- `cm.innotel.us`
-- `com.unity.rizzaura.net`
-- `community.rizzaura.net`
-- `convex.atlas.innotel.us`
-- `coursemate.innotel.tech`
-- `denovo.credit`
-- `denovocredit.com`
-- `directory.pbx.services`
-- `directory.pbx.technology`
-- `directory.telno.services`
-- `genie.ontrak.innotel.us`
-- `grafana.capstone.innotel.us`
-- `i3.innotel.us`
-- `its.ontrak.innotel.us`
-- `lab.ontrak.innotel.us`
-- `mail.atheniq.courses`
-- `mail.atheniq.institute`
-- `mail.atheniq.online`
-- `mail.innotel.site`
-- `mail.innovative.tel`
-- `mail.ontrak.technology`
-- `mail.pbx.it.com`
-- `mail.pbx.services`
-- `mail.pbx.technology`
-- `mail.rizzaura.net`
-- `ns1.atheniq.courses`
-- `ns1.atheniq.institute`
-- `ns1.atheniq.online`
-- `ns1.denovo.credit`
-- `ns1.denovocredit.com`
-- `ns1.innotel.site`
-- `ns1.innotel.tech`
-- `ns1.innotel.us`
-- `ns1.innovative.tel`
-- `ns1.loomix.art`
-- `ns1.loomix.lol`
-- `ns1.num.directory`
-- `ns1.number.directory`
-- `ns1.ontrak.technology`
-- `ns1.orion.locker`
-- `ns1.pbx.it.com`
-- `ns1.pbx.services`
-- `ns1.pbx.technology`
-- `ns1.rizzaura.net`
-- `ns1.telno.digital`
-- `ns1.telno.directory`
-- `ns1.telno.mobi`
-- `ns1.telno.network`
-- `ns1.telno.online`
-- `ns1.telno.services`
-- `ns1.telno.tel`
-- `ns2.atheniq.courses`
-- `ns2.atheniq.institute`
-- `ns2.atheniq.online`
-- `ns2.denovo.credit`
-- `ns2.denovocredit.com`
-- `ns2.innotel.site`
-- `ns2.innotel.tech`
-- `ns2.innotel.us`
-- `ns2.innovative.tel`
-- `ns2.loomix.art`
-- `ns2.loomix.lol`
-- `ns2.num.directory`
-- `ns2.number.directory`
-- `ns2.ontrak.technology`
-- `ns2.orion.locker`
-- `ns2.pbx.it.com`
-- `ns2.pbx.services`
-- `ns2.pbx.technology`
-- `ns2.rizzaura.net`
-- `ns2.telno.digital`
-- `ns2.telno.directory`
-- `ns2.telno.mobi`
-- `ns2.telno.network`
-- `ns2.telno.online`
-- `ns2.telno.services`
-- `ns2.telno.tel`
-- `plutus.innotel.us`
-- `sentinel.ontrak.innotel.us`
-- `sync.ontrak.innotel.us`
-- `tix.ontrak.innotel.us`
-- `turn.telno.services`
-- `v.innotel.us`
+## 73.68.203.71 — the old edge: 272 names still reach it
 
-</details>
+The 276-name suspect set from the first pass was re-probed twice each, sequentially enough not to trip the box's own rate limits. The result is not a certificate problem:
 
-## innotel.site — 1 names
-
-| result | count | meaning |
+| result | count | what it actually is |
 |---|---|---|
-| ok | 1 | answers with a page |
+| handshake rejected | 206 | `tlsv1 unrecognized name` — nginx refuses the name at the handshake, i.e. **no vhost for it**, no certificate asked for |
+| 302 | 22 | answering, redirecting somewhere |
+| 200 | 20 | answering |
+| 301 | 11 | answering, redirecting |
+| 404 | 4 | vhost exists, route does not |
+| 502 | 1 | vhost and certificate fine, upstream behind it is gone |
+| 307 / 308 / 401 / 501 | 5 | answering, by design |
+| wildcards | 3 | `*.genie`, `*.lab`, `*.atheniq` — reported, not names a browser types |
 
-## innotel.tech — 1 names
+Handshake rejections by zone: `innotel.us` 141, then three each in `rizzaura.net`(5), `loomix.art`, `loomix.lol`, `atheniq.courses`, `atheniq.institute`, `atheniq.online`, `innotel.site`, `innovative.tel`, `ontrak.technology`, `it.com`, `pbx.services`, `pbx.technology`, `telno.services`.
 
-| result | count | meaning |
+**The certificates on that box are not the fault.** The names it does serve carry valid Let's Encrypt certificates — `rizzaura.net` has `*.rizzaura.net` + apex, `atheniq.online` has `*.atheniq.online` + apex, `christ.innotel.us` had its own — all with months left. A name that fails there was never added to its proxy, and adding one needs a shell on that box, which this host cannot reach (port 22 closed from the estate's vantage point; 80 and 443 are the only open ports).
+
+## Still failing, and why
+
+| name | result | cause |
 |---|---|---|
-| ok | 1 | answers with a page |
+| `blueprint.innotel.us` | 502 | vhost up, upstream process gone |
+| `admin.onyx.innotel.us`, `api.onyx.innotel.us`, `backup.onyx.innotel.us` | 404 | Go-style "404 page not found": the old proxy aliases point at a route that was removed |
+| `api.rizzaura.net` | 404 | `{"ok":false,"error":"not found"}` — the app answers, the endpoint does not exist |
+| `app.onyx.innotel.us` | 401 | route exists, credential required |
+| `admin.oasis.innotel.us` | 501 | route exists, handler unimplemented |
+| `pi.innotel.us` | 403 | Pi-hole admin, refusing by design |
+| `app.loomix.art`, `app.loomix.lol` | connect failure | resolves to `73.68.203.71`, nothing answers on 443 for those names |
+| `i3.innotel.us`, `pm4.innotel.us` | 502 in the first pass, handshake-rejected now | proxy-manager instances on retired hardware |
 
-## innotel.us — 250 names
+None of these can be repaired from here: their upstreams are processes on boxes without a shell from this host. What the consolidated edge *can* serve, it now serves.
 
-| result | count | meaning |
-|---|---|---|
-| no-tls | 168 | no usable certificate for this name, or nothing listening on 443 |
-| ok | 78 | answers with a page |
-| auth | 2 | answers, asks for a sign-in (correct) |
-| 404 | 1 | certificate fine, nothing on that path |
-| 502 | 1 | certificate fine, upstream behind the edge is down |
+## What did not move, and why
 
-<details><summary>names that do not answer</summary>
+`rizzaura.net` (apex, `www`, `app`, `api`, `auth`, `admin`, `mail`, `community`, `com.unity`) and `atheniq.online` / `atheniq.courses` / `atheniq.institute` (plus `class`, `mail`, `ns1`) all answer on `73.68.203.71` today. The applications behind them — the Rizzaura site and API, the Atheniq course platform and its Grafana — exist nowhere in this stack: the edge has no container, image or volume that serves them, so an A record moved to `45.77.221.158` today would not consolidate anything, it would take down a working site and answer 404 from the front door. They move when their applications move, one line of `domains.json` and one record each.
 
-- `*.signara.innotel.us`
-- `accounts.innotel.us`
-- `acme.innotel.us`
-- `admin.capstone.innotel.us`
-- `admin.cerulean.innotel.us`
-- `admin.distro.innotel.us`
-- `admin.magnate.innotel.us`
-- `admin.monarch.innotel.us`
-- `admin.oasis.innotel.us`
-- `admin.ontrak.innotel.us`
-- `admin.onyx.innotel.us`
-- `admin.rizz.innotel.us`
-- `admin.zeus.innotel.us`
-- `ai.innotel.us`
-- `ai.lms.innotel.us`
-- `alerts.innotel.us`
-- `ansible.innotel.us`
-- `api.capstone.innotel.us`
-- `api.cerulean.innotel.us`
-- `api.oasis.innotel.us`
-- `api.onyx.innotel.us`
-- `api.rizz.innotel.us`
-- `api.zeus.innotel.us`
-- `app.capstone.innotel.us`
-- `app.cerulean.innotel.us`
-- `app.magnate.innotel.us`
-- `app.oasis.innotel.us`
-- `app.onyx.innotel.us`
-- `app.rizz.innotel.us`
-- `app.zeus.innotel.us`
-- `apps.learn.innotel.us`
-- `apps.lms.innotel.us`
-- `astpp.innotel.us`
-- `atheniq.innotel.us`
-- `auth.atheniq.innotel.us`
-- `auth.atlas.innotel.us`
-- `auth.capstone.innotel.us`
-- `auth.cerulean.innotel.us`
-- `auth.distro.innotel.us`
-- `auth.innotel.us`
-- `auth.magnate.innotel.us`
-- `auth.monarch.innotel.us`
-- `auth.oasis.innotel.us`
-- `auth.onyx.innotel.us`
-- `auth.plutus.innotel.us`
-- `auth.rizz.innotel.us`
-- `auth.zapit.innotel.us`
-- `auth.zeus.innotel.us`
-- `auth1.innotel.us`
-- `auto.innotel.us`
-- `babyai.innotel.us`
-- `backend.api.capstone.innotel.us`
-- `backup.onyx.innotel.us`
-- `bank.innotel.us`
-- `base.innotel.us`
-- `bazarr.monarch.innotel.us`
-- `bbb.innotel.us`
-- `bill.innotel.us`
-- `billing.innotel.us`
-- `billing.magnate.innotel.us`
-- `blueprint.innotel.us`
-- `bolt.innotel.us`
-- `book.innotel.us`
-- `bot.innotel.us`
-- `brr.innotel.us`
-- `bt.innotel.us`
-- `capstone.innotel.us`
-- `certs.cerulean.innotel.us`
-- `cerulean.cerulean.innotel.us`
-- `cerulean.innotel.us`
-- `classroom.innotel.us`
-- `cloud.innotel.us`
-- `code.ai.innotel.us`
-- `cola.innotel.us`
-- `collab.innotel.us`
-- `community.rizz.innotel.us`
-- `convex.innotel.us`
-- `cool.innotel.us`
-- `coturn.zeus.innotel.us`
-- `cp.distro.innotel.us`
-- `credit.api.innotel.us`
-- `credit.innotel.us`
-- `dashboard.capstone.innotel.us`
-- `db.innotel.us`
-- `dc.innotel.us`
-- `delivery.innotel.us`
-- `demo.innotel.us`
-- `dev.innotel.us`
-- `discord.innotel.us`
-- `distro.innotel.us`
-- `dl.innotel.us`
-- `dns.proxy.innotel.us`
-- `docker.innotel.us`
-- `docs.innotel.us`
-- `dograh.capstone.innotel.us`
-- `droppy.innotel.us`
-- `ebook.innotel.us`
-- `flow.innotel.us`
-- `gpt.innotel.us`
-- `grist.capstone.innotel.us`
-- `guard.innotel.us`
-- `ha.innotel.us`
-- `headscale.innotel.us`
-- `health.monarch.innotel.us`
-- `homarr.innotel.us`
-- `hsportainer.innotel.us`
-- `httpsms.innotel.us`
-- `jupyter.innotel.us`
-- `key.innotel.us`
-- `langfuse.innotel.us`
-- `live.innotel.us`
-- `meilisearch.learn.innotel.us`
-- `minio.innotel.us`
-- `monit.innotel.us`
-- `n8n.capstone.innotel.us`
-- `n8n.innotel.us`
-- `neo4j.innotel.us`
-- `neo4js.innotel.us`
-- `nix.innotel.us`
-- `omni.innotel.us`
-- `online.innotel.us`
-- `orbi.innotel.us`
-- `orbi1.innotel.us`
-- `orbi2.innotel.us`
-- `payroll.innotel.us`
-- `pbx.zeus.innotel.us`
-- `pdash.innotel.us`
-- `pdm.innotel.us`
-- `pfsense.innotel.us`
-- `pgp.innotel.us`
-- `pi-tailscale.innotel.us`
-- `pihole.innotel.us`
-- `player.innotel.us`
-- `playsms.innotel.us`
-- `pm1.innotel.us`
-- `pm2.innotel.us`
-- `pm4.innotel.us`
-- `pmg.innotel.us`
-- `portal.capstone.innotel.us`
-- `portal.zeus.innotel.us`
-- `proxy.api.innotel.us`
-- `qb.innotel.us`
-- `quad.innotel.us`
-- `rankings.rizz.innotel.us`
-- `record.innotel.us`
-- `repo.innotel.us`
-- `repo1.innotel.us`
-- `searxng.innotel.us`
-- `sec.innotel.us`
-- `securedocs.innotel.us`
-- `semaphore.ansible.innotel.us`
-- `signal.innotel.us`
-- `slack.innotel.us`
-- `sms.innotel.us`
-- `stealth.innotel.us`
-- `student.ontrak.innotel.us`
-- `stun.innotel.us`
-- `subscribe.api.innotel.us`
-- `teams.zeus.innotel.us`
-- `teleport.innotel.us`
-- `test.innotel.us`
-- `traefik.innotel.us`
-- `tts.innotel.us`
-- `tunnel.innotel.us`
-- `turn.innotel.us`
-- `voip.innotel.us`
-- `wazuh.innotel.us`
-- `workflow.capstone.innotel.us`
-- `ws.zeus.innotel.us`
-- `ziso.innotel.us`
-
-</details>
-
+That is the same reason `docs/dns-retired-66.42.116.17.json` exists: a name follows its application, not the other way round.

@@ -107,3 +107,26 @@ grist.pbx.it.com {
 	import edge
 	reverse_proxy grist:8484
 }
+
+christ.innotel.us {
+	import edge
+	reverse_proxy christ:8001
+}
+
+directory.pbx.services {
+	import edge
+	redir / /d/directory.pbx.services 302
+	reverse_proxy telno:8080
+}
+
+directory.pbx.technology {
+	import edge
+	redir / /d/directory.pbx.technology 302
+	reverse_proxy telno:8080
+}
+
+directory.telno.services {
+	import edge
+	redir / /d/directory.telno.services 302
+	reverse_proxy telno:8080
+}

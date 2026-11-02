@@ -82,6 +82,13 @@ test('the retired pbx names are aliases onto services that answer here, one name
     'fax.pbx.technology': 'fax-engine:8080',
     'n8n.pbx.it.com': 'n8n:5678',
     'grist.pbx.it.com': 'grist:8484',
+    // Names whose only vhost lived on the retired edge, or whose vhost there
+    // answered 502 because the upstream behind it is gone. They land on the
+    // service that owns the job here: the board, and the phonebook.
+    'christ.innotel.us': 'christ:8001',
+    'directory.pbx.services': 'telno:8080',
+    'directory.pbx.technology': 'telno:8080',
+    'directory.telno.services': 'telno:8080',
   });
   // An alias carries one name. The www form has no record behind it, and a block
   // that asks for its certificate would spend retries on a name nobody typed.
