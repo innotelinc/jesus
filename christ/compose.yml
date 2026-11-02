@@ -141,6 +141,9 @@ services:
       # Empty unless the profile is on: a URL for a container that was never
       # selected reads as a broken product, and it is not broken, it is absent.
       TELNO_URL: ${TELNO_URL:-}
+      # The operator's window on this switch. Empty when the console profile is
+      # off, so the board reports it absent rather than probing a dead port.
+      ESTATE_URL: ${ESTATE_URL:-}
       GATEWAY_URL: ${GATEWAY_URL:-}
       CAPSTONE_URL: ${CAPSTONE_URL:-}
       DOGRAH_URL: ${DOGRAH_URL:-}

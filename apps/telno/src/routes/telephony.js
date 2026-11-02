@@ -375,6 +375,22 @@ export default async function telephonyRoutes(app) {
     };
   });
 
+  /**
+   * Wipe the call log.
+   *
+   * History is a record, not a cache — but a DID that a carrier probe found
+   * fills the log with hundreds of rows nobody placed, and the real calls stop
+   * being findable. Clearing is therefore an operator action with an audit
+   * line and a count, not a silent truncate: one button, no filter, so
+   * "clear" cannot quietly mean "clear the rows I do not like".
+   */
+  writeRoute('delete', '/calls', { preHandler: requireWrite }, async (request) => {
+    const before = db_.get('SELECT COUNT(*) AS n FROM calls').n || 0;
+    db_.run('DELETE FROM calls');
+    logEvent({ actor: request.account.email, action: 'telephony.calls_cleared', subject: `${before} calls`, ip: request.ip });
+    return { ok: true, cleared: before };
+  });
+
   app.get('/calls/stats', async () => {
     const since = new Date(Date.now() - 7 * 86400_000).toISOString();
     const today = new Date(Date.now() - 86400_000).toISOString();

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, clockTime, duration, relativeTime } from '../api.js';
-import { Badge, Button, Card, Empty, Icon, Loading, PageHeader, Stat, statusTone } from '../ui.jsx';
+import { Badge, Button, Card, Empty, Icon, Loading, PageHeader, Stat, statusTone, useToast } from '../ui.jsx';
 
 export default function Calls() {
   const [items, setItems] = useState([]);
@@ -8,7 +8,12 @@ export default function Calls() {
   const [direction, setDirection] = useState('');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  // Bumped after a clear so the effect reloads rather than waiting out the
+  // 15 s poll with an empty table on screen.
+  const [refresh, setRefresh] = useState(0);
   const debounce = useRef();
+  const toast = useToast();
 
   useEffect(() => {
     const load = async () => {
@@ -32,7 +37,27 @@ export default function Calls() {
       clearTimeout(debounce.current);
       clearInterval(timer);
     };
-  }, [direction, query]);
+  }, [direction, query, refresh]);
+
+  /**
+   * Clear the whole log. The confirm is the guard: there is no undo, and the
+   * rows are the only record that a call happened at all.
+   */
+  const clearHistory = async () => {
+    if (!window.confirm('Clear the entire call history? This cannot be undone.')) return;
+    setClearing(true);
+    try {
+      const result = await api.del('/calls');
+      setItems([]);
+      setStats(null);
+      toast.success('Call history cleared', `${result?.cleared ?? 0} calls removed`);
+      setRefresh((value) => value + 1);
+    } catch (err) {
+      toast.error('Could not clear the call history', err.message);
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const last24 = stats?.last24h || { total: 0, answered: 0, missed: 0, avgTalk: 0 };
   const rate = last24.total ? Math.round((last24.answered / last24.total) * 100) : 0;
@@ -73,6 +98,18 @@ export default function Calls() {
             <option value="internal">Internal</option>
           </select>
           {stats?.active > 0 ? <Badge tone="success" dot="live">{stats.active} live</Badge> : null}
+          <div className="spacer" style={{ flex: 1 }} />
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="trash"
+            loading={clearing}
+            disabled={!items.length}
+            onClick={clearHistory}
+            title={items.length ? 'Delete every row in the call log' : 'The call log is already empty'}
+          >
+            Clear history
+          </Button>
         </div>
 
         {loading ? (

@@ -91,6 +91,18 @@ function extensionOf(address) {
 }
 
 /**
+ * The number as a person reads it.
+ *
+ * Cantus addresses a call as `<number>@<node domain>`, which is right on the
+ * wire and wrong in a call record: the node suffix showed up in every row as
+ * `...@switch@estate.local`, where the inventory wants the number that rang.
+ */
+function presented(address) {
+  const [user] = String(address || '').split('@');
+  return user || '';
+}
+
+/**
  * Apply one switch event to the call record. Exported so a test can drive it
  * without a switch or a socket.
  */
@@ -114,8 +126,8 @@ export function onEvent(event) {
         // default and the outcome lands when the call ends.
         upsertCall(event.callId, {
           direction: directionFor(event),
-          from_number: String(event.from || ''),
-          to_number: String(event.to || ''),
+          from_number: presented(event.from),
+          to_number: presented(event.to),
           extension: extensionOf(event.to),
           started_at: new Date(event.at || Date.now()).toISOString(),
         });
@@ -163,8 +175,8 @@ export function onEvent(event) {
         // timestamps, so its duration is the authoritative one.
         upsertCall(event.callId, {
           direction: event.direction || 'inbound',
-          from_number: event.from || '',
-          to_number: event.to || '',
+          from_number: presented(event.from),
+          to_number: presented(event.to),
           extension: event.extension || extensionOf(event.to),
           started_at: event.startedAt,
           answered_at: event.answeredAt,

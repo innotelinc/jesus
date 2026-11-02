@@ -64,6 +64,23 @@ export function buildTrunks(estate) {
 }
 
 /**
+ * What a caller reaches when nobody picks up: answer, greet, record, and wait.
+ *
+ * `answer` is not optional — a greeting played into a call nobody answered is
+ * never heard — and neither is the pause: `record` followed straight by a hangup
+ * opens the file and closes it again, so the message was always empty.
+ */
+function voicemail(line) {
+  return [
+    { answer: {} },
+    { play: { file: 'voicemail-greeting' } },
+    { record: { name: `vm-${line}` } },
+    { pause: { ms: 180_000 } },
+    { reject: 0 },
+  ];
+}
+
+/**
  * The routing document, in the order that decides the dial plan.
  *
  * Order is the dial plan: a DID is eleven digits and would also match the
@@ -88,9 +105,7 @@ export function buildRoutes(estate) {
       if (office?.line) {
         const actions = [
           { bridge: { to: String(office.line), timeout: 25 } },
-          { play: { file: 'voicemail-greeting' } },
-          { record: { name: `vm-${plain(office.line)}-${digits(estate.did)}` } },
-          { reject: 0 },
+          ...voicemail(plain(office.line)),
         ];
         routes.push({
           name: `did-${name}-office`,
@@ -98,15 +113,20 @@ export function buildRoutes(estate) {
           then: actions,
         });
       }
-      if (estate.afterHours?.agent) {
+      // Outside office hours the line still rings and the caller still reaches
+      // voicemail. It used to hand the call to the agent runtime instead, which
+      // is only a destination while an ARI client is attached: with none, the
+      // switch ended every inbound call as `app-unavailable` in under a second.
+      // The agents keep their own extensions below, so the AI plane is still
+      // dialable; a DID is a phone number that has to answer.
+      if (office?.line) {
         routes.push({
           name: `did-${name}-after-hours`,
           when: { to: `${name}*` },
-          // No `answer` first: an ARI app has to receive the call still ringing so
-          // it knows this is an inbound call (state=Ring) and answers it itself.
-          // Answering here made every inbound call look like an outbound channel
-          // the runtime had originated, and it dropped it for want of a run id.
-          then: [{ ari: { app: agentApp } }],
+          then: [
+            { bridge: { to: String(office.line), timeout: 25 } },
+            ...voicemail(plain(office.line)),
+          ],
         });
       }
     }
@@ -132,11 +152,8 @@ export function buildRoutes(estate) {
       actions.push({ forward: { to: line.forwardTo } });
     } else {
       actions.push({ bridge: { to: line.ext, timeout: 25 } });
-      if (line.voicemail) {
-        actions.push({ play: { file: 'voicemail-greeting' } });
-        actions.push({ record: { name: `vm-${plain(line.ext)}` } });
-      }
-      actions.push({ reject: 0 });
+      if (line.voicemail) actions.push(...voicemail(plain(line.ext)));
+      else actions.push({ reject: 0 });
     }
     routes.push({ name: `line-${plain(line.ext)}`, when: { to: `${plain(line.ext)}@*` }, then: actions });
   }

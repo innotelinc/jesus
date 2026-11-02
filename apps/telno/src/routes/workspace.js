@@ -1,3 +1,5 @@
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { db_, newId, now } from '../db/index.js';
 import { config } from '../config.js';
 import { newDeviceToken } from '../lib/security.js';
@@ -161,6 +163,48 @@ const voicemailView = (row) => ({
   listened: !!row.listened,
   receivedAt: row.received_at,
 });
+
+/**
+ * Voicemails the switch already recorded.
+ *
+ * A message is a WAV the switch wrote when a caller ran out of ring time, named
+ * `vm-<extension>-<caller>-<stamp>` by the DID route that captured it. The
+ * platform registers any it has not seen the next time the list is read: a
+ * caller who left a message is not waiting for somebody to press an import
+ * button, and a recording nothing knows about is a message that is lost exactly
+ * once.
+ *
+ * The file is the record. Nothing is deleted here, and a file the database
+ * already knows is left alone, so this is safe to run on every read.
+ */
+const VOICEMAIL_FILE = /^vm-([0-9]{1,6})-([0-9]{7,15})-([0-9]{8}-[0-9]{6})\.wav$/;
+
+function importRecordedVoicemails() {
+  let names = [];
+  try {
+    names = readdirSync(config.recordingsDir);
+  } catch {
+    // No recordings volume yet is not a fault: there is simply nothing to read.
+    return;
+  }
+  for (const name of names) {
+    const match = VOICEMAIL_FILE.exec(name);
+    if (!match) continue;
+    if (db_.get('SELECT id FROM voicemails WHERE recording = ?', [name])) continue;
+    let stat;
+    try {
+      stat = statSync(join(config.recordingsDir, name));
+    } catch {
+      continue;
+    }
+    // 8 kHz, mono, 16-bit: sixteen thousand bytes a second after the header.
+    const duration = Math.max(0, Math.round((stat.size - 44) / 16000));
+    db_.run(
+      'INSERT INTO voicemails (id, extension, from_e164, duration, recording, received_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [newId(), match[1], `+${match[2]}`, duration, name, new Date(stat.mtimeMs).toISOString()]
+    );
+  }
+}
 
 const faxView = (row) => ({
   id: row.id,
@@ -541,6 +585,9 @@ export default async function workspaceRoutes(app) {
 
   /* ---------------------------------------------------------- voicemails -- */
   app.get('/voicemails', async (request) => {
+    // A message the switch has already recorded belongs in this list whether or
+    // not anything has read the volume since it landed.
+    importRecordedVoicemails();
     const where = [];
     const params = [];
     if (v.bool(request.query?.unread, false)) where.push('listened = 0');

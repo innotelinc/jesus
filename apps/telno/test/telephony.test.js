@@ -65,7 +65,9 @@ test('a call that rings is recorded, and answered calls keep their numbers', asy
     const ringing = db_.get('SELECT * FROM calls WHERE call_id = ?', ['c-1']);
     assert.ok(ringing, 'the inbound call left a row');
     assert.equal(ringing.from_number, '14134210134');
-    assert.equal(ringing.to_number, '101@estate.local');
+    // The record keeps the number that rang, not the switch's internal address
+    // form: `101@estate.local` on the wire is `101` in the call log.
+    assert.equal(ringing.to_number, '101');
     assert.equal(ringing.extension, '101');
     assert.equal(ringing.direction, 'inbound');
 
@@ -86,7 +88,7 @@ test('a call that rings is recorded, and answered calls keep their numbers', asy
     onEvent({ type: 'call.originated', callId: 'c-3', from: '101', to: '14134210134@trunk' });
     const out = db_.get('SELECT * FROM calls WHERE call_id = ?', ['c-3']);
     assert.equal(out.direction, 'outbound');
-    assert.equal(out.to_number, '14134210134@trunk');
+    assert.equal(out.to_number, '14134210134');
   } finally {
     // Windows will not unlink a database that is still open, and the WAL file
     // holds the only useful bytes if it is. Closing first is also what a test

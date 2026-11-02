@@ -27,7 +27,10 @@ const sipPort = () => config.provisioning.sipPort;
 export function provisioningUrl(device, format = 'yealink') {
   const mac = String(device?.mac || '').replace(/[^A-Fa-f0-9]/g, '').toLowerCase();
   const ext = format === 'grandstream' ? 'xml' : 'cfg';
-  return `${config.provisioning.baseUrl}/provision/${format}/${mac || 'unknown'}.${ext}`;
+  // A device wired before its MAC was recorded still needs an address that
+  // does not change: the row id is minted once, so an ATA can be pointed at
+  // its own config by hand and keep fetching it after every reboot.
+  return `${config.provisioning.baseUrl}/provision/${format}/${mac || String(device?.id || 'unknown')}.${ext}`;
 }
 
 /** Where Option 66 (or "provisioning server") points on this deployment. */
