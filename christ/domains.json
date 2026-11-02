@@ -62,6 +62,48 @@
       "role": "agentops",
       "upstream": "capstone:80",
       "about": "AgentOps: the Capstone Control Center — the agent definitions, the workflow studio, the dashboards and the supervision that keeps dograh answering, over cantus-control and cantus-ari. It gets its own origin because the console is a single-page app: its assets, its /api aggregator and its /ws softphone socket all live at the root, and a page served under another product's prefix loads blank."
+    },
+    {
+      "host": "pbx.innotel.us",
+      "alias": true,
+      "upstream": "capstone:80",
+      "about": "The name the old PBX's admin page answered on. FreePBX and AvantFax went with Asterisk; the console is the administration surface now, so this name reaches it rather than a dead port."
+    },
+    {
+      "host": "voice.innotel.us",
+      "alias": true,
+      "upstream": "dograh-ui:3010",
+      "about": "The voice app's own name: dograh's UI, which was published on the retired box and is published here."
+    },
+    {
+      "host": "pbx.it.com",
+      "alias": true,
+      "upstream": "capstone:80",
+      "about": "The other PBX name, same job as pbx.innotel.us: the panel, not the phone system."
+    },
+    {
+      "host": "pbx.services",
+      "alias": true,
+      "upstream": "capstone:80",
+      "about": "The third PBX name, kept answering so a bookmark outlives the box it was made on."
+    },
+    {
+      "host": "fax.pbx.technology",
+      "alias": true,
+      "upstream": "fax-engine:8080",
+      "about": "The fax portal, which never moved off this stack: sending and receiving still run on the same switch."
+    },
+    {
+      "host": "n8n.pbx.it.com",
+      "alias": true,
+      "upstream": "n8n:5678",
+      "about": "The workflow studio. Its editor lived on the retired box's edge and lives here now; the container itself was always this stack's."
+    },
+    {
+      "host": "grist.pbx.it.com",
+      "alias": true,
+      "upstream": "grist:8484",
+      "about": "The document store the grading workflow writes interview reports into."
     }
   ]
 }

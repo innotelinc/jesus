@@ -20,12 +20,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const declared = JSON.parse(readFileSync(join(HERE, '../../../christ/domains.json'), 'utf8'));
 
 test('every domain the estate declares has a landing page', () => {
-  for (const { host, role } of declared.hosts) {
+  // An alias is a name carried onto a service that answers here, not a door in
+  // front of this product: it has no page of its own to land on.
+  const doors = declared.hosts.filter((entry) => !entry.alias);
+  for (const { host, role } of doors) {
     const site = SITES[host];
     assert.ok(site, `${host} is declared in christ/domains.json but sites.js has no entry`);
     assert.equal(site.role, role, `${host}: role "${site.role}" does not match the declaration's "${role}"`);
   }
-  assert.equal(Object.keys(SITES).length, declared.hosts.length, 'sites.js has a door the estate does not declare');
+  assert.equal(Object.keys(SITES).length, doors.length, 'sites.js has a door the estate does not declare');
 });
 
 test('a landing page is a page, and a directory is a redirect', () => {
