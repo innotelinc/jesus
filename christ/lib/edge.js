@@ -58,7 +58,12 @@ function hostBlock(entry, { httpOnly = false } = {}) {
   // says `http://` out loud. That is the whole difference between the two
   // renders: one word in front of each name.
   const prefix = httpOnly ? 'http://' : '';
-  const names = [entry.host, wwwOf(entry.host)]
+  // An alias is one name, not a door: it carries a name that used to answer
+  // somewhere else onto a service that answers here now, and nobody types
+  // `www.` in front of an address they were given once. Adding the www form
+  // would also mean asking Let's Encrypt for a certificate on a name with no
+  // record, which fails the whole block's retry budget for no reader's benefit.
+  const names = (entry.alias ? [entry.host] : [entry.host, wwwOf(entry.host)])
     .filter(Boolean)
     .map((name) => `${prefix}${name}`)
     .join(', ');

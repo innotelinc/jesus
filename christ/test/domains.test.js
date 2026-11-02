@@ -48,11 +48,11 @@ test('all nine estate domains are routed, each to the service that owns it', () 
     // is a domain that does not answer.
     assert.match(committed, new RegExp(`^${host.replace(/\./g, '\\.')}, www\\.`, 'm'));
   }
-  assert.equal(domains.hosts.length, 9);
+  assert.equal(domains.hosts.filter((entry) => !entry.alias).length, 9);
 });
 
 test('each door has one job, and the phonebook is not a landing page', () => {
-  const roles = Object.fromEntries(domains.hosts.map((entry) => [entry.host, entry.role]));
+  const roles = Object.fromEntries(domains.hosts.filter((entry) => !entry.alias).map((entry) => [entry.host, entry.role]));
   assert.deepEqual(roles, {
     'telno.services': 'product',
     'telno.online': 'signup',
@@ -68,6 +68,26 @@ test('each door has one job, and the phonebook is not a landing page', () => {
   // page now stands between a caller and the number they came for.
   const directory = upstreamFor(domains, 'telno.directory');
   assert.equal(directory.redirect, '/d/telno.directory');
+});
+
+test('the retired pbx names are aliases onto services that answer here, one name each', () => {
+  const aliases = Object.fromEntries(
+    domains.hosts.filter((entry) => entry.alias).map((entry) => [entry.host, entry.upstream])
+  );
+  assert.deepEqual(aliases, {
+    'pbx.innotel.us': 'capstone:80',
+    'voice.innotel.us': 'dograh-ui:3010',
+    'pbx.it.com': 'capstone:80',
+    'pbx.services': 'capstone:80',
+    'fax.pbx.technology': 'fax-engine:8080',
+    'n8n.pbx.it.com': 'n8n:5678',
+    'grist.pbx.it.com': 'grist:8484',
+  });
+  // An alias carries one name. The www form has no record behind it, and a block
+  // that asks for its certificate would spend retries on a name nobody typed.
+  for (const host of Object.keys(aliases)) {
+    assert.doesNotMatch(committed, new RegExp(`www\\.${host.replace(/\./g, '\\.')}`), `${host} must not claim a www name`);
+  }
 });
 
 test('mail leaves from telno.services, whatever host the app is on', () => {

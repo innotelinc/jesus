@@ -72,3 +72,38 @@ capstone.telno.services, www.capstone.telno.services {
 	import edge
 	reverse_proxy capstone:80
 }
+
+pbx.innotel.us {
+	import edge
+	reverse_proxy capstone:80
+}
+
+voice.innotel.us {
+	import edge
+	reverse_proxy dograh-ui:3010
+}
+
+pbx.it.com {
+	import edge
+	reverse_proxy capstone:80
+}
+
+pbx.services {
+	import edge
+	reverse_proxy capstone:80
+}
+
+fax.pbx.technology {
+	import edge
+	reverse_proxy fax-engine:8080
+}
+
+n8n.pbx.it.com {
+	import edge
+	reverse_proxy n8n:5678
+}
+
+grist.pbx.it.com {
+	import edge
+	reverse_proxy grist:8484
+}
