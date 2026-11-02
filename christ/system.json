@@ -84,6 +84,7 @@
       "interface": "cantus-control + cantus-ari",
       "urlEnv": "CAPSTONE_URL",
       "defaultUrl": "",
+      "publicUrl": "https://capstone.telno.services",
       "healthPath": "/api/health",
       "docs": "apps/capstone/README.md"
     },
