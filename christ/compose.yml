@@ -570,6 +570,10 @@ services:
       # by name over the compose network.
       DOGRAH_API_ENDPOINT: http://dograh-api:8000
       DOGRAH_API_TOKEN: ${DOGRAH_API_TOKEN:-}
+      # Read only when dograh cannot say which numbers it answers on: this build
+      # has no phone-numbers route, and the estate's own declaration (the one the
+      # switch was wired from) is the honest roster instead of an empty page.
+      CHRIST_URL: ${CHRIST_URL:-http://christ:8001}
       DOGRAH_CONFIG_NAME: ${DOGRAH_CONFIG_NAME:-Cantus ARI (dograh)}
       DOGRAH_STASIS_APP_NAME: ${DOGRAH_STASIS_APP_NAME:-}
       OMNIROUTE_URL: ${OMNIROUTE_URL:-}

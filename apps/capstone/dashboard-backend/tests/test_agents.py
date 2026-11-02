@@ -153,6 +153,76 @@ class ConfigIdTest(unittest.TestCase):
         self.assertTrue(make_client("TOK").configured())
 
 
+class ChristRosterTest(unittest.TestCase):
+    """The roster is the estate's declaration, not dograh's phone-number list.
+
+    The switch routes 8000/8003/8004 because CHRIST says so; dograh listed 8001
+    (routed by nothing) and omitted two that ring, so the page has to read the
+    document the routes came from. A deployment with no estate in front of it
+    still gets dograh's own list, and a bad token is still an error.
+    """
+
+    @staticmethod
+    def _plan(rows):
+        return FakeResponse(200, json.dumps({"agents": rows}).encode())
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_the_estate_declaration_wins_over_dograh(self, m_url):
+        def responder(req, **kwargs):
+            url = getattr(req, "full_url", str(req))
+            if url.endswith("/api/plan"):
+                return self._plan([
+                    {"ext": "8000", "name": "IT help desk", "ari": "dograh"},
+                    {"ext": "8003", "name": "Receptionist", "ari": "dograh"},
+                    {"ext": "8004", "name": "Outreach", "ari": "dograh"},
+                ])
+            # dograh would answer a different, wrong roster; it must not be asked.
+            return FakeResponse(200, json.dumps({"phone_numbers": [{"id": 9, "address": "8001"}]}).encode())
+
+        m_url.side_effect = responder
+        client = make_client()
+        client._config_id = 3
+        rows = client.list_agents()
+        self.assertEqual([r["extension"] for r in rows], ["8000", "8003", "8004"])
+        self.assertTrue(all(r["source"] == "christ" for r in rows))
+        self.assertEqual(rows[0]["label"], "IT help desk")
+        self.assertEqual(rows[0]["address"], "8000")
+        self.assertEqual(m_url.call_count, 1, "dograh is not consulted when the estate answers")
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_a_broken_token_is_an_error_not_an_empty_roster(self, m_url):
+        def responder(req, **kwargs):
+            url = getattr(req, "full_url", str(req))
+            if url.endswith("/api/plan"):
+                raise urllib.error.URLError("no route to christ")
+            raise urllib.error.HTTPError(url, 401, "Unauthorized", {}, io.BytesIO(b'{"detail":"bad key"}'))
+
+        m_url.side_effect = responder
+        client = make_client()
+        client._config_id = 3
+        with self.assertRaises(agents.DograhError):
+            client.list_agents()
+
+    @mock.patch.object(urllib.request, "urlopen")
+    def test_dograh_answers_when_there_is_no_estate(self, m_url):
+        def responder(req, **kwargs):
+            url = getattr(req, "full_url", str(req))
+            if url.endswith("/api/plan"):
+                raise urllib.error.URLError("no route to christ")
+            return FakeResponse(200, json.dumps({"phone_numbers": [
+                {"id": 1, "address": "8000", "label": "IT Help Desk",
+                 "inbound_workflow_id": 42, "inbound_workflow_name": "Mock Interview"},
+            ]}).encode())
+
+        m_url.side_effect = responder
+        client = make_client()
+        client._config_id = 3
+        rows = client.list_agents()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["extension"], "8000")
+        self.assertNotIn("source", rows[0], "a dograh row is not an estate row")
+
+
 class ListAgentsTest(unittest.TestCase):
     @mock.patch.object(urllib.request, "urlopen")
     def test_normalizes_phone_numbers(self, m_url):

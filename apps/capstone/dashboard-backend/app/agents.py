@@ -44,6 +44,9 @@ STATIC_EXTENSIONS = {f"80{i:02d}" for i in range(0, 8)}  # 8000..8007
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:8000"
 DEFAULT_CONFIG_NAME = "Asterisk ARI (dograh)"
+# The estate's own front door, read only when dograh cannot say which numbers
+# it answers on. Service name first: in this stack CHRIST is a container.
+DEFAULT_CHRIST = "http://christ:8001"
 
 # FreePBX markers so dograh-managed rows are never confused with user rows
 # (mirrors scripts/sync_dograh_routes.py).
@@ -324,6 +327,19 @@ class DograhClient:
         )
 
     def list_agents(self) -> list[dict[str, Any]]:
+        """The agents this deployment answers on.
+
+        CHRIST's declaration is the answer whenever the estate is reachable: the
+        switch's routing document is generated from it, so a roster read from
+        dograh could only disagree with what actually rings — it listed 8001,
+        which nothing routes, and omitted 8003 and 8004, which do. dograh's own
+        phone-number list stays the fallback for a deployment running without an
+        estate in front of it, and a real fault (401, 500) still raises rather
+        than reporting an empty roster.
+        """
+        declared = christ_roster()
+        if declared:
+            return declared
         data = self._request("GET", self._phone_path())
         return [normalize_agent(p) for p in (data or {}).get("phone_numbers", []) or []]
 
@@ -462,6 +478,45 @@ def normalize_workflow(p: dict[str, Any] | None) -> dict[str, Any]:
         "definition": definition if isinstance(definition, dict) else None,
         "maxCallDuration": duration if isinstance(duration, (int, float)) else None,
     }
+
+
+def christ_roster(endpoint: str | None = None) -> list[dict[str, Any]]:
+    """The agents CHRIST declares, in the shape this page renders.
+
+    The estate's own document (``GET /api/plan``) is what the switch's routing
+    was generated from, so it is the honest answer to "which numbers does this
+    deployment answer on" when dograh has no list to give. Reachability is not
+    fatal: an unreachable CHRIST yields an empty roster, which is the truth
+    rather than an error page about a second service.
+    """
+    base = (endpoint or os.environ.get("CHRIST_URL") or DEFAULT_CHRIST).rstrip("/")
+    request = urllib.request.Request(f"{base}/api/plan", headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310 - configured endpoint
+            payload = json.loads(response.read() or b"{}")
+    except (urllib.error.URLError, OSError, ValueError):
+        return []
+    out: list[dict[str, Any]] = []
+    for agent in (payload or {}).get("agents") or []:
+        if not isinstance(agent, dict):
+            continue
+        ext = extension_from_address(str(agent.get("ext") or ""))
+        if not ext:
+            continue
+        name = str(agent.get("name") or "")
+        out.append({
+            "id": None,
+            "extension": ext,
+            "address": ext,
+            "label": name or f"Agent {ext}",
+            "workflowId": None,
+            "workflowName": name,
+            "active": True,
+            # Named so the page can say where a row came from: an agent declared
+            # by the estate is not a dograh row an operator can edit there.
+            "source": "christ",
+        })
+    return out
 
 
 def normalize_agent(p: dict[str, Any]) -> dict[str, Any]:
