@@ -58,6 +58,16 @@ const advertise = arg('SIP_ADVERTISE', '') || firstPublicAddress();
  */
 const srtpStateFile = arg('SRTP_STATE_FILE', '');
 
+/**
+ * Encryption chosen by the deployment rather than by the console.
+ *
+ * `SIP_SRTP_ENFORCE=on` means the border carries encrypted media and nothing
+ * else: the console's switch is refused, the stored preference is ignored, and
+ * a plaintext offer is answered 488 instead of bridged. A sub-account the
+ * carrier already set to mandatory SRTP cannot be handed a plaintext call.
+ */
+const srtpEnforced = /^(1|on|true|yes)$/i.test(arg('SIP_SRTP_ENFORCE', ''));
+
 function storedSrtp() {
   if (!srtpStateFile) return null;
   try {
@@ -187,7 +197,10 @@ async function main() {
     // RTP; a sub-account that requires encryption refuses that with 488. A
     // value set from the console wins over the environment, because the
     // carrier's own setting was changed to match it.
-    srtp: storedSrtp() ?? /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', '')),
+    srtp: srtpEnforced ? true : (storedSrtp() ?? /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', ''))),
+    // "SRTP a must": an enforced deployment carries encrypted media or no call.
+    srtpRequired: srtpEnforced || /^(1|on|true|yes)$/i.test(arg('SIP_SRTP', '')),
+    srtpEnforced,
     rtpStart: num('GATEWAY_RTP_START', 40000),
     rtpEnd: num('GATEWAY_RTP_END', 40063),
     log: (entry) => log(entry),
@@ -206,7 +219,7 @@ async function main() {
       // POST is the change, and it applies to the next call rather than to one
       // already in flight.
       if (request.method === 'GET') {
-        send(200, { enabled: gateway.srtp, registered: !!trunk.registered });
+        send(200, { enabled: gateway.srtp, enforced: srtpEnforced, registered: !!trunk.registered });
         return;
       }
       if (request.method === 'POST') {
@@ -214,6 +227,12 @@ async function main() {
         const enabled = typeof body?.enabled === 'boolean' ? body.enabled : /^(1|on|true|yes)$/i.test(String(body?.enabled ?? ''));
         if (body?.enabled === undefined) {
           send(400, { error: 'enabled is required (true or false)' });
+          return;
+        }
+        if (srtpEnforced && !body.enabled) {
+          send(409, {
+            error: 'SRTP is enforced on this gateway (SIP_SRTP_ENFORCE): media is encrypted or the call does not happen',
+          });
           return;
         }
         const applied = gateway.setSrtp(enabled);

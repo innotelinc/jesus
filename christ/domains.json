@@ -49,6 +49,12 @@
       "role": "network",
       "upstream": "christ:8001",
       "about": "The estate itself: every layer of the system and whether it is up, served by the CHRIST board."
+    },
+    {
+      "host": "christ.telno.services",
+      "role": "front-door",
+      "upstream": "christ:8001",
+      "about": "The CHRIST board under its own name: the front door to the estate, what is running and whether it is up."
     }
   ]
 }

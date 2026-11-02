@@ -17,6 +17,10 @@ const GROUPS = [
       { path: '/softphone', label: 'Softphone', icon: 'phone' },
       { path: '/calls', label: 'Call history', icon: 'calls' },
       { path: '/extensions', label: 'Extensions', icon: 'users' },
+      // The boxes on the wall, next to the lines they carry: an ATA that has
+      // never registered leaves its extension unreachable, and that is a fact
+      // about hardware, not about a line.
+      { path: '/atas', label: 'ATA panel', icon: 'server' },
       { path: '/trunks', label: 'Trunks', icon: 'server' },
       { path: '/ivr', label: 'Call routing', icon: 'branch' },
       { path: '/voicemail', label: 'Voicemail', icon: 'voicemail' },
