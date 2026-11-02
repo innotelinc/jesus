@@ -61,3 +61,8 @@ telno.network, www.telno.network {
 	import edge
 	reverse_proxy christ:8001
 }
+
+christ.telno.services, www.christ.telno.services {
+	import edge
+	reverse_proxy christ:8001
+}

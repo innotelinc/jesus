@@ -28,7 +28,7 @@ test('the committed Caddyfile is the one this map renders', () => {
   );
 });
 
-test('all seven estate domains are routed, each to the service that owns it', () => {
+test('all eight estate domains are routed, each to the service that owns it', () => {
   const expected = {
     'telno.services': 'telno:8080',
     'telno.online': 'telno:8080',
@@ -37,6 +37,7 @@ test('all seven estate domains are routed, each to the service that owns it', ()
     'telno.tel': 'telno:8080',
     'telno.directory': 'telno:8080',
     'telno.network': 'christ:8001',
+    'christ.telno.services': 'christ:8001',
   };
   for (const [host, upstream] of Object.entries(expected)) {
     const entry = upstreamFor(domains, host);
@@ -46,7 +47,7 @@ test('all seven estate domains are routed, each to the service that owns it', ()
     // is a domain that does not answer.
     assert.match(committed, new RegExp(`^${host.replace(/\./g, '\\.')}, www\\.`, 'm'));
   }
-  assert.equal(domains.hosts.length, 7);
+  assert.equal(domains.hosts.length, 8);
 });
 
 test('each door has one job, and the phonebook is not a landing page', () => {
@@ -59,6 +60,7 @@ test('each door has one job, and the phonebook is not a landing page', () => {
     'telno.tel': 'phones',
     'telno.directory': 'directory',
     'telno.network': 'network',
+    'christ.telno.services': 'front-door',
   });
   // telno.directory redirects its root into the directory; anything else means a
   // page now stands between a caller and the number they came for.
@@ -76,7 +78,7 @@ test('mail leaves from telno.services, whatever host the app is on', () => {
 
 test('www is a door too, and the proxy never hides an upstream that is down', () => {
   const noisy = renderCaddyfile(domains);
-  assert.equal((noisy.match(/www\./g) || []).length, 7, 'every host answers on www as well');
+  assert.equal((noisy.match(/www\./g) || []).length, 8, 'every host answers on www as well');
   // No error_page or handle_errors: a 502 from the estate is the honest answer.
   assert.doesNotMatch(noisy, /handle_errors|error_page/);
   // TLS is automatic, so a host must never be listed as plain :80 only.

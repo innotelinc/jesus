@@ -193,6 +193,9 @@ services:
       SIP_FROM_USER: ${VOIPMS_SIP_FROM_USER:-}
       SIP_DOMAIN: ${VOIPMS_SIP_DOMAIN:-}
       SIP_SRTP: ${SIP_SRTP:-}
+      # "SRTP a must": set on a deployment where the carrier leg is encrypted or
+      # the call does not happen. The console then cannot turn it off.
+      SIP_SRTP_ENFORCE: ${SIP_SRTP_ENFORCE:-}
       # Local handsets: `ext:password,...`. The border is also their registrar,
       # so an analog telephone adapter is a client of this box rather than of a
       # carrier it cannot authenticate to.

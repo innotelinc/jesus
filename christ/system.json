@@ -57,6 +57,7 @@
       "interface": "cantus-control + cantus-line",
       "urlEnv": "TELNO_URL",
       "defaultUrl": "http://127.0.0.1:8090",
+      "publicUrl": "https://telno.services",
       "healthPath": "/healthz",
       "docs": "apps/telno/README.md"
     },

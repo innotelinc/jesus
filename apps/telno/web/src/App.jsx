@@ -17,6 +17,7 @@ import Fax from './pages/Fax.jsx';
 import Messages from './pages/Messages.jsx';
 import Billing from './pages/Billing.jsx';
 import Estate from './pages/Estate.jsx';
+import Atas from './pages/Atas.jsx';
 import Health from './pages/Health.jsx';
 import Operations from './pages/Operations.jsx';
 import Settings from './pages/Settings.jsx';
@@ -54,6 +55,7 @@ const PAGES = [
   { path: '/billing', title: 'Billing', subtitle: 'Invoices grouped by currency', Component: Billing },
   { path: '/plans', title: 'Plans and subscriptions', subtitle: 'What the subscribe page sells and who is paying', Component: Plans },
   { path: '/estate', title: 'Estate', subtitle: 'Sites and the equipment installed at them', Component: Estate },
+  { path: '/atas', title: 'ATA panel', subtitle: 'Analog terminal adapters, their extensions and whether they are registered', Component: Atas },
   { path: '/health', title: 'Health', subtitle: 'Live probes across the container', Component: Health },
   { path: '/operations', title: 'Operations', subtitle: 'Incidents, changes and provisioning', Component: Operations },
   { path: '/systems', title: 'Connected systems', subtitle: 'The consoles this platform sits beside', Component: Systems },
@@ -80,6 +82,14 @@ function Router() {
   const directoryEntry = entryPath(window.location.host);
   if (directoryEntry && pathname === '/') {
     navigate(directoryEntry, { replace: true });
+    return null;
+  }
+
+  // The estate API lives under these paths, so a browser that opens one — a
+  // pasted curl, a bookmark from a log line — used to land on the not-found
+  // page. There is a screen for exactly this, so it is the door.
+  if (pathname.startsWith('/estate/')) {
+    navigate('/estate', { replace: true });
     return null;
   }
 
@@ -123,7 +133,8 @@ function Router() {
 
   if (status === 'anon') {
     // A visitor who is not signed in lands on the site, not on a login form:
-    // the console is a paid product and the site is how somebody buys it.
+    // the console is a paid product and the site is how somebody buys it — and
+    // its "Open the console" link is the way to the sign-in from there.
     if (pathname === '/') return <Site />;
     navigate('/login', { replace: true });
     return <Login />;

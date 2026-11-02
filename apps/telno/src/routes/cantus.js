@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
+import { db_, now } from '../db/index.js';
 import { generateLines } from '../telephony/provision.js';
 
 /**
@@ -54,4 +55,39 @@ export default async function cantusRoutes(app) {
     switchUrl: config.telephony.url,
     application: 'telno',
   }));
+
+  /**
+   * A phone registered. The SIP border rings a handset and cannot store what it
+   * learned about it — the inventory is this platform's, so the border reports
+   * the contact here and the device row stops saying "provisioning" forever.
+   * Keyed by extension, because that is the only identity a registrar knows; a
+   * report for an extension no device carries is a 404, not a new row.
+   */
+  app.post('/cantus/devices/:ext/registered', async (request, reply) => {
+    const ext = String(request.params.ext || '');
+    const body = request.body || {};
+    const row = db_.get(
+      `SELECT d.id FROM devices d
+         JOIN extensions e ON e.id = d.extension_id
+        WHERE e.extension = ?`,
+      [ext]
+    );
+    if (!row) {
+      reply.status(404);
+      return { error: 'unknown-device', ext };
+    }
+    const ip = String(body.ip || '').slice(0, 64);
+    // A report without a MAC leaves the stored one alone: the border learns a
+    // MAC only from a provisioning fetch, and blanking it would lose the row's
+    // only hardware identity.
+    const mac = String(body.mac || '').slice(0, 32);
+    db_.run(
+      `UPDATE devices
+          SET ip = ?, mac = CASE WHEN ? = '' THEN mac ELSE ? END,
+              status = 'online', last_seen_at = ?, updated_at = ?
+        WHERE id = ?`,
+      [ip, mac, mac, now(), now(), row.id]
+    );
+    return { ok: true, ext, device: row.id };
+  });
 }

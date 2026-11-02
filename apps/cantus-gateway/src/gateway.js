@@ -102,7 +102,7 @@ export const sipUser = (uri) => {
 };
 
 export class Gateway {
-  constructor({ endpoint, trunk, switchId, domain, advertise, carrier = true, rtpStart = 40000, rtpEnd = 40063, srtp = false, log = () => {} }) {
+  constructor({ endpoint, trunk, switchId, domain, advertise, carrier = true, rtpStart = 40000, rtpEnd = 40063, srtp = false, srtpRequired = srtp, srtpEnforced = false, log = () => {} }) {
     if (!endpoint) throw new Error('Gateway needs a Cantus endpoint');
     if (!trunk) throw new Error('Gateway needs a SIP trunk');
     this.endpoint = endpoint;
@@ -118,6 +118,13 @@ export class Gateway {
     // that does not require it is simpler; a sub-account that does require it
     // answers 488 to plain RTP, which is exactly what VoIP.ms did.
     this.srtp = !!srtp;
+    // "Secure first" is a property of the media, not a preference. When this is
+    // set there is no plaintext path: an offer that is not SDES-SRTP is refused
+    // with 488 and an answer that drops the keys ends the call, because a leg
+    // carried in the clear is exactly the outcome this box exists to prevent.
+    this.srtpRequired = Boolean(srtpRequired) || this.srtp;
+    // Enforced means the deployment chose it and the console may not undo it.
+    this.srtpEnforced = !!srtpEnforced;
     this.log = log;
     // callId (Cantus) and SIP Call-ID are different namespaces; each leg holds
     // both so either side ending the call can find the other.
@@ -226,6 +233,21 @@ export class Gateway {
       this.trunk.reject(call, 484, 'Address Incomplete');
       return;
     }
+    if (this.srtpRequired && !audio?.secure) {
+      // Refused, not bridged. Answering a plaintext offer would put the audio
+      // on the wire unencrypted for the whole call, and nothing later in the
+      // call would ever say so.
+      this.log({
+        kind: 'call-in-refused',
+        number,
+        from: sipUser(call.request?.get('from')),
+        codec: audio ? 'plaintext-refused' : 'no-audio',
+        media: audio?.host ? `${audio.host}:${audio.port}` : '',
+      });
+      this.trunk.reject(call, 488, 'Not Acceptable Here');
+      return;
+    }
+
     // An encrypted offer needs both halves of an SDES pair: their key to read
     // what they send, and a key of ours for what we send back.
     let srtp = null;
@@ -361,10 +383,23 @@ export class Gateway {
         const remote = parseCryptoAttribute(audio.crypto);
         if (remote) {
           rtp.srtp = { send: new SrtpContext(ours), receive: new SrtpContext(remote) };
-        } else {
+        } else if (this.srtpRequired) {
           // They accepted RTP/SAVP and then answered as if it were plain RTP.
-          // Rather than encrypt into a stream nobody can read, say so and carry
-          // plain audio — a call with a warning beats a call with no sound.
+          // Carrying it would mean sending audio nobody can decrypt, and taking
+          // theirs in the clear — the call fails with a cause instead.
+          this.log({
+            kind: 'srtp-missing',
+            call: session.call,
+            number,
+            detail: 'answer had no crypto attribute; refusing to carry the call in the clear',
+          });
+          this.trunk.bye(answered);
+          this.endpoint.reject(session, 'NO_CAPABILITY');
+          this.dropLeg(leg);
+          return;
+        } else {
+          // Not required here: say so and carry plain audio, which still beats
+          // a call with no sound when the deployment did not ask for keys.
           this.log({ kind: 'srtp-missing', number, detail: 'answer had no crypto attribute' });
         }
       }
@@ -398,8 +433,13 @@ export class Gateway {
    */
   setSrtp(enabled) {
     const next = !!enabled;
+    if (!next && this.srtpEnforced) {
+      this.log({ kind: 'srtp-disable-refused', enforced: true });
+      return this.srtp;
+    }
     if (next === this.srtp) return this.srtp;
     this.srtp = next;
+    this.srtpRequired = this.srtpEnforced || next;
     this.log({ kind: 'srtp-changed', enabled: next });
     return this.srtp;
   }
@@ -419,6 +459,10 @@ export class Gateway {
         server: `${this.trunk.host}:${this.trunk.port}`,
         // What the next call will offer: RTP/SAVP with an SDES key when true.
         srtp: this.srtp,
+        // Whether an unencrypted leg is refused outright, and whether that is
+        // a deployment decision the console cannot reverse.
+        srtpRequired: this.srtpRequired,
+        srtpEnforced: this.srtpEnforced,
         registered: this.trunk.registered,
         expiresAt: this.trunk.registerExpiresAt || null,
         error: this.trunk.lastRegisterError || '',

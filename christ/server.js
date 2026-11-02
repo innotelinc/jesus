@@ -165,6 +165,24 @@ const server = createServer(async (request, response) => {
     }
     const proxied = /^\/p\/([a-z0-9][a-z0-9-]*)(\/.*)?$/i.exec(pathname);
     if (proxied) {
+      // A product with its own public hostname is opened there. This prefix is
+      // for a product that has none: an SPA asks for /assets/... at the root,
+      // and under /p/<id>/ those are the board's own assets, so the proxied page
+      // loads blank. Sending the browser to the real door keeps the session, the
+      // assets and the WebSocket on one origin.
+      // Only the door is redirected, not the paths below it: `/p/<id>/` is the
+      // link a reader clicks from the board, while `/p/<id>/api/...` is a caller
+      // reaching the product through this box. Deeper paths keep proxying, which
+      // is what makes this prefix useful for anything that is not a browser.
+      const project = byId.get(proxied[1]);
+      const rest = proxied[2] || '';
+      if (project?.publicUrl && (rest === '' || rest === '/')) {
+        response.writeHead(302, {
+          location: `${String(project.publicUrl).replace(/\/$/, '')}/${url.search}`,
+        });
+        response.end();
+        return;
+      }
       proxyHttp(request, response, proxied[1], proxied[2], url.search);
       return;
     }
