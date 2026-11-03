@@ -8,20 +8,20 @@
 # is rejected before the commit can be created. Policy: only Darnel Hunter
 # <dhunter@innotel.us> may ever be credited.
 #
+# This repository carries no scripts/secret-scan.py, so the credential gate is
+# deliberately absent. The earlier copy called it anyway, which printed
+# "secret-scan: scanner missing — skipping" to stderr on every single commit:
+# that made the hook noisy enough to look broken, and the local hook test
+# asserted the hook stays silent on an ordinary commit. Bring the scanner in
+# first, then the `secret-scan.sh` call that platform-stack's copy makes.
+#
 # Install (enables the guard locally):
 #     git config core.hooksPath .githooks
-# setup.sh on a fresh install already does this.
+# or: .githooks/install
 # ═══════════════════════════════════════════════════════════
 set -uo pipefail
 
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# Secret gate first: blocks the commit when staged added lines carry
-# credential-shaped content (findings block; missing toolchain fails open).
-# Runs as a separate process so its exit path can't short-circuit this hook.
-if ! "$HOOK_DIR/secret-scan.sh"; then
-  exit 1
-fi
 # shellcheck source=.githooks/guard-lib
 # shellcheck disable=SC1091
 source "$HOOK_DIR/guard-lib"
