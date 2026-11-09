@@ -86,7 +86,8 @@
   --tone-sentinel: #b0246a;
   --tone-sync: #05685e;
 
-  --shadow-card: 0 1px 2px rgb(25 20 48 / 5%), 0 10px 30px -14px rgb(25 20 48 / 18%);
+  --shadow-card:
+    0 1px 2px rgb(25 20 48 / 5%), 0 10px 30px -14px rgb(25 20 48 / 18%);
   --shadow-pop: 0 8px 28px -8px rgb(25 20 48 / 26%);
 
   --radius-sm: 8px;
@@ -94,7 +95,9 @@
   --radius-lg: 18px;
   --radius-pill: 999px;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
   --font-display: var(--font-sans);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
@@ -143,7 +146,8 @@
     --tone-sentinel: #ff7cb4;
     --tone-sync: #3fd3c1;
 
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 32px -14px rgb(0 0 0 / 60%);
+    --shadow-card:
+      0 1px 2px rgb(0 0 0 / 30%), 0 12px 32px -14px rgb(0 0 0 / 60%);
     --shadow-pop: 0 10px 34px -8px rgb(0 0 0 / 66%);
   }
 }
@@ -214,7 +218,8 @@
   --tone-sentinel: #9d174d;
   --tone-sync: #0f766e;
 
-  --shadow-card: 0 1px 2px rgb(16 23 29 / 5%), 0 10px 30px -14px rgb(16 23 29 / 18%);
+  --shadow-card:
+    0 1px 2px rgb(16 23 29 / 5%), 0 10px 30px -14px rgb(16 23 29 / 18%);
 }
 
 /* ══ scheme: operations — dark ═════════════════════════════════════════════ */
@@ -292,7 +297,8 @@
     --tone-sentinel: #ff7b72;
     --tone-sync: #56d4dd;
 
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 34%), 0 12px 32px -14px rgb(0 0 0 / 62%);
+    --shadow-card:
+      0 1px 2px rgb(0 0 0 / 34%), 0 12px 32px -14px rgb(0 0 0 / 62%);
   }
 }
 
@@ -338,7 +344,8 @@
   --tone-sentinel: #0e7f9c;
   --tone-sync: #0f766e;
 
-  --shadow-card: 0 1px 2px rgb(7 26 43 / 5%), 0 10px 30px -14px rgb(7 26 43 / 18%);
+  --shadow-card:
+    0 1px 2px rgb(7 26 43 / 5%), 0 10px 30px -14px rgb(7 26 43 / 18%);
 }
 
 /* ══ scheme: soc — dark (near-black navy, cyan) ═══════════════════════════ */
@@ -417,7 +424,8 @@
     --tone-sentinel: #4fd0e8;
     --tone-sync: #56d4dd;
 
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 14px 34px -14px rgb(0 0 0 / 70%);
+    --shadow-card:
+      0 1px 2px rgb(0 0 0 / 40%), 0 14px 34px -14px rgb(0 0 0 / 70%);
     --shadow-pop: 0 10px 34px -8px rgb(0 0 0 / 70%);
   }
 }
@@ -476,15 +484,22 @@
   font-weight: 500;
   cursor: pointer;
 }
-.ot-btn:hover:not(:disabled) { border-color: var(--brand-ring); }
-.ot-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ot-btn:hover:not(:disabled) {
+  border-color: var(--brand-ring);
+}
+.ot-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .ot-btn--primary {
   background: var(--brand);
   border-color: var(--brand);
   color: var(--brand-ink);
   font-weight: 600;
 }
-.ot-btn--quiet { background: transparent; }
+.ot-btn--quiet {
+  background: transparent;
+}
 
 .ot-field > span {
   display: block;
@@ -504,7 +519,9 @@
   font: inherit;
   font-size: 13px;
 }
-.ot-input:focus, .ot-field input:focus, .ot-field select:focus {
+.ot-input:focus,
+.ot-field input:focus,
+.ot-field select:focus {
   outline: 2px solid var(--brand-ring);
   outline-offset: 1px;
   border-color: var(--brand);
@@ -522,19 +539,55 @@
   font-size: 11.5px;
   white-space: nowrap;
 }
-.ot-pill--ok { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
-.ot-pill--bad { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
-.ot-pill--attention { border-color: var(--attention); color: var(--attention); background: var(--attention-soft); }
-.ot-pill--unknown { border-color: var(--unknown); color: var(--unknown); background: var(--unknown-soft); }
-.ot-pill--brand { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+.ot-pill--ok {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.ot-pill--bad {
+  border-color: var(--bad);
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.ot-pill--attention {
+  border-color: var(--attention);
+  color: var(--attention);
+  background: var(--attention-soft);
+}
+.ot-pill--unknown {
+  border-color: var(--unknown);
+  color: var(--unknown);
+  background: var(--unknown-soft);
+}
+.ot-pill--brand {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
 
-.ot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unknown); flex: none; }
-.ot-dot--ok { background: var(--ok); }
-.ot-dot--bad { background: var(--bad); }
-.ot-dot--attention { background: var(--attention); }
+.ot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--unknown);
+  flex: none;
+}
+.ot-dot--ok {
+  background: var(--ok);
+}
+.ot-dot--bad {
+  background: var(--bad);
+}
+.ot-dot--attention {
+  background: var(--attention);
+}
 
-.ot-table { width: 100%; border-collapse: collapse; }
-.ot-table th, .ot-table td {
+.ot-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ot-table th,
+.ot-table td {
   text-align: left;
   padding: 9px 12px;
   border-bottom: 1px solid var(--line);
@@ -549,8 +602,12 @@
   font-weight: 600;
   background: var(--surface-muted);
 }
-.ot-table tbody tr:last-child td { border-bottom: none; }
-.ot-table tbody tr:hover { background: var(--surface-muted); }
+.ot-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ot-table tbody tr:hover {
+  background: var(--surface-muted);
+}
 
 .ot-note {
   border-left: 3px solid var(--line-strong);
@@ -560,14 +617,39 @@
   font-size: 12.5px;
   border-radius: 0 6px 6px 0;
 }
-.ot-note--warn { border-left-color: var(--attention); background: var(--attention-soft); color: var(--ink); }
-.ot-note--bad { border-left-color: var(--bad); background: var(--bad-soft); color: var(--ink); }
-.ot-note--ok { border-left-color: var(--ok); background: var(--ok-soft); color: var(--ink); }
+.ot-note--warn {
+  border-left-color: var(--attention);
+  background: var(--attention-soft);
+  color: var(--ink);
+}
+.ot-note--bad {
+  border-left-color: var(--bad);
+  background: var(--bad-soft);
+  color: var(--ink);
+}
+.ot-note--ok {
+  border-left-color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--ink);
+}
 
-.ot-muted { color: var(--ink-faint); }
-.ot-dim { color: var(--ink-soft); }
-.ot-mono { font-family: var(--mono); font-size: 12.5px; }
-.ot-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.ot-muted {
+  color: var(--ink-faint);
+}
+.ot-dim {
+  color: var(--ink-soft);
+}
+.ot-mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.ot-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
 
 /* ── the theme switch ──────────────────────────────────────────────────────
  * The control that flips light → dark → system. It lives here rather than in each
@@ -600,11 +682,16 @@
   font-size: 11.5px;
   cursor: pointer;
 }
-.ot-theme button:hover { color: var(--ink); }
+.ot-theme button:hover {
+  color: var(--ink);
+}
 .ot-theme button[aria-pressed="true"] {
   background: var(--surface);
   border-color: var(--line-strong);
   color: var(--ink);
   font-weight: 600;
 }
-.ot-theme svg { width: 13px; height: 13px; }
+.ot-theme svg {
+  width: 13px;
+  height: 13px;
+}
