@@ -28,7 +28,8 @@
 
   var MODE_KEY = "ontrak.mode";
   var SCHEME_KEY = "ontrak.scheme";
-  var DEFAULT_SCHEME = global.UNITY_DEFAULT_SCHEME || global.ONTRAK_DEFAULT_SCHEME || "desk";
+  var DEFAULT_SCHEME =
+    global.UNITY_DEFAULT_SCHEME || global.ONTRAK_DEFAULT_SCHEME || "desk";
 
   function read(key) {
     try {
@@ -54,7 +55,9 @@
   }
 
   function normaliseScheme(scheme) {
-    return scheme === "operations" || scheme === "desk" || scheme === "soc" ? scheme : "";
+    return scheme === "operations" || scheme === "desk" || scheme === "soc"
+      ? scheme
+      : "";
   }
 
   /** Paint a mode/scheme pair onto <html>. Anything falsy is removed, not zeroed. */
@@ -75,7 +78,11 @@
   }
 
   function scheme() {
-    return normaliseScheme(read(SCHEME_KEY)) || normaliseScheme(DEFAULT_SCHEME) || "desk";
+    return (
+      normaliseScheme(read(SCHEME_KEY)) ||
+      normaliseScheme(DEFAULT_SCHEME) ||
+      "desk"
+    );
   }
 
   /** Whether the page is actually dark right now, including "follow the machine". */
@@ -105,7 +112,8 @@
     },
 
     setScheme: function (next) {
-      var picked = normaliseScheme(next) || normaliseScheme(DEFAULT_SCHEME) || "desk";
+      var picked =
+        normaliseScheme(next) || normaliseScheme(DEFAULT_SCHEME) || "desk";
       write(SCHEME_KEY, picked);
       apply(read(MODE_KEY), picked);
       notify();
@@ -122,9 +130,11 @@
     start: function () {
       apply(read(MODE_KEY), read(SCHEME_KEY));
       try {
-        global.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-          if (mode() === "system") apply("system", read(SCHEME_KEY));
-        });
+        global
+          .matchMedia("(prefers-color-scheme: dark)")
+          .addEventListener("change", function () {
+            if (mode() === "system") apply("system", read(SCHEME_KEY));
+          });
       } catch (error) {
         /* an older browser with addListener only: the toggle still works */
       }
@@ -134,10 +144,18 @@
 
   function notify() {
     try {
-      global.dispatchEvent(new CustomEvent("unity:theme", { detail: { mode: mode(), scheme: scheme() } }));
+      global.dispatchEvent(
+        new CustomEvent("unity:theme", {
+          detail: { mode: mode(), scheme: scheme() },
+        }),
+      );
       // The old event name, so a listener written against the theme's previous name
       // keeps working. There is exactly one of these shims, and it is one line.
-      global.dispatchEvent(new CustomEvent("ontrak:theme", { detail: { mode: mode(), scheme: scheme() } }));
+      global.dispatchEvent(
+        new CustomEvent("ontrak:theme", {
+          detail: { mode: mode(), scheme: scheme() },
+        }),
+      );
     } catch (error) {
       /* CustomEvent is not the point of this file */
     }
