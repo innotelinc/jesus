@@ -28,6 +28,15 @@ for svc in api ui; do
     docker pull "$REGISTRY/dograh-$svc:$tag"
 done
 
+# The migration revision the database is on before this release starts. The
+# entrypoint runs `alembic upgrade head`, so this can move during the deploy;
+# if it does, the previous images have no such revision and cannot start.
+schema_revision() {
+    docker exec christ-dograh-db psql -U postgres -d postgres -tAc \
+        'select version_num from alembic_version' 2>/dev/null | tr -d '[:space:]'
+}
+before=$(schema_revision || true)
+
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 cp -a .env ".env.bak-$stamp"
 docker exec christ-dograh-db pg_dump -U postgres postgres > "/root/dograh-db-$stamp.sql"
@@ -59,7 +68,28 @@ while [ "$i" -lt 45 ]; do
     sleep 2
 done
 
-echo "api never reported $tag; restoring the previous .env and restarting" >&2
+after=$(schema_revision || true)
+if [ -n "$after" ] && [ "$after" != "$before" ]; then
+    cat >&2 <<EOF
+refusing automatic rollback: this release migrated the database
+    revision before: ${before:-unknown}
+    revision after:  $after
+
+The previous images carry an older alembic head, so restoring their pin would
+swap one non-starting stack for another. $tag stays pinned for inspection.
+
+Recover from the pre-release dump, then re-pin the older version:
+    docker exec christ-dograh-db psql -U postgres -d postgres \\
+        -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+    docker exec -i christ-dograh-db psql -U postgres -d postgres \\
+        < /root/dograh-db-$stamp.sql
+then re-pin the known-good image (see docs/deployment.md, "Rolling back").
+Pre-release .env: $STACK/.env.bak-$stamp
+EOF
+    exit 1
+fi
+
+echo "api never reported $tag; no migration ran, restoring the previous .env and restarting" >&2
 cp -a ".env.bak-$stamp" .env
 docker compose -p christ --profile agents up -d --no-deps dograh-api dograh-ui
 exit 1
