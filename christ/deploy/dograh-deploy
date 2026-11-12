@@ -1,0 +1,65 @@
+#!/bin/sh
+# /usr/local/sbin/dograh-deploy - force-commanded release hook for this host.
+# Usage from CI:  ssh root@christ <version>
+# It may only touch the two dograh services of the christ compose project.
+set -eu
+
+STACK=/opt/christ/jesus/christ
+REGISTRY=ghcr.io/innotelinc
+tag="${SSH_ORIGINAL_COMMAND:-}"
+
+if [ -z "$tag" ]; then
+    echo "usage: ssh <host> <version>" >&2
+    exit 2
+fi
+case "$tag" in
+    *[!A-Za-z0-9._-]*|.*)
+        echo "refusing tag: $tag" >&2
+        exit 2
+        ;;
+esac
+
+echo "requested dograh $tag"
+cd "$STACK"
+
+# Pull before touching anything: a missing or unreachable tag must leave the
+# running stack exactly as it was.
+for svc in api ui; do
+    docker pull "$REGISTRY/dograh-$svc:$tag"
+done
+
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+cp -a .env ".env.bak-$stamp"
+docker exec christ-dograh-db pg_dump -U postgres postgres > "/root/dograh-db-$stamp.sql"
+
+set_image() {
+    key="$1"
+    value="$2"
+    if grep -q "^$key=" .env; then
+        sed -i "s|^$key=.*|$key=$value|" .env
+    else
+        printf '%s=%s\n' "$key" "$value" >> .env
+    fi
+}
+set_image DOGRAH_API_IMAGE "$REGISTRY/dograh-api:$tag"
+set_image DOGRAH_UI_IMAGE "$REGISTRY/dograh-ui:$tag"
+
+docker compose -p christ --profile agents up -d --no-deps dograh-api dograh-ui
+
+i=0
+while [ "$i" -lt 45 ]; do
+    health=$(curl -fsS -m 3 http://127.0.0.1:8100/api/v1/health 2>/dev/null || true)
+    case "$health" in
+        *"\"version\":\"$tag\""*)
+            echo "dograh $tag is live"
+            exit 0
+            ;;
+    esac
+    i=$((i + 1))
+    sleep 2
+done
+
+echo "api never reported $tag; restoring the previous .env and restarting" >&2
+cp -a ".env.bak-$stamp" .env
+docker compose -p christ --profile agents up -d --no-deps dograh-api dograh-ui
+exit 1
