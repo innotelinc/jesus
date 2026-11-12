@@ -2,6 +2,10 @@
 # /usr/local/sbin/dograh-deploy - force-commanded release hook for this host.
 # Usage from CI:  ssh root@christ <version>
 # It may only touch the two dograh services of the christ compose project.
+#
+# Before anything is pinned or restarted, the candidate is rehearsed against a
+# copy of the live database (dograh-rehearse-rollback). A candidate that cannot
+# serve there never reaches production.
 set -eu
 
 STACK=/opt/christ/jesus/christ
@@ -27,6 +31,45 @@ cd "$STACK"
 for svc in api ui; do
     docker pull "$REGISTRY/dograh-$svc:$tag"
 done
+
+# Rehearse before promoting: start this exact image against a throwaway copy of
+# the live database and require it to answer /api/v1/health. This is the same
+# bench an operator runs by hand, so the answer here is the answer they would
+# get. It runs before the dump, the .env backup and the restart, so a refusal
+# leaves production, .env and the database exactly as they were. An
+# inconclusive rehearsal is not a pass.
+REHEARSAL=/usr/local/sbin/dograh-rehearse-rollback
+if [ ! -x "$REHEARSAL" ]; then
+    echo "refusing promotion: $REHEARSAL is not installed here, so $tag cannot be rehearsed" >&2
+    exit 2
+fi
+echo "rehearsing $tag against the live schema before promoting it"
+if "$REHEARSAL" "$tag"; then
+    echo "rehearsal passed: $tag serves on a copy of the live database"
+else
+    rc=$?
+    if [ "$rc" -eq 1 ]; then
+        cat >&2 <<EOF
+refusing promotion: $tag cannot start on the schema production is on
+
+The rehearsal started this exact image against a copy of the live database and
+it never served, so pinning it would take production down rather than forward.
+Nothing was changed: the running stack, .env and the database are as they were.
+
+Read the rehearsal output above for the failing revision or the container log,
+then release a fix.
+EOF
+        exit 1
+    fi
+    cat >&2 <<EOF
+refusing promotion: the rehearsal could not run (exit $rc) for $tag
+
+Inconclusive is not a pass, so production was not touched. Check
+$REHEARSAL on this host - docker reachable, christ-dograh-db present, the
+candidate pullable - and run the deploy again.
+EOF
+    exit 2
+fi
 
 # The migration revision the database is on before this release starts. The
 # entrypoint runs `alembic upgrade head`, so this can move during the deploy;
