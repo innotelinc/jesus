@@ -1,0 +1,210 @@
+#!/bin/sh
+# /usr/local/sbin/dograh-rehearse-rollback - can <tag> start on the schema
+# production is on right now?
+#
+# Usage: dograh-rehearse-rollback <tag> [live-api-container]
+# Exit:  0 the candidate serves on this schema (a pin rollback is safe)
+#        1 the candidate cannot start (a rollback must restore the dump too)
+#        2 the rehearsal itself could not run
+#
+# The live stack is never touched: the candidate runs against a throwaway copy
+# of the live database, on its own network, and everything is torn down after.
+set -eu
+
+REGISTRY=ghcr.io/innotelinc
+LIVE_DB=christ-dograh-db
+LIVE_REDIS=christ-dograh-redis
+LIVE_MINIO=christ-dograh-minio
+LIVE_API=${2:-christ-dograh-api}
+tag=${1:-}
+CURL_IMAGE=curlimages/curl:latest
+
+# Clone the live stack's own supporting images: a bench running different
+# postgres/redis/minio versions than production is not a rehearsal of
+# production's schema. The live redis is password-protected and the live minio
+# is dograhai's mirror, neither of which the obvious upstream names provide.
+live_image() {
+    docker inspect "$1" --format '{{.Config.Image}}' 2>/dev/null || echo "$2"
+}
+PG_IMAGE=${PG_IMAGE:-$(live_image "$LIVE_DB" pgvector/pgvector:pg17)}
+REDIS_IMAGE=${REDIS_IMAGE:-$(live_image "$LIVE_REDIS" redis:7)}
+MINIO_IMAGE=${MINIO_IMAGE:-$(live_image "$LIVE_MINIO" dograhai/minio:2026.09.22)}
+MINIO_CMD=${MINIO_CMD:-$(docker inspect "$LIVE_MINIO" --format '{{join .Config.Cmd " "}}' 2>/dev/null || true)}
+[ -n "${MINIO_CMD:-}" ] || MINIO_CMD="server /data --console-address :9001"
+
+[ -n "${tag:-}" ] || { echo "usage: $0 <tag|image-ref> [live-api-container]" >&2; exit 2; }
+case "$tag" in
+    *"/"*)
+        # A fully qualified reference, so an upstream or older image that this
+        # organisation never published (dograhai/dograh-api:1.51.0) can be
+        # rehearsed against the current schema too.
+        image=$tag
+        case "${image##*:}" in
+            *[!A-Za-z0-9._-]*) echo "refusing image: $image" >&2; exit 2 ;;
+        esac
+        ;;
+    *)
+        case "$tag" in
+            *[!A-Za-z0-9._-]*|.*)
+                echo "refusing tag: $tag" >&2
+                exit 2
+                ;;
+        esac
+        image=$REGISTRY/dograh-api:$tag
+        ;;
+esac
+command -v docker >/dev/null 2>&1 || { echo "docker not found" >&2; exit 2; }
+docker inspect "$LIVE_DB" >/dev/null 2>&1 || { echo "no $LIVE_DB on this host" >&2; exit 2; }
+docker inspect "$LIVE_API" >/dev/null 2>&1 || { echo "no $LIVE_API on this host" >&2; exit 2; }
+
+id=$$
+p=dograh-rehearse-$id
+net=$p
+pg=$p-pg
+redis=$p-redis
+minio=$p-minio
+api=$p-api
+tmp=$(mktemp -d /tmp/dograh-rehearse-XXXXXX)
+envfile=$tmp/env
+dump=$tmp/dump.sql
+
+cleanup() {
+    docker rm -f "$api" "$minio" "$redis" "$pg" >/dev/null 2>&1 || true
+    docker network rm "$net" >/dev/null 2>&1 || true
+    rm -rf "$tmp"
+}
+trap cleanup EXIT INT TERM HUP
+
+say() { echo "[rehearse] $*"; }
+
+revision() {
+    docker exec "$1" psql -U postgres -d postgres -tAc \
+        'select version_num from alembic_version' 2>/dev/null | tr -d '[:space:]'
+}
+
+say "candidate $image against a copy of $LIVE_DB"
+schema_before=$(revision "$LIVE_DB" || true)
+say "production schema revision: ${schema_before:-unknown}"
+
+say "dumping the live database"
+docker exec "$LIVE_DB" pg_dump -U postgres postgres > "$dump" || {
+    echo "pg_dump failed" >&2
+    exit 2
+}
+say "dump: $(wc -c < "$dump") bytes"
+
+say "support images: pg=$PG_IMAGE redis=$REDIS_IMAGE minio=$MINIO_IMAGE"
+
+# Scratch credentials are generated per run. Nothing in this bench is a real
+# secret, and nothing in the source should look like one either.
+rand() { head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-24; }
+pg_pass=$(rand)
+s3_user=$(rand)
+s3_pass=$(rand)
+
+docker network create "$net" >/dev/null
+
+docker run -d --name "$pg" --network "$net" \
+    -e POSTGRES_PASSWORD="$pg_pass" -e POSTGRES_DB=postgres "$PG_IMAGE" >/dev/null || {
+    echo "cannot start scratch postgres ($PG_IMAGE)" >&2
+    exit 2
+}
+i=0
+while [ "$i" -lt 45 ]; do
+    docker exec "$pg" pg_isready -U postgres >/dev/null 2>&1 && break
+    i=$((i + 1))
+    sleep 2
+done
+if [ "$i" -ge 45 ]; then
+    echo "scratch postgres never became ready" >&2
+    exit 2
+fi
+say "restoring the copy"
+docker exec -i "$pg" psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 < "$dump" >/dev/null || {
+    echo "restore into scratch postgres failed" >&2
+    exit 2
+}
+say "copy restored at revision $(revision "$pg" || echo unknown)"
+
+# Scratch redis runs without a password on purpose: the candidate is handed a
+# REDIS_URL that points at the scratch instance only.
+docker run -d --name "$redis" --network "$net" "$REDIS_IMAGE" >/dev/null || {
+    echo "cannot start scratch redis ($REDIS_IMAGE)" >&2
+    exit 2
+}
+docker run -d --name "$minio" --network "$net" \
+    -e MINIO_ROOT_USER="$s3_user" -e MINIO_ROOT_PASSWORD="$s3_pass" \
+    "$MINIO_IMAGE" $MINIO_CMD >/dev/null || {
+    echo "cannot start scratch minio ($MINIO_IMAGE)" >&2
+    exit 2
+}
+i=0
+while [ "$i" -lt 30 ]; do
+    docker run --rm --network "$net" "$CURL_IMAGE" \
+        -fsS -m 3 "http://$minio:9000/minio/health/live" >/dev/null 2>&1 && break
+    i=$((i + 1))
+    sleep 2
+done
+if [ "$i" -ge 30 ]; then
+    echo "scratch minio never became ready" >&2
+    exit 2
+fi
+
+# Reuse the live service's own environment, minus every endpoint and credential
+# that points at production, so the candidate differs only in where it points.
+docker inspect "$LIVE_API" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+    | grep -vE '^(DATABASE_URL|REDIS_URL|MINIO_ENDPOINT|MINIO_ACCESS_KEY|MINIO_SECRET_KEY|MINIO_SECURE)=' \
+    > "$envfile" || true
+{
+    echo "DATABASE_URL=postgresql+asyncpg://postgres:$pg_pass@$pg:5432/postgres"
+    echo "REDIS_URL=redis://$redis:6379/0"
+    echo "MINIO_ENDPOINT=$minio:9000"
+    echo "MINIO_ACCESS_KEY=$s3_user"
+    echo "MINIO_SECRET_KEY=$s3_pass"
+    echo "MINIO_SECURE=false"
+} >> "$envfile"
+
+say "pulling $image"
+docker pull -q "$image" >/dev/null || {
+    echo "cannot pull $image" >&2
+    exit 2
+}
+
+say "starting the candidate"
+docker run -d --name "$api" --network "$net" --env-file "$envfile" \
+    "$image" >/dev/null || {
+    echo "cannot start $image" >&2
+    exit 2
+}
+
+i=0
+while [ "$i" -lt 45 ]; do
+    status=$(docker inspect "$api" --format '{{.State.Status}}' 2>/dev/null || echo gone)
+    case "$status" in
+        exited|dead|gone)
+            code=$(docker inspect "$api" --format '{{.State.ExitCode}}' 2>/dev/null || echo unknown)
+            say "candidate exited $code within $((i * 2))s"
+            docker logs "$api" 2>&1 | grep -Ei 'FAILED|alembic|error' | tail -5
+            say "RESULT: $tag cannot start on revision ${schema_before:-unknown}"
+            say "a rollback to $tag must restore the pre-release dump as well"
+            exit 1
+            ;;
+        running)
+            if docker run --rm --network "$net" "$CURL_IMAGE" \
+                -fsS -m 3 "http://$api:8000/api/v1/health" >/dev/null 2>&1; then
+                say "candidate answers /api/v1/health"
+                say "RESULT: $tag serves on revision ${schema_before:-unknown}"
+                say "a rollback to $tag by pin alone is safe"
+                exit 0
+            fi
+            ;;
+    esac
+    i=$((i + 1))
+    sleep 2
+done
+
+status=$(docker inspect "$api" --format '{{.State.Status}}' 2>/dev/null || echo gone)
+say "no health answer after 90s (container: $status)"
+docker logs "$api" 2>&1 | tail -8
+echo "REHEARSAL INCONCLUSIVE: $tag neither failed nor served; treat as unsafe" >&2
+exit 2
