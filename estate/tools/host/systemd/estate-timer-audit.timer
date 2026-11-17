@@ -1,0 +1,12 @@
+[Unit]
+Description=Audit the host's timers daily
+
+[Timer]
+OnBootSec=15min
+OnCalendar=*-*-* 07:20:00
+Persistent=true
+RandomizedDelaySec=20min
+Unit=estate-timer-audit.service
+
+[Install]
+WantedBy=timers.target
