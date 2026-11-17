@@ -81,6 +81,13 @@ else
   echo "  incus-rebalance.json        -> /etc/incus-rebalance.json"
 fi
 
+if [ -f "$here/hosts/$host/timers" ]; then
+  echo "== timers for $host"
+  grep -vE '^[[:space:]]*(#|$)' "$here/hosts/$host/timers" | sed 's/^/  /'
+else
+  echo "== timers for $host: none declared (hosts/$host/timers missing)"
+fi
+
 if [ "$check_only" -eq 1 ]; then
   echo "check only; nothing installed"
   exit 0
@@ -109,18 +116,34 @@ else
   echo "  policy installed"
 fi
 
+timers_here() {   # which timers this host is supposed to run
+  [ -f "$here/hosts/$host/timers" ] && grep -vE '^[[:space:]]*(#|$)' "$here/hosts/$host/timers"
+}
+
 systemctl daemon-reload
-for timer in incus-rebalance.timer swap-ceiling-check.timer cpk-limits-guard.timer; do
-  [ -e "$unit_dir/$timer" ] && systemctl enable --now "$timer"
-done
+if timers_here >/dev/null 2>&1; then
+  while read -r timer; do
+    [ -n "$timer" ] || continue
+    if [ -e "$unit_dir/$timer" ]; then systemctl enable --now "$timer"; fi
+  done < <(timers_here)
+else
+  echo "  note: no hosts/$host/timers; enabling no timers."
+  echo "        Add one listing the timers this host runs - a host must not"
+  echo "        start a tool it has no remotes or data for."
+fi
 
 echo "== one pass each"
-for svc in incus-rebalance.service swap-ceiling-check.service cpk-limits-guard.service; do
-  [ -e "$unit_dir/$svc" ] && { systemctl start "$svc" || true; }
-done
+if timers_here >/dev/null 2>&1; then
+  while read -r timer; do
+    svc="${timer%.timer}.service"
+    [ -n "$timer" ] && [ -e "$unit_dir/$svc" ] && { systemctl start "$svc" || true; }
+  done < <(timers_here)
+fi
 
 echo "== result"
-for timer in incus-rebalance.timer swap-ceiling-check.timer cpk-limits-guard.timer; do
-  [ -e "$unit_dir/$timer" ] && systemctl is-enabled "$timer"
-done
+if timers_here >/dev/null 2>&1; then
+  while read -r timer; do
+    [ -n "$timer" ] && [ -e "$unit_dir/$timer" ] && systemctl is-enabled "$timer"
+  done < <(timers_here)
+fi
 journalctl -u incus-rebalance --since -2min --no-pager 2>/dev/null | tail -2
