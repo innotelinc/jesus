@@ -54,6 +54,15 @@ dropins() {
   { [ -d "$here/hosts/$host/systemd" ] && find "$here/hosts/$host/systemd" -mindepth 2 -maxdepth 2 -name '*.conf' | sort; } || true
 }
 
+declared_timers() {   # which timers this host is supposed to run
+  [ -f "$here/hosts/$host/timers" ] && grep -vE '^[[:space:]]*(#|$)' "$here/hosts/$host/timers"
+}
+
+runs_rebalance=0
+if declared_timers 2>/dev/null | grep -qx 'incus-rebalance\.timer'; then
+  runs_rebalance=1
+fi
+
 echo "== host: $host"
 echo "== syntax"
 for script in $(scripts); do
@@ -75,7 +84,9 @@ for conf in $(dropins); do
   unit=$(basename "$(dirname "$conf")")
   printf "  %-24s -> %s\n" "$(basename "$conf")" "$unit_dir/$unit/$(basename "$conf")"
 done
-if [ -e /etc/incus-rebalance.json ]; then
+if [ "$runs_rebalance" -eq 0 ]; then
+  echo "  incus-rebalance.json        skipped; this host declares no incus-rebalance.timer"
+elif [ -e /etc/incus-rebalance.json ]; then
   echo "  incus-rebalance.json        present; left untouched (drift reported below)"
 else
   echo "  incus-rebalance.json        -> /etc/incus-rebalance.json"
@@ -106,7 +117,16 @@ for conf in $(dropins); do
   install -D -m 0644 "$conf" "$unit_dir/$unit/$(basename "$conf")"
 done
 
-if [ -e /etc/incus-rebalance.json ]; then
+if [ "$runs_rebalance" -eq 0 ]; then
+  # A host that does not run the allocator has no use for its policy, and a
+  # stale policy sitting in /etc is exactly what a later reader would trust.
+  if [ -e /etc/incus-rebalance.json ]; then
+    echo "  note: /etc/incus-rebalance.json exists, but $host declares no"
+    echo "        incus-rebalance.timer; left untouched"
+  else
+    echo "  policy not installed: $host runs no incus-rebalance.timer"
+  fi
+elif [ -e /etc/incus-rebalance.json ]; then
   if ! diff -q "$here/etc/incus-rebalance.json" /etc/incus-rebalance.json >/dev/null 2>&1; then
     echo "  note: /etc/incus-rebalance.json differs from the copy here; not overwriting"
   fi
@@ -116,16 +136,12 @@ else
   echo "  policy installed"
 fi
 
-timers_here() {   # which timers this host is supposed to run
-  [ -f "$here/hosts/$host/timers" ] && grep -vE '^[[:space:]]*(#|$)' "$here/hosts/$host/timers"
-}
-
 systemctl daemon-reload
-if timers_here >/dev/null 2>&1; then
+if declared_timers >/dev/null 2>&1; then
   while read -r timer; do
     [ -n "$timer" ] || continue
     if [ -e "$unit_dir/$timer" ]; then systemctl enable --now "$timer"; fi
-  done < <(timers_here)
+  done < <(declared_timers)
 else
   echo "  note: no hosts/$host/timers; enabling no timers."
   echo "        Add one listing the timers this host runs - a host must not"
@@ -133,17 +149,17 @@ else
 fi
 
 echo "== one pass each"
-if timers_here >/dev/null 2>&1; then
+if declared_timers >/dev/null 2>&1; then
   while read -r timer; do
     svc="${timer%.timer}.service"
     [ -n "$timer" ] && [ -e "$unit_dir/$svc" ] && { systemctl start "$svc" || true; }
-  done < <(timers_here)
+  done < <(declared_timers)
 fi
 
 echo "== result"
-if timers_here >/dev/null 2>&1; then
+if declared_timers >/dev/null 2>&1; then
   while read -r timer; do
     [ -n "$timer" ] && [ -e "$unit_dir/$timer" ] && systemctl is-enabled "$timer"
-  done < <(timers_here)
+  done < <(declared_timers)
 fi
 journalctl -u incus-rebalance --since -2min --no-pager 2>/dev/null | tail -2
