@@ -100,7 +100,8 @@ this page:
 | 2026-11-02 | 7168 MiB, unchanged | 2048 → **2944 MiB**, swap on | First reading taken on a host rather than inside a guest |
 | 2026-11-17 | **5504 MiB**, `cpu 1` | swap `"true"` → `2GiB` | Measured while the estate was being reshaped; see §1 |
 
-The number is written by automation, not by hand, which is why it keeps moving.
+The number is written by automation, not by hand, which is why it keeps moving —
+[`docs/incus-rebalance.md`](incus-rebalance.md) is the write-up of the tool.
 On i4 a timer runs `/usr/local/sbin/incus-rebalance --apply` every few minutes:
 it budgets each host's RAM across its containers and rewrites `limits.memory`
 when the wanted value leaves a deadband. Its pass on 2026-11-17 reads
