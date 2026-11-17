@@ -30,6 +30,13 @@ policy is installed only when `/etc/incus-rebalance.json` is absent — a rebuil
 host needs one, a live host's re-keyed policy must not be replaced — and a
 difference is reported instead of overwritten.
 
+`hosts/<host>/timers` decides which timers that host runs, and `install.sh`
+enables exactly those: i1 gets `cpk-limits-guard.timer` and
+`swap-ceiling-check.timer`, i4 gets `incus-rebalance.timer` and the same check.
+Enabling the rebalancer on a host that has no `i1move`/`i2move` remotes would
+reproduce the failure this directory exists to prevent, so a host with no
+`timers` file gets a warning and no timers at all.
+
 ## Hosts have diverged, deliberately recorded
 
 `incus-guard` is identical on i1 and i4. Two others are not, and **i1 is ahead**:
