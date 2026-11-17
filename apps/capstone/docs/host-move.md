@@ -217,6 +217,11 @@ app registered** are what this move is for.
   i2/i4, not inside this container, and the estate's incus root password is
   deliberately absent from every repo (golden rule 4 in
   `docs/container-placement.md`). The commands in §5 are for whoever holds it.
+- **`incus` on a container answers for whichever remote it points at.** The
+  Cerulean edge (`proxy`, `.71`) was recorded here as nested inside the `ontrak`
+  container on i1; it is not — it is an instance on **i4** (`.54`), and
+  `incus list local:` inside `ontrak` is empty. The old reading came through that
+  client's default remote. See [`docs/edge-host.md`](../../../docs/edge-host.md).
 
 ## 9. Fallback: if i2 cannot take it
 
