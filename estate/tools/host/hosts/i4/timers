@@ -1,2 +1,6 @@
+estate-edge.timer
+estate-sample.timer
+estate-state.timer
+estate-timer-audit.timer
 incus-rebalance.timer
 swap-ceiling-check.timer

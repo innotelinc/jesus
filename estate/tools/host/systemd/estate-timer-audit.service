@@ -1,0 +1,12 @@
+[Unit]
+Description=List host timers that are failing, silent or idle
+# A timer nobody retires is worse than a missing one: `cpk-limits-guard` re-asserted
+# limits on an instance that no longer exists, 720 times a day, and the steady
+# stream of failures is what hid a real fault. This is the list that would have
+# caught it. Read-only: retiring a timer is a decision, made by hand, recorded in
+# `retired/timers`.
+Documentation=file:///usr/local/sbin/estate-timer-audit
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/estate-timer-audit --since 7d

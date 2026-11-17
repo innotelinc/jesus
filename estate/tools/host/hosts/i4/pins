@@ -1,0 +1,5 @@
+# i4 runs the shared copies of every tool: nothing to pin.
+#
+# Promoting i1's newer `swap-ceiling-check` / `incus-migrate-safe` (see
+# `hosts/i1/pins`) is done by copying the file into `sbin/` and re-running
+# `install.sh` here — a deployment decision, not a side effect of versioning.

@@ -1,0 +1,20 @@
+# What the Cerulean edge proxies to, and which instance owns each target.
+#
+# Format: <label>  <host:port>  <incus remote>  <instance>
+# The remote is the one on the host that runs `estate-edge` (i4): i1's instances are
+# reached through `i1move`, i4's own through `local`.
+#
+# Ports here were measured from i4 on 2026-11-17, not guessed: each target below
+# accepted a TCP connection that day. atheniq is deliberately absent - it runs, but
+# none of the ports tried (80, 3000) answered, and a probe that starts life wrong is
+# a probe nobody trusts. Add its real published port when it is known.
+#
+# ontrak is listed *because* it is stopped: this is the row that proves the tool can
+# tell "parked on purpose" from "broken", which is the whole reason it exists.
+mail-admin	192.168.1.15:8080	i1move	mail
+onyx-web	192.168.1.60:2080	i1move	onyx
+vault-web	192.168.1.73:80	i1move	vault
+coolify	192.168.1.113:8000	i1move	workloads
+edge-admin	192.168.1.71:81	local	proxy
+edge-authentik	192.168.1.71:9000	local	proxy
+ontrak-app	192.168.1.21:3000	i1move	ontrak
