@@ -26,9 +26,15 @@ cd estate/tools/host
 `/usr/local/sbin` (the guard to `/usr/local/bin`, whose unit execs it from
 there), every `systemd/` unit to `/etc/systemd/system`, every `*.d/*.conf` as a
 drop-in for its unit, then the same for `hosts/<hostname>/` **on top**. The
-policy is installed only when `/etc/incus-rebalance.json` is absent — a rebuilt
-host needs one, a live host's re-keyed policy must not be replaced — and a
-difference is reported instead of overwritten.
+policy is installed only on the host that declares `incus-rebalance.timer`, and
+then only when `/etc/incus-rebalance.json` is absent — a rebuilt host needs one,
+a live host's re-keyed policy must not be replaced — and a difference is
+reported instead of overwritten. A host that does not run the allocator gets no
+policy at all, so a stale one cannot be mistaken for a live configuration.
+
+The write path was exercised on i1 and i4 on 2026-11-17: every installed file
+matched its source here, each host enabled only the timers its `timers` file
+declares, i4's live policy kept its bytes and mtime, and i1 was left without one.
 
 `hosts/<host>/timers` decides which timers that host runs, and `install.sh`
 enables exactly those: i1 gets `cpk-limits-guard.timer` and
