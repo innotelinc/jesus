@@ -1,0 +1,5 @@
+[Unit]
+Description=Re-assert the CopilotKit container memory limit
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/cpk-limits-guard.sh
