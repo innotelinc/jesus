@@ -39,6 +39,11 @@ What settles it, measured 2026-11-17:
   returns `limits.memory: 5504MiB`, `limits.cpu: "1"`, and `proxy`'s own
   `memory.max` is `5771362304` — 5504 MiB to the byte.
 
+- The trap caught a second reading too: `incus storage list -c n` run on `.54`
+  showed only `default`, because that client was pointed elsewhere. With
+  `local:` it lists `default` and `tank`, and `proxy`'s root device is
+  `pool: tank, size: 65GiB` — which is why the page says `tank`.
+
 Rule for next time: `incus <cmd> local:` if you mean the box you are standing
 on, or `incus remote switch local` first.
 
@@ -94,6 +99,27 @@ this page:
 | 2026-10-31 | **7168 MiB**, `cpu 2` | **2048 MiB** | Moved again from outside |
 | 2026-11-02 | 7168 MiB, unchanged | 2048 → **2944 MiB**, swap on | First reading taken on a host rather than inside a guest |
 | 2026-11-17 | **5504 MiB**, `cpu 1` | swap `"true"` → `2GiB` | Measured while the estate was being reshaped; see §1 |
+
+The number is written by automation, not by hand, which is why it keeps moving.
+On i4 a timer runs `/usr/local/sbin/incus-rebalance --apply` every few minutes:
+it budgets each host's RAM across its containers and rewrites `limits.memory`
+when the wanted value leaves a deadband. Its pass on 2026-11-17 reads
+
+```
+i4: 8192 MiB host, 7618 MiB budget, 4 container(s)
+  proxy   use 4370 MiB  peak 5504  limit 5504  want 5504  keep
+```
+
+so 5504 MiB is the edge's share of an 8 GiB host, not a judgement about
+Cerulean. Setting the instance by hand is undone on the next pass; the allocator
+is what has to want a different number.
+
+The estate was also mid-migration during these readings.
+`/usr/local/sbin/incus-migrate-safe` moves a stopped container between hosts over
+rsync (written 2026-11-16, after a `incus copy` of monarch died at 13.6 of 25 GB),
+and the stopped `<name>-retired` copies left on i1 are its rollback markers. So
+instance names are not stable identifiers in this estate right now — read the
+address, not the name.
 
 So "the 4 GB limit" is history, not the current state: 4 GiB is the floor at
 which the stack was proved able to run, 7 GiB was written for a fortnight, and
@@ -165,6 +191,10 @@ an instance of i4's incus, and there the accounting is unremarkable:
 - Nothing above the edge fences it except i4's own RAM. There is no second number
   to keep in step, and raising `ontrak`'s memory has never had any effect on the
   edge — it was never the constraint.
+
+5504 MiB is `incus-rebalance`'s budget for the edge on an 8 GiB host (§2), so it
+can change on a timer without anyone touching the instance. The edge is not
+hand-sized, and editing it alone will not make it so.
 
 The residual risk is the ordinary one: `proxy` is at 4245 of 5504 MiB with 24108
 `max` reclaim events and no OOM kills, so the cap is what stands between the
