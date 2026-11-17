@@ -1,0 +1,7 @@
+[Unit]
+Description=Keep the CopilotKit container memory limit pinned
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target

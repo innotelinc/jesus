@@ -194,3 +194,42 @@ current limit and called `config set` anyway. It now lists the remote's instance
 first, exits 0 with one logged line when the instance is absent (it is — the
 CopilotKit data was archived on 2026-11-14), and exits 1 only when a real write
 fails.
+
+That guard is also the one host tool now in the repository, with `install.sh` as
+its re-apply step (§10).
+
+## 10. These tools are host-only, and mostly unversioned
+
+Everything in this page — `incus-rebalance`, `incus-migrate-safe`, `incus-guard`,
+`swap-ceiling-check`, `estate-checks/`, `cpk-limits-guard` — lives only on the
+hosts, under `/usr/local/sbin`, `/usr/local/bin` and `/etc/systemd/system`, with
+policy and state under `/etc` and `/var/lib`. Until 2026-11-17 none of it was in
+version control, so a rebuilt host came back with its containers and nothing that
+sizes or guards them, and the only record of what the timers did was the source
+on the machine being rebuilt.
+
+`cpk-limits-guard` is now versioned at
+[`estate/tools/host/`](../../estate/tools/host/README.md): the script, both units,
+and `install.sh` as the re-apply step. It installs into `/usr/local/bin` and
+`/etc/systemd/system`, so run it as root.
+
+```sh
+cd estate/tools/host
+./install.sh --check      # syntax, plus what the script would do
+./install.sh              # install, enable the timer, run one pass
+```
+
+The rest are still unversioned. Treat any rebuild as an occasion to copy them
+into that directory first. What a rebuild takes with it, concretely:
+
+- `/etc/incus-rebalance.json` — the whole policy, including every `min` and
+  `pinned` reservation, and the `i1move`/`i2move` remote names in `hosts`;
+- `/var/lib/incus-rebalance/state.json` — the `lower_streak` counters without
+  which `stability_runs` means nothing, so every cap restarts as "never held";
+- `/var/log/incus-rebalance.log` — the only history of which caps were changed
+  and when;
+- the timers themselves: `incus-rebalance`, `swap-ceiling-check`, `edge-liveness`,
+  `agent-reaper`, `estate-checks`, `cpk-limits-guard`.
+
+A rebuilt host that loses only the policy is the quiet failure: the containers
+still run, every cap still exists, and nothing is re-asserted again.
