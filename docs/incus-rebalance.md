@@ -178,6 +178,22 @@ applied anywhere. After any migration, re-key the policy — `i4:proxy`,
 `i2:monarch` — or the allocator will size the container as if nobody had ever
 asked for a floor.
 
+**The re-keyed policy applied, 2026-11-17.** After `i2:proxy`, the `i1:*`
+entries and `i2:atheniq` were re-keyed to the hosts their instances actually run
+on, the next `--apply` pass took effect without intervention: the 06:58Z pass
+moved `atheniq` from 6784 MiB to its restored 6144 MiB pin, and every pass since
+logs `atheniq pinned 6144 MiB` with `pass complete: 0 change(s)`. Reading it
+back from i4 gives `6144MiB`:
+
+```sh
+incus config get i1move:atheniq limits.memory   # 6144MiB
+```
+
+The same run reports `i1: proposals still total 15488 MiB against a 14745 MiB
+budget`, which is the pre-existing overcommit the re-key made visible rather
+than created — the pins and floors now add up to more than the host's 90 %
+allowance, and the allocator says so on every pass instead of silently trimming.
+
 **The estate was being migrated while this was written.**
 `incus-migrate-safe` moves a stopped container's rootfs between hosts over rsync
 and rebuilds the instance skeleton with `incus init --empty`; it was written on
@@ -208,19 +224,31 @@ version control, so a rebuilt host came back with its containers and nothing tha
 sizes or guards them, and the only record of what the timers did was the source
 on the machine being rebuilt.
 
-`cpk-limits-guard` is now versioned at
-[`estate/tools/host/`](../../estate/tools/host/README.md): the script, both units,
-and `install.sh` as the re-apply step. It installs into `/usr/local/bin` and
-`/etc/systemd/system`, so run it as root.
+All five of these tools are now versioned at
+[`estate/tools/host/`](../../estate/tools/host/README.md): `sbin/` for the
+scripts, `systemd/` for the units and drop-ins, `hosts/<host>/` for the
+per-host variants, `etc/incus-rebalance.json` for the policy, and `install.sh`
+as the re-apply step. It installs into `/usr/local/sbin`,
+`/usr/local/bin` and `/etc/systemd/system`, so run it as root.
 
 ```sh
 cd estate/tools/host
-./install.sh --check      # syntax, plus what the script would do
-./install.sh              # install, enable the timer, run one pass
+./install.sh --check      # syntax, plus the plan for this hostname
+./install.sh              # install, enable the timers, run one pass of each
 ```
 
-The rest are still unversioned. Treat any rebuild as an occasion to copy them
-into that directory first. What a rebuild takes with it, concretely:
+`install.sh` applies the shared files, then `hosts/<hostname>/` on top, and
+installs the policy only when the host has none — a live policy is never
+replaced, only reported as drift. Two tools genuinely differ per host and i1's
+copies are the newer ones (`swap-ceiling-check` reads the cgroup instead of the
+configured number; `incus-migrate-safe` shares one transport between preflight
+and rsync); they sit under `hosts/i1/` rather than being promoted, because what
+runs on i4 is a deployment decision.
+
+Still unversioned: `edge-liveness`, `agent-reaper`, `estate-checks/`,
+`incus-lifecycle-watch` and the `vault-*` / `regcache-credential` timers. Treat
+any rebuild as an occasion to copy them in. What a rebuild takes with it,
+concretely:
 
 - `/etc/incus-rebalance.json` — the whole policy, including every `min` and
   `pinned` reservation, and the `i1move`/`i2move` remote names in `hosts`;
