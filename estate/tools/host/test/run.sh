@@ -152,6 +152,19 @@ echo "== install.sh --check"
 (cd "$root" && ./install.sh --check >/dev/null 2>&1)
 check "install.sh --check passes on this checkout" 0 $?
 
+# The disable direction is destructive, so a host that declares nothing must be
+# treated as unknown rather than as "declares none of these".
+notimers="$TMP/notimers"
+mkdir -p "$notimers"
+cp -a "$root"/. "$notimers"/ 2>/dev/null
+rm -rf "$notimers/hosts/$(hostname -s)"
+notimers_out=$(cd "$notimers" && ./install.sh --check 2>&1); notimers_rc=$?
+check "a host with no timers file still checks clean" 0 "$notimers_rc"
+case "$notimers_out" in
+	*"nothing repo-managed will be disabled"*) ok "and it promises to leave timers alone" ;;
+	*) no "an unrecognised host would have its timers disabled" ;;
+esac
+
 echo
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

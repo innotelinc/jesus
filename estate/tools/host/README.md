@@ -43,10 +43,16 @@ a live configuration.
 `hosts/<host>/timers` decides which timers that host runs, and `install.sh` acts in
 both directions: it enables exactly those, and **disables** any timer it installs
 that the host no longer declares. i1 runs `estate-sample`, `estate-state`,
-`estate-timer-audit` and `swap-ceiling-check`; i4 runs those plus
-`incus-rebalance`. A host with no `timers` file gets a warning and no timers at all,
-because enabling the rebalancer on a host without `i1move`/`i2move` would reproduce
-the failure this directory exists to prevent.
+`estate-timer-audit` and `swap-ceiling-check`; i4 runs those plus `incus-rebalance`
+and `estate-edge`.
+
+A host with no `timers` file is treated as *unknown*, not as *declares nothing*: it
+gets a warning, no timers are enabled, and **nothing repo-managed is disabled
+either**. The distinction matters because the disable direction is destructive — a
+rebuilt host, or one whose hostname does not match a `hosts/<host>/` directory yet,
+would otherwise have every timer this script had just installed switched off,
+including the allocator on i4. Only `retired/timers`, an estate-wide decision, is
+enforced regardless of what a host declares.
 
 ## Every install leaves a manifest
 
@@ -100,6 +106,12 @@ wallpaper.
 ```sh
 ./test/run.sh        # Linux; no incus daemon, no container, no network needed
 ```
+
+`estate-timer-audit` flags a *silent* timer only when the unit lives under
+`/etc/systemd/system` — that is, when the estate installed it. A vendor timer that
+has not fired yet is waiting for its condition (`apport-autoreport`, `mdcheck_*`,
+`ua-timer`), and reporting it as abandoned is how an audit becomes noise. Failing
+vendor timers are still flagged: those are broken, not idle.
 
 `test/fake-incus` is a CLI double backed by a directory of `state=` files. The
 cases cover the two tools that can actually lose something — `incus-guard`'s lease

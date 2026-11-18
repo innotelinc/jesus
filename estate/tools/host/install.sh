@@ -64,6 +64,16 @@ if declared_timers 2>/dev/null | grep -qx 'incus-rebalance\.timer'; then
   runs_rebalance=1
 fi
 
+# A host with no timers file may be a new host, a rebuilt one, or one whose
+# hostname does not match any hosts/<host>/ directory yet. "Declares nothing" must
+# not be read as "declares none of these": acting on the difference would disable
+# everything this script just installed, including the allocator on i4. Only an
+# explicit list is an authority about what should *not* run.
+has_timers_file=0
+if [ -f "$here/hosts/$host/timers" ]; then
+  has_timers_file=1
+fi
+
 # target <TAB> source <TAB> mode, shared first then this host's overrides on top.
 # Overrides come later on purpose: the map below keeps the last one for a target.
 pairs() {
@@ -205,11 +215,12 @@ else
   echo "  incus-rebalance.json                 -> /etc/incus-rebalance.json"
 fi
 
-if [ -f "$here/hosts/$host/timers" ]; then
+if [ "$has_timers_file" -eq 1 ]; then
   echo "== timers for $host"
   declared_timers | sed 's/^/  /'
 else
   echo "== timers for $host: none declared (hosts/$host/timers missing)"
+  echo "   nothing will be enabled, and nothing repo-managed will be disabled"
 fi
 if retired_timers | grep -q .; then
   echo "== retired (disabled on sight)"
@@ -264,15 +275,19 @@ echo "  $(wc -l <"$manifest") file(s) recorded in $manifest"
 
 systemctl daemon-reload
 echo "== timers"
-while IFS= read -r timer; do
-  [ -n "$timer" ] || continue
-  if declared_timers 2>/dev/null | grep -qx "$timer"; then
-    [ -e "$unit_dir/$timer" ] && systemctl enable --now "$timer"
-  elif systemctl is-enabled --quiet "$timer" 2>/dev/null; then
-    systemctl disable --now "$timer"
-    echo "  disabled $timer: installed here, but no longer declared for $host"
-  fi
-done < <(repo_timers)
+if [ "$has_timers_file" -eq 0 ]; then
+  echo "  no hosts/$host/timers: leaving this host's timers exactly as they are"
+else
+  while IFS= read -r timer; do
+    [ -n "$timer" ] || continue
+    if declared_timers 2>/dev/null | grep -qx "$timer"; then
+      [ -e "$unit_dir/$timer" ] && systemctl enable --now "$timer"
+    elif systemctl is-enabled --quiet "$timer" 2>/dev/null; then
+      systemctl disable --now "$timer"
+      echo "  disabled $timer: installed here, but no longer declared for $host"
+    fi
+  done < <(repo_timers)
+fi
 while IFS= read -r timer; do
   [ -n "$timer" ] || continue
   if systemctl is-enabled --quiet "$timer" 2>/dev/null || systemctl is-active --quiet "$timer" 2>/dev/null; then
