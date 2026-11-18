@@ -46,31 +46,35 @@ library is rebuilt under a live instance, point `ExecStart` at it, re-enable the
 timer and delete this entry — the check itself was sound, it just has nothing left
 to check.
 
-## `regcache-credential` (retired 2026-11-18)
+## `regcache-credential` (retired 2026-11-18, un-retired the same day)
+
+Kept here as the record, but **not** in `timers`: this one came back.
 
 `regcache-credential.service` asks Docker Hub for a token for `library/alpine` and
 reads `toomanyrequests` out of the registry log, so an expired Hub token cannot hide
-behind a cache that keeps serving. It runs `incus exec regcache -- docker …`, and
-`regcache` is STOPPED: last used 2026/11/16 02:18, its storage mount deactivated at
-2026-11-16 09:58 and 10:00, and it carries no `user.estate.*` note, so nothing
-recorded why. On 2026-11-18 `192.168.1.79` — the address the cache was published on —
-answers a different MAC (`10:66:6a:59:3e:45`) than `regcache`'s own
-(`10:66:6a:b7:4c:a2`), so a restart would come back on some other address than the
-one consumers were pointed at.
+behind a cache that keeps serving. It runs `incus exec regcache -- docker …`, which
+is what made it fail: the cache is not on i1. `incus list local:` on i1 shows
+`regcache` STOPPED (last used 2026/11/16 02:18, storage mount deactivated 09:58 and
+10:00, no `user.estate.*` note), while `incus list i2:` shows it RUNNING with the
+`registry` container up and serving `192.168.1.79:5000`. The stopped i1 instance is
+the leftover; the live one was always a remote away.
 
-The alarm is not a dead credential: the last two runs that could reach the registry,
-2026-11-15 and 2026-11-16, both reported `hub token request: HTTP 200, pull_limit
-200/6h`, and exited 1 only because uncached pulls had already hit the anonymous
-limit (2, then 1, in 24 h). From 2026-11-17 the run is `CANNOT RUN: no container
-registry in regcache` — the subject, not the token.
+That also explains the two symptoms that looked like a dead credential. The runs of
+2026-11-15 and 2026-11-16 both logged `hub token request: HTTP 200, pull_limit
+200/6h` and exited 1 only because uncached pulls had already hit the anonymous limit
+(2, then 1, in 24 h); from 2026-11-17 the run was `CANNOT RUN: no container registry
+in regcache`, i.e. the local subject. Pointed at the instance that exists —
+`INCUS=i2:regcache /usr/local/sbin/regcache-credential-check.sh` — it exits 0:
+`the token authenticates and no uncached pull failed on the anonymous limit in the
+last 24h`.
 
-Re-enable this timer only after `regcache` is running again and its address is
-settled, or the check will fail for the same reason it fails now. Until then the
-`OnFailure=estate-notify@%n` path would page daily about a state a person already
-knows; the state itself belongs in `estate-state note regcache` when someone decides
-what the cache is for.
+The retarget is versioned, not hand-placed:
+`hosts/i1/systemd/regcache-credential.service.d/10-remote.conf` sets
+`Environment=INCUS=i2:regcache`, and `install.sh` installs drop-in fragments from
+`systemd/<unit>.d/*.conf` and `hosts/<host>/systemd/<unit>.d/*.conf`.
 
-Note for both: the unit files for these two live in `innotelinc/innotel-platform-stack`
-and are installed by its `install-estate-checks.sh`, which does not read this list.
-If that installer re-enables them, the same two decisions have to be repeated
-there.
+The unit files themselves still live in `innotelinc/innotel-platform-stack`, installed
+by its `install-estate-checks.sh`, which does not read this list; the drop-in is what
+survives that installer re-running. The stopped `regcache` instance on i1 is left
+alone — it is not this repo's to delete, and `estate-state note regcache` on i1 is
+where its story belongs.

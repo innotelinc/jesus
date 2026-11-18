@@ -7,4 +7,3 @@
 # stay in `retired/` so the next reader can see what was removed and why.
 cpk-limits-guard.timer  re-asserted limits.memory on `copilotkit`, an instance that exists on no host (see retired/README.md)
 media-orphans.timer     its subject is gone: `monarch` is now `monarch-retired` and stopped, so every run fails "instance not found" (see retired/README.md)
-regcache-credential.timer  subject `regcache` stopped 2026-11-16 with no recorded reason, so every run is "CANNOT RUN"; re-enable when the cache is back (see retired/README.md)
