@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# estate-health - one screen: the host's memory, swap and pressure, then every
+# instance's pin, working set and swap.
+#
+# Why: answering "is atheniq swapping because it needs 2 GiB of swap, or because its
+# pin is too small?" on 2026-11-17 took about fifteen ssh calls across two sessions -
+# `free`, `incus list`, a cgroup read per instance, the check's log, the timer, and
+# the allocator's journal - to learn three facts about one host. The facts were all
+# already on the host; nothing put them beside each other.
+#
+#   estate-health                    # this host, live numbers per instance
+#   estate-health --remote i1move    # another host's instances via an incus remote
+#   estate-health --history atheniq  # the sampler's last two hours for one instance
+#
+# Live working set / swap is read from the cgroup on the host that runs the
+# instance, so a remote instance shows its pin and state only: `incus` knows a
+# remote instance's config, not its cgroup. `estate-sample` covers the rest.
+set -uo pipefail
+
+REMOTES=(); HISTORY=""; HIST_MINS=120
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--remote) REMOTES+=("${2:-}"); shift 2 ;;
+		--history) HISTORY=${2:-}; shift 2 ;;
+		--minutes) HIST_MINS=${2:-120}; shift 2 ;;
+		-h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		*) echo "estate-health: unknown argument $1" >&2; exit 64 ;;
+	esac
+done
+[ ${#REMOTES[@]} -gt 0 ] || REMOTES=(local)
+
+num() { case "${1:-}" in ''|max) echo 0 ;; *) echo "$1" ;; esac; }
+mib() { echo $(( $(num "$1") / 1048576 )); }
+
+# `limits.memory` is "6144MiB" or "4GiB", never bytes. Converting it here keeps
+# the column comparable with the cgroup's memory.max, and stops it printing
+# "1664MiBM" the way the first version did.
+pin_mib() {   # $1 = remote:instance
+	local v n u
+	v=$(incus config get "$1" limits.memory </dev/null 2>/dev/null) || return 0
+	[ -n "$v" ] || return 0
+	n=${v%%[A-Za-z]*}; u=${v#"$n"}
+	case "$u" in
+		GiB|GB|G) echo $(( ${n%.*} * 1024 )) ;;
+		MiB|MB|M) echo "${n%.*}" ;;
+		KiB|KB|K) echo $(( ${n%.*} / 1024 )) ;;
+		*) echo 0 ;;
+	esac
+}
+
+SAMPLES=${ESTATE_SAMPLES:-/var/lib/estate-samples}
+
+if [ -n "$HISTORY" ]; then
+	file="$SAMPLES/$(hostname -s).tsv"
+	[ -r "$file" ] || { echo "no samples at $file" >&2; exit 1; }
+	cutoff=$(( $(date +%s) - HIST_MINS * 60 ))
+	printf '%-20s %-9s %6s %8s %7s %7s %8s %6s\n' time state pin work anon swap hswap psi60
+	awk -F'\t' -v inst="$HISTORY" -v since="$cutoff" '
+		$3 == inst && $1 >= since {
+			printf "%-20s %-9s %6s %8s %7s %7s %8s %6s\n", strftime("%Y-%m-%d %H:%M", $1), $4, $5, $6, $7, $8, $9, $10
+		}' "$file"
+	exit 0
+fi
+
+hostline() {
+	local m s psi
+	m=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{printf "%d/%d MiB", (t-a)/1024, t/1024}' /proc/meminfo)
+	s=$(awk '/^SwapTotal:/{t=$2} /^SwapFree:/{f=$2} END{printf "%d/%d MiB", (t-f)/1024, t/1024}' /proc/meminfo)
+	psi=$(awk '/^some/{for (i = 1; i <= NF; i++) if ($i ~ /^avg60=/) { sub("avg60=", "", $i); print "psi some avg60 " $i "%" }}' /proc/pressure/memory 2>/dev/null)
+	echo "== $(hostname -s)  mem $m  swap $s  ${psi:-psi unavailable}"
+}
+
+hostline
+printf '%-26s %-9s %7s %9s %7s %6s  %s\n' instance state pin work swap note
+for remote in "${REMOTES[@]}"; do
+	[ "$remote" = "local" ] && continue
+	echo "-- $remote (via incus remote: pin and state only, no cgroup)"
+done
+for remote in "${REMOTES[@]}"; do
+	[ ${#REMOTES[@]} -gt 1 ] && echo "-- $remote"
+	while IFS=, read -r inst st; do
+		[ -n "$inst" ] || continue
+		local_pin=0 work=0 swap=0 note=""
+		cg="/sys/fs/cgroup/lxc.payload.$inst"
+		if [ "$remote" = "local" ] && [ -r "$cg/memory.stat" ]; then
+			local_pin=$(mib "$(cat "$cg/memory.max" 2>/dev/null)")
+			swap=$(mib "$(cat "$cg/memory.swap.current" 2>/dev/null)")
+			# awk already divides: wrapping it in mib() divided the MiB by 1048576
+			# again and printed 0M for every instance.
+			work=$(awk '$1=="anon"||$1=="slab"||$1=="shmem"||$1=="sock"{w+=$2} END{printf "%d", w/1048576}' "$cg/memory.stat" 2>/dev/null)
+		else
+			local_pin=$(pin_mib "$remote:$inst")
+		fi
+		# The stop note, when there is one, is the difference between "down" and
+		# "down on purpose" (see estate-state).
+		[ "$st" != "RUNNING" ] && note=$(incus config get "$remote:$inst" user.estate.why 2>/dev/null || true)
+		printf '%-26s %-9s %7s %9s %7s %6s  %s\n' "$inst" "$st" \
+			"${local_pin:-0}M" "${work:-0}M" "${swap:-0}M" "" "${note}"
+	done < <(incus list "$remote:" --format csv -c n,s </dev/null 2>/dev/null | tr -d '\r' | sort)
+done
+if [ -r "$SAMPLES/$(hostname -s).tsv" ]; then
+	echo "history: $(wc -l <"$SAMPLES/$(hostname -s).tsv") samples at $SAMPLES/$(hostname -s).tsv (estate-health --history <instance>)"
+else
+	echo "history: none yet (estate-sample.timer)"
+fi

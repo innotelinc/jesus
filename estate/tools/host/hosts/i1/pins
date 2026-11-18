@@ -1,0 +1,9 @@
+# Tools where i1 runs a copy of its own rather than the shared one.
+#
+# Format: <tool>   <md5 of sbin/<tool> when the override was last reviewed>
+#
+# `install.sh --verify` reports a pin as STALE when the shared copy moves, which is
+# the moment to read both versions and decide whether i1's is still the newer one.
+# That decision used to be made by comparing md5s by hand, once, weeks late.
+swap-ceiling-check  4a8a065d41c05992b5e1704d50fb76b4
+incus-migrate-safe  ee00cbee2b5bbaca0d9a03d70d988fc5

@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# estate-timer-audit - which timers are still doing something, and which are noise.
+#
+# Why: `cpk-limits-guard.timer` re-asserted memory limits on `copilotkit` every two
+# minutes - 720 no-op runs a day - for an instance that exists on no host and in no
+# Docker list. It was written to fix a real bug (the guard captured the CLI's stdout
+# error as a memory limit and failed every cycle) and it outlived its subject. A
+# timer nobody retires is worse than a missing one: it fills the journal, and the
+# steady stream of failures is exactly what hid the real fault for hours.
+#
+#   estate-timer-audit              # every timer on this host
+#   estate-timer-audit --since 30d  # change the window for the failure count
+#
+# Flags, roughly in order of how much they matter:
+#   retired   listed in /etc/estate-timers-retired (a decision somebody made)
+#   no unit   the timer's .service does not exist
+#   silent    enabled, but has never fired
+#   failing   every run since boot failed and none succeeded (a run killed by the
+#             shutdown that took the machine down is not a failure of the timer)
+#   idle      has not fired in more than 30 days
+#
+# Reads `systemctl show`, not the `list-timers` table: NEXT/LAST collapse to a single
+# `-` when a timer has never fired, which shifts every later column and made the
+# first version of this script report timers called "Wed.service".
+#
+# Nothing here stops anything: the output is the case for retiring a timer, and
+# `systemctl disable --now` plus a line in `retired/timers` of the repo is the act.
+set -uo pipefail
+
+SINCE=7d
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--since) SINCE=${2:-7d}; shift 2 ;;
+		-h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		*) echo "estate-timer-audit: unknown argument $1" >&2; exit 64 ;;
+	esac
+done
+
+RETIRED=${ESTATE_RETIRED_TIMERS:-/etc/estate-timers-retired}
+is_retired() { [ -f "$RETIRED" ] && grep -qxF "$1" "$RETIRED"; }
+
+printf '%-32s %-17s %-10s %s\n' timer last-fired state note
+flagged=0
+while IFS= read -r timer; do
+	[ -n "$timer" ] || continue
+	# `foo@.timer` is a template: it has no `foo@.service` and never fires on its
+	# own, so every template would be reported as "no unit" - noise that buries
+	# the timers that matter. Only instantiated or ordinary units are audited.
+	case "$timer" in *.timer) ;; *) continue ;; esac
+	case "$timer" in *@*) continue ;; esac
+	[ "$(systemctl show "$timer" -p LoadState --value 2>/dev/null)" = "loaded" ] || continue
+	svc=${timer%.timer}.service
+	note=""
+
+	# `systemctl is-enabled` prints "disabled" *and* exits non-zero, so the obvious
+	# `|| echo not-found` produced a two-line value and every disabled timer emitted
+	# a stray wrapped row reading "not-found". UnitFileState has no exit-code trap.
+	state=$(systemctl show "$timer" -p UnitFileState --value 2>/dev/null)
+	[ -n "$state" ] || state="not-found"
+
+	last_raw=$(systemctl show "$timer" -p LastTriggerUSec --value 2>/dev/null)
+	last_epoch=0 last_human="-"
+	if [ -n "$last_raw" ]; then
+		last_epoch=$(date -d "$last_raw" +%s 2>/dev/null || echo 0)
+		[ "$last_epoch" -gt 0 ] 2>/dev/null && last_human=$(date -d "@$last_epoch" '+%Y-%m-%d %H:%M')
+	fi
+
+		load=$(systemctl show "$svc" -p LoadState --value 2>/dev/null)
+	# A vendor unit that has not fired is waiting for its condition
+	# (`apport-autoreport`, `mdcheck_*`, `ua-timer`), not abandoned. Only a timer
+	# installed from here - which means a unit file under /etc/systemd/system - can
+	# be called silent and worth retiring.
+	fragment=$(systemctl show "$timer" -p FragmentPath --value 2>/dev/null)
+	local_unit=0
+	case "$fragment" in /etc/systemd/system/*) local_unit=1 ;; esac
+	if is_retired "$timer"; then
+		note="retired (in $RETIRED)"
+	elif [ -z "$load" ] || [ "$load" = "not-found" ]; then
+		note="target $svc does not exist"
+	elif [ "$state" = "enabled" ] && [ "$last_epoch" -eq 0 ]; then
+		[ "$local_unit" -eq 1 ] && note="enabled, never fired"
+	else
+		# Both counts come from the same journal scope, the current boot. Counting
+		# failures over 7d against successes the journal only has since boot made
+		# one old failure look like "fails every run": xfs_scrub_all's Sunday run
+		# succeeded, but that line predated the 2026-11-15 reboot, so the audit saw
+		# 1 failure and 0 successes and called a healthy weekly scrub failing.
+		# A oneshot killed by the shutdown that takes the machine down is not a
+		# failure either - systemd records `status=15/TERM` then "Failed with
+		# result 'signal'", which is what the reboot at 07:53 did to it at 07:45.
+		runs=$(journalctl -u "$svc" --since "-$SINCE" -b --no-pager 2>/dev/null)
+		fails=$(printf '%s\n' "$runs" | awk '
+			/Failed with result/ && prev !~ /code=killed, status=15\/TERM/ { n++ }
+			{ prev = $0 } END { print n + 0 }')
+		oks=$(printf '%s\n' "$runs" | grep -cE 'Deactivated successfully|Finished ')
+		if [ "${fails:-0}" -gt 0 ] && [ "${oks:-0}" -eq 0 ]; then
+			note="$fails failed run(s) since boot, none succeeded"
+		elif [ "$last_epoch" -gt 0 ]; then
+			age_days=$(( ($(date +%s) - last_epoch) / 86400 ))
+			[ "$age_days" -gt 30 ] && note="idle ${age_days}d"
+		fi
+	fi
+
+	[ -n "$note" ] && flagged=$((flagged + 1))
+	printf '%-32s %-17s %-10s %s\n' "$timer" "$last_human" "$state" "$note"
+done < <(systemctl list-unit-files --type=timer --no-legend --no-pager 2>/dev/null | awk '{print $1}' | sort)
+
+echo
+echo "timers flagged: $flagged (window $SINCE; run outcomes since boot)"
+echo "Retiring one: systemctl disable --now <timer>; add its name to retired/timers in"
+echo "estate/tools/host and delete the unit files; then ./install.sh to record it."

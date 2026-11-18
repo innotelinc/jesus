@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# A test double for the incus CLI: only the subcommands the host tools use, backed
+# by a directory of `state=` files. No daemon, no network, nothing to break.
+#
+#   FAKE_INCUS_STATE=<dir> incus list local: --format csv -c n,s
+#   FAKE_INCUS_STATE=<dir> incus config set local:atheniq user.estate.why "..."
+#
+# Instances are files under $FAKE_INCUS_STATE/instances named by the instance name,
+# each holding `key=value` lines: `state=` plus whatever config the test sets.
+set -uo pipefail
+S=${FAKE_INCUS_STATE:?fake-incus: set FAKE_INCUS_STATE}
+mkdir -p "$S/instances" 2>/dev/null
+inst_file() { printf '%s/instances/%s' "$S" "$1"; }
+bare() { printf '%s' "${1#*:}"; }
+
+cmd=${1:-}; shift || true
+case "$cmd" in
+  list)
+    for f in "$S"/instances/*; do
+      [ -e "$f" ] || continue
+      printf '%s,%s\n' "$(basename "$f")" "$(sed -n 's/^state=//p' "$f" | head -1)"
+    done
+    ;;
+  config)
+    sub=${1:-}; t=$(bare "${2:-}"); shift 2 || true
+    f=$(inst_file "$t")
+    case "$sub" in
+      get)
+        key=${1:-}
+        v=$(sed -n "s/^${key}=//p" "$f" 2>/dev/null | head -1)
+        [ -n "$v" ] || exit 1
+        printf '%s\n' "$v"
+        ;;
+      set)
+        key=${1:-}; shift || true; val=$*
+        [ -f "$f" ] || exit 1
+        grep -v "^${key}=" "$f" >"$f.tmp" 2>/dev/null || :
+        printf '%s=%s\n' "$key" "$val" >>"$f.tmp"
+        mv "$f.tmp" "$f"
+        ;;
+      unset)
+        key=${1:-}
+        [ -f "$f" ] || exit 1
+        grep -v "^${key}=" "$f" >"$f.tmp" 2>/dev/null || :
+        mv "$f.tmp" "$f"
+        ;;
+      show)
+        cat "$f"
+        ;;
+      *) echo "fake-incus: config $sub unsupported" >&2; exit 99 ;;
+    esac
+    ;;
+  stop)
+    t=$(bare "${1:-}"); f=$(inst_file "$t")
+    [ -f "$f" ] || exit 1
+    sed -i 's/^state=.*/state=STOPPED/' "$f"
+    ;;
+  start)
+    t=$(bare "${1:-}"); f=$(inst_file "$t")
+    [ -f "$f" ] || exit 1
+    sed -i 's/^state=.*/state=RUNNING/' "$f"
+    ;;
+  query|info|operation)
+    exit 0
+    ;;
+  *)
+    echo "fake-incus: '$cmd' not implemented (this is a test double)" >&2
+    exit 99
+    ;;
+esac
