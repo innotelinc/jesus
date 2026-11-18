@@ -51,7 +51,11 @@ while IFS= read -r timer; do
 	svc=${timer%.timer}.service
 	note=""
 
-	state=$(systemctl is-enabled "$timer" 2>/dev/null || echo "not-found")
+	# `systemctl is-enabled` prints "disabled" *and* exits non-zero, so the obvious
+	# `|| echo not-found` produced a two-line value and every disabled timer emitted
+	# a stray wrapped row reading "not-found". UnitFileState has no exit-code trap.
+	state=$(systemctl show "$timer" -p UnitFileState --value 2>/dev/null)
+	[ -n "$state" ] || state="not-found"
 
 	last_raw=$(systemctl show "$timer" -p LastTriggerUSec --value 2>/dev/null)
 	last_epoch=0 last_human="-"
@@ -60,13 +64,20 @@ while IFS= read -r timer; do
 		[ "$last_epoch" -gt 0 ] 2>/dev/null && last_human=$(date -d "@$last_epoch" '+%Y-%m-%d %H:%M')
 	fi
 
-	load=$(systemctl show "$svc" -p LoadState --value 2>/dev/null)
+		load=$(systemctl show "$svc" -p LoadState --value 2>/dev/null)
+	# A vendor unit that has not fired is waiting for its condition
+	# (`apport-autoreport`, `mdcheck_*`, `ua-timer`), not abandoned. Only a timer
+	# installed from here - which means a unit file under /etc/systemd/system - can
+	# be called silent and worth retiring.
+	fragment=$(systemctl show "$timer" -p FragmentPath --value 2>/dev/null)
+	local_unit=0
+	case "$fragment" in /etc/systemd/system/*) local_unit=1 ;; esac
 	if is_retired "$timer"; then
 		note="retired (in $RETIRED)"
 	elif [ -z "$load" ] || [ "$load" = "not-found" ]; then
 		note="target $svc does not exist"
 	elif [ "$state" = "enabled" ] && [ "$last_epoch" -eq 0 ]; then
-		note="enabled, never fired"
+		[ "$local_unit" -eq 1 ] && note="enabled, never fired"
 	else
 		fails=$(journalctl -u "$svc" --since "-$SINCE" --no-pager 2>/dev/null | grep -c 'Failed with result')
 		oks=$(journalctl -u "$svc" --since "-$SINCE" --no-pager 2>/dev/null | grep -cE 'Deactivated successfully|Finished ')
