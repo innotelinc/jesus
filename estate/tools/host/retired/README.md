@@ -75,6 +75,11 @@ The retarget is versioned, not hand-placed:
 
 The unit files themselves still live in `innotelinc/innotel-platform-stack`, installed
 by its `install-estate-checks.sh`, which does not read this list; the drop-in is what
-survives that installer re-running. The stopped `regcache` instance on i1 is left
-alone — it is not this repo's to delete, and `estate-state note regcache` on i1 is
-where its story belongs.
+survives that installer re-running.
+
+The stopped copy that made this look broken is gone: by 2026-11-18 i1 listed only its
+seven running instances (`atheniq, genesis, mail, ontrak, onyx, vault, workloads`) and
+`incus exec regcache` there answers `Error: Instance not found`. There is nothing left
+to rename or retire, so the dead target cannot come back into play by accident — and if
+the drop-in is ever lost, the failure is a missing instance rather than a stopped one
+that answers with a misleading message.
