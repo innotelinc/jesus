@@ -165,6 +165,38 @@ case "$notimers_out" in
 	*) no "an unrecognised host would have its timers disabled" ;;
 esac
 
+echo "== install.sh installs (temporary root)"
+# Two things here can only go wrong quietly on a real host: a drop-in that never
+# reaches /etc/systemd/system, and a timer that was un-retired in the repo but stayed
+# in the host's retired file, where the audit would go on calling it retired for ever.
+troot="$TMP/root"
+mkdir -p "$troot/etc/systemd/system" "$TMP/installbin"
+for c in systemctl journalctl; do   # nothing in this test may act on the host's systemd
+	printf '#!/bin/sh\nexit 0\n' >"$TMP/installbin/$c" && chmod +x "$TMP/installbin/$c"
+done
+printf 'regcache-credential.timer  was retired yesterday, live again today\nmedia-orphans.timer  subject retired\n' \
+	>"$troot/etc/estate-timers-retired"
+install_out=$(cd "$root" && ESTATE_ROOT="$troot" ESTATE_HOST=i1 PATH="$TMP/installbin:$PATH" ./install.sh 2>&1)
+check "install.sh completes against a temporary root" 0 $?
+dropin="$troot/etc/systemd/system/regcache-credential.service.d/10-remote.conf"
+if [ -f "$dropin" ]; then ok "the host drop-in is installed"; else no "the drop-in was never written"; fi
+grep -qx 'Environment=INCUS=i2:regcache' "$dropin" 2>/dev/null && ok "and it points the check at i2" || no "the drop-in lost its target"
+if grep -qx 'regcache-credential.timer' "$troot/etc/estate-timers-retired" 2>/dev/null; then
+	no "an un-retired timer stayed in /etc/estate-timers-retired"
+else
+	ok "an un-retired timer is dropped from /etc/estate-timers-retired"
+fi
+grep -qx 'media-orphans.timer' "$troot/etc/estate-timers-retired" 2>/dev/null && ok "a still-retired timer stays" || no "the retired list lost a live decision"
+# The same install must not mistake a host that declares no timers for one that
+# declares none of these; without the host directory it enables and disables nothing.
+rm -rf "$troot/var/lib/estate-host-tools"
+notim_out=$(cd "$root" && ESTATE_ROOT="$troot" ESTATE_HOST=ghost PATH="$TMP/installbin:$PATH" ./install.sh 2>&1)
+check "a host with no hosts/<host> still installs clean" 0 $?
+case "$notim_out" in
+	*"leaving this host's timers exactly as they are"*) ok "and it still leaves timers alone" ;;
+	*) no "the unknown host path did not hold" ;;
+esac
+
 echo
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

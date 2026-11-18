@@ -33,13 +33,19 @@
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-host=$(hostname -s 2>/dev/null || hostname)
-sbin_dir=/usr/local/sbin
-bin_dir=/usr/local/bin
-unit_dir=/etc/systemd/system
-state_dir=/var/lib/estate-host-tools
+# ESTATE_ROOT and ESTATE_HOST exist so test/run.sh can install into a temporary tree
+# for a named host without touching this one; both default to the real thing, so a
+# host still runs this script exactly as before.
+root=${ESTATE_ROOT:-}
+host=${ESTATE_HOST:-$(hostname -s 2>/dev/null || hostname)}
+sbin_dir=$root/usr/local/sbin
+bin_dir=$root/usr/local/bin
+unit_dir=$root/etc/systemd/system
+state_dir=$root/var/lib/estate-host-tools
 manifest=$state_dir/manifest.tsv
-retired_file=/etc/estate-timers-retired
+retired_file=$root/etc/estate-timers-retired
+policy_file=$root/etc/incus-rebalance.json
+rebalance_state=$root/var/lib/incus-rebalance
 
 mode=install
 case "${1:-}" in
@@ -210,7 +216,7 @@ echo "== plan"
 while IFS=$'\t' read -r t s m; do printf '  %-36s -> %s\n' "$(basename "$s")" "$t"; done < <(managed)
 if [ "$runs_rebalance" -eq 0 ]; then
   echo "  incus-rebalance.json                 skipped; this host declares no incus-rebalance.timer"
-elif [ -e /etc/incus-rebalance.json ]; then
+elif [ -e "$policy_file" ]; then
   echo "  incus-rebalance.json                 present; left untouched (drift reported below)"
 else
   echo "  incus-rebalance.json                 -> /etc/incus-rebalance.json"
@@ -249,19 +255,19 @@ while IFS=$'\t' read -r t s m; do install -D -m "$m" "$s" "$t"; done < <(managed
 if [ "$runs_rebalance" -eq 0 ]; then
   # A host that does not run the allocator has no use for its policy, and a
   # stale policy sitting in /etc is exactly what a later reader would trust.
-  if [ -e /etc/incus-rebalance.json ]; then
+  if [ -e "$policy_file" ]; then
     echo "  note: /etc/incus-rebalance.json exists, but $host declares no"
     echo "        incus-rebalance.timer; left untouched"
   else
     echo "  policy not installed: $host runs no incus-rebalance.timer"
   fi
-elif [ -e /etc/incus-rebalance.json ]; then
-  if ! diff -q "$here/etc/incus-rebalance.json" /etc/incus-rebalance.json >/dev/null 2>&1; then
+elif [ -e "$policy_file" ]; then
+      if ! diff -q "$here/etc/incus-rebalance.json" "$policy_file" >/dev/null 2>&1; then
     echo "  note: /etc/incus-rebalance.json differs from the copy here; not overwriting"
   fi
 else
-  install -m 0644 "$here/etc/incus-rebalance.json" /etc/incus-rebalance.json
-  mkdir -p /var/lib/incus-rebalance
+  install -m 0644 "$here/etc/incus-rebalance.json" "$policy_file"
+  mkdir -p "$rebalance_state"
   echo "  policy installed"
 fi
 
