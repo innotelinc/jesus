@@ -39,6 +39,7 @@ bin_dir=/usr/local/bin
 unit_dir=/etc/systemd/system
 state_dir=/var/lib/estate-host-tools
 manifest=$state_dir/manifest.tsv
+retired_file=/etc/estate-timers-retired
 
 mode=install
 case "${1:-}" in
@@ -272,6 +273,16 @@ while IFS=$'\t' read -r t want; do
 done < <(expected_md5)
 sort -t$'\t' -k2 "$tmp" -o "$tmp" && mv "$tmp" "$manifest"
 echo "  $(wc -l <"$manifest") file(s) recorded in $manifest"
+
+# `estate-timer-audit` reads this file to call a timer retired instead of failing.
+# The installer writes it, so the host cannot hold a hand-edited copy that drifts
+# from retired/timers - the audit's "retired" flag was dead until this existed, and
+# cpk-limits-guard.timer was reported as merely "disabled" for a day because of it.
+{
+  echo "# written by install.sh from estate/tools/host/retired/timers"
+  retired_timers || true
+} >"$retired_file"
+echo "  $(retired_timers | wc -l | tr -d ' ') retired timer(s) in $retired_file"
 
 systemctl daemon-reload
 echo "== timers"
