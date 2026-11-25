@@ -357,22 +357,38 @@ somebody intervenes by hand. The honest reading of the Control Center banner's a
 ("re-run `scripts/dograh_wire.py`") is that the fix used to *be* the repair: it now
 reactivates a parked config, so the documented remedy actually works.
 
-`scripts/dograh-ari-recover.sh` runs the check unattended, every 10 minutes via the
-`capstone-dograh-ari.timer` systemd timer:
+`deploy/ari-dupe-guard.sh` runs the check unattended, on the PBX host, from
+`/etc/cron.d/ari-dupe-guard` every five minutes. It is the **only** thing that repairs this
+range: the retired `capstone-dograh-ari.timer` ran `scripts/dograh-ari-recover.sh`, a file
+that never existed in this repo, so it could not repair anything and has been removed.
 
 ```bash
-./scripts/dograh-ari-recover.sh check     # is the Stasis app registered? (exit 1 if not)
-./scripts/dograh-ari-recover.sh recover   # ...and repair it: re-run dograh_wire.py
+/usr/local/sbin/ari-dupe-guard.sh --check   # report what it would repair, change nothing
+/usr/local/sbin/ari-dupe-guard.sh           # repair; silent unless it acts
 ```
 
-The split matters: a missing app with **ARI unreachable** is *not* repaired. dograh cannot
-register against a PBX that isn't answering, and this runs on a timer, so reactivating on a
-loop would only churn for the whole outage — it logs and exits 1 for the journal to show.
-A missing app with **ARI reachable** (the parked-config case) re-runs
-`scripts/dograh_wire.py`, which clears the parked flag, then waits for registration and
-reports whether calls can be taken again. It resolves the PBX container by compose label
-the way `scripts/smoke-e2e.sh` does, so it works on a shared voice host where the PBX is
-`zeus-freepbx` rather than `pbx-freepbx`.
+Three faults are repaired, and `/var/log/ari-dupe-guard.log` names the one it found:
+
+- **a duplicate `[dograh]` section** in the generated `ari_additional.conf`. Asterisk then
+  rejects all of `ari.conf` (*"configuration contains a duplicate object"*), every ARI user
+  disappears and `Stasis()` has no app. The block is commented out and `res_ari` reloaded.
+- **the parked telephony config** described above. The guard clears `inactive` directly in
+  dograh's Postgres, and dograh re-registers on its own 60-second refresh.
+- **`cdr`/`cel` `uniqueid`/`linkedid` narrower than `varchar(64)`**. dograh's external ARI
+  channel is named `dograh-ext-<uuid>` (47 characters); under strict SQL mode the 32-character
+  columns FreePBX ships reject every record for it, so the dograh leg silently vanishes from
+  the call history. The guard widens all four columns back.
+
+It has to run where the PBX container lives, because every repair is a `docker exec` into it:
+
+```bash
+install -m 0755 deploy/ari-dupe-guard.sh  /usr/local/sbin/ari-dupe-guard.sh
+install -m 0644 deploy/ari-dupe-guard.cron /etc/cron.d/ari-dupe-guard
+```
+
+It stays quiet while healthy, which is what makes a non-empty log worth reading. A missing
+app with **ARI unreachable** is still not repaired, and deliberately so: the guard only acts
+when the symptom is one it can actually fix, rather than churning for the whole outage.
 
 If you would rather fix it by hand, the two commands are:
 
@@ -405,7 +421,7 @@ never dograh's fault and never a credential problem, so re-running
 
 ```bash
 systemctl start zeus-pbx-sync.service        # check -> restore ari.conf -> reload
-./scripts/dograh-ari-recover.sh recover      # un-park dograh's config, wait for the app
+/usr/local/sbin/ari-dupe-guard.sh            # repair the duplicate section + un-park the config
 docker exec <freepbx-container> asterisk -rx "ari show apps"   # expect dograh_<hex>
 ```
 

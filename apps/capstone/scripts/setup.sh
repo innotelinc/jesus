@@ -640,36 +640,32 @@ fi
 # dograh parks an ARI config whose connection keeps failing and never retries it
 # on its own, so a PBX that was down (or restarting) long enough leaves the whole
 # range unable to take calls with no PBX-side symptom — the Control Center
-# reports it as "Calls to 8008 will drop … registered: none". Step 6's wire run
-# un-parks the config; this confirms the app actually registered, instead of
-# leaving a silent half-wired stack. The capstone-dograh-ari systemd timer
-# (installed by scripts/install-capstone.sh) repeats this every 10 minutes.
+# reports it as "Calls to 8008 will drop … registered: none".
+#
+# deploy/ari-dupe-guard.sh owns that repair. It also comments out a duplicate
+# [dograh] section that makes Asterisk reject all of ari.conf, and it re-widens
+# cdr/cel uniqueid columns that reject dograh's 47-character channel id. It must
+# run where the PBX container is, so on a host without it this step reports that
+# instead of pretending to repair anything.
 echo ""
 echo "── 6c. dograh ARI / Stasis healthcheck ──"
-if "$REPO/scripts/dograh-ari-recover.sh" recover; then
-    pass "dograh Stasis app registered — calls to the agents will connect"
-else
-    warn "dograh Stasis app is not registered yet — the PBX may still be starting"
-    warn "    re-check with:  scripts/dograh-ari-recover.sh check"
-fi
-
-# Install the recovery timer where this host runs systemd, so the check above
-# is not a one-time step: a config dograh later parks (PBX down long enough)
-# self-heals within 10 minutes instead of waiting for the next setup run. Same
-# units scripts/install-capstone.sh installs; skipped (not failed) without root
-# or systemd — a container-only host still got the healthcheck above.
-if [ "$(id -u)" = "0" ] && command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-    cp "$REPO/systemd/capstone-dograh-ari.service" /etc/systemd/system/capstone-dograh-ari.service
-    cp "$REPO/systemd/capstone-dograh-ari.timer" /etc/systemd/system/capstone-dograh-ari.timer
-    sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$REPO|" /etc/systemd/system/capstone-dograh-ari.service
-    systemctl daemon-reload 2>/dev/null || true
-    if systemctl enable --now capstone-dograh-ari.timer 2>/dev/null; then
-        pass "capstone-dograh-ari.timer enabled — Stasis app re-checked every 10 minutes"
+GUARD="${ARI_GUARD:-/usr/local/sbin/ari-dupe-guard.sh}"
+if [ -x "$GUARD" ]; then
+    guard_report="$("$GUARD" --check 2>&1 || true)"
+    if [ -z "$guard_report" ]; then
+        pass "dograh ARI guard is installed and reports nothing to repair"
     else
-        warn "could not enable capstone-dograh-ari.timer — inspect: systemctl status capstone-dograh-ari.timer"
+        warn "dograh ARI guard would repair:"
+        printf '%s\n' "$guard_report" | sed 's/^/    /'
+        warn "    run it without --check to repair"
     fi
+elif [ "$(id -u)" = "0" ] && [ -f "$REPO/deploy/ari-dupe-guard.sh" ]; then
+    install -m 0755 "$REPO/deploy/ari-dupe-guard.sh" /usr/local/sbin/ari-dupe-guard.sh
+    install -m 0644 "$REPO/deploy/ari-dupe-guard.cron" /etc/cron.d/ari-dupe-guard
+    pass "installed the dograh ARI guard (cron, every 5 minutes)"
 else
-    warn "not root (or no running systemd) — skipped the ARI recovery timer; install it with scripts/install-capstone.sh as root"
+    warn "dograh ARI guard is not installed on this host"
+    warn "    it runs where the PBX container does — see docs/operations.md"
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════

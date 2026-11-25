@@ -146,7 +146,6 @@ install_service() {
     $SUDO systemctl start capstone.service 2>/dev/null || true
     $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
     $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
-    $SUDO systemctl start capstone-dograh-ari.timer 2>/dev/null || true
     $SUDO systemctl start capstone-dashboard-redeploy.timer 2>/dev/null || true
   fi
 }
