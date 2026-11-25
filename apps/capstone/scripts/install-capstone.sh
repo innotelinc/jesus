@@ -100,15 +100,11 @@ install_service() {
   $SUDO cp "$root$TARGET/systemd/capstone-freepbx-web.service" "$root/etc/systemd/system/capstone-freepbx-web.service"
   $SUDO cp "$root$TARGET/systemd/capstone-freepbx-web.timer" "$root/etc/systemd/system/capstone-freepbx-web.timer"
   $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-freepbx-web.service"
-  # dograh Stasis healthcheck: the PBX routes every dograh extension into
-  # Stasis(<stasis app name>), and a Stasis app nobody registered hangs the call
-  # up instantly. dograh parks a telephony config that keeps failing to connect
-  # and never retries it on its own, so a PBX outage long enough to trip that
-  # leaves the range silently unable to take calls until someone re-runs
-  # scripts/dograh_wire.py. A timer probes the registration and repairs it.
-  $SUDO cp "$root$TARGET/systemd/capstone-dograh-ari.service" "$root/etc/systemd/system/capstone-dograh-ari.service"
-  $SUDO cp "$root$TARGET/systemd/capstone-dograh-ari.timer" "$root/etc/systemd/system/capstone-dograh-ari.timer"
-  $SUDO sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$TARGET|" "$root/etc/systemd/system/capstone-dograh-ari.service"
+  # dograh ARI recovery is NOT installed here. deploy/ari-dupe-guard.sh owns it
+  # and runs from cron on the PBX host (deploy/ari-dupe-guard.cron), because the
+  # containers it repairs live there. The capstone-dograh-ari unit/timer used to
+  # run scripts/dograh-ari-recover.sh, a file that never existed in this repo,
+  # so that timer could not have repaired anything.
   # Dashboard redeploy: both Control Center images are built from source, so a
   # code change does nothing until they are rebuilt and recreated. The service
   # is hash-gated (a no-op when the sources match the last deploy), and the
@@ -128,8 +124,6 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer"
     $SUDO systemctl --root "$sysroot" enable capstone-freepbx-web.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer"
-    $SUDO systemctl --root "$sysroot" enable capstone-dograh-ari.timer 2>/dev/null || \
-      $SUDO ln -sf /etc/systemd/system/capstone-dograh-ari.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-dograh-ari.timer"
     $SUDO systemctl --root "$sysroot" enable capstone-dashboard-redeploy.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-dashboard-redeploy.timer "$sysroot/etc/systemd/system/timers.target.wants/capstone-dashboard-redeploy.timer"
     # start only makes sense with a running systemd (live install)
@@ -137,7 +131,6 @@ install_service() {
       $SUDO systemctl start capstone.service 2>/dev/null || true
       $SUDO systemctl start capstone-pbx-sync.timer 2>/dev/null || true
       $SUDO systemctl start capstone-freepbx-web.timer 2>/dev/null || true
-      $SUDO systemctl start capstone-dograh-ari.timer 2>/dev/null || true
       $SUDO systemctl start capstone-dashboard-redeploy.timer 2>/dev/null || true
     fi
   else
@@ -148,8 +141,6 @@ install_service() {
       $SUDO ln -sf /etc/systemd/system/capstone-pbx-sync.timer /etc/systemd/system/timers.target.wants/capstone-pbx-sync.timer
     $SUDO systemctl enable capstone-freepbx-web.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-freepbx-web.timer /etc/systemd/system/timers.target.wants/capstone-freepbx-web.timer
-    $SUDO systemctl enable capstone-dograh-ari.timer 2>/dev/null || \
-      $SUDO ln -sf /etc/systemd/system/capstone-dograh-ari.timer /etc/systemd/system/timers.target.wants/capstone-dograh-ari.timer
     $SUDO systemctl enable capstone-dashboard-redeploy.timer 2>/dev/null || \
       $SUDO ln -sf /etc/systemd/system/capstone-dashboard-redeploy.timer /etc/systemd/system/timers.target.wants/capstone-dashboard-redeploy.timer
     $SUDO systemctl start capstone.service 2>/dev/null || true
