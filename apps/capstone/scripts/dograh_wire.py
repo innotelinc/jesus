@@ -716,7 +716,13 @@ def load_env_file(path: Path) -> dict[str, str]:
 
 
 def save_env_key(path: Path, key: str, value: str) -> None:
-    """Persist KEY=value to .env (replace existing active or commented line)."""
+    """Persist KEY=value to .env (replace existing active or commented line).
+
+    Best-effort on purpose: the setup container mounts the checkout read-only,
+    so this write can legitimately fail. Everything it persists is either
+    re-derived on the next run or supplied through the deployment environment,
+    so losing it is a warning — never a failed deploy.
+    """
     lines: list[str] = []
     if path.exists():
         lines = path.read_text().splitlines()
@@ -736,7 +742,31 @@ def save_env_key(path: Path, key: str, value: str) -> None:
         if out and out[-1].strip():
             out.append("")
         out.append(f"{key}={value}")
-    path.write_text("\n".join(out) + "\n")
+    try:
+        path.write_text("\n".join(out) + "\n")
+    except OSError as e:
+        print(f"WARN could not persist {key} to {path} "
+              f"({e.strerror or e}) — set it in the deployment environment instead")
+
+
+def appliable_settings(config: dict) -> tuple[dict, list[str]]:
+    """Split workflow_configurations into what this dograh build will accept.
+
+    A max_call_duration of 0 means "no cap" upstream, but image builds from
+    before the call-duration change reject anything not > 0 with a 422, and one
+    refused key fails the whole PUT. Drop those keys and report them, so the
+    settings that do apply still land instead of the check failing forever.
+    """
+    applicable: dict = {}
+    refused: list[str] = []
+    for key, value in (config or {}).items():
+        if key == "max_call_duration" and not (
+            isinstance(value, (int, float)) and value > 0
+        ):
+            refused.append(f"{key}={value}")
+            continue
+        applicable[key] = value
+    return applicable, refused
 
 
 def cfg(args: argparse.Namespace, key: str, default: str = "") -> str:
@@ -923,15 +953,22 @@ def main() -> int:
             if wf_config and not args.check:
                 # Reconcile settings on an install that imported the workflow
                 # before the JSON changed — import alone is a no-op for these.
-                try:
-                    live = api.workflow_configurations(track_ids[ext])
-                    if any(live.get(k) != v for k, v in wf_config.items()):
-                        api.set_workflow_configurations(track_ids[ext], wf_config)
-                        settings = ", ".join(f"{k}={v}" for k, v in wf_config.items())
-                        print(f"PASS agent '{wf_name}' settings updated ({settings})")
-                except ApiError as e:
-                    problems.append(f"agent workflow '{wf_name}' settings: {e}")
-                    print(f"FAIL agent '{wf_name}' settings not applied: {e}")
+                wanted, refused = appliable_settings(wf_config)
+                if refused:
+                    print(f"WARN agent '{wf_name}' settings this dograh build "
+                          f"rejects ({', '.join(refused)}) — leaving the live value")
+                if not wanted:
+                    print(f"PASS agent '{wf_name}' settings already as this build allows")
+                else:
+                    try:
+                        live = api.workflow_configurations(track_ids[ext])
+                        if any(live.get(k) != v for k, v in wanted.items()):
+                            api.set_workflow_configurations(track_ids[ext], wanted)
+                            settings = ", ".join(f"{k}={v}" for k, v in wanted.items())
+                            print(f"PASS agent '{wf_name}' settings updated ({settings})")
+                    except ApiError as e:
+                        problems.append(f"agent workflow '{wf_name}' settings: {e}")
+                        print(f"FAIL agent '{wf_name}' settings not applied: {e}")
         elif args.check:
             track_ids[ext] = None
             problems.append(f"agent workflow '{wf_name}' not imported")
