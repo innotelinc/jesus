@@ -104,6 +104,74 @@ class PcapTest(unittest.TestCase):
             code = rtp_probe.main(["--pcap", str(self.path), "--gap", "2.0"])
         self.assertEqual(code, 2, "a 30 s silence must not read as healthy")
 
+    def test_the_stalling_leg_says_the_handset_stopped_not_the_network(self):
+        """Leg B's sequence numbers are contiguous across the gap.
+
+        That is the whole point of the verdict: nothing was lost while the leg
+        was quiet, so the phone sent nothing — silence suppression — rather than
+        talking into a path that dropped its packets.
+        """
+        stalling = [s for s in self.streams().values() if s.ssrc == 0x11223344][0]
+        verdict = stalling.verdict(2.0)
+        self.assertEqual(verdict["cause"], "sender-silent")
+        self.assertEqual(verdict["lost_in_gap"], 0)
+        self.assertEqual(verdict["seq_step"], 1)
+        self.assertTrue(verdict["resumed"], "the leg came back at 40s")
+        self.assertAlmostEqual(verdict["max_gap_s"], 30.0, delta=0.2)
+
+    def test_a_steady_stream_is_continuous(self):
+        steady = [s for s in self.streams().values() if s.ssrc == 0xAABBCCDD][0]
+        self.assertEqual(steady.verdict(2.0)["cause"], "continuous")
+
+    def test_a_sequence_jump_across_the_silence_reads_as_packet_loss(self):
+        """The phone kept talking; the path ate 200 packets in between."""
+        lossy = Path(self.tmp.name) / "lossy.pcap"
+        packets = [
+            (i * 0.05, _ethernet(_ip_udp(
+                "192.168.1.77", "192.168.1.52", 11700, 10002, _rtp(0x51515151, i))))
+            for i in range(100)
+        ]
+        packets += [
+            (35 + i * 0.05, _ethernet(_ip_udp(
+                "192.168.1.77", "192.168.1.52", 11700, 10002, _rtp(0x51515151, 300 + i))))
+            for i in range(100)
+        ]
+        _pcap(lossy, packets)
+        dlt, frames = rtp_probe.read_pcap(lossy)
+        stream = list(rtp_probe.rtp_streams(frames, dlt).values())[0]
+        verdict = stream.verdict(2.0)
+        self.assertEqual(verdict["cause"], "packet-loss")
+        self.assertEqual(verdict["seq_step"], 201)   # 99 -> 300
+        self.assertEqual(verdict["lost_in_gap"], 200)
+
+    def test_the_stall_line_is_one_line_that_names_the_cause(self):
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rtp_probe.main(["--pcap", str(self.path), "--stall-line"])
+        self.assertEqual(code, 2)
+        lines = [ln for ln in buffer.getvalue().splitlines() if ln.strip()]
+        self.assertEqual(len(lines), 1, lines)
+        self.assertTrue(lines[0].startswith("STALL: "), lines[0])
+        self.assertIn("handset stopped sending", lines[0])
+
+    def test_a_capture_without_a_stall_prints_no_line(self):
+        import contextlib
+        import io
+
+        steady = Path(self.tmp.name) / "steady.pcap"
+        _pcap(steady, [
+            (i * 0.02, _ethernet(_ip_udp("192.168.1.77", "192.168.1.52", 11700, 10002, _rtp(9, i))))
+            for i in range(100)
+        ])
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rtp_probe.main(["--pcap", str(steady), "--stall-line"])
+        self.assertEqual(code, 0)
+        self.assertEqual(buffer.getvalue().strip(), "")
+
     def test_linux_cooked_capture_is_read_the_same_as_ethernet(self):
         cooked = Path(self.tmp.name) / "any.pcap"
         packets = [

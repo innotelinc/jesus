@@ -46,6 +46,7 @@ from . import sms_inbound
 from . import sms_outbound
 from . import sms_transport
 from . import stack_access
+from . import voice
 from . import workflows
 from .auth import (
     COOKIE_NAME,
@@ -803,6 +804,10 @@ def build_alerts() -> list[dict[str, Any]]:
     # it still is. Derived from the recovery history rather than a container
     # status, because a recovered box looks perfectly healthy afterwards.
     alerts.extend(_pbx_recovery_alerts())
+    # Voice: a handset leg that stopped sending, or a greeting cache that has
+    # drifted from what the routes render. The host watchers already record
+    # both; this is where they become something an operator will actually see.
+    alerts.extend(voice.build_voice_alerts())
     if not alerts:
         alerts.append({
             "id": "al-all-clear",
@@ -4134,6 +4139,18 @@ def pbx_health(user: dict = Depends(require_session)):
     """PBX self-healing state + recovery history on its own, for callers that
     want it without the whole matrix."""
     return pbx_recovery_status()
+
+
+@app.get("/voice")
+def voice_status(user: dict = Depends(require_session)):
+    """Greeting prewarm state + captured handset media, from the host watchers.
+
+    Backs the Health page's Voice panel: is the prewarm list still what the
+    routes render, when was it last checked, and did any handset leg stop
+    sending RTP. Read-only; a host without the watchers reports `installed:
+    false` instead of failing.
+    """
+    return voice.build_voice_status()
 
 
 @app.get("/authentik/access")

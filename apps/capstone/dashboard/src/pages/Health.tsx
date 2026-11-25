@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { HealthMatrixEntry, PbxRecovery, StackAccessStatus } from '../types';
+import type { HealthMatrixEntry, PbxRecovery, StackAccessStatus, VoiceStatus } from '../types';
 import { api } from '../lib/api';
 import { useDashboardData } from '../context/DashboardDataContext';
 import StatusBadge from '../components/StatusBadge';
@@ -97,6 +97,29 @@ export default function Health() {
   }, [loadPbxRecovery]);
 
   const pbxRecovery = pbxLive ?? healthData.find(e => e.pbxRecovery)?.pbxRecovery;
+
+  // The greeting cache and the handset media history are kept by host scripts
+  // (deploy/prewarm-watch.sh, deploy/rtp-stall-watch.sh). Polling their state is
+  // what makes a drifted prewarm or a silent handset visible without an SSH
+  // session — and `/voice` only reads files, so a 30 s cadence costs nothing.
+  const [voiceState, setVoiceState] = useState<VoiceStatus | null>(null);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const loadVoice = useCallback(async () => {
+    setVoiceLoading(true);
+    try {
+      setVoiceState(await api.voice());
+    } catch {
+      setVoiceState(null);
+    } finally {
+      setVoiceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadVoice();
+    const timer = window.setInterval(() => { void loadVoice(); }, 30000);
+    return () => window.clearInterval(timer);
+  }, [loadVoice]);
 
   return (
     <div className="space-y-6">
@@ -433,6 +456,138 @@ export default function Health() {
           </div>
         </div>
       )}
+
+      {/* Voice plane: the greeting cache every caller hears first, and whether a
+          handset leg actually stopped sending RTP. Both are state the host
+          watchers keep — see docs/voice-rtp-stall.md. */}
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Voice — greeting prewarm &amp; handset media</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              What the TTS shim will answer with (a cache hit is ~80 ms, a miss ~1.8 s of dead air)
+              and whether any handset leg stopped sending RTP · refreshed every 30s.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void loadVoice()} disabled={voiceLoading}>
+            {voiceLoading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
+
+        <div className="mt-2">
+          {voiceState === null ? (
+            <div className="border rounded-2xl bg-card shadow-sm p-4 text-sm text-muted-foreground">
+              {voiceLoading ? 'Reading the host watchers…' : 'Voice state unavailable.'}
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="border rounded-2xl bg-card shadow-sm p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium">Greeting prewarm</h3>
+                  <span
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      !voiceState.prewarm.installed
+                        ? 'bg-muted text-muted-foreground'
+                        : voiceState.prewarm.inSync === true && !voiceState.prewarm.stale
+                          ? 'bg-success/20 text-success'
+                          : 'bg-warning/20 text-warning',
+                    )}
+                  >
+                    {!voiceState.prewarm.installed
+                      ? 'not installed'
+                      : voiceState.prewarm.stale
+                        ? 'check is stale'
+                        : voiceState.prewarm.inSync === true
+                          ? 'in sync'
+                          : voiceState.prewarm.inSync === false
+                            ? 'drifted'
+                            : 'unknown'}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5">
+                    {voiceState.prewarm.greetings} greeting{voiceState.prewarm.greetings === 1 ? '' : 's'}
+                  </span>
+                  <span className="rounded-full bg-muted px-2 py-0.5">
+                    {voiceState.prewarm.checkedAt
+                      ? `checked ${formatRelativeTime(voiceState.prewarm.checkedAt)}`
+                      : 'never checked'}
+                  </span>
+                  {voiceState.prewarm.applied && (
+                    <span className="rounded-full bg-muted px-2 py-0.5">regenerated + applied</span>
+                  )}
+                </div>
+                {voiceState.prewarm.drift && (
+                  <p className="mt-2 break-words text-xs text-warning">{voiceState.prewarm.drift}</p>
+                )}
+                {voiceState.prewarm.error && (
+                  <p className="mt-2 break-words text-xs text-danger">{voiceState.prewarm.error}</p>
+                )}
+                <ul className="mt-3 space-y-1">
+                  {voiceState.prewarm.lines.length === 0 ? (
+                    <li className="text-xs text-muted-foreground">
+                      No greetings on the list — the first caller of each route waits for synthesis.
+                    </li>
+                  ) : (
+                    voiceState.prewarm.lines.map((line, i) => (
+                      <li key={i} className="truncate text-xs text-muted-foreground" title={line}>“{line}”</li>
+                    ))
+                  )}
+                </ul>
+              </div>
+
+              <div className="border rounded-2xl bg-card shadow-sm p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium">Handset media</h3>
+                  <span
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      voiceState.media.lastStallRecent ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success',
+                    )}
+                  >
+                    {voiceState.media.lastStallRecent ? 'a leg went silent' : `no stall in ${voiceState.media.windowHours}h`}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5">
+                    {voiceState.media.captures} capture{voiceState.media.captures === 1 ? '' : 's'}
+                  </span>
+                  <span className="rounded-full bg-muted px-2 py-0.5">
+                    {voiceState.media.stalls} stall{voiceState.media.stalls === 1 ? '' : 's'} on record
+                  </span>
+                  <span className="rounded-full bg-muted px-2 py-0.5">
+                    {voiceState.media.capturesKept} pcap kept
+                  </span>
+                </div>
+                {voiceState.media.lastStallRecent ? (
+                  <p className="mt-2 break-words text-xs text-warning">{voiceState.media.lastStallRecent.text}</p>
+                ) : voiceState.media.lastStall ? (
+                  <p className="mt-2 break-words text-xs text-muted-foreground">
+                    Last on record:
+                    {voiceState.media.lastStall.at ? ` ${formatRelativeTime(voiceState.media.lastStall.at)}` : ''} —{' '}
+                    {voiceState.media.lastStall.text}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No answered handset call has been captured yet — the watcher takes the next one.
+                  </p>
+                )}
+                {voiceState.media.lastCapture && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Latest capture {voiceState.media.lastCapture.name} ·{' '}
+                    {Math.round(voiceState.media.lastCapture.sizeBytes / 1024)} KB
+                  </p>
+                )}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  <Link to="/alerts" className="font-medium text-primary hover:underline">Open alerts</Link>{' '}
+                  for the acknowledge / resolve workflow.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div>

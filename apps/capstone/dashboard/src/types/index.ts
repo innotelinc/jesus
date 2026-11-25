@@ -267,3 +267,46 @@ export interface Entitlement {
   user?: string | null;
   message?: string | null;
 }
+
+/** The greeting list installed in the TTS shim, and the last drift check
+ *  (`deploy/prewarm-watch.sh` writes the status every five minutes). */
+export interface VoicePrewarm {
+  /** false when this host has neither file — the watcher is not deployed here. */
+  installed: boolean;
+  greetings: number;
+  lines: string[];
+  checkedAt: string | null;
+  inSync: boolean | null;
+  drift: string | null;
+  applied: boolean;
+  error: string | null;
+  /** No check inside the watchdog's window: the timer is not running. */
+  stale: boolean;
+  ageSeconds: number | null;
+}
+
+/** One 30 s media silence, as `deploy/rtp-stall-watch.sh` logged it. */
+export interface VoiceStall {
+  at: string | null;
+  text: string;
+}
+
+export interface VoiceMedia {
+  watcherSeen: boolean;
+  captures: number;
+  stalls: number;
+  stallsInWindow: number;
+  windowHours: number;
+  lastStall: VoiceStall | null;
+  lastStallRecent: VoiceStall | null;
+  capturesKept: number;
+  lastCapture: { name: string; sizeBytes: number; at: string | null } | null;
+}
+
+export interface VoiceStatus {
+  ok: boolean;
+  generatedAt: string;
+  hostRoot: string;
+  prewarm: VoicePrewarm;
+  media: VoiceMedia;
+}

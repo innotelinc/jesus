@@ -54,8 +54,13 @@ stop_capture() {
     python3 "$PROBE" --pcap "$pcap" --gap 2.0 >>"$DIR/watch.log" 2>&1
     rc=$?
     # rtp_probe exits 2 when some stream went silent for 30 s or more: that is
-    # the event this watcher exists for, so it gets its own line.
-    [ "$rc" -eq 2 ] && log "STALL: a leg went silent for 30 s or more — $pcap"
+    # the event this watcher exists for, so it gets its own line — and the probe
+    # names the cause (the handset stopped sending, or the path ate the packets),
+    # which is the part Asterisk's "lack of audio RTP activity" cannot tell.
+    if [ "$rc" -eq 2 ]; then
+      line=$(python3 "$PROBE" --pcap "$pcap" --stall-line 2>/dev/null | head -1)
+      log "${line:-STALL: a leg went silent for 30 s or more} — $pcap"
+    fi
     [ "$rc" -eq 1 ] && log "note: could not analyse $pcap (see the error above)"
   else
     log "note: no probe at $PROBE, or the capture is empty; pcap kept at $pcap"

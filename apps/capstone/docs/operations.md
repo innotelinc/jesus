@@ -445,8 +445,8 @@ evidence and its warm cache without anyone remembering to ask:
 
 | Job | Every | What it does | Log |
 |---|---|---|---|
-| `rtp-stall-watch.sh` | 1 min | Captures the media of the next call on 101/102/301/302 and analyses it with `rtp-probe.py`; a stream silent for 30 s or more gets its own `STALL:` line | `/var/log/rtp-watch/watch.log` |
-| `prewarm-watch.sh` | 5 min | Re-exports the routes' `initial_context`, re-renders the greetings, and on drift regenerates the list, installs it in the shim's volume and `POST /prewarm`s — no restart, so no caller waits | `/var/log/prewarm-watch.log` |
+| `rtp-stall-watch.sh` | 1 min | Captures the media of the next call on 101/102/301/302 and analyses it with `rtp-probe.py`; a stream silent for 30 s or more gets its own `STALL:` line that names the cause (the handset stopped sending vs. the path dropped the packets) | `/var/log/rtp-watch/watch.log` |
+| `prewarm-watch.sh` | 5 min | Re-exports the routes' `initial_context`, re-renders the greetings, and on drift regenerates the list, installs it in the shim's volume and `POST /prewarm`s — no restart, so no caller waits. Writes its verdict (in sync, drifted, repaired) to a status file every run | `/var/log/prewarm-watch.log`, `/var/lib/capstone-prewarm/status.json` |
 
 ```bash
 install -m 0755 deploy/rtp-stall-watch.sh /usr/local/sbin/rtp-stall-watch.sh
@@ -463,6 +463,22 @@ The prewarm watcher reads the contexts from where they actually live —
 the greetings render with their fallbacks (which is what the shim already
 prewarms); the day a route is given a name to greet, the next tick renders that
 greeting too and prewarms it before anyone calls.
+
+### What the watchers report, and where it is seen
+
+Both jobs are quiet by design — a silent log is the healthy state — which is
+why their verdicts are also published to places an operator already looks:
+
+| Surface | Shows |
+|---|---|
+| `GET /voice` (dashboard-api) | The installed greeting list, the last drift check, and every captured call / 30 s silence |
+| Health → **Voice — greeting prewarm & handset media** | The same, polled every 30 s, including *why* a leg went silent |
+| Alerts, ids `al-voice-*` | `prewarm-stale` (the timer stopped), `prewarm-drift` (the list no longer matches the routes), `prewarm-error` (state unreadable), `rtp-stall` (a handset leg went silent within 24 h) |
+
+Those are derived from the status file and the watcher log, so they cost a file
+read rather than a `docker exec`. A host with neither file reports
+`installed: false` and raises no alerts. The stall investigation itself, and the
+rule that settles it, is in [voice-rtp-stall.md](voice-rtp-stall.md).
 
 ## Platform address — the name and the LAN IP are not interchangeable
 

@@ -12,6 +12,14 @@ stream resumed, which separates these three cases:
   * the leg stopped, then resumed      -> a burst loss / Wi-Fi roam, not a hangup
   * both legs kept sending throughout  -> the audio was there; look elsewhere
 
+A silence on its own does not say *why* the leg went quiet, because a phone that
+suppresses silence (VAD) and a phone whose packets a lossy path swallowed look
+identical from Asterisk's side. RTP's sequence number separates them: nothing
+lost across the gap means the sender sent nothing (VAD / muted mic), while a
+jump means those packets were sent and never arrived (the path). Every stream
+carries that verdict, and `--stall-line` prints just the one line the watcher
+logs.
+
 Capture and analysis are separate on purpose: take the pcap during the event,
 analyse it afterwards, and keep it as the record.
 
@@ -88,6 +96,41 @@ class Stream:
                 lost += step - 1
         return lost
 
+    def verdict(self, threshold: float) -> dict:
+        """Why the longest silence happened: the sender stopped, or the path dropped.
+
+        RTP's own sequence number answers this. If the packet after a silence is
+        the *next* sequence number, nothing was lost while the stream was quiet —
+        the sender sent nothing, which is what silence suppression (VAD) or a
+        muted microphone on the handset looks like. If the sequence jumped, that
+        many packets were sent and never arrived: the network dropped them and
+        the phone was talking into a hole. The two have opposite fixes, and the
+        `lack of audio RTP activity` notice cannot tell them apart.
+        """
+        if len(self.times) < 2:
+            return {"cause": "single-packet", "max_gap_s": 0.0,
+                    "lost_in_gap": 0, "resumed": False, "seq_step": None}
+        steps = [(b - a) % 65536 for a, b in zip(self.seqs, self.seqs[1:])]
+        deltas = [
+            (t1 - t0, i)
+            for i, (t0, t1) in enumerate(zip(self.times, self.times[1:]))
+            if t1 - t0 >= threshold
+        ]
+        if not deltas:
+            return {"cause": "continuous", "max_gap_s": 0.0,
+                    "lost_in_gap": 0, "resumed": True, "seq_step": None}
+        longest, i = max(deltas)
+        step = steps[i]
+        lost = step - 1 if 1 < step < 1000 else 0
+        return {
+            "cause": "packet-loss" if lost else "sender-silent",
+            "max_gap_s": round(longest, 3),
+            "lost_in_gap": lost,
+            # Packets after the gap's second packet: the stream came back.
+            "resumed": i + 2 < len(self.times),
+            "seq_step": step,
+        }
+
     def summary(self, threshold: float) -> dict:
         duration = (self.times[-1] - self.times[0]) if len(self.times) > 1 else 0.0
         gaps = self.gaps(threshold)
@@ -101,6 +144,7 @@ class Stream:
                 for g in gaps[:20]
             ],
             "seq_lost": self.lost(),
+            "verdict": self.verdict(threshold),
         }
 
 
@@ -264,6 +308,44 @@ def rtp_streams(
     return streams
 
 
+# The silence Asterisk counted before it tore the call down (rtp_timeout, now 0).
+STALL_SECONDS = 30
+
+
+def describe_verdict(verdict: dict) -> str:
+    """One sentence an operator — or the watcher's log — can act on."""
+    cause = verdict.get("cause")
+    if cause == "continuous":
+        return "kept sending throughout — the audio was there, so look past the media"
+    if cause == "single-packet":
+        return "one packet only — nothing to conclude"
+    gap = verdict.get("max_gap_s", 0.0)
+    tail = "and it came back" if verdict.get("resumed") else "and it never came back"
+    if cause == "packet-loss":
+        return (
+            f"{verdict.get('lost_in_gap', 0)} packet(s) were sent and never arrived "
+            f"across the {gap}s silence — the path dropped them, the phone was still "
+            f"talking ({tail})"
+        )
+    return (
+        f"nothing was lost across the {gap}s silence — the handset stopped sending "
+        f"(silence suppression / muted mic), {tail}"
+    )
+
+
+def stall_row(rows: list[dict]) -> dict | None:
+    """The worst stream whose silence reached the threshold Asterisk noticed."""
+    stalled = [r for r in rows if r["max_gap_s"] >= STALL_SECONDS]
+    return max(stalled, key=lambda r: r["max_gap_s"]) if stalled else None
+
+
+def stall_line(row: dict) -> str:
+    return (
+        f"STALL: {row['max_gap_s']}s of silence on {row['stream']} — "
+        f"{describe_verdict(row['verdict'])}"
+    )
+
+
 def capture(seconds: int, iface: str, out: Path) -> Path:
     """`tcpdump -w` for ``seconds``, RTP port range only."""
     cmd = [
@@ -287,6 +369,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-o", "--out", type=Path, default=Path("/var/tmp/rtp-probe.pcap"))
     ap.add_argument("--gap", type=float, default=2.0, help="report silence at least this long (default 2.0 s)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument(
+        "--stall-line", action="store_true",
+        help="print only the one-line STALL summary (exit 2 when a leg stalled)",
+    )
     args = ap.parse_args(argv)
 
     if not args.pcap and not args.capture:
@@ -297,11 +383,19 @@ def main(argv: list[str] | None = None) -> int:
     streams = {k: v for k, v in candidates.items() if plausible_rtp(v)}
     rejected = len(candidates) - len(streams)
     rows = sorted((s.summary(args.gap) for s in streams.values()), key=lambda r: -r["packets"])
+    stall = stall_row(rows)
+
+    if args.stall_line:
+        if stall is None:
+            return 0
+        print(stall_line(stall))
+        return 2
 
     if args.json:
         print(json.dumps({
             "pcap": str(path), "linktype": dlt, "packets": len(frames),
             "streams": rows, "rejected_lookalikes": rejected,
+            "stall": stall_line(stall) if stall else None,
         }, indent=2))
         return 0
 
@@ -317,10 +411,11 @@ def main(argv: list[str] | None = None) -> int:
             f"  {row['packets']} packets over {row['seconds']}s, "
             f"{row['seq_lost']} seq lost, longest silence {row['max_gap_s']}s"
         )
+        print(f"  verdict: {describe_verdict(row['verdict'])}")
         for gap in row["gaps_over_threshold"]:
             print(f"    silence {gap['for_s']}s starting {gap['at_s']}s into the stream")
-    if any(r["max_gap_s"] >= 30 for r in rows):
-        print("\nSTALL: a stream went silent for 30 s or more — that is the leg that stopped sending")
+    if stall is not None:
+        print(f"\n{stall_line(stall)}")
         return 2
     return 0
 

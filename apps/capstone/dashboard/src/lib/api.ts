@@ -13,6 +13,7 @@ import type {
   Entitlement,
   StackAccessStatus,
   PbxRecovery,
+  VoiceStatus,
 } from '../types';
 import { dashboardBaseUrl } from './config';
 import type { Verdict } from './utils';
@@ -442,6 +443,8 @@ export const api = {
   pbxHealth: () => getJSON<PbxRecovery>('/pbx/health'),
   /** Per-stack SSO / access inventory from the Cerulean Authentik instance. */
   authentikAccess: () => getJSON<StackAccessStatus>('/authentik/access'),
+  /** Greeting prewarm state + captured handset media, from the host watchers. */
+  voice: () => getJSON<VoiceStatus>('/voice'),
   incidents: () => getJSON<Incident[]>('/incidents'),
   policies: () => getJSON<ConfigPolicy[]>('/policies'),
   audit: () => getJSON<AuditEntry[]>('/audit'),
