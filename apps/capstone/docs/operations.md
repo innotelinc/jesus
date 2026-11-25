@@ -133,6 +133,67 @@ no loopback leg and everything that dials ARI (dograh, the edge proxy, the host-
 dials the LAN IP. The Dograh ARI user and inbound dialplan are injected during PBX startup.
 The AMI on `5038` follows the same rule.
 
+### What a Coolify redeploy actually does to the PBX
+
+Four things bit us during the 25 November redeploy; none of them are obvious from the
+UI, and all four are checkable:
+
+- **The rendered compose is the deploy input.** `docker_compose_raw` is the template you
+  edit, `docker_compose` is what Coolify writes to
+  `/data/coolify/services/<uuid>/docker-compose.yml` and runs. `PATCH` accepts
+  `docker_compose_raw` (base64) and re-renders `docker_compose` from it; sending
+  `docker_compose` itself fails with `This field is not allowed`. So fix the PBX mapping
+  in the template, never in the file — the next deploy overwrites the file.
+- **Compose interpolation eats shell variables in `command:`.** A `capstone-init` step
+  using `$URL` arrived in the container with the variables already empty, so `git clone`
+  ran with no remote and the init container exited 128 — which took dashboard, dograh and
+  tts-shim down with it, because they gate on `service_completed_successfully`. Escaping
+  to `$$URL` did not help either: the container got the literal `$$URL`. Keep that
+  command free of `$` entirely (a plain `git clone`/`git pull` on a known remote).
+- **Volume names change shape.** The asterisk config volume was
+  `<service>_asterisk-config` and is now
+  `<service>_<service>-asterisk-config`. Anything that edits configs by path (scripts,
+  runbooks, this document) must resolve it with
+  `docker inspect freepbx-… --format '{{range .Mounts}}{{.Destination}}={{.Source}}{{"\n"}}{{end}}'`
+  and look up `/etc/asterisk`. A stale path fails silently: the edit lands in an orphaned
+  volume nobody mounts.
+- **The FreePBX database is in the container layer, not a volume.** The mounts are
+  `/var/www/html`, `/var/lib/asterisk/sounds`, the asterisk config/log/spool volumes —
+  `/var/lib/mysql` is *not* mounted. A recreate therefore starts from the image's baked
+  database: extensions, inbound routes and any GUI work done since the image was built are
+  gone, and the entrypoint regenerates `pjsip.endpoint.conf` with almost nothing in it.
+  Asterisk then loads two endpoints instead of thirteen and the trunk 401s, which looks
+  like a credential problem and is not one. Recover by copying the previous config volume
+  back (below) and then treat persisting `/var/lib/mysql` as the real fix.
+
+`scripts/pjsip_dup_guard.py` covers the other half of it. `pbx/entrypoint-dograh.sh`
+appends its `[101]` AOR/endpoint to `pjsip.aor_custom.conf` and
+`pjsip.endpoint_custom.conf` on every boot, and `pjsip.aor.conf` already includes those
+files and defines the same object — Asterisk then rejects the whole `pjsip.conf`
+("configuration contains a duplicate object"), so *every* pjsip object disappears. The
+guard comments the duplicate on the custom side and reloads `res_pjsip.so`; it resolves
+the volume from the running container, is idempotent, and runs from
+`/etc/cron.d/pjsip-dup-guard` every five minutes:
+
+```bash
+python3 scripts/pjsip_dup_guard.py --dry-run   # what it would disable
+python3 scripts/pjsip_dup_guard.py             # disable + reload pjsip
+```
+
+Restoring a config volume after a recreate, once you know the old path:
+
+```bash
+OLD=/var/lib/docker/volumes/<svc>_asterisk-config/_data
+NEW=$(docker inspect freepbx-<uuid> \
+  --format '{{range .Mounts}}{{.Destination}}={{.Source}}{{"\n"}}{{end}}' \
+  | grep '^/etc/asterisk=' | cut -d= -f2-)
+tar czf /root/pbx-vol-backup/new-$(date +%Y%m%dT%H%M%SZ).tgz -C "$NEW" .
+cp -a "$OLD"/. "$NEW"/
+docker exec freepbx-<uuid> asterisk -rx 'module reload res_pjsip.so'
+docker exec freepbx-<uuid> asterisk -rx 'dialplan reload'
+docker exec freepbx-<uuid> asterisk -rx 'pjsip show endpoints' | grep -c Endpoint:   # expect 13
+```
+
 Hold music is generated, not licensed: `pbx/asterisk/hold_music.py` writes four 32 s, 8 kHz
 mono WAV tracks into `/var/lib/asterisk/moh/capstone` (fixed seed, ~5 s, no ffmpeg), and
 `pbx/entrypoint-dograh.sh` re-runs it on every boot because `/var/lib/asterisk/moh` is not a

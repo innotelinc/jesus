@@ -24,9 +24,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_VOLUME = Path(
-    "/var/lib/docker/volumes/qvifit87vftfxd9ejsch2vxy_asterisk-config/_data"
-)
 DEFAULT_CONTAINER = "freepbx-qvifit87vftfxd9ejsch2vxy"
 PAIRS = ("aor", "endpoint", "auth")
 
@@ -71,6 +68,28 @@ def disable(path: Path, duplicates: set[str]) -> int:
     return disabled
 
 
+def resolve_volume(container: str) -> Path | None:
+    """Host path behind the container's /etc/asterisk.
+
+    Coolify names service volumes `<service>_<service>-asterisk-config`, and the
+    prefix has changed shape before, so the path is looked up rather than
+    hardcoded — a stale path means the guard silently guards nothing.
+    """
+    try:
+        done = subprocess.run(
+            ["docker", "inspect", container, "--format",
+             "{{range .Mounts}}{{.Destination}}={{.Source}}{{\"\\n\"}}{{end}}"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in done.stdout.splitlines():
+        dest, _, source = line.partition("=")
+        if dest == "/etc/asterisk" and source:
+            return Path(source)
+    return None
+
+
 def reload_pjsip(container: str) -> tuple[bool, str]:
     try:
         done = subprocess.run(
@@ -87,9 +106,15 @@ def reload_pjsip(container: str) -> tuple[bool, str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--volume", type=Path, default=DEFAULT_VOLUME)
+    parser.add_argument("--volume", type=Path)
     parser.add_argument("--container", default=DEFAULT_CONTAINER)
     args = parser.parse_args()
+
+    if args.volume is None:
+        args.volume = resolve_volume(args.container)
+        if args.volume is None:
+            print(f"no /etc/asterisk mount found on {args.container}", file=sys.stderr)
+            return 2
 
     total = 0
     for kind in PAIRS:
