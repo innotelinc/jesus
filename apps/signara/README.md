@@ -55,9 +55,24 @@ new password so the existing `pgdata` volume keeps its data. The api now boots a
 route, then stops at the **object store**: `getaddrinfo EAI_AGAIN minio`.
 
 That is the storage profile, not a regression: `minio` is profile-gated (`legacy-storage`)
-because the live store is meant to be onyx-objectstore, and `SIGNARA_S3_*` is still empty, so
-the api falls back to `http://minio:9000` with nothing behind it. The documented endpoint
-`http://192.168.1.71:2090` is not listening; `192.168.1.60:2090` and `:2091` answer `401`, so
-the store is there and what is missing is a credential for it. Until `SIGNARA_S3_ENDPOINT`,
-`SIGNARA_S3_ACCESS_KEY` and `SIGNARA_S3_SECRET_KEY` are set, `api` — and therefore `frontend`,
-which waits for it to be healthy — stays down.
+because the live store is onyx-objectstore, so with `SIGNARA_S3_*` empty the api fell back to
+`http://minio:9000` with nothing behind it.
+
+## Object store (resolved)
+
+The live store is the onyx MinIO at `http://192.168.1.60:2090`, bucket `signara-documents`
+(region `us-east-1`, path-style). The credential is in the Cerulean Vault on `192.168.1.71` at
+`cerulean/onyx` — keys `S3_ACCESS_KEY` / `S3_SECRET_KEY`, the same pair distro uses for
+`distro-shares`. Note `cerulean/signara` also has `S3_*`, but those are the retired MinIO root
+credentials with a different key, not the live store.
+
+The retired `192.168.1.71:2090` endpoint named in `.env.example` no longer listens; `:2091`
+speaks to a store that rejects this credential (403). `192.168.1.60:2090` is the one that
+lists `signara-documents`.
+
+Set in Coolify and mirrored into the app's `.env`: `SIGNARA_S3_ENDPOINT`,
+`SIGNARA_S3_ACCESS_KEY`, `SIGNARA_S3_SECRET_KEY`, plus `SIGNARA_S3_BUCKET`,
+`SIGNARA_S3_REGION` and `SIGNARA_S3_FORCE_PATH_STYLE`. With those in place `api` reaches
+`healthy` and `/ready` returns 200; `frontend` follows it up. `SIGNARA_S3_PUBLIC_ENDPOINT`
+stays unset, so presigned URLs use the internal endpoint — set it to a public host before
+handing upload links to browsers.
