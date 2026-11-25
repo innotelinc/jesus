@@ -488,9 +488,12 @@ rule that settles it, is in [voice-rtp-stall.md](voice-rtp-stall.md).
 `deploy/handset-probe.sh <ext>` rings a handset with an auto-answer INVITE
 (`Call-Info: <sip:x>;answer-after=0`, the intercom convention) and holds the call
 long enough for the watcher to capture it, then prints the `VERDICT:` line. It
-installs one managed block in `extensions_custom.conf` (backed up, idempotent)
-because Asterisk's `channel originate` cannot add a SIP header. Our side sends no
-audio and records nothing, so an auto-answered handset hears silence.
+puts its dialplan in `extensions_custom_handset_probe.conf` and appends a single
+`#include` line to `extensions_custom.conf` (backed up, idempotent) because
+Asterisk's `channel originate` cannot add a SIP header — and because rewriting
+the estate's hand-written dialplan in place is how a probe takes the agents down.
+Our side sends no audio and records nothing, so an auto-answered handset hears
+silence.
 
 It tries both conventions (`Call-Info` then `Alert-Info`) and prints the SIP
 exchange it saw — the INVITE, whether the auto-answer header was on it, and the
