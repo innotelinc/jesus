@@ -367,6 +367,22 @@ A live twin under half its sibling fails the init with `REFUSING: …`, so the d
 with the previous containers still running instead of bringing the stack up on empty data —
 the repair is then a deliberate copy, not a rescue.
 
+You can watch that happen without touching a real volume: plant a synthetic pair with an
+unused uuid, deploy, then remove it and deploy again. The gate is host-wide, so a bogus
+service is enough to trip it.
+
+```bash
+V=/var/lib/docker/volumes; F=gateprobe0000000000000a
+mkdir -p $V/${F}_probe-db/_data $V/${F}_${F}-probe-db/_data
+dd if=/dev/zero of=$V/${F}_probe-db/_data/big bs=1M count=5 status=none
+# deploy: capstone-init exits 1 with "REFUSING: live volume probe-db …", every
+# running container is left alone, and Coolify reports the deployment failed
+rm -rf $V/${F}_probe-db $V/${F}_${F}-probe-db   # then deploy again: 10 pairs, exit 0
+```
+
+The same check runs as a cron on every Coolify server (`.51`, `.53`, `.54` too, where there
+are no twins yet — the guard says so and stays quiet).
+
 Installed on the host as `/usr/local/bin/vol-twin-guard.py` and run from
 `/etc/cron.d/vol-twin-guard` every ten minutes; it is **silent unless it fails**, and a
 failure goes to the journal as `user.err` under the `vol-twin-guard` tag
