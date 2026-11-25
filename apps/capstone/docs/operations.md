@@ -295,20 +295,37 @@ AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py --dry-run
 AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py
 ```
 
-It refuses to guess: without a token it exits 1 with that message, and a token from another
-tenant is reported as `token rejected … (403)`. That is where this stands. The instance is
-`https://auth.innotel.us` — the pbx outpost's own redirect names it, `auth.innotel.site` is
-the same server, and the LAN address `192.168.1.127:9000` has no SSH and is not routable
-from here; only `/api/v3/root/config/` is open, everything else is
-`403 Authentication credentials were not provided`, and no token for this tenant exists
-anywhere in the estate — the one in `/root/ak-api.sh` belongs to cerulean. So `api/` on the
-public host is still behind SSO, and `http://192.168.1.52:8097/api/health` is the
-machine-facing path until that token appears.
+**Applied.** `https://pbx.innotel.site/api/health` answers `{"ok":true,…}` directly while
+`/` still 302s to the outpost, so the machine path is public and the UI keeps SSO.
 
-One warning about scope: `https://pbx.innotel.site/api/health` is not merely SSO-protected,
-it is *reachable* only because the outpost forwards it, so clients hitting it today get a
-302 to a login page rather than a connection error. Anything monitoring that URL is
-monitoring the redirect, not the console.
+The instance is `https://auth.innotel.us` (the pbx outpost's own redirect names it;
+`auth.innotel.site` is the same server). It runs as the incus instance `auth`
+(`192.168.1.127`) on `i3` (`.53`), so it is reachable with
+`incus exec auth -- docker exec auth-authentik-server-1 …` even though the host has no SSH
+of its own. Four things about this instance cost time and are worth remembering:
+
+- `external_host` lives on the **provider**, not the application — matching applications by
+  host finds nothing (that is why the first dry run reported 47 apps and no pbx).
+- The provider is **73**, `Innotel PBX Console NPM Forward Auth`, and the field is
+  `skip_path_regex`.
+- A bare `PATCH` of that field is rejected with
+  `internal_host: Internal host cannot be empty when forward auth is disabled`, so the
+  request must echo `external_host` / `internal_host` / `mode` back unchanged.
+- `/core/applications/` routinely takes longer than 30 s on this instance.
+
+The token used is an Authentik API token with identifier `codebuff-api-bypass` on the `admin`
+user, non-expiring, minted through Django in the server container. To revoke it, delete that
+token in Authentik → Directory → Tokens (or
+`Token.objects.filter(identifier="codebuff-api-bypass").delete()` in `manage.py shell`). Note
+`manage.py shell` on 2026.x no longer executes piped stdin — use
+`manage.py shell -c "exec(open('/path').read())"`, and allow ~2 minutes for startup.
+
+Do **not** try to solve this in the reverse proxy. `cerulean-npm`'s `proxy_host/410.conf`
+carries `auth_request /outpost.goauthentik.io/auth/nginx`; hand-adding `auth_request off` for
+`/api/` looks tempting and is wrong — the block is managed ("Cerulean Authentik forward auth
+(managed)") and will be regenerated, and a heredoc that eats `$http_upgrade` leaves nginx
+with a config that fails `nginx -t`, which only bites at the next restart. If that file is
+ever edited by hand, run `nginx -t` before `nginx -s reload` and keep the `.bak` copy.
 
 ### Repairing a stateful volume from its twin
 
@@ -384,10 +401,19 @@ rm -rf $V/${F}_probe-db $V/${F}_${F}-probe-db   # then deploy again: 10 pairs, e
 The same check runs as a cron on every Coolify server (`.51`, `.53`, `.54` too, where there
 are no twins yet — the guard says so and stays quiet).
 
-Installed on the host as `/usr/local/bin/vol-twin-guard.py` and run from
-`/etc/cron.d/vol-twin-guard` every ten minutes; it is **silent unless it fails**, and a
-failure goes to the journal as `user.err` under the `vol-twin-guard` tag
-(`journalctl -t vol-twin-guard`). Two kinds of volume are deliberately excluded, because a
+Installed on the host as `/usr/local/bin/vol-twin-guard.py`, run every ten minutes from
+`/etc/cron.d/vol-twin-guard` through `/usr/local/bin/vol-twin-guard-run.sh`, on every Coolify
+server (`.51`, `.52`, `.53`, `.54`). The runner writes three different things on purpose:
+
+| where | when | how to read it |
+| --- | --- | --- |
+| `/var/log/vol-twin-guard.log` | every run (one line if healthy, full output if not) | rotated by `/etc/logrotate.d/vol-twin-guard` at 1 MiB, 4 generations, compressed |
+| journal, `user.err`, tag `vol-twin-guard` | failures only | `journalctl -t vol-twin-guard` |
+| ntfy push, urgent priority | failures only | the topic URL in `/etc/vol-twin-guard.conf` (root-only, 0600) |
+
+The push is what makes a failure *reach* someone instead of waiting to be noticed; the URL
+lives in that config file rather than in the cron line or this repo, because an ntfy topic is
+as good as a password. No config file means journal-only — a loud log, not silence. Two kinds of volume are deliberately excluded, because a
 noisy check is an ignored check: `*-logs` and `*-repo` are churn (rotated logs; the live
 checkout is a `--depth 1` clone and legitimately smaller than a full-history sibling), and
 `*-spool` reports `warn` without failing — voicemail drains, and "did we lose a message?" is

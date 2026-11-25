@@ -1,0 +1,466 @@
+# ==========================================================================
+# Signara — production stack
+# Assumes TLS termination at a reverse proxy (NGINX Proxy Manager) in front
+# of the published ports below.
+#
+# Usage:
+#   ./setup.sh
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Hardening: start with `docker compose -f docker-compose.prod.yml config`
+# to review the effective configuration before deploying.
+# ==========================================================================
+name: signara
+
+x-logging-default: &logging-default
+  driver: json-file
+  options:
+    max-size: '50m'
+    max-file: '10'
+
+services:
+  frontend:
+    image: ${SIGNARA_WEB_IMAGE:-ghcr.io/innotelinc/signara-web:latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-https://api.signara.innotel.us}
+        NEXT_PUBLIC_WEB_URL: ${WEB_URL:-https://app.signara.innotel.us}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${API_URL:-https://api.signara.innotel.us}
+      NEXT_PUBLIC_WEB_URL: ${WEB_URL:-https://app.signara.innotel.us}
+    ports:
+      - '${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_BIND_PORT:-3000}:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1 for the same reason as the API probe below: `localhost` also
+      # maps to ::1 and busybox wget prefers it, so this failed and the web app
+      # was reported unhealthy.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+      restart_policy:
+        condition: unless-stopped
+    logging: *logging-default
+
+  api:
+    image: ${SIGNARA_API_IMAGE:-ghcr.io/innotelinc/signara-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: missing
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      API_PORT: 8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-signara}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-signara}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change-me}@redis:6379
+      # The document store is a *profile*, not a hard-coded MinIO
+      # (docs/Roadmap.md W3). These read from SIGNARA_S3_* rather than S3_* on
+      # purpose: S3_ACCESS_KEY/S3_SECRET_KEY stay MinIO's own root credentials,
+      # so the retired store can be started again for rollback without its
+      # credentials having been repointed underneath it. Compose gives
+      # `environment` precedence over `env_file`, so these win over .env.
+      S3_ENDPOINT: ${SIGNARA_S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${SIGNARA_S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${SIGNARA_S3_SECRET_KEY:-}
+      S3_BUCKET: ${SIGNARA_S3_BUCKET:-signara-documents}
+      S3_REGION: ${SIGNARA_S3_REGION:-us-east-1}
+      S3_FORCE_PATH_STYLE: ${SIGNARA_S3_FORCE_PATH_STYLE:-true}
+      S3_PUBLIC_ENDPOINT: ${SIGNARA_S3_PUBLIC_ENDPOINT:-}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-https://auth.signara.innotel.us/application/o/signara/jwks/}
+      OIDC_TOKEN_URL: ${OIDC_TOKEN_URL:-https://auth.signara.innotel.us/application/o/token/}
+      OIDC_USERINFO_URL: ${OIDC_USERINFO_URL:-https://auth.signara.innotel.us/application/o/userinfo/}
+      SMTP_PASS_FILE: /run/secrets/smtp_password
+    ports:
+      - '${API_BIND_ADDRESS:-127.0.0.1}:${API_BIND_PORT:-8000}:8000'
+    volumes:
+      - ./infra/secrets/smtp_password:/run/secrets/smtp_password:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # No `minio` dependency: the API must be able to start with the retired
+      # store stopped, or "demote MinIO" would mean "cannot boot"
+      # (docs/Roadmap.md W3).
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not `localhost`: the container's /etc/hosts maps localhost to
+      # ::1 as well, busybox wget prefers IPv6, and Nest listens on 0.0.0.0
+      # (IPv4) — so `localhost` is refused and this reported unhealthy forever.
+      # That is not cosmetic: `frontend` waits on this service being healthy, so
+      # a full `up` deadlocked on the API rather than starting the web app.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8000/ready']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+      restart_policy:
+        condition: unless-stopped
+    logging: *logging-default
+
+  migrate:
+    image: ${SIGNARA_API_IMAGE:-ghcr.io/innotelinc/signara-api:latest}
+    pull_policy: missing
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-signara}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-signara}?schema=public
+    command:
+      [
+        'node_modules/.bin/prisma',
+        'migrate',
+        'deploy',
+        '--schema',
+        'packages/database/prisma/schema.prisma',
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    logging: *logging-default
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-signara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-signara}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-signara}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    logging: *logging-default
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      ['redis-server', '--requirepass', '${REDIS_PASSWORD:-change-me}', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-change-me}', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *logging-default
+
+  minio:
+    # Retired as the primary store (docs/Roadmap.md W3): Signara now reads and
+    # writes the estate's onyx-objectstore. Kept defined and profile-gated so
+    # it is *not* resurrected by a plain `up -d` — bring it back deliberately
+    # for rollback with `--profile legacy-storage`, alongside its volume, which
+    # still holds every object as it was.
+    profiles: ['legacy-storage']
+    # MinIO no longer serves anonymous pulls from anywhere public — docker.io
+    # `minio/minio` is gone (404) and quay.io `minio/minio` answers 401 — so this
+    # points at the estate's GHCR mirror, built from the maintained community CE
+    # build `pgsty/minio` (ghcr.io/innotelinc/capstone/minio, published by
+    # Capstone's release pipeline).
+    image: ${SIGNARA_MINIO_IMAGE:-ghcr.io/innotelinc/capstone/minio:RELEASE.2026-08-04T00-00-00Z}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-signara}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *logging-default
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-change-me}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: 'true'
+    volumes:
+      - meilidata:/meili_data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:7700/health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *logging-default
+
+  authentik-server:
+    profiles: ["authentik"]
+    image: ghcr.io/goauthentik/server:2024.8.1
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-change-me-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: 'false'
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@signara.innotel.us}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-change-me}
+    ports:
+      - '${AUTHENTIK_BIND_ADDRESS:-127.0.0.1}:${AUTHENTIK_BIND_PORT:-9100}:9000'
+      - '${AUTHENTIK_BIND_ADDRESS:-127.0.0.1}:${AUTHENTIK_HTTPS_BIND_PORT:-9443}:9443'
+    volumes:
+      - ./cert:/certs:ro
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_started
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:9000/health/live/']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging-default
+
+  authentik-worker:
+    profiles: ["authentik"]
+    image: ghcr.io/goauthentik/server:2024.8.1
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-change-me-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: 'false'
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_started
+    logging: *logging-default
+
+  authentik-db:
+    profiles: ["authentik"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      POSTGRES_DB: authentik
+    volumes:
+      - authentikdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U authentik']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging-default
+
+  authentik-redis:
+    profiles: ["authentik"]
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - authentikredis:/data
+    logging: *logging-default
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROM_RETENTION:-90d}
+    volumes:
+      - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+      - promdata:/prometheus
+    # Bound to loopback, not published: Prometheus has no authentication, and
+    # its UI and query API expose every metric in the estate.
+    ports:
+      - '${PROMETHEUS_BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_BIND_PORT:-9090}:9090'
+    depends_on:
+      - api
+    logging: *logging-default
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    # The config carries ${...} placeholders that Alertmanager cannot expand
+    # itself, so the entrypoint renders it before exec'ing the binary — without
+    # that step the receiver silently sends nowhere. See the script's header.
+    entrypoint: ['/bin/sh', '/etc/alertmanager/entrypoint.sh']
+    # The address Alertmanager advertises in every notification link. Left
+    # unset it uses the container's own hostname on :9093
+    # (http://<container-id>:9093), which resolves for nobody — that was the
+    # link in the estate's delivery-probe mail. Set it in .env; the LAN
+    # address is the default because the monitoring UIs are not published
+    # through the Cerulean edge.
+    command:
+      - '--web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://192.168.1.44:9093}'
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      # The FQDN Alertmanager says EHLO with. Left unset it renders as
+      # `localhost`, which a strict relay (Stalwart) refuses with
+      # `550 5.5.0 Invalid EHLO domain`; the entrypoint defaults it to a dotted
+      # name when empty.
+      SMTP_HELLO: ${SMTP_HELLO:-innotel.us}
+      # The name the relay's certificate is verified against. Set it when the
+      # relay is dialled by an address its certificate does not name; that keeps
+      # verification on instead of reaching for the switch below.
+      SMTP_TLS_SERVERNAME: ${SMTP_TLS_SERVERNAME:-}
+      # `true` keeps STARTTLS but skips verifying the relay's certificate; set
+      # it for an internal relay reached by IP with a self-signed certificate.
+      SMTP_TLS_INSECURE: ${SMTP_TLS_INSECURE:-false}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+    volumes:
+      - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./infra/monitoring/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+      - ./infra/monitoring/alertmanager/email.tmpl:/etc/alertmanager/email.tmpl:ro
+      # 0444 on the host, mounted read-only: the submission password never appears
+      # in `docker inspect`. Alertmanager reads it via smtp_auth_password_file; the
+      # API via SMTP_PASS_FILE. Not 0600 — both consumers are unprivileged
+      # (alertmanager as `nobody`, the api as `signara`) and were refused the file
+      # at 0600, which read as an empty password rather than as a permission problem.
+      # infra/secrets/README.md carries the detail.
+      - ./infra/secrets/smtp_password:/run/secrets/smtp_password:ro
+      - alertdata:/alertmanager
+    ports:
+      - '${ALERTMANAGER_BIND_ADDRESS:-127.0.0.1}:${ALERTMANAGER_BIND_PORT:-9093}:9093'
+    logging: *logging-default
+
+  # --------------------------------------------------------------- backup ---
+  backup:
+    build:
+      context: .
+      dockerfile: infra/backup/Dockerfile
+    restart: unless-stopped
+    entrypoint: ['/bin/sh', '/backup/entrypoint.sh']
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-signara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-signara}
+      AUTHENTIK_POSTGRES_HOST: ${AUTHENTIK_POSTGRES_HOST:-}
+      AUTHENTIK_POSTGRES_USER: authentik
+      AUTHENTIK_POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-}
+      AUTHENTIK_POSTGRES_DB: authentik
+      # Backs up whatever the API is actually using, so it follows the storage
+      # profile rather than naming MinIO.
+      SOURCE_S3_ENDPOINT: ${SIGNARA_S3_ENDPOINT:-http://minio:9000}
+      SOURCE_S3_BUCKET: ${SIGNARA_S3_BUCKET:-signara-documents}
+      SOURCE_S3_ACCESS_KEY: ${SIGNARA_S3_ACCESS_KEY:-signara}
+      SOURCE_S3_SECRET_KEY: ${SIGNARA_S3_SECRET_KEY:-change-me}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-signara-backups}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_ONCE: ${BACKUP_ONCE:-false}
+      BACKUP_RUN_ON_START: ${BACKUP_RUN_ON_START:-false}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_REQUIRE_REMOTE: ${BACKUP_REQUIRE_REMOTE:-false}
+      # Addresses that mean "this host", for the off-host check. The job cannot
+      # see them from inside the container, so they are declared here.
+      BACKUP_LOCAL_ADDRESSES: ${BACKUP_LOCAL_ADDRESSES:-}
+    volumes:
+      - ./infra/backup:/backup:ro
+      - backupcache:/backup-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # No `minio` dependency — same reason as the api service above.
+    logging: *logging-default
+
+  backup-metrics:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command: ['python', '/metrics/backup_metrics.py']
+    volumes:
+      - backupcache:/backup-cache:ro
+      - ./infra/backup/backup_metrics.py:/metrics/backup_metrics.py:ro
+    expose:
+      - '9101'
+    depends_on:
+      - backup
+    logging: *logging-default
+
+  # Resolves the public hostnames every scrape so that a record disappearing from
+  # the zone is an alert rather than a support ticket (the 2026-10-15 outage). No
+  # dependency on the API or the edge on purpose: this measures the one thing that
+  # can be broken while both of them look healthy.
+  dns-probe:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command: ['python', '/metrics/dns_probe.py']
+    environment:
+      DNS_PROBE_HOSTS: ${DNS_PROBE_HOSTS:-signara.innotel.us,app.signara.innotel.us,api.signara.innotel.us,auth.signara.innotel.us,admin.signara.innotel.us,storage.signara.innotel.us,subscribe.signara.innotel.us}
+      # The address the names must resolve to; leaves resolution alone when unset.
+      DNS_PROBE_EXPECTED_ADDRESS: ${CERULEAN_WAN_IP:-}
+    volumes:
+      - ./infra/monitoring/dns_probe.py:/metrics/dns_probe.py:ro
+    expose:
+      - '9102'
+    logging: *logging-default
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  meilidata:
+  authentikdb:
+  authentikredis:
+  promdata:
+  alertdata:
+  backupcache:

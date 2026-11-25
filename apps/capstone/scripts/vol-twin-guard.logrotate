@@ -1,0 +1,12 @@
+# Every run is appended to this file; failures are also pushed to ntfy and the journal.
+/var/log/vol-twin-guard.log {
+    su root root
+    size 1M
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    create 0640 root root
+}

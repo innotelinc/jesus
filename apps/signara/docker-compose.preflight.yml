@@ -1,0 +1,465 @@
+name: signara
+x-logging-default: &id001
+  driver: json-file
+  options:
+    max-size: 50m
+    max-file: '10'
+services:
+  frontend:
+    image: ${SIGNARA_WEB_IMAGE:-ghcr.io/innotelinc/signara-web:latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-https://api.signara.innotel.us}
+        NEXT_PUBLIC_WEB_URL: ${WEB_URL:-https://app.signara.innotel.us}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${API_URL:-https://api.signara.innotel.us}
+      NEXT_PUBLIC_WEB_URL: ${WEB_URL:-https://app.signara.innotel.us}
+    ports:
+    - ${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_BIND_PORT:-3000}:3000
+    depends_on:
+      api:
+        condition: service_healthy
+      volume-preflight:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -qO-
+      - http://127.0.0.1:3000/
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+      restart_policy:
+        condition: unless-stopped
+    logging: *id001
+  api:
+    image: ${SIGNARA_API_IMAGE:-ghcr.io/innotelinc/signara-api:latest}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    pull_policy: missing
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      API_PORT: 8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-signara}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-signara}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-change-me}@redis:6379
+      S3_ENDPOINT: ${SIGNARA_S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${SIGNARA_S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${SIGNARA_S3_SECRET_KEY:-}
+      S3_BUCKET: ${SIGNARA_S3_BUCKET:-signara-documents}
+      S3_REGION: ${SIGNARA_S3_REGION:-us-east-1}
+      S3_FORCE_PATH_STYLE: ${SIGNARA_S3_FORCE_PATH_STYLE:-true}
+      S3_PUBLIC_ENDPOINT: ${SIGNARA_S3_PUBLIC_ENDPOINT:-}
+      MEILISEARCH_HOST: http://meilisearch:7700
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-https://auth.signara.innotel.us/application/o/signara/jwks/}
+      OIDC_TOKEN_URL: ${OIDC_TOKEN_URL:-https://auth.signara.innotel.us/application/o/token/}
+      OIDC_USERINFO_URL: ${OIDC_USERINFO_URL:-https://auth.signara.innotel.us/application/o/userinfo/}
+      SMTP_PASS_FILE: /run/secrets/smtp_password
+    ports:
+    - ${API_BIND_ADDRESS:-127.0.0.1}:${API_BIND_PORT:-8000}:8000
+    volumes:
+    - ./infra/secrets/smtp_password:/run/secrets/smtp_password:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+      volume-preflight:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -qO-
+      - http://127.0.0.1:8000/ready
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+      restart_policy:
+        condition: unless-stopped
+    logging: *id001
+  migrate:
+    image: ${SIGNARA_API_IMAGE:-ghcr.io/innotelinc/signara-api:latest}
+    pull_policy: missing
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-signara}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-signara}?schema=public
+    command:
+    - node_modules/.bin/prisma
+    - migrate
+    - deploy
+    - --schema
+    - packages/database/prisma/schema.prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+      volume-preflight:
+        condition: service_completed_successfully
+    restart: 'no'
+    logging: *id001
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-signara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-signara}
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-signara}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+    - redis-server
+    - --requirepass
+    - ${REDIS_PASSWORD:-change-me}
+    - --appendonly
+    - 'yes'
+    volumes:
+    - redisdata:/data
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - -a
+      - ${REDIS_PASSWORD:-change-me}
+      - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  minio:
+    profiles:
+    - legacy-storage
+    image: ${SIGNARA_MINIO_IMAGE:-ghcr.io/innotelinc/capstone/minio:RELEASE.2026-08-04T00-00-00Z}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-signara}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    volumes:
+    - miniodata:/data
+    healthcheck:
+      test:
+      - CMD
+      - mc
+      - ready
+      - local
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_API_KEY:-change-me}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: 'true'
+    volumes:
+    - meilidata:/meili_data
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:7700/health
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  authentik-server:
+    profiles:
+    - authentik
+    image: ghcr.io/goauthentik/server:2024.8.1
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-change-me-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: 'false'
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-admin@signara.innotel.us}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:-change-me}
+    ports:
+    - ${AUTHENTIK_BIND_ADDRESS:-127.0.0.1}:${AUTHENTIK_BIND_PORT:-9100}:9000
+    - ${AUTHENTIK_BIND_ADDRESS:-127.0.0.1}:${AUTHENTIK_HTTPS_BIND_PORT:-9443}:9443
+    volumes:
+    - ./cert:/certs:ro
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_started
+      volume-preflight:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -qO-
+      - http://localhost:9000/health/live/
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *id001
+  authentik-worker:
+    profiles:
+    - authentik
+    image: ghcr.io/goauthentik/server:2024.8.1
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:-change-me-authentik}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: 'false'
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: authentik-redis
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_started
+      volume-preflight:
+        condition: service_completed_successfully
+    logging: *id001
+  authentik-db:
+    profiles:
+    - authentik
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-change-me-authentik-db}
+      POSTGRES_DB: authentik
+    volumes:
+    - authentikdb:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U authentik
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  authentik-redis:
+    profiles:
+    - authentik
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
+    volumes:
+    - authentikredis:/data
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=${PROM_RETENTION:-90d}
+    volumes:
+    - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./infra/monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    - promdata:/prometheus
+    ports:
+    - ${PROMETHEUS_BIND_ADDRESS:-127.0.0.1}:${PROMETHEUS_BIND_PORT:-9090}:9090
+    depends_on:
+    - api
+    logging: *id001
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: unless-stopped
+    entrypoint:
+    - /bin/sh
+    - /etc/alertmanager/entrypoint.sh
+    command:
+    - --web.external-url=${ALERTMANAGER_EXTERNAL_URL:-http://192.168.1.44:9093}
+    environment:
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_HELLO: ${SMTP_HELLO:-innotel.us}
+      SMTP_TLS_SERVERNAME: ${SMTP_TLS_SERVERNAME:-}
+      SMTP_TLS_INSECURE: ${SMTP_TLS_INSECURE:-false}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+    volumes:
+    - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    - ./infra/monitoring/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+    - ./infra/monitoring/alertmanager/email.tmpl:/etc/alertmanager/email.tmpl:ro
+    - ./infra/secrets/smtp_password:/run/secrets/smtp_password:ro
+    - alertdata:/alertmanager
+    ports:
+    - ${ALERTMANAGER_BIND_ADDRESS:-127.0.0.1}:${ALERTMANAGER_BIND_PORT:-9093}:9093
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  backup:
+    build:
+      context: .
+      dockerfile: infra/backup/Dockerfile
+    restart: unless-stopped
+    entrypoint:
+    - /bin/sh
+    - /backup/entrypoint.sh
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-signara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-signara}
+      AUTHENTIK_POSTGRES_HOST: ${AUTHENTIK_POSTGRES_HOST:-}
+      AUTHENTIK_POSTGRES_USER: authentik
+      AUTHENTIK_POSTGRES_PASSWORD: ${AUTHENTIK_DB_PASSWORD:-}
+      AUTHENTIK_POSTGRES_DB: authentik
+      SOURCE_S3_ENDPOINT: ${SIGNARA_S3_ENDPOINT:-http://minio:9000}
+      SOURCE_S3_BUCKET: ${SIGNARA_S3_BUCKET:-signara-documents}
+      SOURCE_S3_ACCESS_KEY: ${SIGNARA_S3_ACCESS_KEY:-signara}
+      SOURCE_S3_SECRET_KEY: ${SIGNARA_S3_SECRET_KEY:-change-me}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-signara-backups}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_ONCE: ${BACKUP_ONCE:-false}
+      BACKUP_RUN_ON_START: ${BACKUP_RUN_ON_START:-false}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_REQUIRE_REMOTE: ${BACKUP_REQUIRE_REMOTE:-false}
+      BACKUP_LOCAL_ADDRESSES: ${BACKUP_LOCAL_ADDRESSES:-}
+    volumes:
+    - ./infra/backup:/backup:ro
+    - backupcache:/backup-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      volume-preflight:
+        condition: service_completed_successfully
+    logging: *id001
+  backup-metrics:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command:
+    - python
+    - /metrics/backup_metrics.py
+    volumes:
+    - backupcache:/backup-cache:ro
+    - ./infra/backup/backup_metrics.py:/metrics/backup_metrics.py:ro
+    expose:
+    - '9101'
+    depends_on:
+    - backup
+    logging: *id001
+  dns-probe:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command:
+    - python
+    - /metrics/dns_probe.py
+    environment:
+      DNS_PROBE_HOSTS: ${DNS_PROBE_HOSTS:-signara.innotel.us,app.signara.innotel.us,api.signara.innotel.us,auth.signara.innotel.us,admin.signara.innotel.us,storage.signara.innotel.us,subscribe.signara.innotel.us}
+      DNS_PROBE_EXPECTED_ADDRESS: ${CERULEAN_WAN_IP:-}
+    volumes:
+    - ./infra/monitoring/dns_probe.py:/metrics/dns_probe.py:ro
+    expose:
+    - '9102'
+    logging: *id001
+    depends_on:
+      volume-preflight:
+        condition: service_completed_successfully
+  volume-preflight:
+    image: alpine:3.20
+    restart: 'no'
+    volumes:
+    - /var/lib/docker/volumes:/volumes:ro
+    - /usr/local/bin/volume-preflight.sh:/preflight.sh:ro
+    command:
+    - sh
+    - /preflight.sh
+    - /volumes
+volumes:
+  pgdata: null
+  redisdata: null
+  miniodata: null
+  meilidata: null
+  authentikdb: null
+  authentikredis: null
+  promdata: null
+  alertdata: null
+  backupcache: null
