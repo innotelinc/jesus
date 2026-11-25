@@ -1,0 +1,5 @@
+# Repairs a duplicate [dograh] ARI user, a self-parked dograh ARI config, or
+# cdr/cel columns narrowed below varchar(64).
+# Install to /etc/cron.d/ari-dupe-guard (root:root 0644); the script itself goes
+# to /usr/local/sbin/ari-dupe-guard.sh (root:root 0755).
+*/5 * * * * root /usr/local/sbin/ari-dupe-guard.sh >/dev/null 2>&1
