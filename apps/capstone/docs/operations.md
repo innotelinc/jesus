@@ -296,11 +296,18 @@ AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py
 ```
 
 It refuses to guess: without a token it exits 1 with that message, and a token from another
-tenant is reported as `token rejected … (403)`. That is where this stands — the instance at
-`192.168.1.127` exposes only 9000/9443, has no SSH, and no token for it exists anywhere in
-the estate (the one in `/root/ak-api.sh` belongs to the cerulean tenant), so `api/` on the
-public host is still behind SSO. `http://192.168.1.52:8097/api/health` is the machine-facing
-path until that token appears.
+tenant is reported as `token rejected … (403)`. That is where this stands. The API is at
+`https://auth.innotel.site` (the LAN instance answers on `192.168.1.127:9000` but has no SSH
+and is not routable from here); only `/api/v3/root/config/` is open, everything else is
+`403 Authentication credentials were not provided`, and no token for this tenant exists
+anywhere in the estate — the one in `/root/ak-api.sh` belongs to cerulean. So `api/` on the
+public host is still behind SSO, and `http://192.168.1.52:8097/api/health` is the
+machine-facing path until that token appears.
+
+One warning about scope: `https://pbx.innotel.site/api/health` is not merely SSO-protected,
+it is *reachable* only because the outpost forwards it, so clients hitting it today get a
+302 to a login page rather than a connection error. Anything monitoring that URL is
+monitoring the redirect, not the console.
 
 ### Repairing a stateful volume from its twin
 

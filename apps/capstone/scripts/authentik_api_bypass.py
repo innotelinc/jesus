@@ -13,7 +13,8 @@ is missing, and reports what it found otherwise.
     AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py
 
 Needs a token with permission to read/write providers on the instance that
-fronts the host (defaults to http://192.168.1.127:9000). The outpost picks the
+fronts the host (defaults to https://auth.innotel.site, the public API; the LAN instance
+at 192.168.1.127 answers on 9000 if you have a shell there). The outpost picks the
 change up on its next refresh (~60 s); no redeploy, no restart.
 """
 from __future__ import annotations
@@ -25,7 +26,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_API = "http://192.168.1.127:9000"
+DEFAULT_API = "https://auth.innotel.site"
 DEFAULT_HOST = "pbx.innotel.site"
 PATTERN = r"^/api/"
 
