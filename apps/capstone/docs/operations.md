@@ -285,6 +285,23 @@ service. What still stands between the hostname and the platform is Authentik: a
 `https://pbx.innotel.site/api/health` is answered with a 302 to `/outpost.goauthentik.io/start`
 by the outpost in front of Traefik.
 
+Opening `/api/` back up is one field on the proxy provider, and
+`scripts/authentik_api_bypass.py` does it idempotently — it finds the application by
+`external_host`, appends `^/api/` to `skip_path_regex` (never dropping an existing pattern),
+and reads the result back. The outpost picks it up on its next refresh, no redeploy:
+
+```bash
+AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py --dry-run
+AUTHENTIK_TOKEN=<admin token> python3 scripts/authentik_api_bypass.py
+```
+
+It refuses to guess: without a token it exits 1 with that message, and a token from another
+tenant is reported as `token rejected … (403)`. That is where this stands — the instance at
+`192.168.1.127` exposes only 9000/9443, has no SSH, and no token for it exists anywhere in
+the estate (the one in `/root/ak-api.sh` belongs to the cerulean tenant), so `api/` on the
+public host is still behind SSO. `http://192.168.1.52:8097/api/health` is the machine-facing
+path until that token appears.
+
 ### Repairing a stateful volume from its twin
 
 Every stateful volume exists twice (`<svc>_postgres-data` and
@@ -311,6 +328,40 @@ Then stop everything that writes to it, back it up, copy, and start in dependenc
 the wire needs: with it present the voice step reconciles and `capstone-wire` exits 0; with it
 absent the wire stops at `404: no default model configuration` and nothing in the repo can
 re-create it.
+
+### A check that shouts before you notice
+
+`scripts/volume_twin_guard.py` compares every volume with its twin and exits non-zero when
+the live (dash) one is a fraction of its sibling — the state a deploy leaves behind when it
+lands on the empty twin, which `docker ps` reports as perfectly healthy.
+
+```bash
+python3 scripts/volume_twin_guard.py            # table, exit 1 on a suspect twin
+python3 scripts/volume_twin_guard.py --json     # same facts, machine-readable
+python3 scripts/volume_twin_guard.py --volumes-root /tmp/fixture   # test it without docker
+```
+
+Installed on the host as `/usr/local/bin/vol-twin-guard.py` and run from
+`/etc/cron.d/vol-twin-guard` every ten minutes; it is **silent unless it fails**, and a
+failure goes to the journal as `user.err` under the `vol-twin-guard` tag
+(`journalctl -t vol-twin-guard`). Two kinds of volume are deliberately excluded, because a
+noisy check is an ignored check: `*-logs` and `*-repo` are churn (rotated logs; the live
+checkout is a `--depth 1` clone and legitimately smaller than a full-history sibling), and
+`*-spool` reports `warn` without failing — voicemail drains, and "did we lose a message?" is
+not a byte-count question.
+
+### Reaching the FreePBX admin UI now
+
+The UI is no longer on the LAN: the publish is `127.0.0.1:8083:80` in the template, so it is
+host-local only. Tunnel it when you need it:
+
+```bash
+ss -ltn | grep 8083                 # 127.0.0.1:8083, nothing on 0.0.0.0
+ssh -N -L 8083:127.0.0.1:8083 root@192.168.1.52   # then http://localhost:8083
+```
+
+Nothing in the stack depends on that port — `asterisk-console` drives the PBX over AMI and
+ARI, and the console's own UI is the one on `pbx.innotel.site`.
 
 One more thing the recreate exposed: `ari.conf` in the config volume is a *symlink* into
 `/var/www/html/admin/modules/arimanager/etc/ari.conf`. When the image ships without the
