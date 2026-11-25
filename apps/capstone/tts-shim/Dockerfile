@@ -19,6 +19,9 @@ COPY app.py .
 # Latency/RTF harness, so an engine can be compared from inside the image it
 # will serve from: `docker exec tts-shim python bench_tts.py --target kokoro`.
 COPY bench_tts.py .
+# Greeting lines synthesized into the audio cache at startup
+# (TTS_SHIM_PREWARM_FILE), so the first caller of a scripted greeting is a hit.
+COPY prewarm.txt .
 
 # Cache lives on a volume; the directory has to exist for the app's startup
 # eviction pass even when the volume is not mounted (e.g. a bare `docker run`).

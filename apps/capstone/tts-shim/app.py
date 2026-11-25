@@ -158,6 +158,16 @@ WARMUP_TEXT = os.getenv(
 ).strip()
 WARMUP_TIMEOUT_S = float(os.getenv("TTS_SHIM_WARMUP_TIMEOUT_S", "120"))
 
+# Greeting prewarm. Warm-up only loads the model: the first caller still pays
+# for synthesis, measured at 1.76 s for the survey greeting on Kokoro against
+# ~0.02 s for a cache hit. The lines in this file are synthesized at startup and
+# written to the cache under the key the caller's request will use, so the
+# greeting is a hit. The voice is part of that key, so it has to be the string
+# dograh sends (`tts.settings.voice`), not the engine's internal default.
+PREWARM_FILE = os.getenv("TTS_SHIM_PREWARM_FILE", "").strip()
+PREWARM_VOICE = os.getenv("TTS_SHIM_PREWARM_VOICE", "").strip()
+PREWARM_TIMEOUT_S = float(os.getenv("TTS_SHIM_PREWARM_TIMEOUT_S", "300"))
+
 CACHE_VERSION = "v2"  # bump to invalidate every entry after a format change
 
 # One loaded Piper voice, one synthesis at a time: the ONNX session is not
@@ -579,16 +589,24 @@ async def lifespan(app: FastAPI):
         REGISTRY.add(PiperEngine(PIPER_VOICE, PIPER_VOICE_DIR))
     await REGISTRY.startup()
     evict()
+    tasks: list[asyncio.Task] = []
     warmup = None
     if WARMUP_ENABLED and WARMUP_TEXT and REGISTRY.names():
         # Off the event loop's critical path: /health must answer while the
         # engine is still loading, or the container never comes up healthy.
         warmup = asyncio.create_task(_warmup())
+        tasks.append(warmup)
+    if REGISTRY.names():
+        # Runs after the warm-up (it waits for it) so the two do not race for
+        # the engine; independent of TTS_SHIM_WARMUP, because an unprimed cache
+        # is a latency bug rather than a loading concern.
+        tasks.append(asyncio.create_task(_prewarm(warmup)))
     try:
         yield
     finally:
-        if warmup is not None and not warmup.done():
-            warmup.cancel()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
 
 
 app = FastAPI(title="Capstone TTS shim", version="1.0.0", lifespan=lifespan)
@@ -599,6 +617,80 @@ def _float(value, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _request_voice(engine_name: str) -> str:
+    """The voice string a caller's request will carry, i.e. the cache key's.
+
+    Prewarming with ``voice=""`` writes an entry no real request can hit — the
+    voice is part of the key. Piper is configured with a file name
+    (``en_US-amy-medium.onnx``) while dograh sends the bare id, so the suffix is
+    dropped; Kokoro's own default is already the id dograh sends.
+    """
+    if PREWARM_VOICE:
+        return PREWARM_VOICE
+    if engine_name == "kokoro":
+        return KOKORO_DEFAULT_VOICE
+    if engine_name == "piper" and PIPER_VOICE:
+        return Path(PIPER_VOICE).stem
+    return ""
+
+
+def _prewarm_texts() -> list[str]:
+    """Utterances from ``TTS_SHIM_PREWARM_FILE``; ``#`` comments and blanks skipped."""
+    if not PREWARM_FILE:
+        return []
+    try:
+        raw = Path(PREWARM_FILE).read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("tts-shim prewarm: cannot read %s: %s", PREWARM_FILE, exc)
+        return []
+    return [
+        line.strip()
+        for line in raw.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+async def _prewarm(previous: "asyncio.Task | None" = None) -> None:
+    """Synthesize each greeting line into the cache, so the first call is a hit."""
+    if previous is not None:
+        await asyncio.gather(previous, return_exceptions=True)
+    texts = _prewarm_texts()
+    if not texts:
+        return
+    try:
+        name, engine = REGISTRY.resolve(DEFAULT_ENGINE or None)
+    except EngineUnavailable:
+        return
+    voice = _request_voice(name)
+    for text in texts:
+        key = cache_key(name, voice, 1.0, text)
+        if cache_get(key) is not None:
+            logger.info("tts-shim prewarm: %s already cached (%d chars)", name, len(text))
+            continue
+        started = time.perf_counter()
+        data = bytearray()
+        try:
+            async with asyncio.timeout(PREWARM_TIMEOUT_S):
+                # Empty voice for synthesis (the engine's own default is the
+                # audio a caller hears); `voice` only names the cache entry.
+                async for chunk in engine.stream(text, "", 1.0):
+                    if chunk:
+                        data.extend(chunk)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # a failed prewarm must never fail the service
+            logger.warning("tts-shim prewarm failed on %s: %s", name, exc)
+            return
+        cache_put(key, bytes(data))
+        logger.info(
+            "tts-shim prewarm: %s voice=%s %.2fs, %d bytes",
+            name,
+            voice or "<default>",
+            time.perf_counter() - started,
+            len(data),
+        )
 
 
 async def _warmup() -> None:

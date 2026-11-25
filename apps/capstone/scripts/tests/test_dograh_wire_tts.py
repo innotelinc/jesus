@@ -158,6 +158,53 @@ class ShimTtsProblemTest(unittest.TestCase):
         )
 
 
+class StrayTtsKeysTest(unittest.TestCase):
+    """A stray key beside `settings` takes every inbound call down.
+
+    Observed 2026-11-25: `tts.connection_revision` was added while switching the
+    voice, every value stayed correct, and dograh refused each run with
+    "Quota exceeded for user 1" and a zero call duration. The check has to fire
+    on the shape alone, before anything compares models.
+    """
+
+    def test_a_correct_configuration_has_no_stray_keys(self):
+        self.assertEqual(dograh_wire.stray_tts_keys(configured(CORRECT_TTS)), [])
+        self.assertEqual(dograh_wire.stray_tts_keys(None), [])
+        self.assertEqual(dograh_wire.stray_tts_keys(configured({})), [])
+
+    def test_connection_revision_is_named(self):
+        tts = {**CORRECT_TTS, "connection_revision": 1}
+        problem = dograh_wire.shim_tts_problem(
+            configured(tts), CONNECTION, BASE_URL, MODEL, VOICE
+        )
+        self.assertIn("connection_revision", problem)
+        self.assertIn("Quota exceeded", problem)
+
+    def test_a_stray_setting_is_named_with_its_prefix(self):
+        tts = {**CORRECT_TTS, "settings": {**CORRECT_TTS["settings"], "engine": "x"}}
+        self.assertEqual(dograh_wire.stray_tts_keys(configured(tts)), ["settings.engine"])
+
+    def test_a_stray_key_is_reported_before_a_matching_model_masks_it(self):
+        # The dangerous case: model, voice and connection are all correct.
+        tts = {**CORRECT_TTS, "connection_revision": 7}
+        self.assertNotEqual(
+            dograh_wire.shim_tts_problem(
+                configured(tts), CONNECTION, BASE_URL, MODEL, VOICE
+            ),
+            "",
+        )
+
+    def test_rewriting_the_role_drops_the_stray_key(self):
+        # self-heal: the write path builds `tts` from scratch, so a re-run of
+        # the wire script repairs a configuration that already has the key.
+        before = configured({**CORRECT_TTS, "connection_revision": 3})
+        after = dograh_wire.with_shim_tts(before, CONNECTION, MODEL, VOICE)
+        self.assertEqual(dograh_wire.stray_tts_keys(after), [])
+        self.assertEqual(
+            dograh_wire.shim_tts_problem(after, CONNECTION, BASE_URL, MODEL, VOICE), ""
+        )
+
+
 class WithShimTtsTest(unittest.TestCase):
     def test_the_other_roles_are_carried_over_untouched(self):
         # Every other role names its own connection; re-pointing TTS must not

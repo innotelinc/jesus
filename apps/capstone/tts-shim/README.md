@@ -105,6 +105,9 @@ only need setting when you change the behaviour.
 | `TTS_SHIM_WARMUP` | `true` | Synthesize `TTS_SHIM_WARMUP_TEXT` once at startup, off the readiness path, so voice-pack/torch load does not land on the first caller. |
 | `TTS_SHIM_WARMUP_TEXT` | `Hello. This is the voice agent speaking.` | The warm-up line. Empty disables warm-up even when `TTS_SHIM_WARMUP` is true. |
 | `TTS_SHIM_WARMUP_TIMEOUT_S` | `120` | Give up (and log a warning) rather than warming forever. |
+| `TTS_SHIM_PREWARM_FILE` | *(empty)* | One utterance per line (`#` comments and blank lines skipped), synthesized into the **cache** at startup. Warm-up only loads the model; this is what makes the first caller of a fixed greeting a hit instead of ~1.8 s of dead air. Shipped as `prewarm.txt`; measured on this host, the survey greeting went from 1.76 s to a cache hit. |
+| `TTS_SHIM_PREWARM_VOICE` | *(engine default)* | Voice the prewarmed entries are keyed under: kokoro → `TTS_SHIM_KOKORO_VOICE`, piper → the configured voice id without `.onnx`. It must be the voice the caller's request carries (`tts.settings.voice`) because the voice is part of the cache key — a mismatch is a silent miss, not an error. |
+| `TTS_SHIM_PREWARM_TIMEOUT_S` | `300` | Per-utterance cap. A failed prewarm is logged and never fails the service. |
 
 Two knobs are worth knowing about the cache: `CACHE_VERSION` in `app.py` is part
 of every key, so bumping it invalidates the whole cache after a format change,

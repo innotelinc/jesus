@@ -1,0 +1,16 @@
+# Greetings spoken at the start of every inbound call. The shim synthesizes one
+# utterance per line at startup and writes it into the audio cache, so the first
+# caller gets a cache hit (~0.02 s) instead of paying for synthesis — measured
+# 1.76 s for the survey greeting with Kokoro `af_heart`, which is dead air in a
+# live call.
+#
+# The text is part of the cache key, so it has to be what dograh actually sends:
+# the *rendered* greeting, i.e. the `| fallback:` arm of each
+# {{initial_context.…}} template, since an inbound call arrives without context.
+# One character off is a cache miss, and the miss is silent — check the shim log
+# for "already cached" after a call rather than trusting this file by eye.
+#
+# Job Interview — workflow 6, extension 201
+Hi there, this is Jordan from our company. I'm the interviewer for the role. Thanks for making time today.
+# Phone Survey — workflow 7, extension 202
+Hi there, this is Robin from our organization. We're running a short survey — it takes about a few minutes. Do you have a quick minute to answer a few questions?

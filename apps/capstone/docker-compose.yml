@@ -609,6 +609,13 @@ services:
       # upstream would reject). af_heart is Kokoro v1.0's own default voice.
       TTS_SHIM_KOKORO_VOICE: "${TTS_SHIM_KOKORO_VOICE:-af_heart}"
       TTS_SHIM_PIPER_VOICE: "${TTS_SHIM_PIPER_VOICE:-}"
+      # Greeting lines (`tts-shim/prewarm.txt`) synthesized into the cache at
+      # startup. Warm-up alone only loads the model — the first caller still
+      # paid 1.76 s for the survey greeting with Kokoro, which is dead air on a
+      # live call. Empty voice = the default engine's own voice (kokoro →
+      # af_heart, piper → the configured id), which is what dograh sends.
+      TTS_SHIM_PREWARM_FILE: "${TTS_SHIM_PREWARM_FILE:-/app/prewarm.txt}"
+      TTS_SHIM_PREWARM_VOICE: "${TTS_SHIM_PREWARM_VOICE:-}"
       TTS_SHIM_CACHE_ENABLED: "${TTS_SHIM_CACHE_ENABLED:-true}"
       TTS_SHIM_CACHE_MAX_BYTES: "${TTS_SHIM_CACHE_MAX_BYTES:-536870912}"
       TTS_SHIM_SAMPLE_RATE: "24000"

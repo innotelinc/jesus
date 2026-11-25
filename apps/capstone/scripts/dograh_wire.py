@@ -162,6 +162,33 @@ def _role(configuration: dict | None, role: str) -> dict:
     return section if isinstance(section, dict) else {}
 
 
+# The only keys a v3 role may carry. A stray sibling is not cosmetic: observed
+# 2026-11-25, adding `connection_revision` beside `settings` made dograh read
+# the TTS role as a new, unauthorised connection, and every inbound run was
+# then refused with "Quota exceeded for user 1" and
+# `usage_info.call_duration_seconds = 0` — a quota message for a configuration
+# mismatch, which is why the preflight below names the offending keys instead.
+ROLE_KEYS = {"settings", "provider_connection_uuid"}
+TTS_SETTING_KEYS = {"model", "voice", "speed"}
+
+
+def stray_tts_keys(configuration: dict | None) -> list[str]:
+    """Keys the stored ``tts`` role carries that dograh does not accept.
+
+    Pure, and deliberately blind to what the values *should* be: a stray key is
+    wrong even when the model and voice are already correct, which is exactly
+    the case that hides behind a green "TTS is kokoro" check.
+    """
+    tts = _role(configuration, "tts")
+    if not tts:
+        return []
+    stray = sorted(set(tts) - ROLE_KEYS)
+    settings = tts.get("settings")
+    if isinstance(settings, dict):
+        stray += [f"settings.{key}" for key in sorted(set(settings) - TTS_SETTING_KEYS)]
+    return stray
+
+
 def shim_connection(connections: list[dict] | None, base_url: str) -> dict | None:
     """The provider connection that points at the local shim, or ``None``."""
     for connection in connections or []:
@@ -202,6 +229,17 @@ def shim_tts_problem(
             "no TTS engine is configured for the organization — the agents have "
             "nothing to speak with, which is what a caller hears as an agent "
             "that never responds"
+        )
+    stray = stray_tts_keys(configuration)
+    if stray:
+        # Reported before "is the model right?", because a stray key is the
+        # failure that costs calls while every value looks correct.
+        return (
+            f"the TTS role carries keys dograh does not accept "
+            f"({', '.join(stray)}) — anything beside `settings` and "
+            f"`provider_connection_uuid` makes it a new, unauthorised "
+            f"connection, and every inbound run is then refused with "
+            f"'Quota exceeded for user 1'"
         )
     if connection is None:
         return (
