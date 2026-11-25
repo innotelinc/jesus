@@ -190,7 +190,10 @@ class VoiceStateTest(unittest.TestCase):
 
     def test_the_push_state_is_reported_and_off_until_it_is_configured(self):
         push = voice.build_voice_status()["push"]
-        self.assertEqual(push["gateway"], "opensms")
+        # `gateway` names the transport the nudge would actually travel (it used
+        # to be hard-coded to opensms even when SMS_PROVIDER chose the portal).
+        self.assertIn(push["gateway"], ("zeus", "opensms"),
+                      "the nudge travels the selected transport")
         self.assertIn(push["provider"], ("zeus", "opensms", "auto"))
         self.assertEqual(push["to"], "", "no recipient configured means no number to leak")
         self.assertFalse(push["configured"])

@@ -498,11 +498,16 @@ silence.
 It tries both conventions (`Call-Info` then `Alert-Info`) and prints the SIP
 exchange it saw — the INVITE, whether the auto-answer header was on it, and the
 phone's status codes — because "it did not answer" is only useful with that
-evidence. On 2026-11-25 the INVITE reached 101 and the phone replied `100 Trying`
-/ `180 Ringing` with no `200 OK`, but the header was **missing from the INVITE
-itself** (a `;` in the value is eaten by the dialplan parser), so the probe
-reports that attempt as proving nothing rather than as a refusal. Until that is
-fixed — or someone answers one call by hand — the media question stays open.
+evidence. On 2026-11-25 that evidence closed the media question: the `Call-Info`
+INVITE reached 101 carrying `answer-after=0`, the handset answered `200 OK`, and
+the call then sent 6,450 RTP packets over 129 s with a longest silence of 0.0 s —
+`VERDICT: continuous`. Two probe defects had to be fixed first, and both are worth
+knowing about: the variant names (`call-info`) did not match the dialplan contexts
+(`…-callinfo`), so `channel originate` logged `No such extension/context` and never
+placed a call at all; and `rtp_probe.py` counted each packet twice in an `-i any`
+capture (physical interface plus the bridge/DNAT leg), so half the sequence steps
+were zero and real media was rejected as a lookalike — a 12,900-packet call read as
+`no-media`. Details and the wire evidence are in [voice-rtp-stall.md](voice-rtp-stall.md).
 
 ### Is the wiring alive, not just installed?
 

@@ -270,10 +270,23 @@ class VoiceCheckTest(unittest.TestCase):
 
     def test_a_recipient_without_a_configured_push_fails(self):
         os.environ["VOICE_ALERT_SMS_TO"] = "+15551234567"
-        api = self.serve_api(self.api_payload())
+        api = self.serve_api(self.api_payload(
+            push={"configured": False, "to": "", "provider": "opensms",
+                  "gateway": "opensms", "sent": 0, "lastError": None}))
         code, out = self.run_check(api)
         self.assertEqual(code, 1, out)
         self.assertIn("OPENSMS_URL", out)
+
+    def test_a_zeus_push_names_the_portal_session_not_the_gateway(self):
+        """The hint has to name what the selected transport is waiting on."""
+        os.environ["VOICE_ALERT_SMS_TO"] = "+15551234567"
+        api = self.serve_api(self.api_payload(
+            push={"configured": False, "to": "", "provider": "zeus",
+                  "gateway": "zeus", "sent": 0, "lastError": None}))
+        code, out = self.run_check(api)
+        self.assertEqual(code, 1, out)
+        self.assertIn("ZEUS_SESSION_TOKEN", out)
+        self.assertNotIn("OPENSMS_URL", out)
 
     def test_a_configured_push_that_is_erroring_fails(self):
         os.environ["VOICE_ALERT_SMS_TO"] = "+15551234567"

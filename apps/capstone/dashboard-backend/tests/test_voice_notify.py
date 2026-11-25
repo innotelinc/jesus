@@ -29,6 +29,7 @@ ENV_KEYS = (
     "OPENSMS_URL", "OPENSMS_API_KEY", "OPENSMS_TIMEOUT_MS",
     "VOICE_ALERT_SMS_TO", "VOICE_ALERT_PUSH_STATE",
     "CAPSTONE_SMS_INBOUND_STATE", "CAPSTONE_SMS_TRANSPORT_STATE", "SMS_PROVIDER",
+    "ZEUS_API_URL", "ZEUS_SESSION_TOKEN", "ZEUS_SMS_DID", "ZEUS_SMS_TIMEOUT_MS",
 )
 
 
@@ -66,7 +67,10 @@ class VoiceNotifyTest(unittest.TestCase):
         self.thread.start()
 
         self.saved = {key: os.environ.get(key) for key in ENV_KEYS}
-        os.environ.pop("SMS_PROVIDER", None)
+        # These cases drive the OpenSMS gateway they start below, so they say so;
+        # the Zeus cases set their own transport. Which sender carries the nudge
+        # is SMS_PROVIDER's decision, and that is what is under test.
+        os.environ["SMS_PROVIDER"] = "opensms"
         os.environ["OPENSMS_URL"] = f"http://127.0.0.1:{self.server.server_port}"
         os.environ["OPENSMS_API_KEY"] = "test-key"
         os.environ["VOICE_ALERT_SMS_TO"] = "+15551234567"
@@ -95,6 +99,52 @@ class VoiceNotifyTest(unittest.TestCase):
 
     def dispatch(self, *alerts, now=None):
         return voice_notify.dispatch(list(alerts), now=now)
+
+    def test_a_zeus_push_goes_through_the_portal_with_the_session_cookie(self):
+        """The nudge follows SMS_PROVIDER; it is not pinned to one gateway."""
+        received = {}
+
+        class _Portal(BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802 - http.server's spelling
+                length = int(self.headers.get("Content-Length") or 0)
+                received["path"] = self.path
+                received["cookie"] = self.headers.get("Cookie")
+                received["body"] = json.loads(self.rfile.read(length) or b"{}")
+                payload = b'{"ok": true, "message_id": "msg-1", "status": "queued"}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *args):
+                pass
+
+        portal = HTTPServer(("127.0.0.1", 0), _Portal)
+        threading.Thread(target=portal.serve_forever, daemon=True).start()
+        try:
+            os.environ["SMS_PROVIDER"] = "zeus"
+            os.environ["ZEUS_API_URL"] = f"http://127.0.0.1:{portal.server_port}"
+            os.environ["ZEUS_SESSION_TOKEN"] = "session-abc"
+            os.environ["ZEUS_SMS_DID"] = "42"
+            result = self.dispatch(self.alert())
+        finally:
+            portal.shutdown()
+            portal.server_close()
+
+        self.assertEqual(result["sent"], ["al-voice-rtp-stall"], result)
+        self.assertEqual(received["path"], "/api/messages/send")
+        self.assertEqual(received["cookie"], "pbx_session=session-abc")
+        self.assertEqual(received["body"]["to_number"], "+15551234567")
+        self.assertEqual(received["body"]["from_did_id"], "42")
+        self.assertIn("Capstone warning", received["body"]["body"])
+
+    def test_a_zeus_push_with_no_session_names_the_missing_setting(self):
+        os.environ["SMS_PROVIDER"] = "zeus"
+        os.environ["ZEUS_API_URL"] = "http://127.0.0.1:1"
+        os.environ.pop("ZEUS_SESSION_TOKEN", None)
+        result = self.dispatch(self.alert())
+        self.assertEqual(result["sent"], [])
+        self.assertIn("ZEUS_SESSION_TOKEN", result["error"])
 
     def test_a_new_voice_alert_is_sent_as_one_sms(self):
         result = self.dispatch(self.alert())

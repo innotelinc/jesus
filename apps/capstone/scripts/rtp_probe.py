@@ -301,6 +301,15 @@ def rtp_streams(
         stream = streams.get(key)
         if stream is None:
             stream = streams[key] = Stream(src, sport, dst, dport, ssrc, pt)
+        if stream.seqs and stream.seqs[-1] == seq:
+            # The same packet, captured twice: `-i any` sees the frame on the
+            # physical interface and again on the bridge/DNAT leg, so every
+            # packet of a published RTP port arrives in this file twice. Those
+            # repeats are one media packet, not two — counting them doubles the
+            # packet total and, worse, makes half the sequence steps zero, which
+            # plausible_rtp() reads as "not a media stream". That is how a real
+            # 12,900-packet call was reported as `VERDICT: no-media`.
+            continue
         stream.times.append(ts)
         stream.seqs.append(seq)
     if strict:

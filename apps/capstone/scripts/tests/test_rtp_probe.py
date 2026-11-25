@@ -247,6 +247,28 @@ class PcapTest(unittest.TestCase):
         dlt, frames = rtp_probe.read_pcap(cooked)
         self.assertEqual(len(rtp_probe.rtp_streams(frames, dlt)), 1)
 
+    def test_a_packet_captured_twice_is_still_one_media_stream(self):
+        """`-i any` sees a published RTP port on two interfaces at once.
+
+        Every packet then appears twice, so half the sequence steps are zero.
+        Read as "not advancing", that rejected a real 12,900-packet call and
+        left the watcher reporting `no-media` for a call the phone answered.
+        """
+        doubled = Path(self.tmp.name) / "doubled.pcap"
+        packets = [
+            (i * 0.02, _ethernet(_ip_udp(
+                "192.168.1.10", "192.168.1.52", 11858, 10178, _rtp(0x2349043F, i))))
+            for i in range(40)
+            for _ in range(2)
+        ]
+        _pcap(doubled, packets)
+        dlt, frames = rtp_probe.read_pcap(doubled)
+        streams = rtp_probe.rtp_streams(frames, dlt)
+        self.assertEqual(len(streams), 1, "a doubled capture is still one stream")
+        stream = list(streams.values())[0]
+        self.assertEqual(len(stream.seqs), 40, "a repeat is the same packet, not two")
+        self.assertEqual(stream.verdict(2.0)["cause"], "continuous")
+
     def test_a_two_packet_lookalike_is_below_the_threshold(self):
         """Docker's embedded DNS (127.0.0.11) passes the version test twice."""
         dns = Path(self.tmp.name) / "dns.pcap"

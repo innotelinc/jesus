@@ -45,6 +45,19 @@ HOLD=${PROBE_HOLD:-130}
 VARIANTS=${PROBE_VARIANTS:-"call-info alert-info"}
 DIR=${RTP_WATCH_DIR:-/var/log/rtp-watch}
 
+# The variant names carry a hyphen (`call-info`); the dialplan contexts do not
+# (`…-callinfo`). One place maps one to the other, because when they disagreed
+# `channel originate` logged "No such extension/context" and never rang the
+# handset at all — the probe then reported an empty SIP capture as if the phone
+# had refused.
+ctx_name() {
+  case $1 in
+    call-info) echo capstone-handset-probe-callinfo ;;
+    alert-info) echo capstone-handset-probe-alertinfo ;;
+    *) echo "" ;;
+  esac
+}
+
 MAIN=/etc/asterisk/extensions_custom.conf
 HELPER=/etc/asterisk/extensions_custom_handset_probe.conf
 INCLUDE='#include extensions_custom_handset_probe.conf'
@@ -86,18 +99,21 @@ CONF
 sip_summary() {
   # The INVITE, the header it carried, and the phone's status codes — read from
   # the packets, which is the only place that shows what the phone was told.
-  local pcap=$1 text
+  local pcap=$1 text invite header codes
   if [ ! -s "$pcap" ]; then
     echo "  (no SIP packets captured — this attempt proves nothing)"
     return
   fi
   text=$(tcpdump -r "$pcap" -n -A 2>/dev/null | tr -d '\r')
-  printf '  INVITE to the handset: %s\n' \
-    "$(printf '%s\n' "$text" | grep -aoE "INVITE sip:${EXT}@[^ ]+ SIP/2\.0" | head -1 || true)"
-  printf '  auto-answer header: %s\n' \
-    "$(printf '%s\n' "$text" | grep -aoE '(Call-Info|Alert-Info): [^\r]*' | sort -u | head -2 || echo 'NOT PRESENT on the INVITE')"
-  printf '  handset status codes: %s\n' \
-    "$(printf '%s\n' "$text" | grep -aoE 'SIP/2\.0 [0-9]{3}[A-Za-z ]*' | sort -u | tr '\n' ';')"
+  # Each of these is captured first and defaulted second: a pipeline ending in
+  # `head` exits 0 even when it printed nothing, so `|| echo` never fired and the
+  # probe printed a blank line where the evidence should be.
+  invite=$(printf '%s\n' "$text" | grep -aoE "INVITE sip:${EXT}@[^ ]+ SIP/2\.0" | head -1 || true)
+  header=$(printf '%s\n' "$text" | grep -aoE '(Call-Info|Alert-Info): [^\r]*' | sort -u | paste -sd'; ' - || true)
+  codes=$(printf '%s\n' "$text" | grep -aoE 'SIP/2\.0 [0-9]{3}[A-Za-z ]*' | sort -u | paste -sd'; ' - || true)
+  printf '  INVITE to the handset: %s\n' "${invite:-NOT PRESENT — no call left this box}"
+  printf '  auto-answer header: %s\n' "${header:-NOT PRESENT on the INVITE}"
+  printf '  handset status codes: %s\n' "${codes:-none}"
 }
 
 tmp=$(mktemp -d) || exit 1
@@ -127,8 +143,13 @@ fi
 ast "dialplan reload" | tail -1
 
 for variant in $VARIANTS; do
-  if ! ast "dialplan show capstone-handset-probe-$variant" | grep -q "capstone-handset-probe-$variant"; then
-    echo "the probe context capstone-handset-probe-$variant did not load — check $HELPER" >&2
+  context=$(ctx_name "$variant")
+  if [ -z "$context" ]; then
+    echo "unknown PROBE_VARIANTS entry '$variant' (use call-info / alert-info)" >&2
+    exit 1
+  fi
+  if ! ast "dialplan show $context" | grep -q "$context"; then
+    echo "the probe context $context did not load — check $HELPER" >&2
     exit 1
   fi
 done
@@ -143,7 +164,7 @@ for variant in $VARIANTS; do
   tcpdump -i any -n -s 0 -U -w "$sipcap" 'port 5060' >/dev/null 2>&1 &
   sip_pid=$!
   sleep 2
-  ast "channel originate Local/${EXT}@capstone-handset-probe-$variant application Wait $HOLD" >/dev/null
+  ast "channel originate Local/${EXT}@$(ctx_name "$variant") application Wait $HOLD" >/dev/null
 
   start=$SECONDS
   while [ $((SECONDS - start)) -lt "$((RING + 3))" ]; do

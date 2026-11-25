@@ -57,10 +57,46 @@ stopped sending (silence suppression / muted mic), and it came back
 24 h into the `al-voice-rtp-stall` alert, so the next occurrence is visible on
 the Alerts page as well as greppable.
 
-## Current verdict: one answered call short
+## Current verdict: settled — the handset answered and never stopped sending
 
-**Not yet established.** Three calls have now been captured and all three had no
-media to judge:
+**Established 2026-11-25 10:10Z.** Two defects sat between the probe and an
+answer, and both were in the probe rather than the phone:
+
+1. **The call was never placed.** The variants are `call-info` / `alert-info`, but
+   the dialplan contexts are `capstone-handset-probe-callinfo` /
+   `…-alertinfo`. `channel originate Local/101@capstone-handset-probe-call-info`
+   logged `No such extension/context … while calling Local channel`, so no INVITE
+   ever left the box — and the probe printed the empty capture as though the phone
+   had refused. The mapping now lives in one `ctx_name` function.
+2. **Real media was discarded.** `tcpdump -i any` captures a published RTP port
+   twice (physical interface, then the bridge/DNAT leg), so every packet is in the
+   file twice and half the sequence steps are zero. `plausible_rtp()` read that as
+   "not advancing" and dropped the stream — which is how 12,900 real packets became
+   `VERDICT: no-media`. A repeat of the last sequence number is now one packet.
+
+With both fixed, `handset-probe.sh 101` on the **Call-Info** variant produced:
+
+| Evidence | Value |
+|---|---|
+| INVITE | `INVITE sip:101@192.168.1.10:5060 SIP/2.0` |
+| auto-answer header | `Call-Info: <sip:probe@localhost>;answer-after=0`, on the INVITE |
+| phone's answer | `100 Trying`, `180 Ringing`, then **`200 OK`** — the channel went `Up` |
+| media | 6,450 packets `192.168.1.10:11858 → :10178` over **129 s**, 0 lost, **longest silence 0.0 s** |
+| verdict | `continuous — kept sending throughout` |
+
+So **the handset does not suppress silence.** It auto-answers —— Features →
+General → "Allow Auto Answer by Call-Info" is enabled on the T54W —— and it sends
+RTP for the whole call, including while nothing is played into it. The two 30 s
+notices were therefore not the phone choosing to be quiet, and with `rtp_timeout=0`
+a silent leg no longer ends a call.
+
+What remains unproven is narrower than before: the original stalls happened during
+a real conversation with an agent talking, which this probe does not reproduce (it
+holds a silent call). A future `sender-silent` verdict over a ≥30 s silence on a
+live call is the remaining case — and the watcher now states that, or states
+`continuous`, for every call it captures.
+
+## What the earlier attempts captured
 
 | When | Call | What the capture held | Why |
 |---|---|---|---|
@@ -68,6 +104,7 @@ media to judge:
 | 06:49 | auto-answer probe to 101 | 15662 packets, 0 RTP | rang 25 s, never answered |
 | 06:50 | auto-answer probe to 301 | 0 RTP | rang 20 s, never answered |
 | 07:1x | probe 101, both header conventions | INVITE ×8 to `192.168.1.10:5060`, then `100 Trying`, `180 Ringing`, our `487` | the phone rang and never sent `200 OK` |
+| 10:10 | probe 101, **Call-Info** | INVITE with `answer-after=0`, `200 OK`, 6,450 RTP packets, no gap | **answered — the answer** |
 
 The probes are the point: waiting for a human to pick up a desk phone at 03:00
 was the thing that kept this open, so `deploy/handset-probe.sh` rings the handset
@@ -75,38 +112,21 @@ itself — first with `Call-Info: <sip:x>;answer-after=0` (the intercom
 convention), then with `Alert-Info: …info=alert-autoanswer` — and reports what
 came back.
 
-**What the wire shows.** The INVITE is delivered to `192.168.1.10:5060` and the
-handset answers `100 Trying` then `180 Ringing`: it rings, and then never sends
-`200 OK`; our side cancels with `487` when the ring timeout expires. So the
-header is not being honoured. There is a second, smaller finding in the same
-capture that has to be fixed before that can honestly be called a refusal — the
-INVITE carries **no `Call-Info:` line at all**: the value's `;` is consumed as a
-dialplan comment even escaped, so the pre-dial handler produces no header. That
-is why the probe now prints `auto-answer header: NOT PRESENT … proves nothing`
-instead of guessing, and why this section still says *pending*:
+The setting lives on the phone, in its own web UI (`https://192.168.1.10/`, admin
+login): **Features → General → "Allow Auto Answer by Call-Info" → Enabled**. It is
+device-level, so it covers both of the phone's accounts (101 and 102). Nothing on
+the PBX needs to change — the pre-dial handler adds the header, and the probe
+prints whether it actually reached the INVITE.
 
 ```bash
-# the honest state of the two sub-questions:
-#   is the phone being asked?   no  — the header is missing from the INVITE
-#   does the phone suppress silence?  unknown — no answered call has media yet
-```
-
-The switch is on the phone, in its own web UI (`https://192.168.1.10/`, admin login):
-**Features → General → "Allow Auto Answer by Call-Info" → Enabled**, then Save. It
-is a device-level setting, so it covers both of the phone's accounts (101 and 102)
-and both header conventions the probe tries. Nothing on the PBX needs to change —
-the pre-dial handler already adds the header, and the probe prints whether it
-actually reached the INVITE.
-
-```bash
-# once the phone allows Call-Info auto-answer, one command:
 handset-probe.sh 101          # rings, holds 130 s, prints the verdict
 ```
 
-What would confirm VAD: an answered call where the verdict is `sender-silent`,
-the silence sits where the caller is not speaking, and the stream resumes. What
-would refute it: `packet-loss`, or `sender-silent` with `resumed: false` (the
-audio path broke rather than the phone choosing to be quiet).
+What would still confirm VAD on a live call: a `sender-silent` verdict where the
+silence sits where nobody is speaking and the stream resumes. What refutes it:
+`packet-loss`, or `sender-silent` with `resumed: false` (the audio path broke
+rather than the phone choosing to be quiet). The 10:10 call was neither — it sent
+continuously.
 
 Either way the call no longer drops: with `rtp_timeout=0` a silent leg is not a
 reason to hang up, and `rtp_keepalive=15` keeps the estate's side of the media

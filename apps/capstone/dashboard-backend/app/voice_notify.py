@@ -2,8 +2,11 @@
 
 The Alerts page is the durable record, but it assumes somebody is looking at it.
 A handset leg that went silent at 03:00 is precisely the thing nobody is looking
-at, so the voice alerts are also sent as one SMS through the same outbound path
-`POST /sms-outbound` already uses (OpenSMS: `OPENSMS_URL` + `OPENSMS_API_KEY`).
+at, so the voice alerts are also sent as one SMS, through whichever transport
+`SMS_PROVIDER` selects: the Zeus portal (`ZEUS_API_URL` +
+`ZEUS_SESSION_TOKEN`) or a local OpenSMS gateway (`OPENSMS_URL` +
+`OPENSMS_API_KEY`). A nudge must not be the one message that ignores the
+operator's transport choice.
 
     VOICE_ALERT_SMS_TO         E.164 recipient; unset disables the push
     VOICE_ALERT_PUSH_STATE     JSON bookkeeping (default /state/voice-alert-push.json)
@@ -31,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from . import sms_outbound, sms_transport
+from . import sms_outbound, sms_transport, zeus_sms
 
 TO_ENV = "VOICE_ALERT_SMS_TO"
 STATE_ENV = "VOICE_ALERT_PUSH_STATE"
@@ -55,9 +58,41 @@ def mask(number: str) -> str:
     return f"…{digits[-4:]}" if len(digits) >= 4 else ""
 
 
+def transport() -> str:
+    """Which sender carries the message: the Zeus portal, or the phone node.
+
+    `SMS_PROVIDER` decides it in one place (Control Center → Settings records
+    the same choice). `auto` keeps `scripts/send_sms.py`'s precedence: the
+    local gateway when it is configured, the portal otherwise.
+    """
+    provider = sms_transport.effective()[0]
+    if provider == "auto":
+        return "opensms" if sms_outbound.configured() else "zeus"
+    return provider
+
+
+def sender_configured() -> bool:
+    return zeus_sms.configured() if transport() == "zeus" else sms_outbound.configured()
+
+
+def missing_setting() -> str:
+    """The next thing that has to be set on the host, for the current transport."""
+    if not recipient():
+        return TO_ENV
+    if transport() == "zeus":
+        return "ZEUS_API_URL/ZEUS_SESSION_TOKEN"
+    return "OPENSMS_URL/OPENSMS_API_KEY"
+
+
 def enabled() -> bool:
-    """A recipient *and* a gateway. Either missing means nothing is sent."""
-    return bool(recipient()) and sms_outbound.configured()
+    """A recipient *and* a sender. Either missing means nothing is sent."""
+    return bool(recipient()) and sender_configured()
+
+
+def _send(number: str, body: str) -> dict[str, Any]:
+    if transport() == "zeus":
+        return zeus_sms.send(number, body)
+    return sms_outbound.send(number, body)
 
 
 def interval() -> float:
@@ -129,7 +164,7 @@ def state(now: datetime | None = None) -> dict[str, Any]:
         "to": mask(number),
         "provider": provider,
         "providerSource": source,
-        "gateway": "opensms",
+        "gateway": transport(),
         "lastSentAt": book.get("lastSentAt"),
         "lastAttemptAt": book.get("lastAttemptAt"),
         "lastError": book.get("lastError"),
@@ -152,8 +187,7 @@ def dispatch(alerts: list[dict[str, Any]], now: datetime | None = None) -> dict[
     if not voices:
         return result
     if not enabled():
-        missing = TO_ENV if not recipient() else "OPENSMS_URL/OPENSMS_API_KEY"
-        result["error"] = f"not configured — set {missing}"
+        result["error"] = f"not configured — set {missing_setting()}"
         return result
 
     book = _load()
@@ -175,7 +209,7 @@ def dispatch(alerts: list[dict[str, Any]], now: datetime | None = None) -> dict[
             f"{alert.get('service', '')} — {message}"
         )[:MAX_BODY_CHARS]
         try:
-            reply = sms_outbound.send(recipient(), body)
+            reply = _send(recipient(), body)
         except Exception as exc:  # noqa: BLE001 - a nudge must never crash the loop
             text = str(exc) or exc.__class__.__name__
             entries[key] = {

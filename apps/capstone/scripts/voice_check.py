@@ -325,11 +325,16 @@ def check_api(api: str) -> list[Check]:
     ))
 
     push = payload.get("push") or {}
+    provider = push.get("provider") or "?"
+    # Name the setting the *selected* transport actually needs: a zeus push is
+    # waiting on a portal session, not on a phone node.
+    hint = ("ZEUS_API_URL/ZEUS_SESSION_TOKEN" if provider == "zeus"
+            else "OPENSMS_URL/OPENSMS_API_KEY")
     recipient = (os.environ.get("VOICE_ALERT_SMS_TO") or "").strip()
     if recipient and not push.get("configured"):
         out.append(Check("SMS push", "fail",
                          f"VOICE_ALERT_SMS_TO is set but the push is not configured "
-                         f"(provider {push.get('provider') or '?'}) — set OPENSMS_URL/OPENSMS_API_KEY"))
+                         f"(provider {provider}) — set {hint}"))
     elif push.get("configured") and push.get("lastError"):
         out.append(Check("SMS push", "fail", f"configured but failing: {push['lastError']}"))
     elif push.get("configured"):
@@ -338,7 +343,7 @@ def check_api(api: str) -> list[Check]:
                          f"{push.get('sent', 0)} sent"))
     else:
         out.append(Check("SMS push", "warn",
-                         "off — set VOICE_ALERT_SMS_TO and OPENSMS_URL/OPENSMS_API_KEY to be paged"))
+                         f"off — set VOICE_ALERT_SMS_TO and {hint} to be paged"))
     return out
 
 
