@@ -40,24 +40,32 @@ def call(base: str, token: str, method: str, path: str, body: dict | None = None
     req.add_header("Accept", "application/json")
     if data:
         req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    # /core/applications/ serialises every application and can take a while on a
+    # loaded instance; 30s was not enough and looked like a token failure.
+    with urllib.request.urlopen(req, timeout=90) as resp:
         raw = resp.read().decode() or "{}"
         return json.loads(raw)
 
 
 def find_provider(base: str, token: str, host: str) -> dict:
-    apps = call(base, token, "GET", "/core/applications/?page_size=200").get("results", [])
-    wanted = [a for a in apps if host in (a.get("external_host") or "")]
+    """Find the proxy provider that owns `host`.
+
+    external_host lives on the *provider* in this version; the application's own
+    external_host is usually empty, so matching on applications finds nothing.
+    """
+    providers = call(base, token, "GET", "/providers/proxy/?page_size=200").get("results", [])
+    wanted = [p for p in providers if host in (p.get("external_host") or "")]
     if not wanted:
         raise SystemExit(
-            f"no application on {base} has external_host containing {host} "
-            f"(saw {len(apps)} applications)"
+            f"no proxy provider on {base} has external_host containing {host} "
+            f"(saw {len(providers)} providers)"
         )
     if len(wanted) > 1:
-        names = ", ".join(a.get("slug", "?") for a in wanted)
-        raise SystemExit(f"ambiguous: several applications match {host} ({names})")
-    app = wanted[0]
-    provider = call(base, token, "GET", f"/providers/proxy/{app['provider']}/")
+        names = ", ".join(p.get("name", "?") for p in wanted)
+        raise SystemExit(f"ambiguous: several providers match {host} ({names})")
+    provider = wanted[0]
+    apps = call(base, token, "GET", "/core/applications/?page_size=200").get("results", [])
+    app = next((a for a in apps if a.get("provider") == provider["pk"]), {})
     return {"application": app, "provider": provider}
 
 
@@ -112,7 +120,14 @@ def main() -> int:
         print("dry run: not writing")
         return 0
 
-    call(args.api, token, "PATCH", f"/providers/proxy/{provider['pk']}/", {"skip_path_regex": merged})
+    # The proxy serializer validates the whole provider even for a PATCH: sending
+    # skip_path_regex alone fails with "Internal host cannot be empty when forward
+    # auth is disabled", so echo the routing fields back unchanged.
+    body = {"skip_path_regex": merged}
+    for field in ("external_host", "internal_host", "mode"):
+        if provider.get(field) is not None:
+            body[field] = provider[field]
+    call(args.api, token, "PATCH", f"/providers/proxy/{provider['pk']}/", body)
     after = call(args.api, token, "GET", f"/providers/proxy/{provider['pk']}/")
     ok = args.pattern in (after.get("skip_path_regex") or "")
     print(f"wrote and read back: {ok}")
