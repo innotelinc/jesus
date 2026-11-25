@@ -1432,9 +1432,15 @@ To go back to LAN-reachable AMI, restore
 decides once something can reach the port:
 
 - **The AMI ACL.** Every account is `deny = 0.0.0.0/0.0.0.0` with a loopback
-  permit. `didtest` also permits `192.168.1.113`, but nothing has ever
-  authenticated from there (zero hits in `full.log`); while AMI is loopback-only
-  that permit is not a reachable path.
+  permit, and nothing else. The last account holding a LAN permit, `didtest`
+  (`192.168.1.113`, never once authenticated — zero hits in `full.log`), was
+  retired on 2026-11-25: the block is gone from `manager_custom.conf`, so
+  `manager show user didtest` answers "There is no manager called didtest" and a
+  login attempt is logged as `InvalidAccountID`. To bring it back, restore
+  `/etc/asterisk/manager_custom.conf.bak-didtest-<stamp>` inside the container and
+  run `asterisk -rx "manager reload"`. Note that the PJSIP endpoint
+  `telno-didtest` is a different thing — the inbound DID test harness — and was
+  left in place.
 
 AMI auth failures do reach the `security` log — `SecurityEvent="InvalidAccountID"`
 with `Service="AMI"` and a `TCP` `RemoteAddress` — and the `asterisk-capstone`
