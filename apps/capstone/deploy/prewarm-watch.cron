@@ -1,0 +1,6 @@
+# Regenerates the greeting prewarm list when it drifts from the shipped
+# greetings, installs it into the shim's volume and re-prewarms through
+# POST /prewarm — no restart, no caller waiting 1.8 s. Quiet when in sync.
+# Install to /etc/cron.d/prewarm-watch (root:root 0644); the script goes to
+# /usr/local/sbin/prewarm-watch.sh (root:root 0755).
+*/5 * * * * root /usr/local/sbin/prewarm-watch.sh >/dev/null 2>&1

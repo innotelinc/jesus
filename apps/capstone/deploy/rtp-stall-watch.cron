@@ -1,0 +1,7 @@
+# Captures the media of the next real call on a handset extension (101/102/301/
+# 302) and analyses it with rtp-probe.py, so the next "lack of audio RTP
+# activity" is evidence rather than a mystery. Quiet unless it captures.
+# Install to /etc/cron.d/rtp-stall-watch (root:root 0644); the script goes to
+# /usr/local/sbin/rtp-stall-watch.sh (root:root 0755) and the probe to
+# /usr/local/bin/rtp-probe.py (root:root 0755).
+*/1 * * * * root /usr/local/sbin/rtp-stall-watch.sh >/dev/null 2>&1

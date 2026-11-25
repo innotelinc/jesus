@@ -438,6 +438,32 @@ RTP**. A local `Local/201@from-internal` test call therefore captures no media a
 all, and the two inactivity notices ever logged both named `PJSIP/101-…`. Capture
 while someone is on a real call from 101.
 
+### Watchers on the PBX host
+
+Two cron jobs run where the PBX container does, so the estate keeps its
+evidence and its warm cache without anyone remembering to ask:
+
+| Job | Every | What it does | Log |
+|---|---|---|---|
+| `rtp-stall-watch.sh` | 1 min | Captures the media of the next call on 101/102/301/302 and analyses it with `rtp-probe.py`; a stream silent for 30 s or more gets its own `STALL:` line | `/var/log/rtp-watch/watch.log` |
+| `prewarm-watch.sh` | 5 min | Re-exports the routes' `initial_context`, re-renders the greetings, and on drift regenerates the list, installs it in the shim's volume and `POST /prewarm`s — no restart, so no caller waits | `/var/log/prewarm-watch.log` |
+
+```bash
+install -m 0755 deploy/rtp-stall-watch.sh /usr/local/sbin/rtp-stall-watch.sh
+install -m 0644 deploy/rtp-stall-watch.cron /etc/cron.d/rtp-stall-watch
+install -m 0755 deploy/prewarm-watch.sh   /usr/local/sbin/prewarm-watch.sh
+install -m 0644 deploy/prewarm-watch.cron /etc/cron.d/prewarm-watch
+install -m 0755 deploy/greeting-contexts.sh /usr/local/sbin/greeting-contexts.sh
+install -m 0755 scripts/rtp_probe.py /usr/local/bin/rtp-probe.py
+```
+
+The prewarm watcher reads the contexts from where they actually live —
+`telephony_phone_numbers.extra_metadata` merged with the workflow's
+`template_context_variables`. Today every route's `extra_metadata` is `{}`, so
+the greetings render with their fallbacks (which is what the shim already
+prewarms); the day a route is given a name to greet, the next tick renders that
+greeting too and prewarms it before anyone calls.
+
 ## Platform address — the name and the LAN IP are not interchangeable
 
 | Surface | Address | Reachable from |

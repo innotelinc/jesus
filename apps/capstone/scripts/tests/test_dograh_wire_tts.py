@@ -257,10 +257,39 @@ class GreetingPrewarmTest(unittest.TestCase):
         fallback = dograh_wire.render_greeting(self.TEMPLATE, {})
         self.assertEqual(dograh_wire.prewarm_drift(f"# note\n{fallback}\n", [fallback]), [])
 
+    def test_a_greeting_no_route_asks_for_any_more_is_stale(self):
+        fallback = dograh_wire.render_greeting(self.TEMPLATE, {})
+        named = dograh_wire.render_greeting(self.TEMPLATE, {"candidate_name": "Dana"})
+        self.assertEqual(dograh_wire.stale_prewarm_lines(f"{fallback}\n{named}\n", [fallback]), [named])
+        self.assertEqual(dograh_wire.stale_prewarm_lines(fallback, [fallback]), [])
+
     def test_comments_and_blank_lines_are_not_utterances(self):
         self.assertEqual(
             dograh_wire.prewarm_lines("# a comment\n\nHi there.\n"), ["Hi there."]
         )
+
+    def test_an_empty_route_list_still_renders_the_fallbacks(self):
+        """A failed context export must not be read as "prewarm nothing"."""
+        repo = Path(dograh_wire.__file__).resolve().parent.parent
+        self.assertEqual(len(dograh_wire.expected_greetings(repo / "dograh", [], [])), 2)
+
+    def test_one_context_per_route_render_every_greeting_a_call_can_ask_for(self):
+        repo = Path(dograh_wire.__file__).resolve().parent.parent
+        rendered = dograh_wire.expected_greetings(
+            repo / "dograh", [], [{}, {"candidate_name": "Dana"}, {}]
+        )
+        # 201 and 202 each greet with fallbacks and 201 also with the name, and
+        # the duplicate empty context must not produce a duplicate line.
+        self.assertEqual(len(rendered), 3)
+        self.assertTrue(any("Hi Dana," in text for text in rendered))
+
+    def test_a_route_context_only_affects_its_own_workflow(self):
+        repo = Path(dograh_wire.__file__).resolve().parent.parent
+        rendered = dograh_wire.expected_greetings(
+            repo / "dograh", [], [{"contact_name": "Dana"}]
+        )
+        self.assertEqual(len(rendered), 2, "a name the survey does not use is still one line per track")
+        self.assertTrue(all("Dana" not in text for text in rendered), rendered)
 
     def test_the_shipped_workflows_render_their_fallbacks(self):
         repo = Path(dograh_wire.__file__).resolve().parent.parent

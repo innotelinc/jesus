@@ -344,22 +344,51 @@ def prewarm_drift(existing: str, expected: list[str]) -> list[str]:
     return [text for text in expected if text not in listed]
 
 
-def expected_greetings(workflows_dir: Path, files: list[str], context: dict | None) -> list[str]:
-    """Rendered greetings of the named workflows (default: the live tracks)."""
+def stale_prewarm_lines(existing: str, expected: list[str]) -> list[str]:
+    """Prewarmed greetings no route asks for any more.
+
+    A list that is only ever appended to drifts into noise: the route that was
+    given a name to greet is later renamed back, and its greeting stays in the
+    cache list forever, prewarming text nothing will ask for. Keeping the list
+    equal to what the routes render is what makes a drift report meaningful.
+    """
+    wanted = set(expected)
+    return [line for line in prewarm_lines(existing) if line not in wanted]
+
+
+def expected_greetings(
+    workflows_dir: Path, files: list[str], contexts: dict | list | None
+) -> list[str]:
+    """Rendered greetings of the named workflows (default: the live tracks).
+
+    ``contexts`` is one context — the fallbacks-only case — or a list of them,
+    one per live route. A route that supplies ``candidate_name`` renders a
+    different string than a route that does not, and both have to be in the
+    list, because the text is part of the cache key.
+    """
     names = files or list(LIVE_GREETING_WORKFLOWS)
+    if isinstance(contexts, dict) or contexts is None:
+        contexts = [contexts]
+    if isinstance(contexts, list) and not contexts:
+        # No routes exported is not the same as no greetings: every scripted
+        # greeting is still asked for, with its fallbacks. Falling through with
+        # an empty list would silently prewarm nothing.
+        contexts = [None]
     expected: list[str] = []
     for name in names:
         path = workflows_dir / name
         doc = json.loads(path.read_text())
         definition = doc.get("workflow_definition", doc)
         for template in greeting_templates(definition):
-            rendered = render_greeting(template, context)
-            if "\n" in rendered:
-                raise ValueError(
-                    f"{path.name}: the greeting renders across lines, which the shim's "
-                    "one-utterance-per-line prewarm file cannot express"
-                )
-            expected.append(rendered)
+            for context in contexts:
+                rendered = render_greeting(template, context)
+                if "\n" in rendered:
+                    raise ValueError(
+                        f"{path.name}: the greeting renders across lines, which the shim's "
+                        "one-utterance-per-line prewarm file cannot express"
+                    )
+                if rendered not in expected:
+                    expected.append(rendered)
     return expected
 
 
@@ -367,24 +396,45 @@ def prewarm_main(args: argparse.Namespace) -> int:
     """--check-prewarm / --write-prewarm: keep the prewarm list honest."""
     repo = Path(__file__).resolve().parent.parent
     target = Path(args.prewarm_file) if args.prewarm_file else repo / "tts-shim" / "prewarm.txt"
-    context: dict = {}
+    # A list is one context per live route (see deploy/greeting-contexts.sh); a
+    # single object is the fallbacks-only case.
+    contexts: dict | list = {}
     if args.context_json:
-        context = json.loads(Path(args.context_json).read_text())
-    expected = expected_greetings(Path(args.workflows_dir), args.workflow_file, context)
+        contexts = json.loads(Path(args.context_json).read_text())
+    expected = expected_greetings(Path(args.workflows_dir), args.workflow_file, contexts)
+    if not expected:
+        print(
+            "FAIL no greetings to prewarm — refusing to write an empty list, which would "
+            "turn the first call of every scripted greeting back into a ~1.8 s miss",
+            file=sys.stderr,
+        )
+        return 1
     existing = target.read_text() if target.exists() else ""
     drift = prewarm_drift(existing, expected)
 
     if args.check_prewarm:
-        if not drift:
-            print(f"PASS prewarm list covers all {len(expected)} shipped greetings ({target})")
+        stale = stale_prewarm_lines(existing, expected)
+        if not drift and not stale:
+            print(f"PASS prewarm list matches all {len(expected)} shipped greetings ({target})")
             return 0
+        if drift:
+            print(
+                f"FAIL {len(drift)} greeting(s) that a call will ask for are not prewarmed in "
+                f"{target} — the first caller of each pays ~1.8 s of dead air:"
+            )
+            for text in drift:
+                print(f"  missing: {text}")
+        if stale:
+            print(
+                f"FAIL {len(stale)} prewarmed greeting(s) no route asks for any more in "
+                f"{target} — they cost a startup synthesis and hide the drift that matters:"
+            )
+            for text in stale:
+                print(f"  stale: {text}")
         print(
-            f"FAIL {len(drift)} greeting(s) that a call will ask for are not prewarmed in "
-            f"{target} — the first caller of each pays ~1.8 s of dead air:"
+            "  fix: python3 scripts/dograh_wire.py --write-prewarm, install the file into "
+            "the shim's volume, then POST /prewarm (no restart needed)"
         )
-        for text in drift:
-            print(f"  missing: {text}")
-        print("  fix: python3 scripts/dograh_wire.py --write-prewarm   (then restart the shim)")
         return 1
 
     header = (
@@ -403,7 +453,7 @@ def prewarm_main(args: argparse.Namespace) -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(header + body)
     print(f"PASS wrote {len(expected)} greeting(s) to {target}")
-    print("  restart the shim to re-prewarm: docker restart tts-shim-<project>")
+    print("  adjust: install it in the shim's volume and POST /prewarm to apply it without a restart")
     return 0
 
 
@@ -762,8 +812,8 @@ def main() -> int:
     parser.add_argument(
         "--context-json",
         default="",
-        help="JSON object of the initial_context values a route supplies; without it the "
-        "greetings render with their fallbacks",
+        help="JSON object of the initial_context a route supplies, or a list of them "
+        "(one per route); without it the greetings render with their fallbacks",
     )
     parser.add_argument(
         "--workflow-file",

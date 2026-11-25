@@ -612,6 +612,20 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Capstone TTS shim", version="1.0.0", lifespan=lifespan)
 
 
+@app.post("/prewarm")
+async def prewarm_now() -> dict:
+    """Synthesize the current prewarm list into the cache (idempotent).
+
+    The list changes when a route's greeting or its initial_context changes, and
+    restarting the container to pick that up costs ~20 s of pip install plus the
+    engine's own load — during which a call gets no audio at all. This re-runs
+    the same prewarm the startup task does, so a regenerated list can be applied
+    while the service keeps serving.
+    """
+    await _prewarm(None)
+    return {"ok": True, "file": PREWARM_FILE, "texts": len(_prewarm_texts())}
+
+
 def _float(value, default: float) -> float:
     try:
         return float(value)

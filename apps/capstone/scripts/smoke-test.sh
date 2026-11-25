@@ -674,6 +674,41 @@ if [[ "$SCOPE" == "all" || "$SCOPE" == "pbx" || "$SCOPE" == "cantus" ]]; then
   fi
 fi
 # ═══════════════════════════════════════════════════════════════════════════
+# REPO-OWNED VOICE DRIFT
+# ═══════════════════════════════════════════════════════════════════════════
+# Two things silently cost calls or seconds and never raise an error on their
+# own: FreePBX reverting the endpoint settings that keep a call up (rtp_timeout
+# back to 30 drops a call after a 30 s media gap), and the greeting prewarm list
+# drifting from what a call will actually ask the voice for (a miss is ~1.8 s of
+# dead air, not a failure). Both are checked offline against the repo, so a
+# drifted estate fails here instead of on a customer's call.
+section "Repo-owned voice drift"
+
+HARDEN_BIN="${VOICE_HARDEN:-/usr/local/sbin/pbx-voice-hardening.sh}"
+if [[ -x "$HARDEN_BIN" ]]; then
+  harden_report="$("$HARDEN_BIN" --check 2>&1 || true)"
+  if [[ -z "$harden_report" ]]; then
+    pass "PBX endpoint voice settings hold on 101/102/301/302"
+  else
+    fail "PBX voice hardening drifted — run $HARDEN_BIN"
+    printf '%s\n' "$harden_report" | sed 's/^/    /'
+  fi
+else
+  warn "pbx-voice-hardening.sh is not installed on this host (see docs/operations.md)"
+fi
+
+if [[ -f "$ROOT/scripts/dograh_wire.py" ]]; then
+  if prewarm_report="$(cd "$ROOT" && python3 scripts/dograh_wire.py --check-prewarm 2>&1)"; then
+    pass "greeting prewarm list matches the shipped greetings"
+  else
+    fail "greeting prewarm list has drifted — the first caller pays ~1.8 s of dead air"
+    printf '%s\n' "$prewarm_report" | sed 's/^/    /'
+  fi
+else
+  skip "scripts/dograh_wire.py not present; prewarm drift check skipped"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
 printf '\n%s=== Summary ===%s\n' "$C_BOLD" "$C_NC"

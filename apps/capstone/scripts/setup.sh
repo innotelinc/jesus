@@ -697,6 +697,35 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 6e. voice watchers — capture the next stall, keep the greeting prewarmed
+# ═══════════════════════════════════════════════════════════════════════════
+# Neither of these can fail a call on its own, and both are worth nothing if
+# nobody installed them: rtp-stall-watch.sh captures the media of the next real
+# handset call (the two RTP inactivity notices ever logged both named
+# PJSIP/101), and prewarm-watch.sh re-renders and re-applies the greeting
+# prewarm when it drifts, without restarting the shim.
+echo ""
+echo "── 6e. voice watchers ──"
+if [ "$(id -u)" = "0" ] && [ -f "$REPO/deploy/rtp-stall-watch.sh" ]; then
+    install -d /usr/local/share/capstone/dograh /etc/capstone /var/lib/capstone-prewarm
+    install -m 0755 "$REPO/deploy/rtp-stall-watch.sh" /usr/local/sbin/rtp-stall-watch.sh
+    install -m 0644 "$REPO/deploy/rtp-stall-watch.cron" /etc/cron.d/rtp-stall-watch
+    install -m 0755 "$REPO/scripts/rtp_probe.py" /usr/local/bin/rtp-probe.py
+    install -m 0755 "$REPO/deploy/prewarm-watch.sh" /usr/local/sbin/prewarm-watch.sh
+    install -m 0644 "$REPO/deploy/prewarm-watch.cron" /etc/cron.d/prewarm-watch
+    install -m 0755 "$REPO/deploy/greeting-contexts.sh" /usr/local/sbin/greeting-contexts.sh
+    install -m 0755 "$REPO/scripts/dograh_wire.py" /usr/local/share/capstone/dograh-wire.py
+    cp -f "$REPO"/dograh/job-interview-workflow.json "$REPO"/dograh/survey-workflow.json \
+        /usr/local/share/capstone/dograh/ 2>/dev/null || true
+    pass "installed the RTP stall watcher and the prewarm watcher"
+elif [ -x /usr/local/sbin/rtp-stall-watch.sh ]; then
+    pass "voice watchers already installed"
+else
+    warn "voice watchers are not installed on this host"
+    warn "    they run where the PBX container does — see docs/operations.md"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 7. Recreate n8n with fresh secrets
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
