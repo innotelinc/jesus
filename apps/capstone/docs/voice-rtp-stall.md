@@ -66,15 +66,29 @@ media to judge:
 | 05:14 | first `PJSIP/101` ring | 8163 packets, 0 RTP | nobody answered |
 | 06:49 | auto-answer probe to 101 | 15662 packets, 0 RTP | rang 25 s, never answered |
 | 06:50 | auto-answer probe to 301 | 0 RTP | rang 20 s, never answered |
+| 07:1x | probe 101, both header conventions | INVITE ×8 to `192.168.1.10:5060`, then `100 Trying`, `180 Ringing`, our `487` | the phone rang and never sent `200 OK` |
 
-The two probes are the point: waiting for a human to pick up a desk phone at
-03:00 was the thing that kept this open, so `deploy/handset-probe.sh` now rings
-the handset itself with the intercom auto-answer header
-(`Call-Info: <sip:x>;answer-after=0`). **No handset on this estate answered it.**
-A Grandstream only honours that header when its account has *Allow Auto Answer by
-Call-Info* enabled, and 301/302 (from `192.168.1.5`) declined as well. So the
-mechanism is in place and the blocker is now a single setting, not a wait for a
-person:
+The probes are the point: waiting for a human to pick up a desk phone at 03:00
+was the thing that kept this open, so `deploy/handset-probe.sh` rings the handset
+itself — first with `Call-Info: <sip:x>;answer-after=0` (the intercom
+convention), then with `Alert-Info: …info=alert-autoanswer` — and reports what
+came back.
+
+**What the wire shows.** The INVITE is delivered to `192.168.1.10:5060` and the
+handset answers `100 Trying` then `180 Ringing`: it rings, and then never sends
+`200 OK`; our side cancels with `487` when the ring timeout expires. So the
+header is not being honoured. There is a second, smaller finding in the same
+capture that has to be fixed before that can honestly be called a refusal — the
+INVITE carries **no `Call-Info:` line at all**: the value's `;` is consumed as a
+dialplan comment even escaped, so the pre-dial handler produces no header. That
+is why the probe now prints `auto-answer header: NOT PRESENT … proves nothing`
+instead of guessing, and why this section still says *pending*:
+
+```bash
+# the honest state of the two sub-questions:
+#   is the phone being asked?   no  — the header is missing from the INVITE
+#   does the phone suppress silence?  unknown — no answered call has media yet
+```
 
 ```bash
 # once the phone allows Call-Info auto-answer (its own web UI), one command:

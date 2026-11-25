@@ -456,6 +456,7 @@ install -m 0644 deploy/prewarm-watch.cron /etc/cron.d/prewarm-watch
 install -m 0755 deploy/greeting-contexts.sh /usr/local/sbin/greeting-contexts.sh
 install -m 0755 scripts/rtp_probe.py /usr/local/bin/rtp-probe.py
 install -m 0755 deploy/handset-probe.sh /usr/local/sbin/handset-probe.sh
+install -m 0755 scripts/voice_check.py /usr/local/bin/voice-check.py
 ```
 
 The prewarm watcher reads the contexts from where they actually live —
@@ -491,11 +492,30 @@ installs one managed block in `extensions_custom.conf` (backed up, idempotent)
 because Asterisk's `channel originate` cannot add a SIP header. Our side sends no
 audio and records nothing, so an auto-answered handset hears silence.
 
-A Grandstream only honours that header when the account has **Allow Auto Answer
-by Call-Info** enabled, which is a setting in the phone's own web UI. On
-2026-11-25 both 101 and 301 rang for their full ring timeout instead: no handset
-on this estate auto-answers yet, so the question still needs that toggle (or one
-answered call by hand).
+It tries both conventions (`Call-Info` then `Alert-Info`) and prints the SIP
+exchange it saw — the INVITE, whether the auto-answer header was on it, and the
+phone's status codes — because "it did not answer" is only useful with that
+evidence. On 2026-11-25 the INVITE reached 101 and the phone replied `100 Trying`
+/ `180 Ringing` with no `200 OK`, but the header was **missing from the INVITE
+itself** (a `;` in the value is eaten by the dialplan parser), so the probe
+reports that attempt as proving nothing rather than as a refusal. Until that is
+fixed — or someone answers one call by hand — the media question stays open.
+
+### Is the wiring alive, not just installed?
+
+`scripts/voice_check.py` (installed as `/usr/local/bin/voice-check.py`) asserts
+the things that must be *running*: the stall watcher scheduled and logging, the
+prewarm status rewritten inside its window, the Control Center able to see the
+host files, and the SMS push armed and not erroring once `VOICE_ALERT_SMS_TO` is
+set. Exit 0 alive, 1 installed-but-broken, 2 nothing installed.
+
+```bash
+voice-check.py            # the gate; run it after a deploy
+```
+
+`scripts/smoke-test.sh` runs it in **Voice watchers — alive, not just installed**,
+so a cron that quietly stopped fails a smoke run instead of leaving a page that
+says "in sync" forever.
 
 ## Platform address — the name and the LAN IP are not interchangeable
 

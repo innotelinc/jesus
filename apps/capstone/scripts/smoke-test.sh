@@ -708,6 +708,29 @@ else
   skip "scripts/dograh_wire.py not present; prewarm drift check skipped"
 fi
 
+# Those two checks read the repo. The watchers themselves are installed by hand
+# on the host, so "installed" and "working" drift apart — a cron file that never
+# fired, a status file nothing rewrites, an SMS push that is configured but
+# erroring. All of those look exactly like a quiet, healthy estate.
+section "Voice watchers — alive, not just installed"
+
+VOICE_CHECK="${VOICE_CHECK:-$ROOT/scripts/voice_check.py}"
+if [[ -f "$VOICE_CHECK" ]]; then
+  voice_report="$(python3 "$VOICE_CHECK" 2>&1)"
+  voice_rc=$?
+  case "$voice_rc" in
+    0)  pass "every installed voice watcher is alive (prewarm fresh, stall log writable)" ;;
+    2)  warn "no voice watchers installed on this host — nothing to check (see docs/operations.md)" ;;
+    *)  fail "a voice watcher is installed but not working — run python3 $VOICE_CHECK"
+        printf '%s\n' "$voice_report" | sed 's/^/    /' ;;
+  esac
+  # The handset verdict and the SMS push are information unless they contradict
+  # the configuration, which the checker already failed on above.
+  printf '%s\n' "$voice_report" | grep -E 'handset question|SMS push' | sed 's/^/    /' || true
+else
+  skip "scripts/voice_check.py not present; watcher liveness check skipped"
+fi
+
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════
