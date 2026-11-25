@@ -1403,19 +1403,57 @@ fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.con
 # get dropped (then unban it) — see the CI job for the exact line.
 ```
 
-**AMI listens on loopback only, and nothing publishes it.** `manager.conf`
-carries `bindaddr = 127.0.0.1`, so Asterisk opens `5038` on the container's own
-loopback. The compose file went on publishing it on `192.168.1.52:5038`, which
-accepted the TCP connection only to have the container refuse it; that line was
-removed on 2026-11-25 and the container recreated, so the host no longer listens
-on `5038` at all.
+**AMI listens on loopback only; LAN clients reach it through the bridge.**
+`manager.conf` carries `bindaddr = 127.0.0.1`, so Asterisk opens `5038` only on
+the container's own loopback. A second service, `ami-bridge` (`alpine/socat`,
+`network_mode: service:freepbx`), listens on `15038` *inside that same network
+namespace* and relays to `127.0.0.1:5038`. The console dials `freepbx:15038` for
+that reason, and the relay is also why the publish no longer depends on the PBX
+container's address, which changes on every deploy.
+
+On 2026-11-25 the compose publish was repointed from the dead container port to
+the bridge — `192.168.1.52:5038:15038` — so the LAN gets AMI on its usual port
+while Asterisk itself never leaves loopback:
 
 ```bash
 docker exec pbx-freepbx asterisk -rx "manager show settings" | grep -i bindaddress
 #  TCP Bindaddress:           127.0.0.1:5038
-ss -ltn | grep 5038 || echo 'nothing on 5038'      # on the host
-#  nothing on 5038
+docker port freepbx-qvifit87vftfxd9ejsch2vxy 15038
+#  192.168.1.52:5038
 ```
+
+Verified end to end from another fleet host on 2026-11-25: a real login over the
+LAN address answers `Response: Success`.
+
+```bash
+# credentials read on the box, never printed; run from any LAN host
+exec 3<>/dev/tcp/192.168.1.52/5038
+printf 'Action: Login\r\nUsername: <user>\r\nSecret: <secret>\r\n\r\n' >&3
+head -3 <&3
+```
+
+Two consequences follow from the relay:
+
+- **The ACL stops filtering LAN clients.** The bridge dials from `127.0.0.1`, so
+  every account permitting loopback is reachable over the published port with a
+  password alone; `permit` is decided for the bridge, not for the caller. The
+  port stays bound to the LAN address and is deliberately not forwarded at the
+  edge — `pbx.innotel.site` resolves to the WAN IP (`73.68.203.71`), so dialling
+  the FQDN from inside the estate does not reach it (there is no hairpin NAT).
+- **The mapping lives in Coolify's own copy of the compose file**, not just in
+  the rendered file on disk. On 2026-11-25 it was written through the API
+  (`PATCH /api/v1/services/qvifit87vftfxd9ejsch2vxy` on `192.168.1.85:8000`,
+  field `docker_compose_raw`, **base64-encoded** — the read side returns it
+  decoded), so a redeploy re-renders it instead of dropping it. That API is only
+  reachable on the LAN address: `deploy.innotel.us` sits behind the Authentik
+  forward-auth outpost and answers API calls with the SSO flow. The token is
+  `/root/.coolify-token` on `192.168.1.51`. `docker port … 15038` stays the
+  tripwire after a deploy.
+- **`pbx.innotel.site` is behind the same Authentik outpost.** Unauthenticated
+  requests are 302'd into the SSO flow, so scripts and server-side `fetch` calls
+  must use the app's own published port (`http://192.168.1.52:8097`, verified
+  `200` on `/api/health`); in the browser, an expired SSO session surfaces as a
+  failed `fetch` in the console UI rather than an auth error.
 
 Three things make that hold, each checked rather than assumed:
 
@@ -1425,11 +1463,10 @@ Three things make that hold, each checked rather than assumed:
 - **Local clients still work.** `ucp_events` (UCP) and the generated hex user
   both authenticate from `127.0.0.1`; both are in use, so deleting either breaks
   UCP or the portal's AMI poll.
-- **Remote use goes through the container, not the host.** `ssh -L
+- **With the publish gone, the container carries the stream.** `ssh -L
   5038:127.0.0.1:5038 root@192.168.1.52` does *not* work — the socket is on the
-  container's loopback, and the host has nothing listening to forward to. Carry
-  the AMI stream over the exec instead; the container has `socat`, so this gets a
-  real login prompt:
+  container's loopback. Go through the exec instead; the container has `socat`,
+  so this gets a real login prompt:
 
   ```bash
   printf 'Action: Login\r\nUsername: <user>\r\nSecret: <secret>\r\n\r\n' \
@@ -1446,10 +1483,13 @@ docker exec pbx-freepbx sh -c 'sed -n "/^\[/p;/^secret/p" \
   /etc/asterisk/manager_custom.conf /etc/asterisk/manager.conf'
 ```
 
-To go back to LAN-reachable AMI, restore
+To go back to a loopback-only estate, drop the `5038` publish and recreate the
+PBX; to widen the bind instead, restore
 `/etc/asterisk/manager.conf.bak-bind-<stamp>` inside the container and run
-`asterisk -rx "manager reload"`. The ACL is the second layer, and the one that
-decides once something can reach the port:
+`asterisk -rx "manager reload"` (the `AMI bound to loopback` check in
+`voice-check.py` reports the bind either way). Below the port sits the ACL —
+`permit` is the second layer, and the one that decides once something is inside
+the namespace:
 
 - **The AMI ACL.** Every account starts at `deny = 0.0.0.0/0.0.0.0` and then
   names its permits; on this box `pbxportal` and `ucp_events` permit `127.0.0.1`
