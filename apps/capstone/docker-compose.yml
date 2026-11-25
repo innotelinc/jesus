@@ -584,15 +584,21 @@ services:
       # serves Kokoro `af_heart` (`kokoro,piper`, Kokoro the default) and can
       # fall back to Piper with one edit; the standalone default stays `piper`
       # because it is the engine that holds real time on a small CPU box.
-      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-piper}"
-      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-piper}"
+      TTS_SHIM_ENGINES: "${TTS_SHIM_ENGINES:-kokoro,piper}"
+      TTS_SHIM_DEFAULT_ENGINE: "${TTS_SHIM_DEFAULT_ENGINE:-kokoro}"
       # Only read when `kokoro` is in TTS_SHIM_ENGINES (see scripts/install-onnx-kokoro.sh).
       # The name has to resolve FROM THE SHIM: these two services are on this
       # compose file's network in the standalone layout, and on the voice
       # platform's own project network when that runs as a separate project —
       # where `speaches`/`kokoro-fastapi` do not resolve from here ("Temporary
       # failure in name resolution" in the shim log) and the engine cannot work.
-      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://kokoro-fastapi:8880}"
+      TTS_SHIM_KOKORO_URL: "${TTS_SHIM_KOKORO_URL:-http://speaches:8000}"
+      # Kokoro-82M ONNX served by `speaches` (onnxruntime, CPU). ~3x realtime on
+      # this box and cached per line by the shim, which is why it is the default
+      # rather than the kokoro-fastapi PyTorch image the `kokoro` profile still
+      # carries. Install the model with scripts/install-onnx-kokoro.sh.
+      TTS_SHIM_KOKORO_MODEL: "${TTS_SHIM_KOKORO_MODEL:-speaches-ai/Kokoro-82M-v1.0-ONNX}"
+      TTS_SHIM_KOKORO_VOICE: "${TTS_SHIM_KOKORO_VOICE:-af_heart}"
       # The model id the kokoro upstream is asked for. kokoro-fastapi ignores it;
       # an upstream that hosts more than one model does not — the ONNX Kokoro
       # lives in `speaches` and answers to `speaches-ai/Kokoro-82M-v1.0-ONNX`, so
