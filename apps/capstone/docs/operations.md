@@ -1431,8 +1431,9 @@ To go back to LAN-reachable AMI, restore
 `asterisk -rx "manager reload"`. The ACL is the second layer, and the one that
 decides once something can reach the port:
 
-- **The AMI ACL.** Every account is `deny = 0.0.0.0/0.0.0.0` with a loopback
-  permit, and nothing else. The last account holding a LAN permit, `didtest`
+- **The AMI ACL.** Every account starts at `deny = 0.0.0.0/0.0.0.0` and then
+  names its permits; on this box `pbxportal` and `ucp_events` permit `127.0.0.1`
+  and nothing else. The last account holding a LAN permit, `didtest`
   (`192.168.1.113`, never once authenticated — zero hits in `full.log`), was
   retired on 2026-11-25: the block is gone from `manager_custom.conf`, so
   `manager show user didtest` answers "There is no manager called didtest" and a
