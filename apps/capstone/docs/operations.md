@@ -1434,14 +1434,18 @@ decides once something can reach the port:
 - **The AMI ACL.** Every account starts at `deny = 0.0.0.0/0.0.0.0` and then
   names its permits; on this box `pbxportal` and `ucp_events` permit `127.0.0.1`
   and nothing else. The last account holding a LAN permit, `didtest`
-  (`192.168.1.113`, never once authenticated — zero hits in `full.log`), was
-  retired on 2026-11-25: the block is gone from `manager_custom.conf`, so
-  `manager show user didtest` answers "There is no manager called didtest" and a
-  login attempt is logged as `InvalidAccountID`. To bring it back, restore
+  (`192.168.1.113`), was the inbound DID harness's AMI login: it authenticated
+  every 15 minutes until **2026-11-24 17:38** (its last `SuccessfulAuth`, in
+  `security` — it also logged `InvalidPassword` in bursts whenever its stored
+  secret drifted), and went silent after that. It was retired on 2026-11-25: the
+  block is gone from `manager_custom.conf`, so `manager show user didtest`
+  answers "There is no manager called didtest" and a login attempt is logged as
+  `InvalidAccountID`. Whatever runs on `192.168.1.113` that still expects it (the
+  harness behind `/usr/local/bin/did-inbound-test`) now fails and needs the SSH
+  tunnel plus an account of its own. To bring `didtest` back, restore
   `/etc/asterisk/manager_custom.conf.bak-didtest-<stamp>` inside the container and
-  run `asterisk -rx "manager reload"`. Note that the PJSIP endpoint
-  `telno-didtest` is a different thing — the inbound DID test harness — and was
-  left in place.
+  run `asterisk -rx "manager reload"`. The PJSIP endpoint `telno-didtest` is a
+  different thing — the harness's SIP side — and was left in place.
 
 AMI auth failures do reach the `security` log — `SecurityEvent="InvalidAccountID"`
 with `Service="AMI"` and a `TCP` `RemoteAddress` — and the `asterisk-capstone`
