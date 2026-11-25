@@ -24,6 +24,12 @@ Only classic pcap (what `tcpdump -w` writes by default) is parsed; pcapng is
 refused rather than half-read. Ethernet, Linux cooked capture (`-i any`), SLL2
 and raw-IP frames are all understood — `-i any` is the obvious interface to use
 on a host with bridges, and it does not write Ethernet headers.
+
+Expect no RTP for the dograh leg on this stack: it is a `WebSocket/dograh/…`
+channel over ARI, so only the handset legs (the `PJSIP/<ext>-…` channels) carry
+RTP at all. That is consistent with the two inactivity notices ever logged —
+both named `PJSIP/101-…`. Capturing the stall therefore needs a real call from a
+physical phone; nothing on the dograh side will appear either way.
 """
 
 from __future__ import annotations
@@ -201,7 +207,42 @@ def read_pcap(path: Path) -> tuple[int, list[tuple[float, bytes]]]:
     return dlt, frames
 
 
-def rtp_streams(frames: list[tuple[float, bytes]], dlt: int = DLT_EN10MB) -> dict[tuple, Stream]:
+# Ports owned by other UDP protocols. NetBIOS and IAX2 payloads pass the RTP
+# version test often enough to matter: a LAN broadcast on 137 with ssrc=0 and a
+# 20 s gap between four packets otherwise reads as "this leg went silent", which
+# is the opposite of the truth when the question is whether audio died.
+NON_RTP_PORTS = {53, 67, 68, 69, 123, 137, 138, 139, 161, 162, 500, 514, 520, 1900, 4500, 4569, 5353}
+
+
+def plausible_rtp(stream: Stream) -> bool:
+    """Whether this is real RTP and not a lookalike that happens to pass bit 0-1.
+
+    Three independent checks, because any one of them alone lets a lookalike
+    through: a live SSRC, a port no other protocol owns, and sequence numbers
+    that actually advance the way a media stream's do.
+    """
+    if stream.ssrc == 0:
+        return False
+    if stream.sport in NON_RTP_PORTS or stream.dport in NON_RTP_PORTS:
+        return False
+    # Fewer than five packets cannot show a silence worth acting on, and a
+    # two-packet lookalike (Docker's embedded DNS on 127.0.0.11 answers with a
+    # payload that passes the version test) is the kind of thing that turns a
+    # quiet capture into a fake "stall".
+    if len(stream.seqs) < 5:
+        return False
+    if len(stream.seqs) >= 5:
+        steps = [(b - a) % 65536 for a, b in zip(stream.seqs, stream.seqs[1:])]
+        advancing = sum(1 for step in steps if step in (1, 2))  # 2 = one lost packet
+        if advancing / len(steps) < 0.8:
+            return False
+    return True
+
+
+def rtp_streams(
+    frames: list[tuple[float, bytes]], dlt: int = DLT_EN10MB, strict: bool = True
+) -> dict[tuple, Stream]:
+    """RTP streams in the capture; ``strict`` drops lookalikes (see plausible_rtp)."""
     streams: dict[tuple, Stream] = {}
     for ts, frame in frames:
         udp = _udp_payload(frame, dlt)
@@ -218,6 +259,8 @@ def rtp_streams(frames: list[tuple[float, bytes]], dlt: int = DLT_EN10MB) -> dic
             stream = streams[key] = Stream(src, sport, dst, dport, ssrc, pt)
         stream.times.append(ts)
         stream.seqs.append(seq)
+    if strict:
+        return {k: v for k, v in streams.items() if plausible_rtp(v)}
     return streams
 
 
@@ -250,14 +293,21 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("give --pcap or --capture")
     path = args.pcap or capture(args.capture, args.iface, args.out)
     dlt, frames = read_pcap(path)
-    streams = rtp_streams(frames, dlt)
+    candidates = rtp_streams(frames, dlt, strict=False)
+    streams = {k: v for k, v in candidates.items() if plausible_rtp(v)}
+    rejected = len(candidates) - len(streams)
     rows = sorted((s.summary(args.gap) for s in streams.values()), key=lambda r: -r["packets"])
 
     if args.json:
-        print(json.dumps({"pcap": str(path), "linktype": dlt, "packets": len(frames), "streams": rows}, indent=2))
+        print(json.dumps({
+            "pcap": str(path), "linktype": dlt, "packets": len(frames),
+            "streams": rows, "rejected_lookalikes": rejected,
+        }, indent=2))
         return 0
 
     print(f"{path}: {len(frames)} packets, linktype {dlt}, {len(rows)} RTP streams")
+    if rejected:
+        print(f"  ({rejected} lookalike flow(s) dropped: non-zero SSRC, real RTP port, advancing sequence)")
     if not rows:
         print("no RTP found — either nothing was talking, or the capture point does not see the media")
         return 0

@@ -117,20 +117,56 @@ class PcapTest(unittest.TestCase):
         self.assertEqual(list(streams.values())[0].ssrc, 0xDEADBEEF)
 
     def test_sll2_capture_is_also_read(self):
+        # The header layout that libpcap writes for `-i any`, and enough packets
+        # to be a media stream rather than a lookalike.
         cooked = Path(self.tmp.name) / "any2.pcap"
         _pcap(
             cooked,
-            [(0.0, _sll(_ip_udp("10.0.4.9", "10.0.4.1", 16000, 10020, _rtp(7, 1)), sll2=True))],
+            [
+                (i * 0.02, _sll(_ip_udp("10.0.4.9", "10.0.4.1", 16000, 10020, _rtp(7, i)), sll2=True))
+                for i in range(10)
+            ],
             dlt=rtp_probe.DLT_LINUX_SLL2,
         )
         dlt, frames = rtp_probe.read_pcap(cooked)
         self.assertEqual(len(rtp_probe.rtp_streams(frames, dlt)), 1)
+
+    def test_a_two_packet_lookalike_is_below_the_threshold(self):
+        """Docker's embedded DNS (127.0.0.11) passes the version test twice."""
+        dns = Path(self.tmp.name) / "dns.pcap"
+        payload = bytes([0x80, 0x32]) + struct.pack("!HII", 1, 0, 1) + b"\x00" * 20
+        packets = [(i * 0.001, _ethernet(_ip_udp(
+            "127.0.0.1", "127.0.0.11", 49191, 44775, payload))) for i in range(2)]
+        _pcap(dns, packets)
+        dlt, frames = rtp_probe.read_pcap(dns)
+        self.assertEqual(rtp_probe.rtp_streams(frames, dlt), {})
 
     def test_a_pcapng_file_is_refused_rather_than_half_read(self):
         bogus = Path(self.tmp.name) / "x.pcapng"
         bogus.write_bytes(b"\x0a\x0d\x0d\x0a" + b"\x00" * 40)
         with self.assertRaises(ValueError):
             rtp_probe.read_pcap(bogus)
+
+    def test_netbios_on_137_is_not_mistaken_for_a_stalled_leg(self):
+        """A LAN broadcast passed the version test and read as a 20 s silence."""
+        noisy = Path(self.tmp.name) / "netbios.pcap"
+        packets = [(i * 7.0, _ethernet(_ip_udp(
+            "192.168.1.1", "192.168.1.56", 56515, 137, b"\x80\x20" + b"\x00" * 30))) for i in range(4)]
+        _pcap(noisy, packets)
+        dlt, frames = rtp_probe.read_pcap(noisy)
+        self.assertEqual(rtp_probe.rtp_streams(frames, dlt), {})
+
+    def test_iax2_on_4569_is_not_mistaken_for_media(self):
+        iax = _ip_udp("10.0.3.10", "208.100.60.66", 4569, 4569,
+                      bytes([0x80, 0x55]) + b"\x06\x0d" + b"\x00" * 40)
+        path = Path(self.tmp.name) / "iax.pcap"
+        _pcap(path, [(0.0, _ethernet(iax)), (0.03, _ethernet(iax))])
+        dlt, frames = rtp_probe.read_pcap(path)
+        self.assertEqual(rtp_probe.rtp_streams(frames, dlt), {})
+
+    def test_real_rtp_survives_the_strict_filter(self):
+        dlt, frames = rtp_probe.read_pcap(self.path)
+        self.assertEqual(len(rtp_probe.rtp_streams(frames, dlt)), 2)
 
     def test_non_rtp_udp_is_ignored(self):
         quiet = Path(self.tmp.name) / "junk.pcap"

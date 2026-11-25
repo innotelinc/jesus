@@ -432,6 +432,12 @@ python3 scripts/rtp_probe.py --capture 300 --iface br0 -o /var/tmp/rtp.pcap
 python3 scripts/rtp_probe.py --pcap /var/tmp/rtp.pcap --gap 2.0  # exit 2 on a 30 s stall
 ```
 
+One thing to know before reading an empty result: on this stack the agent leg is
+a `WebSocket/dograh/…` channel over ARI, not RTP, so **only handset legs emit
+RTP**. A local `Local/201@from-internal` test call therefore captures no media at
+all, and the two inactivity notices ever logged both named `PJSIP/101-…`. Capture
+while someone is on a real call from 101.
+
 ## Platform address — the name and the LAN IP are not interchangeable
 
 | Surface | Address | Reachable from |
