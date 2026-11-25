@@ -194,6 +194,39 @@ docker exec freepbx-<uuid> asterisk -rx 'dialplan reload'
 docker exec freepbx-<uuid> asterisk -rx 'pjsip show endpoints' | grep -c Endpoint:   # expect 13
 ```
 
+That restore is a stop-gap, not a repair: the next recreate regenerates
+`pjsip.endpoint.conf` from the database again and drops back to a handful of objects.
+Persisting `/var/lib/mysql` (or moving the database to the `postgres`/MariaDB service the
+rest of the stack uses) is the real fix, and it needs the extensions re-entered once —
+the GUI state did not survive the recreate and no FreePBX backup exists in
+`/var/spool/asterisk/backup`.
+
+One more thing the recreate exposed: `ari.conf` in the config volume is a *symlink* into
+`/var/www/html/admin/modules/arimanager/etc/ari.conf`. When the image ships without the
+`arimanager` module that target does not exist, the entrypoint's `touch /etc/asterisk/ari.conf`
+fails with `No such file or directory`, and `set -e` turns it into a restart loop that takes
+the stack with it. Check for dangling links before blaming the entrypoint:
+
+```bash
+docker run --rm -v "$NEW":/etc/asterisk --entrypoint sh \
+  ghcr.io/innotelinc/pbx-portal:latest-fullstack \
+  -c 'for f in /etc/asterisk/*; do [ -L "$f" ] && [ ! -e "$f" ] && echo "dangling $f"; done'
+```
+
+Materialise the offender as a regular file (`rm` the link, `install -o asterisk -g asterisk`
+an empty file); the entrypoint writes the ARI config into it on the next boot.
+
+### The Control Center is not on the voice network
+
+The console app runs on Coolify's `coolify` bridge (`10.0.1.0/24`, e.g. `10.0.1.9`), while
+AMI is published only on `192.168.1.52:5038`. From inside the console container that
+address refuses, and `freepbx`/`15038` does not resolve either — the bridge listens on
+Asterisk's loopback, so only the published port is usable. Anything the console dials
+fails at the socket layer, which the UI renders as `fetch failed` rather than as an auth
+error. Fix by attaching the console to the voice compose network with the bridge
+reachable there, or by publishing `5038` on an address both networks route to; do not
+chase it as a credential problem.
+
 Hold music is generated, not licensed: `pbx/asterisk/hold_music.py` writes four 32 s, 8 kHz
 mono WAV tracks into `/var/lib/asterisk/moh/capstone` (fixed seed, ~5 s, no ffmpeg), and
 `pbx/entrypoint-dograh.sh` re-runs it on every boot because `/var/lib/asterisk/moh` is not a
