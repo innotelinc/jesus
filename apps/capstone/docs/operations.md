@@ -1394,38 +1394,53 @@ fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.con
 # get dropped (then unban it) — see the CI job for the exact line.
 ```
 
-**AMI answers on the host LAN IP only.** Two independent things keep it that way,
-and only one of them actually stops a client:
+**AMI listens on loopback only.** The published port is still in the compose
+file, but it no longer answers: `manager.conf` carries `bindaddr = 127.0.0.1`, so
+Asterisk opens `5038` on the container's loopback, and `docker-proxy` on
+`192.168.1.52:5038` accepts the TCP connection only for the container to refuse
+it. A client on the LAN gets a refused connection, never a login prompt.
 
-- **The port binding.** `docker-compose.yml` publishes `5038` on the host LAN IP
-  (`PJSIP_MEDIA_ADDRESS`) — never `0.0.0.0`, never a docker address (project
-  rule: README → Addressing). The portal dials that same LAN IP, so the bind and
-  the target agree. On a shared Zeus PBX the port belongs to that stack
-  (`zeus/docker-compose.full.yml`), which still publishes it on
-  `0.0.0.0` and needs the same pin.
-- **The AMI ACL.** The image wrote `permit = 0.0.0.0/0.0.0.0` for the portal's
-  AMI user, so any address that could reach the port could also authenticate
-  against it. `pbx/entrypoint-dograh.sh` now narrows `[pbxportal]` to loopback
-  plus this host's LAN subnet, idempotently, on every boot:
+```bash
+docker exec pbx-freepbx asterisk -rx "manager show settings" | grep -i bindaddress
+#  TCP Bindaddress:           127.0.0.1:5038
+timeout 4 bash -c 'cat </dev/null >/dev/tcp/192.168.1.52/5038' && echo OPEN || echo refused
+#  refused
+```
 
-  ```bash
-  docker exec pbx-freepbx asterisk -rx "manager show user pbxportal" | tail -3
-  #  0:  deny - 0.0.0.0/0.0.0.0
-  #  1:  allow - 127.0.0.1/255.255.255.255
-  #  2:  allow - 192.168.1.0/255.255.255.0   (PJSIP_LOCAL_NET)
-  ```
+Three things make that hold, each checked rather than assumed:
 
-  The ACL is the half that decides, and what it decides on is the source
-  address. The portal dials the host LAN IP, the host masquerades that
-  connection, and Asterisk sees the LAN address — which the LAN permit admits.
-  A client that reaches Asterisk by any other route is refused
-  (`SecurityEvent="FailedACL"`). Same user, same secret, opposite outcomes — so
-  check the address a client's packets carry before touching the secret.
+- **`/etc/asterisk` is a volume** (`…_asterisk-config`), so the line survives a
+  container recreate, and `fwconsole reload` does not rewrite it — reload
+  returned 0, the bind stayed `127.0.0.1`, and a real login was re-tested after.
+- **Local clients still work.** `ucp_events` (UCP) and the generated hex user
+  both authenticate from `127.0.0.1`; both are in use, so deleting either breaks
+  UCP or the portal's AMI poll.
+- **Remote use needs a tunnel:** `ssh -L 5038:127.0.0.1:5038 root@192.168.1.52`,
+  then point the client at `127.0.0.1:5038`. Nothing else reaches AMI now.
 
-  A scanner that clears the ACL — through the router's forward, or the Zeus
-  stack's own binding — lands in the security log as `Service="AMI"` /
-  `RequestType="Action: NONE"` and is banned by the `asterisk-security` jail
-  (see the filter's `RequestBadFormat` entry).
+Reading the credentials — they are not in this repo, and they should not be
+pasted into a ticket or a chat:
+
+```bash
+docker exec pbx-freepbx sh -c 'sed -n "/^\[/p;/^secret/p" \
+  /etc/asterisk/manager_custom.conf /etc/asterisk/manager.conf'
+```
+
+To go back to LAN-reachable AMI, restore
+`/etc/asterisk/manager.conf.bak-bind-<stamp>` inside the container and run
+`asterisk -rx "manager reload"`. The ACL is the second layer, and the one that
+decides once something can reach the port:
+
+- **The AMI ACL.** Every account is `deny = 0.0.0.0/0.0.0.0` with a loopback
+  permit. `didtest` also permits `192.168.1.113`, but nothing has ever
+  authenticated from there (zero hits in `full.log`); while AMI is loopback-only
+  that permit is not a reachable path.
+
+AMI auth failures do reach the `security` log — `SecurityEvent="InvalidAccountID"`
+with `Service="AMI"` and a `TCP` `RemoteAddress` — and the `asterisk-capstone`
+filter matches them, proved with `fail2ban-regex` against the live log. With the
+loopback bind there is no remote attempt left to ban, which is why no
+AMI-specific jail was added.
 
 The ordering is load-bearing: Asterisk honours the **last** matching ACL entry,
 so the permits must come *after* the deny. Put them before it and every AMI login
