@@ -3,20 +3,26 @@
 Two questions had no answer anywhere an operator looks. First, is the TTS
 shim's prewarmed greeting list still what the routes will render? A cache hit is
 ~80 ms and a miss ~1.8 s of dead air on the very first thing a caller hears, so
-a list that drifts is expensive in exactly the way nobody sees. Second, did a
-handset leg actually stop sending RTP — and was that the phone going quiet or
-the path eating the packets?
+a list that drifts is expensive in exactly the way nobody sees. Second, does a
+handset leg actually stop sending RTP — and is that the phone going quiet or the
+path eating the packets?
 
 Both are already measured on the host by scripts nobody watches:
 `deploy/prewarm-watch.sh` writes its verdict to a status file every five
-minutes, and `deploy/rtp-stall-watch.sh` records each captured call and every
-30 s silence in its log. This module reads those two files, so the state costs a
-`stat` rather than a `docker exec` and can be polled by the page.
+minutes, and `deploy/rtp-stall-watch.sh` records each captured call, one
+`VERDICT:` line per capture, and every 30 s silence in its log. This module
+reads those two files, so the state costs a `stat` rather than a `docker exec`
+and can be polled by the page.
 
-The API container mounts the whole host read-only at `/host` (`- /:/host:ro`),
-hence the default root; set `DASHBOARD_HOST_ROOT` to point somewhere else.
-Alerts are derived, not stored: an operator's acknowledge/resolve still rides on
-main.py's in-memory overrides, keyed by the stable ids below.
+The `VERDICT:` line is what closes the silence-suppression question without
+anyone reading a log: a capture whose handset kept sending throughout is a
+handset that does not suppress silence, and the page says so instead of leaving
+the reader to interpret it. `voice_notify` carries the same alerts out over SMS.
+
+The API container mounts the host read-only at `/host`; set
+`DASHBOARD_HOST_ROOT` to point somewhere else. Alerts are derived, not stored:
+an operator's acknowledge/resolve still rides on main.py's in-memory overrides,
+keyed by the stable ids below.
 """
 
 from __future__ import annotations
@@ -28,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from . import voice_notify
+
 # Where the host filesystem is visible. The compose file mounts it read-only.
 HOST_ROOT = os.environ.get("DASHBOARD_HOST_ROOT", "/host")
 
@@ -35,8 +43,8 @@ HOST_ROOT = os.environ.get("DASHBOARD_HOST_ROOT", "/host")
 PREWARM_STATUS = os.environ.get("VOICE_PREWARM_STATUS", "/var/lib/capstone-prewarm/status.json")
 # The list actually installed in the shim's volume, as shipped.
 PREWARM_LIST = os.environ.get("VOICE_PREWARM_LIST", "/var/lib/capstone-prewarm/prewarm.txt")
-# deploy/rtp-stall-watch.sh: one line per captured call, and one STALL line per
-# media silence, in `date -Is` + message form.
+# deploy/rtp-stall-watch.sh: one line per captured call, a VERDICT line per
+# analysed capture, and one STALL line per media silence, in `date -Is` form.
 WATCH_LOG = os.environ.get("VOICE_WATCH_LOG", "/var/log/rtp-watch/watch.log")
 WATCH_DIR = os.environ.get("VOICE_WATCH_DIR", "/var/log/rtp-watch")
 
@@ -48,6 +56,35 @@ STALL_ALERT_WINDOW = timedelta(hours=int(os.environ.get("VOICE_STALL_ALERT_HOURS
 
 _STAMPED = re.compile(r"^(\d{4}-\d{2}-\d{2}T[0-9:.+Z-]+)\s+(.*)$")
 _STALL_PREFIX = "STALL:"
+_VERDICT_PREFIX = "VERDICT:"
+# `VERDICT: <cause> — <one sentence>`; the em dash is the watcher's, not a typo.
+_CAUSE_RE = re.compile(r"^\s*([a-z][a-z-]*)\s*[—-]")
+_CAPTURE_RE = re.compile(r"(call-[0-9TZ]+\.pcap)")
+
+# What each cause means for the question that started all this — whether the
+# DP750 suppresses silence — written as a conclusion so the page does not ask an
+# operator to derive it from a sentence about sequence numbers.
+CONCLUSIONS = {
+    "sender-silent": (
+        "The handset stopped sending while the call was up and came back on its own — "
+        "silence suppression (VAD) or a muted mic. With rtp_timeout=0 that no longer "
+        "drops the call; nothing else needs fixing."
+    ),
+    "packet-loss": (
+        "The handset kept sending and the packets never arrived — the path dropped them. "
+        "Look at the network between the phone and the PBX, not at the phone's settings."
+    ),
+    "continuous": (
+        "The handset sent media throughout the call — it does not suppress silence, so the "
+        "2026-11-25 stalls were not VAD and the phone needs no setting change."
+    ),
+    "single-packet": "One packet only — nothing to conclude from that call.",
+    "no-media": "No RTP was captured on that call, so it settles nothing.",
+}
+
+# A verdict that answers the question. `no-media` is deliberately not one: a
+# ringing call has no media, so its silence proves nothing.
+SETTLING_CAUSES = ("sender-silent", "packet-loss", "continuous")
 
 
 def _host(rel: str) -> Path:
@@ -98,6 +135,21 @@ def _greeting_lines(path: Path) -> list[str]:
         ln.strip() for ln in _lines(path)
         if ln.strip() and not ln.lstrip().startswith("#")
     ]
+
+
+def parse_verdict(text: str) -> dict[str, Any] | None:
+    """`VERDICT: <cause> — <sentence>` (without the prefix) → its parts."""
+    match = _CAUSE_RE.match(text)
+    if not match:
+        return None
+    cause = match.group(1)
+    capture = _CAPTURE_RE.search(text)
+    return {
+        "cause": cause,
+        "conclusion": CONCLUSIONS.get(cause, "The probe recorded a call; its cause is not one this rule names."),
+        "text": text,
+        "capture": capture.group(1) if capture else None,
+    }
 
 
 def prewarm_state(now: datetime | None = None) -> dict[str, Any]:
@@ -153,10 +205,11 @@ def prewarm_state(now: datetime | None = None) -> dict[str, Any]:
 
 
 def media_state(now: datetime | None = None) -> dict[str, Any]:
-    """Captured handset calls and every recorded media silence."""
+    """Captured handset calls, every verdict, and every recorded media silence."""
     now = now or datetime.now(timezone.utc)
     log_path = _host(WATCH_LOG)
     stalls: list[dict[str, Any]] = []
+    verdicts: list[dict[str, Any]] = []
     captures = 0
     for line in _lines(log_path):
         match = _STAMPED.match(line)
@@ -165,8 +218,12 @@ def media_state(now: datetime | None = None) -> dict[str, Any]:
             captures += 1
         elif text.startswith(_STALL_PREFIX):
             stalls.append({"at": stamp, "text": text[len(_STALL_PREFIX):].strip()})
+        elif text.startswith(_VERDICT_PREFIX):
+            parsed = parse_verdict(text[len(_VERDICT_PREFIX):].strip())
+            if parsed is not None:
+                verdicts.append({"at": stamp, **parsed})
 
-    kept: list[Path] = []
+    kept: list[Path]
     try:
         kept = sorted(
             _host(WATCH_DIR).glob("call-*.pcap"),
@@ -197,6 +254,7 @@ def media_state(now: datetime | None = None) -> dict[str, Any]:
             ),
         }
 
+    last_verdict = verdicts[-1] if verdicts else None
     return {
         "watcherSeen": log_path.exists(),
         "captures": captures,
@@ -207,6 +265,15 @@ def media_state(now: datetime | None = None) -> dict[str, Any]:
         "lastStallRecent": recent[-1] if recent else None,
         "capturesKept": len(kept),
         "lastCapture": last_capture,
+        "verdicts": len(verdicts),
+        "lastVerdict": last_verdict,
+        # `settled` is the page's whole point: one answered call with media is
+        # enough to say whether the handset suppresses silence.
+        "question": (
+            "settled"
+            if last_verdict and last_verdict["cause"] in SETTLING_CAUSES
+            else "pending"
+        ),
     }
 
 
@@ -220,6 +287,7 @@ def build_voice_status(now: datetime | None = None) -> dict[str, Any]:
         "hostRoot": str(root),
         "prewarm": prewarm_state(now),
         "media": media_state(now),
+        "push": voice_notify.state(now),
     }
 
 

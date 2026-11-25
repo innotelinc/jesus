@@ -53,6 +53,12 @@ stop_capture() {
   if [ -x "$PROBE" ] && [ -s "$pcap" ]; then
     python3 "$PROBE" --pcap "$pcap" --gap 2.0 >>"$DIR/watch.log" 2>&1
     rc=$?
+    # Every analysed call gets one VERDICT line, not just the stalled ones: the
+    # Control Center reads it to close the silence-suppression question, and a
+    # call where the handset kept sending throughout is that answer. Without
+    # this line, the healthy case leaves nothing behind to read.
+    verdict=$(python3 "$PROBE" --pcap "$pcap" --verdict-line 2>/dev/null | head -1)
+    log "${verdict:-VERDICT: unreadable — the probe printed no verdict} — $pcap"
     # rtp_probe exits 2 when some stream went silent for 30 s or more: that is
     # the event this watcher exists for, so it gets its own line — and the probe
     # names the cause (the handset stopped sending, or the path ate the packets),

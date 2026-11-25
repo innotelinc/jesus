@@ -445,7 +445,7 @@ evidence and its warm cache without anyone remembering to ask:
 
 | Job | Every | What it does | Log |
 |---|---|---|---|
-| `rtp-stall-watch.sh` | 1 min | Captures the media of the next call on 101/102/301/302 and analyses it with `rtp-probe.py`; a stream silent for 30 s or more gets its own `STALL:` line that names the cause (the handset stopped sending vs. the path dropped the packets) | `/var/log/rtp-watch/watch.log` |
+| `rtp-stall-watch.sh` | 1 min | Captures the media of the next call on 101/102/301/302 and analyses it with `rtp-probe.py`; a stream silent for 30 s or more gets its own `STALL:` line that names the cause (the handset stopped sending vs. the path dropped the packets), and **every** analysed call gets a `VERDICT:` line — a healthy call is evidence too | `/var/log/rtp-watch/watch.log` |
 | `prewarm-watch.sh` | 5 min | Re-exports the routes' `initial_context`, re-renders the greetings, and on drift regenerates the list, installs it in the shim's volume and `POST /prewarm`s — no restart, so no caller waits. Writes its verdict (in sync, drifted, repaired) to a status file every run | `/var/log/prewarm-watch.log`, `/var/lib/capstone-prewarm/status.json` |
 
 ```bash
@@ -455,6 +455,7 @@ install -m 0755 deploy/prewarm-watch.sh   /usr/local/sbin/prewarm-watch.sh
 install -m 0644 deploy/prewarm-watch.cron /etc/cron.d/prewarm-watch
 install -m 0755 deploy/greeting-contexts.sh /usr/local/sbin/greeting-contexts.sh
 install -m 0755 scripts/rtp_probe.py /usr/local/bin/rtp-probe.py
+install -m 0755 deploy/handset-probe.sh /usr/local/sbin/handset-probe.sh
 ```
 
 The prewarm watcher reads the contexts from where they actually live —
@@ -474,11 +475,27 @@ why their verdicts are also published to places an operator already looks:
 | `GET /voice` (dashboard-api) | The installed greeting list, the last drift check, and every captured call / 30 s silence |
 | Health → **Voice — greeting prewarm & handset media** | The same, polled every 30 s, including *why* a leg went silent |
 | Alerts, ids `al-voice-*` | `prewarm-stale` (the timer stopped), `prewarm-drift` (the list no longer matches the routes), `prewarm-error` (state unreadable), `rtp-stall` (a handset leg went silent within 24 h) |
+| SMS, `VOICE_ALERT_SMS_TO` | The same alerts, one message each, deduplicated by alert id and message digest, through OpenSMS — the path `/sms-outbound` already uses. Off until a recipient and `OPENSMS_*` are set; the panel says which is missing |
 
 Those are derived from the status file and the watcher log, so they cost a file
 read rather than a `docker exec`. A host with neither file reports
 `installed: false` and raises no alerts. The stall investigation itself, and the
 rule that settles it, is in [voice-rtp-stall.md](voice-rtp-stall.md).
+
+### Making a handset answer, so the media question can close
+
+`deploy/handset-probe.sh <ext>` rings a handset with an auto-answer INVITE
+(`Call-Info: <sip:x>;answer-after=0`, the intercom convention) and holds the call
+long enough for the watcher to capture it, then prints the `VERDICT:` line. It
+installs one managed block in `extensions_custom.conf` (backed up, idempotent)
+because Asterisk's `channel originate` cannot add a SIP header. Our side sends no
+audio and records nothing, so an auto-answered handset hears silence.
+
+A Grandstream only honours that header when the account has **Allow Auto Answer
+by Call-Info** enabled, which is a setting in the phone's own web UI. On
+2026-11-25 both 101 and 301 rang for their full ring timeout instead: no handset
+on this estate auto-answers yet, so the question still needs that toggle (or one
+answered call by hand).
 
 ## Platform address — the name and the LAN IP are not interchangeable
 

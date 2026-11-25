@@ -346,6 +346,34 @@ def stall_line(row: dict) -> str:
     )
 
 
+def verdict_line(rows: list[dict]) -> str:
+    """The one line every analysed call leaves behind, stall or not.
+
+    A `STALL:` line only exists when something went wrong, which leaves the
+    opposite answer — "this call was fine, and here is what the media looked
+    like" — nowhere to be read. That answer is worth as much: it is what closes
+    the silence-suppression question, because a handset that kept sending for a
+    whole answered call is a handset that does not suppress silence.
+    """
+    if not rows:
+        return (
+            "VERDICT: no-media — no RTP was captured, so this call settles nothing "
+            "(nothing was answered, or the capture missed the media)"
+        )
+    head = f"{len(rows)} stream(s), {sum(r['packets'] for r in rows)} packet(s)"
+    stalled = stall_row(rows)
+    worst = stalled or max(rows, key=lambda r: r["max_gap_s"])
+    if stalled is None:
+        return (
+            f"VERDICT: {worst['verdict']['cause']} — {describe_verdict(worst['verdict'])} "
+            f"({head}, longest silence {worst['max_gap_s']}s on {worst['stream']})"
+        )
+    return (
+        f"VERDICT: {worst['verdict']['cause']} — {describe_verdict(worst['verdict'])} "
+        f"({head}, worst silence {worst['max_gap_s']}s on {worst['stream']})"
+    )
+
+
 def capture(seconds: int, iface: str, out: Path) -> Path:
     """`tcpdump -w` for ``seconds``, RTP port range only."""
     cmd = [
@@ -373,6 +401,10 @@ def main(argv: list[str] | None = None) -> int:
         "--stall-line", action="store_true",
         help="print only the one-line STALL summary (exit 2 when a leg stalled)",
     )
+    ap.add_argument(
+        "--verdict-line", action="store_true",
+        help="print only one line saying what the media did, stall or not (always exit 0)",
+    )
     args = ap.parse_args(argv)
 
     if not args.pcap and not args.capture:
@@ -391,11 +423,16 @@ def main(argv: list[str] | None = None) -> int:
         print(stall_line(stall))
         return 2
 
+    if args.verdict_line:
+        print(verdict_line(rows))
+        return 0
+
     if args.json:
         print(json.dumps({
             "pcap": str(path), "linktype": dlt, "packets": len(frames),
             "streams": rows, "rejected_lookalikes": rejected,
             "stall": stall_line(stall) if stall else None,
+            "verdict": verdict_line(rows),
         }, indent=2))
         return 0
 

@@ -39,7 +39,10 @@ produced. So the packet after a silence says which of the two causes it was:
 
 `scripts/rtp_probe.py` computes exactly this per stream (`verdict.cause` =
 `sender-silent` / `packet-loss` / `continuous`, plus `lost_in_gap` and
-`resumed`), and `--stall-line` prints the one sentence the watcher logs:
+`resumed`). Two flags print the sentences the watcher logs — `--stall-line` only
+when something stalled, and `--verdict-line` for **every** analysed call, because
+"the handset kept sending throughout" is the answer to this question and a log
+that only records failures can never state it:
 
 ```
 STALL: 31.4s of silence on 192.168.1.10:52172 -> 192.168.1.52:16142
@@ -55,18 +58,33 @@ the Alerts page as well as greppable.
 
 ## Current verdict: one answered call short
 
-**Not yet established.** The watcher is armed and has already captured its first
-real `PJSIP/101` ring, but no *answered* handset call has happened since it was
-installed, so there is no media to read. The leading hypothesis — the handset
-suppressing silence during a long agent turn — is consistent with every
-observation above (mid-call, only on 101, ~30 s of silence while the agent talks)
-but it is a hypothesis, not a finding.
+**Not yet established.** Three calls have now been captured and all three had no
+media to judge:
 
-What would confirm it: an answered call where `verdict.cause` is
-`sender-silent`, the silence sits inside a stretch where the caller is not
-speaking, and the stream resumes. What would refute it: `packet-loss`, or
-`sender-silent` with `resumed: false` (the audio path broke rather than the
-phone choosing to be quiet).
+| When | Call | What the capture held | Why |
+|---|---|---|---|
+| 05:14 | first `PJSIP/101` ring | 8163 packets, 0 RTP | nobody answered |
+| 06:49 | auto-answer probe to 101 | 15662 packets, 0 RTP | rang 25 s, never answered |
+| 06:50 | auto-answer probe to 301 | 0 RTP | rang 20 s, never answered |
+
+The two probes are the point: waiting for a human to pick up a desk phone at
+03:00 was the thing that kept this open, so `deploy/handset-probe.sh` now rings
+the handset itself with the intercom auto-answer header
+(`Call-Info: <sip:x>;answer-after=0`). **No handset on this estate answered it.**
+A Grandstream only honours that header when its account has *Allow Auto Answer by
+Call-Info* enabled, and 301/302 (from `192.168.1.5`) declined as well. So the
+mechanism is in place and the blocker is now a single setting, not a wait for a
+person:
+
+```bash
+# once the phone allows Call-Info auto-answer (its own web UI), one command:
+handset-probe.sh 101          # rings, holds 130 s, prints the verdict
+```
+
+What would confirm VAD: an answered call where the verdict is `sender-silent`,
+the silence sits where the caller is not speaking, and the stream resumes. What
+would refute it: `packet-loss`, or `sender-silent` with `resumed: false` (the
+audio path broke rather than the phone choosing to be quiet).
 
 Either way the call no longer drops: with `rtp_timeout=0` a silent leg is not a
 reason to hang up, and `rtp_keepalive=15` keeps the estate's side of the media
@@ -74,13 +92,24 @@ flowing. If the verdict is VAD, the residual cost is that Asterisk sees no
 inbound audio while the caller is silent — which is when nothing is listening to
 them anyway.
 
+**Nobody has to read the log to get that answer.** Each capture's `VERDICT:`
+line is parsed by the Control Center: `GET /voice` reports `media.question` as
+`pending` or `settled`, alongside the cause and a plain-language conclusion, and
+the Health page prints it ("Settled: continuous — the handset sent media
+throughout…"). The first answered call closes the question without anyone
+opening a shell.
+
 ## Reading the record
 
 ```bash
 # what the watcher has seen
 tail -40 /var/log/rtp-watch/watch.log
+# what each captured call did, healthy or not
+grep '^.*VERDICT:' /var/log/rtp-watch/watch.log
 # every stall, with its cause
 grep '^.*STALL:' /var/log/rtp-watch/watch.log
 # re-read any kept capture
 python3 /usr/local/bin/rtp-probe.py --pcap /var/log/rtp-watch/call-*.pcap --gap 2.0
+# what the Control Center concluded
+grep '"question"' <(curl -s localhost:8095/voice | python3 -m json.tool)
 ```

@@ -301,6 +301,32 @@ export interface VoiceMedia {
   lastStallRecent: VoiceStall | null;
   capturesKept: number;
   lastCapture: { name: string; sizeBytes: number; at: string | null } | null;
+  verdicts: number;
+  lastVerdict: VoiceVerdict | null;
+  /** `settled` once a captured call had media to judge; `pending` until then. */
+  question: 'settled' | 'pending';
+}
+
+export interface VoiceVerdict {
+  at: string | null;
+  cause: string;
+  /** What the cause means for the handset question, in the API's words. */
+  conclusion: string;
+  text: string;
+  capture: string | null;
+}
+
+export interface VoicePush {
+  configured: boolean;
+  to: string;
+  provider: string;
+  providerSource: string;
+  gateway: string;
+  lastSentAt: string | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  sent: number;
+  intervalSeconds: number;
 }
 
 export interface VoiceStatus {
@@ -309,4 +335,5 @@ export interface VoiceStatus {
   hostRoot: string;
   prewarm: VoicePrewarm;
   media: VoiceMedia;
+  push: VoicePush;
 }

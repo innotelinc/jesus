@@ -131,6 +131,70 @@ class VoiceStateTest(unittest.TestCase):
 
     # ── handset media ───────────────────────────────────────────────────────
 
+    def test_a_capture_verdict_settles_the_silence_question(self):
+        """The page should *answer* the VAD question, not just log a sentence.
+
+        A handset that kept sending through an answered call is a handset that
+        does not suppress silence; the panel says so, in the API's words.
+        """
+        self.write_status()
+        self.write_listing("Hi there, this is Jordan.")
+        self.write_log(
+            f"{_iso(6)} VERDICT: continuous — kept sending throughout — the audio was there, "
+            "so look past the media (1 stream(s), 41 packet(s), longest silence 0.2s on "
+            "192.168.1.10:52172 -> 192.168.1.52:16142 ssrc=0x0000beef pt=0) — "
+            "/var/log/rtp-watch/call-20261125T062010Z.pcap",
+        )
+        media = voice.build_voice_status()["media"]
+        self.assertEqual(media["question"], "settled")
+        self.assertEqual(media["lastVerdict"]["cause"], "continuous")
+        self.assertEqual(media["lastVerdict"]["capture"], "call-20261125T062010Z.pcap")
+        self.assertIn("does not suppress silence", media["lastVerdict"]["conclusion"])
+        self.assertEqual(self.alerts(), {}, "a healthy call is not an alert")
+
+    def test_a_sender_silent_verdict_reads_as_vad_and_keeps_the_stall(self):
+        self.write_status()
+        self.write_listing("Hi there, this is Jordan.")
+        self.write_log(
+            f"{_iso(9)} STALL: 31.4s of silence on 192.168.1.10:52172 -> 192.168.1.52:16142 "
+            "ssrc=0x0000beef pt=0 — nothing was lost across the 31.4s silence — the handset "
+            "stopped sending (silence suppression / muted mic), and it came back",
+            f"{_iso(9)} VERDICT: sender-silent — nothing was lost across the 31.4s silence — "
+            "the handset stopped sending (silence suppression / muted mic), and it came back "
+            "(1 stream(s), 612 packet(s), worst silence 31.4s on 192.168.1.10:52172) — "
+            "/var/log/rtp-watch/call-c.pcap",
+        )
+        media = voice.build_voice_status()["media"]
+        self.assertEqual(media["question"], "settled")
+        self.assertEqual(media["lastVerdict"]["cause"], "sender-silent")
+        self.assertIn("silence suppression", media["lastVerdict"]["conclusion"])
+        self.assertIn("al-voice-rtp-stall", self.alerts())
+
+    def test_a_call_without_media_leaves_the_question_pending(self):
+        self.write_status()
+        self.write_listing("Hi there, this is Jordan.")
+        self.write_log(
+            f"{_iso(6)} VERDICT: no-media — no RTP was captured, so this call settles nothing "
+            "(nothing was answered, or the capture missed the media) — "
+            "/var/log/rtp-watch/call-d.pcap",
+        )
+        media = voice.build_voice_status()["media"]
+        self.assertEqual(media["question"], "pending")
+        self.assertIn("settles nothing", media["lastVerdict"]["conclusion"])
+
+    def test_a_stall_without_a_verdict_leaves_the_question_pending(self):
+        self.write_status()
+        self.write_listing("Hi there, this is Jordan.")
+        self.write_log(f"{_iso(4)} STALL: 30.2s of silence on PJSIP/101 — the handset stopped sending")
+        self.assertEqual(voice.build_voice_status()["media"]["question"], "pending")
+
+    def test_the_push_state_is_reported_and_off_until_it_is_configured(self):
+        push = voice.build_voice_status()["push"]
+        self.assertEqual(push["gateway"], "opensms")
+        self.assertIn(push["provider"], ("zeus", "opensms", "auto"))
+        self.assertEqual(push["to"], "", "no recipient configured means no number to leak")
+        self.assertFalse(push["configured"])
+
     def test_a_recent_stall_becomes_an_alert_that_names_the_cause(self):
         self.write_status()
         self.write_listing("Hi there, this is Jordan.")

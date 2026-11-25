@@ -172,6 +172,54 @@ class PcapTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(buffer.getvalue().strip(), "")
 
+    def test_the_verdict_line_says_a_healthy_handset_kept_sending(self):
+        """A healthy call still leaves a line — "no silence" is an answer too.
+
+        Without this the panel could only ever show failures, and the question
+        "does the phone suppress silence" could not be closed by a good call.
+        """
+        import contextlib
+        import io
+
+        steady = Path(self.tmp.name) / "steady-verdict.pcap"
+        _pcap(steady, [
+            (i * 0.02, _ethernet(_ip_udp("192.168.1.77", "192.168.1.52", 11700, 10002, _rtp(9, i))))
+            for i in range(100)
+        ])
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rtp_probe.main(["--pcap", str(steady), "--verdict-line"])
+        self.assertEqual(code, 0, "a healthy call is not an error")
+        line = buffer.getvalue().strip()
+        self.assertTrue(line.startswith("VERDICT: continuous — "), line)
+        self.assertIn("kept sending throughout", line)
+        self.assertIn("100 packet(s)", line)
+
+    def test_the_verdict_line_on_a_stalled_capture_names_sender_silent(self):
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rtp_probe.main(["--pcap", str(self.path), "--verdict-line"])
+        self.assertEqual(code, 0, "--verdict-line reports, it does not fail the run")
+        line = buffer.getvalue().strip()
+        self.assertTrue(line.startswith("VERDICT: sender-silent — "), line)
+        self.assertIn("handset stopped sending", line)
+        self.assertIn("worst silence", line)
+
+    def test_a_capture_with_no_rtp_says_it_settles_nothing(self):
+        import contextlib
+        import io
+
+        empty = Path(self.tmp.name) / "empty.pcap"
+        _pcap(empty, [(0.0, _ethernet(_ip_udp(
+            "192.168.1.1", "192.168.1.2", 5000, 5001, b"\x00" * 20))) for _ in range(3)])
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            rtp_probe.main(["--pcap", str(empty), "--verdict-line"])
+        self.assertIn("VERDICT: no-media", buffer.getvalue())
+
     def test_linux_cooked_capture_is_read_the_same_as_ethernet(self):
         cooked = Path(self.tmp.name) / "any.pcap"
         packets = [

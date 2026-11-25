@@ -47,6 +47,7 @@ from . import sms_outbound
 from . import sms_transport
 from . import stack_access
 from . import voice
+from . import voice_notify
 from . import workflows
 from .auth import (
     COOKIE_NAME,
@@ -4151,6 +4152,50 @@ def voice_status(user: dict = Depends(require_session)):
     false` instead of failing.
     """
     return voice.build_voice_status()
+
+
+# --------------------------------------------------------------------------
+# Voice alerts → SMS
+# --------------------------------------------------------------------------
+# The Alerts page assumes somebody is looking at it. A handset leg that went
+# silent at 03:00 is exactly what nobody is looking at, so the voice alerts are
+# also pushed as one SMS each — opt-in (VOICE_ALERT_SMS_TO plus a gateway),
+# deduplicated per alert by voice_notify, and never fatal: the page stays the
+# record, the SMS is the nudge.
+_voice_push_started = False
+
+
+def _voice_alert_push_loop(interval: float) -> None:
+    while True:
+        try:
+            sent = voice_notify.dispatch(voice.build_voice_alerts())
+            if sent.get("sent"):
+                logger.info("voice alert SMS sent: %s", ", ".join(sent["sent"]))
+            elif sent.get("error"):
+                logger.debug("voice alert SMS not sent: %s", sent["error"])
+        except Exception as exc:  # noqa: BLE001 - the loop must never die
+            logger.debug("voice alert push error: %s", exc)
+        time.sleep(interval)
+
+
+@app.on_event("startup")
+def _start_voice_alert_push() -> None:
+    """Start the SMS nudge loop once, and only when it is actually configured."""
+    global _voice_push_started
+    if _voice_push_started:
+        return
+    if not voice_notify.enabled():
+        logger.info(
+            "voice alert SMS push off — set %s and OPENSMS_URL/OPENSMS_API_KEY to arm it",
+            voice_notify.TO_ENV,
+        )
+        return
+    _voice_push_started = True
+    threading.Thread(
+        target=_voice_alert_push_loop, args=(voice_notify.interval(),),
+        name="voice-alert-push", daemon=True,
+    ).start()
+    logger.info("voice alert SMS push started (every %.0fs)", voice_notify.interval())
 
 
 @app.get("/authentik/access")

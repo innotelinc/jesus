@@ -573,6 +573,29 @@ export default function Health() {
                     No answered handset call has been captured yet — the watcher takes the next one.
                   </p>
                 )}
+                {voiceState.media.lastVerdict ? (
+                  <div className="mt-2">
+                    <p className="text-xs">
+                      <span className="font-medium">
+                        {voiceState.media.question === 'settled' ? 'Settled' : 'Verdict'}:
+                      </span>{' '}
+                      <code className="rounded bg-muted px-1 py-0.5 font-mono">
+                        {voiceState.media.lastVerdict.cause}
+                      </code>{' '}
+                      {voiceState.media.lastVerdict.at && (
+                        <span className="text-muted-foreground">
+                          {formatRelativeTime(voiceState.media.lastVerdict.at)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{voiceState.media.lastVerdict.conclusion}</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No verdict yet — the watcher writes one for every captured call, so the first
+                    answered handset call settles the question.
+                  </p>
+                )}
                 {voiceState.media.lastCapture && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Latest capture {voiceState.media.lastCapture.name} ·{' '}
@@ -580,6 +603,20 @@ export default function Health() {
                   </p>
                 )}
                 <p className="mt-3 text-xs text-muted-foreground">
+                  {voiceState.push.configured ? (
+                    <>
+                      SMS push to {voiceState.push.to} via {voiceState.push.gateway}
+                      {voiceState.push.lastError ? ` — last attempt failed: ${voiceState.push.lastError}` : ''}
+                    </>
+                  ) : (
+                    <>
+                      SMS push is off — set{' '}
+                      <code className="rounded bg-muted px-1 py-0.5 font-mono">VOICE_ALERT_SMS_TO</code>{' '}
+                      and the gateway&rsquo;s URL/key to be paged.
+                    </>
+                  )}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
                   <Link to="/alerts" className="font-medium text-primary hover:underline">Open alerts</Link>{' '}
                   for the acknowledge / resolve workflow.
                 </p>
