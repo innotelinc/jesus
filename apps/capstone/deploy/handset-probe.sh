@@ -25,7 +25,9 @@
 # `#include` line to the main file (once, backed up first).
 #
 # Variants (PROBE_VARIANTS, default both, in this order):
-#   call-info   Call-Info: <sip:probe@localhost>;answer-after=0   (Grandstream intercom)
+#   call-info   Call-Info: <sip:probe@localhost>;answer-after=0   (the intercom convention;
+#               on the T54W at 192.168.1.10 this is Features → General →
+#               "Allow Auto Answer by Call-Info")
 #   alert-info  Alert-Info: <http://127.0.0.1>;info=alert-autoanswer
 #
 #   handset-probe.sh                      # probe 101, both variants
@@ -176,9 +178,10 @@ done
 if [ "$answered" -eq 0 ]; then
   echo
   echo "No variant was answered on $EXT. If the auto-answer header above is on the"
-  echo "INVITE, the refusal is the handset's: enable \"Allow Auto Answer by Call-Info\""
-  echo "(or the phone's intercom auto-answer) in its own web UI. If it is NOT PRESENT,"
-  echo "the header was never sent and this probe proves nothing about the phone."
+  echo "INVITE, the refusal is the handset's: on its web UI (https://192.168.1.10/)"
+  echo "set Features -> General -> \"Allow Auto Answer by Call-Info\" = Enabled."
+  echo "If the header is NOT PRESENT, it was never sent and this probe proves"
+  echo "nothing about the phone."
   exit 3
 fi
 

@@ -19,7 +19,8 @@ occurrence into an answer instead of another hypothesis.
 | Each arrived ~30 s before a long call ended (the second: a 121 s call) | `rtp_timeout` was 30 |
 | The agent leg emits **no RTP at all** — it is a `WebSocket/dograh/…` channel over ARI | `core show channels`, call legs |
 | A ringing call on 101 captures **0 RTP streams** | `call-20261125T051444Z.pcap`: 8163 packets, linktype 276, no media |
-| The handset is a **Grandstream DP750 1.0.21.33** (a DECT base; 101 and 102 both register from `192.168.1.10`, 301/302 from `192.168.1.5`) | `User-Agent` in that capture |
+| The handset is a **Yealink SIP-T54W, firmware 96.86.0.70** — it holds two accounts, 101 ("Desk T54W") and 102 ("Fax"), both registering from `192.168.1.10`; 301/302 register from `192.168.1.5` | `User-Agent: Yealink SIP-T54W 96.86.0.70` on a live `pjsip qualify 101`, and `https://192.168.1.10/` answers `<title>Yealink T54W Phone</title>` |
+| Earlier revisions called it a **Grandstream DP750 1.0.21.33** — that was wrong, read off the 05:14 capture; the auto-answer instruction below names the Yealink setting | `pjsip qualify 101` and the phone's own web UI, both checked 2026-11-25 09:47Z |
 | No SDP from the handset is on record, so its declared VAD/comfort-noise capability is unknown | the capture's only SIP responses were two `200 OK` to qualify |
 
 Zero media on a ringing call is correct, not a capture fault: an unanswered call
@@ -90,8 +91,15 @@ instead of guessing, and why this section still says *pending*:
 #   does the phone suppress silence?  unknown — no answered call has media yet
 ```
 
+The switch is on the phone, in its own web UI (`https://192.168.1.10/`, admin login):
+**Features → General → "Allow Auto Answer by Call-Info" → Enabled**, then Save. It
+is a device-level setting, so it covers both of the phone's accounts (101 and 102)
+and both header conventions the probe tries. Nothing on the PBX needs to change —
+the pre-dial handler already adds the header, and the probe prints whether it
+actually reached the INVITE.
+
 ```bash
-# once the phone allows Call-Info auto-answer (its own web UI), one command:
+# once the phone allows Call-Info auto-answer, one command:
 handset-probe.sh 101          # rings, holds 130 s, prints the verdict
 ```
 

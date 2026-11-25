@@ -1461,12 +1461,29 @@ decides once something can reach the port:
   (`read = system,call,reporting,command`, `write = call,command`) and a permit
   for `127.0.0.1` only — it reaches AMI over the exec path above rather than from
   its own address. The harness still needs `didiag`'s secret put in its place;
-  `192.168.1.113` refused our SSH on the day the account was created, so that
-  half is open. To bring `didtest` back, restore
+  `192.168.1.113` refused every credential the fleet store holds (all five root
+  logins were tried on 2026-11-25; the box runs OpenSSH 10.2p1 and serves
+  nothing on 80, 443 or 9292), so that half is open. To bring `didtest` back, restore
   `/etc/asterisk/manager_custom.conf.bak-didtest-<stamp>` inside the container and
   run `asterisk -rx "manager reload"` — and expect `voice-check.py` to fail until
   you take it out again. The PJSIP endpoint `telno-didtest` is a different thing —
   the harness's SIP side — and was left in place.
+
+The swap on the harness host, once someone has a login there (the secret is read
+from the PBX, never typed into a shell or a chat):
+
+```bash
+# on 192.168.1.113
+SECRET=$(ssh root@192.168.1.52 \
+  'docker exec freepbx-qvifit87vftfxd9ejsch2vxy sed -n "/^\[didiag\]/,/^\[/p" \
+     /etc/asterisk/manager_custom.conf | sed -n "s/^secret *=* *//p"')
+# set $SECRET as didiag's AMI password in the harness config, restart the harness,
+# and confirm from the PBX: tail -1 /var/log/asterisk/security must carry
+# AccountID="didiag" — an AMI login still on the old secret logs InvalidAccountID.
+```
+
+Do not echo `$SECRET`; the reader above prints every account's secret, so its
+output belongs nowhere but that assignment.
 
 AMI auth failures do reach the `security` log — `SecurityEvent="InvalidAccountID"`
 with `Service="AMI"` and a `TCP` `RemoteAddress` — and the `asterisk-capstone`
