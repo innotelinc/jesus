@@ -8,15 +8,16 @@ starts, the healthcheck passes, and the only symptom is missing data (zero
 devices in FreePBX, no model configuration in dograh, a TTS cache that silently
 re-synthesises every greeting).
 
-This compares each pair by apparent size and shouts when the live twin (the
-dash form, the one the running stack mounts) is a fraction of its sibling. It
-only reads: the repair is a copy, documented in docs/operations.md.
+This compares each pair by apparent size and shouts when the live twin (the dash
+form, the one the running stack mounts) is a fraction of its sibling. It only
+reads: the repair is a copy, documented in docs/operations.md.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import sys
 
 DEFAULT_UUID = "qvifit87vftfxd9ejsch2vxy"
@@ -34,6 +35,10 @@ CHURN = ("-logs", "-repo")
 # is answered by listening to it, not by a byte count.
 SOFT = ("-spool",)
 
+# `<uuid>_<uuid>-anything` is the dash twin, and the only self-describing
+# signature of the pattern; it also tells us the uuid without being configured.
+TWIN = re.compile(r"^(?P<uuid>[0-9a-zA-Z]{8,40})_(?P=uuid)-")
+
 
 def tree_size(path: str) -> int:
     total = 0
@@ -47,7 +52,7 @@ def tree_size(path: str) -> int:
     return total
 
 
-def pairs(root: str, uuid: str) -> dict[str, dict[str, str]]:
+def twins(root: str, uuid: str) -> dict[str, dict[str, str]]:
     """Group volume directories by base name: {"mariadb-data": {"live": …, "old": …}}."""
     grouped: dict[str, dict[str, str]] = {}
     try:
@@ -66,9 +71,59 @@ def pairs(root: str, uuid: str) -> dict[str, dict[str, str]]:
     return grouped
 
 
+def discover(root: str) -> list[str]:
+    """Every service uuid on this host that has at least one dash twin."""
+    try:
+        names = os.listdir(root)
+    except OSError as e:
+        raise SystemExit(f"cannot read {root}: {e}")
+    uuids = set()
+    for entry in names:
+        m = TWIN.match(entry)
+        if m:
+            uuids.add(m.group("uuid"))
+    return sorted(uuids)
+
+
+def inspect(root: str, uuid: str, ratio: float, min_bytes: int, label: str) -> list[dict]:
+    findings = []
+    grouped = twins(root, uuid)
+    for base in sorted(grouped):
+        vols = grouped[base]
+        live, old = vols.get("live"), vols.get("old")
+        if any(base.endswith(suffix) for suffix in CHURN):
+            continue
+        live_size = tree_size(live) if live else 0
+        old_size = tree_size(old) if old else 0
+        state = "pair"
+        if live is None or old is None:
+            state = "unpaired"
+        elif max(live_size, old_size) < min_bytes:
+            state = "empty-both"
+        elif old_size >= min_bytes and live_size < old_size * ratio:
+            state = "LIVE-LOOKS-EMPTY"
+        elif live_size >= min_bytes and old_size < live_size * ratio:
+            state = "old-looks-stale"
+        findings.append(
+            {
+                "service": label,
+                "volume": base,
+                "live_bytes": live_size,
+                "old_bytes": old_size,
+                "state": state,
+            }
+        )
+    return findings
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--uuid", default=DEFAULT_UUID, help="Coolify service uuid")
+    p.add_argument(
+        "--all",
+        action="store_true",
+        help="every service on this host that has dash twins (ignores --uuid)",
+    )
     p.add_argument("--volumes-root", default=DEFAULT_ROOT, help="docker volumes dir")
     p.add_argument(
         "--ratio",
@@ -85,34 +140,23 @@ def main() -> int:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     args = p.parse_args()
 
-    grouped = pairs(args.volumes_root, args.uuid)
-    if not grouped:
-        raise SystemExit(f"no volumes for {args.uuid} under {args.volumes_root}")
+    if args.all:
+        found = discover(args.volumes_root)
+        if not found:
+            print(
+                f"no volume twins under {args.volumes_root} — "
+                "nothing on this host uses the doubled naming"
+            )
+            return 0
+        uuids = found
+    else:
+        uuids = [args.uuid]
 
-    findings = []
-    for base in sorted(grouped):
-        twins = grouped[base]
-        live, old = twins.get("live"), twins.get("old")
-        live_size = tree_size(live) if live else 0
-        old_size = tree_size(old) if old else 0
-        if any(base.endswith(suffix) for suffix in CHURN):
-            continue
-        state = "pair"
-        if live is None or old is None:
-            state = "unpaired"
-        elif max(live_size, old_size) < args.min_bytes:
-            state = "empty-both"
-        elif old_size >= args.min_bytes and live_size < old_size * args.ratio:
-            state = "LIVE-LOOKS-EMPTY"
-        elif live_size >= args.min_bytes and old_size < live_size * args.ratio:
-            state = "old-looks-stale"
-        findings.append(
-            {
-                "volume": base,
-                "live_bytes": live_size,
-                "old_bytes": old_size,
-                "state": state,
-            }
+    findings: list[dict] = []
+    for uuid in uuids:
+        label = uuid if args.all else ""
+        findings.extend(
+            inspect(args.volumes_root, uuid, args.ratio, args.min_bytes, label)
         )
 
     bad = [
@@ -122,23 +166,26 @@ def main() -> int:
         and not any(f["volume"].endswith(suffix) for suffix in SOFT)
     ]
     if args.json:
-        print(json.dumps({"uuid": args.uuid, "findings": findings}, indent=1))
+        print(json.dumps({"findings": findings}, indent=1))
     else:
         for f in findings:
             live_mb = f["live_bytes"] / 1048576
             old_mb = f["old_bytes"] / 1048576
             soft = any(f["volume"].endswith(suffix) for suffix in SOFT)
-            mark = "CRITICAL" if f["state"] == "LIVE-LOOKS-EMPTY" and not soft else "ok"
-            if soft and f["state"] == "LIVE-LOOKS-EMPTY":
-                mark = "warn"
+            if f["state"] == "LIVE-LOOKS-EMPTY":
+                mark = "warn" if soft else "CRITICAL"
+            else:
+                mark = "ok"
+            prefix = f"{f['service'][:12]:<12} " if args.all else ""
             print(
-                f"{mark:9} {f['volume']:<16} live={live_mb:8.1f}M "
+                f"{mark:9} {prefix}{f['volume']:<16} live={live_mb:8.1f}M "
                 f"sibling={old_mb:8.1f}M  {f['state']}"
             )
     if bad:
+        detail = ", ".join(f"{f['volume']} ({f['service'][:12]})" for f in bad)
         print(
-            f"CRITICAL: {len(bad)} live volume(s) look empty next to their sibling — "
-            "the stack is probably running on the wrong twin; see "
+            f"CRITICAL: {len(bad)} live volume(s) look empty next to their sibling "
+            f"[{detail}] — the stack is probably running on the wrong twin; see "
             "docs/operations.md → Repairing a stateful volume from its twin",
             file=sys.stderr,
         )

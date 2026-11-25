@@ -337,9 +337,28 @@ lands on the empty twin, which `docker ps` reports as perfectly healthy.
 
 ```bash
 python3 scripts/volume_twin_guard.py            # table, exit 1 on a suspect twin
+python3 scripts/volume_twin_guard.py --all      # every service on this host
 python3 scripts/volume_twin_guard.py --json     # same facts, machine-readable
 python3 scripts/volume_twin_guard.py --volumes-root /tmp/fixture   # test it without docker
 ```
+
+`--all` is the mode the cron uses: it finds uuids by their dash twin, so it keeps
+covering services nobody has told it about. As of writing only `.52` uses the doubled
+naming — `.53` (a Coolify server with many services) and `.51` have no twins, and the guard
+says so instead of pretending it checked something.
+
+The same rule runs **before a deploy** as `scripts/volume_preflight.sh`, the first step of
+`capstone-init` (which everything else gates on). The init container mounts the volumes root
+read-only at `/volumes` and calls it with plain BusyBox `sh` — no python in `alpine/git`:
+
+```
+volume-preflight: warn: asterisk-spool live 696K vs sibling 3052K (soft)
+volume-preflight: 10 volume pair(s) checked under /volumes
+```
+
+A live twin under half its sibling fails the init with `REFUSING: …`, so the deploy stops
+with the previous containers still running instead of bringing the stack up on empty data —
+the repair is then a deliberate copy, not a rescue.
 
 Installed on the host as `/usr/local/bin/vol-twin-guard.py` and run from
 `/etc/cron.d/vol-twin-guard` every ten minutes; it is **silent unless it fails**, and a
