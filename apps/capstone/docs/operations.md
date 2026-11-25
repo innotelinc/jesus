@@ -264,6 +264,54 @@ ss -ltn | grep 5038          # exactly one line, 192.168.1.52:5038
 docker port freepbx-<uuid> 15038
 ```
 
+### The new platform owns `pbx.innotel.site`
+
+`asterisk-console` (`innotelinc/asterisk-console`, Coolify app `jbtpvwsy7yiq4cawc4aoqf7n`) is
+the public face of this stack. It is not a container in the voice service — it is its own
+Coolify application, attached to the voice network so it can reach AMI and ARI:
+
+```bash
+docker inspect -f '{{range $k,$v := .Config.Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' \
+  $(docker ps --format '{{.Names}}' | grep jbtpvwsy7yiq4cawc4aoqf7n) \
+  | grep 'traefik.http.routers.*rule'      # Host(`pbx.innotel.site`) && PathPrefix(`/`)
+curl -s http://192.168.1.52:8097/api/health  # {"ok":true,"version":"1.0.0","needsSetup":false}
+```
+
+No `freepbx-…` container carries a traefik router, so FreePBX is *not* on a hostname at all:
+it stays as the Asterisk engine (SIP, ARI on `8088`, AMI through `ami-bridge` on
+`192.168.1.52:5038`) and its admin UI is only on the host at `:8083`. Replacing the console
+with something else therefore means removing that app's router label, not editing this
+service. What still stands between the hostname and the platform is Authentik: a request to
+`https://pbx.innotel.site/api/health` is answered with a 302 to `/outpost.goauthentik.io/start`
+by the outpost in front of Traefik.
+
+### Repairing a stateful volume from its twin
+
+Every stateful volume exists twice (`<svc>_postgres-data` and
+`<svc>_<svc>-postgres-data`); the live stack mounts the dash form. When a deploy leaves a
+service on the empty twin, the fix is a copy — but read the old twin *before* copying, so you
+know what you are about to restore. For Postgres, copy it out and count rows in a throwaway
+container of the same image; this is what proved dograh's model configuration still existed:
+
+```bash
+V=/var/lib/docker/volumes
+OLD=$V/<svc>_postgres-data/_data
+IMG=$(docker inspect -f '{{.Config.Image}}' postgres-<uuid>)
+rm -rf /tmp/pgprobe && cp -a "$OLD"/. /tmp/pgprobe/
+docker run -d --name pgprobe -v /tmp/pgprobe:/var/lib/postgresql/data \
+  -e POSTGRES_HOST_AUTH_METHOD=trust "$IMG" >/dev/null
+sleep 10
+docker exec pgprobe psql -U postgres -d postgres -tA \
+  -c 'select count(*) from model_configurations'   # 1 = the voice is still there
+docker rm -f pgprobe && rm -rf /tmp/pgprobe
+```
+
+Then stop everything that writes to it, back it up, copy, and start in dependency order
+(`postgres` → `dograh-api`/`dograh-ui` → `capstone-wire`). `model_configurations` is the row
+the wire needs: with it present the voice step reconciles and `capstone-wire` exits 0; with it
+absent the wire stops at `404: no default model configuration` and nothing in the repo can
+re-create it.
+
 One more thing the recreate exposed: `ari.conf` in the config volume is a *symlink* into
 `/var/www/html/admin/modules/arimanager/etc/ari.conf`. When the image ships without the
 `arimanager` module that target does not exist, the entrypoint's `touch /etc/asterisk/ari.conf`
