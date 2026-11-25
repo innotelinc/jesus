@@ -157,6 +157,13 @@ UI, and all four are checkable:
   `docker inspect freepbx-… --format '{{range .Mounts}}{{.Destination}}={{.Source}}{{"\n"}}{{end}}'`
   and look up `/etc/asterisk`. A stale path fails silently: the edit lands in an orphaned
   volume nobody mounts.
+- **Every stateful volume exists twice.** `docker volume ls | grep <service>` lists both
+  `<service>_postgres-data` and `<service>_<service>-postgres-data` (same for mariadb,
+  minio, redis, speaches, the tts caches). The live stack mounts the **dash** form, and a
+  re-render can move a service onto the other twin without saying so: the container comes
+  up *empty* rather than failing, so the symptom is missing data, not an error. Compare
+  `du -sh` for each pair before and after a deploy — a 4 KB twin beside a 658 MB one is
+  the tell, and it is what emptied dograh's model configuration on 25 November.
 - **The FreePBX database is in the container layer, not a volume.** The mounts are
   `/var/www/html`, `/var/lib/asterisk/sounds`, the asterisk config/log/spool volumes —
   `/var/lib/mysql` is *not* mounted. A recreate therefore starts from the image's baked
@@ -217,6 +224,45 @@ so a further recreate keeps them. Verify the count before the copy
 (`select count(*) from asterisk.devices`) and after; nine devices is the healthy number
 here. A `du -sh` on both volumes is the quick tell — the live database was 244 M, the
 image's baked one 200 M.
+
+### The setup wire after a redeploy
+
+`capstone-wire` is a one-shot container (`restart: no`, mounts `/repo` read-only) that
+reconciles dograh from the repo: agents, ARI config, Stasis name, voice, extension
+bindings. It runs on every deploy and its exit code is the signal, so these are the modes
+it fails in and what each one means now:
+
+- **`OSError: [Errno 30] Read-only file system: '/repo/.env'`** — the mount is read-only by
+  design, so persisting `DOGRAH_API_TOKEN` / `DOGRAH_STASIS_APP_NAME` back into the
+  checkout cannot work from inside the container. It is a warning now; both values are
+  re-derived from the API on the next run, and anything that must survive belongs in the
+  deployment environment.
+- **`HTTP 422 … max_call_duration: Input should be greater than 0`** — an image built
+  before the call-duration change rejects a duration of `0`, and one refused key fails the
+  whole `PUT`. Non-positive durations are dropped with a warning and the rest of the
+  settings still land. The workflow JSONs ship `1200`, which every build accepts.
+- **`HTTP 404: no default model configuration is set for the organization`** — dograh's
+  own state, not the repo's: nothing in the wire creates the default model configuration,
+  so after one is lost it has to be re-created in the dograh UI before the voice step can
+  reconcile. Everything else (agents, ARI, Stasis, extensions 8000–8007) still applies.
+
+```bash
+docker start capstone-wire-<uuid>
+docker inspect -f '{{.State.ExitCode}}' capstone-wire-<uuid>   # 0 = wired
+docker logs --tail 30 capstone-wire-<uuid>
+```
+
+### AMI is published on the PBX's own address
+
+The console dials `192.168.1.52:5038`, and `ami-bridge` listens on `127.0.0.1:5038` inside
+freepbx's network namespace. The publish used to be `'5038:15038'`, which put AMI on every
+interface (`0.0.0.0` and `[::]`, so every docker bridge too); it is now
+`'192.168.1.52:5038:15038'` in the template. Check it from the host rather than the UI:
+
+```bash
+ss -ltn | grep 5038          # exactly one line, 192.168.1.52:5038
+docker port freepbx-<uuid> 15038
+```
 
 One more thing the recreate exposed: `ari.conf` in the config volume is a *symlink* into
 `/var/www/html/admin/modules/arimanager/etc/ari.conf`. When the image ships without the
