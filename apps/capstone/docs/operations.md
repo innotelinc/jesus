@@ -194,12 +194,29 @@ docker exec freepbx-<uuid> asterisk -rx 'dialplan reload'
 docker exec freepbx-<uuid> asterisk -rx 'pjsip show endpoints' | grep -c Endpoint:   # expect 13
 ```
 
-That restore is a stop-gap, not a repair: the next recreate regenerates
-`pjsip.endpoint.conf` from the database again and drops back to a handful of objects.
-Persisting `/var/lib/mysql` (or moving the database to the `postgres`/MariaDB service the
-rest of the stack uses) is the real fix, and it needs the extensions re-entered once —
-the GUI state did not survive the recreate and no FreePBX backup exists in
-`/var/spool/asterisk/backup`.
+The database itself *is* a volume — the freepbx service mounts
+`<service>_<service>-mariadb-data:/var/lib/mysql`. What broke is that the recreate moved
+freepbx onto the **newly named** copy of that volume, which contained the image's baked
+database: zero devices, zero users, zero outbound routes. The previous volume
+(`<service>_mariadb-data`, last written the day before) still held the real database, so
+the repair is to copy it into the live volume while the container is stopped:
+
+```bash
+OLD=/var/lib/docker/volumes/<service>_mariadb-data/_data
+NEW=/var/lib/docker/volumes/<service>_<service>-mariadb-data/_data
+docker stop freepbx-<uuid>
+tar czf /root/pbx-vol-backup/mariadb-$(date +%Y%m%dT%H%M%SZ).tgz -C "$NEW" .
+rm -rf "$NEW"/* && cp -a "$OLD"/. "$NEW"/
+docker start freepbx-<uuid>
+docker exec freepbx-<uuid> fwconsole reload
+docker exec freepbx-<uuid> asterisk -rx 'pjsip show endpoints' | grep -c Endpoint:   # 13
+```
+
+After that the configs are generated from the restored database rather than hand-restored,
+so a further recreate keeps them. Verify the count before the copy
+(`select count(*) from asterisk.devices`) and after; nine devices is the healthy number
+here. A `du -sh` on both volumes is the quick tell — the live database was 244 M, the
+image's baked one 200 M.
 
 One more thing the recreate exposed: `ari.conf` in the config volume is a *symlink* into
 `/var/www/html/admin/modules/arimanager/etc/ari.conf`. When the image ships without the
@@ -216,16 +233,35 @@ docker run --rm -v "$NEW":/etc/asterisk --entrypoint sh \
 Materialise the offender as a regular file (`rm` the link, `install -o asterisk -g asterisk`
 an empty file); the entrypoint writes the ARI config into it on the next boot.
 
-### The Control Center is not on the voice network
+### The Control Center, the AMI port, and what actually connects them
 
-The console app runs on Coolify's `coolify` bridge (`10.0.1.0/24`, e.g. `10.0.1.9`), while
-AMI is published only on `192.168.1.52:5038`. From inside the console container that
-address refuses, and `freepbx`/`15038` does not resolve either — the bridge listens on
-Asterisk's loopback, so only the published port is usable. Anything the console dials
-fails at the socket layer, which the UI renders as `fetch failed` rather than as an auth
-error. Fix by attaching the console to the voice compose network with the bridge
-reachable there, or by publishing `5038` on an address both networks route to; do not
-chase it as a credential problem.
+The console app (`innotelinc/asterisk-console`, Coolify application
+`jbtpvwsy7yiq4cawc4aoqf7n`) is created on Coolify's `coolify` bridge (`10.0.1.0/24`), which
+has no route to the PBX: its AMI settings point at `192.168.1.52:5038` and that address
+was unreachable from its namespace, so every dashboard action failed at the socket layer
+and the UI rendered it as `fetch failed` — not as an auth error.
+
+Two things make it work, and both are enforced by `/usr/local/bin/console-net-guard.sh`
+(cron `*/2`), because a console redeploy throws them away:
+
+- **Network attachment.** `docker network connect qvifit… <console>` puts it on the voice
+  network, where the bridge is reachable as `freepbx:15038`. Coolify 4.7.6 rejects
+  `additional_networks` on this application (`This field is not allowed`), so it cannot be
+  expressed in the app config.
+- **python3 in the container.** The image ships without it. `post_deployment_command` looks
+  like the right lever but needs `post_deployment_command_container`, which changes on
+  every deploy, so the guard installs it idempotently instead
+  (`docker exec -u 0 <c> apk add --no-cache python3`).
+
+The AMI publish is `'5038:15038'` rather than the LAN IP alone: with the narrow bind the
+console's configured `192.168.1.52:5038` did not answer from a container network. Asterisk
+itself still binds `127.0.0.1` (`voice_check.py` asserts it) and the socat bridge only
+forwards to loopback, so what is exposed is the password-protected manager port on the
+host's interfaces — the same posture as before, minus the address restriction.
+
+If the console connects but the AMI looks dead (`fetch failed`, timeouts, while
+`docker port` looks right), restart `ami-bridge`: its `TCP-LISTEN` backlog is 5, and a
+handful of abandoned connections leaves it silently dropping new SYNs.
 
 Hold music is generated, not licensed: `pbx/asterisk/hold_music.py` writes four 32 s, 8 kHz
 mono WAV tracks into `/var/lib/asterisk/moh/capstone` (fixed seed, ~5 s, no ffmpeg), and
