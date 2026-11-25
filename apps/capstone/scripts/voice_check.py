@@ -10,6 +10,12 @@ same picture until you check the clock.
 So this is the check a deploy runs and the one smoke-test calls: it asserts the
 things that must be *alive*, not just present.
 
+It also guards the one property that a running watcher cannot show: AMI is
+reachable from the box's own loopback and nowhere else, and the account that was
+retired to get it there stays retired. Both live in the configuration the
+container reads off the host volume, so this reads that copy rather than asking
+the daemon.
+
   voice-check.py                    # the host this runs on, plus the Control Center
   voice-check.py --root /tmp/fixture # check another host root (tests)
   voice-check.py --api ""            # skip the Control Center probe
@@ -24,6 +30,8 @@ tests point the whole thing at a temporary tree:
     VOICE_CHECK_ROOT              prefix for every host path (default /)
     VOICE_PREWARM_STALE_MINUTES   a status older than this is dead (default 20)
     VOICE_ALERT_SMS_TO            the SMS push recipient, if it is meant to be on
+    VOICE_ASTERISK_CONFIG         the PBX's /etc/asterisk on this host, if not the
+                                  <project>_asterisk-config volume under /var/lib/docker
 """
 
 from __future__ import annotations
@@ -44,6 +52,19 @@ PREWARM_SCRIPT = "/usr/local/sbin/prewarm-watch.sh"
 PREWARM_CRON = "/etc/cron.d/prewarm-watch"
 PREWARM_STATUS = "/var/lib/capstone-prewarm/status.json"
 DEFAULT_API = "http://127.0.0.1:8095"
+ASTERISK_VOLUMES = "var/lib/docker/volumes/*_asterisk-config/_data"
+
+# Accounts retired on purpose. `didtest` was the inbound DID harness's AMI login
+# until 2026-11-25: it held a LAN permit, so it was the last way in from off-box.
+# Nothing may quietly create it again.
+RETIRED_AMI_ACCOUNTS = ("didtest",)
+
+# The only permits that count as "loopback". Anything else is a way in from the LAN.
+LOOPBACK_PERMITS = frozenset({
+    "127.0.0.1/255.255.255.255",
+    "127.0.0.1/255.255.255.0",
+    "127.0.0.1/255.0.0.0",
+})
 
 
 class Check:
@@ -179,6 +200,102 @@ def check_prewarm(root: Path) -> list[Check]:
     return out
 
 
+def _asterisk_config(root: Path) -> Path | None:
+    """The PBX's /etc/asterisk as this host can see it, or None off the PBX.
+
+    The container's `asterisk-config` volume is the same directory the daemon
+    reads, so this is the live file and not a copy of a template.
+    """
+    override = (os.environ.get("VOICE_ASTERISK_CONFIG") or "").strip()
+    if override:
+        return _root_path(override, root)
+    matches = sorted(root.glob(ASTERISK_VOLUMES))
+    return matches[0] if len(matches) == 1 else None
+
+
+def _ami_sections(path: Path) -> list[tuple[str, dict[str, list[str]]]]:
+    """Parse `[user]` blocks into their lowercase keys, dropping `;` comments."""
+    sections: list[tuple[str, dict[str, list[str]]]] = []
+    name: str | None = None
+    fields: dict[str, list[str]] = {}
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.split(";", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            if name is not None:
+                sections.append((name, fields))
+            name, fields = line[1:-1].strip(), {}
+            continue
+        if name is None:
+            continue
+        key, _, value = line.partition("=")
+        fields.setdefault(key.strip().lower(), []).append(value.strip())
+    if name is not None:
+        sections.append((name, fields))
+    return sections
+
+
+def check_ami(root: Path) -> list[Check]:
+    """AMI answers on loopback only, and the accounts retired for that stay retired."""
+    base = _asterisk_config(root)
+    if base is None:
+        return [Check("AMI configuration", "skip", "no asterisk-config volume on this host")]
+
+    manager = base / "manager.conf"
+    if not manager.exists():
+        return [Check("AMI configuration", "fail",
+                      f"{manager} is missing — the volume is not the PBX's config")]
+
+    out: list[Check] = []
+    bind: str | None = None
+    for name, fields in _ami_sections(manager):
+        if name == "general" and fields.get("bindaddr"):
+            bind = fields["bindaddr"][-1]
+    if bind == "127.0.0.1":
+        out.append(Check("AMI bound to loopback", "pass", "bindaddr = 127.0.0.1"))
+    else:
+        out.append(Check("AMI bound to loopback", "fail",
+                         f"bindaddr = {bind or 'unset'} in {manager} — "
+                         "`0.0.0.0` answers on the LAN, whatever the ACL says"))
+
+    accounts: list[tuple[str, str, dict[str, list[str]]]] = []
+    for path in (manager, base / "manager_custom.conf"):
+        if not path.exists():
+            continue
+        for name, fields in _ami_sections(path):
+            if name != "general":
+                accounts.append((name, path.name, fields))
+
+    revived = sorted({(name, where) for name, where, _ in accounts
+                      if name in RETIRED_AMI_ACCOUNTS})
+    if revived:
+        out.append(Check(
+            "retired AMI accounts stayed retired", "fail",
+            "; ".join(f"[{name}] is back in {where}" for name, where in revived)
+            + " — nothing may recreate it; delete the block and run `asterisk -rx 'manager reload'`",
+        ))
+    else:
+        out.append(Check("retired AMI accounts stayed retired", "pass",
+                         f"none of {', '.join(RETIRED_AMI_ACCOUNTS)} is configured"))
+
+    loose = []
+    for name, where, fields in accounts:
+        permits = fields.get("permit") or []
+        if not permits:
+            loose.append(f"[{name}] in {where} has no permit line, so it accepts any address")
+            continue
+        off = [p for p in permits if p not in LOOPBACK_PERMITS]
+        if off:
+            loose.append(f"[{name}] in {where} permits {', '.join(off)}")
+    out.append(Check(
+        "every AMI account is loopback-only",
+        "fail" if loose else "pass",
+        "; ".join(loose) if loose else f"{len(accounts)} account(s), all on 127.0.0.1",
+    ))
+    return out
+
+
 def check_api(api: str) -> list[Check]:
     """What the Control Center reports, cross-checked against the SMS config."""
     if not api:
@@ -226,10 +343,13 @@ def check_api(api: str) -> list[Check]:
 
 
 def run(root: Path, api: str) -> tuple[list[Check], int]:
-    checks = check_watcher(root) + check_prewarm(root) + check_api(api)
-    failures = sum(1 for c in checks if c.state == "fail")
-    skipped = all(c.state == "skip" for c in checks)
-    return checks, (2 if skipped else (1 if failures else 0))
+    # "Nothing installed" is about the watchers, so that a PBX host which lost
+    # them still says so; a failing AMI check outranks it either way.
+    watchers = check_watcher(root) + check_prewarm(root)
+    checks = watchers + check_ami(root) + check_api(api)
+    if any(c.state == "fail" for c in checks):
+        return checks, 1
+    return checks, (2 if all(c.state == "skip" for c in watchers) else 0)
 
 
 def main(argv: list[str] | None = None) -> int:

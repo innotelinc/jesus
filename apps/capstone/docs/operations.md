@@ -510,7 +510,11 @@ fixed — or someone answers one call by hand — the media question stays open.
 the things that must be *running*: the stall watcher scheduled and logging, the
 prewarm status rewritten inside its window, the Control Center able to see the
 host files, and the SMS push armed and not erroring once `VOICE_ALERT_SMS_TO` is
-set. Exit 0 alive, 1 installed-but-broken, 2 nothing installed.
+set. It also reads the container's `asterisk-config` volume for the one thing a
+running watcher cannot show: `bindaddr` is still `127.0.0.1`, no AMI account
+permits anything but loopback, and `didtest` has not come back. Exit 0 alive, 1
+something is broken (a bad AMI outranks a quiet host), 2 no watchers installed at
+all.
 
 ```bash
 voice-check.py            # the gate; run it after a deploy
@@ -1394,17 +1398,18 @@ fail2ban-regex /tmp/attacks.log /etc/fail2ban/filter.d/asterisk-registration.con
 # get dropped (then unban it) — see the CI job for the exact line.
 ```
 
-**AMI listens on loopback only.** The published port is still in the compose
-file, but it no longer answers: `manager.conf` carries `bindaddr = 127.0.0.1`, so
-Asterisk opens `5038` on the container's loopback, and `docker-proxy` on
-`192.168.1.52:5038` accepts the TCP connection only for the container to refuse
-it. A client on the LAN gets a refused connection, never a login prompt.
+**AMI listens on loopback only, and nothing publishes it.** `manager.conf`
+carries `bindaddr = 127.0.0.1`, so Asterisk opens `5038` on the container's own
+loopback. The compose file went on publishing it on `192.168.1.52:5038`, which
+accepted the TCP connection only to have the container refuse it; that line was
+removed on 2026-11-25 and the container recreated, so the host no longer listens
+on `5038` at all.
 
 ```bash
 docker exec pbx-freepbx asterisk -rx "manager show settings" | grep -i bindaddress
 #  TCP Bindaddress:           127.0.0.1:5038
-timeout 4 bash -c 'cat </dev/null >/dev/tcp/192.168.1.52/5038' && echo OPEN || echo refused
-#  refused
+ss -ltn | grep 5038 || echo 'nothing on 5038'      # on the host
+#  nothing on 5038
 ```
 
 Three things make that hold, each checked rather than assumed:
@@ -1415,8 +1420,18 @@ Three things make that hold, each checked rather than assumed:
 - **Local clients still work.** `ucp_events` (UCP) and the generated hex user
   both authenticate from `127.0.0.1`; both are in use, so deleting either breaks
   UCP or the portal's AMI poll.
-- **Remote use needs a tunnel:** `ssh -L 5038:127.0.0.1:5038 root@192.168.1.52`,
-  then point the client at `127.0.0.1:5038`. Nothing else reaches AMI now.
+- **Remote use goes through the container, not the host.** `ssh -L
+  5038:127.0.0.1:5038 root@192.168.1.52` does *not* work — the socket is on the
+  container's loopback, and the host has nothing listening to forward to. Carry
+  the AMI stream over the exec instead; the container has `socat`, so this gets a
+  real login prompt:
+
+  ```bash
+  printf 'Action: Login\r\nUsername: <user>\r\nSecret: <secret>\r\n\r\n' \
+    | ssh root@192.168.1.52 "docker exec -i pbx-freepbx socat - TCP:127.0.0.1:5038"
+  #  Response: Success
+  #  Message: Authentication accepted
+  ```
 
 Reading the credentials — they are not in this repo, and they should not be
 pasted into a ticket or a chat:
@@ -1440,12 +1455,18 @@ decides once something can reach the port:
   secret drifted), and went silent after that. It was retired on 2026-11-25: the
   block is gone from `manager_custom.conf`, so `manager show user didtest`
   answers "There is no manager called didtest" and a login attempt is logged as
-  `InvalidAccountID`. Whatever runs on `192.168.1.113` that still expects it (the
-  harness behind `/usr/local/bin/did-inbound-test`) now fails and needs the SSH
-  tunnel plus an account of its own. To bring `didtest` back, restore
+  `InvalidAccountID`. The harness behind `/usr/local/bin/did-inbound-test` on
+  `192.168.1.113` still expected it, so it got an account of its own instead:
+  `[didiag]`, added 2026-11-25 with exactly the permissions `didtest` had
+  (`read = system,call,reporting,command`, `write = call,command`) and a permit
+  for `127.0.0.1` only — it reaches AMI over the exec path above rather than from
+  its own address. The harness still needs `didiag`'s secret put in its place;
+  `192.168.1.113` refused our SSH on the day the account was created, so that
+  half is open. To bring `didtest` back, restore
   `/etc/asterisk/manager_custom.conf.bak-didtest-<stamp>` inside the container and
-  run `asterisk -rx "manager reload"`. The PJSIP endpoint `telno-didtest` is a
-  different thing — the harness's SIP side — and was left in place.
+  run `asterisk -rx "manager reload"` — and expect `voice-check.py` to fail until
+  you take it out again. The PJSIP endpoint `telno-didtest` is a different thing —
+  the harness's SIP side — and was left in place.
 
 AMI auth failures do reach the `security` log — `SecurityEvent="InvalidAccountID"`
 with `Service="AMI"` and a `TCP` `RemoteAddress` — and the `asterisk-capstone`

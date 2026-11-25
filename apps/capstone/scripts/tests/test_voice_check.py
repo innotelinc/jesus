@@ -48,7 +48,6 @@ class VoiceCheckTest(unittest.TestCase):
             "var/log/rtp-watch", "var/lib/capstone-prewarm",
         ):
             (self.root / rel).mkdir(parents=True)
-
         self.watcher = self.root / "usr/local/sbin/rtp-stall-watch.sh"
         self.watcher.write_text("#!/bin/bash\n")
         (self.root / "etc/cron.d/rtp-stall-watch").write_text("*/1 * * * * root true\n")
@@ -56,6 +55,15 @@ class VoiceCheckTest(unittest.TestCase):
         (self.root / "etc/cron.d/prewarm-watch").write_text("*/5 * * * * root true\n")
         self.status = self.root / "var/lib/capstone-prewarm/status.json"
         self.log = self.root / "var/log/rtp-watch/watch.log"
+
+        # The AMI half of the check reads the container's config volume, which the
+        # daemon reads too — so the fixture builds the same tree, on loopback.
+        self.asterisk = self.root / (
+            "var/lib/docker/volumes/qvifit87vftfxd9ejsch2vxy_asterisk-config/_data"
+        )
+        self.asterisk.mkdir(parents=True)
+        self.write_manager()
+        self.write_custom()
 
         self.write_status()
         self.write_log(
@@ -87,6 +95,23 @@ class VoiceCheckTest(unittest.TestCase):
 
     def write_log(self, *lines):
         self.log.write_text("\n".join(lines) + "\n")
+
+    def write_manager(self, bindaddr="127.0.0.1"):
+        (self.asterisk / "manager.conf").write_text(
+            "; manager.conf\n[general]\nenabled = yes\nport = 5038\n"
+            f"bindaddr = {bindaddr}\nhook = manager_event_status\n\n"
+            "[336166155b52dd5cdf32d0990c8c622a]\nsecret = <generated>\n"
+            "deny=0.0.0.0/0.0.0.0\npermit=127.0.0.1/255.255.255.0\n"
+        )
+
+    def write_custom(self, extra=""):
+        (self.asterisk / "manager_custom.conf").write_text(
+            "[pbxportal]\nsecret = <generated>\n"
+            "deny = 0.0.0.0/0.0.0.0\npermit = 127.0.0.1/255.255.255.255\n"
+            "read = system,call\nwrite = call\n\n"
+            "[ucp_events]\nsecret = <generated>\n"
+            "deny = 0.0.0.0/0.0.0.0\npermit = 127.0.0.1/255.255.255.255\n" + extra
+        )
 
     def run_check(self, api=""):
         out = io.StringIO()
@@ -141,6 +166,29 @@ class VoiceCheckTest(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("prewarm status readable", out)
 
+    def test_a_pbx_host_that_lost_its_watchers_still_says_nothing_installed(self):
+        for rel in (
+            "usr/local/sbin/rtp-stall-watch.sh", "etc/cron.d/rtp-stall-watch",
+            "usr/local/sbin/prewarm-watch.sh", "etc/cron.d/prewarm-watch",
+            "var/lib/capstone-prewarm/status.json",
+        ):
+            (self.root / rel).unlink()
+        code, out = self.run_check()
+        self.assertEqual(code, 2, out)
+        self.assertIn("nothing installed", out)
+        self.assertIn("AMI bound to loopback", out, "the AMI checks still run and report")
+
+    def test_a_broken_ami_outranks_nothing_installed(self):
+        for rel in (
+            "usr/local/sbin/rtp-stall-watch.sh", "etc/cron.d/rtp-stall-watch",
+            "usr/local/sbin/prewarm-watch.sh", "etc/cron.d/prewarm-watch",
+            "var/lib/capstone-prewarm/status.json",
+        ):
+            (self.root / rel).unlink()
+        self.write_manager(bindaddr="0.0.0.0")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+
     def test_nothing_installed_is_its_own_answer(self):
         for rel in (
             "usr/local/sbin/rtp-stall-watch.sh", "etc/cron.d/rtp-stall-watch",
@@ -152,7 +200,48 @@ class VoiceCheckTest(unittest.TestCase):
         self.assertEqual(code, 2, f"a host without the watchers must not be a failure: {out}")
         self.assertIn("nothing installed", out)
 
-    # ── the Control Center's own view ───────────────────────────────────────
+    # ── AMI stays on loopback, and didtest stays gone ───────────────────────
+
+    def test_ami_on_loopback_passes(self):
+        code, out = self.run_check()
+        self.assertEqual(code, 0, out)
+        self.assertIn("AMI bound to loopback", out)
+        self.assertIn("3 account(s), all on 127.0.0.1", out)
+
+    def test_ami_with_a_lan_bindaddr_fails(self):
+        self.write_manager(bindaddr="0.0.0.0")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("bindaddr = 0.0.0.0", out)
+
+    def test_a_retired_account_that_came_back_fails(self):
+        self.write_custom("\n[didtest]\nsecret = <generated>\n"
+                          "read = system,call\npermit = 192.168.1.113/255.255.255.255\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("[didtest] is back in manager_custom.conf", out)
+
+    def test_an_account_that_permits_the_lan_fails(self):
+        self.write_custom("\n[didharness]\nsecret = <generated>\n"
+                          "deny = 0.0.0.0/0.0.0.0\npermit = 192.168.1.113/255.255.255.255\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("[didharness] in manager_custom.conf permits 192.168.1.113", out)
+
+    def test_an_account_without_a_permit_line_fails(self):
+        self.write_custom("\n[openami]\nsecret = <generated>\n")
+        code, out = self.run_check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("[openami] in manager_custom.conf has no permit line", out)
+
+    def test_a_host_without_the_pbx_volume_skips_the_ami_checks(self):
+        import shutil
+
+        shutil.rmtree(self.root / "var/lib/docker")
+        code, out = self.run_check()
+        self.assertEqual(code, 0, out)
+        self.assertIn("no asterisk-config volume on this host", out)
+
 
     def serve_api(self, payload, status=200):
         server = HTTPServer(("127.0.0.1", 0), _VoiceApi)
