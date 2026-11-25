@@ -409,11 +409,23 @@ server (`.51`, `.52`, `.53`, `.54`). The runner writes three different things on
 | --- | --- | --- |
 | `/var/log/vol-twin-guard.log` | every run (one line if healthy, full output if not) | rotated by `/etc/logrotate.d/vol-twin-guard` at 1 MiB, 4 generations, compressed |
 | journal, `user.err`, tag `vol-twin-guard` | failures only | `journalctl -t vol-twin-guard` |
-| ntfy push, urgent priority | failures only | the topic URL in `/etc/vol-twin-guard.conf` (root-only, 0600) |
+| ntfy push, urgent priority | failures only | topic `estate-alerts`, plus the guard's own URL when one is configured |
 
-The push is what makes a failure *reach* someone instead of waiting to be noticed; the URL
-lives in that config file rather than in the cron line or this repo, because an ntfy topic is
-as good as a password. No config file means journal-only — a loud log, not silence. Two kinds of volume are deliberately excluded, because a
+The push is what makes a failure *reach* someone instead of waiting to be noticed. It goes to
+two channels on purpose:
+
+1. **`estate-alerts`** on the estate ntfy — the same topic every other host's
+   `OnFailure=estate-notify@%n` unit publishes to, using the credential in
+   `/etc/innotel/ntfy.env`. This is the channel that is already being watched, so a guard
+   failure arrives beside the estate's other pages instead of on a topic nobody subscribed to.
+2. **the guard's own URL** in `/etc/vol-twin-guard.conf` (root-only, 0600), kept as a second
+   channel and as the only one if that credential is ever absent.
+
+Credentials never reach `argv`: curl reads them from a mode-600 config on disk that is removed
+straight after the push, and the body goes in from a file. No config file and no estate
+credential means journal-only — a loud log, not silence. Verified 2026-11-25 with a synthetic
+pair on `i2`: the runner exits 1, the log carries `LIVE-LOOKS-EMPTY`, and the message lands as
+`i2: a live volume looks empty` on `estate-alerts`. Two kinds of volume are deliberately excluded, because a
 noisy check is an ignored check: `*-logs` and `*-repo` are churn (rotated logs; the live
 checkout is a `--depth 1` clone and legitimately smaller than a full-history sibling), and
 `*-spool` reports `warn` without failing — voicemail drains, and "did we lose a message?" is
