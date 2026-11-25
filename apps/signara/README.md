@@ -36,11 +36,28 @@ The preflight service bind-mounts `/usr/local/bin/volume-preflight.sh` read-only
 reports `0 volume pair(s) checked`, because signara uses the single-form volume names — the
 gate is there for the deploy that would introduce a twin.
 
+## Build in GitHub, not on the host
+
+A Coolify deploy of this app builds `api` and `frontend` **from source on `i3`**: the
+frontend `npm ci` alone takes six minutes and a full deploy took about 1h20m on 2026-11-25.
+Deploys should instead pull images built in CI — GitHub Actions publishing
+`ghcr.io/innotelinc/signara-api` and `-web` per commit — so a deploy is a pull plus a restart,
+and a bad build fails in the pipeline instead of tying up the host that runs the stack.
+
 ## State when this was written
 
-`api` was `Exited (1)` for two days with `PlaceholderSecretError: Refusing to start: this
+`api` had been `Exited (1)` for two days with `PlaceholderSecretError: Refusing to start: this
 deployment would run with default credentials` — `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` and
-`CRYPTO_MASTER_KEY` unset, and `DATABASE_URL` / `REDIS_URL` still resolving to `change-me`
-because every env row in Coolify was an empty template row. Fixed by filling
-`POSTGRES_PASSWORD` and `REDIS_PASSWORD`, creating the three secrets, and rotating the
-`signara` postgres role to the new password so the existing `pgdata` volume keeps its data.
+`CRYPTO_MASTER_KEY` unset, and `DATABASE_URL` / `REDIS_URL` resolving to `change-me` because
+every env row in Coolify was an empty template row. Filled `POSTGRES_PASSWORD` and
+`REDIS_PASSWORD`, created the three secrets, and rotated the `signara` postgres role to the
+new password so the existing `pgdata` volume keeps its data. The api now boots and maps every
+route, then stops at the **object store**: `getaddrinfo EAI_AGAIN minio`.
+
+That is the storage profile, not a regression: `minio` is profile-gated (`legacy-storage`)
+because the live store is meant to be onyx-objectstore, and `SIGNARA_S3_*` is still empty, so
+the api falls back to `http://minio:9000` with nothing behind it. The documented endpoint
+`http://192.168.1.71:2090` is not listening; `192.168.1.60:2090` and `:2091` answer `401`, so
+the store is there and what is missing is a credential for it. Until `SIGNARA_S3_ENDPOINT`,
+`SIGNARA_S3_ACCESS_KEY` and `SIGNARA_S3_SECRET_KEY` are set, `api` — and therefore `frontend`,
+which waits for it to be healthy — stays down.
