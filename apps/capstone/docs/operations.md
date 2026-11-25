@@ -280,6 +280,18 @@ shim's startup warm-up (`TTS_SHIM_WARMUP`) removes the ~7 s first-synthesis stal
 first caller, and the audio cache makes repeated lines (the script's fixed lines, goodbyes)
 near-instant — which is why the cache matters more with af_heart than with Piper.
 
+**Switch the voice through `tts.settings` and nothing else.** In
+`model_configurations.configuration` the TTS role is `{"settings": {"model", "voice"},
+"provider_connection_uuid"}`; edit those two values in place. Adding a sibling key — notably
+`tts.connection_revision`, which looks like the obvious way to "bump" the connection — makes
+dograh read the TTS connection as a new, unauthorised one, and
+`authorize_workflow_run_start` (dograh's `quota_service.py`) then refuses *every* inbound call
+with the misleading `Quota exceeded for user 1 — hanging up inbound call` and
+`usage_info {"call_duration_seconds": 0}`. The org quota columns are innocent: on 2026-11-25
+`quota_enabled=false` and a zero token budget throughout, and calls resumed the moment the key
+was removed (identical runs: piper 75 ms, kokoro 1.76 s to first audio). If a voice change is
+followed by that quota message, check this key before touching quotas.
+
 **The addresses are container names on purpose.** Every one of them is dialled *by
 `dograh-api`*, from inside its own container: `127.0.0.1:8881` is the shim as seen from the
 host, and resolves to the dograh container itself — the symptom is a TTS connection error on
