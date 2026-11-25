@@ -24,6 +24,7 @@ makes that testable.
 import importlib.util
 import os
 import unittest
+from pathlib import Path
 
 _WIRE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dograh_wire.py")
@@ -203,6 +204,70 @@ class StrayTtsKeysTest(unittest.TestCase):
         self.assertEqual(
             dograh_wire.shim_tts_problem(after, CONNECTION, BASE_URL, MODEL, VOICE), ""
         )
+
+
+class GreetingPrewarmTest(unittest.TestCase):
+    """The prewarm list only helps while it matches what a call will ask for.
+
+    A greeting is rendered from ``{{initial_context.x | fallback:y}}``, so a
+    route that supplies a name renders a different string than the fallbacks —
+    and the text is part of the cache key, which makes a stale list a silent
+    miss (1.76 s of dead air), not an error.
+    """
+
+    TEMPLATE = (
+        "Hi {{initial_context.candidate_name | fallback:there}}, this is "
+        "{{initial_context.interviewer_name | fallback:Jordan}} from "
+        "{{initial_context.company | fallback:our company}}. I'm the interviewer "
+        "for the {{initial_context.role | fallback:role}}."
+    )
+
+    def test_a_context_free_route_renders_the_fallbacks(self):
+        self.assertEqual(
+            dograh_wire.render_greeting(self.TEMPLATE, {}),
+            "Hi there, this is Jordan from our company. I'm the interviewer for the role.",
+        )
+
+    def test_a_route_context_replaces_every_placeholder(self):
+        rendered = dograh_wire.render_greeting(
+            self.TEMPLATE,
+            {"candidate_name": "Dana", "interviewer_name": "Sam", "company": "Acme"},
+        )
+        self.assertEqual(
+            rendered, "Hi Dana, this is Sam from Acme. I'm the interviewer for the role."
+        )
+
+    def test_context_may_be_nested_or_flat(self):
+        flat = dograh_wire.render_greeting(self.TEMPLATE, {"candidate_name": "Dana"})
+        nested = dograh_wire.render_greeting(
+            self.TEMPLATE, {"initial_context": {"candidate_name": "Dana"}}
+        )
+        self.assertEqual(flat, nested)
+        self.assertIn("Hi Dana,", flat)
+
+    def test_a_placeholder_without_a_fallback_becomes_empty(self):
+        self.assertEqual(dograh_wire.render_greeting("Hi {{initial_context.n}}", {}), "Hi ")
+
+    def test_drift_names_the_greeting_a_call_will_ask_for(self):
+        wanted = dograh_wire.render_greeting(self.TEMPLATE, {"candidate_name": "Dana"})
+        fallback = dograh_wire.render_greeting(self.TEMPLATE, {})
+        self.assertEqual(dograh_wire.prewarm_drift(fallback, [wanted]), [wanted])
+
+    def test_a_listed_greeting_is_not_drift(self):
+        fallback = dograh_wire.render_greeting(self.TEMPLATE, {})
+        self.assertEqual(dograh_wire.prewarm_drift(f"# note\n{fallback}\n", [fallback]), [])
+
+    def test_comments_and_blank_lines_are_not_utterances(self):
+        self.assertEqual(
+            dograh_wire.prewarm_lines("# a comment\n\nHi there.\n"), ["Hi there."]
+        )
+
+    def test_the_shipped_workflows_render_their_fallbacks(self):
+        repo = Path(dograh_wire.__file__).resolve().parent.parent
+        rendered = dograh_wire.expected_greetings(repo / "dograh", [], {})
+        self.assertEqual(len(rendered), 2, "the two live tracks each greet once")
+        self.assertIn("this is Jordan from our company", rendered[0])
+        self.assertIn("this is Robin from our organization", rendered[1])
 
 
 class WithShimTtsTest(unittest.TestCase):

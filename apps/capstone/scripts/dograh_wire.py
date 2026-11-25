@@ -55,6 +55,7 @@ Usage (from the repo root):
 
 from __future__ import annotations
 
+import re
 import argparse
 import json
 import os
@@ -258,6 +259,152 @@ def shim_tts_problem(
     if voice and settings.get("voice") != voice:
         return f"TTS voice is '{settings.get('voice')}', not '{voice}'"
     return ""
+
+
+# ── greeting prewarm ─────────────────────────────────────────────────────────
+#
+# The shim prewarms whatever lines are in tts-shim/prewarm.txt, and a cache hit
+# is the difference between 74 ms and 1.76 s of dead air before the agent
+# speaks. The text is part of the cache key, so the list only helps while it is
+# exactly what the caller's run will ask for — and the greeting is a template
+# ("{{initial_context.candidate_name | fallback:there}}") rendered from the
+# route's initial_context. A route that supplies a name therefore misses a list
+# rendered from fallbacks, silently. Hence: render the greetings from the
+# shipped workflows and compare.
+PLACEHOLDER = re.compile(
+    r"\{\{\s*([A-Za-z0-9_.]+)\s*(?:\|\s*fallback\s*:\s*([^}]*?))?\s*\}\}"
+)
+
+# Greetings the estate actually serves: 201 -> job interview, 202 -> survey.
+LIVE_GREETING_WORKFLOWS = ("job-interview-workflow.json", "survey-workflow.json")
+
+
+def _context_value(context: dict | None, path: str) -> str:
+    """A dotted path through the context, or ``""``.
+
+    Accepts either ``{"initial_context": {...}}`` or the inner object directly,
+    because the workflow JSONs and dograh's route payloads disagree about which
+    one they carry.
+    """
+    context = context or {}
+    candidates = [path]
+    if path.startswith("initial_context."):
+        candidates.append(path[len("initial_context."):])
+    elif "initial_context" in context:
+        candidates.append(f"initial_context.{path}")
+    for candidate in candidates:
+        current: Any = context
+        for part in candidate.split("."):
+            if not isinstance(current, dict) or part not in current:
+                current = None
+                break
+            current = current[part]
+        if current not in (None, ""):
+            return str(current)
+    return ""
+
+
+def render_greeting(template: str, context: dict | None = None) -> str:
+    """The text dograh will ask the voice for: placeholders, else fallbacks."""
+
+    def substitute(match: re.Match[str]) -> str:
+        return _context_value(context, match.group(1)) or (match.group(2) or "")
+
+    return PLACEHOLDER.sub(substitute, template)
+
+
+def greeting_templates(definition: Any) -> list[str]:
+    """Every spoken greeting in a workflow definition, in document order."""
+    found: list[str] = []
+    if isinstance(definition, dict):
+        greeting = definition.get("greeting")
+        if isinstance(greeting, str) and greeting.strip():
+            if definition.get("greeting_type", "text") == "text":
+                found.append(greeting)
+        for value in definition.values():
+            found.extend(greeting_templates(value))
+    elif isinstance(definition, list):
+        for value in definition:
+            found.extend(greeting_templates(value))
+    return found
+
+
+def prewarm_lines(text: str) -> list[str]:
+    """The utterances a prewarm file lists, skipping ``#`` comments and blanks."""
+    return [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def prewarm_drift(existing: str, expected: list[str]) -> list[str]:
+    """Greetings a call will ask for that the prewarm list does not contain."""
+    listed = set(prewarm_lines(existing))
+    return [text for text in expected if text not in listed]
+
+
+def expected_greetings(workflows_dir: Path, files: list[str], context: dict | None) -> list[str]:
+    """Rendered greetings of the named workflows (default: the live tracks)."""
+    names = files or list(LIVE_GREETING_WORKFLOWS)
+    expected: list[str] = []
+    for name in names:
+        path = workflows_dir / name
+        doc = json.loads(path.read_text())
+        definition = doc.get("workflow_definition", doc)
+        for template in greeting_templates(definition):
+            rendered = render_greeting(template, context)
+            if "\n" in rendered:
+                raise ValueError(
+                    f"{path.name}: the greeting renders across lines, which the shim's "
+                    "one-utterance-per-line prewarm file cannot express"
+                )
+            expected.append(rendered)
+    return expected
+
+
+def prewarm_main(args: argparse.Namespace) -> int:
+    """--check-prewarm / --write-prewarm: keep the prewarm list honest."""
+    repo = Path(__file__).resolve().parent.parent
+    target = Path(args.prewarm_file) if args.prewarm_file else repo / "tts-shim" / "prewarm.txt"
+    context: dict = {}
+    if args.context_json:
+        context = json.loads(Path(args.context_json).read_text())
+    expected = expected_greetings(Path(args.workflows_dir), args.workflow_file, context)
+    existing = target.read_text() if target.exists() else ""
+    drift = prewarm_drift(existing, expected)
+
+    if args.check_prewarm:
+        if not drift:
+            print(f"PASS prewarm list covers all {len(expected)} shipped greetings ({target})")
+            return 0
+        print(
+            f"FAIL {len(drift)} greeting(s) that a call will ask for are not prewarmed in "
+            f"{target} — the first caller of each pays ~1.8 s of dead air:"
+        )
+        for text in drift:
+            print(f"  missing: {text}")
+        print("  fix: python3 scripts/dograh_wire.py --write-prewarm   (then restart the shim)")
+        return 1
+
+    header = (
+        "# Greetings the shim synthesizes into its cache at startup, so the first\n"
+        "# caller does not pay for synthesis (1.76 s vs 74 ms measured on this host).\n"
+        "# Generated: python3 scripts/dograh_wire.py --write-prewarm\n"
+        "# The text is part of the cache key, so it must match the *rendered*\n"
+        "# greeting exactly — including the fallbacks used when a route supplies no\n"
+        "# initial_context. `--check-prewarm` fails when this file drifts.\n"
+    )
+    body = "\n".join(expected) + "\n"
+    if target.exists() and target.read_text() != header + body:
+        backup = target.with_suffix(target.suffix + ".bak")
+        backup.write_text(target.read_text())
+        print(f"note: previous list kept at {backup}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(header + body)
+    print(f"PASS wrote {len(expected)} greeting(s) to {target}")
+    print("  restart the shim to re-prewarm: docker restart tts-shim-<project>")
+    return 0
 
 
 def shim_health_url(base_url: str) -> str:
@@ -601,12 +748,41 @@ def main() -> int:
         "--check", action="store_true", help="verify only — no writes, exit 1 if incomplete"
     )
     parser.add_argument(
+        "--check-prewarm",
+        action="store_true",
+        help="offline: does the prewarm list still match what the workflows will ask "
+        "the voice for? exit 1 on drift",
+    )
+    parser.add_argument(
+        "--write-prewarm",
+        action="store_true",
+        help="offline: regenerate tts-shim/prewarm.txt from the workflow greetings",
+    )
+    parser.add_argument("--prewarm-file", default="", help="prewarm list (default tts-shim/prewarm.txt)")
+    parser.add_argument(
+        "--context-json",
+        default="",
+        help="JSON object of the initial_context values a route supplies; without it the "
+        "greetings render with their fallbacks",
+    )
+    parser.add_argument(
+        "--workflow-file",
+        action="append",
+        default=[],
+        help="workflow JSON whose greeting to prewarm (repeatable; default: the live tracks)",
+    )
+    parser.add_argument(
         "--health-timeout",
         type=int,
         default=HEALTH_TIMEOUT_S,
         help=f"seconds to wait for the dograh API to come up (default {HEALTH_TIMEOUT_S})",
     )
     args = parser.parse_args()
+    if args.check_prewarm or args.write_prewarm:
+        # Offline and first: a drifted prewarm list costs the first caller of
+        # every scripted greeting ~1.8 s of dead air, and it is checkable from
+        # the shipped workflows alone.
+        return prewarm_main(args)
     args.env = load_env_file(Path(args.env_file))
 
     endpoint = args.endpoint or cfg(args, "DOGRAH_API_ENDPOINT", DEFAULT_ENDPOINT)

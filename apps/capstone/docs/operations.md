@@ -398,6 +398,55 @@ install -m 0755 deploy/ari-dupe-guard.sh  /usr/local/sbin/ari-dupe-guard.sh
 install -m 0644 deploy/ari-dupe-guard.cron /etc/cron.d/ari-dupe-guard
 ```
 
+## Voice hardening — the endpoint settings live in the repo now
+
+`deploy/pbx-voice-hardening.sh` owns the PJSIP settings that keep a call up.
+They were previously hand edits on the host, which a rebuilt config volume
+silently reverts to FreePBX's defaults:
+
+| Setting | FreePBX default | Estate | Why |
+|---|---|---|---|
+| `rtp_timeout` | `30` | `0` | A handset that stops sending RTP for 30 s had its call torn down mid-interview (`res_pjsip_sdp_rtp: lack of audio RTP activity in 30 seconds`, 30 s before a 121 s call ended). A stall is not a reason to drop the call. |
+| `rtp_keepalive` | `0` | `15` | Keeps media flowing from this side instead of waiting to be declared dead. |
+| `rtp_timeout_hold` | `300` | `1800` | Long holds were dropped mid-MOH. |
+| `direct_media` | `yes` | `no` | Asterisk must stay in the media path for hold/MOH on internal calls. |
+| `mailboxes` | `@device` | `@default` | MWI has to name a mailbox that exists in `voicemail.conf`; 102 is the fax and has none. |
+
+```bash
+install -m 0755 deploy/pbx-voice-hardening.sh /usr/local/sbin/pbx-voice-hardening.sh
+pbx-voice-hardening.sh --check   # drift report; exit 1 when it does not hold
+pbx-voice-hardening.sh --render  # the managed block, for review
+pbx-voice-hardening.sh           # apply, reload res_pjsip, re-read the live values
+```
+
+It writes one marked block into `pjsip.endpoint_custom_post.conf`, so the
+settings come back on a rebuilt box. `pjsip reload` is **not** an Asterisk
+command — `module reload res_pjsip.so` is what re-reads the file — and the
+script verifies the live values afterwards rather than trusting the write.
+
+`scripts/rtp_probe.py` is the evidence tool for the next stall: capture the
+media during the event, then read the gaps back per stream.
+
+```bash
+python3 scripts/rtp_probe.py --capture 300 --iface br0 -o /var/tmp/rtp.pcap
+python3 scripts/rtp_probe.py --pcap /var/tmp/rtp.pcap --gap 2.0  # exit 2 on a 30 s stall
+```
+
+## Platform address — the name and the LAN IP are not interchangeable
+
+| Surface | Address | Reachable from |
+|---|---|---|
+| Console, `/healthz` | `https://pbx.innotel.site` | anywhere (443/80 published) |
+| SSH 22, SIP 5060/5061, ARI 8088, SMS webhook 8080 | `192.168.1.52` | LAN only |
+
+`pbx.innotel.site` resolves to the box's own egress address, so it is the same
+host under a public name, not a second estate. Only 443/80 are published, so:
+use the name for the console and for health checks, and keep the LAN address for
+SSH, SIP and the `/sms-inbound` webhook. `POST https://pbx.innotel.site/sms-inbound`
+returns **404** — the 200 on `GET` is the console's SPA fallback — so pointing a
+provider's webhook at the public name silently loses messages.
+```
+
 It stays quiet while healthy, which is what makes a non-empty log worth reading. A missing
 app with **ARI unreachable** is still not repaired, and deliberately so: the guard only acts
 when the symptom is one it can actually fix, rather than churning for the whole outage.

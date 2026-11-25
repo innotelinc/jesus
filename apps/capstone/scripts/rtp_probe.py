@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+"""rtp_probe.py — capture and read RTP so a media stall is evidence, not a guess.
+
+On 2026-11-25 two calls to 201 were torn down after the handset stopped sending
+RTP for 30 s (`res_pjsip_sdp_rtp: lack of audio RTP activity in 30 seconds`).
+The teardown was fixed (rtp_timeout=0, rtp_keepalive=15), but *why* the phone
+went silent was never established: Asterisk only says that it did. This reads a
+pcap and says, per media stream, how long the gaps actually were and whether the
+stream resumed, which separates these three cases:
+
+  * the leg stopped and never resumed  -> the phone stopped sending
+  * the leg stopped, then resumed      -> a burst loss / Wi-Fi roam, not a hangup
+  * both legs kept sending throughout  -> the audio was there; look elsewhere
+
+Capture and analysis are separate on purpose: take the pcap during the event,
+analyse it afterwards, and keep it as the record.
+
+  # take a capture on the PBX host for 5 minutes (RTP range only)
+  python3 scripts/rtp_probe.py --capture 300 --iface br0 -o /var/tmp/rtp.pcap
+  # what happened on each stream
+  python3 scripts/rtp_probe.py --pcap /var/tmp/rtp.pcap --gap 2.0
+
+Only classic pcap (what `tcpdump -w` writes by default) is parsed; pcapng is
+refused rather than half-read. Ethernet, Linux cooked capture (`-i any`), SLL2
+and raw-IP frames are all understood — `-i any` is the obvious interface to use
+on a host with bridges, and it does not write Ethernet headers.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import socket
+import struct
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+# Link types as written in the pcap global header.
+DLT_EN10MB = 1          # ethernet
+DLT_RAW = 101           # raw IP (Linux `-i any` on some builds, `-y RAW`)
+DLT_LINUX_SLL = 113     # `tcpdump -i any`
+DLT_IPV4 = 228          # raw IPv4
+DLT_LINUX_SLL2 = 276    # `tcpdump -i any` on newer libpcaps
+
+
+@dataclass
+class Stream:
+    """One RTP stream, identified the way RTP itself identifies it."""
+
+    src: str
+    sport: int
+    dst: str
+    dport: int
+    ssrc: int
+    payload_type: int
+    times: list[float] = field(default_factory=list)
+    seqs: list[int] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        return (
+            f"{self.src}:{self.sport} -> {self.dst}:{self.dport} "
+            f"ssrc=0x{self.ssrc:08x} pt={self.payload_type}"
+        )
+
+    def gaps(self, threshold: float) -> list[tuple[float, float, float]]:
+        """(start, end, seconds) for every silence at least ``threshold`` long."""
+        return [
+            (t0, t1, t1 - t0)
+            for t0, t1 in zip(self.times, self.times[1:])
+            if t1 - t0 >= threshold
+        ]
+
+    def lost(self) -> int:
+        """Sequence numbers that never arrived (RTP seq wraps at 2**16)."""
+        lost = 0
+        for a, b in zip(self.seqs, self.seqs[1:]):
+            step = (b - a) % 65536
+            if 1 < step < 1000:  # a reorder or duplicate is not a loss burst
+                lost += step - 1
+        return lost
+
+    def summary(self, threshold: float) -> dict:
+        duration = (self.times[-1] - self.times[0]) if len(self.times) > 1 else 0.0
+        gaps = self.gaps(threshold)
+        return {
+            "stream": self.label,
+            "packets": len(self.times),
+            "seconds": round(duration, 3),
+            "max_gap_s": round(max((g[2] for g in gaps), default=0.0), 3),
+            "gaps_over_threshold": [
+                {"at_s": round(g[0] - self.times[0], 2), "for_s": round(g[2], 2)}
+                for g in gaps[:20]
+            ],
+            "seq_lost": self.lost(),
+        }
+
+
+def _ipv4_at(raw: bytes, off: int) -> bytes | None:
+    """The IPv4 packet starting at ``off``, recognised by its version nibble.
+
+    The link headers that precede it differ not just by link type but by libpcap
+    version (SLL2's protocol field is not even in a fixed byte order across
+    writers), so the offset is *searched* for a plausible IPv4 header instead of
+    trusted. A wrong guess here reads a busy live capture as "0 RTP streams",
+    which is worse than an error: it looks like evidence that nothing was sent.
+    """
+    if off < 0 or len(raw) <= off + 20:
+        return None
+    if raw[off] >> 4 != 4:
+        return None
+    ihl = (raw[off] & 0x0F) * 4
+    total = struct.unpack("!H", raw[off + 2:off + 4])[0]
+    if ihl < 20 or total < ihl:
+        return None
+    return raw[off:off + min(total, len(raw) - off)]
+
+
+def _ip_packet(raw: bytes, dlt: int) -> bytes | None:
+    """The IP packet inside a captured frame, or None if it is not IPv4."""
+    if dlt == DLT_EN10MB:
+        if len(raw) < 14:
+            return None
+        ethertype = struct.unpack("!H", raw[12:14])[0]
+        off = 14
+        while ethertype in (0x8100, 0x88A8):  # VLAN / QinQ
+            if len(raw) < off + 4:
+                return None
+            ethertype = struct.unpack("!H", raw[off + 2:off + 4])[0]
+            off += 4
+        return _ipv4_at(raw, off) if ethertype == 0x0800 else None
+    if dlt == DLT_LINUX_SLL:
+        for off in (16, 0):
+            ip = _ipv4_at(raw, off)
+            if ip is not None:
+                return ip
+        return None
+    if dlt == DLT_LINUX_SLL2:
+        # 20-byte header per the current spec, 16 in older writers.
+        for off in (20, 16, 0):
+            ip = _ipv4_at(raw, off)
+            if ip is not None:
+                return ip
+        return None
+    if dlt in (DLT_RAW, DLT_IPV4):
+        return _ipv4_at(raw, 0)
+    return None
+
+
+def _udp_payload(raw: bytes, dlt: int) -> tuple[str, str, int, int, bytes] | None:
+    """(src, dst, sport, dport, payload) for a UDP datagram, else None."""
+    ip = _ip_packet(raw, dlt)
+    if ip is None or len(ip) < 20:
+        return None
+    if ip[0] >> 4 != 4 or ip[9] != 17:  # IPv4, protocol UDP
+        return None
+    ihl = (ip[0] & 0x0F) * 4
+    if len(ip) < ihl + 8:
+        return None
+    src = socket.inet_ntoa(ip[12:16])
+    dst = socket.inet_ntoa(ip[16:20])
+    sport, dport, length = struct.unpack("!HHH", ip[ihl:ihl + 6])
+    payload = ip[ihl + 8:ihl + max(8, length)]
+    return src, dst, sport, dport, payload
+
+
+def rtp_header(payload: bytes) -> tuple[int, int, int] | None:
+    """(payload_type, seq, ssrc) when this datagram is RTP, else None."""
+    if len(payload) < 12 or payload[0] >> 6 != 2:  # RTP version
+        return None
+    return payload[1] & 0x7F, struct.unpack("!H", payload[2:4])[0], struct.unpack("!I", payload[8:12])[0]
+
+
+def read_pcap(path: Path) -> tuple[int, list[tuple[float, bytes]]]:
+    """(link type, [(timestamp, frame)]) for a classic pcap file."""
+    data = path.read_bytes()
+    if len(data) < 24:
+        raise ValueError(f"{path} is too short to be a pcap")
+    magic = data[:4]
+    if magic == b"\x0a\x0d\x0d\x0a":
+        raise ValueError(f"{path} is pcapng; re-save it with `tcpdump -w` (classic pcap)")
+    if magic in (b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1"):
+        endian, divisor = "<", 1e6
+    elif magic in (b"\xa1\xb2\xc3\xd4", b"\xa1\xb2\x3c\x4d"):
+        endian, divisor = ">", 1e6
+    else:
+        raise ValueError(f"{path}: unrecognised pcap magic {magic!r}")
+    dlt = struct.unpack(endian + "I", data[20:24])[0]
+    frames: list[tuple[float, bytes]] = []
+    off = 24
+    while off + 16 <= len(data):
+        sec, frac, incl, _orig = struct.unpack(endian + "IIII", data[off:off + 16])
+        off += 16
+        frame = data[off:off + incl]
+        if len(frame) < incl:
+            break
+        off += incl
+        frames.append((sec + frac / divisor, frame))
+    return dlt, frames
+
+
+def rtp_streams(frames: list[tuple[float, bytes]], dlt: int = DLT_EN10MB) -> dict[tuple, Stream]:
+    streams: dict[tuple, Stream] = {}
+    for ts, frame in frames:
+        udp = _udp_payload(frame, dlt)
+        if not udp:
+            continue
+        src, dst, sport, dport, payload = udp
+        rtp = rtp_header(payload)
+        if not rtp:
+            continue
+        pt, seq, ssrc = rtp
+        key = (src, sport, dst, dport, ssrc)
+        stream = streams.get(key)
+        if stream is None:
+            stream = streams[key] = Stream(src, sport, dst, dport, ssrc, pt)
+        stream.times.append(ts)
+        stream.seqs.append(seq)
+    return streams
+
+
+def capture(seconds: int, iface: str, out: Path) -> Path:
+    """`tcpdump -w` for ``seconds``, RTP port range only."""
+    cmd = [
+        "tcpdump", "-i", iface, "-n", "-s", "0", "-w", str(out),
+        "udp", "and", "portrange", "10000-20000",
+    ]
+    print(f"capturing {seconds}s on {iface} → {out}", file=sys.stderr)
+    proc = subprocess.run(["timeout", str(seconds)] + cmd, capture_output=True, text=True)
+    # timeout(1) exits 124 when it stops tcpdump, which is the normal end here.
+    if proc.returncode not in (0, 124):
+        print(proc.stderr.strip() or f"tcpdump exited {proc.returncode}", file=sys.stderr)
+        raise SystemExit(1)
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--pcap", type=Path, help="classic pcap to analyse")
+    ap.add_argument("--capture", type=int, metavar="SECONDS", help="capture first, then analyse")
+    ap.add_argument("--iface", default="any", help="capture interface (default: any)")
+    ap.add_argument("-o", "--out", type=Path, default=Path("/var/tmp/rtp-probe.pcap"))
+    ap.add_argument("--gap", type=float, default=2.0, help="report silence at least this long (default 2.0 s)")
+    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    args = ap.parse_args(argv)
+
+    if not args.pcap and not args.capture:
+        ap.error("give --pcap or --capture")
+    path = args.pcap or capture(args.capture, args.iface, args.out)
+    dlt, frames = read_pcap(path)
+    streams = rtp_streams(frames, dlt)
+    rows = sorted((s.summary(args.gap) for s in streams.values()), key=lambda r: -r["packets"])
+
+    if args.json:
+        print(json.dumps({"pcap": str(path), "linktype": dlt, "packets": len(frames), "streams": rows}, indent=2))
+        return 0
+
+    print(f"{path}: {len(frames)} packets, linktype {dlt}, {len(rows)} RTP streams")
+    if not rows:
+        print("no RTP found — either nothing was talking, or the capture point does not see the media")
+        return 0
+    for row in rows:
+        print(
+            f"\n{row['stream']}\n"
+            f"  {row['packets']} packets over {row['seconds']}s, "
+            f"{row['seq_lost']} seq lost, longest silence {row['max_gap_s']}s"
+        )
+        for gap in row["gaps_over_threshold"]:
+            print(f"    silence {gap['for_s']}s starting {gap['at_s']}s into the stream")
+    if any(r["max_gap_s"] >= 30 for r in rows):
+        print("\nSTALL: a stream went silent for 30 s or more — that is the leg that stopped sending")
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

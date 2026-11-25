@@ -669,6 +669,34 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 6d. PBX voice hardening — FreePBX defaults that drop live calls
+# ═══════════════════════════════════════════════════════════════════════════
+# FreePBX ships rtp_timeout=30, so a handset that stops sending RTP for 30 s has
+# its call torn down (that is how a 121 s interview ended) and rtp_timeout_hold=300,
+# which drops long holds mid-MOH. deploy/pbx-voice-hardening.sh re-asserts the
+# estate's endpoint settings, because the hand edits it replaces did not survive
+# a rebuilt config volume.
+echo ""
+echo "── 6d. PBX voice hardening ──"
+HARDEN="${VOICE_HARDEN:-/usr/local/sbin/pbx-voice-hardening.sh}"
+if [ -x "$HARDEN" ]; then
+    harden_report="$("$HARDEN" --check 2>&1 || true)"
+    if [ -z "$harden_report" ]; then
+        pass "PBX endpoint voice settings hold on 101/102/301/302"
+    else
+        warn "PBX voice hardening drifted:"
+        printf '%s\n' "$harden_report" | sed 's/^/    /'
+        warn "    run $HARDEN to re-assert them"
+    fi
+elif [ "$(id -u)" = "0" ] && [ -f "$REPO/deploy/pbx-voice-hardening.sh" ]; then
+    install -m 0755 "$REPO/deploy/pbx-voice-hardening.sh" /usr/local/sbin/pbx-voice-hardening.sh
+    pass "installed the PBX voice-hardening script"
+else
+    warn "PBX voice hardening is not installed on this host"
+    warn "    it runs where the PBX container does — see docs/operations.md"
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 7. Recreate n8n with fresh secrets
 # ═══════════════════════════════════════════════════════════════════════════
 echo ""
