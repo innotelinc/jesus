@@ -73,6 +73,24 @@ lists `signara-documents`.
 Set in Coolify and mirrored into the app's `.env`: `SIGNARA_S3_ENDPOINT`,
 `SIGNARA_S3_ACCESS_KEY`, `SIGNARA_S3_SECRET_KEY`, plus `SIGNARA_S3_BUCKET`,
 `SIGNARA_S3_REGION` and `SIGNARA_S3_FORCE_PATH_STYLE`. With those in place `api` reaches
-`healthy` and `/ready` returns 200; `frontend` follows it up. `SIGNARA_S3_PUBLIC_ENDPOINT`
-stays unset, so presigned URLs use the internal endpoint — set it to a public host before
-handing upload links to browsers.
+`healthy` and `/ready` returns 200; `frontend` follows it up.
+
+### Public links
+
+`SIGNARA_S3_PUBLIC_ENDPOINT=https://storage.signara.innotel.us`. Browsers get presigned URLs
+on that host; the internal calls still go to `192.168.1.60:2090`, and the object store must
+see the same `Host` header the signature was made for, or it answers
+`SignatureDoesNotMatch`. Nginx Proxy Manager forwards the hostname unchanged, so presigning
+for the public host works end to end.
+
+The hostname is NPM host **417** (`.71`, `http://127.0.0.1:81`) → `http://192.168.1.60:2090`,
+SSL forced, certificate **31** (`*.signara.innotel.us`). The `*.innotel.us` certificate does
+**not** cover `storage.signara.innotel.us` — a wildcard matches one label only — so the
+`*.signara.innotel.us` certificate is the one to use here. Both appear as deleted rows in
+NPM's database while their files under `/data/custom_ssl/npm-<id>/` stay current; restoring
+the row (`is_deleted=0`) and attaching it is enough, no re-issue needed.
+
+Verified: a SigV4-presigned `GET` for `signara-documents/healthchecks/presign-probe.txt`
+returned 200 through `https://storage.signara.innotel.us`, while the store itself answers
+`/minio/health/live` with 401 `bad credentials` (this gateway is not plain MinIO). The
+certificate expires 2026-12-06 and renews through NPM.
