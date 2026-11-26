@@ -1,0 +1,9 @@
+# Timers this estate has retired: `install.sh` disables each one it finds running,
+# on every host, and nothing re-enables it.
+#
+# Format: <timer>   <why, one line>
+#
+# Adding a line here is the record of the decision. The unit and script files may
+# stay in `retired/` so the next reader can see what was removed and why.
+cpk-limits-guard.timer  re-asserted limits.memory on `copilotkit`, an instance that exists on no host (see retired/README.md)
+media-orphans.timer     its subject is gone: `monarch` is now `monarch-retired` and stopped, so every run fails "instance not found" (see retired/README.md)

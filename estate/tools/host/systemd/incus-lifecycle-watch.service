@@ -1,0 +1,21 @@
+[Unit]
+Description=Log incus lifecycle events with their requestor
+After=incus.service
+# Versioned here because it has no other home: the estate-checks suite, the edge
+# watcher and the vault tooling all live in `innotelinc/innotel-platform-stack`, but
+# this unit (i1 only, since 2026-11-16) was written on the host and recorded
+# nowhere. It appends every lifecycle event incus emits - with the requestor - to a
+# jsonl log, which is the only record of *who* started, stopped or deleted an
+# instance. Everything else in the estate records what happened, not who asked.
+#
+# It is a service with `WantedBy=multi-user.target`, so `install.sh` copies it but
+# does not enable it: running a stream per host is a decision, and on i4 the
+# allocator's own journal covers most of it.
+[Service]
+Nice=10
+Restart=always
+RestartSec=5
+ExecStart=/bin/bash -c 'exec incus monitor --type=lifecycle --format json >> /var/log/incus-lifecycle.jsonl'
+
+[Install]
+WantedBy=multi-user.target

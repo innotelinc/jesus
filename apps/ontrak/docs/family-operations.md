@@ -26,6 +26,13 @@ All six run on the **`ontrak` incus container**, `192.168.1.21`, on host **i1**
 (`192.168.1.51`). Each is independently deployable and each has its own stack;
 `docker-compose.all.yml` in the repository root runs them together.
 
+The **Cerulean edge** drawn below at `192.168.1.71` is not on this host at all: it
+is an incus container on **i4** (`192.168.1.54`), with its own memory and CPU caps
+and 24 Docker containers of its own. Note also that `incus` on this container is
+pointed at a remote rather than its own socket — `incus list local:` is empty — so
+`incus config show proxy` run here describes another host's instance, not a nested
+one. See [`docs/edge-host.md`](../../../docs/edge-host.md).
+
 **`lab.ontrak.technology` is the seventh name, and the only one with no row in the
 table above** — it is not a service in this stack. OnTrak Lab (ontrak-lab/) is its own
 deployment on its own host, and it publishes exactly one port: its own nginx, which
