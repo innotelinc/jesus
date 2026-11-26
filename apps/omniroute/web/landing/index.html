@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-scheme="operations">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,8 +9,18 @@
   <meta property="og:description" content="One OpenAI-compatible endpoint in front of every model provider.">
   <meta property="og:type" content="website">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle' fill='%2322d3ee'%3EO%3C/text%3E%3C/svg%3E">
-  <style>
-    :root { color-scheme: dark; --bg:#0b0d10; --panel:#12151a; --line:#262c35; --text:#f4f7fb; --muted:#a8b2bf; --accent:#22d3ee; }
+  <link rel="stylesheet" href="unity-theme.css">
+  <script>window.UNITY_DEFAULT_SCHEME = "operations";</script>
+  <script src="unity-theme.js"></script>
+  <style>:root {
+      --bg: var(--canvas);
+      --panel: var(--surface);
+      --text: var(--ink);
+      --muted: var(--ink-faint);
+      --accent: var(--brand);
+    }
+
+    
     * { box-sizing:border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; line-height:1.6; }
     a { color:var(--accent); text-decoration:none; }
@@ -26,7 +36,7 @@
     .lede { font-size:1.1rem; color:var(--muted); max-width:640px; margin:0 0 28px; }
     .cta { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:34px; }
     .btn { border:1px solid var(--line); border-radius:9px; padding:10px 18px; color:var(--text); font-size:14px; }
-    .btn.primary { background:var(--accent); border-color:var(--accent); color:#0a0e13; font-weight:600; }
+    .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--brand-ink); font-weight:600; }
     pre { background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:14px 16px; overflow-x:auto; font:13px/1.5 "JetBrains Mono",ui-monospace,monospace; color:var(--muted); }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin:44px 0 8px; }
     .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; }
@@ -44,6 +54,7 @@
         <a href="https://github.com/innotelinc/omniroute">GitHub</a>
         <a href="https://github.com/innotelinc/omniroute#readme">Docs</a>
       </nav>
+        <div class="ot-theme" role="group" aria-label="Colour theme" data-unity-switch><button type="button" data-theme-mode="system" aria-pressed="false">System</button><button type="button" data-theme-mode="light" aria-pressed="false">Light</button><button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button></div>
     </header>
     <main>
       <p class="kicker">CodeOps · self-hosted</p>
@@ -71,5 +82,13 @@
     </main>
     <footer>Part of the <a href="https://github.com/innotelinc/innotel-platform-stack">Innotel Platform Stack</a>. © 2026 Innotel Inc.</footer>
   </div>
+  <script>(function(){
+  var api=window.UnityTheme||window.OntrakTheme;if(!api)return;
+  function paint(){var now=api.mode();var all=document.querySelectorAll('[data-theme-mode]');
+    for(var i=0;i<all.length;i++){all[i].setAttribute('aria-pressed',String(all[i].getAttribute('data-theme-mode')===now));}}
+  var buttons=document.querySelectorAll('[data-theme-mode]');
+  for(var i=0;i<buttons.length;i++){buttons[i].addEventListener('click',function(){api.setMode(this.getAttribute('data-theme-mode'));});}
+  window.addEventListener('unity:theme',paint);window.addEventListener('ontrak:theme',paint);paint();
+})();</script>
 </body>
 </html>

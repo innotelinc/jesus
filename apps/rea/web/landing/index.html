@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-scheme="operations">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -18,16 +18,18 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0d10'/%3E%3Ctext x='32' y='44' font-size='32' text-anchor='middle' fill='%23f4c430'%3ER%3C/text%3E%3C/svg%3E"
     />
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #0b0d10;
-        --panel: #12151a;
-        --line: #262c35;
-        --text: #f4f7fb;
-        --muted: #a8b2bf;
-        --accent: #f4c430;
-      }
+    <link rel="stylesheet" href="unity-theme.css">
+  <script>window.UNITY_DEFAULT_SCHEME = "operations";</script>
+  <script src="unity-theme.js"></script>
+  <style>:root {
+      --bg: var(--canvas);
+      --panel: var(--surface);
+      --text: var(--ink);
+      --muted: var(--ink-faint);
+      --accent: var(--brand);
+    }
+
+      
       * {
         box-sizing: border-box;
       }
@@ -113,7 +115,7 @@
       .btn.primary {
         background: var(--accent);
         border-color: var(--accent);
-        color: #0a0e13;
+        color: var(--brand-ink);
         font-weight: 600;
       }
       pre {
@@ -167,6 +169,7 @@
           <a href="https://github.com/innotelinc/rea">GitHub</a>
           <a href="https://github.com/innotelinc/rea#readme">Docs</a>
         </nav>
+        <div class="ot-theme" role="group" aria-label="Colour theme" data-unity-switch><button type="button" data-theme-mode="system" aria-pressed="false">System</button><button type="button" data-theme-mode="light" aria-pressed="false">Light</button><button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button></div>
       </header>
       <main>
         <p class="kicker">SecurityOps · self-hosted</p>
@@ -224,5 +227,13 @@
         >. © 2026 Innotel Inc.
       </footer>
     </div>
-  </body>
+    <script>(function(){
+  var api=window.UnityTheme||window.OntrakTheme;if(!api)return;
+  function paint(){var now=api.mode();var all=document.querySelectorAll('[data-theme-mode]');
+    for(var i=0;i<all.length;i++){all[i].setAttribute('aria-pressed',String(all[i].getAttribute('data-theme-mode')===now));}}
+  var buttons=document.querySelectorAll('[data-theme-mode]');
+  for(var i=0;i<buttons.length;i++){buttons[i].addEventListener('click',function(){api.setMode(this.getAttribute('data-theme-mode'));});}
+  window.addEventListener('unity:theme',paint);window.addEventListener('ontrak:theme',paint);paint();
+})();</script>
+</body>
 </html>
